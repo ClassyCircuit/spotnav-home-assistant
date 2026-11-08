@@ -62,9 +62,14 @@ def profile_for(periods: tuple[tuple[datetime, datetime], ...], amps: int, now: 
         start, end = _utc(start), _utc(end)
         if start <= requested_at or start <= previous_end or end <= start or end - now > MAX_HORIZON:
             raise ScheduleRefused("invalid_plan")
+        # OCPP offsets are whole seconds: never start before or end after a displayed window.
+        start_offset = math.ceil((start - now).total_seconds())
+        end_offset = math.floor((end - now).total_seconds())
+        if end_offset <= start_offset:
+            raise ScheduleRefused("invalid_plan")
         transitions.extend((
-            {"startPeriod": int((start - now).total_seconds()), "limit": amps},
-            {"startPeriod": int((end - now).total_seconds()), "limit": 0},
+            {"startPeriod": start_offset, "limit": amps},
+            {"startPeriod": end_offset, "limit": 0},
         ))
         previous_end = end
     if len(transitions) > MAX_PERIODS or len({p["startPeriod"] for p in transitions}) != len(transitions):
@@ -333,11 +338,11 @@ def _proposed_profile(hass: HomeAssistant, entry_id: str, now: datetime) -> dict
     snapshot = planner.snapshot() if planner is not None else None
     proposal = snapshot.proposal if snapshot is not None and snapshot.in_process else None
     if (proposal is None or snapshot.settings_revision != settings.revision
-            or not proposal.has_plan or proposal.unpriced or not proposal.periods):
+            or not proposal.has_plan or proposal.unpriced or not proposal.shown_periods):
         raise ScheduleRefused("no_current_plan")
-    if proposal.shown_periods != proposal.periods:
-        raise ScheduleRefused("target_stop_unsupported")
-    return profile_for(tuple(proposal.periods), settings.amps, now)
+    # The stored profile is a fixed-time snapshot of exactly what the card shows,
+    # including the estimated shorter final block. It does not implement feedback-based energy stopping.
+    return profile_for(tuple(proposal.shown_periods), settings.amps, now)
 
 
 def _preview_id(profile: dict[str, Any], revision: Any) -> str:

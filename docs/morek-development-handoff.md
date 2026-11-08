@@ -10,13 +10,14 @@ Re-check the live system and Git state before acting; observations below may bec
   `https://github.com/ClassyCircuit/spotnav-home-assistant.git`.
 - Fork display name: **SpotNav Enhanced**, from `hacs.json` and the integration manifest.
   Its HA domain stays `spotnav` to preserve existing integration entries and card identities.
-- Source version for this handoff: **2.5.6** adds bounded, upload-owned readback
+- Source version for this handoff: **2.5.7** sends displayed plan windows, including
+  a shortened final block, as a fixed-time schedule. **2.5.6** added bounded, upload-owned readback
   verification and explicit coverage/timing-drift diagnostics. **2.5.5** added selective cleanup of test profile
   `42001`, with explicit confirmation, persisted outcome and a fresh readback.
   Version 2.5.3 added the Morek
   preview and layout fix (commit `ef483315`); 2.5.4 explicitly enables text
   selection in the card and Morek panel, preserving nonselection on the graph.
-  Check Git and the installed manifest before assuming 2.5.6 is installed in HA.
+  Check Git and the installed manifest before assuming 2.5.7 is installed in HA.
   Marketplace installs this fork from the default branch; it shows commit hashes rather
   than `vX.Y.Z` because the fork has no GitHub Releases. Do not reintroduce
   `zip_release: true` into `hacs.json` while installing from `main`: Marketplace tried
@@ -24,7 +25,7 @@ Re-check the live system and Git state before acting; observations below may bec
   `.github/workflows/release-zip.yml` does not make every push a release.
 - **Deployment drift observed:** the first read-only SMB check on 2026-11-08 found
   HA at **2.5.1**. A later check after the user's screenshot found **2.5.3**
-  installed; source is **2.5.6**. Recheck before assuming the latest version is
+  installed; source is **2.5.7**. Recheck before assuming the latest version is
   installed. The user has seen the 2.5.3 preview/readback on HA.
   Do not assume a Git push has installed or restarted the integration on HA.
 
@@ -83,8 +84,10 @@ Re-check the live system and Git state before acting; observations below may bec
   the physical-station check.
 - Send is intentionally manual. SpotNav Auto must be paused **Until I resume**;
   plan current must be 16 A, with 1–3 nonoverlapping future blocks within 48 hours,
-  matching the current settings revision. Unpriced plans and plans that depend on
-  stopping early at an energy target are refused. The OCPP 1.6 `TxDefaultProfile`
+  matching the current settings revision. Unpriced plans are refused. From 2.5.7,
+  `proposal.shown_periods` supplies the displayed, energy-estimated shortened end
+  as a fixed stop time; prior versions refused it with `target_stop_unsupported`.
+  No feedback-based energy stop is promised by this stored schedule. The OCPP 1.6 `TxDefaultProfile`
   uses profile ID `42001`, stack level 1, an absolute schedule and up to seven
   0/16 A transitions with a final **persistent 0 A** period. No automatic uploads
   or authorization of a new charging transaction are implemented. Version 2.5.5
@@ -192,6 +195,24 @@ Re-check the live system and Git state before acting; observations below may bec
   Do not assume `GetCompositeSchedule` lists stored profiles.
 
 ## Tests, build, and next steps
+
+### 2.5.7 displayed-window Send fix
+
+- After updating to 2.5.6, the user removed the old schedule and found Send disabled.
+  Read-only `status` showed removal Accepted, but current preview reason
+  `target_stop_unsupported`. This was the old shortened-final-block guard, **not**
+  removal locking Send. The user requested fixing it; no live send/clear is part
+  of implementing this change.
+- `_proposed_profile`, shared by preview and Send, now converts **shown_periods**
+  instead of the whole-slot **periods**. Shorter final blocks are accepted. All
+  existing identity/current/pause/revision/future/horizon/block-count safeguards
+  and the preview fingerprint remain. Changing only a shown end invalidates the
+  old fingerprint. No silent fallback to whole-slot ends is allowed.
+- Wire offsets are integers. Fractional start timestamps round up and ends down
+  by less than one second; windows that disappear under rounding are refused.
+  The UI explicitly says the sent schedule uses fixed start/stop times and will
+  not adjust itself according to measured energy. Old-backend refusal messages
+  now say to update rather than implying shortened windows cannot be sent.
 
 ### 2.5.6 code changes after the wire-trace investigation
 
@@ -345,6 +366,13 @@ Re-check the live system and Git state before acting; observations below may bec
   cleanup cancellation, unload including an in-flight read, and restart state.
   The isolated Python runner is not the full HA pytest suite. The new timer
   lifecycle has not yet been installed or hardware-tested on HA.
+- For 2.5.7 displayed windows: **2,342 frontend tests** and **29 isolated Python
+  cases** passed; type-check, build, check-dist, Ruff and Python compilation passed.
+  Tests cover a real Send of two shown blocks with a shortened fractional-second
+  end, preview/Send agreement, stale fingerprint refusal after changing that end,
+  inward rounding, and retained unpriced/stale/empty/past/too-many-block safeguards.
+  Full HA pytest remains unrun on Windows; the new conversion is not yet deployed
+  or hardware-tested. No live schedule was sent or removed during this change.
 - Tests: `tests/test_morek_schedule.py` and `frontend/test/morek-view.test.ts`.
   Run the Python tests on Linux/Python 3.14 with project test dependencies, and
   add integration tests for alias resolution, WebSocket access and OCPP responses.

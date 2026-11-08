@@ -11,9 +11,11 @@ does not start another OCPP server. Only an administrator can send, fetch, or re
    controller is sending start/stop or current-limit commands. Do not disable
    household load protection for this test.
 2. Set SpotNav's plan current to **16 A** and charge periods to **3** or fewer. Choose a plan whose first
-   charging window is still in the future, within the next 48 hours. A plan
-   that stops early after reaching an energy target cannot be sent: a stored
-   charger schedule cannot perform that target-based stop.
+   charging window is still in the future, within the next 48 hours. From 2.5.7,
+   the sent schedule uses the **displayed windows**, including an estimated
+   shorter final block. Morek follows those fixed times; it does not adjust the
+   stop based on actual energy delivered. OCPP uses whole seconds: any fractional
+   start is rounded up and fractional end down, never extending a window.
 3. Pause SpotNav Auto **Until I resume**. The Send button refuses to run without
    this pause, because SpotNav's usual timer-based control is still present.
    Open **Morek schedule details** to see **Preview — calculated, NOT sent**.
@@ -30,7 +32,7 @@ does not start another OCPP server. Only an administrator can send, fetch, or re
    effective current limits reported by `GetCompositeSchedule`, not a list of
    installed profile IDs. Compare them with the Sent rows; **NOT verified**
    means they differ or the read failed. Watch actual charger measurements at
-    the transitions as a separate check.
+   the transitions as a separate check.
 
 ### Readback verification (2.5.6+)
 

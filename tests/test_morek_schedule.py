@@ -132,7 +132,18 @@ def test_preview_reuses_send_calculation_without_contacting_station(monkeypatch)
     assert paused["reason"] == "pause_auto_first"
     settings.pause.choice = "until_resumed"
     proposal.shown_periods = ((periods[0][0], periods[0][0] + timedelta(minutes=15)),)
-    assert morek_schedule._preview(hass, "charger", target)["reason"] == "target_stop_unsupported"
+    shortened = morek_schedule._preview(hass, "charger", target)
+    assert shortened["reason"] is None
+    assert shortened["profile"]["chargingSchedule"]["chargingSchedulePeriod"][-1] == {
+        "startPeriod": 4500, "limit": 0, "numberPhases": 3}
+    assert shortened["preview_id"] != preview["preview_id"]
+
+
+def test_fractional_windows_round_inwards_never_extending_charging():
+    profile = profile_for(((NOW + timedelta(seconds=3600.2), NOW + timedelta(seconds=4500.8)),), 16, NOW)
+    assert [p["startPeriod"] for p in profile["chargingSchedule"]["chargingSchedulePeriod"]] == [0, 3601, 4500]
+    with pytest.raises(ScheduleRefused, match="invalid_plan"):
+        profile_for(((NOW + timedelta(seconds=3600.2), NOW + timedelta(seconds=3600.8)),), 16, NOW)
 
 
 @pytest.mark.asyncio
@@ -227,12 +238,13 @@ def _send_harness(monkeypatch, read_results):
     data = {}
     store = SimpleNamespace(async_save=AsyncMock())
     target = SimpleNamespace(connector_id=1)
-    callbacks, cancelled, delays, calls, unload = [], [], [], [], []
+    callbacks, cancelled, delays, calls, unload, requests = [], [], [], [], [], []
     clock = [NOW]
     results = deque(read_results)
 
     async def station_call(request):
         calls.append(request.action)
+        requests.append(request)
         if request.action != "fetch":
             return SimpleNamespace(status="Accepted")
         result = results.popleft() if results else "mismatch"
@@ -275,8 +287,57 @@ def _send_harness(monkeypatch, read_results):
         GetCompositeSchedule=lambda **kw: SimpleNamespace(action="fetch", payload=kw)))
     monkeypatch.setitem(sys.modules, "ocpp.v16", protocol)
     return SimpleNamespace(hass=hass, data=data, callbacks=callbacks, cancelled=cancelled,
-                           delays=delays, calls=calls, unload=unload, clock=clock,
+                           delays=delays, calls=calls, unload=unload, clock=clock, requests=requests,
                            preview_id=morek_schedule._preview_id(profile, 4))
+
+
+@pytest.mark.asyncio
+async def test_send_uses_displayed_shortened_blocks_not_whole_slot_ends(monkeypatch):
+    real_proposed_profile = morek_schedule._proposed_profile
+    h = _send_harness(monkeypatch, ["mismatch"])
+    whole = ((NOW + timedelta(hours=1), NOW + timedelta(hours=2)),
+             (NOW + timedelta(hours=4), NOW + timedelta(hours=5)))
+    shown = (whole[0], (whole[1][0], NOW + timedelta(hours=4, minutes=17, seconds=12.8)))
+    proposal = SimpleNamespace(has_plan=True, unpriced=False, periods=whole, shown_periods=shown)
+    snapshot = SimpleNamespace(in_process=True, proposal=proposal, settings_revision=4)
+    settings = SimpleNamespace(amps=16, revision=4, pause=SimpleNamespace(choice="until_resumed"))
+    monkeypatch.setattr(morek_schedule, "_proposed_profile", real_proposed_profile)
+    monkeypatch.setattr(morek_schedule, "preview_for", lambda hass, entry: SimpleNamespace(snapshot=lambda: snapshot))
+    monkeypatch.setattr(morek_schedule, "domain_data", lambda hass: SimpleNamespace(
+        auto_store=SimpleNamespace(settings=lambda entry: settings)))
+    preview = morek_schedule._preview(h.hass, "charger", None)
+    assert preview["reason"] is None
+    result = await morek_schedule.async_schedule_action(h.hass, "charger", "send", preview["preview_id"])
+    sent = h.requests[0].payload["cs_charging_profiles"]
+    assert sent == preview["profile"] == result["sent"]
+    assert [p["startPeriod"] for p in sent["chargingSchedule"]["chargingSchedulePeriod"]] == [
+        0, 3600, 7200, 14400, 15432]
+    assert [p["limit"] for p in sent["chargingSchedule"]["chargingSchedulePeriod"]] == [0, 16, 0, 16, 0]
+    # Changing only the shown end invalidates a preview; no second upload is permitted.
+    proposal.shown_periods = (whole[0], (whole[1][0], NOW + timedelta(hours=4, minutes=20)))
+    with pytest.raises(ScheduleRefused, match="preview_changed"):
+        await morek_schedule.async_schedule_action(h.hass, "charger", "send", preview["preview_id"])
+    assert h.calls.count("send") == 1
+
+
+@pytest.mark.parametrize("case", ["unpriced", "stale", "empty", "past", "too_many"])
+def test_shortened_windows_keep_existing_eligibility_guards(monkeypatch, case):
+    periods = ((NOW + timedelta(hours=1), NOW + timedelta(hours=2)),)
+    shown = ((periods[0][0], periods[0][0] + timedelta(minutes=15)),)
+    proposal = SimpleNamespace(has_plan=True, unpriced=case == "unpriced", periods=periods, shown_periods=shown)
+    snapshot = SimpleNamespace(in_process=True, proposal=proposal, settings_revision=3 if case == "stale" else 4)
+    if case == "empty":
+        proposal.shown_periods = ()
+    elif case == "past":
+        proposal.shown_periods = ((NOW - timedelta(minutes=5), NOW + timedelta(minutes=15)),)
+    elif case == "too_many":
+        proposal.shown_periods = tuple((shown[0][0] + timedelta(hours=i * 2), shown[0][1] + timedelta(hours=i * 2))
+                                      for i in range(4))
+    monkeypatch.setattr(morek_schedule, "domain_data", lambda h: SimpleNamespace(
+        auto_store=SimpleNamespace(settings=lambda e: SimpleNamespace(amps=16, revision=4))))
+    monkeypatch.setattr(morek_schedule, "preview_for", lambda h, e: SimpleNamespace(snapshot=lambda: snapshot))
+    with pytest.raises(ScheduleRefused):
+        morek_schedule._proposed_profile(None, "charger", NOW)
 
 
 @pytest.mark.asyncio

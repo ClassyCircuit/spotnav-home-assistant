@@ -23,6 +23,12 @@ const state = {
 };
 
 describe("Morek manual test panel", () => {
+  it("explains that shortened plan windows are sent as fixed times, not live energy control", () => {
+    const panel = morekPanel(document, state, true, false, null, vi.fn());
+    expect(panel.textContent).toContain("fixed start/stop times from the displayed plan");
+    expect(panel.textContent).toContain("will not adjust them based on actual energy delivered");
+    expect(Array.from(panel.querySelectorAll("button")).find((button) => button.textContent === "Send current plan")?.disabled).toBe(false);
+  });
   it("distinguishes delayed verification from a confirmed or silently applied schedule", () => {
     const act = vi.fn();
     const panel = morekPanel(document, { ...state, verification: {

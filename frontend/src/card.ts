@@ -2624,7 +2624,7 @@ export class SpotnavCard extends HTMLElement {
           : code === "spotnav_morek_current_must_be_16"
             ? "This test requires the plan current to be set to 16 A; nothing was sent."
           : code === "spotnav_morek_target_stop_unsupported"
-            ? "This plan stops early at its energy target. A stored charger schedule cannot do that; nothing was sent."
+             ? "This HA backend cannot send shortened charging windows yet. Update the integration; nothing was sent."
           : code === "spotnav_morek_upload_not_confirmed"
             ? "The upload was rejected or timed out. Fetch Morek's schedule to see what is active."
             : code === "spotnav_morek_preview_changed"

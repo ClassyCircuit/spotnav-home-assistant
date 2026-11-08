@@ -85,7 +85,7 @@ const PREVIEW_REFUSALS: Record<string, string> = {
   pause_auto_first: "Pause Auto 'Until I resume' before sending.",
   current_must_be_16: "Set the plan current to 16 A to preview this test.",
   no_current_plan: "No current, priced plan matches the saved settings.",
-  target_stop_unsupported: "This plan stops at its energy target; a stored charger schedule cannot do that.",
+  target_stop_unsupported: "This HA backend cannot send shortened charging windows yet. Update the integration.",
   too_many_blocks: "This test supports at most three charging windows.",
   invalid_plan: "The charging windows must be future, ordered, and within 48 hours.",
   morek_offline: "Morek is not connected through HA OCPP.",
@@ -136,7 +136,7 @@ export function morekPanel(
   if (state.preview?.profile) {
     section.append(transitions(doc, state.preview.profile));
     const endNote = doc.createElement("p");
-    endNote.textContent = "The final 0 A limit remains installed after the last window until explicitly cleared.";
+    endNote.textContent = "These are fixed start/stop times from the displayed plan, including its estimated final stop. Morek will not adjust them based on actual energy delivered. The final 0 A limit remains installed after the last window until explicitly cleared.";
     section.append(endNote);
   }
   if (state.preview?.reason) {
