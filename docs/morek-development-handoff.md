@@ -19,10 +19,10 @@ Re-check the live system and Git state before acting; observations below may bec
   `zip_release: true` into `hacs.json` while installing from `main`: Marketplace tried
   `/releases/download/main/spotnav.zip` and received HTTP 404. The existing optional
   `.github/workflows/release-zip.yml` does not make every push a release.
-- **Deployment drift observed:** the read-only SMB check on 2026-11-08 found the HA share's
-  `custom_components/spotnav/manifest.json` at **2.5.1**, while the fork was **2.5.2**.
-  Source is now 2.5.4; update via Marketplace and recheck before evaluating the
-  alias diagnostics, preview, or layout fix.
+- **Deployment drift observed:** the first read-only SMB check on 2026-11-08 found
+  HA at **2.5.1**. A later check after the user's screenshot found **2.5.3**
+  installed; source is **2.5.4**. Recheck before assuming the latest version is
+  installed. The user has seen the 2.5.3 preview/readback on HA.
   Do not assume a Git push has installed or restarted the integration on HA.
 
 ## Local Home Assistant access: verified facts and limits
@@ -32,17 +32,23 @@ Re-check the live system and Git state before acting; observations below may bec
   `\\HOMEASSISTANT\` did not pass a `Test-Path` check; use the `config` share. **Write
   permissions were not tested.** Do not change live files without the user's explicit request.
 - An environment variable named `homeassistant` exists in the current shell and has a
-  token-like shape. The user believes it contains HA API authentication material, but
-  **its meaning and validity are unverified**. Never print, persist, commit, or transmit
-  its value to an unconfirmed host. A long-lived token would normally use a Bearer header;
-  a login password is *not* an API Bearer token.
-- `HOMEASSISTANT` resolved as a host, but a read-only attempt to reach
-  `http://HOMEASSISTANT:8123/api/config` could not establish a connection, and a direct
-  `curl` attempt to `http://HOMEASSISTANT:8123/api/` was also refused. There was **no
-  authentication verdict** and no confirmed API base URL. SMB access does not establish
-  the address, protocol or port of HA's API. Ask the user for the URL they use in a
-  browser before trying another API address; verify the destination and use only read-only
-  calls (for example `GET /api/`) first. Do not publish the user's URL if private.
+  token-like shape. The user originally did not know whether it was a password or API
+  token; the later authenticated `GET /api/` confirmed it works as a Bearer token
+  for the user-supplied HA URL. Never print, persist, commit, or transmit its
+  value to an unconfirmed host.
+- `HOMEASSISTANT:8123` refused HTTP earlier; SMB access did not establish the API URL.
+  The user subsequently provided `http://homeassistant.local/` (local port 80).
+  On 2026-11-08, unauthenticated `GET /api/` returned 401; with the `homeassistant`
+  environment variable as a Bearer token it returned HA's `API running.` message
+  and HTTP 200. **The token value was not printed or saved.** Check the destination
+  before any future credentialed request; do not follow redirects with credentials.
+- The old `GET /api/error_log` returns 404 on this HA. Authenticated admin
+  WebSocket `system_log/list` returned retained warnings/errors; authenticated
+  read-only `GET /api/hassio/core/logs?lines=1000` returned the Supervisor's
+  recent raw Core log. Both surfaces can contain private data: filter in memory
+  and print only needed timestamps, logger names and stable diagnoses; never
+  paste/export raw logs. The SMB `config` share still had only a zero-byte
+  `home-assistant.log.fault`; the `share` share had no log export.
 - Safe share version check, without reading credentials:
 
   ```powershell
@@ -100,14 +106,14 @@ Re-check the live system and Git state before acting; observations below may bec
   refuses the upload. The 0 A start time still moves with the clock. The panel separates proposed,
   last Sent, and effective schedules, and disables Send if preview is missing or
   blocked. The ordinary Plan settings popup is **not** an OCPP profile preview.
-  A manual **Recalculate preview** sends only `status`. No hardware test yet.
+  A manual **Recalculate preview** sends only `status`; a user hardware test is
+  described below.
 - `frontend/src/card-fill.ts` and `frontend/src/card-view.ts` subtract the Morek
   opener and expanded panel from the host's available chart height, rather than
   making the chart fill the added panel height. Regression coverage lives in
   `frontend/test/card-fill.test.ts`. Verify visually in HA after installation.
-- The latest user-reported HA experience before 2.5.2 was an unstyled text button
-  that disappeared after reporting the station unsupported. That was observed with
-  2.5.1 and motivated `d8454555`; **the user has not yet confirmed the fix on HA**.
+- The user observed an unstyled button that disappeared on 2.5.1; `d8454555`
+  addressed it, and the later 2.5.3 screenshot shows the styled panel and preview.
 
 ## Safety and outstanding decisions
 
@@ -137,16 +143,25 @@ Re-check the live system and Git state before acting; observations below may bec
   verification is false. `Accepted` confirms an OCPP response, **not** that the
   submitted limits are the effective ones or that the car actually draws 16 A.
   The station's profile inventory and measured charging were not verified.
-- At that check, the config SMB share contained no usable `home-assistant.log`
-  (only an empty `.fault` file), and no HA API URL was verified. No OCPP wire
-  trace or Home Assistant supervisor/container logs were available from SMB.
-  Installed HA OCPP 0.12.3 can create its own `TxProfile` for active transactions
+- Subsequent authenticated, read-only API log inspection on 2026-11-08 found
+  **no logged `SetChargingProfile`/`GetCompositeSchedule` payload** and no SpotNav
+  or OCPP error at the upload time in the recent raw Core log. The retained OCPP
+  warning at 16:18 local (source `ocppv16.py:760`) was **"Force Smart Charging
+  feature profile"**, reflecting a configured force option, not proof of
+  charger's advertised capabilities. Multiple `homeassistant.loader` warnings
+  at 16:17–16:18 indicate HA integration initialization between the 16:12
+  upload and 16:19 readback; this could reflect an HA restart, but does not
+  prove whether Morek retained or applied a profile across the reconnect.
+  A **single read-only Morek `fetch` at 16:31** returned Accepted with one
+  effective 16 A period again; `verified` remains false. No profile was sent,
+  cleared, or modified by this investigation. Installed HA OCPP 0.12.3 can
+  create its own `TxProfile` for active transactions
   and `TxDefaultProfile` for future ones (`custom_components/ocpp/ocppv16.py`);
   competition is **one possible** explanation, not a confirmed diagnosis.
   Avoid another send, generic clear, or resuming a competing controller until
-  existing profiles and measured current can be investigated safely. Ask for
-  the user's HA browser URL to check API reachability, or consult HA Settings >
-  System > Logs. Do not assume `GetCompositeSchedule` lists stored profiles.
+  existing profiles and measured current can be investigated safely. Consult
+  HA Settings > System > Logs for additional historical startup logs if needed.
+  Do not assume `GetCompositeSchedule` lists stored profiles.
 
 ## Tests, build, and next steps
 
@@ -171,8 +186,9 @@ Re-check the live system and Git state before acting; observations below may bec
   integration files. This procedure is **not yet verified on this HA install**.
 - Backend changes such as the preview WebSocket response **cannot** be tested
   merely by replacing the JS bundle: the HA integration code must be installed
-  and loaded, normally via Marketplace + restart. The current HA share was
-  observed at 2.5.1; its old backend will not provide the preview field.
+  and loaded, normally via Marketplace + restart. The 2.5.3 backend was confirmed
+  installed at the time of the first user-initiated send; check the installed
+  manifest rather than relying on this historical observation.
 - Alternative fully local UI loop: exercise the DOM/tests with canned WebSocket
   responses; it is quicker but not an actual HA visual verification. Never
   point a dev server at the HA authentication token or expose the share as a
@@ -193,11 +209,12 @@ Re-check the live system and Git state before acting; observations below may bec
 - Tests: `tests/test_morek_schedule.py` and `frontend/test/morek-view.test.ts`.
   Run the Python tests on Linux/Python 3.14 with project test dependencies, and
   add integration tests for alias resolution, WebSocket access and OCPP responses.
-- On the next HA check: confirm the **installed** manifest is 2.5.2, restart HA
-  after updating, refresh the browser, open the Morek details panel and capture
-  configured ID, resolved ID, connector, and any refusal. If identified, use
-  **Refresh from Morek** only, which does not install a profile. Compare later
-  sent vs effective schedules and actual current during an authorized session.
+- On the next HA check: confirm the **installed** manifest version. Before any
+  further send, determine whether HA restarted around 16:17 on 2026-11-08,
+  whether another controller has an active profile, whether the station retained
+  profile ID `42001`, and whether measured charging differs from the effective
+  16 A limit. Refreshing from Morek does not install a profile; generic clear
+  may remove other controllers' limits, so do not use it as cleanup.
 - When modifying the card, bump the manifest version, run `npm run build` from
   `frontend/`, and commit the built bundle in `custom_components/spotnav/www/`.
   A push to `main` is not an HA deployment: Marketplace checks custom forks on
