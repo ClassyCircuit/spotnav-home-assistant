@@ -21,6 +21,7 @@ from homeassistant.helpers.start import async_at_started
 from homeassistant.util import dt as dt_util
 
 from .api.dashboard import async_setup_dashboard_api
+from .api.morek_schedule import async_setup_morek_schedule_api
 from .api.blueprints import async_setup_blueprints_api
 from .api.debug import async_setup_debug_api
 from .blueprint_install import async_install_blueprints
@@ -177,6 +178,7 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     await data.session_store.async_load()
     async_register_services(hass)
     async_setup_dashboard_api(hass)
+    async_setup_morek_schedule_api(hass)
     async_setup_sessions_api(hass)
     async_setup_market_api(hass)
     async_setup_region_api(hass)

@@ -87,6 +87,20 @@ export async function getDashboard(
   });
 }
 
+/** Experimental Morek controls; separate from SpotNav's normal charging actions. */
+export async function morekSchedule(
+  hass: HomeAssistantLike,
+  chargerId: string,
+  action: "status" | "send" | "fetch",
+): Promise<unknown> {
+  return await call<unknown>(hass, {
+    type: "spotnav/morek_schedule",
+    api_version: 1,
+    charger_id: chargerId,
+    action,
+  });
+}
+
 /**
  * The action request is `{type, api_version, charger_id, action}` plus one `choice` only for Stop;
  * the field is added only where the contract allows it.

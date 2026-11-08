@@ -45,6 +45,7 @@ import {
   getSettings,
   identifyVehicle,
   listChargers,
+  morekSchedule,
   performAction,
   previewPlan,
   setVehicleSoc,
@@ -61,6 +62,7 @@ import {
   setEntsoeKey,
   updateVehicle,
 } from "./api";
+import { decodeMorekState, morekPanel, type MorekState } from "./morek-view";
 import {
   brandMark,
   createCardView,
@@ -336,6 +338,12 @@ export class SpotnavCard extends HTMLElement {
   /** The reader's language from `hass`, which `language` follows once it can. */
   private wantedLanguage: Language | null = null;
   private view: CardView | null = null;
+  private morekState: MorekState | null = null;
+  private morekEnabled = false;
+  private morekOperation = 0;
+  private morekBusy = false;
+  private morekError: string | null = null;
+  private morekExpanded = false;
   private actionInFlight: { generation: number; attempt: number; action: ActionId } | null = null;
   private editor: SettingsEditorState | null = null;
   /** The Plan dialog's live preview, bound to the editor it was asked for (`plan-preview.ts`). */
@@ -433,6 +441,12 @@ export class SpotnavCard extends HTMLElement {
     this.actionInFlight = null;
     this.sentAction = null;
     this.shownAutomatic = null;
+    this.morekState = null;
+    this.morekEnabled = false;
+    this.morekBusy = false;
+    this.morekError = null;
+    this.morekExpanded = false;
+    this.morekOperation += 1;
     this.deferredRefresh = false;
     this.marketEditor = null;
     this.entityConfig = null;
@@ -2590,6 +2604,44 @@ export class SpotnavCard extends HTMLElement {
     return await getDashboard(hass, charger, API_VERSION);
   }
 
+  private async morekAction(action: "status" | "send" | "fetch"): Promise<void> {
+    const hass = this.hassObject;
+    const charger = this.config?.charger;
+    if (!this.connected || !this.isAdmin || hass === null || !charger || this.morekBusy) return;
+    const generation = this.generation;
+    const operation = ++this.morekOperation;
+    this.morekBusy = true;
+    this.morekError = null;
+    this.render();
+    try {
+      const result = decodeMorekState(await morekSchedule(hass, charger, action));
+      if (operation === this.morekOperation) this.morekState = result;
+    } catch (error) {
+      if (operation !== this.morekOperation) return;
+      const code = error instanceof SpotnavApiError ? error.code : null;
+      this.morekError = code === "spotnav_morek_pause_auto_first"
+        ? "Pause Auto until resumed before sending."
+        : code === "spotnav_morek_too_many_blocks"
+          ? "This plan has more than three charging blocks. Choose fewer charge periods."
+          : code === "spotnav_morek_current_must_be_16"
+            ? "This test requires the plan current to be set to 16 A; nothing was sent."
+          : code === "spotnav_morek_target_stop_unsupported"
+            ? "This plan stops early at its energy target. A stored charger schedule cannot do that; nothing was sent."
+          : code === "spotnav_morek_upload_not_confirmed"
+            ? "The upload was rejected or timed out. Fetch Morek's schedule to see what is active."
+            : code ?? "Could not reach the charger.";
+      try {
+        const result = decodeMorekState(await morekSchedule(hass, charger, "status"));
+        if (operation === this.morekOperation) this.morekState = result;
+      } catch { /* Keep the last known result; do not claim the upload worked. */ }
+    } finally {
+      if (operation === this.morekOperation) this.morekBusy = false;
+      if (this.connected && operation === this.morekOperation && generation === this.generation && charger === this.config?.charger) {
+        this.render();
+      }
+    }
+  }
+
   private async load(
     hass: HomeAssistantLike,
     charger: string,
@@ -2604,6 +2656,14 @@ export class SpotnavCard extends HTMLElement {
       const answer: unknown = await this.readDashboard(hass, charger);
       const decoded = decodeDashboard(answer);
       next = decoded.ok ? { kind: "ready", dashboard: decoded.value } : { kind: decoded.failure };
+      if (next.kind === "ready" && this.morekEnabled) {
+        try {
+          const morek = decodeMorekState(await morekSchedule(hass, charger, "status"));
+          if (this.accepts(charger, generation, attempt)) this.morekState = morek;
+        } catch {
+          if (this.accepts(charger, generation, attempt)) this.morekState = null;
+        }
+      }
     } catch (error) {
       code = error instanceof SpotnavApiError ? error.code : null;
       next = this.stateFromError(error);
@@ -3007,6 +3067,35 @@ export class SpotnavCard extends HTMLElement {
       if (this.reopenOverview && this.confirmingReturn === 0) {
         this.reopenOverview = false;
         this.view.openSettingsOverview();
+      }
+      if (!this.morekEnabled && this.isAdmin) {
+        const open = doc.createElement("button");
+        open.type = "button";
+        open.textContent = "Morek schedule details";
+        open.addEventListener("click", () => {
+          this.morekEnabled = true;
+          this.morekExpanded = true;
+          void this.morekAction("status");
+        });
+        host.append(open);
+      } else if (this.morekEnabled && this.morekState?.supported) {
+        const panel = morekPanel(doc, this.morekState, this.isAdmin, this.morekBusy, this.morekError,
+          (action) => { void this.morekAction(action); });
+        (panel as HTMLDetailsElement).open = this.morekExpanded;
+        panel.addEventListener("toggle", () => { this.morekExpanded = (panel as HTMLDetailsElement).open; });
+        host.append(panel);
+      } else if (this.morekEnabled && this.morekBusy) {
+        const loading = doc.createElement("p");
+        loading.textContent = "Loading Morek schedule…";
+        host.append(loading);
+      } else if (this.morekEnabled && this.morekState?.supported === false) {
+        const unsupported = doc.createElement("p");
+        unsupported.textContent = "This test is only available for Morek station 3020002509120029, connector 1.";
+        host.append(unsupported);
+      } else if (this.morekEnabled && this.morekError !== null) {
+        const error = doc.createElement("p");
+        error.textContent = `Morek schedule: ${this.morekError}`;
+        host.append(error);
       }
       return;
     }
