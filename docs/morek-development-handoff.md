@@ -10,10 +10,12 @@ Re-check the live system and Git state before acting; observations below may bec
   `https://github.com/ClassyCircuit/spotnav-home-assistant.git`.
 - Fork display name: **SpotNav Enhanced**, from `hacs.json` and the integration manifest.
   Its HA domain stays `spotnav` to preserve existing integration entries and card identities.
-- Source version for this handoff: **2.5.4**. Version 2.5.3 added the Morek
+- Source version for this handoff: **2.5.5** adds selective cleanup of test profile
+  `42001`, with explicit confirmation, persisted outcome and a fresh readback.
+  Version 2.5.3 added the Morek
   preview and layout fix (commit `ef483315`); 2.5.4 explicitly enables text
   selection in the card and Morek panel, preserving nonselection on the graph.
-  Check Git and the installed manifest before assuming 2.5.4 is installed in HA.
+  Check Git and the installed manifest before assuming 2.5.5 is installed in HA.
   Marketplace installs this fork from the default branch; it shows commit hashes rather
   than `vX.Y.Z` because the fork has no GitHub Releases. Do not reintroduce
   `zip_release: true` into `hacs.json` while installing from `main`: Marketplace tried
@@ -21,7 +23,7 @@ Re-check the live system and Git state before acting; observations below may bec
   `.github/workflows/release-zip.yml` does not make every push a release.
 - **Deployment drift observed:** the first read-only SMB check on 2026-11-08 found
   HA at **2.5.1**. A later check after the user's screenshot found **2.5.3**
-  installed; source is **2.5.4**. Recheck before assuming the latest version is
+  installed; source is **2.5.5**. Recheck before assuming the latest version is
   installed. The user has seen the 2.5.3 preview/readback on HA.
   Do not assume a Git push has installed or restarted the integration on HA.
 
@@ -83,8 +85,9 @@ Re-check the live system and Git state before acting; observations below may bec
   matching the current settings revision. Unpriced plans and plans that depend on
   stopping early at an energy target are refused. The OCPP 1.6 `TxDefaultProfile`
   uses profile ID `42001`, stack level 1, an absolute schedule and up to seven
-  0/16 A transitions with a final **persistent 0 A** period. No automatic uploads,
-  profile cleanup, or authorization of a new charging transaction are implemented.
+  0/16 A transitions with a final **persistent 0 A** period. No automatic uploads
+  or authorization of a new charging transaction are implemented. Version 2.5.5
+  adds *manual selective* cleanup, never automatic removal.
 - Upload intent/time are stored before the OCPP call because a timed-out request
   may still have changed the charger. A response of `Accepted` is recorded separately
   from readback. The per-charger record is persisted in HA storage across restarts.
@@ -117,12 +120,36 @@ Re-check the live system and Git state before acting; observations below may bec
 
 ## Safety and outstanding decisions
 
+- Clarification requested by the user: `42001` identifies the **real SpotNav
+  calculated schedule**, not a dummy schedule. Sending with the same ID replaces
+  that profile; removal is not required between routine schedule updates.
+  Selective cleanup is for withdrawing SpotNav's stored schedule, especially its
+  persistent final 0 A limit. Other profile IDs/purposes may coexist. The UI's
+  historical "test profile" wording refers to the experimental feature, not
+  fake charging windows. Investigating the mismatching effective readback remains
+  necessary before claiming charger-side scheduling works.
+
+- The user authorized adding selective cleanup on 2026-11-08 and explicitly
+  reported that **the car is currently unplugged**. This is a time-specific user
+  observation, not a live sensor verification; recheck before further testing.
+  Unplugged readback does not prove control of an ongoing charging transaction.
 - Do not send a test profile until there is a deliberate way to undo it. The final
   0 A period is not cleared on Resume. HA OCPP's generic `ocpp.clear_profile`
   may clear **all** charging profiles on a connector, including other controllers'
-  limits; it is not a selective cleanup. A future safe enhancement would selectively
-  clear **only** profile ID `42001`, with confirmation and readback. Confirm the
-  charger response and effect before calling cleanup successful.
+  limits; it is not a selective cleanup. In 2.5.5, action `clear` requires admin
+  and `confirm_profile_id: 42001`. It targets the same verified physical station
+  and uses `ClearChargingProfile(id=42001)` only. No user-supplied arbitrary ID,
+  connector-wide clear, or generic HA clear service is exposed. The request is
+  persisted before calling OCPP; timeout is recorded as an unknown outcome.
+  Readback follows even when cleanup is not confirmed, and `verified` stays false
+  after any cleanup attempt until another Send. Sent history is retained.
+  `cleanup_supported` gates the UI on older backends. Cleanup neither resumes
+  Auto nor authorizes charging. It may increase effective limits; inspect the
+  charger response and readback rather than claiming a profile inventory check.
+  **Not yet deployed/hardware-tested at implementation time.** The user prefers
+  Marketplace update + restart over editing the HA share. Do not restart HA or
+  modify live files without specific approval; further Send/fetch needs the new
+  cleanup backend installed first and a deliberate cleanup step after testing.
 - SpotNav's usual live start/stop controller remains in the code. A stored Morek
   schedule must not compete with it; pause Auto for manual testing and do not resume
   blindly while the test profile is still present. Morek's independent CT-based
@@ -206,6 +233,11 @@ Re-check the live system and Git state before acting; observations below may bec
   preview calculation); full HA Python pytest remains unrun on Windows.
 - For 2.5.4's text-selection change: 2,336 frontend tests passed; type-check,
   build and check-dist passed. Browser/HA text selection is not yet verified.
+- For 2.5.5 selective cleanup: 2,338 frontend tests passed; type-check, build,
+  check-dist, Ruff and Python compilation passed. Twelve isolated Python cases
+  passed, including exact-ID cleanup, readback after Accepted/Unknown/timeout,
+  and refusal of missing/wrong confirmation. Full HA pytest remains unrun.
+  No live send or clear was performed for this implementation.
 - Tests: `tests/test_morek_schedule.py` and `frontend/test/morek-view.test.ts`.
   Run the Python tests on Linux/Python 3.14 with project test dependencies, and
   add integration tests for alias resolution, WebSocket access and OCPP responses.

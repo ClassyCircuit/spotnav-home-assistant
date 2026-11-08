@@ -263,7 +263,11 @@ def _preview(hass: HomeAssistant, entry_id: str, target: Any) -> dict[str, Any]:
 
 
 async def async_schedule_action(hass: HomeAssistant, entry_id: str, action: str,
-                                preview_id: str | None = None) -> dict[str, Any]:
+                                preview_id: str | None = None, confirm_profile_id: int | None = None) -> dict[str, Any]:
+    if action not in ("send", "fetch", "clear"):
+        raise ScheduleRefused("invalid_action")
+    if action == "clear" and (type(confirm_profile_id) is not int or confirm_profile_id != PROFILE_ID):
+        raise ScheduleRefused("cleanup_confirmation_required")
     if action == "send" and not preview_id:
         raise ScheduleRefused("preview_changed")
     entry, failure = lookup_charger(hass, entry_id)
@@ -291,7 +295,7 @@ async def async_schedule_action(hass: HomeAssistant, entry_id: str, action: str,
                 raise ScheduleRefused("preview_changed")
             # Record *before* the request: a timeout can still have installed a profile.
             data.update({"sent_at": now.isoformat(), "profile": profile, "ack": "unknown", "verified": False,
-                         "effective": None})
+                         "effective": None, "cleanup": None})
             await store.async_save(data)
             try:
                 response = await asyncio.wait_for(cp.call(ocpp_call.SetChargingProfile(
@@ -302,8 +306,19 @@ async def async_schedule_action(hass: HomeAssistant, entry_id: str, action: str,
             await store.async_save(data)
             if data["ack"].lower() != "accepted":
                 raise ScheduleRefused("upload_not_confirmed")
-        elif action != "fetch":
-            raise ScheduleRefused("invalid_action")
+        elif action == "clear":
+            # By OCPP 1.6, id alone selects this exact profile. Never send an empty
+            # ClearChargingProfile request or use the generic HA clear service.
+            data.update({"cleanup": {"requested_at": now.isoformat(), "profile_id": PROFILE_ID,
+                                     "status": "unknown"}, "effective": None, "verified": False})
+            await store.async_save(data)
+            try:
+                response = await asyncio.wait_for(cp.call(ocpp_call.ClearChargingProfile(id=PROFILE_ID)), timeout=30)
+                data["cleanup"]["status"] = _status(response)
+            except Exception:
+                # A timeout does not prove the station did not remove the profile.
+                data["cleanup"]["status"] = "unknown"
+            await store.async_save(data)
         query_at = datetime.now(timezone.utc)
         duration = 43200
         profile = data.get("profile")
@@ -318,7 +333,8 @@ async def async_schedule_action(hass: HomeAssistant, entry_id: str, action: str,
             if getattr(response, "connector_id", target.connector_id) != target.connector_id:
                 data["effective"]["status"] = "wrong_connector"
             data["verified"] = False
-            if isinstance(profile, dict) and data.get("ack", "").lower() == "accepted" and matches(profile, data["effective"]):
+            if (not data.get("cleanup") and isinstance(profile, dict)
+                    and data.get("ack", "").lower() == "accepted" and matches(profile, data["effective"])):
                 schedule = _schedule(response)
                 reported_duration = schedule.get("duration") if schedule else None
                 coverage = reported_duration if isinstance(reported_duration, int) and reported_duration > 0 else duration
@@ -329,12 +345,13 @@ async def async_schedule_action(hass: HomeAssistant, entry_id: str, action: str,
             data["verified"] = False
         await store.async_save(data)
         return {"supported": True, "sent_at": data.get("sent_at"), "ack": data.get("ack"), "verified": data.get("verified", False),
-                "sent": profile, "effective": data.get("effective")}
+                "sent": profile, "effective": data.get("effective"), "cleanup": data.get("cleanup"),
+                "cleanup_supported": True}
 
 
 @websocket_api.websocket_command({vol.Required("type"): "spotnav/morek_schedule", vol.Required("api_version"): int,
-                                   vol.Required("charger_id"): str, vol.Required("action"): vol.In(("status", "send", "fetch")),
-                                   vol.Optional("preview_id"): str})
+                                   vol.Required("charger_id"): str, vol.Required("action"): vol.In(("status", "send", "fetch", "clear")),
+                                   vol.Optional("preview_id"): str, vol.Optional("confirm_profile_id"): int})
 @websocket_api.async_response
 async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
     if msg["api_version"] != API_VERSION:
@@ -354,9 +371,11 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
             result = {**_identity_status(hass, target),
                       "sent_at": data.get("sent_at"), "ack": data.get("ack"), "verified": data.get("verified", False),
                       "sent": data.get("profile"), "effective": data.get("effective"),
-                      "preview": _preview(hass, entry.entry_id, target)}
+                      "preview": _preview(hass, entry.entry_id, target),
+                      "cleanup": data.get("cleanup"), "cleanup_supported": True}
         else:
-            result = await async_schedule_action(hass, msg["charger_id"], msg["action"], msg.get("preview_id"))
+            result = await async_schedule_action(hass, msg["charger_id"], msg["action"], msg.get("preview_id"),
+                                                 msg.get("confirm_profile_id"))
             controller = controller_for(hass, msg["charger_id"])
             target = getattr(controller, "ocpp_target", None)
             result.update(_identity_status(hass, target))

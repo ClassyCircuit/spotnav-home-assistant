@@ -4,6 +4,8 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
+from unittest.mock import AsyncMock
+import sys
 from custom_components.spotnav.api import morek_schedule
 
 from custom_components.spotnav.api.morek_schedule import (
@@ -131,3 +133,52 @@ def test_preview_reuses_send_calculation_without_contacting_station(monkeypatch)
     settings.pause.choice = "until_resumed"
     proposal.shown_periods = ((periods[0][0], periods[0][0] + timedelta(minutes=15)),)
     assert morek_schedule._preview(hass, "charger", target)["reason"] == "target_stop_unsupported"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("reply_status", ["Accepted", "Unknown", "timeout"])
+async def test_selective_cleanup_only_names_test_id_and_fetches_afterwards(monkeypatch, reply_status):
+    import asyncio
+
+    calls = []
+
+    async def station_call(request):
+        calls.append(request)
+        if request.action == "clear":
+            if reply_status == "timeout":
+                raise TimeoutError
+            return SimpleNamespace(status=reply_status)
+        return SimpleNamespace(status="Accepted", schedule_start=NOW.isoformat(), connector_id=1,
+                               charging_schedule={"chargingRateUnit": "A", "chargingSchedulePeriod": [
+                                   {"startPeriod": 0, "limit": 16}]})
+
+    point = SimpleNamespace(call=station_call)
+    target = SimpleNamespace(connector_id=1)
+    data = {"ack": "Accepted", "profile": profile_for(((NOW + timedelta(hours=1), NOW + timedelta(hours=2)),), 16, NOW)}
+    store = SimpleNamespace(async_save=AsyncMock())
+    hass = SimpleNamespace(data={morek_schedule._DATA_KEY: {"charger": (data, store, asyncio.Lock())}})
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda h, e: (SimpleNamespace(entry_id=e), None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda h, e: SimpleNamespace(ocpp_target=target))
+    monkeypatch.setattr(morek_schedule, "_identity_status", lambda h, t: {"supported": True})
+    monkeypatch.setattr(morek_schedule, "_charge_point", lambda h, t: point)
+    monkeypatch.setattr(morek_schedule, "_state", AsyncMock(return_value=(data, store)))
+    protocol = SimpleNamespace(call=SimpleNamespace(
+        ClearChargingProfile=lambda **kw: SimpleNamespace(action="clear", payload=kw),
+        GetCompositeSchedule=lambda **kw: SimpleNamespace(action="fetch", payload=kw)))
+    monkeypatch.setitem(sys.modules, "ocpp.v16", protocol)
+    result = await morek_schedule.async_schedule_action(hass, "charger", "clear", confirm_profile_id=42001)
+    assert [request.action for request in calls] == ["clear", "fetch"]
+    assert calls[0].payload == {"id": 42001}
+    assert calls[1].payload["connector_id"] == 1
+    assert result["cleanup"]["status"] == ("unknown" if reply_status == "timeout" else reply_status)
+    assert result["verified"] is False
+    assert result["effective"]["status"] == "Accepted"
+    assert result["sent"] is data["profile"]
+    assert store.async_save.await_count == 3
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("confirmation", [None, 0, 42002, True])
+async def test_cleanup_refuses_missing_or_wrong_confirmation_before_any_station_access(confirmation):
+    with pytest.raises(ScheduleRefused, match="cleanup_confirmation_required"):
+        await morek_schedule.async_schedule_action(None, "charger", "clear", confirm_profile_id=confirmation)

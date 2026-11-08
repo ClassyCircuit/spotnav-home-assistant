@@ -3,6 +3,8 @@ import { VISUAL_CLASSES as C } from "./visual-styles";
 
 export interface MorekState {
   supported: boolean;
+  cleanup_supported?: boolean;
+  cleanup?: { requested_at: string; profile_id: number; status: string } | null;
   reason?: string | null;
   configured_id?: string | null;
   resolved_id?: string | null;
@@ -26,6 +28,9 @@ export function decodeMorekState(raw: unknown): MorekState | null {
   if (value === null || typeof value !== "object") return null;
   const state = value as MorekState;
   if (typeof state.supported !== "boolean" || typeof state.verified !== "boolean") return null;
+  if (state.cleanup_supported !== undefined && typeof state.cleanup_supported !== "boolean") return null;
+  if (state.cleanup != null && (typeof state.cleanup !== "object" || state.cleanup.profile_id !== 42001 ||
+    typeof state.cleanup.status !== "string" || typeof state.cleanup.requested_at !== "string")) return null;
   if (state.sent !== null && (
     typeof state.sent !== "object" || !Array.isArray(state.sent.chargingSchedule?.chargingSchedulePeriod)
   )) return null;
@@ -79,7 +84,7 @@ export function morekPanel(
   admin: boolean,
   busy: boolean,
   error: string | null,
-  act: (action: "status" | "send" | "fetch") => void,
+  act: (action: "status" | "send" | "fetch" | "clear") => void,
 ): HTMLElement {
   const section = doc.createElement("section");
   section.className = C.morekPanel;
@@ -129,6 +134,16 @@ export function morekPanel(
   const verification = state.sent === null ? "" : state.verified ? " · Matched at last read" : " · NOT verified";
   status.textContent = ack + verification;
   section.append(status);
+  if (state.cleanup) {
+    const cleanup = doc.createElement("p");
+    cleanup.textContent = `Cleanup request for profile ${state.cleanup.profile_id}: ${state.cleanup.status} at ${localTime(state.cleanup.requested_at)}. ` +
+      (state.cleanup.status.toLowerCase() === "accepted"
+        ? "Morek acknowledged removal. Readback below shows effective limits, not proof of the stored profile inventory."
+        : state.cleanup.status.toLowerCase() === "unknown"
+          ? "Outcome unknown; the request may have taken effect. Do not assume the profile is removed."
+          : "Morek did not acknowledge removal. Do not assume the profile is removed.");
+    section.append(cleanup);
+  }
 
   if (state.sent !== null) {
     const title = doc.createElement("strong");
@@ -174,6 +189,18 @@ export function morekPanel(
       actions.append(button);
     }
     section.append(actions);
+    if (state.supported && state.cleanup_supported === true) {
+      const clear = doc.createElement("button");
+      clear.type = "button";
+      clear.className = C.button;
+      clear.textContent = "Remove test profile 42001";
+      clear.disabled = busy;
+      clear.addEventListener("click", () => {
+        if (!doc.defaultView?.confirm("Remove ONLY SpotNav test profile 42001 from Morek? This removes its persistent 0 A limit. Other installed profiles will not be deliberately cleared. Effective limits may increase. Auto will not be resumed.")) return;
+        act("clear");
+      });
+      actions.append(clear);
+    }
   }
   return section;
 }

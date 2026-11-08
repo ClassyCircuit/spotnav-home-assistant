@@ -91,7 +91,7 @@ export async function getDashboard(
 export async function morekSchedule(
   hass: HomeAssistantLike,
   chargerId: string,
-  action: "status" | "send" | "fetch",
+  action: "status" | "send" | "fetch" | "clear",
   previewId?: string,
 ): Promise<unknown> {
   return await call<unknown>(hass, {
@@ -100,6 +100,7 @@ export async function morekSchedule(
     charger_id: chargerId,
     action,
     ...(action === "send" && previewId ? { preview_id: previewId } : {}),
+    ...(action === "clear" ? { confirm_profile_id: 42001 } : {}),
   });
 }
 

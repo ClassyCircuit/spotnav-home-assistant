@@ -23,6 +23,28 @@ const state = {
 };
 
 describe("Morek manual test panel", () => {
+  it("requires separate confirmation for selective cleanup and never offers it on an old backend", () => {
+    const act = vi.fn();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const panel = morekPanel(document, { ...state, cleanup_supported: true }, true, false, null, act);
+    const clear = Array.from(panel.querySelectorAll("button")).find((button) => button.textContent === "Remove test profile 42001")!;
+    clear.click();
+    expect(act).not.toHaveBeenCalled();
+    confirm.mockReturnValue(true);
+    clear.click();
+    expect(act).toHaveBeenCalledWith("clear");
+    expect(morekPanel(document, state, true, false, null, act).textContent).not.toContain("Remove test profile 42001");
+    confirm.mockRestore();
+  });
+
+  it("labels cleanup acknowledgement separately from readback and physical charging", () => {
+    const panel = morekPanel(document, { ...state, cleanup: {
+      requested_at: "2026-11-06T20:02:00Z", profile_id: 42001, status: "Accepted",
+    } }, true, false, null, vi.fn());
+    expect(panel.textContent).toContain("Morek acknowledged removal");
+    expect(panel.textContent).toContain("not proof of the stored profile inventory");
+    expect(panel.textContent).toContain("Sent (profile 42001)");
+  });
   afterEach(() => {
     vi.useRealTimers();
     document.body.replaceChildren();

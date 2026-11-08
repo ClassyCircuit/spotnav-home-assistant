@@ -3,7 +3,7 @@
 This is an **opt-in diagnostic**, not a replacement for SpotNav's normal charger
 control. The panel is opened with **Morek schedule details** below the SpotNav card.
 It reads and writes through the *existing* Home Assistant OCPP connection; it
-does not start another OCPP server. Only an administrator can send or fetch.
+does not start another OCPP server. Only an administrator can send, fetch, or remove the test profile.
 
 ## First test
 
@@ -30,7 +30,32 @@ does not start another OCPP server. Only an administrator can send or fetch.
    effective current limits reported by `GetCompositeSchedule`, not a list of
    installed profile IDs. Compare them with the Sent rows; **NOT verified**
    means they differ or the read failed. Watch actual charger measurements at
-   the transitions as a separate check.
+    the transitions as a separate check.
+
+## Selective cleanup (2.5.5+)
+
+Profile `42001` contains the **real calculated SpotNav schedule**. A subsequent
+Send replaces that same profile; cleanup is not required between updates.
+Removal is for withdrawing SpotNav's schedule, not a prerequisite for each Send.
+Other profiles can coexist and affect the effective limits.
+
+Use **Remove test profile 42001**, then confirm the warning. This sends OCPP 1.6
+`ClearChargingProfile` with **only `id: 42001`** to the verified Morek connection;
+it never sends an empty request or calls HA's generic `ocpp.clear_profile`.
+No other profile IDs are deliberately removed. Removing the limit can increase
+the effective current allowed by other profiles. Auto stays paused as configured.
+
+The panel keeps the last Sent rows as history and separately records the cleanup
+request time and reply, then automatically fetches fresh effective limits. An
+`Accepted` reply acknowledges removal; `Unknown` or a timeout is not confirmation
+of removal. A timeout may still have taken effect. Composite readback is not an
+inventory proving profile 42001 absent. Inspect the readback before resuming any
+controller. Cleanup is a separate manual action, not automatic after Send.
+
+If the car is unplugged, an upload/readback test cannot demonstrate transitions
+in a live charging transaction or measure physical charging. An effective 16 A
+limit does not mean 16 A is flowing. Recheck whether it is still unplugged before
+a later hardware test; do not assume its state remains unchanged.
 
 The record of the last request and readback survives HA restarts; its timestamps
 show how old it is. Sending does **not** authorize a new transaction, adjust
@@ -47,4 +72,6 @@ charger is connected and SpotNav's OCPP connector identity is configured.
 This integration calls HA OCPP's connected ChargePoint through its internal
 Python API because `ocpp.set_charge_rate` does not expose the charger reply and
 HA OCPP has no `GetCompositeSchedule` action. That API can change with HA OCPP
-updates. No charger hardware test has yet confirmed this code on Morek.
+updates. A user test on 2026-11-08 received an Accepted upload but a mismatching
+16 A effective readback. Neither the sent schedule's operation nor selective
+cleanup has yet been verified in a physical charging session.

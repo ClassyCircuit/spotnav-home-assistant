@@ -2602,7 +2602,7 @@ export class SpotnavCard extends HTMLElement {
     return await getDashboard(hass, charger, API_VERSION);
   }
 
-  private async morekAction(action: "status" | "send" | "fetch"): Promise<void> {
+  private async morekAction(action: "status" | "send" | "fetch" | "clear"): Promise<void> {
     const hass = this.hassObject;
     const charger = this.config?.charger;
     if (!this.connected || !this.isAdmin || hass === null || !charger || this.morekBusy) return;
