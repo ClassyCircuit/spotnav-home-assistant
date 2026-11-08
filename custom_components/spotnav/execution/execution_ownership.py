@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -69,6 +70,8 @@ class ExecutionOwnershipStore:
         self._loaded = False
         self._state = "missing"
         self._records: dict[str, dict[str, Any]] = {}
+        self._contenders: dict[tuple[str, int], set[str]] = {}
+        self._cancelled_write = False
 
     async def _load(self) -> None:
         if self._loaded:
@@ -80,24 +83,70 @@ class ExecutionOwnershipStore:
             self._state, self._records = "malformed", {}
         self._loaded = True
 
-    async def async_initialize(self, entry_id: str, identity: dict[str, Any]) -> None:
-        """Create only a legacy record, only for a uniquely resolved physical connector."""
+    async def _async_ensure_locked_connector(
+        self, entry_id: str, identity: dict[str, Any], resolve_identity: Callable[[], Mapping[str, Any]]
+    ) -> str:
+        """Ensure a legacy record; caller must hold the shared physical connector lock."""
         async with self._lock:
+            if self._cancelled_write:
+                # An executor-backed write can outlive cancellation; rereading now
+                # cannot prove it will not land later. Never race it with a retry.
+                return "save_uncertain"
+            # A failed or silently unsuccessful save has an unknown outcome. Reread
+            # the durable document before any retry; never publish cached intent.
+            if self._state == "save_failed":
+                self._loaded = False
             await self._load()
             station, connector = identity.get("resolved_id"), identity.get("connector_id")
-            if (self._state not in ("missing", "valid") or entry_id in self._records
-                    or not identity.get("supported") or not isinstance(station, str) or not station
+            if (not identity.get("supported") or not isinstance(station, str) or not station
                     or type(connector) is not int or connector < 1):
-                return
+                return "identity_unresolved"
+            fresh = resolve_identity()
+            if (fresh.get("supported") is not True or type(fresh.get("connector_id")) is not int or
+                    (fresh.get("resolved_id"), fresh.get("connector_id")) != (station, connector)):
+                return "identity_changed"
+            if self._state not in ("missing", "valid"):
+                return f"ownership_{self._state}"
+            stored_physical = [(item["station_id"], item["connector_id"]) for item in self._records.values()]
+            if len(stored_physical) != len(set(stored_physical)):
+                return "ownership_conflict"
+            physical = (station, connector)
+            contenders = self._contenders.setdefault(physical, set())
+            contenders.add(entry_id)
+            if (len(contenders) > 1 or any(other != entry_id and
+                    (item["station_id"], item["connector_id"]) == physical
+                    for other, item in self._records.items())):
+                return "ownership_conflict"
+            existing = self._records.get(entry_id)
+            if existing is not None:
+                if (existing["station_id"], existing["connector_id"]) != physical:
+                    return "ownership_identity_mismatch"
+                return "already_initialized"
             records = {**self._records, entry_id: {
                 "station_id": station, "connector_id": connector, "owner": "legacy",
             }}
             try:
                 await self._store.async_save({"schema_version": SCHEMA_VERSION, "records": records})
-            except Exception:  # noqa: BLE001 - status must expose an uncertain save, not assume success
+                raw = await self._hass.async_add_executor_job(_read_envelope, self._store.path)
+                saved_state, saved_records = _decode(raw)
+                if saved_state != "valid" or saved_records != records:
+                    self._state = "save_failed"
+                    return "save_uncertain"
+            except asyncio.CancelledError:
                 self._state = "save_failed"
-                return
+                self._cancelled_write = True
+                raise
+            except BaseException:
+                # HA Store may report success after a write error; cancellation can
+                # also leave a write in flight. Do not publish success from memory.
+                self._state = "save_failed"
+                raise
             self._records, self._state = records, "valid"
+            fresh = resolve_identity()
+            if (fresh.get("supported") is not True or type(fresh.get("connector_id")) is not int or
+                    (fresh.get("resolved_id"), fresh.get("connector_id")) != physical):
+                return "identity_changed"
+            return "initialized"
 
     async def async_status(self, entry_id: str, identity: dict[str, Any]) -> dict[str, Any]:
         """Read metadata only; this is not a command gate or a safety assessment."""
@@ -111,6 +160,8 @@ class ExecutionOwnershipStore:
                     state = ("conflict" if physical[0] is not None and any(
                         (item["station_id"], item["connector_id"]) == physical
                         for item in self._records.values()) else "missing")
+                elif len(self._contenders.get((record["station_id"], record["connector_id"]), set())) > 1:
+                    state = "conflict"
                 elif any(other != entry_id and (item["station_id"], item["connector_id"]) ==
                          (record["station_id"], record["connector_id"])
                          for other, item in self._records.items()):

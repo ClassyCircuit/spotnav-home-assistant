@@ -21,14 +21,13 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.event import async_call_later
 
-from ..const import DOMAIN
+from ..const import DOMAIN, MOREK_CONNECTOR_ID, MOREK_STATION_ID
 from ..execution.execution_ownership import ownership_store
 from ..runtime import domain_data, preview_for, controller_for
 from .common import is_admin, lookup_charger, send_unsupported_version
 
 API_VERSION = 1
 PROFILE_ID = 42001
-MOREK_STATION_ID = "3020002509120029"
 MAX_PERIODS = 8
 MAX_HORIZON = timedelta(hours=48)
 VERIFY_TOLERANCE_S = 90
@@ -288,20 +287,22 @@ def _identity_status(hass: HomeAssistant, target: Any) -> dict[str, Any]:
     """Read-only diagnosis; an alias is valid only when HA OCPP maps it to this Morek."""
     if target is None:
         return {"supported": False, "reason": "no_ocpp_target", "configured_id": None,
-                "resolved_id": None, "connector_id": None}
+                "resolved_id": None, "connector_id": None, "match_count": 0, "ocpp_version": None}
     found = _matching_points(hass, target)
     resolved = found[0][0] if len(found) == 1 else (target.devid if not found else None)
     reason = None
-    if target.connector_id != 1:
-        reason = "wrong_connector"
-    elif len(found) > 1:
+    if len(found) > 1:
         reason = "ambiguous_station"
+    elif target.connector_id != MOREK_CONNECTOR_ID:
+        reason = "wrong_connector"
     elif resolved != MOREK_STATION_ID:
         reason = "station_not_matched"
     elif found and getattr(found[0][1], "_ocpp_version", None) != "1.6":
         reason = "unsupported_ocpp_version"
     return {"supported": reason is None, "reason": reason, "configured_id": target.devid,
-            "resolved_id": resolved if found else None, "connector_id": target.connector_id}
+            "resolved_id": resolved if len(found) == 1 else None, "connector_id": target.connector_id,
+            "match_count": len(found), "ocpp_version": getattr(found[0][1], "_ocpp_version", None)
+            if len(found) == 1 else None}
 
 
 def _charge_point(hass: HomeAssistant, target: Any) -> Any:

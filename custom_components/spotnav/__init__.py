@@ -13,10 +13,10 @@ from functools import partial
 from typing import Any, Callable
 
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
-from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, EVENT_HOMEASSISTANT_STOP
+from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, EVENT_HOMEASSISTANT_STOP, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import CoreState, Event, HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers.event import async_call_later
+from homeassistant.helpers.event import async_call_later, async_track_state_change_event
 from homeassistant.helpers.start import async_at_started
 from homeassistant.util import dt as dt_util
 
@@ -65,7 +65,7 @@ from .entity_renames import async_setup_entity_renames
 from .debug_day import ChargerDay
 from .log_buffer import attach_log_buffer
 from .execution.charger_handback import async_hand_back_charger
-from .execution.execution_ownership import ownership_store
+from .execution.command_admission import command_admission
 from .execution.auto_execution import AutoExecutor, pause_blocks_execution
 from .execution.controller import ChargingController
 from .execution.min_soc_floor import FloorInputs, MinSocFloor
@@ -299,6 +299,29 @@ def _drop_core_ownership_choice(hass: HomeAssistant, entry: ConfigEntry) -> None
         )
 
 
+async def _async_setup_ownership_metadata(
+    hass: HomeAssistant, entry: ChargerConfigEntry, controller: ChargingController
+) -> None:
+    """Initialize metadata now and on the control entity's next availability transition."""
+    if controller.ocpp_target is None:
+        return
+
+    async def ensure() -> None:
+        await command_admission(hass).async_ensure_initialized(
+            entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target)
+        )
+
+    @callback
+    def control_available(event: Event) -> None:
+        old, new = event.data.get("old_state"), event.data.get("new_state")
+        if (new is not None and new.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN)
+                and (old is None or old.state in (STATE_UNAVAILABLE, STATE_UNKNOWN))):
+            entry.async_create_background_task(hass, ensure(), "spotnav ownership initialization")
+
+    entry.async_on_unload(async_track_state_change_event(hass, [controller.charge_control], control_available))
+    await ensure()
+
+
 async def _async_setup_charger_entry(hass: HomeAssistant, entry: ChargerConfigEntry) -> bool:
     """One charger: its controller, its authority boundary, solar, Auto, its webhook, its entities."""
     _drop_core_ownership_choice(hass, entry)
@@ -354,7 +377,7 @@ async def _async_setup_charger_entry(hass: HomeAssistant, entry: ChargerConfigEn
     data = entry.runtime_data = ChargerData(controller=controller, soc_reader=soc_reader)
     entry.async_on_unload(controller.async_shutdown)
     # Metadata only: A2.2 must enforce ownership before any executor/restore writes.
-    await ownership_store(hass).async_initialize(entry.entry_id, _identity_status(hass, controller.ocpp_target))
+    await _async_setup_ownership_metadata(hass, entry, controller)
     await _async_start_debug_day(hass, entry, data, controller)
 
     settings_store = domain_data(hass).auto_store

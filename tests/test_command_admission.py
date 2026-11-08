@@ -2,6 +2,7 @@
 
 import asyncio
 import ast
+import json
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -10,13 +11,15 @@ import pytest
 
 from custom_components.spotnav.execution.command_admission import CommandAdmission, physical_connector
 from custom_components.spotnav.execution import execution_ownership
+from custom_components.spotnav.const import MOREK_STATION_ID
 
 
-def identity(station="physical", connector=1, alias="one"):
-    return {"supported": True, "resolved_id": station, "connector_id": connector, "configured_id": alias}
+def identity(station=MOREK_STATION_ID, connector=1, alias="one"):
+    return {"supported": True, "resolved_id": station, "connector_id": connector, "configured_id": alias,
+            "match_count": 1, "ocpp_version": "1.6"}
 
 
-def status(station="physical", connector=1, owner="legacy", state="valid"):
+def status(station=MOREK_STATION_ID, connector=1, owner="legacy", state="valid"):
     return {"record_state": state, "recorded_owner": owner, "station_id": station,
             "connector_id": connector, "armed": False, "ready": False}
 
@@ -185,15 +188,15 @@ async def test_real_store_missing_entry_cannot_bypass_other_physical_record(tmp_
             self.path = str(tmp_path / key)
 
         async def async_save(self, data):
-            pass
+            Path(self.path).write_text(json.dumps({"version": 1, "data": data}), encoding="utf-8")
 
     async def run_job(fn, *args):
         return fn(*args)
 
     monkeypatch.setattr(execution_ownership, "Store", FakeStore)
     store = execution_ownership.ExecutionOwnershipStore(SimpleNamespace(async_add_executor_job=run_job))
-    await store.async_initialize("original", identity(alias="first"))
     gate = CommandAdmission(store)
+    await gate.async_ensure_initialized("original", lambda: identity(alias="first"))
     write = AsyncMock()
     result = await gate.async_execute("new-entry", "legacy_actuator", lambda: identity(alias="second"), write)
     assert not result.allowed and result.reason == "ownership_conflict"
@@ -234,7 +237,7 @@ async def test_identity_rechecked_after_awaited_ownership_read():
 def test_foundation_is_not_imported_by_production_writers():
     root = Path(__file__).resolve().parents[1] / "custom_components" / "spotnav"
     for path in root.rglob("*.py"):
-        if path.name == "command_admission.py":
+        if path.name == "command_admission.py" or path == root / "__init__.py":
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):

@@ -75,25 +75,76 @@ def test_composite_uses_reply_schedule_start_and_catches_extra_charging():
 
 
 def test_ocpp_alias_must_resolve_to_the_physical_morek_before_commands():
+    from custom_components.spotnav.execution.command_admission import classify_morek_identity
     morek = SimpleNamespace(_ocpp_version="1.6", status="ok")
     system = SimpleNamespace(cpids={"garage": "3020002509120029"},
                              charge_points={"3020002509120029": morek})
     hass = SimpleNamespace(data={"ocpp": {"entry": system}})
     target = SimpleNamespace(devid="garage", connector_id=1)
     assert _identity_status(hass, target)["supported"] is True
+    assert classify_morek_identity(_identity_status(hass, target)) == "supported_morek"
     assert _identity_status(hass, target)["resolved_id"] == "3020002509120029"
     assert _charge_point(hass, target) is morek
 
     system.cpids["garage"] = "other_station"
     system.charge_points["other_station"] = SimpleNamespace(_ocpp_version="1.6", status="ok")
     assert _identity_status(hass, target)["supported"] is False
+    assert classify_morek_identity(_identity_status(hass, target)) == "non_target"
     with pytest.raises(ScheduleRefused):
         _charge_point(hass, target)
 
     system.cpids.clear()
     system.charge_points.clear()
     assert _identity_status(hass, target)["reason"] == "station_not_matched"
+    assert classify_morek_identity(_identity_status(hass, target)) == "unresolved"
     assert _identity_status(hass, None)["reason"] == "no_ocpp_target"
+
+
+@pytest.mark.parametrize(("station", "connector", "version", "duplicates", "classification"), [
+    ("3020002509120029", 1, "1.6", False, "supported_morek"),
+    ("3020002509120029", 1, "2.0.1", False, "target_unsupported"),
+    ("3020002509120029", 1, None, False, "target_unsupported"),
+    ("different", 1, "1.6", False, "non_target"),
+    ("3020002509120029", 2, "1.6", False, "non_target"),
+    ("3020002509120029", 2, "1.6", True, "unresolved"),
+])
+def test_classification_uses_real_unique_identity(station, connector, version, duplicates, classification):
+    from custom_components.spotnav.execution.command_admission import classify_morek_identity
+    point = SimpleNamespace(_ocpp_version=version, status="ok")
+    system = SimpleNamespace(cpids={"alias": station}, charge_points={station: point})
+    systems = {"first": system, **({"second": system} if duplicates else {})}
+    result = _identity_status(SimpleNamespace(data={"ocpp": systems}),
+                              SimpleNamespace(devid="alias", connector_id=connector))
+    assert classify_morek_identity(result) == classification
+    if duplicates:
+        assert result["reason"] == "ambiguous_station" and result["resolved_id"] is None
+
+
+@pytest.mark.asyncio
+async def test_initializer_refuses_real_unsupported_and_ambiguous_identities():
+    from custom_components.spotnav.execution.command_admission import CommandAdmission, classify_morek_identity
+    store = SimpleNamespace(_async_ensure_locked_connector=AsyncMock())
+    gate = CommandAdmission(store)
+    point = SimpleNamespace(_ocpp_version="2.0.1", status="ok")
+    system = SimpleNamespace(cpids={"alias": morek_schedule.MOREK_STATION_ID},
+                             charge_points={morek_schedule.MOREK_STATION_ID: point})
+    hass = SimpleNamespace(data={"ocpp": {"first": system}})
+    target = SimpleNamespace(devid="alias", connector_id=1)
+    def resolve():
+        return _identity_status(hass, target)
+    assert await gate.async_ensure_initialized("a", resolve) == "identity_target_unsupported"
+    point._ocpp_version = None
+    assert await gate.async_ensure_initialized("a", resolve) == "identity_target_unsupported"
+    hass.data["ocpp"]["second"] = system
+    target.connector_id = 2
+    assert await gate.async_ensure_initialized("a", resolve) == "identity_unresolved"
+    hass.data["ocpp"].clear()
+    target.devid, target.connector_id = morek_schedule.MOREK_STATION_ID, 1
+    assert classify_morek_identity(resolve()) == "unresolved"
+    assert await gate.async_ensure_initialized("a", resolve) == "identity_unresolved"
+    with pytest.raises(ScheduleRefused):
+        _charge_point(hass, target)
+    store._async_ensure_locked_connector.assert_not_awaited()
 
 
 @pytest.mark.asyncio

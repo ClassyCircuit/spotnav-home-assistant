@@ -1,6 +1,8 @@
 """Constants for SpotNav charging control."""
 
 DOMAIN = "spotnav"
+MOREK_STATION_ID = "3020002509120029"
+MOREK_CONNECTOR_ID = 1
 
 #: The Repairs issue of an electricity price whose area has no price source and whose prices have stopped (translation
 #: key under `issues`, and the issue id's prefix before the price entry's id; `price_device.py`).

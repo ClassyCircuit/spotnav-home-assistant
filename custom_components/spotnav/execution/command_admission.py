@@ -13,6 +13,7 @@ from typing import Any, Generic, Literal, TypeVar
 
 from homeassistant.core import HomeAssistant
 
+from ..const import MOREK_CONNECTOR_ID, MOREK_STATION_ID
 from .execution_ownership import ExecutionOwnershipStore, ownership_store
 
 OperationKind = Literal["legacy_actuator", "owned_profile", "read_only"]
@@ -50,6 +51,22 @@ def physical_connector(identity: Mapping[str, Any]) -> PhysicalConnector | None:
     return PhysicalConnector(station, connector)
 
 
+def classify_morek_identity(identity: Mapping[str, Any]) -> str:
+    """Classify the existing Morek resolver's result, never an unresolved alias."""
+    if (identity.get("reason") == "ambiguous_station" or type(identity.get("match_count")) is not int
+            or identity["match_count"] != 1):
+        return "unresolved"
+    if not isinstance(identity.get("resolved_id"), str) or not identity["resolved_id"]:
+        return "unresolved"
+    if type(identity.get("connector_id")) is not int or identity["connector_id"] < 1:
+        return "unresolved"
+    if (identity["resolved_id"], identity["connector_id"]) != (MOREK_STATION_ID, MOREK_CONNECTOR_ID):
+        return "non_target"
+    if identity.get("ocpp_version") == "1.6" and identity.get("supported") is True:
+        return "supported_morek"
+    return "target_unsupported"
+
+
 class CommandAdmission:
     """Serialize writes by physical connector and re-evaluate intent inside the lock."""
 
@@ -71,6 +88,31 @@ class CommandAdmission:
         async with self._lock_for(connector):
             self._generations[connector] = self._generations.get(connector, 0) + 1
             return self.generation(connector)
+
+    async def async_ensure_initialized(
+        self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]]
+    ) -> str:
+        """Initialize metadata under the same physical connector lock as admission."""
+        try:
+            identity = dict(resolve_identity())
+            classification = classify_morek_identity(identity)
+            connector = physical_connector(identity)
+        except Exception:  # noqa: BLE001 - an unknown identity cannot create ownership
+            return "identity_unresolved"
+        if classification == "non_target":
+            return "identity_non_target"
+        if classification == "target_unsupported":
+            return "identity_target_unsupported"
+        if classification != "supported_morek" or connector is None:
+            return "identity_unresolved"
+        async with self._lock_for(connector):
+            try:
+                identity = dict(resolve_identity())
+                if classify_morek_identity(identity) != "supported_morek" or physical_connector(identity) != connector:
+                    return "identity_changed"
+                return await self._store._async_ensure_locked_connector(entry_id, identity, resolve_identity)
+            except Exception:  # noqa: BLE001 - failed persistence is an unknown outcome
+                return "save_uncertain"
 
     async def async_execute(
         self,
