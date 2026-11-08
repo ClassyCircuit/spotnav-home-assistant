@@ -22,6 +22,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.helpers.event import async_call_later
 
 from ..const import DOMAIN
+from ..execution.execution_ownership import ownership_store
 from ..runtime import domain_data, preview_for, controller_for
 from .common import is_admin, lookup_charger, send_unsupported_version
 
@@ -524,7 +525,10 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
             data, _ = await _state(hass, entry.entry_id)
             controller = controller_for(hass, entry.entry_id)
             target = getattr(controller, "ocpp_target", None)
-            result = {**_identity_status(hass, target),
+            identity = _identity_status(hass, target)
+            ownership = await ownership_store(hass).async_status(entry.entry_id, identity)
+            result = {**identity,
+                      "ownership": ownership,
                       "sent_at": data.get("sent_at"), "ack": data.get("ack"), "verified": data.get("verified", False),
                       "sent": data.get("profile"), "effective": data.get("effective"),
                       "preview": _preview(hass, entry.entry_id, target),

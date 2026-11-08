@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 import sys
 from custom_components.spotnav.api import morek_schedule
 
@@ -94,6 +94,29 @@ def test_ocpp_alias_must_resolve_to_the_physical_morek_before_commands():
     system.charge_points.clear()
     assert _identity_status(hass, target)["reason"] == "station_not_matched"
     assert _identity_status(hass, None)["reason"] == "no_ocpp_target"
+
+
+@pytest.mark.asyncio
+async def test_status_exposes_read_only_unarmed_ownership(monkeypatch):
+    target = SimpleNamespace(devid="alias", connector_id=1)
+    identity = {"supported": True, "resolved_id": "physical", "connector_id": 1}
+    ownership = {"record_state": "valid", "recorded_owner": "legacy", "ready": False, "armed": False}
+    store = SimpleNamespace(async_status=AsyncMock(return_value=ownership))
+    hass = SimpleNamespace(data={})
+    connection = SimpleNamespace(send_result=Mock(), send_error=Mock())
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda h, e: (SimpleNamespace(entry_id=e), None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda h, e: SimpleNamespace(ocpp_target=target))
+    monkeypatch.setattr(morek_schedule, "_identity_status", lambda h, t: identity)
+    monkeypatch.setattr(morek_schedule, "ownership_store", lambda h: store)
+    monkeypatch.setattr(morek_schedule, "_state", AsyncMock(return_value=({}, None)))
+    monkeypatch.setattr(morek_schedule, "_preview", lambda h, e, t: {})
+    monkeypatch.setattr(morek_schedule, "async_schedule_action", AsyncMock())
+    await morek_schedule.websocket_morek_schedule.__wrapped__(
+        hass, connection, {"id": 1, "api_version": 1, "charger_id": "charger", "action": "status"})
+    assert connection.send_result.call_args.args[1]["schedule"]["ownership"] == ownership
+    store.async_status.assert_awaited_once_with("charger", identity)
+    morek_schedule.async_schedule_action.assert_not_awaited()
+    connection.send_error.assert_not_called()
 
 
 def test_preview_reuses_send_calculation_without_contacting_station(monkeypatch):

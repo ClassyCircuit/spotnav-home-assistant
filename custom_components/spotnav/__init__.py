@@ -21,7 +21,7 @@ from homeassistant.helpers.start import async_at_started
 from homeassistant.util import dt as dt_util
 
 from .api.dashboard import async_setup_dashboard_api
-from .api.morek_schedule import async_setup_morek_schedule_api
+from .api.morek_schedule import async_setup_morek_schedule_api, _identity_status
 from .api.blueprints import async_setup_blueprints_api
 from .api.debug import async_setup_debug_api
 from .blueprint_install import async_install_blueprints
@@ -65,6 +65,7 @@ from .entity_renames import async_setup_entity_renames
 from .debug_day import ChargerDay
 from .log_buffer import attach_log_buffer
 from .execution.charger_handback import async_hand_back_charger
+from .execution.execution_ownership import ownership_store
 from .execution.auto_execution import AutoExecutor, pause_blocks_execution
 from .execution.controller import ChargingController
 from .execution.min_soc_floor import FloorInputs, MinSocFloor
@@ -352,6 +353,8 @@ async def _async_setup_charger_entry(hass: HomeAssistant, entry: ChargerConfigEn
     )
     data = entry.runtime_data = ChargerData(controller=controller, soc_reader=soc_reader)
     entry.async_on_unload(controller.async_shutdown)
+    # Metadata only: A2.2 must enforce ownership before any executor/restore writes.
+    await ownership_store(hass).async_initialize(entry.entry_id, _identity_status(hass, controller.ocpp_target))
     await _async_start_debug_day(hass, entry, data, controller)
 
     settings_store = domain_data(hass).auto_store
