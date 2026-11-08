@@ -23,17 +23,51 @@ const state = {
 };
 
 describe("Morek manual test panel", () => {
+  it("distinguishes delayed verification from a confirmed or silently applied schedule", () => {
+    const act = vi.fn();
+    const panel = morekPanel(document, { ...state, verification: {
+      pending: true, reason: "limits_or_transitions_differ", next_check_at: "2026-11-06T20:01:30Z",
+    } }, true, false, null, act);
+    expect(panel.textContent).toContain("Awaiting follow-up readback — NOT verified");
+    expect(panel.textContent).toContain("No profile will be resent or cleared");
+    expect(panel.textContent).toContain("Do not assume the sent limits are active yet");
+    expect(act).not.toHaveBeenCalled();
+  });
+
+  it("discloses the timing tolerance and coverage rather than calling drift an exact match", () => {
+    const panel = morekPanel(document, { ...state, verified: true, verification: {
+      pending: false, reason: "matched_with_drift", max_delta_s: 57, tolerance_s: 90,
+      coverage_end: "2026-11-07T08:00:00Z",
+    } }, true, false, null, vi.fn());
+    expect(panel.textContent).toContain("Matched within tolerance, NOT exact");
+    expect(panel.textContent).toContain("Maximum transition drift: 57 s; tolerance: 90 s");
+    expect(panel.textContent).toContain("Readback covers through");
+    expect(panel.textContent).toContain("physical charging is not verified");
+  });
+
+  it("reports interrupted and missing-coverage checks without claiming verification", () => {
+    const interrupted = morekPanel(document, { ...state, verification: {
+      pending: false, reason: "verification_interrupted",
+    } }, true, false, null, vi.fn());
+    expect(interrupted.textContent).toContain("Automatic checks were interrupted");
+    const missing = morekPanel(document, { ...state, verification: {
+      pending: false, reason: "coverage_missing",
+    } }, true, false, null, vi.fn());
+    expect(missing.textContent).toContain("duration; coverage cannot be verified");
+    expect(decodeMorekState({ schedule: { ...state, verification: { pending: "yes" } } })).toBeNull();
+    expect(decodeMorekState({ schedule: { ...state, verification: { max_delta_s: NaN } } })).toBeNull();
+  });
   it("requires separate confirmation for selective cleanup and never offers it on an old backend", () => {
     const act = vi.fn();
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     const panel = morekPanel(document, { ...state, cleanup_supported: true }, true, false, null, act);
-    const clear = Array.from(panel.querySelectorAll("button")).find((button) => button.textContent === "Remove test profile 42001")!;
+    const clear = Array.from(panel.querySelectorAll("button")).find((button) => button.textContent === "Remove SpotNav schedule")!;
     clear.click();
     expect(act).not.toHaveBeenCalled();
     confirm.mockReturnValue(true);
     clear.click();
     expect(act).toHaveBeenCalledWith("clear");
-    expect(morekPanel(document, state, true, false, null, act).textContent).not.toContain("Remove test profile 42001");
+    expect(morekPanel(document, state, true, false, null, act).textContent).not.toContain("Remove SpotNav schedule");
     confirm.mockRestore();
   });
 

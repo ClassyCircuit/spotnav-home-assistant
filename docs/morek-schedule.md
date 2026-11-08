@@ -32,6 +32,29 @@ does not start another OCPP server. Only an administrator can send, fetch, or re
    means they differ or the read failed. Watch actual charger measurements at
     the transitions as a separate check.
 
+### Readback verification (2.5.6+)
+
+Send keeps the real schedule at **stack level 1** and checks it immediately.
+If the upload was Accepted but readback differs or is unavailable, SpotNav
+schedules up to three additional **read-only** checks, approximately 30, 75 and
+120 seconds after the initial check (charger response time can add delay).
+No automatic resend, clear, priority escalation, start/stop or Auto resume occurs.
+These short-lived checks belong to that upload, independent of whether the panel
+is open. A new Send, removal request or integration unload cancels them. HA
+restarts do not silently resume them; use Refresh from Morek if interrupted.
+
+**Awaiting follow-up readback — NOT verified** does not mean the requested limits
+are active. After the last unsuccessful check, the mismatch remains visible and
+a warning is logged. Manual Refresh can still verify a later matching response.
+
+The panel exposes Morek's actual reported duration, schedule start and units.
+Verification requires that reported coverage reaches one hour past the final
+stop; a missing duration is **not** assumed to equal the requested duration.
+Matching transitions may differ by up to **90 seconds**: the maximum observed
+drift and tolerance are displayed, and a drifting match is labelled **NOT exact**.
+This tolerance is not a correction of Morek's clock or a guarantee of precise
+switching. Neither Accepted nor a matching readback proves physical charging.
+
 ## Selective cleanup (2.5.5+)
 
 Profile `42001` contains the **real calculated SpotNav schedule**. A subsequent
@@ -39,7 +62,8 @@ Send replaces that same profile; cleanup is not required between updates.
 Removal is for withdrawing SpotNav's schedule, not a prerequisite for each Send.
 Other profiles can coexist and affect the effective limits.
 
-Use **Remove test profile 42001**, then confirm the warning. This sends OCPP 1.6
+Use **Remove SpotNav schedule** (called **Remove test profile 42001** in 2.5.5),
+then confirm the warning. This sends OCPP 1.6
 `ClearChargingProfile` with **only `id: 42001`** to the verified Morek connection;
 it never sends an empty request or calls HA's generic `ocpp.clear_profile`.
 No other profile IDs are deliberately removed. Removing the limit can increase

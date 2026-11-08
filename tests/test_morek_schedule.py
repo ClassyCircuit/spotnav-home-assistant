@@ -182,3 +182,231 @@ async def test_selective_cleanup_only_names_test_id_and_fetches_afterwards(monke
 async def test_cleanup_refuses_missing_or_wrong_confirmation_before_any_station_access(confirmation):
     with pytest.raises(ScheduleRefused, match="cleanup_confirmation_required"):
         await morek_schedule.async_schedule_action(None, "charger", "clear", confirm_profile_id=confirmation)
+
+
+def test_readback_preserves_reported_coverage_and_rejects_partial_or_invalid_periods():
+    response = SimpleNamespace(status="Accepted", schedule_start=NOW.isoformat(), charging_schedule={
+        "duration": 43200, "chargingRateUnit": "A", "chargingSchedulePeriod": [
+            {"startPeriod": 0, "limit": 0}, {"startPeriod": 3600, "limit": 16}]})
+    actual = readback(response, NOW)
+    assert actual["duration_s"] == 43200
+    assert actual["schedule_start"] == NOW.isoformat()
+    assert actual["rate_unit"] == "A"
+    for invalid in [True, float("nan"), -1]:
+        response.charging_schedule["chargingSchedulePeriod"][1]["limit"] = invalid
+        assert readback(response, NOW)["periods"] == []
+    response.charging_schedule["chargingSchedulePeriod"] = [{"startPeriod": 10, "limit": 0}]
+    assert readback(response, NOW)["periods"] == []
+
+
+def test_verification_requires_reported_duration_and_discloses_drift():
+    profile = profile_for(((NOW + timedelta(hours=1), NOW + timedelta(hours=2)),), 16, NOW)
+    actual = readback(SimpleNamespace(status="Accepted", schedule_start=NOW.isoformat(), charging_schedule={
+        "chargingRateUnit": "A", "duration": 14400, "chargingSchedulePeriod": [
+            {"startPeriod": 0, "limit": 0}, {"startPeriod": 3657, "limit": 16},
+            {"startPeriod": 7257, "limit": 0}]}), NOW)
+    comparison = morek_schedule.compare_schedule(profile, actual)
+    assert comparison["matched"] is True
+    assert comparison["exact"] is False
+    assert comparison["max_delta_s"] == 57
+    assert comparison["reason"] == "matched_with_drift"
+    actual["duration_s"] = None
+    assert morek_schedule.compare_schedule(profile, actual)["reason"] == "coverage_missing"
+    actual["duration_s"] = 7200
+    assert morek_schedule.compare_schedule(profile, actual)["reason"] == "coverage_too_short"
+    actual["duration_s"] = 14400
+    actual["periods"][1]["at"] = (NOW + timedelta(seconds=3691)).isoformat()
+    assert morek_schedule.compare_schedule(profile, actual)["matched"] is False
+
+
+def _send_harness(monkeypatch, read_results):
+    import asyncio
+    from collections import deque
+
+    profile = profile_for(((NOW + timedelta(hours=1), NOW + timedelta(hours=2)),), 16, NOW)
+    data = {}
+    store = SimpleNamespace(async_save=AsyncMock())
+    target = SimpleNamespace(connector_id=1)
+    callbacks, cancelled, delays, calls, unload = [], [], [], [], []
+    clock = [NOW]
+    results = deque(read_results)
+
+    async def station_call(request):
+        calls.append(request.action)
+        if request.action != "fetch":
+            return SimpleNamespace(status="Accepted")
+        result = results.popleft() if results else "mismatch"
+        if result == "timeout":
+            raise TimeoutError
+        periods = [{"startPeriod": 0, "limit": 16}] if result == "mismatch" else [
+            {"startPeriod": 0, "limit": 0}, {"startPeriod": 3600, "limit": 16},
+            {"startPeriod": 7200, "limit": 0}]
+        return SimpleNamespace(status="Accepted", schedule_start=NOW.isoformat(), connector_id=1,
+                               charging_schedule={"duration": 14400, "chargingRateUnit": "A",
+                                                  "chargingSchedulePeriod": periods})
+
+    def call_later(hass, delay, callback):
+        index = len(callbacks)
+        callbacks.append(callback)
+        delays.append(delay)
+        return lambda: cancelled.append(index)
+
+    class Clock:
+        now = staticmethod(lambda tz: clock[0])
+        fromisoformat = staticmethod(datetime.fromisoformat)
+
+    point = SimpleNamespace(call=station_call)
+    entry = SimpleNamespace(entry_id="charger", async_on_unload=unload.append)
+    hass = SimpleNamespace(data={morek_schedule._DATA_KEY: {"charger": (data, store, asyncio.Lock())}})
+    settings = SimpleNamespace(pause=SimpleNamespace(choice="until_resumed"), revision=4)
+    monkeypatch.setattr(morek_schedule, "datetime", Clock)
+    monkeypatch.setattr(morek_schedule, "async_call_later", call_later)
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda h, e: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda h, e: SimpleNamespace(ocpp_target=target))
+    monkeypatch.setattr(morek_schedule, "_identity_status", lambda h, t: {"supported": True})
+    monkeypatch.setattr(morek_schedule, "_charge_point", lambda h, t: point)
+    monkeypatch.setattr(morek_schedule, "_state", AsyncMock(return_value=(data, store)))
+    monkeypatch.setattr(morek_schedule, "domain_data", lambda h: SimpleNamespace(
+        auto_store=SimpleNamespace(settings=lambda e: settings)))
+    monkeypatch.setattr(morek_schedule, "_proposed_profile", lambda h, e, n: profile)
+    protocol = SimpleNamespace(call=SimpleNamespace(
+        SetChargingProfile=lambda **kw: SimpleNamespace(action="send", payload=kw),
+        ClearChargingProfile=lambda **kw: SimpleNamespace(action="clear", payload=kw),
+        GetCompositeSchedule=lambda **kw: SimpleNamespace(action="fetch", payload=kw)))
+    monkeypatch.setitem(sys.modules, "ocpp.v16", protocol)
+    return SimpleNamespace(hass=hass, data=data, callbacks=callbacks, cancelled=cancelled,
+                           delays=delays, calls=calls, unload=unload, clock=clock,
+                           preview_id=morek_schedule._preview_id(profile, 4))
+
+
+@pytest.mark.asyncio
+async def test_send_rechecks_delayed_activation_without_resending_or_clearing(monkeypatch):
+    h = _send_harness(monkeypatch, ["mismatch", "matched"])
+    result = await morek_schedule.async_schedule_action(h.hass, "charger", "send", h.preview_id)
+    assert result["verification"]["pending"] is True
+    assert result["verified"] is False
+    assert h.delays == [30]
+    await h.callbacks[0](NOW)
+    assert h.data["verified"] is True
+    assert h.data["verification"]["pending"] is False
+    assert h.calls == ["send", "fetch", "fetch"]
+
+
+@pytest.mark.asyncio
+async def test_immediately_matching_send_does_not_schedule_extra_reads(monkeypatch):
+    h = _send_harness(monkeypatch, ["matched"])
+    result = await morek_schedule.async_schedule_action(h.hass, "charger", "send", h.preview_id)
+    assert result["verified"] is True
+    assert result["verification"]["exact"] is True
+    assert result["verification"]["pending"] is False
+    assert h.delays == []
+    assert h.calls == ["send", "fetch"]
+
+
+@pytest.mark.asyncio
+async def test_temporary_offline_followup_retries_read_only_after_reconnect(monkeypatch):
+    h = _send_harness(monkeypatch, ["mismatch", "matched"])
+    await morek_schedule.async_schedule_action(h.hass, "charger", "send", h.preview_id)
+    online_charge_point = morek_schedule._charge_point
+
+    def offline(hass, target):
+        raise ScheduleRefused("morek_offline")
+
+    monkeypatch.setattr(morek_schedule, "_charge_point", offline)
+    await h.callbacks[0](NOW)
+    assert h.data["verification"]["pending"] is True
+    assert h.data["verification"]["reason"] == "readback_unavailable"
+    monkeypatch.setattr(morek_schedule, "_charge_point", online_charge_point)
+    await h.callbacks[1](NOW)
+    assert h.data["verified"] is True
+    assert h.calls == ["send", "fetch", "fetch"]
+
+
+@pytest.mark.asyncio
+async def test_followup_reads_stop_after_three_retries_and_keep_mismatch(monkeypatch):
+    h = _send_harness(monkeypatch, ["mismatch", "timeout", "mismatch", "mismatch"])
+    await morek_schedule.async_schedule_action(h.hass, "charger", "send", h.preview_id)
+    for index in range(3):
+        await h.callbacks[index](NOW)
+    assert h.delays == [30, 45, 45]
+    assert h.data["verification"]["pending"] is False
+    assert h.data["verification"]["reason"] == "limits_or_transitions_differ"
+    assert h.data["verified"] is False
+    assert h.calls.count("send") == 1
+    assert h.calls.count("fetch") == 4
+    assert "clear" not in h.calls
+
+
+@pytest.mark.asyncio
+async def test_clear_and_unload_cancel_verification_and_stale_callback_does_nothing(monkeypatch):
+    h = _send_harness(monkeypatch, ["mismatch", "mismatch"])
+    await morek_schedule.async_schedule_action(h.hass, "charger", "send", h.preview_id)
+    await morek_schedule.async_schedule_action(h.hass, "charger", "clear", confirm_profile_id=42001)
+    before = list(h.calls)
+    await h.callbacks[0](NOW)
+    assert h.calls == before
+    assert h.cancelled == [0]
+    assert h.data["verification"]["pending"] is False
+
+    h = _send_harness(monkeypatch, ["mismatch"])
+    await morek_schedule.async_schedule_action(h.hass, "charger", "send", h.preview_id)
+    h.unload[0]()
+    await h.callbacks[0](NOW)
+    assert h.calls == ["send", "fetch"]
+    status = morek_schedule._verification_state(h.hass, "charger", h.data)
+    assert status["pending"] is False
+    assert status["reason"] == "verification_interrupted"
+
+
+@pytest.mark.asyncio
+async def test_new_send_invalidates_old_verification_without_losing_new_timer(monkeypatch):
+    h = _send_harness(monkeypatch, ["mismatch", "mismatch", "matched"])
+    await morek_schedule.async_schedule_action(h.hass, "charger", "send", h.preview_id)
+    old_sent_at = h.data["sent_at"]
+    h.clock[0] += timedelta(seconds=1)
+    await morek_schedule.async_schedule_action(h.hass, "charger", "send", h.preview_id)
+    await h.callbacks[0](NOW)
+    assert h.calls == ["send", "fetch", "send", "fetch"]
+    with pytest.raises(ScheduleRefused, match="verification_superseded"):
+        await morek_schedule.async_schedule_action(h.hass, "charger", "fetch", expected_sent_at=old_sent_at)
+    await h.callbacks[1](NOW)
+    assert h.data["verified"] is True
+
+
+@pytest.mark.asyncio
+async def test_manual_matching_fetch_cancels_followup_and_restart_does_not_claim_pending(monkeypatch):
+    h = _send_harness(monkeypatch, ["mismatch", "matched"])
+    await morek_schedule.async_schedule_action(h.hass, "charger", "send", h.preview_id)
+    result = await morek_schedule.async_schedule_action(h.hass, "charger", "fetch")
+    assert result["verified"] is True
+    assert h.cancelled == [0]
+    await h.callbacks[0](NOW)
+    assert h.calls == ["send", "fetch", "fetch"]
+    h.data["verification"]["pending"] = True
+    assert morek_schedule._verification_state(h.hass, "charger", h.data)["pending"] is False
+
+
+@pytest.mark.asyncio
+async def test_pending_inflight_read_is_not_interrupted_and_unload_prevents_more_timers(monkeypatch):
+    import asyncio
+
+    h = _send_harness(monkeypatch, ["mismatch", "matched"])
+    await morek_schedule.async_schedule_action(h.hass, "charger", "send", h.preview_id)
+    point = morek_schedule._charge_point(h.hass, None)
+    original_call = point.call
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    async def blocked_call(request):
+        entered.set()
+        await release.wait()
+        return await original_call(request)
+
+    point.call = blocked_call
+    task = asyncio.create_task(h.callbacks[0](NOW))
+    await entered.wait()
+    assert morek_schedule._verification_state(h.hass, "charger", h.data)["pending"] is True
+    h.unload[0]()
+    release.set()
+    await task
+    assert morek_schedule._verification_state(h.hass, "charger", h.data)["pending"] is False
+    assert len(h.callbacks) == 1

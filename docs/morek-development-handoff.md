@@ -10,12 +10,13 @@ Re-check the live system and Git state before acting; observations below may bec
   `https://github.com/ClassyCircuit/spotnav-home-assistant.git`.
 - Fork display name: **SpotNav Enhanced**, from `hacs.json` and the integration manifest.
   Its HA domain stays `spotnav` to preserve existing integration entries and card identities.
-- Source version for this handoff: **2.5.5** adds selective cleanup of test profile
+- Source version for this handoff: **2.5.6** adds bounded, upload-owned readback
+  verification and explicit coverage/timing-drift diagnostics. **2.5.5** added selective cleanup of test profile
   `42001`, with explicit confirmation, persisted outcome and a fresh readback.
   Version 2.5.3 added the Morek
   preview and layout fix (commit `ef483315`); 2.5.4 explicitly enables text
   selection in the card and Morek panel, preserving nonselection on the graph.
-  Check Git and the installed manifest before assuming 2.5.5 is installed in HA.
+  Check Git and the installed manifest before assuming 2.5.6 is installed in HA.
   Marketplace installs this fork from the default branch; it shows commit hashes rather
   than `vX.Y.Z` because the fork has no GitHub Releases. Do not reintroduce
   `zip_release: true` into `hacs.json` while installing from `main`: Marketplace tried
@@ -23,7 +24,7 @@ Re-check the live system and Git state before acting; observations below may bec
   `.github/workflows/release-zip.yml` does not make every push a release.
 - **Deployment drift observed:** the first read-only SMB check on 2026-11-08 found
   HA at **2.5.1**. A later check after the user's screenshot found **2.5.3**
-  installed; source is **2.5.5**. Recheck before assuming the latest version is
+  installed; source is **2.5.6**. Recheck before assuming the latest version is
   installed. The user has seen the 2.5.3 preview/readback on HA.
   Do not assume a Git push has installed or restarted the integration on HA.
 
@@ -192,6 +193,33 @@ Re-check the live system and Git state before acting; observations below may bec
 
 ## Tests, build, and next steps
 
+### 2.5.6 code changes after the wire-trace investigation
+
+- Keep stack 1 and the exact calculated ON/OFF windows. There is no automatic
+  switch to stack 4, clear/reinstall workaround, or repeat upload. The original
+  charger-side cause is **not proven fixed**; this release fixes the deficient
+  single-read verification lifecycle and overly implicit verification claims.
+- Accepted Send gets an immediate composite read, then at most three follow-up
+  reads at delays 30/45/45 seconds if unverified. Timers use HA `async_call_later`,
+  not browser polling. Another Send or clear cancels the previous timer; upload
+  identity is checked inside the per-charger lock so a stale callback cannot
+  replace newer state. Entry unload cancels the timer. A restart's persisted
+  pending flag is reported as interrupted rather than claiming a live timer.
+- `readback` retains reported duration/unit/scheduleStart and atomically rejects
+  malformed, unsorted, duplicate, negative, nonfinite or non-zero-first-offset
+  periods. Verification never substitutes requested coverage for an absent
+  reported duration. Limits/transitions must match and coverage must include one
+  hour after the final stop. The 90-second tolerance is now explicit in the UI,
+  with maximum observed drift and a **NOT exact** label for drifting matches.
+- Pending reads do not imply the sent current limits are active. Exhausted
+  follow-up checks stay unverified and emit a stable warning. Summary logs
+  contain action, ACK/readback status and comparison reason only, not raw frames,
+  tokens or household context. The removal button now says **Remove SpotNav
+  schedule**, because 42001 contains the real plan, not artificial test windows.
+- No live send, clear, priority change, file deployment or restart was performed
+  during this code implementation. The previous investigation's real stack-1
+  profile remains installed; the user reported the car unplugged at that time.
+
 ### Follow-up after installing 2.5.5 (2026-11-08)
 
 - The installed manifest was confirmed at 2.5.5. The user resent the calculated
@@ -310,6 +338,13 @@ Re-check the live system and Git state before acting; observations below may bec
   passed, including exact-ID cleanup, readback after Accepted/Unknown/timeout,
   and refusal of missing/wrong confirmation. Full HA pytest remains unrun.
   No live send or clear was performed for this implementation.
+- For 2.5.6 readback handling: **2,341 frontend tests** and **22 isolated Python
+  cases** passed; type-check, build, check-dist, Ruff and Python compilation passed.
+  Coverage includes delayed activation, finite read retries, timeouts/reconnect,
+  coverage missing/short, drift disclosure, manual refresh, stale send callbacks,
+  cleanup cancellation, unload including an in-flight read, and restart state.
+  The isolated Python runner is not the full HA pytest suite. The new timer
+  lifecycle has not yet been installed or hardware-tested on HA.
 - Tests: `tests/test_morek_schedule.py` and `frontend/test/morek-view.test.ts`.
   Run the Python tests on Linux/Python 3.14 with project test dependencies, and
   add integration tests for alias resolution, WebSocket access and OCPP responses.

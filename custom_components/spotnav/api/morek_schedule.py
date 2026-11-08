@@ -11,6 +11,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import math
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -18,6 +19,7 @@ import voluptuous as vol
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.storage import Store
+from homeassistant.helpers.event import async_call_later
 
 from ..const import DOMAIN
 from ..runtime import domain_data, preview_for, controller_for
@@ -28,7 +30,10 @@ PROFILE_ID = 42001
 MOREK_STATION_ID = "3020002509120029"
 MAX_PERIODS = 8
 MAX_HORIZON = timedelta(hours=48)
+VERIFY_TOLERANCE_S = 90
+VERIFY_DELAYS = (30, 45, 45)  # Follow-up reads at approximately 30, 75 and 120 seconds.
 _DATA_KEY = "spotnav_morek_schedule"
+_VERIFY_KEY = "spotnav_morek_verification"
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -91,7 +96,8 @@ def readback(response: Any, now: datetime) -> dict[str, Any]:
     """Decode an OCPP composite answer into absolute UTC current changes."""
     status = _status(response)
     schedule = _schedule(response)
-    result: dict[str, Any] = {"status": status, "fetched_at": _utc(now).isoformat(), "periods": []}
+    result: dict[str, Any] = {"status": status, "fetched_at": _utc(now).isoformat(), "periods": [],
+                              "schedule_start": None, "duration_s": None, "rate_unit": None}
     if status.lower() != "accepted" or schedule is None:
         return result
     # OCPP 1.6 GetCompositeSchedule puts scheduleStart on the *reply*, not inside
@@ -99,23 +105,35 @@ def readback(response: Any, now: datetime) -> dict[str, Any]:
     start_text = getattr(response, "schedule_start", None) or schedule.get("startSchedule", schedule.get("start_schedule"))
     unit = schedule.get("chargingRateUnit", schedule.get("charging_rate_unit"))
     raw = schedule.get("chargingSchedulePeriod", schedule.get("charging_schedule_period"))
+    result["rate_unit"] = unit
+    duration = schedule.get("duration")
+    if type(duration) is int and duration > 0:
+        result["duration_s"] = duration
     try:
         start = _utc(datetime.fromisoformat(start_text.replace("Z", "+00:00")))
+        result["schedule_start"] = start.isoformat()
         if unit != "A" or not isinstance(raw, list):
             return result
+        decoded = []
+        previous_offset = -1
         for period in raw:
             offset = period.get("startPeriod", period.get("start_period"))
             limit = period["limit"]
-            if isinstance(offset, bool) or not isinstance(offset, int) or not isinstance(limit, (int, float)):
+            if (type(offset) is not int or offset < 0 or offset <= previous_offset
+                    or isinstance(limit, bool) or not isinstance(limit, (int, float))
+                    or not math.isfinite(limit) or limit < 0):
                 return result
-            result["periods"].append({"at": (start + timedelta(seconds=offset)).isoformat(), "amps": limit})
-        result["periods"].sort(key=lambda item: item["at"])
+            previous_offset = offset
+            decoded.append({"at": (start + timedelta(seconds=offset)).isoformat(), "amps": limit})
+        if raw and raw[0].get("startPeriod", raw[0].get("start_period")) != 0:
+            return result
+        result["periods"] = decoded
     except (AttributeError, KeyError, TypeError, ValueError, OverflowError):
         result["periods"] = []
     return result
 
 
-def matches(profile: dict[str, Any], actual: dict[str, Any], *, tolerance_s: int = 90) -> bool:
+def matches(profile: dict[str, Any], actual: dict[str, Any], *, tolerance_s: int = VERIFY_TOLERANCE_S) -> bool:
     """Compare *effective* changes, including a pause after the last window."""
     if actual["status"].lower() != "accepted" or not actual["periods"]:
         return False
@@ -144,6 +162,105 @@ def matches(profile: dict[str, Any], actual: dict[str, Any], *, tolerance_s: int
         amps == want_amps and abs((at - want_at).total_seconds()) <= tolerance_s
         for (at, amps), (want_at, want_amps) in zip(changes, wanted)
     )
+
+
+def compare_schedule(profile: dict[str, Any] | None, actual: dict[str, Any] | None) -> dict[str, Any]:
+    """A matching limit sequence is not verified without the station's reported coverage."""
+    result: dict[str, Any] = {"matched": False, "exact": False, "reason": "no_sent_profile",
+                              "tolerance_s": VERIFY_TOLERANCE_S, "max_delta_s": None,
+                              "coverage_end": None}
+    if profile is None:
+        return result
+    if not actual or actual.get("status", "").lower() != "accepted" or not actual.get("periods"):
+        result["reason"] = "readback_unavailable"
+        return result
+    if not matches(profile, actual):
+        result["reason"] = "limits_or_transitions_differ"
+        return result
+    start = datetime.fromisoformat(profile["chargingSchedule"]["startSchedule"].replace("Z", "+00:00"))
+    expected = [(start + timedelta(seconds=p["startPeriod"]), p["limit"])
+                for p in profile["chargingSchedule"]["chargingSchedulePeriod"]][1:]
+    changes = []
+    current = actual["periods"][0]["amps"]
+    for period in actual["periods"][1:]:
+        at = datetime.fromisoformat(period["at"])
+        if at > expected[-1][0] + timedelta(hours=1):
+            break
+        if period["amps"] != current:
+            changes.append((at, period["amps"]))
+            current = period["amps"]
+    delta = max(abs((at - want_at).total_seconds()) for (at, _), (want_at, _) in zip(changes, expected))
+    result["max_delta_s"] = delta
+    duration = actual.get("duration_s")
+    if type(duration) is not int or duration <= 0 or not actual.get("schedule_start"):
+        result["reason"] = "coverage_missing"
+        return result
+    coverage_end = datetime.fromisoformat(actual["schedule_start"]) + timedelta(seconds=duration)
+    result["coverage_end"] = coverage_end.isoformat()
+    if coverage_end < expected[-1][0] + timedelta(hours=1):
+        result["reason"] = "coverage_too_short"
+        return result
+    result.update({"matched": True, "exact": delta < 1, "reason": "matched" if delta < 1 else "matched_with_drift"})
+    return result
+
+
+def _cancel_verification(hass: HomeAssistant, entry_id: str) -> None:
+    cancel = hass.data.get(_VERIFY_KEY, {}).pop(entry_id, None)
+    if cancel is not None:
+        cancel()
+
+
+def _schedule_verification(hass: HomeAssistant, entry_id: str, sent_at: str, attempt: int = 0) -> None:
+    """Only retry readback, never Set/ClearChargingProfile. No indefinite polling."""
+    _cancel_verification(hass, entry_id)
+
+    async def check(_now: datetime) -> None:
+        if hass.data.get(_VERIFY_KEY, {}).get(entry_id) is not cancel_handle:
+            return
+        try:
+            await async_schedule_action(hass, entry_id, "fetch", expected_sent_at=sent_at,
+                                        verification_attempt=attempt)
+        except ScheduleRefused as error:
+            # Unload, identity change, or a newer send/clear invalidates the old operation.
+            if error.code != "morek_offline":
+                if hass.data.get(_VERIFY_KEY, {}).get(entry_id) is cancel_handle:
+                    _cancel_verification(hass, entry_id)
+                return
+            data, store = await _state(hass, entry_id)
+            async with hass.data[_DATA_KEY][entry_id][2]:
+                if (hass.data.get(_VERIFY_KEY, {}).get(entry_id) is not cancel_handle
+                        or data.get("sent_at") != sent_at or data.get("cleanup") or data.get("verified")):
+                    return
+                data["verified"] = False
+                data["effective"] = {"status": "unavailable", "fetched_at": datetime.now(timezone.utc).isoformat(),
+                                     "periods": []}
+                verification = data.setdefault("verification", {})
+                verification.update({"reason": "readback_unavailable", "attempts": attempt + 2,
+                                     "checked_at": datetime.now(timezone.utc).isoformat(),
+                                     "pending": False, "next_check_at": None})
+                if attempt + 1 < len(VERIFY_DELAYS):
+                    _schedule_verification(hass, entry_id, sent_at, attempt + 1)
+                    verification.update({"pending": True, "next_check_at": (
+                        datetime.now(timezone.utc) + timedelta(seconds=VERIFY_DELAYS[attempt + 1])).isoformat()})
+                else:
+                    _cancel_verification(hass, entry_id)
+                    _LOGGER.warning("Morek schedule still unverified after bounded readback checks: offline")
+                await store.async_save(data)
+        except Exception:
+            if hass.data.get(_VERIFY_KEY, {}).get(entry_id) is cancel_handle:
+                _cancel_verification(hass, entry_id)
+            _LOGGER.exception("Morek readback verification failed")
+
+    cancel_handle = async_call_later(hass, VERIFY_DELAYS[attempt], check)
+    hass.data.setdefault(_VERIFY_KEY, {})[entry_id] = cancel_handle
+
+
+def _verification_state(hass: HomeAssistant, entry_id: str, data: dict[str, Any]) -> dict[str, Any]:
+    """Persisted pending state cannot claim a timer survived a Home Assistant restart."""
+    verification = dict(data.get("verification") or {})
+    if verification.get("pending") and entry_id not in hass.data.get(_VERIFY_KEY, {}):
+        verification.update({"pending": False, "reason": "verification_interrupted", "next_check_at": None})
+    return verification
 
 
 def _matching_points(hass: HomeAssistant, target: Any) -> list[tuple[str, Any]]:
@@ -263,7 +380,9 @@ def _preview(hass: HomeAssistant, entry_id: str, target: Any) -> dict[str, Any]:
 
 
 async def async_schedule_action(hass: HomeAssistant, entry_id: str, action: str,
-                                preview_id: str | None = None, confirm_profile_id: int | None = None) -> dict[str, Any]:
+                                preview_id: str | None = None, confirm_profile_id: int | None = None, *,
+                                expected_sent_at: str | None = None,
+                                verification_attempt: int | None = None) -> dict[str, Any]:
     if action not in ("send", "fetch", "clear"):
         raise ScheduleRefused("invalid_action")
     if action == "clear" and (type(confirm_profile_id) is not int or confirm_profile_id != PROFILE_ID):
@@ -281,6 +400,9 @@ async def async_schedule_action(hass: HomeAssistant, entry_id: str, action: str,
     cache = hass.data[_DATA_KEY]
     data, store, lock = cache[entry_id]
     async with lock:
+        if expected_sent_at is not None and (data.get("sent_at") != expected_sent_at or data.get("cleanup")
+                                             or data.get("verified")):
+            raise ScheduleRefused("verification_superseded")
         if not _identity_status(hass, target)["supported"]:
             raise ScheduleRefused("not_morek_connector")
         cp = _charge_point(hass, target)
@@ -293,9 +415,12 @@ async def async_schedule_action(hass: HomeAssistant, entry_id: str, action: str,
             profile = _proposed_profile(hass, entry_id, now)
             if preview_id is None or preview_id != _preview_id(profile, settings.revision):
                 raise ScheduleRefused("preview_changed")
+            _cancel_verification(hass, entry_id)
             # Record *before* the request: a timeout can still have installed a profile.
             data.update({"sent_at": now.isoformat(), "profile": profile, "ack": "unknown", "verified": False,
-                         "effective": None, "cleanup": None})
+                          "effective": None, "cleanup": None,
+                          "verification": {"pending": False, "reason": "upload_unconfirmed",
+                                           "next_check_at": None, "attempts": 0}})
             await store.async_save(data)
             try:
                 response = await asyncio.wait_for(cp.call(ocpp_call.SetChargingProfile(
@@ -307,10 +432,13 @@ async def async_schedule_action(hass: HomeAssistant, entry_id: str, action: str,
             if data["ack"].lower() != "accepted":
                 raise ScheduleRefused("upload_not_confirmed")
         elif action == "clear":
+            _cancel_verification(hass, entry_id)
             # By OCPP 1.6, id alone selects this exact profile. Never send an empty
             # ClearChargingProfile request or use the generic HA clear service.
             data.update({"cleanup": {"requested_at": now.isoformat(), "profile_id": PROFILE_ID,
-                                     "status": "unknown"}, "effective": None, "verified": False})
+                                      "status": "unknown"}, "effective": None, "verified": False,
+                         "verification": {"pending": False, "reason": "cleanup_requested",
+                                          "next_check_at": None, "attempts": 0}})
             await store.async_save(data)
             try:
                 response = await asyncio.wait_for(cp.call(ocpp_call.ClearChargingProfile(id=PROFILE_ID)), timeout=30)
@@ -333,20 +461,43 @@ async def async_schedule_action(hass: HomeAssistant, entry_id: str, action: str,
             if getattr(response, "connector_id", target.connector_id) != target.connector_id:
                 data["effective"]["status"] = "wrong_connector"
             data["verified"] = False
-            if (not data.get("cleanup") and isinstance(profile, dict)
-                    and data.get("ack", "").lower() == "accepted" and matches(profile, data["effective"])):
-                schedule = _schedule(response)
-                reported_duration = schedule.get("duration") if schedule else None
-                coverage = reported_duration if isinstance(reported_duration, int) and reported_duration > 0 else duration
-                coverage_start = datetime.fromisoformat(data["effective"]["periods"][0]["at"])
-                data["verified"] = coverage_start + timedelta(seconds=coverage) >= start + timedelta(seconds=end + 3600)
         except Exception:
             data["effective"] = {"status": "unavailable", "fetched_at": datetime.now(timezone.utc).isoformat(), "periods": []}
             data["verified"] = False
+        if expected_sent_at is not None and entry_id not in hass.data.get(_VERIFY_KEY, {}):
+            raise ScheduleRefused("verification_superseded")
+        comparison = compare_schedule(profile, data["effective"])
+        if data.get("cleanup"):
+            comparison.update({"matched": False, "exact": False, "reason": "cleanup_requested"})
+        elif data.get("ack", "").lower() != "accepted":
+            comparison.update({"matched": False, "exact": False, "reason": "upload_unconfirmed"})
+        data["verified"] = comparison["matched"]
+        verification = data.setdefault("verification", {})
+        verification.update(comparison)
+        verification["checked_at"] = datetime.now(timezone.utc).isoformat()
+        if data["verified"] or action == "clear":
+            _cancel_verification(hass, entry_id)
+            verification.update({"pending": False, "next_check_at": None})
+        elif action == "send" or verification_attempt is not None:
+            next_attempt = 0 if action == "send" else verification_attempt + 1
+            verification["attempts"] = 1 if action == "send" else verification_attempt + 2
+            if next_attempt < len(VERIFY_DELAYS):
+                _schedule_verification(hass, entry_id, data["sent_at"], next_attempt)
+                if action == "send":
+                    # Entry reload/unload invalidates timers. No hardware commands on unload.
+                    entry.async_on_unload(lambda: _cancel_verification(hass, entry_id))
+                verification.update({"pending": True, "next_check_at": (
+                    datetime.now(timezone.utc) + timedelta(seconds=VERIFY_DELAYS[next_attempt])).isoformat()})
+            else:
+                _cancel_verification(hass, entry_id)
+                verification.update({"pending": False, "next_check_at": None})
+                _LOGGER.warning("Morek schedule still unverified after bounded readback checks: %s", comparison["reason"])
+        _LOGGER.info("Morek %s: upload=%s readback=%s verified=%s reason=%s",
+                     action, data.get("ack"), data["effective"]["status"], data["verified"], comparison["reason"])
         await store.async_save(data)
         return {"supported": True, "sent_at": data.get("sent_at"), "ack": data.get("ack"), "verified": data.get("verified", False),
                 "sent": profile, "effective": data.get("effective"), "cleanup": data.get("cleanup"),
-                "cleanup_supported": True}
+                "cleanup_supported": True, "verification": _verification_state(hass, entry_id, data)}
 
 
 @websocket_api.websocket_command({vol.Required("type"): "spotnav/morek_schedule", vol.Required("api_version"): int,
@@ -372,7 +523,8 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
                       "sent_at": data.get("sent_at"), "ack": data.get("ack"), "verified": data.get("verified", False),
                       "sent": data.get("profile"), "effective": data.get("effective"),
                       "preview": _preview(hass, entry.entry_id, target),
-                      "cleanup": data.get("cleanup"), "cleanup_supported": True}
+                      "cleanup": data.get("cleanup"), "cleanup_supported": True,
+                      "verification": _verification_state(hass, entry.entry_id, data)}
         else:
             result = await async_schedule_action(hass, msg["charger_id"], msg["action"], msg.get("preview_id"),
                                                  msg.get("confirm_profile_id"))
