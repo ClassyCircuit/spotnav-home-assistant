@@ -192,6 +192,78 @@ Re-check the live system and Git state before acting; observations below may bec
 
 ## Tests, build, and next steps
 
+### Follow-up after installing 2.5.5 (2026-11-08)
+
+- The installed manifest was confirmed at 2.5.5. The user resent the calculated
+  profile at **16:44:34** and fetched at **16:44:37**: upload Accepted, effective
+  readback Accepted but only **16 A**, verification false. HA startup activity
+  was at 16:43–16:44 **before** the send, so a restart *between* this send and
+  readback does not explain this repeat. No cleanup attempt is recorded.
+- The raw Core log contains no current wire frames for this send/fetch and no
+  relevant SpotNav/OCPP error in that interval. Historical frames from November
+  6 exist, but do not establish what happened to the November 8 request.
+- Read-only HA OCPP `get_configuration` queries returned `SupportedFeatureProfiles`
+  including SmartCharging, `ChargeProfileMaxStackLevel=5`,
+  `ChargingScheduleMaxPeriods=8`, `MaxChargingProfilesInstalled=5`, and rate units
+  reported as `Current,Power`. The five-period, stack-1 request fits the reported
+  period/stack bounds. Maximum profiles is capacity, not the installed count.
+- Read-only HA OCPP entity states reported connector Available, measured current
+  0 A, and power 0 kW, consistent with the user's unplugged report. Current-limit
+  entities also showed 16 A; do not confuse these with measured current.
+- Root cause is **not established**: effective composite calculation while idle,
+  another default/transaction profile taking precedence, or Morek firmware
+  behavior remain possibilities. OCPP 1.6 does not provide a standard inventory
+  call for retrieving the stored profile 42001. Next useful diagnostic is a
+  narrowly scoped wire trace of an explicitly authorized send+immediate fetch,
+  preserving response duration/unit/periods and checking any competing commands.
+  This follow-up investigation performed no Send, Clear, restart or live-file edits.
+
+### Authorized wire-trace investigation, 16:48–16:54 on 2026-11-08
+
+- The user explicitly authorized enabling logging and triggering actions for
+  investigation. OCPP INFO and integration DEBUG logging were temporarily enabled.
+  Filtered request/reply payloads were analyzed in memory, not exported into Git.
+  At the end these three diagnostic loggers were set to WARNING. HA was not
+  restarted and live integration files were not edited.
+- A fresh SpotNav Send at 16:48:48 sent the correct five-period real plan on
+  connector 1; Morek's correlated wire reply was Accepted. The actual composite
+  reply requested for 43,200 seconds contained one 16 A period. This confirmed
+  that the initial mismatch was not frontend rendering or dropped decoder rows.
+- Controlled changes to the *same ID 42001*, keeping all real ON/OFF windows,
+  tried stack 2, a start timestamp two minutes earlier (offsets adjusted), and
+  explicit schedule duration 43,200 seconds. Each was Accepted but initially
+  returned flat 16 A. Stack **5** was rejected as NotSupported at 16:50:01;
+  the user confirmed this firmware only accepts levels below 5. Do not mistake
+  the advertised maximum value 5 for a usable stack level 5 on this Morek.
+  The warning from `ocppv16.py:1086` was from this diagnostic probe, not the
+  user's original stack-1 request. Stack **4** was Accepted and first produced
+  all five expected transitions at 16:52:25. Do not assume this alone proves
+  that a permanent priority increase is necessary or safe.
+- Selective clears used exactly `ClearChargingProfile {"id":42001}` and received
+  Accepted; no other IDs or generic clears were used. The final action restored
+  the *real calculated plan through SpotNav's own Send*, stack **1**, at
+  **16:53:13**. Immediate readback initially had an extra 16 A period until
+  approximately 16:54, then the expected overnight transitions. At **16:54:06**
+  a fresh fetch reported **0 A now**, then approximately **22:00:57 16 A,
+  23:00:57 0 A, 00:15:57 16 A, 01:00:57 0 A**. SpotNav's `verified` became
+  **true** under the existing 90-second transition tolerance and horizon check.
+- Thus the final stored Sent record and station readback were consistent within
+  tolerance at stack 1. Do not automatically change the production stack to 4
+  based on the earlier probe. Root cause is still not isolated: stack selection,
+  retained state and scheduler activation/recalculation may have interacted.
+  Same-ID replacement/clear behavior cannot be proved from composite output.
+  Observed composite transition seconds drifted with query time, and station
+  `scheduleStart` lagged HA by several seconds. A strict second-accurate schedule
+  has **not** been established. No concurrent non-diagnostic profile-writing
+  traffic was observed in the captured request window, which does not rule out
+  preexisting profiles or other controllers outside that window.
+- **Final live state:** real SpotNav profile 42001 remains installed at stack 1,
+  Auto was not resumed by the investigation; final persistent 0 A remains part
+  of that profile. The user reports the car unplugged. This is schedule readback
+  verification only, not a physical charging test. No new release/code change
+  was made in response to this trace. Future work should expose timing/coverage
+  and verification tolerance in the UI rather than implying exact equivalence.
+
 ### Fast preview during frontend development
 
 - Local iteration: `cd frontend; npm exec -- vitest run test/card-fill.test.ts
