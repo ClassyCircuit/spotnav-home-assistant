@@ -5,6 +5,12 @@ Morek schedule experiment or trying to reach the user's Home Assistant. It recor
 implementation, hardware limits, outstanding work, deployment/version differences, test status,
 and the verified (and unverified) local access paths. The user-facing test procedure is in
 [docs/morek-schedule.md](docs/morek-schedule.md).
+For the approved future direction and prioritized LLM work blocks, read
+[docs/charging-dashboard-roadmap.md](docs/charging-dashboard-roadmap.md): one HA
+charging dashboard with multiple cards, ECharts, and autonomous Morek schedule-only
+execution. This is a roadmap, not a claim that automatic uploads exist today.
+It also specifies soft-cap/minimum-SOC planning and genuine measured charging
+history. Hardware testing is user-directed, not a separate roadmap stage.
 
 - This is the user's `SpotNav Enhanced` fork. Keep the Home Assistant integration domain
   `spotnav` unchanged, including the `custom_components/spotnav/` directory.

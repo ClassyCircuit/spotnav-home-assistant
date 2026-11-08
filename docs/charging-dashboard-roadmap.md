@@ -1,0 +1,632 @@
+# Morek autonomous charging and dashboard roadmap
+
+Status: **approved direction; implementation not started**. Updated 2026-11-08.
+
+This is the forward-looking plan for SpotNav Enhanced. Implement **one work block
+at a time**, not a dashboard rewrite and controller rewrite in one release.
+For existing code, HA access, hardware observations and credentials handling, read
+[the development handoff](morek-development-handoff.md) and `AGENTS.md` first.
+This document is not permission to deploy, restart HA, or issue hardware commands.
+
+## 1. What the user wants
+
+- **One charging dashboard in Home Assistant, containing multiple coordinated
+  cards.** No second charging dashboard for the stock SpotNav card, and no separate
+  compact-dashboard deliverable. Reuse/redesign existing card components where
+  useful; do not build two parallel charging interfaces.
+- A comprehensive, modern, evcc-inspired charging overview: clear large values,
+  useful charts, polished controls, compact status badges and tables—not long
+  paragraphs or an initially hidden Morek section.
+- Important information visible on opening the page. On smaller screens the same
+  dashboard scrolls vertically; “visible by default” does not mean cramming every
+  historical row or raw protocol detail into the first viewport.
+- Nord Pool prices, cheap periods, SpotNav's proposed plan, the schedule sent to
+  Morek, Morek's effective readback, and measured charging clearly distinguished.
+- Car connection, battery/target, energy needed, estimated active charging time,
+  elapsed time until ready, next start/stop, planned costs and savings.
+- Yesterday's planned-versus-actual charging and costs, so the user can check
+  whether charging actually followed the schedule. **Actual history must come
+  from Morek measurements/events, never be guessed from calculated windows.**
+- **Autonomous daily operation:** planning, schedule updates, verification and
+  reconnect recovery without clicking Send. Keep manual Send/Refresh for debugging.
+- **Schedule-only execution for the Morek connector:** SpotNav must not also run
+  its legacy live start/stop/current-setting control against the same connector.
+- **Soft price limit + minimum ready-by SOC:** normally exclude prices above a
+  configurable cap (example: 10 cents/kWh). Override it only for the energy needed
+  to reach a configurable minimum SOC (typically 40%) by the ready-by deadline,
+  choosing the cheapest feasible periods. The ordinary target can be higher.
+- Saving a changed ready-by time, price cap or minimum SOC must automatically
+  recalculate; if the effective charging schedule changes, automatically resend
+  it. No manual Send or browser refresh should be required.
+- **No separate overnight/hardware-testing stage.** The goal is a great dashboard
+  with an improved backend. The user decides when to test hardware; uncertainty
+  must be documented, not made a prerequisite blocking dashboard development.
+- No solar panels: do not spend this project's effort on solar, battery-storage
+  flows or decorative whole-home energy diagrams.
+
+The user accepted Apache ECharts after comparing it with ApexCharts. ECharts is
+the selected chart library; visual similarity to evcc does not require running
+evcc or another controller alongside SpotNav.
+
+## 2. Current baseline, not the finished product
+
+At planning time source version is **2.5.7**; verify installed/runtime versions.
+
+- The manual Morek API can preview, send, fetch and selectively clear profile
+  `42001`, station `3020002509120029`, connector `1`, through HA OCPP.
+- The real schedule is an absolute `TxDefaultProfile`, stack level **1**, using
+  0/16 A periods and a persistent final 0 A limit. Level 5 was rejected by Morek;
+  level 4 was accepted during a diagnostic probe. Stack 1 also eventually matched.
+  **Do not escalate priority or automatically clear profiles to hide a mismatch.**
+- Send currently requires the old Auto control paused “Until I resume”. That is a
+  temporary experimental interlock, **not** the intended autonomous UX. Replace
+  it only after exclusive execution ownership is implemented and tested.
+- 2.5.7 sends the displayed windows, including a shortened energy-estimated final
+  block. These are fixed times, not a guarantee of stopping at a measured kWh/SOC.
+- 2.5.6 adds immediate + bounded delayed readback checks, reported coverage and
+  visible timing drift. A match currently allows up to 90 seconds' drift and
+  requires reported coverage through one hour after the final stop.
+- Morek has returned Accepted uploads with a flat 16 A readback, later returning
+  the expected transitions with varying seconds. There is no isolated, proven
+  firmware/root-cause fix. Physical charging behavior is not established by those
+  readbacks; hardware testing is user-directed, not a roadmap stage.
+- The user reported the car unplugged during those investigations. This is not a
+  permanent fact; check its current state before a future supervised test.
+- Session totals/cost/savings APIs exist. A reliable historical comparison also
+  needs retained schedule versions, readback snapshots and detailed measurements;
+  the current last-upload record cannot reconstruct every previous night.
+
+## 3. Architecture and non-negotiable rules
+
+### One plan, one execution owner
+
+Retain SpotNav's planner; create a dedicated Morek schedule executor. A shared
+backend snapshot feeds all dashboard cards. Frontend rendering must not be needed
+for automation, and must never itself trigger uploads just by opening the page.
+
+For the connector in Morek schedule mode:
+
+1. **Plan -> validate -> SetChargingProfile -> read back -> compare -> report.**
+2. Time boundaries are enforced by Morek's stored profile, not HA timers sending
+   RemoteStart/RemoteStop or number/current writes at each boundary.
+3. Disable/gate all conflicting SpotNav legacy execution paths for that connector:
+   timed start/stop, direct current writes, normal action buttons, session runner
+   side effects, reconnect/bootstrap writes and applicable site-control writes.
+   Inspect actual paths; hiding buttons alone does not establish ownership.
+4. Preserve read-only status, metering, planning and diagnostics. Do not remove
+   unrelated integrations or globally break legacy support for other chargers.
+5. Do not run another charger controller (including evcc/Gridio) against the same
+   connector during tests. They are UI references, not additional executors.
+
+### Safety and authorization
+
+- Do not disable household load protection, raise electrical limits, or assume
+  that disabling a SpotNav software actuator leaves equivalent protection.
+  Audit any dependency on live software load management before gating its writes;
+  if independent protection is not established, block schedule-only daily readiness.
+- OCPP current limits **do not authorize a charging transaction**. Establish how
+  a newly plugged-in car becomes authorized without legacy start commands. Do not
+  silently change charger authorization mode, credentials, RFID or vehicle settings.
+  If this requires another configuration decision, surface it and get approval.
+- Keep the physical station/connector identity guard. Never use blanket profile
+  clears; removal targets only the owned ID. Keep stack 1 unless a separately
+  justified, approved change is made.
+- Same-ID updates are intended to replace the owned schedule, not all charger
+  profiles. Persistent final 0 A, rollback/removal and leaving schedule mode need
+  deliberate behavior; do not assume Resume or HA restart clears them.
+- No stale/unpriced/invalid plan upload and no unbounded retries. Unknown upload
+  outcome means “may have applied”, not permission for a rapid resend loop.
+- Make unavailable SoC/metering explicit. Never show missing data as zero or claim
+  a precise completion estimate without sufficient inputs.
+
+### Soft price limit and minimum SOC policy
+
+These are **planning inputs**, not another live charger controller. Persist them
+and use the same backend policy for chart proposals, cost estimates, automatic
+uploads and manual Send.
+
+- Settings: optional soft price cap in the configured currency/kWh, minimum
+  ready-by SOC (suggested initial default 40%, editable), normal target SOC, and
+  ready-by time. Validate `0 <= minimum SOC <= normal target SOC <= 100`.
+  Represent 10 cents/kWh explicitly as 0.10 currency units/kWh, not 10 units/kWh.
+- Price **at or below** the cap is allowed for ordinary charging toward the
+  normal target. Price **above** it is excluded unless the minimum-SOC exception
+  is needed. The cap is a maximum per interval, not an average-price threshold.
+- First determine whether available below-cap periods before departure can
+  deliver enough energy to meet the minimum. If they cannot, add only the
+  necessary above-cap energy using the cheapest feasible remaining intervals.
+  Continue toward the normal target only in below-cap periods. Do not waive the
+  cap for the entire plan merely because the minimum is not yet reached.
+- Optimize the combined plan under real power/energy estimates and charger
+  period/block constraints. Do not independently select two conflicting plans,
+  silently drop periods, or broaden an expensive period to fill a whole slot
+  when a partial block suffices. Preserve the shortened final stop behavior.
+- If SOC is already at/above minimum, expensive slots stay excluded even when
+  the normal target cannot be reached. Say “minimum met; target limited by
+  price cap”, rather than quietly charging expensively to the higher target.
+- If there is insufficient time/known data to reach the minimum, calculate a
+  bounded best-effort feasible plan and clearly report the shortfall. Never
+  imply the ready-by minimum is guaranteed, use unknown future prices as cheap,
+  or extend beyond departure without a separately approved policy.
+- Missing/stale SOC, usable capacity or charging-power data must produce an
+  explicit degraded/refused-policy state. Do not invent the energy deficit or
+  silently grant the expensive-price exception without adequate information.
+- Use and label one consistent cap price basis (Nord Pool-only or configured
+  variable cost including fees/taxes). Confirm the default with the user. The
+  price chart, cap marker, optimizer and explanation must agree on that basis;
+  negative prices and currency/unit conversions must work correctly.
+- Explain exception windows in the UI: **“Above price cap: needed for 40% by
+  07:00”**, with the actual configured SOC/deadline and extra cost. Distinguish
+  minimum SOC from the normal target everywhere.
+
+Example: SOC 25%, minimum 40%, normal target 80%, cap 10 cents/kWh, ready 07:00.
+If all known periods before 07:00 are above the cap, select the cheapest feasible
+time needed for **40%, not 80%**. If cheap periods suffice for 40%, no expensive
+override is allowed; use additional eligible cheap time toward 80% if available.
+If SOC is already 45% and everything is expensive, schedule no extra charging.
+
+Saving a new deadline must recompute the eligible horizon, minimum-energy
+feasibility, selected windows and cost immediately through the normal backend
+update path. The executor replaces the owned schedule when those windows change,
+including removing no-longer-needed future blocks. Coalesce rapid edits; unchanged
+wire intent must not cause upload spam. Do not assume this reactive behavior
+already exists in the current manual experiment.
+
+### Separate operational meanings
+
+Do not conflate these in APIs, UI, history or tests:
+
+| Data | Meaning |
+| --- | --- |
+| Prices / cheap slots | Published tariff data and selectable low-cost opportunities |
+| Proposal | What SpotNav calculates now; may not be installed |
+| Last sent | The exact outgoing profile and its version/time |
+| Upload ACK | Morek's response; Accepted alone does not verify behavior |
+| Effective readback | Composite limits returned at a particular time and horizon |
+| Actual charging | Measured current/power/energy; not inferred from a 16 A limit |
+
+`GetCompositeSchedule` is not a profile inventory. “Configured in Morek” must be
+presented as the known sent schedule plus effective readback, not invented proof
+of every stored profile or its absence.
+
+## 4. Work blocks, in implementation order
+
+Each block is sized as a focused LLM task/reviewable change, not a requirement to
+rewrite whole subsystems. Split further if necessary. Do not implement future
+blocks opportunistically while working on the current one.
+
+| Block | Priority | Deliverable | Depends on |
+| --- | --- | --- | --- |
+| A1 | P0 | Execution ownership and authorization audit/design | None |
+| A2 | P0 | Enforced Morek schedule-only mode | A1 |
+| A2P | P0 | Soft price cap, minimum SOC and ready-by planning | A1; planner work can parallel A2 |
+| A3 | P0 | Persistent autonomous schedule reconciliation | A2, A2P |
+| A4 | P0 | Restart/reconnect recovery and verification health | A3 |
+| A5 | P0 | Minimum always-visible daily operations UI | A2–A4 |
+| B1 | P1 | Investigate Morek telemetry; persist genuine measured history | Start source audit early; A3 for plan versions |
+| B2 | P1 | Dashboard layout prototype and reusable components | A5; read this brief |
+| B3 | P1 | ECharts prices and aligned schedule tracks | B2 |
+| B4 | P1 | Yesterday's actual charging versus plan | B1, B3 |
+| C1 | P2 | Costs, savings and session/day/month summaries | B1, B4 |
+| C2 | P2 | Refinement, accessibility and installation polish | B2–C1 |
+
+**First useful release:** A2, A2P and A3–A5 with automated regression checks and
+explicit known limitations. Do not defer backend automation/price policy until
+after a cosmetic redesign. Start B1's source audit and minimal event/measurement
+capture early so useful history accumulates while other cards are developed.
+There is **no A6 hardware gate**; the user tests on their own schedule. Do not
+confuse “implemented and software-tested” with “physically verified on Morek”.
+
+User-facing stage summary:
+
+1. **Improved autonomous backend:** ownership, soft cap/minimum SOC policy,
+   automatic recalculation/resending, restart/reconnect recovery (A1–A4, A2P).
+2. **Clear daily controls/status:** always-visible operational information (A5).
+3. **Modern single-dashboard prototype:** approve layout and components (B2).
+4. **Interactive prices and schedules:** ECharts zoom/overlays/tracks (B3).
+5. **True charging history:** establish Morek data sources and show measured
+   behavior versus historical plans, never schedule-derived guesses (B1, B4).
+6. **Costs, savings and finishing:** summaries, responsive UX and polish (C1–C2).
+
+Stage 5's data-source investigation/collection can start before its finished UI;
+the numbered stages are delivery priorities, not a reason to discard early data.
+
+For larger blocks, use these separately reviewable sub-tasks rather than asking
+one LLM session to finish everything:
+
+- **A2.1:** persisted mode/ownership model and migration; **A2.2:** gate all
+  identified legacy writers and test transitions. Keep autonomous mode unarmed
+  until both are complete; partial gating must not be deployed as safe ownership.
+- **A3.1:** pure intent/fingerprint and active-window/no-plan policies;
+  **A3.2:** persistent worker, triggers and deduplication;
+  **A3.3:** unify manual commands and bounded upload retry behavior.
+- **A4.1:** restart/reconnect reconciliation; **A4.2:** verification health,
+  timeouts, alerts and remaining-window comparison.
+- **A2P.1:** settings schema, validation and price basis; **A2P.2:** constrained
+  planner/minimum-SOC exception; **A2P.3:** API/UI controls and reactive update tests.
+- **B1.1:** read-only Morek telemetry/source audit; **B1.2:** genuine measurement
+  and versioned event capture; **B1.3:** retention and historical query API.
+- **B3.1:** price chart with zoom/units/time handling; **B3.2:** aligned plan,
+  readback and measurement tracks. Each uses the same approved component design.
+
+Finish, test and document one sub-task before moving on. Keep incomplete features
+disabled; do not weaken acceptance gates merely to make a partial release usable.
+
+### A1 — Audit the existing execution paths (documentation + tests/design)
+
+Inspect the planner, `execution/session_runner.py`, OCPP adapter/actions, Auto
+pause/resume, direct current/number writes, startup/reconnect and site-control
+paths. Inspect—not assume—current charger transaction authorization behavior.
+
+Deliver a short implementation map listing every writer and where Morek-mode
+gates belong. Specify how to enter/leave schedule-only mode, what existing
+profile remains installed, and what must be approved before hardware testing.
+
+**Done when:** there is an explicit ownership/transition design, an authorization
+plan, and a test matrix showing how conflicting writes will be detected.
+No live commands, mode changes or file deployment are needed for this audit.
+
+### A2 — Enforce exclusive schedule-only mode
+
+Add a persisted per-connector execution mode with safe migration from the current
+manual experiment. Do not silently arm autonomous control on an integration update.
+After deliberate setup, Morek mode is the user's normal path; legacy live
+execution cannot also own that connector. Replace the temporary “pause old Auto
+forever” requirement with this ownership interlock, not with a deleted safeguard.
+
+Define separate semantics for **suspend automatic uploads**, **pause charging**,
+**remove stored schedule**, and **leave schedule mode**. They are not equivalent:
+stopping uploads leaves a profile installed, and removing a 0 A limit may allow
+charging. If pause/charge-now controls are included, express them through the same
+owned profile/executor, never a hidden return to legacy RemoteStart/RemoteStop.
+Do not ship an ambiguous “Auto” button whose meaning depends on a hidden mode.
+
+**Done when:** automated tests prove that all applicable legacy writers emit no
+conflicting commands in Morek mode, including at scheduled boundaries and reload.
+Read-only diagnostics and independent protections still work. Entry/exit policy
+and the remaining stored limits are explicit to the operator.
+
+### A2P — Soft price cap, minimum ready-by SOC and reactive planning
+
+Implement the policy in section 3 in the existing planner/settings system. Audit
+existing price/target/departure support before adding parallel settings or a
+second optimizer. Price cap and minimum SOC are **P0 backend requirements**, not
+late cosmetic chart options.
+
+Expose cap on/off and value, minimum SOC, normal target and ready-by time as
+distinct persisted inputs. Confirm and label the cap's cost basis. A disabled cap
+retains normal optimization behavior; an enabled cap filters expensive intervals
+except for the explicitly calculated minimum-SOC deficit.
+
+Choose the cheapest feasible plan before departure, respecting both the minimum
+exception and the charger's period capacity. Surface why a target cannot be met;
+do not silently relax the cap for extra energy above the minimum. Keep estimated
+energy/cost and the shown/sent times consistent, including partial final windows.
+
+**Done when:** deterministic tests cover all prices above cap, all below cap,
+price exactly equal to cap, enough/insufficient cheap energy for minimum, SOC
+already at minimum, minimum below the normal target, disabled cap, negative
+prices, currency/fee basis, missing/stale SOC, infeasible departure, partial slots,
+and charger block limits. Saving deadline/cap/minimum changes produces a fresh
+plan event without requiring a browser or charger state change. A3 tests prove
+that a changed plan is then automatically resent, rather than only redrawn.
+
+### A3 — Autonomous, idempotent schedule reconciliation
+
+Implement one backend worker that sends the latest valid plan when needed, not
+on every HA state update. Triggers include published prices, relevant saved
+settings/target/departure/**soft-cap/minimum-SOC** changes, material changes in the planned windows, and
+the charger becoming available. Include a deliberate initial reconciliation.
+
+- Use the same displayed-window builder for automatic and manual Send.
+- A saved ready-by/departure change must trigger planning and reconciliation
+  even if no charger entity changed. Apply the same rule to cap/minimum/target
+  edits and relevant SOC updates. If selected windows change, replace the owned
+  schedule automatically; if identical, report the new plan state without a
+  duplicate upload. No dashboard-open dependency or extra Send click.
+- Fingerprint absolute ON/OFF windows, amperage, relevant profile attributes and
+  revision/ownership; exclude the moving initial 0 A timestamp. Debounce/coalesce
+  changes and serialize per connector. Ignore stale generations/results.
+- Keep Send/Refresh as debugging tools using that same worker and state machine.
+  Manual Send cannot bypass identity, ownership, electrical or freshness checks.
+- Bound retries/backoff and keep desired, attempted, acknowledged and verified
+  versions separate. A refresh or dashboard reload never forces an upload.
+- Define handling for **currently active windows**. The experimental builder
+  refuses starts in the past; daily operation needs a tested continuation policy
+  that does not restart a whole block or extend its original end. Never resend an
+  old expired plan just because the charger reconnects.
+- Define expired/no-plan/unpriced-data behavior and how pending 0 A limits are
+  handled. Do not silently release all limits when tomorrow's prices are absent.
+
+**Done when:** deterministic tests cover stable-plan deduplication, concurrent
+triggers, changed plans, refusal, unknown upload outcomes, active-window updates,
+stale responses, manual debugging, deadline moved earlier/later, cap/minimum edits,
+and finite retry behavior. Persist enough
+version/event metadata to explain which schedule was supposed to run overnight.
+
+### A4 — Recovery and truthful execution health
+
+Extend verification/recovery for autonomous ownership. Recheck on HA restart and
+charger reconnect; decide whether to reapply only from current valid intent, not
+from stale cached ACK. Keep readback retries bounded and independent of open UI.
+
+Compare the relevant remaining schedule when a charging window is already active;
+the current experimental comparator cannot reconstruct past behavior from a
+composite reply. Do not label that a verified historical session. Retain reported
+duration, timing drift, data freshness and last attempt/error reason.
+
+Provide states such as disabled, waiting for prices, ready, sending, checking,
+matched, mismatch, offline and intervention needed. Persistent mismatch must be
+prominent, with bounded notifications—not silent priority escalation or clears.
+
+**Done when:** tests simulate restart, disconnect/reconnect, missing/short
+coverage, delayed activation, drift, malformed replies, missing measurements and
+an active transaction. Recovery cannot revive a cancelled/older upload or enable
+the legacy controller. A user can understand what remains installed while HA is
+offline and what has not been proved.
+
+### A5 — Minimum daily operations UI (before the big redesign)
+
+Make the existing Morek overview visible without opening “schedule details”.
+Use a small set of compact panels/status chips and a window table, not another
+wall of explanation. Keep it on the path toward the **single** final dashboard.
+
+Always show: current execution owner/mode, plugged-in/charging state, measured
+kW/current, next start/end, proposed versus sent version, upload/readback health,
+last checked time, and a visible reason when any action is disabled. Keep target,
+minimum SOC, soft cap, departure and estimated plan energy/cost visible where
+supported. Show whether the price cap is active and why any expensive window
+is required to meet minimum SOC. Distinguish
+time spent charging from elapsed time until ready.
+
+Keep manual Send and Refresh accessible for debugging. Removal has a separate
+confirmation and clear consequences. Critical mismatches cannot hide in a menu.
+
+**Done when:** operators can tell whether the car is charging, why it is waiting,
+when it will next charge, who controls it, and whether the schedule matches
+without opening settings. This block need not include a new chart library.
+
+### B1 — Durable plan, event and measurement history
+
+**First find out what Morek actually reports.** Make a read-only source inventory
+of the installed HA OCPP integration, entity history/Recorder/statistics, and any
+existing SpotNav stores. Document exact entity/message fields, connector binding,
+units, sample frequency, timestamps, freshness, reset behavior and retained
+history. Do not assume session start/end equals continuous charging.
+
+Candidate evidence, to validate against this station:
+
+- OCPP **MeterValues**: measured `Power.Active.Import`, `Current.Import` and
+  cumulative `Energy.Active.Import.Register`, if this charger exposes them.
+  Power/current samples support observed flow; meter-counter increments support
+  delivered energy. `Current.Offered` and configured limits are **not** flow.
+- **StatusNotification** (Charging, SuspendedEV/EVSE, Available, etc.) explains
+  charger/session state, but a Charging label alone is not an accurate kWh trace.
+- **StartTransaction/StopTransaction** delimit a session and may carry meter
+  start/stop values. One transaction can span several scheduled pauses; do not
+  paint its entire duration as physical charging.
+- HA OCPP measurement entities and Recorder can supply historical samples if
+  those entities were recorded. Existing SpotNav measured-energy/session stores
+  may already supply some data. Verify quality/provenance before reuse.
+- **BMW CarData through the user's Bavarian CarData HA integration** is an
+  alternative/complementary source to investigate, especially if Morek provides
+  no retrievable history. Audit the installed integration/API rather than assuming
+  BMW exposes historical charging intervals. Check for genuine charging-history
+  records, timestamped charging-state transitions, measured charging power/energy,
+  and whether available live telemetry can be retained in HA going forward.
+  Distinguish remotely retrievable past history from data collected only after
+  Recorder/SpotNav starts storing it. Sparse SOC changes or a predicted finish
+  time alone cannot establish exact charging periods.
+
+Compare the coverage and timestamp precision of Morek/OCPP and BMW observations
+before choosing the history source. Prefer fresh, connector-specific charger
+metering for home charging when available; use validated BMW charging records as
+a fallback or cross-check, with source/confidence visible in the UI. BMW sessions
+can include public/other-location charging, and battery-side energy is not
+necessarily grid-side energy. Verify the vehicle and home-charger association,
+do not double-count overlapping sources, and do not silently use battery energy
+as exact billed electricity consumption. Respect API rate limits and use the
+existing authenticated integration rather than embedding BMW credentials in
+SpotNav or adding aggressive vehicle polling.
+
+Prefer the existing OCPP ingestion/HA data paths; do not parse permanently enabled
+debug logs as the production history feed, invent a Morek cloud API, or install a
+second OCPP server. If useful telemetry is missing, explicitly document the gap
+and any proposed configuration change for approval rather than fabricating it.
+
+Retain immutable versions of the plan actually sent, upload ACK, readback samples,
+mode/setting changes and execution failures with timestamps. Record/retrieve
+charger power/energy at useful resolution through the existing HA data paths;
+do not invent past measurements or wake vehicle APIs at excessive frequency.
+
+Define observed charging intervals from fresh measured flow/energy evidence,
+with an explicit noise threshold/debounce and sample-resolution uncertainty.
+Keep status-only evidence labelled separately. Integrating sampled measured power
+is a **measurement-derived estimate**, not meter-exact energy; label it and prefer
+valid meter-counter deltas where available. Preserve gaps instead of bridging
+them with the proposed/sent schedule or interpolating an entire offline session.
+Handle delayed/out-of-order messages, duplicate samples, counter resets/rollovers,
+and charger clock drift; preserve measurement and HA receipt times where possible.
+
+Keep meter provenance, gaps, quality flags, price/tariff context and timezone.
+Check existing session/price/history stores before adding duplicate storage.
+Add retention/aggregation and an API that can reconstruct a specific night's
+plan-versus-actual story after HA restart. Storage size must remain bounded.
+
+**Done when:** tests reconstruct an overnight session across midnight and a
+restart, preserving the original plan despite later replanning, and render gaps
+as unknown. This uses recorded/synthetic measurement fixtures; it does **not**
+require the user to run an overnight test before development proceeds. Include a
+case where charging occurs **outside** the plan and one where a planned block has
+no observed flow. The history must show the measured behavior in both cases.
+Older days cannot silently use today's plan or changed tariff. Deliver the source
+inventory alongside the implementation so future LLMs know what is real evidence.
+Include BMW fallback/cross-check availability, source disagreements and
+location/energy-basis limitations; missing Morek history is not permission to
+substitute the calculated plan for actual observations.
+
+### B2 — Dashboard prototype and visual building blocks
+
+Build a browser-rendered prototype with sample data first, then obtain visual
+approval. Do not require HA update/restart for every spacing adjustment. Use
+desktop and mobile layouts with the same cards and shared design tokens.
+
+Use HA Sections as the intended responsive layout. Bundle ECharts locally with
+licence/notice files; load heavy chart code only where needed. Evaluate HA-native
+components and Web Awesome **Core** for controls; choose one coherent approach
+rather than multiple styling frameworks. Do not require paid Pro components,
+runtime CDN access or a separate React/Vue rewrite merely for styling.
+
+**Done when:** the single-dashboard composition, responsive layout, controls,
+status vocabulary, chart colours/patterns and empty/error states are approved.
+No second stock-card dashboard is introduced.
+
+### B3 — Interactive Nord Pool prices and schedule tracks
+
+Implement ECharts in the approved Prices & Plan card. Show the entire day and all
+available published data, with Today/Tomorrow/All available, drag/touch zoom,
+overview slider, reset, “now” and departure markers, and exact tooltip values.
+Include a labelled soft-cap line and visually distinguish ordinary below-cap
+windows from above-cap minimum-SOC exception windows, with the reason on tap/hover.
+
+Use source-resolution bars/steps, including negative prices; do not smooth away
+price changes. Mark unavailable future prices honestly. Support local timezone,
+midnight and DST days with 23/25 hours. Preserve zoom across routine updates.
+
+Align labelled tracks for proposal, last sent, effective readback and actual
+charging with the price time axis. Shade planned windows lightly on the chart
+without making prices unreadable. Suggested cheap opportunities are not the
+same thing as a selected plan. Never imply a reported 16 A limit is measured kW.
+
+**Done when:** interactions work on touch/mouse/keyboard, axes/units are clear,
+plan/readback mismatches remain legible, and browser tests cover resize, zoom,
+missing prices, repeated updates and time-boundary cases. Do not rely solely on
+jsdom for visual or layout acceptance.
+
+### B4 — Yesterday and planned-versus-actual review
+
+Add an always-visible recent-history section with a date selector defaulting to
+yesterday. Show measured power against the plan sent that day, price context,
+actual energy, start/stop differences, and charging outside intended windows.
+Keep latest readback separate from historical measured charging. Missing meter
+data means unknown, not “did not charge”. Use shared ECharts components.
+Use only the genuine observed data established in B1 for the actual-charging
+track; a calculated schedule or Accepted upload may never populate that track.
+
+**Done when:** the next morning the user can answer “did it charge when intended,
+how much, what did it cost, and where did it differ?” without reading raw logs.
+
+### C1 — Costs, savings and summaries
+
+Show estimated total plan cost and energy-weighted price, per-window costs, and
+measured/estimated session/day/month totals. Extend existing session/savings APIs
+rather than recalculating business rules separately in each card.
+
+Suggested savings baseline: charging the **same energy** immediately after
+plugging in at comparable power. Label the baseline, coverage, tariff basis and
+whether the value is an estimate. Distinguish future estimated savings from
+historical results; unknown cost/savings must not become a fabricated zero.
+
+**Done when:** consistent inputs produce consistent totals across cards, and
+tests cover partial data, fee/tax changes, negative prices and missing baseline.
+
+### C2 — Finish the product, not another interface
+
+Refine the vehicle/target panel, inline plan controls, clear feedback for actions,
+session table and lightweight diagnostic event list. Raw OCPP/JSON, rare setup
+and destructive actions may use a details drawer; everyday information may not.
+
+Ensure HA light/dark theme support, accessible contrast, non-colour-only states,
+copyable text, touch targets, reduced motion and keyboard navigation. Avoid
+CSS overrides depending on another card's private DOM. Provide a documented
+single-dashboard installation/template without overwriting the user's HA views.
+
+**Done when:** the full dashboard works as one coherent, responsive product with
+no solar clutter, no duplicate charging dashboard, no hidden critical status and
+no accidental controller competition.
+
+## 5. Intended final page layout
+
+This is information architecture, not a pixel-approved design:
+
+1. **Overview / vehicle:** connection, battery -> target, measured power, next
+   action, minimum ready-by SOC, charge-time needed, estimated ready time,
+   execution health and missing-data indicators.
+2. **Prices & plan (largest panel):** zoomable Nord Pool graph and aligned tracks;
+   compact per-block energy/price/cost table.
+3. **Plan controls + Morek status:** inline target/minimum SOC/soft price cap/
+   ready-by/current settings,
+   autonomous status, manual debugging controls, ACK/readback freshness and drift.
+4. **Yesterday / recent charging:** measured-versus-sent chart and session rows.
+5. **Costs & savings:** estimated plan totals plus historical summaries.
+
+Desktop can place smaller panels beside the chart. Mobile stacks the same
+sections in this order. No essential Morek section is collapsed by default.
+
+## 6. Decisions still to settle, without blocking A1
+
+- Primary screen/device sizes and final visual mockup approval.
+- Default cost display: suggested full configured variable cost (fees/taxes)
+  with a Nord Pool-only option; confirm available inputs and the user's preference.
+- History retention: proposed 90 days detailed traces plus longer-term aggregates;
+  confirm storage impact and preference before treating that as agreed policy.
+- New-transaction authorization, active-window update policy, invalid/no-price
+  policy, charging pause/boost behavior and safe mode exit must be resolved in
+  A1–A4/A2P. The soft-cap/minimum-SOC requirement is agreed; only precise cost
+  basis/defaults, missing-data and infeasible-case behavior remain to specify.
+  Do not improvise these while drawing widgets.
+- The extent to which parts of the original stock card are repurposed inside the
+  one dashboard. Backward compatibility can be retained without making a second
+  dashboard a required user workflow.
+
+## 7. Instructions for the LLM executing a block
+
+1. Read `AGENTS.md`, this roadmap, the handoff and applicable existing architecture
+   docs. Inspect Git state; preserve unrelated user work.
+2. State the single block being implemented and its dependencies. Do not assume
+   the existence of an entity, sensor, API field or authorization behavior.
+3. Add regression tests, including failure/race/restart cases for executor work.
+   Use browser-rendered tests for chart interaction/layout. State any unrun tests.
+4. Keep planner and executor semantics separate; do not reimplement cost/planning
+   logic in JavaScript or grant unrestricted raw OCPP requests to a browser.
+5. Record changed files, checks/results, known limits and next block in this file
+   or the handoff. Update the progress checklist truthfully.
+6. Follow version/build rules for integration/frontend changes. Publish/deploy or
+   perform a hardware test only within the user's current authorization. Never
+   copy credentials/raw household logs into documentation or commits.
+7. A task is not complete merely because a button renders or OCPP says Accepted.
+   Meet its acceptance criteria before calling it operational.
+
+### Progress
+
+- [x] User requirements, direction, priorities and work blocks documented.
+- [ ] A1 execution ownership/authorization audit approved.
+- [ ] A2 schedule-only mode enforced.
+- [ ] A2P soft price cap/minimum-SOC/deadline policy implemented.
+- [ ] A3 autonomous reconciliation implemented.
+- [ ] A4 recovery and execution health implemented.
+- [ ] A5 minimum daily UI implemented.
+- [ ] B1 Morek measurement-source audit and genuine history available.
+- [ ] B2 prototype/layout approved.
+- [ ] B3 ECharts price/plan card implemented.
+- [ ] B4 yesterday comparison implemented.
+- [ ] C1 costs/savings completed.
+- [ ] C2 accessibility, polish and installation completed.
+
+## 8. Research references
+
+- [evcc dynamic prices and charging-plan UI](https://docs.evcc.io/en/features/dynamic-prices)
+  — price bars, cheap periods and goal/departure planning.
+- [Gridio](https://www.gridio.io/) and [FAQ](https://www.gridio.io/faq)
+  — charging overview and savings comparison inspiration; do not copy marketing
+  savings percentages or assume their tariff treatment matches this household.
+- [HA custom-card API](https://contributors.home-assistant.io/frontend/custom-ui/card/)
+  — coordinated cards within a dashboard, not a new standalone controller.
+- [Apache ECharts](https://echarts.apache.org/) and
+  [licence](https://github.com/apache/echarts/blob/master/LICENSE)
+  — chosen chart engine, Apache-2.0 plus applicable notices.
+- [Web Awesome Core](https://webawesome.com/) — candidate UI widgets; check the
+  exact package licence/assets and avoid a paid-Pro dependency.
+- [ApexCharts licensing](https://apexcharts.com/license/)
+  — not the chosen engine; do not assume the current library is unrestricted MIT
+  merely because the HA ApexCharts wrapper has an MIT licence.

@@ -4,6 +4,35 @@ Last checked: 2026-11-08. This file is a **public-repository handoff**, not a pl
 passwords, access tokens, HA configuration exports, logs, or private household information.
 Re-check the live system and Git state before acting; observations below may become stale.
 
+## Approved next direction (planning, not implemented)
+
+Read [charging-dashboard-roadmap.md](charging-dashboard-roadmap.md) for the user's
+latest requirements and prioritized, bounded LLM tasks. The user wants **one HA
+charging dashboard with multiple cards**, not a second stock-card dashboard;
+evcc-inspired styling and Apache ECharts; no solar UI. Crucially, daily operation
+must become **autonomous Morek schedule sending**, with manual debug controls
+retained and **no competing legacy SpotNav start/stop/current loop** for that
+connector. Establish execution ownership, transaction authorization and safety
+before removing the current manual-mode interlock. None of that roadmap is
+implemented by this documentation change; the manual baseline below remains
+accurate for current code. The first implementation block is **A1** in the roadmap.
+The user subsequently clarified: **no separate overnight/hardware-testing stage**;
+they decide when to test. Continue automated regression checks and document
+physical uncertainties without blocking dashboard development on an overnight run.
+History must use **real Morek telemetry/events**, not infer charging from planned
+windows; the roadmap includes a source audit of OCPP MeterValues/status/transactions
+and recorded HA measurement entities. The user also suggested **BMW CarData via
+the Bavarian CarData integration** if Morek lacks history; investigate actual
+history/live telemetry availability, home-session association and timestamp/energy
+quality rather than assuming SOC changes reveal precise charging periods.
+New P0 planning requirement: configurable
+**soft price cap** (example 10 cents/kWh), overridden only for energy necessary to
+reach configurable **minimum SOC** (typically 40%) by the ready-by deadline, using
+the cheapest feasible periods. Higher normal targets use below-cap slots only.
+Changes to ready-by time, cap or minimum SOC must trigger backend recalculation
+and automatic resending when the resulting schedule changes. These are future
+requirements, not features claimed implemented in the manual baseline below.
+
 ## Repository and deployment
 
 - Local checkout: `C:\Code\spotnav-home-assistant`; Git `main`, remote
