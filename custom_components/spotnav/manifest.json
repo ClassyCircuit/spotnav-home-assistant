@@ -1,6 +1,6 @@
 {
   "domain": "spotnav",
-  "name": "SpotNav",
+  "name": "SpotNav Enhanced",
   "after_dependencies": ["ai_task", "camera", "media_source", "nordpool", "ocpp", "pvpc_hourly_pricing", "recorder"],
   "categories": ["energy.ev_charging"],
   "codeowners": ["@henrikekblad"],
@@ -11,5 +11,5 @@
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/henrikekblad/spotnav-home-assistant/issues",
   "requirements": [],
-  "version": "2.5.0"
+  "version": "2.5.1"
 }
