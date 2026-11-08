@@ -2612,7 +2612,7 @@ export class SpotnavCard extends HTMLElement {
     this.morekError = null;
     this.render();
     try {
-      const result = decodeMorekState(await morekSchedule(hass, charger, action));
+      const result = decodeMorekState(await morekSchedule(hass, charger, action, this.morekState?.preview?.preview_id ?? undefined));
       if (operation === this.morekOperation) this.morekState = result;
     } catch (error) {
       if (operation !== this.morekOperation) return;
@@ -2627,6 +2627,8 @@ export class SpotnavCard extends HTMLElement {
             ? "This plan stops early at its energy target. A stored charger schedule cannot do that; nothing was sent."
           : code === "spotnav_morek_upload_not_confirmed"
             ? "The upload was rejected or timed out. Fetch Morek's schedule to see what is active."
+            : code === "spotnav_morek_preview_changed"
+              ? "The plan changed since the preview. Recalculate and review before sending; nothing was sent."
             : code ?? "Could not reach the charger.";
       try {
         const result = decodeMorekState(await morekSchedule(hass, charger, "status"));
@@ -3092,6 +3094,7 @@ export class SpotnavCard extends HTMLElement {
         loading.textContent = this.morekBusy ? "Loading Morek schedule…" : this.morekError ?? "Morek schedule is unavailable. Close and reopen to retry.";
         host.append(loading);
       }
+      this.view.refit();
       return;
     }
 

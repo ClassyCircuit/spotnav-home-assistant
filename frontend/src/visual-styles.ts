@@ -1100,7 +1100,7 @@ export const VISUAL_STYLES = `
    * box's bottom edge.
    */
   .${VISUAL_CLASSES.card}[data-fill] {
-    height: 100%;
+    height: var(--spotnav-card-box, 100%);
   }
   .${VISUAL_CLASSES.card}[data-fill] .${VISUAL_CLASSES.status}[data-lines] {
     display: -webkit-box;

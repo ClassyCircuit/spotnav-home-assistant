@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
+from custom_components.spotnav.api import morek_schedule
 
 from custom_components.spotnav.api.morek_schedule import (
     _charge_point,
@@ -91,3 +92,42 @@ def test_ocpp_alias_must_resolve_to_the_physical_morek_before_commands():
     system.charge_points.clear()
     assert _identity_status(hass, target)["reason"] == "station_not_matched"
     assert _identity_status(hass, None)["reason"] == "no_ocpp_target"
+
+
+def test_preview_reuses_send_calculation_without_contacting_station(monkeypatch):
+    periods = ((NOW + timedelta(hours=1), NOW + timedelta(hours=2)),)
+    proposal = SimpleNamespace(has_plan=True, unpriced=False, periods=periods, shown_periods=periods)
+    snapshot = SimpleNamespace(in_process=True, proposal=proposal, settings_revision=4)
+    settings = SimpleNamespace(amps=16, revision=4, pause=SimpleNamespace(choice="until_resumed"))
+    monkeypatch.setattr(morek_schedule, "domain_data", lambda hass: SimpleNamespace(
+        auto_store=SimpleNamespace(settings=lambda entry: settings)))
+    monkeypatch.setattr(morek_schedule, "preview_for", lambda hass, entry: SimpleNamespace(snapshot=lambda: snapshot))
+    point = SimpleNamespace(_ocpp_version="1.6", status="ok")
+    hass = SimpleNamespace(data={"ocpp": {"entry": SimpleNamespace(
+        cpids={"garage": "3020002509120029"}, charge_points={"3020002509120029": point})}})
+    target = SimpleNamespace(devid="garage", connector_id=1)
+    expected = morek_schedule._proposed_profile(hass, "charger", NOW)
+    assert [p["limit"] for p in expected["chargingSchedule"]["chargingSchedulePeriod"]] == [0, 16, 0]
+    # Pin the clock so the preview and send helper must calculate the exact same wire payload.
+    original_datetime = morek_schedule.datetime
+    class FrozenDatetime:
+        now = staticmethod(lambda tz: NOW)
+        fromisoformat = staticmethod(original_datetime.fromisoformat)
+
+    monkeypatch.setattr(morek_schedule, "datetime", FrozenDatetime)
+    preview = morek_schedule._preview(hass, "charger", target)
+    assert preview["profile"] == expected
+    assert preview["reason"] is None
+    assert preview["preview_id"] == morek_schedule._preview_id(expected, settings.revision)
+    # The profile starts at a new clock instant at Send, but the ON/OFF times stay identical.
+    shifted = morek_schedule._proposed_profile(hass, "charger", NOW + timedelta(seconds=10))
+    assert morek_schedule._preview_id(shifted, settings.revision) == preview["preview_id"]
+    changed = morek_schedule._proposed_profile(hass, "charger", NOW + timedelta(minutes=30))
+    assert morek_schedule._preview_id(changed, settings.revision + 1) != preview["preview_id"]
+    settings.pause.choice = "none"
+    paused = morek_schedule._preview(hass, "charger", target)
+    assert paused["profile"] == expected
+    assert paused["reason"] == "pause_auto_first"
+    settings.pause.choice = "until_resumed"
+    proposal.shown_periods = ((periods[0][0], periods[0][0] + timedelta(minutes=15)),)
+    assert morek_schedule._preview(hass, "charger", target)["reason"] == "target_stop_unsupported"

@@ -7,14 +7,17 @@ export interface MorekState {
   configured_id?: string | null;
   resolved_id?: string | null;
   connector_id?: number | null;
+  preview?: { calculated_at: string; profile: MorekProfile | null; reason: string | null; preview_id?: string | null };
   sent_at: string | null;
   ack: string | null;
   verified: boolean;
-  sent: {
+  sent: MorekProfile | null;
+  effective: { status: string; fetched_at: string; periods: { at: string; amps: number }[] } | null;
+}
+
+interface MorekProfile {
     chargingProfileId: number;
     chargingSchedule: { startSchedule: string; chargingSchedulePeriod: { startPeriod: number; limit: number }[] };
-  } | null;
-  effective: { status: string; fetched_at: string; periods: { at: string; amps: number }[] } | null;
 }
 
 export function decodeMorekState(raw: unknown): MorekState | null {
@@ -29,6 +32,15 @@ export function decodeMorekState(raw: unknown): MorekState | null {
   if (state.effective !== null && (
     typeof state.effective !== "object" || !Array.isArray(state.effective.periods)
   )) return null;
+  if (state.preview !== undefined && (
+    typeof state.preview !== "object" || state.preview === null ||
+    typeof state.preview.calculated_at !== "string" ||
+    (state.preview.reason !== null && typeof state.preview.reason !== "string") ||
+    (state.preview.profile !== null && (
+      typeof state.preview.profile !== "object" ||
+      !Array.isArray(state.preview.profile.chargingSchedule?.chargingSchedulePeriod)
+    ))
+  )) return null;
   return state;
 }
 
@@ -37,6 +49,29 @@ function localTime(value: string | null): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "unknown" : date.toLocaleString();
 }
+
+function transitions(doc: Document, profile: MorekProfile): HTMLUListElement {
+  const start = new Date(profile.chargingSchedule.startSchedule).getTime();
+  const list = doc.createElement("ul");
+  for (const period of profile.chargingSchedule.chargingSchedulePeriod) {
+    const line = doc.createElement("li");
+    line.textContent = `${localTime(new Date(start + period.startPeriod * 1000).toISOString())}: ${period.limit} A`;
+    list.append(line);
+  }
+  return list;
+}
+
+const PREVIEW_REFUSALS: Record<string, string> = {
+  pause_auto_first: "Pause Auto 'Until I resume' before sending.",
+  current_must_be_16: "Set the plan current to 16 A to preview this test.",
+  no_current_plan: "No current, priced plan matches the saved settings.",
+  target_stop_unsupported: "This plan stops at its energy target; a stored charger schedule cannot do that.",
+  too_many_blocks: "This test supports at most three charging windows.",
+  invalid_plan: "The charging windows must be future, ordered, and within 48 hours.",
+  morek_offline: "Morek is not connected through HA OCPP.",
+  not_morek_connector: "This connector is not identified as the permitted Morek station.",
+  preview_unavailable: "The plan could not be calculated right now. Try again shortly.",
+};
 
 export function morekPanel(
   doc: Document,
@@ -70,6 +105,25 @@ export function morekPanel(
   const note = doc.createElement("p");
   note.textContent = "SpotNav still uses live start/stop commands. Pause Auto 'Until I resume' before sending. These controls do not authorize a plugged-in car.";
   section.append(note);
+  const previewTitle = doc.createElement("strong");
+  previewTitle.textContent = "Preview — calculated, NOT sent";
+  section.append(previewTitle);
+  const preview = doc.createElement("p");
+  preview.textContent = state.preview === undefined
+    ? "Preview unavailable from this HA version. Update the integration before sending."
+    : `Calculated ${localTime(state.preview.calculated_at)}. Send recalculates from the latest plan and time; these times may shift.`;
+  section.append(preview);
+  if (state.preview?.profile) {
+    section.append(transitions(doc, state.preview.profile));
+    const endNote = doc.createElement("p");
+    endNote.textContent = "The final 0 A limit remains installed after the last window until explicitly cleared.";
+    section.append(endNote);
+  }
+  if (state.preview?.reason) {
+    const refusal = doc.createElement("p");
+    refusal.textContent = `Cannot send: ${PREVIEW_REFUSALS[state.preview.reason] ?? "This plan cannot be sent."}`;
+    section.append(refusal);
+  }
   const status = doc.createElement("p");
   const ack = state.ack === null ? "No plan sent from this card" : `Last upload: ${state.ack} at ${localTime(state.sent_at)}`;
   const verification = state.sent === null ? "" : state.verified ? " · Matched at last read" : " · NOT verified";
@@ -80,14 +134,7 @@ export function morekPanel(
     const title = doc.createElement("strong");
     title.textContent = `Sent (profile ${state.sent.chargingProfileId})`;
     section.append(title);
-    const start = new Date(state.sent.chargingSchedule.startSchedule).getTime();
-    const list = doc.createElement("ul");
-    for (const period of state.sent.chargingSchedule.chargingSchedulePeriod) {
-      const line = doc.createElement("li");
-      line.textContent = `${localTime(new Date(start + period.startPeriod * 1000).toISOString())}: ${period.limit} A`;
-      list.append(line);
-    }
-    section.append(list);
+    section.append(transitions(doc, state.sent));
   }
   if (state.effective !== null) {
     const title = doc.createElement("strong");
@@ -110,17 +157,17 @@ export function morekPanel(
     const actions = doc.createElement("div");
     actions.className = C.morekActions;
     const choices = state.supported
-      ? [["Send current plan", "send"], ["Refresh from Morek", "fetch"]] as const
+      ? [["Recalculate preview", "status"], ["Send current plan", "send"], ["Refresh from Morek", "fetch"]] as const
       : [["Check connection again", "status"]] as const;
     for (const [label, action] of choices) {
       const button = doc.createElement("button");
       button.type = "button";
       button.className = C.button;
       button.textContent = label;
-      button.disabled = busy;
+      button.disabled = busy || (action === "send" && (state.preview === undefined || state.preview.reason !== null || !state.preview.profile || !state.preview.preview_id));
       button.addEventListener("click", () => {
         if (action === "send" && !doc.defaultView?.confirm(
-          "Send this plan to Morek? Its final 0 A limit stays installed until explicitly cleared, even if SpotNav Auto resumes."
+          "Recalculate and send the CURRENT plan to Morek? Times may differ from this preview. Its final 0 A limit stays installed until explicitly cleared, even if SpotNav Auto resumes."
         )) return;
         act(action);
       });

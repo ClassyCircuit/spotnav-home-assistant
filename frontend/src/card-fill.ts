@@ -42,6 +42,18 @@ const SAME_HEIGHT_PX = 1;
 /** A sliver of a line is not a line: a deficit this close to a whole number of lines needs no extra one. */
 const LINE_EPSILON = 1e-3;
 
+/** Available height for the main card, excluding in-flow controls mounted after it. */
+export function cardBoxHeight(shell: HTMLElement, card: HTMLElement): number {
+  let siblings = 0;
+  for (const child of Array.from(shell.children)) {
+    if (child === card || !(child instanceof HTMLElement)) continue;
+    const style = getComputedStyle(child);
+    if (style.position === "absolute" || style.position === "fixed" || style.display === "none") continue;
+    siblings += child.offsetHeight + (Number.parseFloat(style.marginTop) || 0) + (Number.parseFloat(style.marginBottom) || 0);
+  }
+  return Math.max(0, shell.offsetHeight - siblings);
+}
+
 /**
  * The plan for one reading, or `null` when the card is not in a box of its own height (the container
  * leaves the height to the card, or gives it exactly its natural height): then nothing changes.

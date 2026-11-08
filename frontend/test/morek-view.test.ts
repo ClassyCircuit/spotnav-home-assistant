@@ -4,6 +4,12 @@ import { dashboard, FakeHass, mountCard } from "./helpers";
 
 const state = {
   supported: true,
+  preview: { calculated_at: "2026-11-06T20:00:00Z", preview_id: "preview-matches-windows", reason: null, profile: {
+    chargingProfileId: 42001, chargingSchedule: {
+      startSchedule: "2026-11-06T20:00:00Z",
+      chargingSchedulePeriod: [{ startPeriod: 0, limit: 0 }, { startPeriod: 3600, limit: 16 }, { startPeriod: 5400, limit: 0 }],
+    },
+  } },
   sent_at: "2026-11-06T20:00:00Z",
   ack: "Accepted",
   verified: false,
@@ -30,11 +36,22 @@ describe("Morek manual test panel", () => {
     expect(panel.textContent).toContain("Last upload: Accepted");
     expect(panel.textContent).toContain("NOT verified");
     expect(panel.textContent).toContain("Sent (profile 42001)");
+    expect(panel.textContent).toContain("Preview — calculated, NOT sent");
+    expect(panel.textContent).toContain("final 0 A limit remains installed");
     expect(panel.textContent).toContain("Morek effective schedule");
     const buttons = panel.querySelectorAll("button");
-    expect(buttons).toHaveLength(2);
-    buttons[1]?.click();
+    expect(buttons).toHaveLength(3);
+    buttons[2]?.click();
     expect(action).toHaveBeenCalledWith("fetch");
+  });
+
+  it("refuses send when preview is stale, unavailable, or Auto is not paused", () => {
+    const noPreview = morekPanel(document, { ...state, preview: undefined }, true, false, null, vi.fn());
+    expect(noPreview.textContent).toContain("Preview unavailable");
+    expect(Array.from(noPreview.querySelectorAll("button")).find((button) => button.textContent === "Send current plan")?.disabled).toBe(true);
+    const paused = morekPanel(document, { ...state, preview: { ...state.preview, reason: "pause_auto_first" } }, true, false, null, vi.fn());
+    expect(paused.textContent).toContain("Cannot send: Pause Auto");
+    expect(Array.from(paused.querySelectorAll("button")).find((button) => button.textContent === "Send current plan")?.disabled).toBe(true);
   });
 
   it("does not offer upload controls to a non-admin", () => {
@@ -67,5 +84,10 @@ describe("Morek manual test panel", () => {
     expect(root.textContent).not.toContain("Send current plan");
     root.querySelector<HTMLButtonElement>(".spotnav-morek-panel button")!.click();
     expect(transport.messages.at(-1)?.action).toBe("status");
+  });
+
+  it("will not enable Send for a preview without a backend plan fingerprint", () => {
+    const panel = morekPanel(document, { ...state, preview: { ...state.preview, preview_id: null } }, true, false, null, vi.fn());
+    expect(Array.from(panel.querySelectorAll("button")).find((button) => button.textContent === "Send current plan")?.disabled).toBe(true);
   });
 });

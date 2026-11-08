@@ -92,12 +92,14 @@ export async function morekSchedule(
   hass: HomeAssistantLike,
   chargerId: string,
   action: "status" | "send" | "fetch",
+  previewId?: string,
 ): Promise<unknown> {
   return await call<unknown>(hass, {
     type: "spotnav/morek_schedule",
     api_version: 1,
     charger_id: chargerId,
     action,
+    ...(action === "send" && previewId ? { preview_id: previewId } : {}),
   });
 }
 

@@ -16,6 +16,14 @@ does not start another OCPP server. Only an administrator can send or fetch.
    charger schedule cannot perform that target-based stop.
 3. Pause SpotNav Auto **Until I resume**. The Send button refuses to run without
    this pause, because SpotNav's usual timer-based control is still present.
+   Open **Morek schedule details** to see **Preview — calculated, NOT sent**.
+   This shows the proposed 0/16 A transitions and why Send is disabled, if applicable.
+   It is distinct from the Plan settings popup, the last sent profile, and the
+   charger effective readback. **Recalculate preview** reads the latest plan without
+   contacting Morek. Send recalculates with the current clock, so the precise
+   start timestamp can differ from the preview. The server checks that the
+   absolute charging windows and settings revision still match the preview;
+   otherwise Send refuses without uploading. Review again before confirming.
 4. Open **Morek schedule details** and press **Send current plan**. The panel
    shows the exact 0/16 A transitions sent, the charger reply, and the time.
 5. Press **Refresh from Morek** at any time, even before sending. It shows the

@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { planFill, type FillReading } from "../src/card-fill";
+import { cardBoxHeight, planFill, type FillReading } from "../src/card-fill";
 import { createCardView, type CardView, type CardViewInput } from "../src/card-view";
 import type { ChartObserverLike } from "../src/chart-interaction";
 import { chartHeightForWidth } from "../src/chart-render";
@@ -66,6 +66,28 @@ describe("planFill", () => {
   it("is the same plan for the same reading", () => {
     const first = planFill(reading(380, 400, 3), { basis: BASIS, min: MIN });
     expect(planFill(reading(380, 400, 3), { basis: BASIS, min: MIN })).toEqual(first);
+  });
+});
+
+describe("card height with an expanded Morek panel", () => {
+  it("excludes the opener and expanding panel rather than expanding the chart", () => {
+    const shell = document.createElement("div");
+    const card = document.createElement("div");
+    const opener = document.createElement("button");
+    const panel = document.createElement("section");
+    opener.style.marginTop = "12px";
+    panel.style.marginTop = "8px";
+    Object.defineProperty(opener, "offsetHeight", { value: 36 });
+    Object.defineProperty(panel, "offsetHeight", { value: 220 });
+    shell.append(card, opener);
+    Object.defineProperty(shell, "offsetHeight", { value: 468, configurable: true });
+    expect(cardBoxHeight(shell, card)).toBe(420);
+    shell.append(panel);
+    // A content-height shell grows by exactly the panel's own height and margin.
+    Object.defineProperty(shell, "offsetHeight", { value: 696 });
+    expect(cardBoxHeight(shell, card)).toBe(420);
+    expect(planFill({ box: cardBoxHeight(shell, card), natural: 420, statusHeight: LINE, lineHeight: LINE },
+      { basis: BASIS, min: MIN })).toBeNull();
   });
 });
 
@@ -143,6 +165,26 @@ function parts(root: ShadowRoot) {
 }
 
 describe("the card in a box", () => {
+  it("refits the real view after a Morek section is appended without enlarging its chart", () => {
+    let shellHeight = 420;
+    const read = (card: HTMLElement): FillReading => {
+      const shell = (card.getRootNode() as ShadowRoot).host as HTMLElement;
+      Object.defineProperty(shell, "offsetHeight", { configurable: true, value: shellHeight });
+      return { box: cardBoxHeight(shell, card), natural: 420, statusHeight: LINE, lineHeight: LINE };
+    };
+    const { view, root } = fillView(read);
+    const shell = root.host as HTMLElement;
+    const panel = document.createElement("section");
+    panel.style.marginTop = "8px";
+    Object.defineProperty(panel, "offsetHeight", { value: 200 });
+    shell.append(panel);
+    shellHeight = 628;
+    view.refit();
+    expect(parts(root).card?.hasAttribute("data-fill")).toBe(false);
+    expect(parts(root).viewport?.style.height).toBe(`${BASIS}px`);
+    view.destroy();
+  });
+
   it("observes the mount's host and changes nothing when the box is the card's own height", () => {
     const sim = layout({ box: null, statusLines: 2 });
     const { view, root, fire, observed } = fillView(sim.read);

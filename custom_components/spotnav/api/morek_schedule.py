@@ -8,6 +8,8 @@ of installed profiles. OCPP's internal ChargePoint API is isolated here for easy
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -205,7 +207,65 @@ async def _state(hass: HomeAssistant, entry_id: str) -> tuple[dict[str, Any], St
     return data, store
 
 
-async def async_schedule_action(hass: HomeAssistant, entry_id: str, action: str) -> dict[str, Any]:
+def _proposed_profile(hass: HomeAssistant, entry_id: str, now: datetime) -> dict[str, Any]:
+    """One calculation shared by the read-only preview and the actual send."""
+    settings = domain_data(hass).auto_store.settings(entry_id)
+    if settings.amps != 16:
+        raise ScheduleRefused("current_must_be_16")
+    planner = preview_for(hass, entry_id)
+    snapshot = planner.snapshot() if planner is not None else None
+    proposal = snapshot.proposal if snapshot is not None and snapshot.in_process else None
+    if (proposal is None or snapshot.settings_revision != settings.revision
+            or not proposal.has_plan or proposal.unpriced or not proposal.periods):
+        raise ScheduleRefused("no_current_plan")
+    if proposal.shown_periods != proposal.periods:
+        raise ScheduleRefused("target_stop_unsupported")
+    return profile_for(tuple(proposal.periods), settings.amps, now)
+
+
+def _preview_id(profile: dict[str, Any], revision: Any) -> str:
+    """Commit to the absolute ON/OFF transitions and settings revision, not the moving 0 A start."""
+    schedule = profile["chargingSchedule"]
+    start = datetime.fromisoformat(schedule["startSchedule"].replace("Z", "+00:00"))
+    transitions = [(start + timedelta(seconds=period["startPeriod"])).isoformat() + f":{period['limit']}"
+                   for period in schedule["chargingSchedulePeriod"][1:]]
+    return hashlib.sha256(json.dumps([str(revision), transitions]).encode()).hexdigest()
+
+
+def _preview(hass: HomeAssistant, entry_id: str, target: Any) -> dict[str, Any]:
+    """Describe a proposal without contacting OCPP or changing stored charger state."""
+    now = datetime.now(timezone.utc)
+    profile = None
+    reason = None
+    preview_id = None
+    try:
+        profile = _proposed_profile(hass, entry_id, now)
+        settings = domain_data(hass).auto_store.settings(entry_id)
+        preview_id = _preview_id(profile, settings.revision)
+        if settings.pause.choice != "until_resumed":
+            reason = "pause_auto_first"
+        elif not _identity_status(hass, target)["supported"]:
+            reason = "not_morek_connector"
+        else:
+            try:
+                _charge_point(hass, target)
+            except ScheduleRefused as error:
+                reason = error.code
+    except ScheduleRefused as error:
+        reason = error.code
+    except Exception:
+        # An unavailable planner must not prevent status from reporting charger identity/readback.
+        profile = None
+        preview_id = None
+        reason = "preview_unavailable"
+    return {"calculated_at": now.isoformat(), "profile": profile, "reason": reason,
+            "preview_id": preview_id}
+
+
+async def async_schedule_action(hass: HomeAssistant, entry_id: str, action: str,
+                                preview_id: str | None = None) -> dict[str, Any]:
+    if action == "send" and not preview_id:
+        raise ScheduleRefused("preview_changed")
     entry, failure = lookup_charger(hass, entry_id)
     if failure is not None or entry is None:
         raise ScheduleRefused(failure or "unknown_charger")
@@ -226,20 +286,9 @@ async def async_schedule_action(hass: HomeAssistant, entry_id: str, action: str)
             settings = domain_data(hass).auto_store.settings(entry_id)
             if settings.pause.choice != "until_resumed":
                 raise ScheduleRefused("pause_auto_first")
-            if settings.amps != 16:
-                raise ScheduleRefused("current_must_be_16")
-            planner = preview_for(hass, entry_id)
-            snapshot = planner.snapshot() if planner is not None else None
-            proposal = snapshot.proposal if snapshot is not None and snapshot.in_process else None
-            if (proposal is None or snapshot.settings_revision != settings.revision
-                    or not proposal.has_plan or proposal.unpriced or not proposal.periods):
-                raise ScheduleRefused("no_current_plan")
-            # Auto normally stops the last whole slot when the energy need is met.
-            # A charger profile cannot infer that target; refuse rather than silently
-            # charge for longer than the plan the card shows.
-            if proposal.shown_periods != proposal.periods:
-                raise ScheduleRefused("target_stop_unsupported")
-            profile = profile_for(tuple(proposal.periods), settings.amps, now)
+            profile = _proposed_profile(hass, entry_id, now)
+            if preview_id is None or preview_id != _preview_id(profile, settings.revision):
+                raise ScheduleRefused("preview_changed")
             # Record *before* the request: a timeout can still have installed a profile.
             data.update({"sent_at": now.isoformat(), "profile": profile, "ack": "unknown", "verified": False,
                          "effective": None})
@@ -284,7 +333,8 @@ async def async_schedule_action(hass: HomeAssistant, entry_id: str, action: str)
 
 
 @websocket_api.websocket_command({vol.Required("type"): "spotnav/morek_schedule", vol.Required("api_version"): int,
-                                   vol.Required("charger_id"): str, vol.Required("action"): vol.In(("status", "send", "fetch"))})
+                                   vol.Required("charger_id"): str, vol.Required("action"): vol.In(("status", "send", "fetch")),
+                                   vol.Optional("preview_id"): str})
 @websocket_api.async_response
 async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
     if msg["api_version"] != API_VERSION:
@@ -303,11 +353,14 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
             target = getattr(controller, "ocpp_target", None)
             result = {**_identity_status(hass, target),
                       "sent_at": data.get("sent_at"), "ack": data.get("ack"), "verified": data.get("verified", False),
-                      "sent": data.get("profile"), "effective": data.get("effective")}
+                      "sent": data.get("profile"), "effective": data.get("effective"),
+                      "preview": _preview(hass, entry.entry_id, target)}
         else:
-            result = await async_schedule_action(hass, msg["charger_id"], msg["action"])
+            result = await async_schedule_action(hass, msg["charger_id"], msg["action"], msg.get("preview_id"))
             controller = controller_for(hass, msg["charger_id"])
-            result.update(_identity_status(hass, getattr(controller, "ocpp_target", None)))
+            target = getattr(controller, "ocpp_target", None)
+            result.update(_identity_status(hass, target))
+            result["preview"] = _preview(hass, msg["charger_id"], target)
         connection.send_result(msg["id"], {"api_version": API_VERSION, "schedule": result})
     except ScheduleRefused as error:
         connection.send_error(msg["id"], f"spotnav_morek_{error.code}", error.code)

@@ -19,7 +19,7 @@ import {
   type ChartObserverLike,
   type ChartSize,
 } from "./chart-interaction";
-import { planFill, type FillReading } from "./card-fill";
+import { cardBoxHeight, planFill, type FillReading } from "./card-fill";
 import { applyFocus, chartHeightForWidth, renderChart, type ChartLabels } from "./chart-render";
 import { stripBarPlacement, stripBars, stripNowPosition, stripTicks } from "./chart-strip";
 import { createDialog, type DialogHandle } from "./dialog";
@@ -355,6 +355,8 @@ export interface FailureSentence {
 
 export interface CardView {
   element: HTMLElement;
+  /** Refit after the card owner mounts in-flow siblings under the same shell. */
+  refit(): void;
   destroy(): void;
   chart(): ChartInteraction;
   selection(): ChartMark | null;
@@ -2083,7 +2085,9 @@ export function createCardView(input: CardViewInput): CardView {
     }
     return {
       // Layout pixels, not the bounding rectangle: a scaled container (a CSS transform) must not change the fit.
-      box: fillBox?.offsetHeight ?? 0,
+      // The manual Morek section and its opener are siblings of the card inside the shell.
+      // Their height is not available to the chart, even when the shell is in a fixed-height box.
+      box: fillBox === null ? 0 : cardBoxHeight(fillBox, target),
       natural: target.offsetHeight,
       statusHeight: statusNode?.offsetHeight ?? 0,
       lineHeight: Number.isFinite(lineHeight) ? lineHeight : 0,
@@ -2098,6 +2102,7 @@ export function createCardView(input: CardViewInput): CardView {
     filled = false;
     delete card.dataset["fill"];
     card.style.removeProperty("--spotnav-fill-spare");
+    card.style.removeProperty("--spotnav-card-box");
     if (statusNode !== null) {
       delete statusNode.dataset["lines"];
       statusNode.style.removeProperty("--spotnav-status-lines");
@@ -2121,7 +2126,8 @@ export function createCardView(input: CardViewInput): CardView {
     const before = fillHeight;
     naturalLayout();
     const basis = collapsed ? 0 : chartHeightForWidth(size.width, density);
-    const plan = planFill((input.readFill ?? readFillFromLayout)(card), {
+    const reading = (input.readFill ?? readFillFromLayout)(card);
+    const plan = planFill(reading, {
       basis,
       min: collapsed ? 0 : density.minHeight,
     });
@@ -2130,6 +2136,7 @@ export function createCardView(input: CardViewInput): CardView {
       filled = true;
       card.dataset["fill"] = "true";
       card.style.setProperty("--spotnav-fill-spare", `${plan.spare}px`);
+      card.style.setProperty("--spotnav-card-box", `${reading.box}px`);
       if (statusNode !== null && plan.statusLines !== null) {
         statusNode.dataset["lines"] = String(plan.statusLines);
         statusNode.style.setProperty("--spotnav-status-lines", String(plan.statusLines));
@@ -5075,6 +5082,7 @@ export function createCardView(input: CardViewInput): CardView {
 
   return {
     element: card,
+    refit: fit,
     chart: () => interaction as ChartInteraction,
     selection: () => interaction?.selection() ?? null,
     readoutText: () => readout.textContent ?? "",
