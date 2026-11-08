@@ -695,6 +695,22 @@ class CurrentRestore:
     to_a: int | None
 
 
+@dataclass(slots=True)
+class StartAttemptEvidence:
+    """Conservative, in-memory evidence; it does not decide the session outcome.
+
+    Preparation calls can return without writing, so their flags mean *may*
+    have written. A start interrupted after dispatch has an unknown outcome.
+    """
+
+    phase_preparation_attempted: bool = False
+    current_preparation_attempted: bool = False
+    reservation_requested: bool = False
+    reservation_release_requested: bool = False
+    retry_already_armed: bool = False
+    start_dispatch: Literal["not_attempted", "unknown", "not_executed", "executed"] = "not_attempted"
+
+
 #: The core's owners as today's two owner fields (`charge_origin`, `plan_charge`): nobody's, and the charger's own
 #: charge, are neither.
 _CORE_OWNER_ORIGIN: Final = {
@@ -860,6 +876,7 @@ class ChargingController:
         # returns): an observation of the command, not ownership. The hold counts such a charge SpotNav's
         # (`_spotnav_owned`) before the start's result gives the session its owner.
         self._start_in_flight = False
+        self._last_start_attempt: StartAttemptEvidence | None = None
         # Shut down (`async_shutdown`): a regulator step that still holds this controller (the entry unloaded
         # while the step waited) sends the charger nothing more.
         self._shut_down = False
@@ -3790,21 +3807,19 @@ class ChargingController:
           phase switching was turned off: the next start of any kind leaves the one phase we set behind. A charge that
           runs when the setting is turned off is left as it is (no extra interruption).
         """
+        attempt = self._last_start_attempt = StartAttemptEvidence(retry_already_armed=self._start_retry_since is not None)
         self._start_held_back = False
         if manual or cause != "solar" or not self.phase_switching_option:
+            # This call can write a current and/or phases, or do nothing. Mark it
+            # before awaiting: cancellation cannot prove that it sent nothing.
+            attempt.phase_preparation_attempted = True
             await self._restore_three_phases_locked()
         # Whatever balancing paused before is over (this start is a charge of its own), and a person's start overrules
         # what the car ended before: the core decided both where the start began.
         if manual and self._target_stop is not None:
             self._target_stop = None
             await self._async_save()
-        explicit_amps = amps if amps is not None else self._setting_amps()
-        if explicit_amps is None and self.plan is not None:
-            explicit_amps = self.plan.amps
-        if explicit_amps is None and manual:
-            # A person's Start with no current named and no plan (a paused Auto keeps none): the last current
-            # asked for, so the start is still capped by load balancing as every start is.
-            explicit_amps = self._requested_current_a
+        explicit_amps = self._start_requested_amps(amps, manual=manual)
         reserved = False
         if self.is_switch_only:
             # A charger whose current cannot be set draws its whole switched current from the moment it starts: with
@@ -3823,11 +3838,13 @@ class ChargingController:
                     elif allowance is not None:
                         self._reserve_start(math.ceil(needed - 1e-9))
                         reserved = True
+                        attempt.reservation_requested = True
                 if switch_too_low is None and explicit_amps is not None:
                     await self._async_save()
             except BaseException:
                 if reserved:
                     self._reserve_start(None)
+                    attempt.reservation_release_requested = True
                 raise
             if switch_too_low is not None:
                 await self._hold_start_for_room(manual, cause, switch_too_low, needed)
@@ -3853,11 +3870,14 @@ class ChargingController:
                             # same site reads the allowance less this.
                             self._reserve_start(explicit_amps)
                             reserved = True
+                            attempt.reservation_requested = True
                         if self.current_control == CURRENT_CONTROL_CHANGE_CONFIGURATION:
+                            attempt.current_preparation_attempted = True
                             await self._assign_current_locked(
                                 explicit_amps, verify=False, reason=WRITE_SESSION_START
                             )
                         elif self._writes_current_at_start and not self.adapter.policy.ignored_while_paused:
+                            attempt.current_preparation_attempted = True
                             outcome = await self._assign_current_locked(
                                 explicit_amps, verify=False, reason=WRITE_SESSION_START
                             )
@@ -3868,9 +3888,10 @@ class ChargingController:
                 if too_low is None:
                     await self._async_save()
             except BaseException:
-                # Nothing went out: the site's margin is not on its way to this charger.
+                # Existing reservation cleanup; a preceding current write may already have gone out.
                 if reserved:
                     self._reserve_start(None)
+                    attempt.reservation_release_requested = True
                 raise
             if too_low is not None:
                 await self._hold_start_for_room(manual, cause, too_low, DEFAULT_MIN_CURRENT_A)
@@ -3895,15 +3916,18 @@ class ChargingController:
             was_cause = self._start_cause
             self._start_cause = (("manual" if manual else cause or "other"), sent_at)
             try:
+                attempt.start_dispatch = "unknown"
                 executed = await self.adapter.async_start(explicit_amps)
+                attempt.start_dispatch = "executed" if executed else "not_executed"
                 if executed:
                     # A start went out after any stop before it: a stop from now on is a new decision.
                     self._stop_settle_since = None
                     self._set_own_stop(False)
             except BaseException:
-                # The command failed outright: whatever it was to begin is not ours, nor anybody's.
+                # Preserve existing cleanup; an exception does not prove the command did not reach the charger.
                 if reserved:
                     self._reserve_start(None)
+                    attempt.reservation_release_requested = True
                 self._start_cause = was_cause
                 self._start_sent_at = None
                 self._start_write_pending = False
@@ -3913,6 +3937,7 @@ class ChargingController:
                 # The command never went out: nothing is awaiting an answer, and nothing may say so.
                 if reserved:
                     self._reserve_start(None)
+                    attempt.reservation_release_requested = True
                 self._start_cause = was_cause
                 self._start_sent_at = None
                 self._start_write_pending = False
@@ -3924,6 +3949,7 @@ class ChargingController:
             ):
                 # A charger that only stores a value while paused takes it once it is running; the site may
                 # have less room than when the start was decided.
+                attempt.current_preparation_attempted = True
                 await self._async_assign_current_outcome(
                     explicit_amps, reason=WRITE_SESSION_START, capped=capped
                 )
@@ -3939,6 +3965,19 @@ class ChargingController:
             await self._async_save_quietly()
         self._notify()
         return executed
+
+    def _start_requested_amps(self, amps: int | None, *, manual: bool) -> int | None:
+        """Choose the request without commanding the charger or changing controller state.
+
+        Called at the original decision point, after phase preparation and the
+        manual target-stop save, so this extraction does not change their order.
+        """
+        requested = amps if amps is not None else self._setting_amps()
+        if requested is None and self.plan is not None:
+            requested = self.plan.amps
+        if requested is None and manual:
+            requested = self._requested_current_a
+        return requested
 
     def _setting_amps(self) -> int | None:
         """The charging current the person set for this charger ("Laddström", the settings' `amps`), or `None` when

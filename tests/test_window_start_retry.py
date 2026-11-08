@@ -131,6 +131,7 @@ async def test_a_start_the_charger_ignores_is_sent_again_three_times_and_no_more
     await install_schedule(controller, _window())
     await _after(hass, freezer, 31)
     assert len(starts) == 1, "the window's own start"
+    assert controller._last_start_attempt.retry_already_armed  # noqa: SLF001
     for retry, after in enumerate(START_RETRY_AFTER_S, start=1):
         await _walk(hass, freezer, after - (0 if retry == 1 else START_RETRY_AFTER_S[retry - 2]))
         assert len(starts) == 1 + retry, f"retry {retry} at {after:.0f} s"
