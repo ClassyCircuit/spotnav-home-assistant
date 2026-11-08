@@ -1,7 +1,7 @@
 name: Release zip
 
-# HACS installs SpotNav from spotnav.zip attached to each release (hacs.json: zip_release), which also lets
-# GitHub count the downloads. The zip holds what is inside custom_components/spotnav, at the tag.
+# Optional downloadable archive for GitHub releases. Marketplace installs this fork
+# directly from main; hacs.json deliberately does not request a release ZIP.
 
 on:
   release:
