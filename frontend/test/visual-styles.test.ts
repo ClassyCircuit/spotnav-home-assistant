@@ -72,6 +72,12 @@ describe("responsive and hostile-content rules", () => {
     expect(VISUAL_STYLES).toMatch(/\.spotnav-dialog-overlay \{[^}]*position: fixed/s);
     expect(VISUAL_STYLES).toContain("[hidden]");
   });
+
+  it("allows copying normal card and Morek text without enabling selection on the interactive graph", () => {
+    expect(VISUAL_STYLES).toMatch(/:host \{[^}]*user-select: text;[^}]*-webkit-user-select: text;/s);
+    expect(VISUAL_STYLES).toMatch(/\.spotnav-morek-panel \{[^}]*user-select: text;[^}]*-webkit-user-select: text;/s);
+    expect(VISUAL_STYLES).toMatch(/\.spotnav-graph \{[^}]*user-select: none;[^}]*-webkit-user-select: none;/s);
+  });
 });
 
 describe("accessibility and theming", () => {

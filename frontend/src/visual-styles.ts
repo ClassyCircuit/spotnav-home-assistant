@@ -925,6 +925,8 @@ export const VISUAL_STYLES = `
     border-radius: 12px;
     background: var(--secondary-background-color, transparent);
     color: var(--primary-text-color, #212121);
+    user-select: text;
+    -webkit-user-select: text;
   }
   .spotnav-morek-panel h3 { margin: 0 0 8px; font-size: 1em; }
   .spotnav-morek-panel p { margin: 8px 0; }
@@ -1073,6 +1075,9 @@ export const VISUAL_STYLES = `
     box-sizing: border-box;
     max-width: 100%;
     height: 100%;
+    /* Dashboard/card wrappers can disable selection for drag gestures; ordinary text stays copyable. */
+    user-select: text;
+    -webkit-user-select: text;
   }
   *, *::before, *::after {
     box-sizing: border-box;

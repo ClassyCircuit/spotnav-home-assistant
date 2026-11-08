@@ -10,9 +10,10 @@ Re-check the live system and Git state before acting; observations below may bec
   `https://github.com/ClassyCircuit/spotnav-home-assistant.git`.
 - Fork display name: **SpotNav Enhanced**, from `hacs.json` and the integration manifest.
   Its HA domain stays `spotnav` to preserve existing integration entries and card identities.
-- Source version for this handoff: **2.5.3**, adding the Morek preview and chart
-  layout fix. The previous remote checkpoint was **2.5.2**, commit `d8454555`.
-  Check Git and the installed manifest before assuming 2.5.3 is installed in HA.
+- Source version for this handoff: **2.5.4**. Version 2.5.3 added the Morek
+  preview and layout fix (commit `ef483315`); 2.5.4 explicitly enables text
+  selection in the card and Morek panel, preserving nonselection on the graph.
+  Check Git and the installed manifest before assuming 2.5.4 is installed in HA.
   Marketplace installs this fork from the default branch; it shows commit hashes rather
   than `vX.Y.Z` because the fork has no GitHub Releases. Do not reintroduce
   `zip_release: true` into `hacs.json` while installing from `main`: Marketplace tried
@@ -20,7 +21,7 @@ Re-check the live system and Git state before acting; observations below may bec
   `.github/workflows/release-zip.yml` does not make every push a release.
 - **Deployment drift observed:** the read-only SMB check on 2026-11-08 found the HA share's
   `custom_components/spotnav/manifest.json` at **2.5.1**, while the fork was **2.5.2**.
-  Source is now 2.5.3; update via Marketplace and recheck before evaluating the
+  Source is now 2.5.4; update via Marketplace and recheck before evaluating the
   alias diagnostics, preview, or layout fix.
   Do not assume a Git push has installed or restarted the integration on HA.
 
@@ -127,10 +128,25 @@ Re-check the live system and Git state before acting; observations below may bec
   intended roughly **one hour** of charging but a five-transition Morek composite
   readback appeared to allow roughly **two and a half hours**. Treat mismatches as
   substantive and watch measured charging, not just an `Accepted` OCPP reply.
-- **No hardware test of this code has been completed.** Do read-only `status` and
-  `fetch` first after updating HA to 2.5.2; capture the diagnostic identity and
-  Morek's effective schedule. Resolve any wrong/unresolved identity before a send.
-  Plan a supervised send/cleanup only after the user agrees to its effects.
+- **A user-initiated hardware test occurred on 2026-11-08 with 2.5.3 installed.**
+  The user's screenshot and the read-only persisted SpotNav record show a 4:12 PM
+  `SetChargingProfile` reply of `Accepted` for profile `42001`. The sent profile
+  called for 0 A until 10:00 PM, 16 A until 11:00 PM, 0 A until 12:15 AM, 16 A
+  until 1:00 AM, then persistent 0 A. A 4:19 PM `GetCompositeSchedule` reply was
+  also `Accepted` but contained just one period, **16 A immediately**, so
+  verification is false. `Accepted` confirms an OCPP response, **not** that the
+  submitted limits are the effective ones or that the car actually draws 16 A.
+  The station's profile inventory and measured charging were not verified.
+- At that check, the config SMB share contained no usable `home-assistant.log`
+  (only an empty `.fault` file), and no HA API URL was verified. No OCPP wire
+  trace or Home Assistant supervisor/container logs were available from SMB.
+  Installed HA OCPP 0.12.3 can create its own `TxProfile` for active transactions
+  and `TxDefaultProfile` for future ones (`custom_components/ocpp/ocppv16.py`);
+  competition is **one possible** explanation, not a confirmed diagnosis.
+  Avoid another send, generic clear, or resuming a competing controller until
+  existing profiles and measured current can be investigated safely. Ask for
+  the user's HA browser URL to check API reachability, or consult HA Settings >
+  System > Logs. Do not assume `GetCompositeSchedule` lists stored profiles.
 
 ## Tests, build, and next steps
 
@@ -172,6 +188,8 @@ Re-check the live system and Git state before acting; observations below may bec
   type-check, build, check-dist, Ruff and Python compile checks passed. Five
   pure Python tests were exercised by isolated AST extraction (including the
   preview calculation); full HA Python pytest remains unrun on Windows.
+- For 2.5.4's text-selection change: 2,336 frontend tests passed; type-check,
+  build and check-dist passed. Browser/HA text selection is not yet verified.
 - Tests: `tests/test_morek_schedule.py` and `frontend/test/morek-view.test.ts`.
   Run the Python tests on Linux/Python 3.14 with project test dependencies, and
   add integration tests for alias resolution, WebSocket access and OCPP responses.
