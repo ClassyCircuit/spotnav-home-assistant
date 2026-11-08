@@ -27,6 +27,9 @@ export const VISUAL_CLASSES = {
   button: "spotnav-button",
   actionButton: "spotnav-action-button",
   plannerButton: "spotnav-planner-button",
+  morekToggle: "spotnav-morek-toggle",
+  morekPanel: "spotnav-morek-panel",
+  morekActions: "spotnav-morek-actions",
   actionHelp: "spotnav-action-help",
   strategyButton: "spotnav-strategy-button",
   actionError: "spotnav-action-error",
@@ -912,6 +915,21 @@ export const VISUAL_STYLES = `
     color: var(--primary-color, #03a9f4);
     font-weight: 500;
   }
+  .spotnav-morek-toggle {
+    margin: 12px 0 0;
+  }
+  .spotnav-morek-panel {
+    margin-top: 8px;
+    padding: 14px;
+    border: 1px solid var(--divider-color, #e0e0e0);
+    border-radius: 12px;
+    background: var(--secondary-background-color, transparent);
+    color: var(--primary-text-color, #212121);
+  }
+  .spotnav-morek-panel h3 { margin: 0 0 8px; font-size: 1em; }
+  .spotnav-morek-panel p { margin: 8px 0; }
+  .spotnav-morek-panel ul { margin: 6px 0 12px; padding-left: 24px; }
+  .spotnav-morek-actions { display: flex; flex-wrap: wrap; gap: 8px; }
   .spotnav-strategy-button {
     font-weight: 500;
   }

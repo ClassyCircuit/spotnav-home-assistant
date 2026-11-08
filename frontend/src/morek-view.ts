@@ -1,7 +1,12 @@
 // Manual Morek profile test panel. Nothing here treats a sent profile as a confirmed schedule.
+import { VISUAL_CLASSES as C } from "./visual-styles";
 
 export interface MorekState {
   supported: boolean;
+  reason?: string | null;
+  configured_id?: string | null;
+  resolved_id?: string | null;
+  connector_id?: number | null;
   sent_at: string | null;
   ack: string | null;
   verified: boolean;
@@ -39,13 +44,29 @@ export function morekPanel(
   admin: boolean,
   busy: boolean,
   error: string | null,
-  act: (action: "send" | "fetch") => void,
+  act: (action: "status" | "send" | "fetch") => void,
 ): HTMLElement {
-  const section = doc.createElement("details");
-  section.style.cssText = "margin: 12px 0; padding: 12px; border: 1px solid currentColor; border-radius: 8px";
-  const heading = doc.createElement("summary");
+  const section = doc.createElement("section");
+  section.className = C.morekPanel;
+  const heading = doc.createElement("h3");
   heading.textContent = "Morek stored schedule (manual test)";
   section.append(heading);
+  if (!state.supported) {
+    const warning = doc.createElement("p");
+    warning.textContent = state.reason === "no_ocpp_target"
+      ? "SpotNav has not identified an OCPP connector for this charger. Check its OCPP charger setup."
+      : state.reason === "wrong_connector"
+        ? "SpotNav is configured for a different connector; this test requires connector 1."
+        : state.reason === "ambiguous_station"
+          ? "Multiple OCPP connections match this charger. No request will be sent until its identity is unambiguous."
+          : state.reason === "unsupported_ocpp_version"
+            ? "This test requires an OCPP 1.6 connection."
+            : "HA OCPP has not matched this charger to Morek station 3020002509120029. Check its OCPP configuration and connection.";
+    section.append(warning);
+    const identity = doc.createElement("p");
+    identity.textContent = `SpotNav OCPP ID: ${state.configured_id ?? "not found"} · connector: ${state.connector_id ?? "not found"} · HA OCPP station: ${state.resolved_id ?? "not resolved"}`;
+    section.append(identity);
+  }
   const note = doc.createElement("p");
   note.textContent = "SpotNav still uses live start/stop commands. Pause Auto 'Until I resume' before sending. These controls do not authorize a plugged-in car.";
   section.append(note);
@@ -86,20 +107,26 @@ export function morekPanel(
     section.append(message);
   }
   if (admin) {
-    for (const [label, action] of [["Send current plan", "send"], ["Refresh from Morek", "fetch"]] as const) {
+    const actions = doc.createElement("div");
+    actions.className = C.morekActions;
+    const choices = state.supported
+      ? [["Send current plan", "send"], ["Refresh from Morek", "fetch"]] as const
+      : [["Check connection again", "status"]] as const;
+    for (const [label, action] of choices) {
       const button = doc.createElement("button");
       button.type = "button";
+      button.className = C.button;
       button.textContent = label;
       button.disabled = busy;
-      button.style.marginRight = "8px";
       button.addEventListener("click", () => {
         if (action === "send" && !doc.defaultView?.confirm(
           "Send this plan to Morek? Its final 0 A limit stays installed until explicitly cleared, even if SpotNav Auto resumes."
         )) return;
         act(action);
       });
-      section.append(button);
+      actions.append(button);
     }
+    section.append(actions);
   }
   return section;
 }

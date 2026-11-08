@@ -144,20 +144,50 @@ def matches(profile: dict[str, Any], actual: dict[str, Any], *, tolerance_s: int
     )
 
 
-def _charge_point(hass: HomeAssistant, target: Any) -> Any:
-    """Use only the one connected OCPP 1.6 charger resolved by SpotNav's connector identity."""
-    found = []
+def _matching_points(hass: HomeAssistant, target: Any) -> list[tuple[str, Any]]:
+    """Resolve HA OCPP's configured charger alias to its physical WebSocket station ID."""
+    found: list[tuple[str, Any]] = []
     for system in hass.data.get("ocpp", {}).values():
         points = getattr(system, "charge_points", None)
         cpids = getattr(system, "cpids", None)
         if not isinstance(points, dict) or not isinstance(cpids, dict):
             continue
-        point = points.get(cpids.get(target.devid, target.devid))
+        physical_id = cpids.get(target.devid, target.devid)
+        point = points.get(physical_id)
         if point is not None:
-            found.append(point)
-    if len(found) != 1 or getattr(found[0], "_ocpp_version", None) != "1.6" or getattr(found[0], "status", None) != "ok":
+            found.append((physical_id, point))
+    return found
+
+
+def _identity_status(hass: HomeAssistant, target: Any) -> dict[str, Any]:
+    """Read-only diagnosis; an alias is valid only when HA OCPP maps it to this Morek."""
+    if target is None:
+        return {"supported": False, "reason": "no_ocpp_target", "configured_id": None,
+                "resolved_id": None, "connector_id": None}
+    found = _matching_points(hass, target)
+    resolved = found[0][0] if len(found) == 1 else (target.devid if not found else None)
+    reason = None
+    if target.connector_id != 1:
+        reason = "wrong_connector"
+    elif len(found) > 1:
+        reason = "ambiguous_station"
+    elif resolved != MOREK_STATION_ID:
+        reason = "station_not_matched"
+    elif found and getattr(found[0][1], "_ocpp_version", None) != "1.6":
+        reason = "unsupported_ocpp_version"
+    return {"supported": reason is None, "reason": reason, "configured_id": target.devid,
+            "resolved_id": resolved if found else None, "connector_id": target.connector_id}
+
+
+def _charge_point(hass: HomeAssistant, target: Any) -> Any:
+    """Use only the one connected OCPP 1.6 physical Morek charger."""
+    found = _matching_points(hass, target)
+    if len(found) != 1 or found[0][0] != MOREK_STATION_ID:
         raise ScheduleRefused("morek_offline")
-    return found[0]
+    point = found[0][1]
+    if getattr(point, "_ocpp_version", None) != "1.6" or getattr(point, "status", None) != "ok":
+        raise ScheduleRefused("morek_offline")
+    return point
 
 
 async def _state(hass: HomeAssistant, entry_id: str) -> tuple[dict[str, Any], Store]:
@@ -181,12 +211,14 @@ async def async_schedule_action(hass: HomeAssistant, entry_id: str, action: str)
         raise ScheduleRefused(failure or "unknown_charger")
     controller = controller_for(hass, entry_id)
     target = getattr(controller, "ocpp_target", None)
-    if target is None or target.connector_id != 1 or target.charge_point_id != MOREK_STATION_ID:
+    if not _identity_status(hass, target)["supported"]:
         raise ScheduleRefused("not_morek_connector")
     await _state(hass, entry_id)
     cache = hass.data[_DATA_KEY]
     data, store, lock = cache[entry_id]
     async with lock:
+        if not _identity_status(hass, target)["supported"]:
+            raise ScheduleRefused("not_morek_connector")
         cp = _charge_point(hass, target)
         from ocpp.v16 import call as ocpp_call
         now = datetime.now(timezone.utc)
@@ -269,12 +301,13 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
             data, _ = await _state(hass, entry.entry_id)
             controller = controller_for(hass, entry.entry_id)
             target = getattr(controller, "ocpp_target", None)
-            result = {"supported": target is not None and target.connector_id == 1
-                      and target.charge_point_id == MOREK_STATION_ID,
+            result = {**_identity_status(hass, target),
                       "sent_at": data.get("sent_at"), "ack": data.get("ack"), "verified": data.get("verified", False),
                       "sent": data.get("profile"), "effective": data.get("effective")}
         else:
             result = await async_schedule_action(hass, msg["charger_id"], msg["action"])
+            controller = controller_for(hass, msg["charger_id"])
+            result.update(_identity_status(hass, getattr(controller, "ocpp_target", None)))
         connection.send_result(msg["id"], {"api_version": API_VERSION, "schedule": result})
     except ScheduleRefused as error:
         connection.send_error(msg["id"], f"spotnav_morek_{error.code}", error.code)

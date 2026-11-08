@@ -6,6 +6,8 @@ from types import SimpleNamespace
 import pytest
 
 from custom_components.spotnav.api.morek_schedule import (
+    _charge_point,
+    _identity_status,
     ScheduleRefused,
     matches,
     profile_for,
@@ -67,3 +69,25 @@ def test_composite_uses_reply_schedule_start_and_catches_extra_charging():
                                {"startPeriod": 0, "limit": 0}, {"startPeriod": 3000, "limit": 0},
                            ]})
     assert not matches(profile, readback(late, NOW + timedelta(hours=1, minutes=10)))
+
+
+def test_ocpp_alias_must_resolve_to_the_physical_morek_before_commands():
+    morek = SimpleNamespace(_ocpp_version="1.6", status="ok")
+    system = SimpleNamespace(cpids={"garage": "3020002509120029"},
+                             charge_points={"3020002509120029": morek})
+    hass = SimpleNamespace(data={"ocpp": {"entry": system}})
+    target = SimpleNamespace(devid="garage", connector_id=1)
+    assert _identity_status(hass, target)["supported"] is True
+    assert _identity_status(hass, target)["resolved_id"] == "3020002509120029"
+    assert _charge_point(hass, target) is morek
+
+    system.cpids["garage"] = "other_station"
+    system.charge_points["other_station"] = SimpleNamespace(_ocpp_version="1.6", status="ok")
+    assert _identity_status(hass, target)["supported"] is False
+    with pytest.raises(ScheduleRefused):
+        _charge_point(hass, target)
+
+    system.cpids.clear()
+    system.charge_points.clear()
+    assert _identity_status(hass, target)["reason"] == "station_not_matched"
+    assert _identity_status(hass, None)["reason"] == "no_ocpp_target"

@@ -343,7 +343,6 @@ export class SpotnavCard extends HTMLElement {
   private morekOperation = 0;
   private morekBusy = false;
   private morekError: string | null = null;
-  private morekExpanded = false;
   private actionInFlight: { generation: number; attempt: number; action: ActionId } | null = null;
   private editor: SettingsEditorState | null = null;
   /** The Plan dialog's live preview, bound to the editor it was asked for (`plan-preview.ts`). */
@@ -445,7 +444,6 @@ export class SpotnavCard extends HTMLElement {
     this.morekEnabled = false;
     this.morekBusy = false;
     this.morekError = null;
-    this.morekExpanded = false;
     this.morekOperation += 1;
     this.deferredRefresh = false;
     this.marketEditor = null;
@@ -3068,34 +3066,31 @@ export class SpotnavCard extends HTMLElement {
         this.reopenOverview = false;
         this.view.openSettingsOverview();
       }
-      if (!this.morekEnabled && this.isAdmin) {
+      if (this.isAdmin) {
         const open = doc.createElement("button");
         open.type = "button";
+        open.className = `${VISUAL_CLASSES.button} ${VISUAL_CLASSES.plannerButton} ${VISUAL_CLASSES.morekToggle}`;
         open.textContent = "Morek schedule details";
+        open.setAttribute("aria-expanded", String(this.morekEnabled));
         open.addEventListener("click", () => {
-          this.morekEnabled = true;
-          this.morekExpanded = true;
-          void this.morekAction("status");
+          this.morekEnabled = !this.morekEnabled;
+          if (this.morekEnabled && this.morekState === null && !this.morekBusy) {
+            void this.morekAction("status");
+          } else {
+            this.render();
+          }
         });
         host.append(open);
-      } else if (this.morekEnabled && this.morekState?.supported) {
+      }
+      if (this.morekEnabled && this.morekState !== null) {
         const panel = morekPanel(doc, this.morekState, this.isAdmin, this.morekBusy, this.morekError,
           (action) => { void this.morekAction(action); });
-        (panel as HTMLDetailsElement).open = this.morekExpanded;
-        panel.addEventListener("toggle", () => { this.morekExpanded = (panel as HTMLDetailsElement).open; });
         host.append(panel);
-      } else if (this.morekEnabled && this.morekBusy) {
+      } else if (this.morekEnabled) {
         const loading = doc.createElement("p");
-        loading.textContent = "Loading Morek schedule…";
+        loading.className = VISUAL_CLASSES.morekPanel;
+        loading.textContent = this.morekBusy ? "Loading Morek schedule…" : this.morekError ?? "Morek schedule is unavailable. Close and reopen to retry.";
         host.append(loading);
-      } else if (this.morekEnabled && this.morekState?.supported === false) {
-        const unsupported = doc.createElement("p");
-        unsupported.textContent = "This test is only available for Morek station 3020002509120029, connector 1.";
-        host.append(unsupported);
-      } else if (this.morekEnabled && this.morekError !== null) {
-        const error = doc.createElement("p");
-        error.textContent = `Morek schedule: ${this.morekError}`;
-        host.append(error);
       }
       return;
     }

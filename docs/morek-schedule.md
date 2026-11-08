@@ -31,6 +31,10 @@ replans, or clear the final 0 A limit. Resume SpotNav Auto only after deciding
 how to handle the test profile: its live start/stop controller otherwise conflicts
 with a stored profile. A reported `Accepted` is not proof the car will charge.
 This diagnostic is limited to OCPP station ID `3020002509120029`, connector 1.
+HA OCPP may name the charger with an alias. The panel shows both SpotNav's
+configured OCPP ID and the physical ID resolved by HA OCPP; an alias is accepted
+only when it resolves to that exact station. If it is not resolved, verify the
+charger is connected and SpotNav's OCPP connector identity is configured.
 
 This integration calls HA OCPP's connected ChargePoint through its internal
 Python API because `ocpp.set_charge_rate` does not expose the charger reply and
