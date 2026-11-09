@@ -1,12 +1,186 @@
 # Morek autonomous charging and dashboard roadmap
 
-Status: **approved direction; implementation not started**. Updated 2026-11-08.
+Status: **in progress; manual baseline and ownership groundwork complete; autonomous mode not active**.
+Updated 2026-11-09. The checklist below is the authoritative work queue.
 
 This is the forward-looking plan for SpotNav Enhanced. Implement **one work block
 at a time**, not a dashboard rewrite and controller rewrite in one release.
 For existing code, HA access, hardware observations and credentials handling, read
 [the development handoff](morek-development-handoff.md) and `AGENTS.md` first.
 This document is not permission to deploy, restart HA, or issue hardware commands.
+
+## Task overview — start here
+
+One **substage** is one implementation session followed by coordinator review.
+Substages are intended to be comparable reviewable changes, not equal line counts.
+Do not assign a whole stage in one prompt. Each substage includes its own focused
+tests, documentation and required version/build checks; these are not extra stages.
+
+`[x]` = implemented groundwork (not proof of live hardware behavior).
+`[ ]` = remaining. Do not repeat checked tasks or replace working foundations.
+Detailed requirements and acceptance cases follow outside this checklist.
+
+| Stage | Outcome | Dependency / status |
+| --- | --- | --- |
+| 0 | Existing functionality and groundwork | Complete; reuse it |
+| 1 | Price cap and minimum ready-by SOC planning | **Next: 1.1**; independent of isolation |
+| 2 | Isolate Morek from legacy control | Groundwork done; actual isolation remains |
+| 3 | Automatically send changed schedules | Stages 1 and 2 before activation |
+| 4 | Recover and report execution health | Stage 3 |
+| 5 | One usable daily dashboard | Layout may start early; live status needs 3–4 |
+| 6 | Genuine charging history | Source inventory can start early |
+| 7 | Interactive ECharts prices and tracks | Stage 5; actual track uses Stage 6 |
+| 8 | Yesterday, costs and savings | Stages 6–7 |
+| 9 | Product polish and installation | Stages 5–8 |
+
+### Stage 0 — Completed baseline: preserve and reuse
+
+- [x] **0.1 Manual Morek workflow:** exact displayed-window preview/send, selective
+  removal, bounded readback, drift/coverage reporting and shortened final blocks.
+- [x] **0.2 Writer audit:** mapped ordinary, safety, startup and handback writers;
+  documented unresolved authorization/transition decisions.
+- [x] **0.3 Ownership groundwork:** persisted unarmed metadata, physical connector
+  admission locks, identity classification and serialized late initialization.
+- [x] **0.4 Uncertainty groundwork:** partial start extraction/characterization and
+  standalone durable attempt evidence. These are unwired, not isolation or recovery.
+
+Evidence: `docs/morek-execution-audit.md`; source through **2.5.13**. Isolated
+tests are documented there; full HA collection is still blocked on Windows.
+
+### Stage 1 — Price policy (old A2P)
+
+- [ ] **1.1 Settings and API**
+  - Persist optional cap and distinct minimum ready-by SOC in existing settings.
+  - Validate units/minimum/target; expose price basis and preserve old behavior.
+- [ ] **1.2 Planner policy**
+  - Use cheap slots toward target; add cheapest above-cap energy only for minimum.
+  - Handle partial blocks, period limits, stale inputs and infeasible deadlines.
+- [ ] **1.3 Reactive planning and explanation**
+  - Replan on cap/minimum/target/SOC/ready-by changes without a browser.
+  - Expose policy reasons and consistent plan energy/cost; test API-to-plan flow.
+
+### Stage 2 — Actual Morek isolation (remaining old A2)
+
+- [ ] **2.1 Reuse the legacy execution boundary**
+  - Extend the existing Auto execution gate with explicit Morek ownership: no
+    ordinary legacy starts OR stops, plan installation, retries or automatic resume.
+  - Reject conflicting manual/API actions before preparation effects; keep planning,
+    metering and status. Reuse pause infrastructure, not its stop-on-pause semantics.
+- [ ] **2.2 Close bypasses with shared guards**
+  - Guard the few direct write boundaries that bypass Auto (current/phase writes,
+    restore and deletion handback); reuse guards rather than gate every caller.
+  - Keep protection unchanged; expose an activation blocker if live site regulation
+    conflicts with schedule-only control. Do not redesign the regulator here.
+- [ ] **2.3 Mode lifecycle and end-to-end regression**
+  - Establish ownership before legacy startup/restore; quiesce old work before any
+    explicit handover. Prefer a deliberate reload over seamless hot switching.
+  - Test all audited writer categories against the shared guards, including aliases,
+    restart and unrelated chargers. Explain retained profiles and activation blockers.
+
+### Stage 3 — Autonomous schedule updates (old A3)
+
+- [ ] **3.1 Shared schedule intent**
+  - Reuse the existing builder/fingerprint; support remaining active windows.
+  - Define expired/no-plan/missing-price behavior without silently releasing limits.
+- [ ] **3.2 Backend worker and triggers**
+  - Coalesce price/SOC/settings/deadline changes; send only changed wire intent.
+  - Serialize and reject stale work; test deduplication and concurrent edits.
+- [ ] **3.3 Shared manual actions and persisted outcomes**
+  - Route manual Send through the same safeguards; keep Refresh read-only.
+  - Persist desired/attempted/ACK/verified versions; bound uncertain-upload retries.
+
+### Stage 4 — Recovery and health (old A4)
+
+- [ ] **4.1 Restart and reconnect**
+  - Reconcile current valid intent, not cached stale profiles; test offline startup.
+  - Cover duplicate identities and uncertain persisted attempts before enabling mode.
+- [ ] **4.2 Verification**
+  - Extend existing bounded checks to active/remaining windows and delayed replies.
+  - Preserve coverage, drift, freshness and mismatch reasons; reject stale results.
+- [ ] **4.3 Operator state and unresolved actions**
+  - Expose waiting/ready/sending/checking/mismatch/offline/intervention states.
+  - Finish only the unresolved-command handling needed by the chosen Morek path;
+    preserve explicit Stop intent and protection; document safe recovery/downgrade.
+
+### Stage 5 — Single dashboard and daily controls (old A5 + B2)
+
+- [ ] **5.1 Layout and shared components**
+  - Build desktop/mobile browser prototype with sample data; get visual approval.
+  - Choose shared tokens/controls and HA Sections composition; no second dashboard.
+- [ ] **5.2 Overview and operation status**
+  - Bind connection/SOC/measured power/next window and proposal/sent/readback health.
+  - Make missing data and critical failures visible without expanding details.
+- [ ] **5.3 Plan controls and actions**
+  - Add target/minimum/cap/ready-by controls, costs and policy explanations.
+  - Keep Send/Refresh accessible; distinguish upload suspension/pause/removal/exit.
+
+### Stage 6 — Real history data (old B1)
+
+- [ ] **6.1 Source inventory**
+  - Verify actual Morek/OCPP/Recorder measurements, resolution and retained history.
+  - Check Bavarian CarData as fallback/cross-check; document association and gaps.
+- [ ] **6.2 Capture and provenance**
+  - Reuse existing stores; retain sent-plan versions and genuine power/energy events.
+  - Handle resets/duplicates/gaps; never substitute schedule windows for observations.
+- [ ] **6.3 Queries and retention**
+  - Add bounded historical queries/retention with original tariff and plan context.
+  - Test restart/midnight, charging outside plan and planned blocks with no flow.
+
+### Stage 7 — ECharts prices and schedule tracks (old B3)
+
+- [ ] **7.1 Price chart**
+  - Bundle ECharts locally; show source-resolution prices, units, cap and markers.
+  - Handle negative/missing prices, timezone and DST correctly.
+- [ ] **7.2 Interaction**
+  - Add Today/Tomorrow/All, touch/mouse zoom, overview/reset and exact tooltips.
+  - Preserve zoom on updates; test resize and keyboard/touch behavior in a browser.
+- [ ] **7.3 Aligned tracks**
+  - Distinguish proposal/sent/effective/measured tracks and minimum-SOC exceptions.
+  - Show mismatches and missing observations honestly; reuse Stage 6 provenance.
+
+### Stage 8 — Yesterday and financial summaries (old B4 + C1)
+
+- [ ] **8.1 Yesterday comparison**
+  - Date selection, measured-versus-sent chart and out-of-plan charging.
+  - Show unknown coverage separately from confirmed absence of flow.
+- [ ] **8.2 Costs**
+  - Extend existing calculations for per-window and session/day/month totals.
+  - Preserve historical tariffs, distinguish estimates and test missing/negative data.
+- [ ] **8.3 Savings and summary cards**
+  - Compare the same energy against an explicit comparable charging baseline.
+  - Label coverage/assumptions; keep totals consistent across dashboard cards.
+
+### Stage 9 — Finish and installation (old C2)
+
+- [ ] **9.1 Accessibility and themes:** light/dark, contrast, non-colour states,
+  keyboard/touch, copyable text and reduced motion.
+- [ ] **9.2 Responsive integration:** browser-test the whole dashboard, empty/error
+  states and repeated updates; remove duplicate daily controls within the new UI.
+- [ ] **9.3 Installation and documentation:** one dashboard template, migration and
+  diagnostics guidance; never overwrite user views or claim unperformed hardware tests.
+
+### Execution boundaries — avoid another prerequisite spiral
+
+- **Next implementation is 1.1**, not another unwired admission helper. Stage 1
+  can proceed while Stage 2 activation questions remain open.
+- The previously proposed durable pre-dispatch callback wrapper was **not assigned**
+  and is **not a required task**. Do not implement it automatically.
+- Reuse the completed evidence store if the selected execution path needs it.
+  Do not expand generic legacy-command recovery as a prerequisite for planner/UI work.
+- Stage 2 uses three implementation slices, not a per-caller gating project. Reuse
+  the audited writer inventory and existing execution/admission boundaries. Full
+  writer coverage is a test requirement, not a requirement to scatter checks through
+  every function. No new standalone design/audit session is required first.
+- Code can be reviewed with mode unarmed. Actual activation requires completed
+  isolation and resolved electrical/authorization blockers; do not weaken those.
+- Source inventory (6.1) and sample-data layout (5.1) may start early. Hardware
+  testing remains user-directed, never a separate delivery gate.
+
+## Detailed requirements and acceptance reference
+
+The sections below explain policy and test cases. Legacy A/B/C identifiers are
+retained for links/history only; the numbered checklist above controls task scope
+and progress. Do not treat an old broad block as a single implementation session.
 
 ## 1. What the user wants
 
@@ -50,7 +224,8 @@ evcc or another controller alongside SpotNav.
 
 ## 2. Current baseline, not the finished product
 
-At planning time source version is **2.5.7**; verify installed/runtime versions.
+The manual baseline below describes **2.5.7**. Source has since reached **2.5.13**
+with unarmed groundwork; see Stage 0 and the execution audit. Verify runtime versions.
 
 - The manual Morek API can preview, send, fetch and selectively clear profile
   `42001`, station `3020002509120029`, connector `1`, through HA OCPP.
@@ -189,68 +364,12 @@ Do not conflate these in APIs, UI, history or tests:
 presented as the known sent schedule plus effective readback, not invented proof
 of every stored profile or its absence.
 
-## 4. Work blocks, in implementation order
+## 4. Detailed backend, dashboard and history acceptance
 
-Each block is sized as a focused LLM task/reviewable change, not a requirement to
-rewrite whole subsystems. Split further if necessary. Do not implement future
-blocks opportunistically while working on the current one.
-
-| Block | Priority | Deliverable | Depends on |
-| --- | --- | --- | --- |
-| A1 | P0 | Execution ownership and authorization audit/design | None |
-| A2 | P0 | Enforced Morek schedule-only mode | A1 |
-| A2P | P0 | Soft price cap, minimum SOC and ready-by planning | A1; planner work can parallel A2 |
-| A3 | P0 | Persistent autonomous schedule reconciliation | A2, A2P |
-| A4 | P0 | Restart/reconnect recovery and verification health | A3 |
-| A5 | P0 | Minimum always-visible daily operations UI | A2–A4 |
-| B1 | P1 | Investigate Morek telemetry; persist genuine measured history | Start source audit early; A3 for plan versions |
-| B2 | P1 | Dashboard layout prototype and reusable components | A5; read this brief |
-| B3 | P1 | ECharts prices and aligned schedule tracks | B2 |
-| B4 | P1 | Yesterday's actual charging versus plan | B1, B3 |
-| C1 | P2 | Costs, savings and session/day/month summaries | B1, B4 |
-| C2 | P2 | Refinement, accessibility and installation polish | B2–C1 |
-
-**First useful release:** A2, A2P and A3–A5 with automated regression checks and
-explicit known limitations. Do not defer backend automation/price policy until
-after a cosmetic redesign. Start B1's source audit and minimal event/measurement
-capture early so useful history accumulates while other cards are developed.
-There is **no A6 hardware gate**; the user tests on their own schedule. Do not
-confuse “implemented and software-tested” with “physically verified on Morek”.
-
-User-facing stage summary:
-
-1. **Improved autonomous backend:** ownership, soft cap/minimum SOC policy,
-   automatic recalculation/resending, restart/reconnect recovery (A1–A4, A2P).
-2. **Clear daily controls/status:** always-visible operational information (A5).
-3. **Modern single-dashboard prototype:** approve layout and components (B2).
-4. **Interactive prices and schedules:** ECharts zoom/overlays/tracks (B3).
-5. **True charging history:** establish Morek data sources and show measured
-   behavior versus historical plans, never schedule-derived guesses (B1, B4).
-6. **Costs, savings and finishing:** summaries, responsive UX and polish (C1–C2).
-
-Stage 5's data-source investigation/collection can start before its finished UI;
-the numbered stages are delivery priorities, not a reason to discard early data.
-
-For larger blocks, use these separately reviewable sub-tasks rather than asking
-one LLM session to finish everything:
-
-- **A2.1:** persisted mode/ownership model and migration; **A2.2:** gate all
-  identified legacy writers and test transitions. Keep autonomous mode unarmed
-  until both are complete; partial gating must not be deployed as safe ownership.
-- **A3.1:** pure intent/fingerprint and active-window/no-plan policies;
-  **A3.2:** persistent worker, triggers and deduplication;
-  **A3.3:** unify manual commands and bounded upload retry behavior.
-- **A4.1:** restart/reconnect reconciliation; **A4.2:** verification health,
-  timeouts, alerts and remaining-window comparison.
-- **A2P.1:** settings schema, validation and price basis; **A2P.2:** constrained
-  planner/minimum-SOC exception; **A2P.3:** API/UI controls and reactive update tests.
-- **B1.1:** read-only Morek telemetry/source audit; **B1.2:** genuine measurement
-  and versioned event capture; **B1.3:** retention and historical query API.
-- **B3.1:** price chart with zoom/units/time handling; **B3.2:** aligned plan,
-  readback and measurement tracks. Each uses the same approved component design.
-
-Finish, test and document one sub-task before moving on. Keep incomplete features
-disabled; do not weaken acceptance gates merely to make a partial release usable.
+Use these descriptions to implement the corresponding numbered substage above,
+not as a second work queue. The first autonomous release requires price policy,
+actual isolation, automatic updates, recovery and daily controls. No overnight run
+is a prerequisite for software development or dashboard work.
 
 ### A1 — Audit the existing execution paths (documentation + tests/design)
 
@@ -597,21 +716,11 @@ sections in this order. No essential Morek section is collapsed by default.
 7. A task is not complete merely because a button renders or OCPP says Accepted.
    Meet its acceptance criteria before calling it operational.
 
-### Progress
+### Progress updates
 
-- [x] User requirements, direction, priorities and work blocks documented.
-- [ ] A1 execution ownership/authorization audit approved.
-- [ ] A2 schedule-only mode enforced.
-- [ ] A2P soft price cap/minimum-SOC/deadline policy implemented.
-- [ ] A3 autonomous reconciliation implemented.
-- [ ] A4 recovery and execution health implemented.
-- [ ] A5 minimum daily UI implemented.
-- [ ] B1 Morek measurement-source audit and genuine history available.
-- [ ] B2 prototype/layout approved.
-- [ ] B3 ECharts price/plan card implemented.
-- [ ] B4 yesterday comparison implemented.
-- [ ] C1 costs/savings completed.
-- [ ] C2 accessibility, polish and installation completed.
+Update the numbered checklist at the top; do not maintain a duplicate checklist.
+Record detailed implementation/test evidence in `morek-execution-audit.md` or the
+relevant handoff. Completing groundwork is not completing actuator isolation.
 
 ## 8. Research references
 

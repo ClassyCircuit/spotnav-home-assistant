@@ -6,6 +6,14 @@ Re-check the live system and Git state before acting; observations below may bec
 
 ## Approved next direction (planning, not implemented)
 
+**2026-11-09 coordination update:** the roadmap now begins with a concise numbered
+task checklist. Completed audit/ownership/admission/identity/start-evidence work
+through 2.5.13 is Stage 0, not work to repeat. Next is **1.1: price-policy settings
+and API**, followed by planner policy and reactive planning. Actual isolation is
+Stage 2 and remains incomplete/unarmed. The proposed additional unwired durable
+pre-dispatch helper was never assigned and is not the next task. Detailed historical
+versions/deployment facts below must not override current Git or the new checklist.
+
 Read [charging-dashboard-roadmap.md](charging-dashboard-roadmap.md) for the user's
 latest requirements and prioritized, bounded LLM tasks. The user wants **one HA
 charging dashboard with multiple cards**, not a second stock-card dashboard;

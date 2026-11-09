@@ -8,6 +8,36 @@ because you have been initialized.
 Snapshot: **2026-11-09**. This is a reusable handoff, not proof of current Git,
 deployment or hardware state. Update its progress section when handing off again.
 
+## Current direction — supersedes the older next-action notes below
+
+The user requested less engineering overhead and a concise task-based roadmap.
+`docs/charging-dashboard-roadmap.md` now starts with the authoritative numbered
+stage/substage checklist. Detailed old A/B/C descriptions remain only as acceptance
+reference. Use the new numbering for future implementation prompts.
+
+- Completed groundwork is Stage 0; do not rebuild it.
+- Source through **2.5.13** includes the standalone, unwired
+  `execution/unresolved_start.py` and its tests. Coordinator inspected the store
+  and tests and ran Ruff; the implementer reported 15 isolated evidence cases and
+  440 pure-core cases. These are not full HA validation.
+- The durable pre-dispatch callback helper proposed after that review was **never
+  assigned to the implementer**. It is cancelled as the next task, not a dependency.
+- **Next task: Stage 1.1, price-policy settings and API**, for a new implementation
+  LLM. Stage 1 planner work is independent of unresolved Morek activation questions.
+- Remaining isolation is Stage 2, simplified after checking actual pause semantics:
+  extend the existing execution boundary, close direct-write bypasses with shared
+  guards, then test startup/handover end to end. Ordinary pause permits automatic
+  stops, manual starts and protection writes; it is useful groundwork, not isolation.
+  No separate new audit/design session or per-caller gating project is required.
+  Do not resume an open-ended series of unwired command/recovery foundations.
+- Uncertainty handling is only required to the extent needed by the chosen Morek
+  execution path. Generic legacy recovery is not a prerequisite for planner/UI work.
+- Keep all safety/authorization activation blockers; simplification does not grant
+  permission to disable protection, deploy or issue live commands.
+
+At future initialization, follow this section and the current roadmap rather than
+the historical suggestion below to keep extending the 2.5.12 extraction.
+
 ## Role and working agreement
 
 - The user gives your bounded prompts to another LLM, usually continuing the same
