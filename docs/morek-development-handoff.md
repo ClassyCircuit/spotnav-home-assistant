@@ -233,6 +233,37 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2.5.14 — Stage 1.1 settings and API only
+
+- The existing charger settings store and settings API add `soft_price_cap` (nullable
+  currency/kWh, e.g. 0.10 for 10 cents/kWh), `cap_price_basis` (nullable
+  `nord_pool` or `configured_variable_cost`), and `minimum_ready_by_soc` (nullable
+  percent). Null cap disables it; zero and negative values are valid. A non-null cap
+  requires an explicit basis; a basis can remain stored when the cap is cleared.
+  `nord_pool` denotes the published source price as supplied, including anything
+  already included by that source; `configured_variable_cost` denotes that price
+  with the existing configured variable fees and taxes, not fixed/demand charges.
+  The actual price-basis calculation and currency/source compatibility remain for 1.2.
+- Missing legacy fields load as null; no 40% minimum is imposed. Omitted API fields
+  retain their existing values, and null clears one. The minimum is distinct from
+  the vehicle's immediate `min_percent` SOC floor. It must not exceed a numeric
+  normal target. An unknown target stays unknown; the comparison is deferred until
+  a numeric target is committed, including a remembered target on a vehicle switch.
+  A vehicle-target propagation below a configured minimum is refused for that
+  charger, so its earlier target remains; no adjustment is invented.
+- **No policy enforcement, automatic uploads or Morek activation are implemented.**
+  The stored cap is not effective protection. No default basis has been selected;
+  the user must explicitly choose one. Replanning and explanations are Stage 1.3.
+- Checks: frontend `npm run build`, `npm run check-dist`, `npm run type-check`, and
+  `npm test` (2,342 passed); `python -m ruff check .`, Python compileall and
+  `git diff --check` passed. Isolated AST-extracted code with stubbed dependencies
+  exercised legacy load, cap/wire round-trips, invalid inputs, basis/target checks,
+  partial updates, vehicle target resolution, and a stubbed in-memory store's reload
+  and revision conflict. This is not the full HA test suite. The requested pytest
+  settings tests could not start on Windows because HA's test plugin imports `fcntl`;
+  run `tests/test_price_policy_settings.py` and the existing settings tests on a
+  supported HA/Linux environment. No hardware, HA or deployment actions were performed.
+
 ### 2.5.7 displayed-window Send fix
 
 - After updating to 2.5.6, the user removed the old schedule and found Send disabled.

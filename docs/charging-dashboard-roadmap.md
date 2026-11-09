@@ -49,9 +49,10 @@ tests are documented there; full HA collection is still blocked on Windows.
 
 ### Stage 1 — Price policy (old A2P)
 
-- [ ] **1.1 Settings and API**
+- [x] **1.1 Settings and API**
   - Persist optional cap and distinct minimum ready-by SOC in existing settings.
   - Validate units/minimum/target; expose price basis and preserve old behavior.
+  - Stored inputs only; no cap or minimum policy is enforced until Stage 1.2.
 - [ ] **1.2 Planner policy**
   - Use cheap slots toward target; add cheapest above-cap energy only for minimum.
   - Handle partial blocks, period limits, stale inputs and infeasible deadlines.
