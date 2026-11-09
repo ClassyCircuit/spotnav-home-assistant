@@ -700,7 +700,7 @@ class AutoSettings:
     pause: PauseIntent = field(default_factory=PauseIntent)
     driver: EnergyDriver = DRIVER_MANUAL_KWH
     target: TargetSocIntent = field(default_factory=TargetSocIntent)
-    #: Stored planning inputs only; not yet enforced by the planner.
+    #: Price policy for planned Auto charging; separate manual/floor actions are not capped.
     soft_price_cap: float | None = None
     cap_price_basis: str | None = None
     minimum_ready_by_soc: float | None = None

@@ -394,6 +394,8 @@ class ChargingPlan:
     auto_identity: str | None = None
     auto_settings_revision: int | None = None
     auto_price_identity: str | None = None
+    # A capped Auto plan must not extend its selected windows, including after restore.
+    strict_windows: bool = False
 
     @property
     def auto_owned(self) -> bool:
@@ -449,6 +451,8 @@ def stored_plan(raw: Any) -> ChargingPlan | None:
         plan = ChargingPlan(**raw)
     except TypeError:
         # Unknown keys: a shape this release did not write.
+        return None
+    if not isinstance(plan.strict_windows, bool):
         return None
     try:
         windows = plan.windows
@@ -2456,6 +2460,8 @@ class ChargingController:
         async with self._lock:
             if self.plan is None:
                 return False
+            if self.plan.strict_windows:
+                return await self._need_met_locked()
             if self.charges_to_vehicle_limit():
                 # The car ends this charge itself when it is full: no count or estimate of ours ends it. Said
                 # once per plan: every calculation while the need reads met asks again.
@@ -6124,7 +6130,7 @@ class ChargingController:
         takes the charge over at this boundary (`_successor_continues`).
         """
         self._cancel_start_retry()
-        if self._end_window_guard is not None and self._end_window_guard():
+        if (self.plan is None or not self.plan.strict_windows) and self._end_window_guard is not None and self._end_window_guard():
             _LOGGER.debug(
                 "%s charger %s: window ended with sun available, handing off to solar control",
                 HYBRID_LOG_TOKEN,
@@ -6193,7 +6199,7 @@ class ChargingController:
         (`_successor_continues`).
         """
         self._cancel_start_retry()
-        if self._end_window_guard is not None and self._end_window_guard():
+        if (self.plan is None or not self.plan.strict_windows) and self._end_window_guard is not None and self._end_window_guard():
             _LOGGER.debug(
                 "%s charger %s: final window ended with sun available, handing off to solar control",
                 HYBRID_LOG_TOKEN,
@@ -6314,7 +6320,7 @@ class ChargingController:
         evidence). Never past the departure: a deadline already reached is none.
         """
         plan = self.plan
-        if plan is None or not self.charges_to_vehicle_limit():
+        if plan is None or plan.strict_windows or not self.charges_to_vehicle_limit():
             return None
         try:
             window_end = plan.windows[-1][1]
@@ -6393,6 +6399,9 @@ class ChargingController:
         charge that strays past the last window is. Whether one goes on."""
         until = self._top_off_until
         if until is None:
+            return False
+        if self.plan is not None and self.plan.strict_windows:
+            self._clear_top_off()
             return False
         if self.plan is None or now >= until or self._hold_blocked():
             self._clear_top_off()
@@ -6549,7 +6558,7 @@ class ChargingController:
         return sent_at is not None and (dt_util.utcnow() - sent_at).total_seconds() < STOP_ACK_S
 
     def _core_handed_off(self) -> bool:
-        return self._end_window_guard is not None and bool(self._end_window_guard())
+        return (self.plan is None or not self.plan.strict_windows) and self._end_window_guard is not None and bool(self._end_window_guard())
 
     def _core_hold_facts(self) -> dict[str, bool]:
         """What else may own the charger, split as the core decides it: the sun's phase, and whether the plan is

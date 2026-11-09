@@ -69,6 +69,8 @@ PlannerReason = Literal[
     "insufficient_price_horizon",
     "deadline_too_short",
     "missing_fx_rate",
+    "price_policy_unavailable",
+    "no_eligible_energy",
 ]
 
 TargetEnergyReason = Literal["ok", "unknown_capacity", "already_at_target"]
@@ -333,6 +335,31 @@ def effective_minor_per_kwh(local_major_per_kwh: float, fiscal: FiscalChoice, st
     return minor
 
 
+def price_within_cap(
+    local_major_per_kwh: float,
+    *,
+    cap_major_per_kwh: float,
+    basis: str,
+    fiscal: FiscalChoice,
+    start: datetime,
+) -> bool:
+    """Compare an already currency-converted published price with a major-unit cap.
+
+    The published price retains any charges included by the source. Configured
+    variable cost additionally applies the existing fiscal calculation, whose
+    return value is in minor units. Unknown prices must not be passed here.
+    """
+    price = _finite(local_major_per_kwh, "invalid_number", "local_major_per_kwh")
+    cap = _finite(cap_major_per_kwh, "invalid_number", "cap_major_per_kwh")
+    if basis == "nord_pool":
+        comparison = price
+    elif basis == "configured_variable_cost":
+        comparison = effective_minor_per_kwh(price, fiscal.validated(), _aware(start, "start")) / 100.0
+    else:
+        _refuse("invalid_number", "a price cap requires a supported price basis")
+    return comparison <= cap
+
+
 #: The voltage between two phases on a TN network, what the planner assumed before it was a setting.
 DEFAULT_VOLTAGE_BETWEEN_PHASES_V: Final = 400.0
 
@@ -519,6 +546,11 @@ class PlanRequest:
     #: The power this car is known to really draw at this current (`planning/learned_power.py`), or `None`:
     #: the plan counts on the lower of it and the current's power (`planned_kw`).
     power_cap_kw: float | None = None
+    #: A configured cap must never be silently ignored by any planner entry point.
+    soft_price_cap: float | None = None
+    cap_price_basis: str | None = None
+    #: Resolved wall-energy deficit to the minimum, or None to forbid exceptions.
+    minimum_energy_kwh: float | None = None
 
     @property
     def planned_kw(self) -> float:
@@ -536,12 +568,22 @@ class PlanRequest:
         if self.max_periods is not AUTO_PERIODS and not MIN_PERIODS <= _as_int(self.max_periods) <= MAX_PERIODS:
             _refuse("invalid_periods", f"max_periods must be between {MIN_PERIODS} and {MAX_PERIODS}")
         _positive(self.requested_kwh, "invalid_energy", "requested_kwh")
+        if self.minimum_energy_kwh is not None:
+            minimum = _finite(self.minimum_energy_kwh, "invalid_energy", "minimum_energy_kwh")
+            if minimum < 0 or minimum > self.requested_kwh:
+                _refuse("invalid_energy", "minimum_energy_kwh must be between zero and requested_kwh")
         _positive(self.consumption_kwh_per_10km, "invalid_consumption", "consumption_kwh_per_10km")
         _aware(self.now, "now")
         if self.window_end is not None:
             _aware(self.window_end, "window_end")
         if self.power_cap_kw is not None:
             _positive(self.power_cap_kw, "invalid_number", "power_cap_kw")
+        if self.soft_price_cap is not None:
+            _finite(self.soft_price_cap, "invalid_number", "soft_price_cap")
+            if self.cap_price_basis not in ("nord_pool", "configured_variable_cost"):
+                _refuse("invalid_number", "a price cap requires a supported price basis")
+        elif self.cap_price_basis is not None and self.cap_price_basis not in ("nord_pool", "configured_variable_cost"):
+            _refuse("invalid_number", "unsupported price basis")
         if self.departure is not None:
             if not isinstance(self.departure, time):
                 _refuse("invalid_departure", "departure must be a wall time")
@@ -588,6 +630,9 @@ class PlanRequest:
             window_end=self.window_end,
             voltage_between_phases_v=float(self.voltage_between_phases_v),
             power_cap_kw=None if self.power_cap_kw is None else float(self.power_cap_kw),
+            soft_price_cap=None if self.soft_price_cap is None else float(self.soft_price_cap),
+            cap_price_basis=self.cap_price_basis,
+            minimum_energy_kwh=None if self.minimum_energy_kwh is None else float(self.minimum_energy_kwh),
         )
 
 
@@ -636,6 +681,15 @@ class PlanResult:
     #: The charge stops once the need is delivered (`ending_at_need`): `delivered_kwh` is the need, and the costs
     #: count the last slot only for the share of it the need takes.
     ends_at_need: bool = False
+    #: A cap-aware plan already contains the actual shortened windows.
+    exact_periods: bool = False
+    #: Remaining requested energy, for capped plans including an empty result.
+    policy_shortfall_kwh: float | None = None
+    #: None when no minimum deficit was supplied; otherwise the unmet wall energy.
+    minimum_shortfall_kwh: float | None = None
+    #: Actual above-cap portions of the selected windows and their wall energy.
+    exception_periods: tuple[tuple[datetime, datetime], ...] = ()
+    exception_kwh: float = 0.0
 
     @property
     def has_plan(self) -> bool:
@@ -655,7 +709,7 @@ class PlanResult:
     @property
     def shown_periods(self) -> tuple[tuple[datetime, datetime], ...]:
         """The periods as a person is shown them: the last one ending where the need is expected to be met.
-        Never what is installed, which keeps whole slots (the count ends the charge)."""
+        Legacy plans install whole slots; cap-aware plans already contain exact periods."""
         met = self.need_met_at
         if met is None:
             return self.periods
@@ -982,6 +1036,8 @@ def plan_unpriced(request: PlanRequest) -> PlanResult:
     One run of consecutive slots, each flagged unpriced; cost is reported as zero.
     """
     request = request.validated()
+    if request.soft_price_cap is not None:
+        return _no_plan(request, "price_policy_unavailable")
     window = _window(request)
     if isinstance(window, str):
         return _no_plan(request, window)
@@ -1038,6 +1094,8 @@ def calculate_plan(request: PlanRequest) -> PlanResult:
     `insufficient_price_horizon` is `price_wait`'s decision, not this function's.
     """
     request = request.validated()
+    if request.soft_price_cap is not None:
+        return _calculate_capped(request)
     window = _window(request)
     if isinstance(window, str):
         return _no_plan(request, window)
@@ -1114,6 +1172,206 @@ def calculate_plan(request: PlanRequest) -> PlanResult:
     )
 
 
+def _calculate_capped(request: PlanRequest) -> PlanResult:
+    """Select known cheap intervals and, only when necessary, minimum exceptions.
+
+    The search counts full slots plus at most one fractional slot. A fractional
+    slot may touch either neighbour; it must not make an excluded gap disappear.
+    First maximize delivered energy. When a minimum exception is necessary,
+    minimize exception energy, then configured variable cost. Automatic periods
+    have no hard run limit in this branch.
+    """
+    try:
+        published = planning_slots(request.documents, currency=request.currency, timezone=request.timezone)
+    except PlannerInputError as err:
+        if err.code == "missing_fx_rate":
+            return replace(
+                _no_plan(request, "missing_fx_rate"), policy_shortfall_kwh=request.requested_kwh,
+                minimum_shortfall_kwh=request.minimum_energy_kwh,
+            )
+        raise
+    if not published:
+        return replace(
+            _no_plan(request, "no_published_prices"), policy_shortfall_kwh=request.requested_kwh,
+            minimum_shortfall_kwh=request.minimum_energy_kwh,
+        )
+
+    first = first_start_for(request.documents, now=request.now, tz=request.timezone).astimezone(timezone.utc)
+    zone = time_zones.require_zone(request.timezone)
+    end = first + timedelta(hours=HORIZON_HOURS)
+    if request.departure is not None:
+        if request.departure_date is not None:
+            departure = local_instant(request.departure_date, request.departure, zone)
+            end = departure.astimezone(timezone.utc)
+        else:
+            end = min(end, resolve_departure(request.now, request.timezone, request.departure, first).astimezone(timezone.utc))
+    if request.window_end is not None:
+        end = min(end, request.window_end.astimezone(timezone.utc))
+    candidates = [slot for slot in published if slot.start >= first and slot.start < end]
+    if not candidates:
+        return replace(
+            _no_plan(request, "insufficient_price_horizon"), policy_shortfall_kwh=request.requested_kwh,
+            minimum_shortfall_kwh=request.minimum_energy_kwh,
+        )
+    assert request.soft_price_cap is not None and request.cap_price_basis is not None
+    eligible = [
+        slot for slot in candidates
+        if price_within_cap(
+            slot.local_major_per_kwh, cap_major_per_kwh=request.soft_price_cap,
+            basis=request.cap_price_basis, fiscal=request.fiscal, start=slot.start,
+        )
+    ]
+    minimum = request.minimum_energy_kwh
+    if not eligible and not minimum:
+        return replace(
+            _no_plan(request, "no_eligible_energy"), policy_shortfall_kwh=request.requested_kwh,
+            minimum_shortfall_kwh=minimum,
+        )
+
+    # Cheap-only is optimized independently only to establish feasibility of
+    # the minimum. If it cannot reach the minimum, rerun over *all* known
+    # candidates together with one shared period budget and an energy ceiling
+    # of the minimum, never the higher target.
+    cost, selected = _select_policy_slots(request, eligible, end, request.requested_kwh)
+    cheap_energy = _selected_energy(request, selected)
+    if minimum is not None and cheap_energy + 1e-9 < minimum:
+        cost, selected = _select_policy_slots(request, candidates, end, minimum, prefer_cheap=True)
+    delivered = sum((slot.end - slot.start).total_seconds() / 3600 * request.planned_kw for slot in selected)
+    shortfall = max(0.0, request.requested_kwh - delivered)
+    exceptions = tuple(slot for slot in selected if not _slot_within_cap(request, slot))
+    selected_starts = {slot.start for slot in selected}
+    horizon_selected = tuple(slot for slot in candidates if any(slot.start <= start < slot.end for start in selected_starts))
+    return PlanResult(
+        version=CONTRACT_VERSION, area_id=request.area_id, timezone=request.timezone,
+        currency=request.currency, major_unit=request.major_unit, minor_unit=request.minor_unit,
+        now=request.now, reason=None, power_kw=request.planned_kw, requested_kwh=request.requested_kwh,
+        delivered_kwh=delivered, distance_mil=delivered / request.consumption_kwh_per_10km,
+        estimated_cost=cost / 100, periods=_periods(selected), slots=selected,
+        unpriced_slots=0, priced_slots=len(selected), unpriced=False, slots_needed=len(selected),
+        horizon=_horizon(candidates, horizon_selected, zone=zone, fiscal=request.fiscal),
+        exact_periods=True, policy_shortfall_kwh=shortfall,
+        minimum_shortfall_kwh=None if minimum is None else max(0.0, minimum - delivered),
+        exception_periods=_periods(exceptions), exception_kwh=_selected_energy(request, exceptions),
+    )
+
+
+def _slot_within_cap(request: PlanRequest, slot: PlanningSlot | SelectedSlot) -> bool:
+    assert request.soft_price_cap is not None and request.cap_price_basis is not None
+    return price_within_cap(
+        slot.local_major_per_kwh, cap_major_per_kwh=request.soft_price_cap,
+        basis=request.cap_price_basis, fiscal=request.fiscal, start=slot.start,
+    )
+
+
+def _selected_energy(request: PlanRequest, slots: tuple[SelectedSlot, ...]) -> float:
+    return sum((slot.end - slot.start).total_seconds() / 3600 * request.planned_kw for slot in slots)
+
+
+def _selection_rank(
+    request: PlanRequest, option: tuple[float, tuple[SelectedSlot, ...]], *, prefer_cheap: bool,
+) -> tuple:
+    cost, selected = option
+    exception_energy = _selected_energy(request, tuple(slot for slot in selected if not _slot_within_cap(request, slot)))
+    return (
+        -round(_selected_energy(request, selected), _SLOT_DIGITS),
+        round(exception_energy, _SLOT_DIGITS) if prefer_cheap else 0.0,
+        cost, tuple(-s.start.timestamp() for s in reversed(selected)),
+    )
+
+
+def _select_policy_slots(
+    request: PlanRequest, eligible: list[PlanningSlot], end: datetime, need_kwh: float, *, prefer_cheap: bool = False,
+) -> tuple[float, tuple[SelectedSlot, ...]]:
+    """Search full slots and optional deadline fragment with a shared run limit."""
+    tail = eligible[-1] if eligible and eligible[-1].end > end else None
+    full_slots = eligible[:-1] if tail is not None else eligible
+    options = [_select_cheap_slots(request, full_slots, need_kwh, prefer_cheap=prefer_cheap)]
+    if tail is not None:
+        tail_capacity = (end - tail.start).total_seconds() / 3600 * request.planned_kw
+        tail_amounts = {min(need_kwh, tail_capacity)}
+        remainder = need_kwh % (request.planned_kw * SLOT_HOURS)
+        if 1e-9 < remainder < tail_capacity:
+            tail_amounts.add(remainder)
+        for tail_energy in tail_amounts:
+            if tail_energy > 0:
+                options.append(_select_cheap_slots(
+                    request, full_slots, need_kwh - tail_energy, tail, tail_energy, prefer_cheap=prefer_cheap,
+                ))
+    possible = [option for option in options if option is not None]
+    return min(possible, key=lambda option: _selection_rank(request, option, prefer_cheap=prefer_cheap))
+
+
+def _select_cheap_slots(
+    request: PlanRequest, eligible: list[PlanningSlot], need_kwh: float,
+    tail: PlanningSlot | None = None, tail_kwh: float = 0.0,
+    *, prefer_cheap: bool = False,
+) -> tuple[float, tuple[SelectedSlot, ...]] | None:
+    """Search whole-grid slots and optionally append the available deadline fragment."""
+    per_slot = request.planned_kw * SLOT_HOURS
+    quotient = round(need_kwh / per_slot, _SLOT_DIGITS)
+    full_target = math.floor(quotient)
+    fraction = quotient - full_target
+    # Key: full slots, partial used, runs (only when capped), previous end open.
+    # Value: minor-unit cost, actual selected slots, run count, exception kWh.
+    states: dict[tuple[int, bool, int, bool], tuple[float, tuple[SelectedSlot, ...], int, float]] = {
+        (0, False, 0, False): (0.0, (), 0, 0.0)
+    }
+    for slot in eligible:
+        next_states: dict[tuple[int, bool, int, bool], tuple[float, tuple[SelectedSlot, ...], int, float]] = {}
+        price = effective_minor_per_kwh(slot.local_major_per_kwh, request.fiscal, slot.start)
+        above_cap = prefer_cheap and not _slot_within_cap(request, slot)
+
+        def keep(key: tuple[int, bool, int, bool], value: tuple[float, tuple[SelectedSlot, ...], int, float]) -> None:
+            old = next_states.get(key)  # noqa: B023 - called within this iteration
+            rank = lambda v: (round(v[3], _SLOT_DIGITS), v[0], tuple(-s.start.timestamp() for s in reversed(v[1])))  # noqa: E731
+            if old is None or rank(value) < rank(old):
+                next_states[key] = value  # noqa: B023
+
+        for (full, partial, _, active), (cost, selected, runs, exception_kwh) in states.items():
+            run_key = runs if request.max_periods is not None else 0
+            keep((full, partial, run_key, False), (cost, selected, runs, exception_kwh))
+            options: list[tuple[datetime, datetime, bool]] = []
+            if full < full_target:
+                options.append((slot.start, slot.end, False))
+            if fraction > 0 and not partial:
+                duration = timedelta(hours=SLOT_HOURS * fraction)
+                options.append((slot.start, slot.start + duration, True))
+                options.append((slot.end - duration, slot.end, True))
+            for start, finish, is_partial in options:
+                connected = bool(active and selected and selected[-1].end == start)
+                new_runs = runs + (0 if connected else 1)
+                if request.max_periods is not None and new_runs > request.max_periods:
+                    continue
+                duration_hours = (finish - start).total_seconds() / 3600
+                chosen = SelectedSlot(start, finish, slot.local_major_per_kwh, price, False, slot.source)
+                new_key = (
+                    full + (not is_partial), partial or is_partial,
+                    new_runs if request.max_periods is not None else 0, finish == slot.end,
+                )
+                energy = duration_hours * request.planned_kw
+                keep(new_key, (
+                    cost + energy * price, selected + (chosen,), new_runs,
+                    exception_kwh + (energy if above_cap else 0.0),
+                ))
+        states = next_states
+
+    results: list[tuple[float, tuple[SelectedSlot, ...]]] = []
+    for cost, selected, runs, _exception_kwh in states.values():
+        if tail is not None:
+            finish = tail.start + timedelta(hours=tail_kwh / request.planned_kw)
+            connected = bool(selected and selected[-1].end == tail.start)
+            if request.max_periods is not None and runs + (not connected) > request.max_periods:
+                continue
+            price = effective_minor_per_kwh(tail.local_major_per_kwh, request.fiscal, tail.start)
+            selected += (SelectedSlot(tail.start, finish, tail.local_major_per_kwh, price, False, tail.source),)
+            cost += (finish - tail.start).total_seconds() / 3600 * request.planned_kw * price
+        results.append((cost, selected))
+    if not results:
+        return None
+
+    return min(results, key=lambda result: _selection_rank(request, result, prefer_cheap=prefer_cheap))
+
+
 #: Less than this left over in the last slot is a need that fills its slots exactly (float noise).
 _WHOLE_SLOTS_KWH: Final = 1e-6
 
@@ -1128,7 +1386,7 @@ def ending_at_need(result: PlanResult) -> PlanResult:
     A plan short of its departure, one with no slots, or one whose need fills its slots exactly is unchanged
     beyond the flag.
     """
-    if not result.has_plan or result.short_of_deadline or not result.slots or result.power_kw <= 0:
+    if result.exact_periods or not result.has_plan or result.short_of_deadline or not result.slots or result.power_kw <= 0:
         return result
     per_slot = result.power_kw * SLOT_HOURS
     extra = result.delivered_kwh - result.requested_kwh
@@ -1361,7 +1619,7 @@ def cheapest_slots(
     return None if chosen is None else tuple(candidates[index] for index in chosen)
 
 
-def _periods(selected: tuple[PlanningSlot, ...]) -> tuple[tuple[datetime, datetime], ...]:
+def _periods(selected: tuple[PlanningSlot, ...] | tuple[SelectedSlot, ...]) -> tuple[tuple[datetime, datetime], ...]:
     """Contiguous chosen slots merged into half-open `[start, end)` periods.
 
     Merging is by instant, not local clock label, so clock changes neither join nor split runs.

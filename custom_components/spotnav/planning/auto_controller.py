@@ -13,6 +13,7 @@ proposal is delegated to the injected `AutoExecutor`; without one this only calc
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Callable, Final, Literal
@@ -65,7 +66,7 @@ from ..vehicles.guest import is_guest
 from ..vehicles.vehicle_discovery import resolve_target_vehicle
 from ..vehicles.vehicle_properties import resolved_vehicle_id, stored_properties
 from ..execution.min_soc_floor import effective_floor, known_soc
-from ..execution.target_stop import car_ended_full_percent
+from ..execution.target_stop import car_ended_full_percent, SOC_FRESH_MAX_AGE_S
 from .auto_settings import (
     AutoSettings,
     AutoSettingsError,
@@ -103,6 +104,7 @@ from .phases import effective_phases
 from .planner import (
     calculate_plan,
     ending_at_need,
+    effective_target_soc_percent,
     FiscalChoice,
     local_instant,
     MAX_DEPARTURE_DAYS_AHEAD,
@@ -370,6 +372,8 @@ AutoReason = Literal[
     "target_capacity_unknown",
     #: A target needs the car's state of charge and no source provides or can estimate one.
     "target_soc_unknown",
+    "target_soc_stale",
+    "minimum_above_target",
     "no_prices_yet",
     "price_data_stale",
     "ready",
@@ -406,6 +410,9 @@ AutoReason = Literal[
     #: Strategy is `solar` and the site can run it; the price planner stands down and a
     #: `SolarExecutionCoordinator` reports the state (`solar_execution.solar_execution_state`).
     "solar_running",
+    #: A configured cap is not yet supported by the planner; no uncapped fallback is safe.
+    "price_policy_unavailable",
+    "no_eligible_energy",
 ]
 
 
@@ -495,6 +502,67 @@ class _EnergyResolution:
     #: A target only: the car's learned wall kWh per percent the need was worked out with (`learned_energy.py`),
     #: `None` while nothing trusted is learned (the battery size and `CHARGE_EFFICIENCY` then).
     kwh_per_percent: float | None = None
+    #: Resolved minimum wall-energy deficit for capped target planning; None forbids exceptions.
+    minimum_energy_kwh: float | None = None
+
+
+def capped_vehicle_energy(
+    facts: LiveVehicleFacts | None,
+    *,
+    target_percent: float | None,
+    minimum_percent: float | None,
+    learned: LearnedEnergy,
+) -> tuple[str, float | None, float | None]:
+    """Resolve capped target and minimum wall energy from a fresh actual reading.
+
+    This does not assume that the independent immediate SOC floor has charged
+    the vehicle. Both deficits use the same existing learned-energy conversion.
+    """
+    if facts is None or facts.soc_percent is None:
+        return ("target_soc_unknown", None, None)
+    soc, age, capacity = facts.soc_percent, facts.soc_age_s, facts.reported_capacity_kwh
+    if (
+        facts.soc_estimated or isinstance(soc, bool) or not isinstance(soc, (int, float))
+        or not math.isfinite(soc) or not 0 <= soc <= 100
+        or isinstance(age, bool) or not isinstance(age, (int, float))
+        or not math.isfinite(age) or not 0 <= age <= SOC_FRESH_MAX_AGE_S
+    ):
+        return ("target_soc_stale", None, None)
+    if (
+        isinstance(capacity, bool) or not isinstance(capacity, (int, float))
+        or not math.isfinite(capacity) or capacity <= 0
+    ):
+        return ("target_capacity_unknown", None, None)
+    try:
+        if (target_percent is None or isinstance(target_percent, bool)
+                or not isinstance(target_percent, (int, float)) or not math.isfinite(target_percent)
+                or not 0 <= target_percent <= 100):
+            return ("price_policy_unavailable", None, None)
+        # Match target_need_kwh, which resolves stored target percentages to a whole value.
+        target = effective_target_soc_percent(round(target_percent), facts.max_percent, apply_default_target=False)
+    except PlannerInputError:
+        return ("price_policy_unavailable", None, None)
+    if minimum_percent is not None:
+        if (
+            isinstance(minimum_percent, bool) or not isinstance(minimum_percent, (int, float))
+            or not math.isfinite(minimum_percent) or not 0 <= minimum_percent <= 100
+        ):
+            return ("price_policy_unavailable", None, None)
+        if minimum_percent > target:
+            return ("minimum_above_target", None, None)
+    _, target_kwh = target_need(
+        learned, soc_percent=soc, capacity_kwh=capacity, target_percent=target,
+        vehicle_max_percent=facts.max_percent,
+    )
+    if target_kwh is None:
+        return ("target_capacity_unknown", None, None)
+    minimum_kwh = None
+    if minimum_percent is not None:
+        # target_need rounds targets to whole percentages; scale its resolved
+        # wall energy instead so a fractional minimum is not rounded away.
+        delta = max(0.0, target - soc)
+        minimum_kwh = 0.0 if delta == 0 else target_kwh * max(0.0, minimum_percent - soc) / delta
+    return ("ok", target_kwh, minimum_kwh)
 
 
 @dataclass(frozen=True, slots=True)
@@ -622,6 +690,10 @@ class AutoSnapshot:
             proposal.reason,
             proposal.slots_needed,
             proposal.estimated_cost,
+            proposal.policy_shortfall_kwh,
+            proposal.minimum_shortfall_kwh,
+            proposal.exception_kwh,
+            proposal.exception_periods,
             tuple((start.isoformat(), end.isoformat()) for start, end in proposal.periods),
             tuple(
                 (slot.start.isoformat(), slot.end.isoformat(), slot.unpriced, slot.source)
@@ -1240,6 +1312,12 @@ class AutoPlannerController:
         # Any earlier appointment is void: this calculation re-arms one only if it needs it.
         if not preview:
             self._cancel_wake()
+        if settings.soft_price_cap is not None and settings.strategy in (STRATEGY_HYBRID, STRATEGY_SOLAR):
+            # Solar and hybrid have separate charging owners; the price policy
+            # cannot yet authorize their unpriced energy or forecast credits.
+            return self._fresh_snapshot(
+                settings, "planning_unavailable", "price_policy_unavailable", calculated_at
+            )
         if settings.strategy != STRATEGY_HYBRID and not preview:
             # Cleared for every non-hybrid strategy on every path below, so a charger not on `hybrid`
             # reads as "nothing observed" (`hybrid_execution.clear_hybrid_state`).
@@ -1323,8 +1401,13 @@ class AutoPlannerController:
 
         documents = tuple(
             snapshot.document
-            for snapshot in (area_snapshot.today_snapshot, area_snapshot.tomorrow_snapshot)
-            if snapshot.document is not None
+            for snapshot, state in (
+                (area_snapshot.today_snapshot, area_snapshot.today_state),
+                (area_snapshot.tomorrow_snapshot, area_snapshot.tomorrow_state),
+            )
+            if snapshot.document is not None and (
+                settings.soft_price_cap is None or state not in ("stale", "invalid", "unavailable")
+            )
         )
         if not documents:  # pragma: no cover - the gate covers every documented day state
             return self._fresh_snapshot(
@@ -1382,6 +1465,9 @@ class AutoPlannerController:
             departure_date=self._effective_departure_date(settings, entry, calculated_at),
             voltage_between_phases_v=voltage_between_phases_v(self._hass, self._entry_id),
             power_cap_kw=self._plan_power_cap_kw(settings),
+            soft_price_cap=settings.soft_price_cap,
+            cap_price_basis=settings.cap_price_basis,
+            minimum_energy_kwh=resolved.minimum_energy_kwh,
             # A guest car with no departure is charged within `GUEST_WITHIN`, not the whole horizon.
             window_end=(
                 calculated_at + GUEST_WITHIN if is_guest(settings) and not settings.departure_enabled else None
@@ -1390,7 +1476,7 @@ class AutoPlannerController:
         wait_facts: dict[str, Any] = {}
         try:
             result = calculate_plan(plan_request)
-            if result.reason == "insufficient_price_horizon":
+            if result.reason == "insufficient_price_horizon" and plan_request.soft_price_cap is None:
                 waited = None
                 if plan_request.departure is not None:
                     waited = await self._plan_departure_by_history(
@@ -1426,6 +1512,11 @@ class AutoPlannerController:
         if not preview:
             self._last_failure = None
 
+        if result.reason == "no_eligible_energy" and settings.soft_price_cap is not None:
+            return self._fresh_snapshot(
+                settings, "nothing_to_charge", "no_eligible_energy", calculated_at,
+                entry=entry, price_snapshot=area_snapshot, proposal=result, attempt=attempt,
+            )
         if not result.has_plan:
             return self._fresh_snapshot(
                 settings, "planning_unavailable", self._map_planner_code(result.reason or ""), calculated_at,
@@ -2049,7 +2140,7 @@ class AutoPlannerController:
                 entry=entry, price_snapshot=area_snapshot, error_code="invalid_contract",
             )
         if today_state in ("stale", "unavailable"):
-            preserved = self._preserved_snapshot(settings)
+            preserved = None if settings.soft_price_cap is not None else self._preserved_snapshot(settings)
             if preserved is not None:
                 return preserved
             if today_state == "unavailable" and area_snapshot.today_authority == "not_listed":
@@ -2214,6 +2305,22 @@ class AutoPlannerController:
         capacity = None
         if facts is not None and facts.reported_capacity_kwh is not None:
             capacity = facts.reported_capacity_kwh
+        if settings.soft_price_cap is not None:
+            learned = self._learned_energy_for(facts, drop=True)
+            policy_reason, target_kwh, minimum_kwh = capped_vehicle_energy(
+                facts, target_percent=settings.target.target_percent,
+                minimum_percent=settings.minimum_ready_by_soc, learned=learned,
+            )
+            if policy_reason != "ok" or target_kwh is None:
+                return self._fresh_snapshot(
+                    settings, "planning_unavailable", policy_reason, calculated_at,
+                    entry=entry, price_snapshot=price_snapshot,
+                )
+            return _EnergyResolution(
+                kwh=target_kwh, delivered_energy_trustworthy=True, soc_percent=live_soc,
+                capacity_kwh=capacity, kwh_per_percent=learned.use_kwh_per_percent,
+                minimum_energy_kwh=minimum_kwh,
+            )
         planned_from = self._planned_from_floor(settings, facts, live_soc, calculated_at)
         # Energy the wall must deliver: battery need divided by charging efficiency
         # (`soc_estimate.CHARGE_EFFICIENCY`), or, once trusted, the car's learned wall kWh per percent

@@ -8,9 +8,10 @@ Re-check the live system and Git state before acting; observations below may bec
 
 **2026-11-09 coordination update:** the roadmap now begins with a concise numbered
 task checklist. Completed audit/ownership/admission/identity/start-evidence work
-through 2.5.13 is Stage 0, not work to repeat. Next is **1.1: price-policy settings
-and API**, followed by planner policy and reactive planning. Actual isolation is
-Stage 2 and remains incomplete/unarmed. The proposed additional unwired durable
+through 2.5.13 is Stage 0, not work to repeat. **1.1 settings/API and 1.2 cheapest-price
+planner/Auto integration are implemented through 2.5.20. Next is 1.3: reactive
+planning and explanation.** Actual isolation is Stage 2 and remains
+incomplete/unarmed. The proposed additional unwired durable
 pre-dispatch helper was never assigned and is not the next task. Detailed historical
 versions/deployment facts below must not override current Git or the new checklist.
 
@@ -232,6 +233,153 @@ requirements, not features claimed implemented in the manual baseline below.
   Do not assume `GetCompositeSchedule` lists stored profiles.
 
 ## Tests, build, and next steps
+
+### 2.5.20 — Stage 1.2c capped Auto planning
+
+- Cheapest-price Auto now resolves fresh actual SOC and the vehicle's effective
+  target into target/minimum wall-energy deficits and uses the existing capped
+  planner. Manual kWh plans have no minimum exception. Unknown prices never enter
+  the unpriced/history fallback. Missing inputs and zero eligible energy stand
+  down the current Auto-owned plan; the executor preserves independently owned
+  manual and immediate-SOC-floor charges. The immediate floor remains independent
+  and the cap is not a restriction on every manual or safety action.
+- Capped Auto plans persist `strict_windows`, preventing top-off, leave-to-car and
+  deferred replacement outside selected windows; older stored plans default to
+  the legacy behavior. Failed policy stand-down is reported and remains retryable.
+  Dashboard and preview plan responses carry price-basis, shortfall and exception
+  facts. Solar/hybrid with a cap is explicitly unavailable, not an unpriced bypass.
+- This completes Stage 1.2 software planning and legacy Auto reconciliation, not
+  Stage 1.3 triggers, Morek ownership/activation or automatic uploads. Hardware
+  behavior is not established, and full HA integration tests remain to run on a
+  supported host. No live action or deployment was performed.
+- Checks: 282 isolated tests passed against actual repository modules, including
+  persisted-format settings to real calculation/preview, and real reconciliation
+  and controller methods with mocked charger boundaries. One dependency
+  deprecation warning was emitted. Full `tests/test_auto_controller.py` collection
+  remains blocked on Windows by the HA pytest plugin's `fcntl` import; its added
+  HA integration cases were not run. Ruff, compileall, frontend build, check-dist
+  and diff-check passed.
+
+### 2.5.19 — Stage 1.2c incomplete; Auto cap guard retained
+
+- Added capped target-energy resolution using a fresh, non-estimated actual SOC,
+  usable capacity, the resolved vehicle target and existing wall-energy/learned
+  conversion. Fractional minimum percentages retain their precision. The normal
+  target-energy path has been prepared to pass this deficit to the planner, and
+  capped requests are excluded from the unpriced price-wait/history fallback.
+- **This path is not active:** the existing Auto cap refusal remains. Removing it
+  safely also requires reconciling an existing installed plan when the capped
+  result is empty or inputs become unavailable, suppressing vehicle-limit top-off
+  and leave-to-car behavior for capped plans (including restart), and encoding
+  policy facts in proposal/status APIs. Hybrid/solar interactions also need a
+  deliberate safe decision. Stage 1.2 remains unchecked.
+- The isolated harness passed 268 cases against actual repository modules,
+  including 12 capped-energy cases, one feeding the actual planner directly;
+  it does not exercise Auto reconciliation or execution. Full HA/controller pytest
+  collection remains blocked on Windows because the HA plugin imports `fcntl`.
+  Ruff, targeted compileall, frontend build, check-dist and diff-check passed.
+  No HA, charger, deployment or restart operations were performed.
+
+### 2.5.18 — Stage 1.2b pure minimum-energy exceptions
+
+- `PlanRequest.minimum_energy_kwh` is an optional, validated wall-energy deficit;
+  no value or zero authorizes no above-cap exception. The capped planner searches
+  known cheap and expensive intervals together under the period limit if cheap
+  energy cannot reach that minimum. Minimum coverage takes priority, followed by
+  minimizing exception energy and configured variable cost. The exception search
+  is bounded by the minimum, never the higher target; unknown prices stay excluded.
+- Capped results expose `minimum_shortfall_kwh`, the existing target
+  `policy_shortfall_kwh`, and actual `exception_periods`/`exception_kwh`. Exact
+  selected periods and costs include partial intervals. This is pure planner work:
+  Auto still refuses capped settings, and `plan_unpriced` keeps its cap guard.
+- **Stage 1.2 remains incomplete.** A subsequent slice must resolve fresh vehicle
+  SOC, capacity, efficiency, and the effective target, then integrate and test the
+  policy in normal Auto planning without an unpriced fallback. No subscriptions,
+  uploads, activation or hardware actions were added here.
+- Checks: the isolated harness passed 256 cases against actual repository planner
+  modules; `python -m ruff check .`, targeted compileall, frontend build,
+  `npm run check-dist` and `git diff --check` passed. Full HA collection remains
+  blocked on Windows by the HA plugin's `fcntl` import.
+
+### 2.5.17 — Stage 1.2a pure cheap-only planning
+
+- `calculate_plan` now selects only published intervals at or below the requested
+  price basis, respecting a numeric run limit and real gaps. Automatic periods
+  have no hard run limit in this capped-only branch; unlike the uncapped automatic
+  optimizer it does not apply a start cost or minimum block length. It maximizes
+  eligible energy up to the request, then minimizes variable cost, and reports
+  `policy_shortfall_kwh` or `no_eligible_energy`. Actual slot/period durations
+  and cost include fractional slots and a clipped deadline interval.
+- This is **not** full Stage 1.2: no minimum-SOC exceptions or vehicle-energy
+  resolution were added. Auto still refuses capped settings and `plan_unpriced`
+  still refuses capped requests. No production execution or automatic uploads
+  have been enabled. Stage 1.2 and 1.3 remain unchecked.
+- Checks: 234 cases passed in the isolated harness using the repository planner
+  modules; `python -m ruff check .`, targeted compileall, frontend build and
+  `npm run check-dist` passed. HA/controller pytest remains blocked on Windows by
+  the HA test plugin's `fcntl` import. No HA or charger operation was performed.
+
+### 2.5.16 — Stage 1.2 remains incomplete
+
+- Added and tested a pure price-cap comparison helper using the existing fiscal
+  arithmetic, including negative prices and major/minor conversion. It is not yet
+  wired into selection. The existing fail-closed guards remain in place.
+- Cap-aware selection, minimum-energy calculation, partial-window consistency,
+  controller integration and the requested numerical acceptance cases remain to be
+  implemented. Do not treat this helper as an enforced price policy.
+- Checks: the isolated harness loaded the repository's actual planner modules and
+  passed 216 cases (including the existing refusal tests and nine new comparison
+  cases); `python -m ruff check .`, compileall, frontend build and check-dist passed.
+  `python -m pytest -q tests/test_auto_controller.py` could not collect because the
+  Home Assistant test plugin imports `fcntl`, unavailable on Windows. No HA or
+  charger operation was performed.
+
+### 2.5.15 — Stage 1.2 partial fail-closed guard
+
+- Follow-up: `PlanRequest` carries `soft_price_cap` and `cap_price_basis`, and both
+  `calculate_plan` and `plan_unpriced` explicitly refuse configured caps until
+  the cap-aware algorithm exists. Eleven added pure tests and 196 existing tests
+  passed in the isolated actual-module harness (207 total). This is still a refusal,
+  not policy enforcement or a substitute for the requested optimizer tests.
+- **Stage 1.2 is not complete.** Normal Auto planning now returns
+  `planning_unavailable` / `price_policy_unavailable` for a non-null cap, including
+  zero and negative caps. This prevents that calculation from reaching its normal
+  uncapped planner or its unpriced-price-wait fallback. A disabled cap retains the
+  existing path. This is a temporary refusal, not price-policy optimization.
+- This does not establish charger-side protection: previously installed schedules,
+  the independent immediate SOC floor and other execution paths are not audited or
+  controlled by this guard. It does not implement cheap-slot selection, minimum
+  exceptions, partial intervals, shortfall facts, either price basis, or reactive
+  planning. Do not present a cap as enforced, and do not mark 1.2 complete.
+- A controller regression test was added for positive, zero and negative caps, but
+  could not run here: HA pytest's Windows plugin imports unavailable `fcntl` before
+  collection. The isolated pure-planner harness passed 196 existing tests against
+  repository modules; those tests do not exercise this controller guard. Ruff and
+  Python compileall passed. The frontend was rebuilt for version 2.5.15.
+
+### Stage 1.2 investigation — not implemented
+
+- Stage 1.2 remains **unchecked**: the cap and ready-by minimum are still stored
+  inputs only and must not be presented as effective protection. No planner or
+  execution behavior was changed by this investigation.
+- `calculate_plan` selects whole quarter-hour slots and its normal short-deadline
+  path may choose every slot. `ending_at_need` shortens only the final displayed
+  window, whereas legacy Auto execution consumes `proposal.periods`; Morek's
+  profile builder consumes `proposal.shown_periods`. A policy implementation must
+  make the actual selected windows and their energy/cost consistent on both paths,
+  including a partial above-cap exception that is not the final selected interval.
+- The normal controller's missing-price handling can call `plan_unpriced`, including
+  on a short deadline. A cap-aware path must not admit that fallback as though
+  unpublished prices were eligible. Vehicle facts include SOC age and estimated
+  status, while the existing target-energy path can plan from the immediate SOC
+  floor and uses learned wall energy or efficiency; policy integration must resolve
+  freshness, the vehicle's effective target, and minimum energy consistently.
+- Baseline: 196 existing pure planner tests passed on Windows by copying the three
+  planner test modules, their helper and scenario fixture to a temporary directory,
+  disabling pytest plugin autoload, and loading the **actual repository planner and
+  pricing modules** through lightweight package stubs. This did not run HA fixtures,
+  controller integration, settings tests, or any Stage 1.2 policy tests. No live HA
+  or charger operation was performed.
 
 ### 2.5.14 — Stage 1.1 settings and API only
 

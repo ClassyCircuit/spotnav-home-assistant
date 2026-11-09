@@ -23,7 +23,7 @@ Detailed requirements and acceptance cases follow outside this checklist.
 | Stage | Outcome | Dependency / status |
 | --- | --- | --- |
 | 0 | Existing functionality and groundwork | Complete; reuse it |
-| 1 | Price cap and minimum ready-by SOC planning | **Next: 1.1**; independent of isolation |
+| 1 | Price cap and minimum ready-by SOC planning | 1.1–1.2 implemented; **next: 1.3** |
 | 2 | Isolate Morek from legacy control | Groundwork done; actual isolation remains |
 | 3 | Automatically send changed schedules | Stages 1 and 2 before activation |
 | 4 | Recover and report execution health | Stage 3 |
@@ -52,10 +52,17 @@ tests are documented there; full HA collection is still blocked on Windows.
 - [x] **1.1 Settings and API**
   - Persist optional cap and distinct minimum ready-by SOC in existing settings.
   - Validate units/minimum/target; expose price basis and preserve old behavior.
-  - Stored inputs only; no cap or minimum policy is enforced until Stage 1.2.
-- [ ] **1.2 Planner policy**
+  - The saved inputs are consumed by the Stage 1.2 cheapest-price planner.
+- [x] **1.2 Planner policy**
   - Use cheap slots toward target; add cheapest above-cap energy only for minimum.
   - Handle partial blocks, period limits, stale inputs and infeasible deadlines.
+  - **1.2a complete:** the pure planner can select cheap-only capped intervals,
+    including partial durations and shortfalls.
+  - **1.2b complete:** a caller-supplied minimum wall-energy deficit permits only
+    necessary above-cap energy in the pure planner.
+  - **1.2c complete:** cheapest-price Auto resolves fresh vehicle facts, plans and
+    reconciles strict capped windows. Capped solar/hybrid strategies are refused.
+    The separate immediate SOC floor and manual actions are not governed by the cap.
 - [ ] **1.3 Reactive planning and explanation**
   - Replan on cap/minimum/target/SOC/ready-by changes without a browser.
   - Expose policy reasons and consistent plan energy/cost; test API-to-plan flow.
@@ -162,8 +169,9 @@ tests are documented there; full HA collection is still blocked on Windows.
 
 ### Execution boundaries — avoid another prerequisite spiral
 
-- **Next implementation is 1.1**, not another unwired admission helper. Stage 1
-  can proceed while Stage 2 activation questions remain open.
+- **Next implementation is 1.3**, reactive planning and explanation. Reuse the
+  completed 1.1 settings and 1.2 planner/Auto integration; do not rebuild them.
+  Stage 1 can proceed while Stage 2 activation questions remain open.
 - The previously proposed durable pre-dispatch callback wrapper was **not assigned**
   and is **not a required task**. Do not implement it automatically.
 - Reuse the completed evidence store if the selected execution path needs it.

@@ -102,6 +102,7 @@ EXECUTION_RECONCILE_FAILED: Final = "reconcile_failed"
 #: A strategy change to `solar` while a `cheapest` plan Auto installed was running, and stopping
 #: the charger to clear it failed.
 EXECUTION_SOLAR_STAND_DOWN_FAILED: Final = "solar_stand_down_failed"
+EXECUTION_POLICY_STAND_DOWN_FAILED: Final = "policy_stand_down_failed"
 
 #: The one manual-action vocabulary: a control description and the action command that
 #: carries it out use the same names, so a client renders what the backend named.
@@ -417,6 +418,7 @@ class AutoApplication:
             self.plan.target_soc_percent,
             self.plan.vehicle_id,
             self.plan.to_vehicle_limit,
+            self.plan.strict_windows,
         )
 
 
@@ -457,6 +459,7 @@ def auto_plan_for(
         auto_identity=application_identity,
         auto_settings_revision=settings.revision,
         auto_price_identity=snapshot.price_identity,
+        strict_windows=settings.soft_price_cap is not None,
     )
 
 
@@ -684,10 +687,10 @@ class AutoExecutor:
         if self._shutdown:
             return False
         applied = self.applied
+        if self._clear_waiting is not None:
+            return applied is not None
         if applied is None or not self._superseded_by_settings(applied):
             return False
-        if self._clear_waiting is not None:
-            return True
         snapshot = None if self._live_snapshot is None else self._live_snapshot()
         return (
             getattr(snapshot, "state", None) == "waiting_for_publication"
@@ -806,6 +809,8 @@ class AutoExecutor:
         * a recorded failure with nothing on the charger is `execution_error`;
         * otherwise `not_applied`.
         """
+        if self._last_error == EXECUTION_POLICY_STAND_DOWN_FAILED:
+            return EXECUTION_ERROR
         if self.paused:
             if self._last_error == EXECUTION_PAUSE_STOP_FAILED and self.applied is not None:
                 # A pause whose stop failed is not a clean pause: the plan is still on the charger and
@@ -959,6 +964,8 @@ class AutoExecutor:
         self, settings: AutoSettings, snapshot: Any, *, attempt: int
     ) -> AutoApplication | None:
         """`async_reconcile` itself, with this boundary's lock held."""
+        if not self.current(attempt) or self._store.settings(self._entry_id).revision != settings.revision:
+            return self.applied
         application = application_for(settings, snapshot, effective_phases(self._hass, self._entry_id))
         applied = self.applied
         if application is None:
@@ -967,6 +974,11 @@ class AutoExecutor:
             if self.current(attempt):
                 self._pending = None
                 self._clear_waiting = None
+            if settings.soft_price_cap is not None:
+                if applied is None:
+                    self._last_error = None
+                    return None
+                return await self._clear_superseded_locked(attempt)
             if settings.strategy == STRATEGY_SOLAR and applied is not None:
                 # A charge the sun's rules keep is handed over to the sun with no stop (the plan's window, or the
                 # sun carrying it past one); anything else is stopped once, as ever. The floor's charge is not the
@@ -1057,7 +1069,15 @@ class AutoExecutor:
             # stale attempt must not touch newer state, so the wait is dropped only if this is newest.
             if self.current(attempt):
                 self._pending = None
+                if application.plan.strict_windows and applied is not None:
+                    return await self._clear_superseded_locked(attempt)
             return applied
+        if application.plan.strict_windows:
+            # A new capped calculation supersedes both an old pending install
+            # and any earlier stand-down retry, even when the old plan is idle.
+            self._pending = None
+            self._clear_waiting = None
+            self._unwatch_unseen_charge()
         if applied is not None and applied.identity == application.identity:
             self._applied = applied
             self._pending = None
@@ -1070,7 +1090,20 @@ class AutoExecutor:
                 await self._confirm_revision(applied, application)
                 return self.applied
             return applied
-        if self.window_charging_now():
+        if (application.plan.strict_windows and applied is not None) or (
+            self.window_charging_now() and applied is not None and applied.plan.strict_windows
+        ):
+            # Never leave old windows behind if a strict replacement fails, and
+            # never let an active strict window defer its own replacement.
+            if not self._prices_still_live(application, attempt):
+                return await self._clear_superseded_locked(attempt) if applied is not None else None
+            if applied is not None:
+                await self._clear_superseded_locked(attempt)
+                if self.applied is not None or self._clear_waiting is not None:
+                    return self.applied
+            if not self._may_apply(application, attempt):
+                return self.applied
+        elif self.window_charging_now():
             # A window is charging and a new plan never shortens it: the change waits for the boundary
             # the plan's timers mark. (A change answered by a wait stops the plan's own charge instead, above.)
             self._pending = PendingApplication(
@@ -1082,7 +1115,9 @@ class AutoExecutor:
             await self._notify_change()
             return applied
         if not self._prices_still_live(application, attempt):
-            return applied
+            if application.plan.strict_windows and applied is not None:
+                return await self._clear_superseded_locked(attempt)
+            return self.applied
         await self._install_application(application)
         return self.applied
 
@@ -1132,12 +1167,23 @@ class AutoExecutor:
         next change, and nothing of it starts meanwhile. Nothing is told. Returns what remains applied."""
         self._clear_waiting = None
         self._unwatch_unseen_charge()
+        current_plan = self._controller.plan
+        policy_clear = self._store.settings(self._entry_id).soft_price_cap is not None or (
+            current_plan is not None and current_plan.strict_windows
+        )
         try:
             cleared = await self._controller.async_end_superseded_plan()
         except Exception as err:  # noqa: BLE001 - reported, the next calculation retries
             _LOGGER.warning("Clearing a plan whose settings changed failed: %s", type(err).__name__)
+            if policy_clear:
+                self._last_error = EXECUTION_POLICY_STAND_DOWN_FAILED
+                self._clear_waiting = attempt
+                self._watch_unseen_charge()
+                await self._notify_change()
             return self.applied
         if not cleared:
+            if policy_clear:
+                self._last_error = EXECUTION_POLICY_STAND_DOWN_FAILED
             self._clear_waiting = attempt
             self._watch_unseen_charge()
             await self._notify_change()
@@ -1147,6 +1193,8 @@ class AutoExecutor:
             self._entry_id,
         )
         self._applied = None
+        if policy_clear:
+            self._last_error = None
         await self._notify_change()
         return None
 
@@ -1191,10 +1239,10 @@ class AutoExecutor:
                 self._applied = None
                 await self._notify_change()
                 return None
-            if not self._superseded_by_settings(applied):
+            if not self._superseded_by_settings(applied) and self._store.settings(self._entry_id).soft_price_cap is None:
                 self._clear_waiting = None
                 return applied
-            if self._superseded_runs_to_end():
+            if self._store.settings(self._entry_id).soft_price_cap is None and self._superseded_runs_to_end():
                 return applied
             return await self._clear_superseded_locked(attempt)
 
@@ -1325,6 +1373,8 @@ class AutoExecutor:
             return code
         self._applied = application
         self._pending = None
+        if application.plan.strict_windows and self._last_error == EXECUTION_POLICY_STAND_DOWN_FAILED:
+            self._last_error = None
         await self._notify_change()
         return None
 

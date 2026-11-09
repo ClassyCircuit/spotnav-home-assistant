@@ -1,311 +1,361 @@
-# Initialize a SpotNav Enhanced coordinator
+# Initialize the SpotNav Enhanced coordinator
 
-Use this file to start a new coordinating LLM session. You are the **coordinator
-and reviewer**, not the implementation LLM. Read this entire file, then inspect
-the repository before choosing the next task. Do not implement a feature merely
-because you have been initialized.
+Read this entire file, then inspect the repository. You are taking over as the
+**coordinator/reviewer**. Another LLM implements your prompts; the user passes its
+reports back to you. Do not automatically implement features upon initialization.
 
-Snapshot: **2026-11-09**. This is a reusable handoff, not proof of current Git,
-deployment or hardware state. Update its progress section when handing off again.
+**Snapshot: 2026-11-09, source version 2.5.20.** This file replaces the old handoff
+in full. There are no older next-task instructions to follow. Recheck Git/source
+on arrival: source, installed HA version and hardware state are different facts.
 
-## Current direction — supersedes the older next-action notes below
+## 1. Immediate situation and next action
 
-The user requested less engineering overhead and a concise task-based roadmap.
-`docs/charging-dashboard-roadmap.md` now starts with the authoritative numbered
-stage/substage checklist. Detailed old A/B/C descriptions remain only as acceptance
-reference. Use the new numbering for future implementation prompts.
+- Stage **0** groundwork and **1.1** settings/API are complete.
+- Stage **1.2** is now implemented for **cheapest-price Auto**, including planner,
+  fresh vehicle-energy resolution, strict executable windows, policy stand-down
+  and dashboard/preview encoding. The temporary blanket cap refusal is removed
+  for this supported path. Do not restart the implementation or repeat its slices.
+- The implementer's latest report says 1.2 complete; the outgoing coordinator
+  inspected the key source diffs and independently reran the actual-module
+  isolated harness: **282 passed, one dependency deprecation warning**.
+  This was not full HA pytest or physical validation.
+- **Next substage: 1.3 — reactive planning and explanation.** On takeover, finish
+  a proportionate review of 1.2 if needed, then provide its continuation prompt.
+  Carry substantive fixes into 1.3 rather than restarting an open-ended audit.
+- Stage 1.3 must connect saved cap/minimum/target/ready-by edits and relevant
+  SOC/price changes to backend recalculation without a browser, reuse existing
+  listeners/events, and test settings-to-plan updates plus policy explanations.
+  Do not rebuild existing triggers that already work. Inspect first, fill gaps.
+- **Automatic Morek uploads are Stage 3, not 1.3.** Stage 1.3 changes planning;
+  it does not arm Morek scheduling or remove manual Send safeguards.
+- Morek isolation/activation is still incomplete and unarmed. No deployment,
+  restart, live charger command or push was authorized by this handoff.
 
-- Completed groundwork is Stage 0; do not rebuild it.
-- Source through **2.5.13** includes the standalone, unwired
-  `execution/unresolved_start.py` and its tests. Coordinator inspected the store
-  and tests and ran Ruff; the implementer reported 15 isolated evidence cases and
-  440 pure-core cases. These are not full HA validation.
-- The durable pre-dispatch callback helper proposed after that review was **never
-  assigned to the implementer**. It is cancelled as the next task, not a dependency.
-- **Next task: Stage 1.1, price-policy settings and API**, for a new implementation
-  LLM. Stage 1 planner work is independent of unresolved Morek activation questions.
-- Remaining isolation is Stage 2, simplified after checking actual pause semantics:
-  extend the existing execution boundary, close direct-write bypasses with shared
-  guards, then test startup/handover end to end. Ordinary pause permits automatic
-  stops, manual starts and protection writes; it is useful groundwork, not isolation.
-  No separate new audit/design session or per-caller gating project is required.
-  Do not resume an open-ended series of unwired command/recovery foundations.
-- Uncertainty handling is only required to the extent needed by the chosen Morek
-  execution path. Generic legacy recovery is not a prerequisite for planner/UI work.
-- Keep all safety/authorization activation blockers; simplification does not grant
-  permission to disable protection, deploy or issue live commands.
+## 2. How the user wants coordination to work
 
-At future initialization, follow this section and the current roadmap rather than
-the historical suggestion below to keep extending the 2.5.12 extraction.
+- Be decisive and pragmatic. The user explicitly said **stop overcomplicating and
+  overengineering**. Aim for a good-enough tested implementation and keep moving.
+- Assign **one roadmap substage per session**, not an entire stage. Include scope,
+  required behavior, tests, exclusions, deliverable and stop-for-review boundary.
+- The user expects implementers to finish assigned tasks. A newly discovered code
+  path is implementation work, not automatically a reason to stop. Allow a stop
+  for a concrete missing coordinator/user decision or external prerequisite;
+  resolve it explicitly. Never require ignoring safety or concealing test failures.
+- Do not accept another unused helper as completion of a functional task. Several
+  sessions stalled this way before 1.2 was split and finally integrated.
+- Make bounded follow-up fixes part of the next task where sensible. Do not be
+  nitpicky or expand every issue into a prerequisite project.
+- Review actual source/diffs/tests, not just implementer reports. Clearly separate
+  checks you ran from checks the implementer reported. Never call isolated tests
+  full HA/controller integration or hardware proof.
+- Preserve user work. No unrequested commits/pushes/deployment. Do not reset,
+  discard or overwrite unrelated changes. Do not spawn subagents unless authorized.
+- Keep user-facing review brief and give one copyable prompt for the same LLM
+  unless the user asks to initialize a new implementer.
 
-## Role and working agreement
+## 3. Workspace and authoritative reading
 
-- The user gives your bounded prompts to another LLM, usually continuing the same
-  implementation session. That LLM implements; you inspect its actual changes,
-  review risks and tests, and provide the next continuation prompt.
-- The user explicitly rejected a whole Stage 1 assignment as too large. Keep
-  sessions small, with coordinator review between slices. Split further when
-  call-chain complexity warrants it, but avoid repeating audits instead of making
-  concrete, independently testable progress.
-- When asked “quick review and next prompt,” read the actual source/diff and
-  relevant tests/docs. Do not merely endorse the implementer's summary. State
-  what you checked yourself versus tests only reported by the implementer.
-- Provide one copyable continuation prompt for the same LLM: scope, acceptance
-  criteria/tests, exclusions, deliverable and explicit stop-for-review boundary.
-- Preserve unrelated/user work. Inspect Git status before edits; no resets,
-  discards or unrequested commits, pushes, deployment or live changes.
-- Do not spawn subagents unless explicitly authorized by the user or applicable
-  repository instructions.
-- Keep user-facing reviews concise, but include enough detail in prompts to avoid
-  unsafe shortcuts. Open questions must not silently become implementation policy.
+Workspace: `C:\Code\spotnav-home-assistant`, Windows/PowerShell.
 
-## Repository and reading order
+Read in order:
+1. `AGENTS.md` — mandatory safety, naming and build/version rules.
+2. `docs/charging-dashboard-roadmap.md` — **the numbered task checklist at the top
+   is authoritative**; detailed old A/B/C sections below are acceptance reference.
+3. `docs/morek-development-handoff.md` — current implementation/reports, especially
+   the **2.5.20** entry. Older 2.5.15–19 “incomplete/guard retained” entries are
+   history, superseded by 2.5.20. Old branch/deployment statements are not current.
+4. `docs/morek-execution-audit.md` — writer inventory, ownership foundations and
+   historical limitations. It is not permission to revive the abandoned recovery
+   framework work or old A2.2 prompts.
+5. `docs/morek-schedule.md` — current manual Morek workflow.
+6. Relevant architecture docs/source/tests progressively; useful references are
+   `docs/architecture-state.md`, `docs/ocpp.md`, `docs/target-soc.md`, `docs/prices.md`.
 
-Workspace: `C:\Code\spotnav-home-assistant` (Windows/PowerShell).
+Inspect `git status --short --branch`, recent commits and manifest first.
+At this snapshot branch is `feat/dashboard` tracking `origin/feat/dashboard`.
+Latest commits include `08d6d3b8` (1.1), `3dcb9ec6` (roadmap rewrite), and
+`5e40bc87` (unresolved evidence). Stage 1.2 is **uncommitted work** to preserve.
 
-Read these in order, progressively rather than dumping the repository:
+Modified tracked files at takeover:
+- `custom_components/spotnav/api/dashboard.py`, `api/plan_preview.py`
+- `custom_components/spotnav/execution/auto_execution.py`, `execution/controller.py`
+- `custom_components/spotnav/planning/auto_controller.py`, `auto_settings.py`, `planner.py`
+- `custom_components/spotnav/manifest.json`, `www/spotnav-card.js`
+- `docs/charging-dashboard-roadmap.md`, `docs/morek-development-handoff.md`
+- `tests/test_auto_controller.py`
 
-1. `AGENTS.md` — mandatory safety, naming and version/build instructions.
-2. `docs/charging-dashboard-roadmap.md` — authoritative forward requirements,
-   dependencies and acceptance criteria. Read the Stage A blocks and policies.
-3. `docs/morek-execution-audit.md` — most current execution findings and incremental
-   implementation notes. Later sections supersede earlier historical statements.
-4. `docs/morek-development-handoff.md` — manual baseline, HA access and wire
-   investigations. Its old version/branch/deployment statements are historical.
-5. `docs/morek-schedule.md` — existing manual Morek behavior.
-6. As relevant: `docs/architecture-state.md`, `docs/ocpp.md`, `docs/target-soc.md`,
-   `docs/prices.md` and source/tests for the slice under review.
+New untracked tests at takeover:
+- `tests/test_capped_auto_execution_isolated.py`
+- `tests/test_capped_vehicle_energy.py`
+- `tests/test_planner_minimum_energy.py`
+- `tests/test_planner_price_cap_comparison.py`
+- `tests/test_planner_price_policy_guard.py`
 
-Run `git status --short --branch`, inspect recent commits and the current manifest.
-Diffs may be clean because the user/implementer committed work between sessions;
-inspect commit changes/source instead of assuming nothing happened.
+The handoff rewrite itself adds another intentional documentation modification.
+Recheck this list instead of assuming it remains exact.
 
-## Product goal and non-negotiable requirements
+## 4. Product requirements
 
-- One modern Home Assistant charging dashboard containing multiple coordinated
-  cards; no separate stock-card dashboard and no solar UI. evcc-inspired styling;
-  Apache ECharts selected for later frontend work.
-- Visible operational information and zoomable Nord Pool prices. Distinguish
-  proposed plan, sent profile, reported effective limits and measured charging.
-- Autonomous backend planning and Morek schedule uploads, independent of an open
-  browser. Changes to prices, SOC, settings and ready-by time must recalculate and
-  resend when effective wire intent changes. Retain manual Send/Refresh debugging.
-- Exclusive ownership for the physical Morek connector: legacy SpotNav must not
-  compete with stored schedules through live start/stop/current commands. Hiding
-  controls or pausing Auto is not isolation. No hidden fallback to legacy control.
-- Configurable optional **soft price cap**. Above-cap energy is allowed only for
-  the cheapest feasible deficit needed to reach configurable **minimum SOC**
-  (typically 40%) by ready-by. Higher normal target SOC uses eligible cheap slots
-  only. Minimum already reached + all expensive prices means no extra charging.
-  Validate minimum <= target, units/price basis, partial blocks and infeasibility.
-  Use the existing planner/settings, not a second optimizer. Existing immediate
-  minimum-SOC actuator is NOT this ready-by optimizer.
-- Historical charging must come from genuine Morek/OCPP measurements/events or
-  validated BMW Bavarian CarData records, never inferred scheduled windows.
-  Investigate actual history versus live-only telemetry; BMW capability remains
-  unverified. Distinguish home/public sessions, battery/grid energy, provenance,
-  timestamp precision and overlapping sources. Sparse SOC is not exact history.
-- No separate overnight-testing roadmap stage. The user chooses hardware testing
-  timing. Automated regression remains required; do not claim physical proof.
+- **One Home Assistant charging dashboard with multiple coordinated cards.** No
+  second stock-card dashboard, no solar UI, no decorative whole-home energy flows.
+- Modern evcc-inspired styling; **Apache ECharts** selected. Important information
+  visible by default; mobile stacks the same cards. No new React/Vue app required.
+- Show Nord Pool prices and clearly separate **proposed / sent / effective readback /
+  measured charging**. Include connection, SOC/target, minimum SOC, cap, ready-by,
+  measured power, next window, plan energy/cost, execution health and missing data.
+- Backend must eventually recalculate/resend autonomously when prices, SOC or
+  settings/ready-by change. Browser activity must not drive automation. Keep
+  manual Send/Refresh for diagnostics through the same eventual safeguards.
+- Morek owns schedule boundaries in schedule mode; legacy HA start/stop/current
+  loops must not compete. Hiding UI or merely pausing Auto is not ownership.
+- Price policy: use at/below-cap energy toward target; above-cap energy only for
+  the cheapest feasible deficit needed to reach minimum SOC by ready-by. Typical
+  minimum 40% is editable, not a forced migration default. Never buy expensive
+  extra energy merely to reach the higher target.
+- Actual history must use genuine Morek/OCPP measurements/events, or validated
+  BMW **Bavarian CarData** observations. No schedule-derived fake charging history.
+  BMW history capability remains unverified. Distinguish home/public location,
+  battery/grid energy, observed records/live-only collection and sample gaps.
+- No separate overnight/hardware-testing stage. The user chooses when to test;
+  continue software/UI development while clearly documenting physical uncertainty.
 - Preserve integration domain `spotnav` and display name **SpotNav Enhanced**.
 
-## Safety and authorization
+## 5. Current roadmap — no old A2.2 work queue
 
-- Implementation/review permission does not authorize live hardware experiments.
-  No profile sends/clears, charging start/stop, charger configuration changes,
-  autonomous activation, HA restart, deployment or live-share edits without the
-  user's specific approval for that concrete operation.
-- Never disable household electrical protection or invent an emergency bypass.
-  Ordinary and regulator stop/current sinks overlap; `urgent` is NOT a reliable
-  safety classification because manual stops can also be urgent.
-- Schedule mode must remain unavailable/unarmed until isolation and safety,
-  transaction authorization and mode-transition policies are resolved. A current
-  limit profile does not itself authorize a newly plugged-in transaction.
-- Never expose credentials, raw household logs or auth responses. Environment
-  variable `homeassistant` is a token usable as Bearer authentication: use in
-  memory only, never print/save/commit its value. Confirm destination first and
-  do not follow credential-bearing redirects.
-- Historical verified API URL: `http://homeassistant.local/`; port 8123 previously
+| Stage | Substages / status |
+| --- | --- |
+| 0 | **Done:** manual baseline; audit; ownership/identity/admission groundwork; attempt evidence |
+| 1 | **1.1 done:** settings/API; **1.2 implemented:** planner + Auto; **1.3 next:** reactive planning/explanation |
+| 2 | 2.1 existing execution boundary; 2.2 shared direct-write guards; 2.3 mode lifecycle/end-to-end tests |
+| 3 | 3.1 shared schedule intent; 3.2 backend upload worker/triggers; 3.3 manual actions/persisted outcomes |
+| 4 | 4.1 restart/reconnect; 4.2 bounded verification; 4.3 health/unresolved actions |
+| 5 | 5.1 layout/shared components; 5.2 overview/status; 5.3 plan controls/actions |
+| 6 | 6.1 genuine source inventory; 6.2 capture/provenance; 6.3 queries/retention |
+| 7 | 7.1 ECharts prices; 7.2 zoom/interactions; 7.3 aligned schedule/measurement tracks |
+| 8 | 8.1 yesterday comparison; 8.2 costs; 8.3 savings/summaries |
+| 9 | 9.1 accessibility/themes; 9.2 responsive integration; 9.3 installation/docs |
+
+Source inventory 6.1 and sample-data layout 5.1 may start early. Actual mode
+activation still depends on isolation and resolved safety/authorization. Numbered
+stages replace the previous broad A1/A2/A2P/A3/A4/A5/B/C assignment scheme.
+
+## 6. Stage 1 — what exists now
+
+### 1.1 settings/API (2.5.14)
+
+Existing `AutoSettings` and settings API gained additive nullable fields:
+- `soft_price_cap`: currency/kWh, null disables; zero and negative valid.
+- `cap_price_basis`: `nord_pool` or `configured_variable_cost`, required for a cap.
+- `minimum_ready_by_soc`: nullable percentage, distinct from live immediate floor.
+
+Legacy values stay unconfigured; omitted API fields retain values; null clears.
+Finite-number/percentage/minimum-target/revision validation uses existing patterns.
+Minimum is also checked against the resolved vehicle target at planning time.
+Do not add another settings store or redo this schema.
+
+### 1.2 planner (2.5.17–18 work, included in current 2.5.20)
+
+- `price_within_cap` uses existing price/fiscal arithmetic; major/minor conversion
+  remains explicit. The source price may already include fiscal components; reuse
+  existing included-fee handling rather than double-adding taxes.
+- `PlanRequest` carries cap/basis and resolved `minimum_energy_kwh` (wall energy).
+  Missing/zero minimum authorizes no expensive exception.
+- `_calculate_capped` selects known eligible intervals. If feasible cheap energy
+  cannot reach minimum, it searches known cheap/expensive candidates together
+  under the shared period budget, bounded to minimum rather than higher target.
+- Capped automatic periods have no hard run count when `max_periods=None`; this
+  branch intentionally omits the uncapped start-cost/minimum-run preferences so
+  it cannot pad expensive windows. Numeric period limits are enforced.
+- Exact partial intervals include an expensive interval BEFORE a later cheap one.
+  `exact_periods` prevents `ending_at_need`/`shown_periods` from trimming again.
+  Costs and energy use actual durations. Uncapped behavior remains legacy.
+- Result facts: `policy_shortfall_kwh` (target), `minimum_shortfall_kwh`,
+  `exception_periods`, `exception_kwh`; `no_eligible_energy` is an explicit result.
+- `plan_unpriced` still refuses capped requests. Unknown prices never authorize
+  charging or get reclassified as cheap under a short-deadline guarantee.
+
+Tested examples at 6 kW (pure planner, already-resolved wall deficits):
+- Target 33 kWh/minimum 9, all expensive: select cheapest feasible 9, target short 24.
+- Minimum 2.1 kWh, one cheap 15-minute interval: 1.5 cheap + 0.6 expensive over
+  exactly 6 minutes, including when expensive precedes cheap. No whole-slot padding.
+
+### 1.2c final integration (2.5.20)
+
+- `capped_vehicle_energy` resolves fresh, actual/non-estimated SOC, usable capacity
+  and effective target using existing learned wall-energy/efficiency conversion.
+  It does not assume the immediate SOC floor has already charged the vehicle.
+  Minimum fractional percentages are retained. Freshness uses existing rules.
+- Cheapest-price Auto now consumes saved capped settings through normal calculation.
+  Manual-kWh plans remain cheap-only without a minimum exception.
+- Capped solar/hybrid strategies explicitly return unavailable. No solar work is
+  requested; do not expand support opportunistically.
+- Capped missing-price results bypass unpriced/history fallback. Stale input does
+  not preserve a previous capped proposal as if it were freshly validated.
+- `ChargingPlan.strict_windows` is persisted, default false for older plans.
+  Capped plans cannot top off, be left to the car at vehicle limit, or defer a
+  superseding plan so old windows continue outside the new permitted schedule.
+- `AutoExecutor` reconciles empty/unavailable capped outcomes by standing down
+  the old **Auto-owned** plan; stale attempts/settings must not clear newer work.
+  Person-owned and immediate-SOC-floor charges remain separate.
+- `policy_stand_down_failed` is visible as execution error; failed clearing remains
+  retryable instead of pretending the old plan vanished. Existing clear/watch
+  infrastructure is reused, not another recovery worker.
+- Dashboard `serialize_plan` and preview `encode_preview` add `price_policy` facts:
+  basis, reason, minimum/target shortfalls, exception kWh and intervals.
+- The cap governs planned cheapest-price Auto charging. It is **not** a universal
+  electrical limit on manual actions, the immediate floor or protection commands.
+- Stage 1.3 event/trigger coverage is not yet established. None of this implements
+  autonomous Morek profile uploads, isolation or activation.
+
+## 7. Stage 2 — simplified approach and actual pause semantics
+
+Do not revive the lengthy old A2.2 chain of standalone prerequisites. Existing
+ownership/admission/evidence foundations are sufficient material to reuse.
+The proposed durable pre-dispatch callback wrapper was **never assigned** and
+is not required. Do not build it automatically.
+
+The outgoing coordinator checked source: **Pause until I resume does NOT block
+all writes**:
+- Auto application/ordinary automatic starts: blocked.
+- `AutoExecutor.automatic_allowed`: explicitly permits automatic stops under
+  ordinary pause, and has person/balancing resume cases.
+- `async_manual_start`: intentionally works while Auto is paused.
+- Applying pause itself can call stop/clear; do not repeatedly invoke pause as a
+  schedule-mode enforcement mechanism.
+- `ChargingController.async_apply_regulated_current`: independent protection path.
+- `charger_handback.py`: can start/restore current when an entry is deleted,
+  without using the ordinary Auto pause gate.
+
+Three implementation slices remain:
+1. Extend the **existing execution boundary** with Morek ownership, blocking
+   ordinary starts/stops/application/retries and conflicting manual actions BEFORE
+   preparation effects. Reuse the pause infrastructure, not stop-on-pause behavior.
+2. Cover direct current/phase/restore/handback bypasses with **shared guards**.
+   Whole-writer coverage is a test requirement, not checks in every function.
+3. Establish ownership before legacy startup/restore; quiesce old work for explicit
+   handover; prefer deliberate reload over seamless hot switching; end-to-end tests.
+
+Preserve protection. If active site regulation conflicts with schedule-only mode,
+show an activation blocker rather than disabling safety or redesigning regulation.
+Transaction authorization, safe entry/exit and retained 0 A profiles must be clear
+before activation. Generic legacy unknown-command recovery is not a prerequisite
+for planner/UI work. Do not redesign the whole charge-session core for isolation.
+
+### Existing groundwork and cautions
+
+- Ownership store is persisted metadata, not enforcement. Schedule owner strings
+  do not arm control; no activation API exists in the foundation.
+- Admission locks use physical station/connector, not friendly entry aliases.
+  Identity classification distinguishes supported target, unrelated physical
+  connector, target with unsupported protocol and unresolved/ambiguous identity.
+- Late initialization uses the shared connector lock and rechecks identity. Its
+  control-entity availability signal is not proven complete OCPP reconnect coverage.
+- Duplicate contenders are partly in memory and rediscovered after restart.
+- Cancelled storage writes can remain uncertain in-process. Generation invalidation
+  is process-local, not an atomic durable transition and cannot undo dispatch.
+- `unresolved_start.py` is a separate durable attempt-specific evidence store,
+  **unwired**. It is not ownership, authorization, measured flow or a command gate.
+- `_last_start_attempt`/`StartAttemptEvidence` are diagnostic only. Unknown physical
+  outcomes must not silently become confirmed non-execution, but further machinery
+  is only required to the extent needed by the chosen execution path.
+- Existing outer decision/controller and assignment/profile locks precede the
+  connector lock. Never wrap a routine that acquires assignment locks inside the
+  connector lock or recursively reenter admission.
+- Preserve person Stop/pause intent. Do not equate `urgent` with protection or
+  silently suppress regulator stops/current lowering.
+
+## 8. Safety, hardware and access facts
+
+- Code implementation does not authorize live experiments. No sends/clears,
+  charging start/stop, charger config, autonomous activation, HA restart, deployment
+  or live-share changes without the user's specific approval for that operation.
+- Never disable household protection, raise limits or assume a software actuator
+  can be removed safely. Profiles impose current limits; they do not authorize a
+  new charging transaction. Authorization remains unproven for the intended mode.
+- Morek station **3020002509120029**, connector **1**, owned profile **42001**,
+  production stack **1**. No automatic priority escalation or blanket profile clear.
+- Manual builder sends displayed real windows, including shortened final stops,
+  as fixed times—not measured-energy guarantees. Persistent final 0 A remains until
+  replacement/removal. Removing it can permit charging; explain consequences.
+- Accepted uploads sometimes read back flat 16 A before later matching with drift.
+  Stack 5 was rejected; stack 4 and later stack 1 matched in historical diagnostics.
+  Existing tolerance is 90 seconds with coverage checking, not exact physical proof.
+- CompositeSchedule reports effective limits, not installed-profile inventory or
+  measured charging. Earlier checks were unplugged; current connection is unknown.
+- Never print/save/commit credentials, raw household logs or auth responses.
+  Environment variable `homeassistant` was verified as a Bearer token. Use only in
+  memory, only to the confirmed host, without credential-bearing redirects.
+- Historical confirmed API URL: `http://homeassistant.local/`; port 8123 previously
   refused. `\\HOMEASSISTANT\config` was readable, not authorization to write.
-  For authorized read-only diagnostics, see the development handoff. Core logs
-  were available through `/api/hassio/core/logs?lines=1000` and WebSocket
+- Read-only logs were available via `/api/hassio/core/logs?lines=1000` and WebSocket
   `system_log/list`; `/api/error_log` returned 404. Filter private data in memory.
+  See the development handoff before any authorized live diagnostics.
 
-## Morek wire facts and limitations
+## 9. Tests and build facts
 
-- Physical station `3020002509120029`, connector `1`.
-- Owned schedule profile ID `42001`; production stack level `1`.
-- No automatic priority escalation; no blanket profile clearing. Selective
-  cleanup must target only the owned ID through the validated existing path.
-- Stack 5 was rejected; stack 4 and later stack 1 produced matching windows in
-  investigations. Accepted uploads sometimes initially read back as flat 16 A,
-  then later matched with drifting seconds. Root cause was not conclusively found.
-- Existing verification permits 90 seconds drift and checks duration/coverage.
-  CompositeSchedule is effective limits, not installed-profile inventory.
-  Accepted ACK or matching readback is not proof of measured energy delivery.
-- Manual sending uses actual displayed windows, including shortened final blocks,
-  as fixed times. Do not promise stopping at a measured-energy threshold.
-- Final 0 A limit remains installed until replacement/removal.
-- Earlier physical investigations were unplugged; this is not a permanent state
-  fact. Real charging/new-transaction authorization remains unproven.
+Outgoing coordinator independently ran:
+`python C:\Users\simso\AppData\Local\Temp\opencode\spotnav-planner-baseline\run.py`
 
-## Stage sequence
+Result: **282 passed, 1 warning, 2.62 seconds**, against actual repository modules.
+Warning: HA HTTP application's aiohttp inheritance deprecation.
 
-The roadmap remains authoritative; practical implementation is subdivided:
+The harness uses lightweight package stubs/fixtures, not the full HA test runtime.
+It now includes persisted-format settings through real calculation/preview and
+real executor/controller methods with mocked charger boundaries. Inspect the
+harness and tests to understand limits; do not call this a live HA end-to-end run.
+Do not replace it with AST-extracted copies of implementation functions.
 
-1. A1 ownership/writer/authorization/safety audit.
-2. A2.1 persisted unarmed ownership metadata.
-3. A2.2 admission foundation, prerequisites, and incremental writer isolation.
-4. A2P price-policy settings, then planner policy (separate sessions).
-5. A3 reconciliation logic, then reactive triggers (separate sessions).
-6. A4 restart/reconnect, bounded recovery and truthful health.
-7. A5 and later dashboard/history blocks as documented in the roadmap.
+Implementer also reports Ruff, compileall, frontend build, check-dist and diff-check
+passing. Normal HA controller tests were added but could not collect on Windows:
+the HA pytest plugin imports Unix-only `fcntl`. No physical verification occurred.
 
-Do not hand the next LLM all these stages at once. Stage A2 is still incomplete.
-Autonomous scheduling and the new dashboard are not implemented by these steps.
+Environment: local Python 3.14 is available. Earlier existing WSL Ubuntu had Python
+3.12 and Docker daemon was unavailable. Recheck if useful, but do not install/change
+environments or dependencies without authorization just to hide collection failure.
 
-## Progress at this snapshot
+For integration/card changes, AGENTS.md requires manifest bump, `npm run build`
+inside `frontend/`, and `npm run check-dist`. Committed bundled assets live in
+`custom_components/spotnav/www/`; generated frontend sources are not committed.
+Documentation-only edits do not need a version bump/build.
 
-### Historical manual baseline
+## 10. Source/test pointers for the next coordinator
 
-Versions 2.5.2–2.5.7 added alias resolution, panel/layout fixes, exact wire preview
-and fingerprint, text selection, selective cleanup, delayed verification and
-shortened displayed-window sending. At 2.5.7, 2,342 frontend tests and 29 isolated
-Python cases were reported passing. These are historical, not latest-run results.
+- `planning/auto_settings.py`, `api/settings.py`: settings schema/API/persistence.
+- `planning/planner.py`: cap comparison, exact window selection, minimum exception,
+  energy/cost/shortfall result semantics. Keep existing optimizer for uncapped plans.
+- `planning/auto_controller.py`: saved inputs, `capped_vehicle_energy`, actual
+  calculation, snapshots, existing listeners/replan events (inspect for 1.3).
+- `execution/auto_execution.py`: application, current-attempt/revision checks,
+  strict replacements, policy stand-down and retained error state.
+- `execution/controller.py`: `ChargingPlan.strict_windows`, storage compatibility,
+  top-off/leave-to-car restrictions, actual command boundaries.
+- `api/dashboard.py`, `api/plan_preview.py`: `price_policy` encoding.
+- `execution/execution_ownership.py`, `command_admission.py`, `unresolved_start.py`:
+  already-built foundations; not a queue of work to redo.
+- `api/morek_schedule.py`: manual identity/profile/verification behavior; preserve
+  existing safeguards. Autonomous worker is still future Stage 3 work.
+- `__init__.py`, `execution/charger_handback.py`, `execution/chargers/`,
+  `site/site_capacity_controller.py`: later Stage 2 startup/direct/safety paths.
 
-### Reviewed incremental implementation
+Paths above are relative to `custom_components/spotnav/`.
 
-- **A1:** audit completed; writer paths and unresolved policies documented.
-- **2.5.8 / A2.1:** versioned persisted ownership document, bound to physical
-  station/connector, read-only status, no activation API. Metadata is not control.
-- **2.5.9 / A2.2a:** unwired command-admission service; physical-connector locks,
-  explicit refusal reasons, identity rechecks and process-local generation tokens.
-  No production writer uses it; profile writes remain refused as unarmed.
-- **A2.2b initial attempt:** correctly paused without dispatch gates. Starts have
-  phase/current writes, reservations and retries before adapter.start. Several
-  stops record completion before dispatch. Dispatch-only gating would be unsafe.
-- **2.5.10 prerequisite:** startup and charge-control availability transitions use
-  serialized late initialization. Connector lock then store lock; identity
-  rechecks, duplicate checks, conservative persistence verification. Status stays
-  read-only. No actuator admission.
-- **2.5.11 identity hardening:** resolver reports match count/protocol and prioritizes
-  ambiguity. Classifier distinguishes supported target, positively unrelated
-  physical connector, target with unsupported/unknown protocol, and unresolved.
-  Unsupported target must never become an unrelated-charger bypass. Coordinator
-  inspected these changes and ran Ruff/diff checks, but did not rerun reported
-  isolated tests (37 ownership/admission/lifecycle and 37 Morek).
+Tests: `test_price_policy_settings.py`, `test_planner_price_cap_comparison.py`,
+`test_planner_price_policy_guard.py` (name retained; now includes working capped
+selection), `test_planner_minimum_energy.py`, `test_capped_vehicle_energy.py`,
+`test_capped_auto_execution_isolated.py`, `test_auto_controller.py`, existing
+planner/preview/dashboard/Auto tests. Discover existing trigger tests before 1.3.
 
-### Newer source discovered while writing this handoff — not yet coordinator-reviewed
+## 11. Takeover checklist
 
-At this snapshot Git is clean on `feat/dashboard`, manifest **2.5.12**.
-Recent commits: `d8953006` (A2.2b), `326a68a1` (A2.2b start),
-`4c1be201` (A2.2a), `1f37a367` (s1.1). Recheck instead of relying on titles.
-
-The audit now documents a **partial ordinary-start extraction**:
-
-- `_start_requested_amps` extracts read-only amp selection but remains AFTER
-  phase preparation and possible manual target-stop persistence.
-- In-memory `StartAttemptEvidence` / `_last_start_attempt` records possible
-  preparation, reservations/retries and adapter dispatch outcomes. Entering a
-  preparation function means it MAY have written, not a confirmed physical write.
-- `_start_command_locked` still owns the command sequence/outcome handling.
-  No admission gate is called; truthful session/unknown-outcome behavior is not
-  solved just by adding diagnostic evidence.
-- Existing cancellation/exception cleanup can still feed “not executed” despite
-  possible physical action. `_last_switch_command` is not restored on false/failure.
-- Audit reports nine real-controller characterization cases using a minimal
-  standalone HA fixture; these are isolated, not full HA tests. It reports Ruff,
-  compilation, frontend build and check-dist passing. Independently review them.
-
-The last coordinator prompt requested a small behavior-preserving ordinary-start
-preparation/dispatch/outcome refactor, NOT actual admission or stop integration.
-This newer partial work needs review against that scope before choosing a follow-up.
-
-## Critical unresolved boundaries
-
-- Generation invalidation is process-local and not atomic with durable ownership
-  mutation. It cannot cancel a command already dispatched.
-- Late-init availability listener is not proven OCPP reconnect coverage. Identity
-  may resolve without the watched entity transition; entries without a target at
-  setup require the existing configuration/reload path.
-- Duplicate contenders are in memory and must be rediscovered after restart.
-  Do not claim restart-safe exclusive ownership before resolving this.
-- Cancelled storage writes may outlive cancellation; initialization conservatively
-  stays uncertain in that process instead of racing a retry.
-- Starts can restore phases/write current, reserve headroom, mutate target state,
-  set pending evidence and arm retries before adapter.start. A gate at the adapter
-  alone does not isolate them.
-- Several target/need-met/window-end stops record completion before dispatch.
-  Target evidence versus completion notification semantics remain undecided.
-  Manual stop intentionally retains pause intent even on physical failure; do not
-  accidentally remove that intent while making refusal outcomes truthful.
-- Regulator protection, current lowering, direct adapter/handback paths, phase and
-  deferred current writes, Morek profile writers, mode transitions and startup
-  enforcement still need review/integration. Do not claim exclusive control.
-- Authorization, independent household safety, mode entry/exit and uncertain
-  in-flight outcome policies remain unresolved. Keep hardware mode unarmed.
-
-### Lock order constraint
-
-Existing outer Auto/decision/controller locks precede assignment locks where used;
-the connector admission lock comes last at physical dispatch. Existing Morek
-profile locks also precede the connector lock. Never hold the connector lock and
-then wait for controller/assignment/profile/another connector lock. Never recurse
-into connector admission. Wrapping the whole start function in that lock is unsafe
-because it acquires assignment locks inside. Releasing the connector lock after
-one early check is not an atomic multi-write ownership protocol either.
-
-## Source and test map
-
-- `custom_components/spotnav/execution/execution_ownership.py`: versioned metadata,
-  strict reads, durable initialization, conflict/save status.
-- `custom_components/spotnav/execution/command_admission.py`: classifier, connector
-  locks, admission matrix and generation tokens; currently unwired to actuators.
-- `custom_components/spotnav/__init__.py`: setup ordering and metadata lifecycle.
-- `custom_components/spotnav/api/morek_schedule.py`: identity resolution, manual
-  profile API, preview, upload/readback and ownership status.
-- `custom_components/spotnav/const.py`: shared physical Morek identity constants.
-- `custom_components/spotnav/execution/controller.py`: start/stop, retries,
-  preparation writes, reservations, outcome/session effects and regulator paths.
-- `custom_components/spotnav/execution/chargers/`: actual adapter/current/OCPP sinks.
-- `custom_components/spotnav/execution/charger_handback.py`: direct start/current
-  restoration on deletion outside ordinary controller isolation.
-- `custom_components/spotnav/site/site_capacity_controller.py`: protection,
-  lowering, pause/resume and restore behavior.
-- `custom_components/spotnav/planning/`: existing planner and future price policy.
-- `tests/test_execution_ownership.py`, `tests/test_command_admission.py`,
-  `tests/test_ownership_lifecycle.py`, `tests/test_morek_schedule.py`: foundation
-  tests. Discover the new start-evidence/characterization tests from Git/source.
-- Relevant existing controller regressions include `tests/test_core_drives.py`,
-  `tests/test_core_failures.py`, plus start preparation/reservation/window retries.
-
-## Test and build constraints
-
-- Full HA pytest cannot collect in the known Windows environment because Unix-only
-  `fcntl` is missing. Do not call stubbed/isolated runs the full HA test suite.
-- Latest audit says existing WSL Ubuntu has Python 3.12, project needs Python 3.14,
-  and Docker daemon was unavailable. Recheck if useful; do not install/change
-  environments without authorization merely to conceal the collection blocker.
-- Prefer actual controller-method assertions over helper-only or extracted-source
-  tests. Report what tests prove and what remains untested.
-- Integration/card changes require manifest version bump, `npm run build` in
-  `frontend/` and `npm run check-dist`, per AGENTS.md. Documentation-only edits do
-  not require a release bump. Do not casually rebuild for review-only work.
-- Useful review checks: scoped `python -m ruff check ...`, `git diff --check`,
-  relevant regressions. Compilation/build is not behavioral or physical proof.
-
-## First action for the new coordinator
-
-1. Read the files above and reconcile this snapshot with current Git/source.
-2. If initialization is all the user asked for, acknowledge readiness and identify
-   the active slice; do not launch implementation or live diagnostics.
-3. When asked to review the latest implementation, inspect the 2.5.12 partial
-   extraction and its tests. State what it actually achieves versus the requested
-   preparation/outcome boundary. Diagnostic evidence alone is not that boundary.
-4. Choose ONE small next implementation slice based on that review. Do not jump
-   to shared stop gates or the entire ownership transition. Preserve unarmed mode.
-5. Ask for policy decisions when required; do not assume false, refused, partial
-   and unknown physical outcomes can all share a generic “not executed” result.
-
-Maintain this handoff when substantial progress is reviewed so the next coordinator
-does not need the original conversation to understand the project.
+1. Reconcile current Git/manifest with this snapshot; preserve unfinished changes.
+2. Read the numbered roadmap, then inspect the current 1.2 implementation/test
+   boundaries. The outgoing coordinator checked the key diffs and reran the harness;
+   a comprehensive independent HA review has NOT occurred.
+3. Tell the user briefly where we are: **1.1/1.2 implemented; 1.3 next; Morek
+   isolation/activation/uploads still future**.
+4. When asked for implementation continuation, give one concrete **1.3** prompt.
+   Reuse existing settings/SOC/price listeners; close gaps, test browser-independent
+   recalculation and policy explanation. Do not redo 1.2 or jump to uploads.
+5. Keep the roadmap's overview/current-next pointers and this handoff current.
+   Do not append contradictory “supersedes old instructions” blocks; edit stale
+   statements directly. Historical release notes may remain clearly historical.
