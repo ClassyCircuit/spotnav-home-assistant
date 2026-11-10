@@ -234,6 +234,52 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### Stage 5.1b — dark chart comparison (choice and approval pending)
+
+- The same local prototype now offers switchable interval-width bars and a
+  gradient stepped-area treatment, sharing one fictional variable-duration fixture,
+  price/cap/now/deadline markers, window shading, full plan and zoom controls.
+  It includes negative prices, a missing interval, partial future publication and
+  a partial charging window. Sample total: 15 kWh, €0.51, 3.40 c/kWh; the
+  fictional negative-price first window contributes −€0.12. Unknown is not zero.
+  Time is a fixed relative-hour sample axis, not real timezone/DST handling.
+- ECharts 6.1.0 and Web Awesome 3.14.0 remain locally bundled, with the existing
+  Apache, zrender and Web Awesome license/notice output. No new dependency or
+  production card/backend change. The stepped renderer terminates each segment at
+  its interval boundary and does not bridge the sample price gap.
+- Edge headless desktop 1440×1000 and mobile 390×844 rendered both variants.
+  The browser check exercises switching, three plan rows, data gap/final boundary,
+  negative-price mouse and emulated-touch tooltips, zoom/reset buttons, mouse drag
+  of the overview, disabled charger actions and local-only requests. Four full-page
+  captures are in the local temporary `opencode` folder. Real touchscreen gestures,
+  keyboard chart operation, accessibility and HA integration remain unverified.
+  Sample arithmetic tests and the existing TypeScript check passed; prototype JS
+  is outside that check. Keep 5.1 and 5.1b pending user visual/chart choice; do
+  not proceed to 5.1c without review. No HA or hardware operations occurred.
+
+### Stage 5.1a — prototype refinement (visual approval pending)
+
+- `frontend/prototype/` now illustrates a balanced desktop composition and the
+  same mobile cards, with an immediately visible sample mismatch and expandable
+  evidence, a three-window plan, per-window energy/cost and consistent totals.
+  A 48% sample SOC already exceeds its 40% minimum; the 80% target is projected
+  short within the 10 c/kWh sample cap. Controls are inert/simulated.
+- Apache ECharts 6.1.0 (Apache-2.0) is bundled only in the prototype; its LICENSE
+  and NOTICE and zrender 6.1.0 BSD license are copied into the local output. A
+  custom interval-width price bar chart shows sample prices, cap and proposal;
+  a separate stepped gradient chart illustrates sample measured power and a gap.
+  The sample meter difference is independent of the chart and plan. Real telemetry,
+  timezone/DST, production chart interactions and bindings are not implemented.
+- Edge headless browser checks cover 1440×1000 and 390×844, six cards, mobile
+  stacking, three windows, two canvases, no horizontal overflow, price hover,
+  simulated touch, disabled actions, local input and evidence disclosure. Ten
+  observed requests were local/data only. Screenshots are in the local temporary
+  opencode directory; no physical touch, HA or physical charger validation.
+  Sample arithmetic/missing-data node tests and existing project type-check pass;
+  prototype JS is not type-checked. Build passes. npm reports Node 23 engine
+  warnings and five dependency audit findings (two moderate, three high).
+  5.1 and 5.1a remain unchecked for user visual approval; no 5.2 work was done.
+
 ### Stage 5.1 — isolated dashboard design study (visual approval pending)
 
 - `frontend/prototype/` contains a local sample-only browser dashboard with

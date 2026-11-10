@@ -1,0 +1,12 @@
+:root{color-scheme:dark;--ink:#e7f2f1;--muted:#a8bec2;--line:#344751;--teal:#6bd7bd;--wa-color-brand-fill-loud:#167f6b;background:#101b22}
+.panel{background:#1a2a33;border-color:#31434d;box-shadow:0 8px 28px #0003}
+.sample-banner{background:#193d3b;border-color:#316761;color:#c1ece1}.sample-tag{background:#29423f;color:#b3d8cb}
+.alert{background:#422b29;border-color:#9b5b4d;color:#ffddd1}.alert a{color:#ffd4c4}.health{color:#ffc5ad;border-color:#f0a080}
+.status-line,.waiting{color:#9bdccb}.hint,.missing,.plan-total{background:#223d3a;color:#c4e3da}.plan-total small{color:#a6d4c7}
+.swatch{background:#4aa996}.shade{background:#507268}.cap-key{border-color:#d4a969}
+wa-progress-bar{--indicator-color:#60cdb1;--track-color:#344e4e}.chart-intro strong,.history-head strong{color:#effaf8}
+.plan-row,.plan-label{grid-template-columns:1.6fr 1.1fr 1fr .8fr}.plan-row b{font-size:13px}.plan-label{font-size:12px}.plan-row small,.plan-total small{font-size:11px}
+.chart-switch,.chart-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:16px 0}.chart-actions span{font-size:12px;color:var(--muted)}
+.price-context{display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:13px}.price-context span{background:#253941;padding:8px 11px;border-radius:9px}.price-context b{color:#e7f5ef}
+.chart-description{font-size:13px;font-weight:700;margin:16px 0 0}.price-chart{height:340px;margin-top:4px}.chart-actions{margin:2px 0 12px}.legend{font-size:12px}.plan-total strong{font-size:19px}
+@media(max-width:800px){.price-chart{height:330px}.plan-label{display:none}.plan-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.plan-row b{font-size:13px}.plan-row small{font-size:12px}.plan-total strong{font-size:15px}.chart-actions span{width:100%}.chart-switch wa-button{flex:1}}

@@ -139,6 +139,74 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Start with Web Awesome Core for polished shared controls, with shared tokens and
     HA Sections composition; no second dashboard. Validate visual quality and HA
     compatibility. If it does not work, stop and reevaluate alternatives with the user.
+- [ ] **5.1a Initial prototype refinement** (implemented; further review and approval pending)
+  - Refined local prototype and example ECharts are available; verification and
+    unresolved limitations are in the development handoff. The user requested further
+    refinement in 5.1b–5.1d; don't repeat completed groundwork.
+  - Balance desktop columns and eliminate unused chart-column space; review the same
+    cards stacked on mobile. Improve visual hierarchy and polish without decoration.
+  - Make current charging state, measured power, next window start–end, reason for
+    waiting, SOC/target/minimum/deadline, plan feasibility and urgent health clear at
+    a glance. Replace duplicated protocol jargon with a plain-language health summary;
+    keep critical warnings visible and technical evidence and debug actions accessible.
+  - Show the **entire proposed plan**, including multiple start–end windows, estimated
+    energy and cost per window, and the estimated total energy, total cost and
+    energy-weighted average price in c/kWh for this charge. Label estimate, currency
+    and price basis; show unavailable inputs honestly. Keep the complete plan easy to
+    inspect on mobile, not just the next window.
+  - Demonstrate a populated, genuinely measurement-labelled sample history and separate
+    missing/error examples; keep proposal, sent ACK, effective limits and measurements
+    distinguishable. Make all sample values and policy explanations internally coherent,
+    and distinguish measured zero from unavailable and deadline from predicted readiness.
+  - Add locally bundled **ECharts** sample visualizations: a source-interval price bar
+    chart with labelled units, cap, proposed-window shading and basic tooltips; and at
+    least one additional useful chart concept, exploring a gradient-filled stepped area
+    line. The second can illustrate recent measured power with explicit sample data and
+    gaps; do not imply continuous measurements where none exist. Present the chart roles
+    and visual choices for user approval, without adding charts merely as decoration.
+    Preserve actual interval widths, including negative values where illustrated.
+  - The work remains sample-only; final visual approval follows 5.1b–5.1d.
+- [ ] **5.1b Dark price-chart comparison** (sample-only)
+  - Local comparison is implemented for review in `frontend/prototype/`; choice
+    of chart treatment and overall visual approval remain pending.
+  - Present two Prices & Plan card variants using the same coherent sample data and
+    features: interval-width bars versus a gradient-filled stepped price line/area,
+    inspired by the user's example. These are temporary visual alternatives within
+    one prototype, not two required live dashboards or duplicate final cards.
+  - Make the whole prototype dark as the preferred visual direction. Use locally bundled
+    ECharts and Web Awesome; ensure readable contrast, labels and non-colour cues.
+  - Both variants show yesterday, today and all sample published future prices, without
+    assuming tomorrow is always available; unknown future is not zero. Include negative
+    and variable-duration intervals, cap, now, ready-by, selected windows, day boundaries,
+    current and next planned prices, exact tooltips, zoom/pan and overview/reset; test
+    desktop and mobile interaction. Label cap and price basis with explicit units.
+  - Preserve time-interval truth in the step chart, including final interval and missing
+    data gaps. Both variants show the complete multi-window plan, per-window price,
+    energy and cost, plus this-charge totals and weighted average. Reuse shared sample
+    data/components; ask the user which chart direction to keep.
+- [ ] **5.1c Sample price insights and monthly statistics** (sample-only)
+  - Prototype concise, explainable assessments of current/upcoming prices against a
+    stated illustrative longer-term baseline, plus best upcoming price windows and
+    useful monthly statistics. Clearly distinguish cheapest opportunities from the
+    actual proposed charging plan, cap exceptions and user deadline feasibility.
+  - Use deterministic, labelled fictional price/history fixtures; show basis, lookback,
+    coverage and missing-data states. Do not invent live data, market forecasts,
+    universal cheap/high thresholds, savings or unsupported day-of-week claims.
+  - Explore a useful comparison method, including same-day-of-week only if sample
+    coverage supports it; make assumptions and limitations easy to inspect. Obtain
+    feedback on which insights are useful, without implementing the live pipeline.
+- [ ] **5.1d Daily dashboard polish and visual review** (sample-only)
+  - Refine the full dark dashboard around the selected chart direction: strengthen
+    hierarchy, legibility and card balance; remove duplicated cost/status content;
+    keep important warnings visible and technical evidence accessible. Distinguish a
+    schedule mismatch from measured charging state in clear, actionable wording.
+  - Show recent sent-versus-measured history, explicit gaps and useful alternate
+    scenarios: charging, normal waiting, unavailable data/prices, infeasible minimum,
+    partial final window and above-cap exception. Include date/session selection,
+    coverage and out-of-plan flow in the design; do not invent observations.
+  - Reconcile control units/cap enablement and sample explanations, and review desktop,
+    mobile and HA-like constrained widths. Obtain user visual approval; 5.1 and 5.1a
+    remain pending until approved. No live bindings or hardware actions.
 - [ ] **5.2 Overview and operation status**
   - Bind connection/SOC/measured power/next window and proposal/sent/readback health.
   - Make missing data and critical failures visible without expanding details.
@@ -161,14 +229,24 @@ tests are documented there; full HA collection is still blocked on Windows.
 ### Stage 7 — ECharts prices and schedule tracks (old B3)
 
 - [ ] **7.1 Price chart**
-  - Bundle ECharts locally; show source-resolution prices, units, cap and markers.
+  - Reuse the 5.1a sample ECharts work; bundle it for the shipped card locally and bind
+    real source-resolution prices, units, cap and markers.
   - Handle negative/missing prices, timezone and DST correctly.
 - [ ] **7.2 Interaction**
-  - Add Today/Tomorrow/All, touch/mouse zoom, overview/reset and exact tooltips.
+  - Reuse prototype interactions; add Yesterday/Today/available future/All,
+    touch/mouse zoom, overview/reset and exact tooltips for real data.
   - Preserve zoom on updates; test resize and keyboard/touch behavior in a browser.
 - [ ] **7.3 Aligned tracks**
   - Distinguish proposal/sent/effective/measured tracks and minimum-SOC exceptions.
   - Show mismatches and missing observations honestly; reuse Stage 6 provenance.
+- [ ] **7.4 Price insight sources and methods**
+  - Inventory available historical/published price data and its basis, resolution,
+    retention and coverage; define and test explainable comparisons and upcoming
+    opportunities. Missing history or future prices must be reported, not invented.
+- [ ] **7.5 Live price insights and monthly statistics**
+  - Bind validated 7.4 price sources to current/upcoming assessments, best available
+    windows and monthly summaries, reusing 5.1c design. Show baseline, coverage,
+    price basis and assumptions; do not describe opportunities as the charging plan.
 
 ### Stage 8 — Yesterday and financial summaries (old B4 + C1)
 
