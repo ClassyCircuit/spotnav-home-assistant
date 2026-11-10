@@ -133,7 +133,12 @@ tests are documented there; full HA collection is still blocked on Windows.
 
 - [ ] **5.1 Layout and shared components**
   - Build desktop/mobile browser prototype with sample data; get visual approval.
-  - Choose shared tokens/controls and HA Sections composition; no second dashboard.
+  - Local sample prototype is available in `frontend/prototype/`; browser checks
+    and HA integration limitations are recorded in the development handoff. Visual
+    approval remains pending; this does not complete 5.1.
+  - Start with Web Awesome Core for polished shared controls, with shared tokens and
+    HA Sections composition; no second dashboard. Validate visual quality and HA
+    compatibility. If it does not work, stop and reevaluate alternatives with the user.
 - [ ] **5.2 Overview and operation status**
   - Bind connection/SOC/measured power/next window and proposal/sent/readback health.
   - Make missing data and critical failures visible without expanding details.
@@ -617,10 +622,15 @@ approval. Do not require HA update/restart for every spacing adjustment. Use
 desktop and mobile layouts with the same cards and shared design tokens.
 
 Use HA Sections as the intended responsive layout. Bundle ECharts locally with
-licence/notice files; load heavy chart code only where needed. Evaluate HA-native
-components and Web Awesome **Core** for controls; choose one coherent approach
-rather than multiple styling frameworks. Do not require paid Pro components,
-runtime CDN access or a separate React/Vue rewrite merely for styling.
+licence/notice files; load heavy chart code only where needed. Start with Web Awesome
+**Core** as the primary library for polished ready-made controls, rather than styling
+all controls from scratch. Verify the selected package version, licence, bundled assets,
+theme integration, dialogs/popovers, responsive behavior and compatibility with HA
+custom cards. HA-native components may be used selectively where appropriate; avoid
+depending on undocumented internals. Do not require paid Pro components or runtime
+CDN access. If Web Awesome does not work technically or visually, stop and reevaluate
+alternatives with the user, including React-based libraries if appropriate, rather than
+silently falling back to hand-built controls or undertaking a framework rewrite.
 
 **Done when:** the single-dashboard composition, responsive layout, controls,
 status vocabulary, chart colours/patterns and empty/error states are approved.

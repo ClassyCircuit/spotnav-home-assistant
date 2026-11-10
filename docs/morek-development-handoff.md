@@ -234,6 +234,34 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### Stage 5.1 — isolated dashboard design study (visual approval pending)
+
+- `frontend/prototype/` contains a local sample-only browser dashboard with
+  shared tokens, reusable panel/badge/metric helpers and Web Awesome Core controls.
+  It proposes a single Sections view, with a larger Prices & Plan area, the same
+  cards stacked on mobile, explicit missing measurement and mismatch examples,
+  and disabled actions. The chart is an illustration, not ECharts or history.
+  No shipped card, integration or safety/dispatch code changed. The README covers
+  startup, intended composition, local assets, licenses and HA caveats.
+- Web Awesome 3.14.0 is MIT; selected components and theme are bundled locally.
+  Its general icon resolver has a CDN default; no icons are used in this study.
+  Actual HA shadow-root integration, theme mapping, dialogs/popovers and touch
+  still require validation; this prototype is not a claim of compatibility in HA.
+  Future distribution must audit transitive notices and avoid runtime CDN assets.
+- Chromium Edge headless rendered 1440×1000 and 390×844; browser assertions
+  check six cards, mobile order/alignment, no horizontal overflow, library input
+  rendering, disabled actions, local editing and local-only requests. Screenshots
+  are temporary, not committed. Type-check passed for the existing TS project;
+  prototype JavaScript is not included in that type-check. Visual approval is
+  outstanding; keep 5.1 unchecked and stop for coordinator review. No HA access,
+  hardware operation or deployment occurred; autonomous dispatch remains unarmed.
+- Prototype build and the existing focused Morek panel suite (21 tests) passed;
+  `git diff --check` passed with line-ending warnings. npm reported unsupported
+  engine warnings for existing test dependencies on Node 23 and five audit findings
+  (two moderate, three high); the focused test still passed. npm also warned about
+  forwarded test CLI options. The screenshot reflects the test's in-memory edit of
+  the sample target field, not a saved setting.
+
 ### 2.5.30 — Stage 4.3 operator state (unarmed; review required)
 
 - The existing status response derives an operator summary from current connection,
