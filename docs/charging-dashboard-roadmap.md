@@ -69,16 +69,19 @@ tests are documented there; full HA collection is still blocked on Windows.
 
 ### Stage 2 — Actual Morek isolation (remaining old A2)
 
-- [ ] **2.1 Reuse the legacy execution boundary**
+- [x] **2.1 Reuse the legacy execution boundary** (implemented for review; not full isolation)
   - Extend the existing Auto execution gate with explicit Morek ownership: no
     ordinary legacy starts OR stops, plan installation, retries or automatic resume.
   - Reject conflicting manual/API actions before preparation effects; keep planning,
     metering and status. Reuse pause infrastructure, not its stop-on-pause semantics.
-- [ ] **2.2 Close bypasses with shared guards**
+  - Auto-boundary admission is not a final physical-writer or transition guard; see 2.2–2.3.
+- [x] **2.2 Close bypasses with shared guards** (implemented for review; lifecycle remains 2.3)
   - Guard the few direct write boundaries that bypass Auto (current/phase writes,
     restore and deletion handback); reuse guards rather than gate every caller.
   - Keep protection unchanged; expose an activation blocker if live site regulation
     conflicts with schedule-only control. Do not redesign the regulator here.
+  - Shared adapter admission covers ordinary dispatch, not regulator protection or
+    external integrations. Ownership transitions and startup remain unimplemented.
 - [ ] **2.3 Mode lifecycle and end-to-end regression**
   - Establish ownership before legacy startup/restore; quiesce old work before any
     explicit handover. Prefer a deliberate reload over seamless hot switching.
@@ -169,8 +172,8 @@ tests are documented there; full HA collection is still blocked on Windows.
 
 ### Execution boundaries — avoid another prerequisite spiral
 
-- Stage 1 is implemented for coordinator review; the next implementation block is
-  2.1. Reuse the planner and Auto execution boundary; Stage 2 activation questions
+- Stage 1, 2.1 and 2.2 are implemented for coordinator review; the next implementation block is
+  2.3. Reuse the planner and Auto execution boundary; Stage 2 activation questions
   remain open. Stage 1 does not automatically upload Morek schedules.
 - The previously proposed durable pre-dispatch callback wrapper was **not assigned**
   and is **not a required task**. Do not implement it automatically.

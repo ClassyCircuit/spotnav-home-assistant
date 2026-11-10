@@ -646,6 +646,7 @@
   "control.pausedManualStartResume": "Laddar manuellt – tills bilen är full eller du återupptar automatisk laddning.",
   "control.actionPending": "Ett start- eller stoppkommando väntar på att laddaren ska bekräfta.",
   "action.error.unavailable": "Den åtgärden är inte tillgänglig just nu.",
+  "action.error.ownershipBlocked": "Den tidigare laddstyrningen är blockerad: anslutningens ägare är okänd eller Moreks schemastyrning. Ingen åtgärd utfördes.",
   "action.error.failed": "Åtgärden kunde inte utföras. Inget ändrades.",
   "action.error.reconcileFailed": "Åtgärden utfördes, men planen kunde inte uppdateras.",
   "action.error.confirmationFailed": "Åtgärden togs emot, men dess aktuella tillstånd kunde inte bekräftas.",

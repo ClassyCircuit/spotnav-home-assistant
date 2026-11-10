@@ -130,7 +130,7 @@ def test_future_mode_in_stored_metadata_is_never_armed(setup_store):
     status = run(ownership.ExecutionOwnershipStore(setup_store).async_status("c", IDENTITY))
     assert status["recorded_owner"] == "morek_schedule"
     assert not status["armed"] and not status["ready"] and not status["schedule_mode_available"]
-    assert set(status["blockers"]) == {"command_isolation_not_implemented", "safety_unverified",
+    assert set(status["blockers"]) == {"command_isolation_not_implemented", "safety_unverified", "site_regulation_conflict_unresolved",
                                        "transaction_authorization_unverified"}
 
 

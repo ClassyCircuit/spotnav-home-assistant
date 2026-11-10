@@ -78,16 +78,17 @@ async def async_fix_own_mode(
     if conflict is None or call is None:
         return ERROR_NO_CONFLICT
     domain, service, data = call
-    _LOGGER.info(
-        "Setting %s from %s to %s for charger %s, as a person asked from %s",
-        conflict.entity_id,
-        conflict.state,
-        conflict.value,
-        entry.title,
-        source,
-    )
-    try:
+    async def write() -> None:
+        _LOGGER.info(
+            "Setting %s from %s to %s for charger %s, as a person asked from %s",
+            conflict.entity_id, conflict.state, conflict.value, entry.title, source,
+        )
         await hass.services.async_call(domain, service, data, blocking=True)
+
+    try:
+        result = await controller.adapter._guarded(write)  # noqa: SLF001 - shared physical-write boundary
+        if not result.allowed:
+            return "legacy_execution_ownership_blocked"
     except Exception as err:  # noqa: BLE001 - logged by type, answered by a stable code
         _LOGGER.warning("Setting %s to %s failed (%s)", conflict.entity_id, conflict.value, type(err).__name__)
         return ERROR_FAILED

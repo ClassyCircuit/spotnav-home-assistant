@@ -32,6 +32,10 @@ for zone in (
     time_zones.zone(zone)
 
 tests = [
+    "tests/test_stage_22_guards.py",
+    "tests/test_execution_ownership.py",
+    "tests/test_command_admission.py",
+    "tests/test_stage_21_ownership.py",
     "tests/test_stage_13_reactive.py",
     "tests/test_capped_auto_execution_isolated.py",
     "tests/test_morek_schedule.py",

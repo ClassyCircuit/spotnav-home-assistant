@@ -185,7 +185,7 @@ class ExecutionOwnershipStore:
                 "schedule_mode_available": False,
                 "armed": False,
                 "ready": False,
-                "blockers": ["command_isolation_not_implemented", "safety_unverified",
+                "blockers": ["command_isolation_not_implemented", "safety_unverified", "site_regulation_conflict_unresolved",
                              "transaction_authorization_unverified"],
             }
 

@@ -646,6 +646,7 @@
   "control.pausedManualStart": "Charge manuelle – jusqu'à ce que la voiture soit pleine ou débranchée.",
   "control.pausedManualStartResume": "Charge manuelle – jusqu'à ce que la voiture soit pleine ou que vous repreniez la charge automatique.",
   "action.error.unavailable": "Cette action n'est pas disponible pour le moment.",
+  "action.error.ownershipBlocked": "L'ancien contrôle est bloqué : le propriétaire du connecteur est inconnu ou est le contrôle par planning Morek. Aucune action n'a été effectuée.",
   "action.error.failed": "L'action n'a pas pu être effectuée. Rien n'a changé.",
   "action.error.reconcileFailed": "L'action a été effectuée, mais le plan n'a pas pu être mis à jour.",
   "action.error.confirmationFailed": "L'action a été acceptée, mais son état actuel n'a pas pu être confirmé.",

@@ -646,6 +646,7 @@
   "control.pausedManualStart": "Carga manual – hasta que el coche esté lleno o se desenchufe.",
   "control.pausedManualStartResume": "Carga manual – hasta que el coche esté lleno o reanudes la carga automática.",
   "action.error.unavailable": "Esa acción no está disponible ahora mismo.",
+  "action.error.ownershipBlocked": "El control anterior está bloqueado: el propietario del conector es desconocido o es el control de horarios de Morek. No se realizó ninguna acción.",
   "action.error.failed": "No se ha podido realizar la acción. No ha cambiado nada.",
   "action.error.reconcileFailed": "La acción se ha realizado, pero no se ha podido actualizar el plan.",
   "action.error.confirmationFailed": "La acción se ha aceptado, pero no se ha podido confirmar su estado actual.",

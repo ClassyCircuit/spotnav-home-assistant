@@ -646,6 +646,7 @@
   "control.pausedManualStart": "Handmatig laden – tot de auto vol is of wordt losgekoppeld.",
   "control.pausedManualStartResume": "Handmatig laden – tot de auto vol is of je automatisch laden hervat.",
   "action.error.unavailable": "Die actie is nu niet beschikbaar.",
+  "action.error.ownershipBlocked": "De oude laadbesturing is geblokkeerd: de eigenaar van de connector is onbekend of de Morek-planning. Er is geen actie uitgevoerd.",
   "action.error.failed": "De actie kon niet worden uitgevoerd. Er is niets veranderd.",
   "action.error.reconcileFailed": "De actie is uitgevoerd, maar het plan kon niet worden bijgewerkt.",
   "action.error.confirmationFailed": "De actie is geaccepteerd, maar de huidige status kon niet worden bevestigd.",

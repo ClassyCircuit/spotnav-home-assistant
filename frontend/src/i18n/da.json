@@ -646,6 +646,7 @@
   "control.pausedManualStartResume": "Lader manuelt – indtil bilen er fuld, eller du genoptager automatisk opladning.",
   "control.actionPending": "En start- eller stopkommando afventer laderens bekræftelse.",
   "action.error.unavailable": "Den handling er ikke tilgængelig lige nu.",
+  "action.error.ownershipBlocked": "Den gamle ladestyring er blokeret: stikforbindelsens ejer er ukendt eller Morek-planstyring. Ingen handling blev udført.",
   "action.error.failed": "Handlingen kunne ikke udføres. Intet blev ændret.",
   "action.error.reconcileFailed": "Handlingen blev udført, men planen kunne ikke opdateres.",
   "action.error.confirmationFailed": "Handlingen blev accepteret, men den aktuelle tilstand kunne ikke bekræftes.",

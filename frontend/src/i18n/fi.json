@@ -646,6 +646,7 @@
   "control.pausedManualStartResume": "Ladataan käsin – kunnes auto on täynnä tai jatkat automaattista latausta.",
   "control.actionPending": "Aloitus- tai lopetuskomento odottaa laturin vahvistusta.",
   "action.error.unavailable": "Tämä toiminto ei ole juuri nyt käytettävissä.",
+  "action.error.ownershipBlocked": "Vanha latauksen ohjaus on estetty: liittimen omistaja on tuntematon tai Morekin aikatauluohjaus. Toimintoa ei tehty.",
   "action.error.failed": "Toimintoa ei voitu suorittaa. Mikään ei muuttunut.",
   "action.error.reconcileFailed": "Toiminto suoritettiin, mutta suunnitelmaa ei voitu päivittää.",
   "action.error.confirmationFailed": "Toiminto hyväksyttiin, mutta sen nykyistä tilaa ei voitu vahvistaa.",

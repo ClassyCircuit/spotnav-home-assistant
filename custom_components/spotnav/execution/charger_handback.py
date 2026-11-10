@@ -47,6 +47,7 @@ from ..vehicles.duplicate_chargers import duplicates_of
 from .chargers.adapter import build_adapter, PRE_SPOTNAV_CURRENT_STORE_KEY, PreSpotnavCurrent
 from .chargers.base import ASSIGN_ASSIGNED, ASSIGN_UNCHANGED, ASSIGN_UNCONFIRMED, WRITE_HANDBACK
 from .ownership_state import own_stop_from_record, person_paused_in_record
+from .command_admission import legacy_write_guard
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -82,8 +83,9 @@ async def async_hand_back_charger(hass: HomeAssistant, entry: ConfigEntry) -> li
     left: list[str] = []
     try:
         saved = await _async_saved_record(hass, entry_id)
-        target, _source = ocpp_target_of(hass, config)
+        target, source = ocpp_target_of(hass, config)
         adapter = build_adapter(hass, config, ocpp_target=lambda: target, energy_entity_id=None)
+        adapter.write_guard = legacy_write_guard(hass, entry_id, lambda: target, ocpp=bool(source))
         adapter.restore_memory(None if saved is None else saved.get("adapter_memory"))
         own_stop = saved is not None and own_stop_from_record(saved) and not person_paused_in_record(saved)
         pre = PreSpotnavCurrent.from_store(

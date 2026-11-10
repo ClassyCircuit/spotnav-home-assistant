@@ -1,7 +1,7 @@
-"""Unwired connector-scoped command admission; it does not activate an owner.
+"""Connector-scoped command admission; it does not activate an owner.
 
-Only internal callers may classify an operation. Production writers do not use
-this service yet. In particular, it does not provide a safety-stop exception.
+Only internal callers may classify an operation. The Auto boundary uses a
+preparation check; final physical writers and safety stops are not guarded here.
 """
 
 from __future__ import annotations
@@ -53,6 +53,12 @@ def physical_connector(identity: Mapping[str, Any]) -> PhysicalConnector | None:
 
 def classify_morek_identity(identity: Mapping[str, Any]) -> str:
     """Classify the existing Morek resolver's result, never an unresolved alias."""
+    # A known, different connector number cannot be the owned connector on any station.
+    if identity.get("reason") == "ambiguous_station":
+        return "unresolved"
+    connector = identity.get("connector_id")
+    if type(connector) is int and connector > 0 and connector != MOREK_CONNECTOR_ID:
+        return "non_target"
     if (identity.get("reason") == "ambiguous_station" or type(identity.get("match_count")) is not int
             or identity["match_count"] != 1):
         return "unresolved"
@@ -193,3 +199,55 @@ def command_admission(hass: HomeAssistant) -> CommandAdmission:
     if _DATA_KEY not in hass.data:
         hass.data[_DATA_KEY] = CommandAdmission(ownership_store(hass))
     return hass.data[_DATA_KEY]
+
+
+async def async_auto_legacy_allowed(
+    admission: CommandAdmission, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]]
+) -> bool:
+    """Check the target's ownership without changing it; unrelated connectors retain legacy behavior.
+
+    This is a boundary check, not transition serialization or final dispatch admission.
+    Unknown OCPP identity fails closed rather than treating an alias as unrelated.
+    """
+    try:
+        classification = classify_morek_identity(resolve_identity())
+        if classification == "non_target":
+            return True
+        if classification != "supported_morek":
+            return False
+
+        async def checked() -> bool:
+            return True
+
+        result = await admission.async_execute(entry_id, "legacy_actuator", resolve_identity, checked)
+        return result.allowed
+    except Exception:  # noqa: BLE001 - unknown ownership cannot permit execution
+        return False
+
+
+def legacy_write_guard(
+    hass: HomeAssistant, entry_id: str, resolve_target: Callable[[], Any], *, ocpp: bool
+) -> Callable[[Callable[[], Awaitable[T]]], Awaitable[AdmissionResult[T]]]:
+    """Create a final-write guard; the connector lock is taken last around the operation.
+
+    Only positively unrelated connectors bypass target admission. A configured OCPP
+    charger with no resolved target is not treated as a non-OCPP charger.
+    """
+    async def guard(operation: Callable[[], Awaitable[T]]) -> AdmissionResult[T]:
+        if not ocpp:
+            return AdmissionResult(True, "non_ocpp", await operation())
+        from ..api.morek_schedule import _identity_status
+
+        def identity() -> Mapping[str, Any]:
+            return _identity_status(hass, resolve_target())
+
+        try:
+            classification = classify_morek_identity(identity())
+        except Exception:  # noqa: BLE001 - failure to establish identity is not permission
+            return AdmissionResult(False, "ownership_unavailable")
+        if classification == "non_target":
+            return AdmissionResult(True, "non_target", await operation())
+        if classification != "supported_morek":
+            return AdmissionResult(False, "identity_unresolved")
+        return await command_admission(hass).async_execute(entry_id, "legacy_actuator", identity, operation)
+    return guard

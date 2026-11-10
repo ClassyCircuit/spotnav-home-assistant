@@ -646,6 +646,7 @@
   "control.pausedManualStart": "Lädt manuell – bis das Auto voll ist oder abgesteckt wird.",
   "control.pausedManualStartResume": "Lädt manuell – bis das Auto voll ist oder du das automatische Laden fortsetzt.",
   "action.error.unavailable": "Diese Aktion ist gerade nicht verfügbar.",
+  "action.error.ownershipBlocked": "Die bisherige Ladesteuerung ist blockiert: Der Anschlussinhaber ist unbekannt oder die Morek-Zeitplansteuerung. Es wurde keine Aktion ausgeführt.",
   "action.error.failed": "Die Aktion konnte nicht ausgeführt werden. Nichts wurde geändert.",
   "action.error.reconcileFailed": "Die Aktion wurde ausgeführt, aber der Ladeplan konnte nicht aktualisiert werden.",
   "action.error.confirmationFailed": "Die Aktion wurde angenommen, aber ihr aktueller Status konnte nicht bestätigt werden.",

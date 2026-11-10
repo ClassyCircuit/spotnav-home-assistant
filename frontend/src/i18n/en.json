@@ -646,6 +646,7 @@
   "control.pausedManualStart": "Charging manually – until the car is full or unplugged.",
   "control.pausedManualStartResume": "Charging manually – until the car is full or you resume automatic charging.",
   "action.error.unavailable": "That action is not available right now.",
+  "action.error.ownershipBlocked": "Legacy charging control is blocked because connector ownership is not available or belongs to Morek schedule control. No action was taken.",
   "action.error.failed": "The action could not be carried out. Nothing changed.",
   "action.error.reconcileFailed": "The action was carried out, but the plan could not be updated.",
   "action.error.confirmationFailed": "The action was accepted, but its current state could not be confirmed.",

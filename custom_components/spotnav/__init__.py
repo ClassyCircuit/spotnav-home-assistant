@@ -65,7 +65,7 @@ from .entity_renames import async_setup_entity_renames
 from .debug_day import ChargerDay
 from .log_buffer import attach_log_buffer
 from .execution.charger_handback import async_hand_back_charger
-from .execution.command_admission import command_admission
+from .execution.command_admission import async_auto_legacy_allowed, command_admission, legacy_write_guard
 from .execution.auto_execution import AutoExecutor, pause_blocks_execution
 from .execution.controller import ChargingController
 from .execution.min_soc_floor import FloorInputs, MinSocFloor
@@ -374,9 +374,12 @@ async def _async_setup_charger_entry(hass: HomeAssistant, entry: ChargerConfigEn
         vehicle_limit_reader=soc_reader.vehicle_max_percent,
         charger_power_entity_id=charger_power,
     )
+    controller.adapter.write_guard = legacy_write_guard(
+        hass, entry.entry_id, lambda: controller.ocpp_target, ocpp=bool(controller.ocpp_target_source)
+    )
     data = entry.runtime_data = ChargerData(controller=controller, soc_reader=soc_reader)
     entry.async_on_unload(controller.async_shutdown)
-    # Metadata only: A2.2 must enforce ownership before any executor/restore writes.
+    # Initialize metadata before constructing the Auto boundary; lifecycle isolation remains Stage 2.3.
     await _async_setup_ownership_metadata(hass, entry, controller)
     await _async_start_debug_day(hass, entry, data, controller)
 
@@ -386,7 +389,14 @@ async def _async_setup_charger_entry(hass: HomeAssistant, entry: ChargerConfigEn
         # An older release's settings `phases` moves to the vehicle or the charger before anything plans.
         await async_migrate_settings_phases(hass, entry.entry_id)
         # The boundary comes first so the preview can apply on the first calculation of a reload.
-        executor = data.executor = AutoExecutor(hass, controller, settings_store)
+        async def legacy_allowed() -> bool:
+            if not controller.ocpp_target_source:
+                return True
+            return await async_auto_legacy_allowed(
+                command_admission(hass), entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target)
+            )
+
+        executor = data.executor = AutoExecutor(hass, controller, settings_store, legacy_admission=legacy_allowed)
         entry.async_on_unload(executor.async_shutdown)
         await executor.async_start()
         # Solar execution needs only the executor, controller and settings store.

@@ -234,6 +234,78 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2.5.23 — Stage 2.2 shared writer guards (review required)
+
+- Corrected controller callbacks that ignored a denied Auto turn: hold, stray,
+  person-hold, battery-probe resume, owed work, final-window stop and top-off.
+  A denied callback does not dispatch or feed a success; an existing person Stop
+  intent is retained. Denied owed automatic work is discarded rather than
+  repeatedly retried. Final-window completion recording now happens after the
+  boundary admits the action, not in the earlier timer callback.
+- Controller adapters now share a connector-aware admission check immediately
+  around ordinary start/stop, current and phase dispatch, including deferred,
+  resend, setting, solar and restore writes. Start/stop also check before their
+  controller preparation. The direct button fallback checks before acting, and
+  deletion handback builds a guarded adapter. The own-mode API/webhook uses the
+  same guard. Refused current/phase writes are not reported as sent. The existing
+  connector lock is taken after controller/assignment locks; no controller or
+  assignment lock is acquired inside it.
+- Regulator current writes and regulator-classified stops deliberately remain
+  permitted, including protective lowering and safety stops. They can conflict
+  with schedule-only operation: status includes the conservative
+  `site_regulation_conflict_unresolved` activation blocker, alongside the existing
+  isolation, safety and authorization blockers. It is not a live assessment.
+- A positively identified different connector number is unrelated even when its
+  station is offline; ambiguous stations still fail closed. An offline OCPP
+  connector 1 whose physical identity cannot be established still fails closed,
+  including potentially unrelated or legacy chargers: aliases or a record without
+  a verified current binding are not safe proof. Non-OCPP chargers and uniquely
+  resolved unrelated connectors keep their ordinary behavior.
+- These guards do not establish ownership before startup in every case, quiesce
+  producers for handover, atomically change ownership/generation, recall in-flight
+  commands, or control external HA/OCPP actors. Stage 2.3 must cover lifecycle,
+  aliases/duplicates, restore and end-to-end regression. Protection remains an
+  intentional competing writer until safety is resolved. Mode remains unarmed and
+  unavailable; no profile uploads or Send safeguard changes were made.
+- Isolated actual-module tests with mocked charger/HA boundaries cover controller
+  callbacks, write categories, manual fallback, own-mode, deletion handback,
+  queued admission and protection classification. They are not full HA or
+  hardware validation. `python tools/run_isolated_planning_tests.py` passed 413
+  tests, with one deselected and two warnings. Ruff, compileall, frontend build,
+  `npm run check-dist` and `git diff --check` passed (the latter reported only
+  Windows line-ending warnings). Full HA test collection remains blocked on Windows by the
+  HA plugin's Unix-only `fcntl` dependency. No HA, deployment, restart or physical
+  charger operation was performed.
+
+### 2.5.22 — Stage 2.1 Auto boundary (review required)
+
+- The Auto executor checks connector-aware ownership using the existing identity
+  classification and admission store after taking its own lock. Valid Morek
+  ownership blocks ordinary plan reconciliation, pending installs/stand-down,
+  automatic controller turns (including starts, stops and resumes), solar and
+  immediate-SOC-floor starts/stops, and pause expiry/resume. Manual start, stop,
+  cancel, follow, pause, resume and manual API actions refuse before preparation
+  with `legacy_execution_ownership_blocked`. Planning and observations continue.
+  A proven unrelated connector and valid legacy ownership retain their behavior;
+  unresolved OCPP identity or uncertain target ownership fails closed at this
+  boundary. Non-OCPP chargers retain the existing path.
+- This is a preparation/boundary check, **not** final dispatch serialization: the
+  admission lock is released before controller operations, and there is no owner
+  transition API. Already in-flight commands cannot be recalled. Stage 2.2 must
+  guard direct current/phase writes, setting and deferred/resend/restore writes,
+  direct adapter/button fallback, deletion handback and other bypasses using shared
+  guards. Site regulator protection remains unchanged; its conflict with
+  schedule-only operation must block activation, not be silently suppressed.
+  Startup/restore ordering, alias/duplicate lifecycle and full end-to-end
+  regression remain Stage 2.3. External writers remain outside SpotNav.
+- Schedule mode remains unarmed/unavailable and is not ready. Independent safety,
+  transaction authorization, transition and stored-profile/exit policy are still
+  unresolved. Manual Morek Send safeguards are unchanged; no automatic uploads.
+- `python tools/run_isolated_planning_tests.py`: 355 passed, one deselected;
+  real modules with mocked HA/charger boundaries, not full HA integration or
+  physical testing. Full HA tests require a supported Linux environment. No HA
+  access, charger command, deployment or restart was performed.
+
 ### 2.5.21 — Stage 1.3 reactive planning and explanation
 
 - Settings API writes continue through the existing store/reconciliation path;

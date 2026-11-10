@@ -234,15 +234,14 @@ async def test_identity_rechecked_after_awaited_ownership_read():
     write.assert_not_awaited()
 
 
-def test_foundation_is_not_imported_by_production_writers():
+def test_admission_is_reused_at_shared_boundaries_not_profile_writer():
     root = Path(__file__).resolve().parents[1] / "custom_components" / "spotnav"
+    imports = set()
     for path in root.rglob("*.py"):
-        if path.name == "command_admission.py" or path == root / "__init__.py":
+        if path.name == "command_admission.py":
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom):
-                assert not (node.module and "command_admission" in node.module), str(path)
-                assert all(alias.name != "command_admission" for alias in node.names), str(path)
-            elif isinstance(node, ast.Import):
-                assert all("command_admission" not in alias.name for alias in node.names), str(path)
+            if isinstance(node, ast.ImportFrom) and node.module and "command_admission" in node.module:
+                imports.add(path.relative_to(root).as_posix())
+    assert imports == {"__init__.py", "execution/charger_handback.py", "execution/chargers/adapter.py"}
