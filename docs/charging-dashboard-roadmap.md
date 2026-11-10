@@ -122,10 +122,12 @@ tests are documented there; full HA collection is still blocked on Windows.
     including delayed replies, with bounded read-only checks and explicit coverage.
   - Attempt-bound evidence, freshness checks and conservative ambiguous-boundary
     refusals prevent a superseded readback from verifying a newer proposal.
-- [ ] **4.3 Operator state and unresolved actions**
-  - Expose waiting/ready/sending/checking/mismatch/offline/intervention states.
-  - Finish only the unresolved-command handling needed by the chosen Morek path;
-    preserve explicit Stop intent and protection; document safe recovery/downgrade.
+- [x] **4.3 Operator state and unresolved actions** (unarmed scope; review required)
+  - The existing status API and panel report current evidence and waiting, manual-preview
+    ready, sending, checking, mismatch, offline and intervention states. Uncertain
+    outcomes remain latched; no general recovery, ownership transition or reset exists.
+  - Explain activation blockers, person Stop, protection, retained 0 A and supervised
+    recovery/downgrade; neither readback nor selective removal resolves an unknown upload.
 
 ### Stage 5 — Single dashboard and daily controls (old A5 + B2)
 

@@ -48,6 +48,28 @@ uncertainty. Explicit selective removal remains available, but its acknowledgeme
 does not prove an earlier uncertain request cannot still take effect. There is no
 automatic recovery or reset of the uncertainty latch in this release.
 
+### Intervention, retained limits and downgrade (2.5.30+)
+
+The operator state is a snapshot of known evidence, not an installed-profile list.
+When an upload or removal is uncertain, it may already have applied or may still
+take effect. Keep the existing person Stop intent and household load protection;
+do not blindly resume the legacy controller or delete the outcome/ownership records
+to bypass the latch. Refresh can inspect current effective limits when connected,
+but cannot determine which profiles are installed or resolve an unknown command.
+Seek a supervised, explicitly approved physical and ownership recovery decision;
+there is no safe general-purpose reset in this release. Selective removal is a
+separate deliberate action, can increase current, and cannot resolve a preceding
+uncertain upload. Never use a connector-wide or blanket profile clear for cleanup.
+
+A previously applied final 0 A may persist while HA is offline, after restart, or
+after a downgrade. Before downgrade or handback, account for that possible retained
+limit, unknown in-flight commands, protection, person Stop and other controllers;
+do not assume an older version can preserve or enforce this release's uncertainty
+interlock. Safe exit and ownership handover are not implemented. Automatic mode
+remains unarmed: durable transitions and lost-state recovery, electrical protection,
+transaction authorization and retained-profile exit remain unresolved. An Accepted
+ACK or verified remaining effective schedule does not prove physical charging.
+
 ### Readback verification (2.5.6+)
 
 Send keeps the real schedule at **stack level 1** and checks it immediately.

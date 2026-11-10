@@ -23,6 +23,26 @@ const state = {
 };
 
 describe("Morek manual test panel", () => {
+  it.each([
+    ["waiting", "Waiting for a usable plan"], ["offline", "Offline"],
+    ["sending", "Sending — outcome not yet known"], ["checking", "Checking readback"],
+    ["mismatch", "Mismatch"], ["verified", "Remaining effective schedule verified at last read"],
+    ["intervention_needed", "Intervention needed"], ["not_ready", "Not ready"],
+  ])("shows operator state %s and activation blockers", (status, label) => {
+    const panel = morekPanel(document, { ...state, operator: { state: status }, ownership: { recorded_owner: "legacy" } }, true, false, null, vi.fn());
+    expect(panel.textContent).toContain(label);
+    expect(panel.textContent).toContain("Automatic Morek mode unavailable and unarmed");
+    expect(panel.textContent).toContain("household protection");
+    expect(panel.textContent).toContain("transaction authorization");
+    expect(panel.textContent).toContain("not profile inventory");
+    expect(panel.textContent).toContain("do not blindly resume legacy control");
+    expect(panel.textContent).toContain("person Stop");
+  });
+  it("does not display an old verified flag as a match when outcome is uncertain", () => {
+    const panel = morekPanel(document, { ...state, verified: true, outcomes: { uncertain: true } }, true, false, null, vi.fn());
+    expect(panel.textContent).not.toContain("Remaining schedule matched at last read");
+    expect(panel.textContent).toContain("NOT verified");
+  });
   it("exposes uncertain stored outcomes and blocks send without blocking readback", () => {
     const panel = morekPanel(document, { ...state, outcomes: { uncertain: true } }, true, false, null, vi.fn());
     expect(panel.textContent).toContain("may have applied");
@@ -107,7 +127,7 @@ describe("Morek manual test panel", () => {
     expect(panel.textContent).toContain("NOT verified");
     expect(panel.textContent).toContain("Sent (profile 42001)");
     expect(panel.textContent).toContain("Preview — calculated, NOT sent");
-    expect(panel.textContent).toContain("final 0 A limit remains installed");
+    expect(panel.textContent).toContain("final 0 A limit can remain");
     expect(panel.textContent).toContain("Morek effective schedule");
     const buttons = panel.querySelectorAll("button");
     expect(buttons).toHaveLength(3);

@@ -234,6 +234,28 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2.5.30 — Stage 4.3 operator state (unarmed; review required)
+
+- The existing status response derives an operator summary from current connection,
+  preview, attempt and verification evidence. An in-flight upload is tracked only
+  in memory and bound to its attempt; after interruption the durable uncertain record
+  takes precedence over offline or stale matches. The existing panel shows manual
+  readiness, sending, checking, mismatch, verified remaining effective limits and
+  intervention guidance, plus the unarmed activation blockers. It requests fresh
+  status after manual actions. No new outcome store or uncertainty reset was added.
+- The panel and manual procedure distinguish proposal, ACK, effective readback and
+  measurement. Unknown actions, possible final 0 A, person Stop, protection and
+  downgrade/handback need a supervised decision; selective removal does not settle
+  an earlier unknown upload. Automatic dispatch, transition and recovery are not
+  enabled. No live HA, deployment, restart or charger action occurred.
+- Validation: isolated actual-module planning suite 492 passed, one deselected,
+  two warnings; focused Morek selection 115 passed, 378 deselected, two warnings;
+  isolated lifecycle suite 26 passed, six warnings. The focused panel suite passed
+  21 tests; frontend build, check-dist and type-check, targeted Ruff and diff check
+  passed (diff check reported Windows line-ending warnings). HA/OCPP and storage
+  boundaries are mocked; these are neither full HA nor physical validation. Full
+  HA pytest collection remains blocked on Windows by the plugin's `fcntl` import.
+
 ### 2.5.29 — Stage 4.2 remaining-schedule verification (unarmed; review required)
 
 - The existing comparator checks the remaining effective limits and transitions

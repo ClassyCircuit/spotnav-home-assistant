@@ -178,6 +178,23 @@ async def test_status_exposes_read_only_unarmed_ownership(monkeypatch):
     connection.send_error.assert_not_called()
 
 
+@pytest.mark.parametrize(("online", "outcomes", "verification", "verified", "preview", "sending", "expected"), [
+    (True, {"uncertain": False}, {}, False, {"reason": "prices_unavailable"}, None, "waiting"),
+    (False, {"uncertain": False}, {}, False, {}, None, "offline"),
+    (True, {"uncertain": True, "attempt": {"id": "a", "state": "uncertain"}}, {}, False, {}, "a", "sending"),
+    (True, {"uncertain": True, "attempt": {"id": "a", "state": "uncertain"}}, {"pending": True}, True, {}, "old", "intervention_needed"),
+    (False, {"uncertain": True, "state": "storage_unavailable"}, {}, True, {}, None, "intervention_needed"),
+    (True, {"uncertain": False}, {"pending": True}, False, {}, None, "checking"),
+    (True, {"uncertain": False}, {"reason": "limits_or_transitions_differ"}, False, {}, None, "mismatch"),
+    (True, {"uncertain": False}, {"reason": "matched"}, True, {}, None, "verified"),
+    (True, {"uncertain": False}, {"reason": "verification_superseded"}, False, {"profile": {}}, None, "not_ready"),
+    (True, {"uncertain": False}, {}, False, {"profile": {"valid": True}}, None, "ready"),
+])
+def test_operator_state_prioritizes_current_evidence(online, outcomes, verification, verified, preview, sending, expected):
+    result = morek_schedule._operator_state({"supported": True}, online, outcomes, verification, verified, preview, sending)
+    assert result["state"] == expected
+
+
 def test_preview_reuses_send_calculation_without_contacting_station(monkeypatch):
     periods = ((NOW + timedelta(hours=1), NOW + timedelta(hours=2)),)
     proposal = SimpleNamespace(has_plan=True, unpriced=False, periods=periods, shown_periods=periods)
@@ -577,6 +594,23 @@ async def test_status_does_not_expose_old_match_as_current_after_settings_edit(m
     assert result["outcomes"]["verified"] is None
     assert result["verification"]["reason"] == "verification_superseded"
     assert h.ledger.value["verified"] is not None  # Historical evidence is retained on disk.
+
+
+@pytest.mark.asyncio
+async def test_status_does_not_present_superseded_pending_mismatch_as_current(monkeypatch):
+    h = _send_harness(monkeypatch, ["mismatch"])
+    await morek_schedule.async_schedule_action(h.hass, "charger", "send", h.preview_id)
+    assert h.data["verification"]["pending"]
+    h.settings.revision += 1
+    monkeypatch.setattr(morek_schedule, "ownership_store", lambda _: SimpleNamespace(async_status=AsyncMock(return_value={})))
+    monkeypatch.setattr(morek_schedule, "_preview", lambda *_: {})
+    connection = SimpleNamespace(send_result=Mock(), send_error=Mock())
+    await morek_schedule.websocket_morek_schedule.__wrapped__(
+        h.hass, connection, {"id": 1, "api_version": 1, "charger_id": "charger", "action": "status"})
+    result = connection.send_result.call_args.args[1]["schedule"]
+    assert result["verification"]["reason"] == "verification_superseded"
+    assert result["verification"]["pending"] is False
+    assert result["operator"]["state"] == "not_ready"
 
 
 @pytest.mark.asyncio

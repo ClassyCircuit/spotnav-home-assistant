@@ -6,6 +6,8 @@ export interface MorekState {
   cleanup_supported?: boolean;
   cleanup?: { requested_at: string; profile_id: number; status: string } | null;
   outcomes?: { uncertain: boolean; state?: string } | null;
+  operator?: { state: string; reason?: string | null };
+  ownership?: { recorded_owner?: string | null; blockers?: string[]; schedule_mode_available?: boolean };
   reason?: string | null;
   configured_id?: string | null;
   resolved_id?: string | null;
@@ -106,12 +108,34 @@ export function morekPanel(
   busy: boolean,
   error: string | null,
   act: (action: "status" | "send" | "fetch" | "clear") => void,
+  activeAction?: "status" | "send" | "fetch" | "clear" | null,
 ): HTMLElement {
   const section = doc.createElement("section");
   section.className = C.morekPanel;
   const heading = doc.createElement("h3");
   heading.textContent = "Morek stored schedule";
   section.append(heading);
+  const health = doc.createElement("p");
+  const labels: Record<string, string> = {
+    waiting: "Waiting for a usable plan", not_ready: "Not ready", offline: "Offline",
+    sending: "Sending — outcome not yet known", checking: "Checking readback",
+    mismatch: "Mismatch — intervention may be needed", verified: "Remaining effective schedule verified at last read",
+    intervention_needed: "Intervention needed — action outcome uncertain", ready: "Manual preview ready, not sent",
+  };
+  const sending = busy && activeAction === "send" && !state.outcomes?.uncertain;
+  health.textContent = `Operator state: ${sending ? labels.sending : labels[state.operator?.state ?? ""] ?? "Unavailable — recalculate status"}` +
+    (!sending && state.operator?.reason ? ` (${state.operator.reason})` : "");
+  section.append(health);
+  const availability = doc.createElement("p");
+  availability.textContent = `Automatic Morek mode unavailable and unarmed. Recorded owner: ${state.ownership?.recorded_owner ?? "unknown"}. ` +
+    "Durable ownership transitions and lost-state recovery, conflicting control and household protection, transaction authorization, and safe retained-profile exit remain unresolved.";
+  section.append(availability);
+  const evidence = doc.createElement("p");
+  evidence.textContent = "Proposal is not sent; an upload ACK is not effective readback. A verified remaining effective schedule is not profile inventory, transaction authorization, or measured physical charging. Measured charging is not established here; check separate live measurements.";
+  section.append(evidence);
+  const recovery = doc.createElement("p");
+  recovery.textContent = "A retained final 0 A may persist through restart or downgrade. Preserve any person Stop and household protection; do not blindly resume legacy control. For uncertain actions, keep the outcome unresolved and seek a supervised ownership and electrical recovery decision. Refresh is read-only, not inventory or recovery. Selective removal can increase allowed current and cannot resolve an earlier unknown upload; do not use a blanket profile clear.";
+  section.append(recovery);
   if (!state.supported) {
     const warning = doc.createElement("p");
     warning.textContent = state.reason === "no_ocpp_target"
@@ -142,7 +166,7 @@ export function morekPanel(
   if (state.preview?.profile) {
     section.append(transitions(doc, state.preview.profile));
     const endNote = doc.createElement("p");
-    endNote.textContent = "These are fixed start/stop times from the displayed plan, including its estimated final stop. Morek will not adjust them based on actual energy delivered. The final 0 A limit remains installed after the last window until explicitly cleared.";
+    endNote.textContent = "These are fixed start/stop times from the displayed plan, including its estimated final stop. Morek will not adjust them based on actual energy delivered. If applied, the final 0 A limit can remain after the last window until explicitly removed.";
     section.append(endNote);
   }
   if (state.preview?.reason) {
@@ -152,7 +176,7 @@ export function morekPanel(
   }
   const status = doc.createElement("p");
   const ack = state.ack === null ? "No plan sent from this card" : `Last upload: ${state.ack} at ${localTime(state.sent_at)}`;
-  const verification = state.sent === null ? "" : state.verified
+  const verification = state.sent === null ? "" : state.verified && !state.outcomes?.uncertain
      ? state.verification?.reason === "matched_with_drift" ? " · Remaining schedule matched within tolerance, NOT exact" : " · Remaining schedule matched at last read"
     : state.verification?.pending ? " · Awaiting follow-up readback — NOT verified" : " · NOT verified";
   status.textContent = ack + verification;

@@ -564,6 +564,8 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
         await ledger.write(record)
         raise
     from ocpp.v16 import call as ocpp_call
+    sending = hass.data.setdefault("spotnav_morek_sending", {})
+    sending[entry_id] = attempt_id
     try:
         async with asyncio.timeout(30):
             response = await point.call(ocpp_call.SetChargingProfile(
@@ -573,6 +575,9 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
         raise
     except Exception:  # noqa: BLE001 - dispatch may have applied
         ack = "unknown"
+    finally:
+        if sending.get(entry_id) == attempt_id:
+            sending.pop(entry_id, None)
     data["ack"] = ack
     state = ack.lower()
     if state == "accepted":
@@ -617,6 +622,33 @@ def _preview(hass: HomeAssistant, entry_id: str, target: Any) -> dict[str, Any]:
         reason = "preview_unavailable"
     return {"calculated_at": now.isoformat(), "profile": profile, "reason": reason,
             "preview_id": preview_id}
+
+
+def _operator_state(identity: dict[str, Any], online: bool, outcomes: dict[str, Any],
+                    verification: dict[str, Any], verified: bool, preview: dict[str, Any],
+                    sending_id: str | None) -> dict[str, str | None]:
+    """Summarize evidence, never treating an old match or an unknown ACK as success."""
+    attempt = outcomes.get("attempt") or {}
+    if outcomes.get("uncertain"):
+        if sending_id and sending_id == attempt.get("id") and attempt.get("state") == "uncertain":
+            return {"state": "sending", "reason": "upload_in_flight"}
+        return {"state": "intervention_needed", "reason": outcomes.get("state") or "outcome_uncertain"}
+    if not online:
+        return {"state": "offline", "reason": "charger_unavailable"}
+    if not identity.get("supported"):
+        return {"state": "not_ready", "reason": identity.get("reason") or "identity_unresolved"}
+    if verification.get("pending"):
+        return {"state": "checking", "reason": verification.get("reason")}
+    if verified:
+        return {"state": "verified", "reason": verification.get("reason")}
+    reason = verification.get("reason")
+    if reason == "limits_or_transitions_differ":
+        return {"state": "mismatch", "reason": reason}
+    if reason and reason not in ("cleanup_requested",):
+        return {"state": "not_ready", "reason": reason}
+    if preview.get("reason") or not preview.get("profile"):
+        return {"state": "waiting", "reason": preview.get("reason") or "no_current_plan"}
+    return {"state": "ready", "reason": "manual_preview_only"}
 
 
 async def async_schedule_action(hass: HomeAssistant, entry_id: str, action: str,
@@ -891,14 +923,29 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
             verification = _verification_state(hass, entry.entry_id, data)
             if data.get("verified") and not verified:
                 verification.update({"matched": False, "exact": False, "reason": "verification_superseded"})
+            compared = verification.get("reason") in (
+                "limits_or_transitions_differ", "coverage_missing", "coverage_too_short", "coverage_stale",
+                "coverage_boundary_ambiguous", "no_remaining_transitions", "readback_unavailable")
+            if (verification.get("pending") or compared) and not _verification_current(
+                    hass, entry.entry_id, entry, data, outcomes, data.get("sent_at")):
+                verification.update({"pending": False, "next_check_at": None, "reason": "verification_superseded"})
             if not verified and outcomes.get("verified"):
                 outcomes = {**outcomes, "verified": None}
+            preview = _preview(hass, entry.entry_id, target)
+            try:
+                _charge_point(hass, target)
+                online = worker is None or (not worker._suspended and worker._available() and not worker._closed)
+            except ScheduleRefused:
+                online = False
+            operator = _operator_state(identity, online, outcomes, verification, verified, preview,
+                                       hass.data.get("spotnav_morek_sending", {}).get(entry.entry_id))
             result = {**identity,
                       "ownership": ownership,
                       "outcomes": outcomes,
+                      "operator": operator,
                       "sent_at": data.get("sent_at"), "ack": data.get("ack"), "verified": verified,
                       "sent": data.get("profile"), "effective": data.get("effective"),
-                      "preview": _preview(hass, entry.entry_id, target),
+                      "preview": preview,
                       "cleanup": data.get("cleanup"), "cleanup_supported": True,
                       "verification": verification}
         else:

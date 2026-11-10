@@ -339,6 +339,7 @@ export class SpotnavCard extends HTMLElement {
   private wantedLanguage: Language | null = null;
   private view: CardView | null = null;
   private morekState: MorekState | null = null;
+  private morekActiveAction: "status" | "send" | "fetch" | "clear" | null = null;
   private morekEnabled = false;
   private morekOperation = 0;
   private morekBusy = false;
@@ -2609,11 +2610,18 @@ export class SpotnavCard extends HTMLElement {
     const generation = this.generation;
     const operation = ++this.morekOperation;
     this.morekBusy = true;
+    this.morekActiveAction = action;
     this.morekError = null;
     this.render();
     try {
       const result = decodeMorekState(await morekSchedule(hass, charger, action, this.morekState?.preview?.preview_id ?? undefined));
       if (operation === this.morekOperation) this.morekState = result;
+      if (action !== "status") {
+        try {
+          const status = decodeMorekState(await morekSchedule(hass, charger, "status"));
+          if (operation === this.morekOperation && status !== null) this.morekState = status;
+        } catch { /* Keep the action result; its operator summary may be unavailable. */ }
+      }
     } catch (error) {
       if (operation !== this.morekOperation) return;
       const code = error instanceof SpotnavApiError ? error.code : null;
@@ -2635,7 +2643,10 @@ export class SpotnavCard extends HTMLElement {
         if (operation === this.morekOperation) this.morekState = result;
       } catch { /* Keep the last known result; do not claim the upload worked. */ }
     } finally {
-      if (operation === this.morekOperation) this.morekBusy = false;
+      if (operation === this.morekOperation) {
+        this.morekBusy = false;
+        this.morekActiveAction = null;
+      }
       if (this.connected && operation === this.morekOperation && generation === this.generation && charger === this.config?.charger) {
         this.render();
       }
@@ -3086,7 +3097,7 @@ export class SpotnavCard extends HTMLElement {
       }
       if (this.morekEnabled && this.morekState !== null) {
         const panel = morekPanel(doc, this.morekState, this.isAdmin, this.morekBusy, this.morekError,
-          (action) => { void this.morekAction(action); });
+          (action) => { void this.morekAction(action); }, this.morekActiveAction);
         host.append(panel);
       } else if (this.morekEnabled) {
         const loading = doc.createElement("p");
