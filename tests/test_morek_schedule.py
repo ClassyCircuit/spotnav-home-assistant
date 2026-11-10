@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 from unittest.mock import AsyncMock, Mock
+from .morek_fakes import MemoryOutcomes
 import sys
 from custom_components.spotnav.api import morek_schedule
 
@@ -19,6 +20,11 @@ from custom_components.spotnav.api.morek_schedule import (
 
 
 NOW = datetime(2026, 11, 6, 20, 0, tzinfo=timezone.utc)
+
+
+def _supported_identity():
+    return {"supported": True, "resolved_id": morek_schedule.MOREK_STATION_ID,
+            "connector_id": 1, "match_count": 1, "ocpp_version": "1.6"}
 
 
 def test_three_blocks_fit_seven_entries_and_start_paused():
@@ -161,6 +167,7 @@ async def test_status_exposes_read_only_unarmed_ownership(monkeypatch):
     monkeypatch.setattr(morek_schedule, "ownership_store", lambda h: store)
     monkeypatch.setattr(morek_schedule, "_state", AsyncMock(return_value=({}, None)))
     monkeypatch.setattr(morek_schedule, "_preview", lambda h, e, t: {})
+    monkeypatch.setattr(morek_schedule, "outcomes_for", lambda h: MemoryOutcomes())
     monkeypatch.setattr(morek_schedule, "async_schedule_action", AsyncMock())
     await morek_schedule.websocket_morek_schedule.__wrapped__(
         hass, connection, {"id": 1, "api_version": 1, "charger_id": "charger", "action": "status"})
@@ -342,7 +349,12 @@ async def test_selective_cleanup_only_names_test_id_and_fetches_afterwards(monke
     hass = SimpleNamespace(data={morek_schedule._DATA_KEY: {"charger": (data, store, asyncio.Lock())}})
     monkeypatch.setattr(morek_schedule, "lookup_charger", lambda h, e: (SimpleNamespace(entry_id=e), None))
     monkeypatch.setattr(morek_schedule, "controller_for", lambda h, e: SimpleNamespace(ocpp_target=target))
-    monkeypatch.setattr(morek_schedule, "_identity_status", lambda h, t: {"supported": True})
+    monkeypatch.setattr(morek_schedule, "_identity_status", lambda h, t: _supported_identity())
+    from custom_components.spotnav.execution.command_admission import CommandAdmission
+    admission = CommandAdmission(None)
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda h: admission)
+    monkeypatch.setattr(morek_schedule, "outcomes_for", lambda h: ledger)
+    ledger = MemoryOutcomes()
     monkeypatch.setattr(morek_schedule, "_charge_point", lambda h, t: point)
     monkeypatch.setattr(morek_schedule, "_state", AsyncMock(return_value=(data, store)))
     protocol = SimpleNamespace(call=SimpleNamespace(
@@ -447,7 +459,12 @@ def _send_harness(monkeypatch, read_results):
     monkeypatch.setattr(morek_schedule, "async_call_later", call_later)
     monkeypatch.setattr(morek_schedule, "lookup_charger", lambda h, e: (entry, None))
     monkeypatch.setattr(morek_schedule, "controller_for", lambda h, e: SimpleNamespace(ocpp_target=target))
-    monkeypatch.setattr(morek_schedule, "_identity_status", lambda h, t: {"supported": True})
+    monkeypatch.setattr(morek_schedule, "_identity_status", lambda h, t: _supported_identity())
+    from custom_components.spotnav.execution.command_admission import CommandAdmission
+    admission = CommandAdmission(None)
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda h: admission)
+    ledger = MemoryOutcomes()
+    monkeypatch.setattr(morek_schedule, "outcomes_for", lambda h: ledger)
     monkeypatch.setattr(morek_schedule, "_charge_point", lambda h, t: point)
     monkeypatch.setattr(morek_schedule, "_state", AsyncMock(return_value=(data, store)))
     monkeypatch.setattr(morek_schedule, "domain_data", lambda h: SimpleNamespace(
@@ -460,7 +477,7 @@ def _send_harness(monkeypatch, read_results):
     monkeypatch.setitem(sys.modules, "ocpp.v16", protocol)
     return SimpleNamespace(hass=hass, data=data, callbacks=callbacks, cancelled=cancelled,
                            delays=delays, calls=calls, unload=unload, clock=clock, requests=requests,
-                           preview_id=morek_schedule._preview_id(profile, 4))
+                           preview_id=morek_schedule._preview_id(profile, 4), ledger=ledger, store=store, point=point)
 
 
 @pytest.mark.asyncio
@@ -535,6 +552,8 @@ async def test_immediately_matching_send_does_not_schedule_extra_reads(monkeypat
     assert result["verified"] is True
     assert result["verification"]["exact"] is True
     assert result["verification"]["pending"] is False
+    assert result["outcomes"]["verified"]["fingerprint"] == h.preview_id
+    assert result["outcomes"]["acknowledged"]["fingerprint"] == h.preview_id
     assert h.delays == []
     assert h.calls == ["send", "fetch"]
 
@@ -620,6 +639,19 @@ async def test_manual_matching_fetch_cancels_followup_and_restart_does_not_claim
     assert h.calls == ["send", "fetch", "fetch"]
     h.data["verification"]["pending"] = True
     assert morek_schedule._verification_state(h.hass, "charger", h.data)["pending"] is False
+
+
+@pytest.mark.asyncio
+async def test_refresh_cannot_resolve_or_verify_uncertain_profile_action(monkeypatch):
+    h = _send_harness(monkeypatch, ["mismatch", "matched"])
+    await morek_schedule.async_schedule_action(h.hass, "charger", "send", h.preview_id)
+    h.ledger.value["uncertain"] = True
+    h.ledger.value["attempt"]["state"] = "uncertain"
+    result = await morek_schedule.async_schedule_action(h.hass, "charger", "fetch")
+    assert h.calls == ["send", "fetch", "fetch"]
+    assert result["verified"] is False
+    assert result["verification"]["reason"] == "outcome_uncertain"
+    assert result["outcomes"]["uncertain"] is True
 
 
 @pytest.mark.asyncio

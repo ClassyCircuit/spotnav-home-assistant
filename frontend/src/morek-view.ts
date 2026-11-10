@@ -5,6 +5,7 @@ export interface MorekState {
   supported: boolean;
   cleanup_supported?: boolean;
   cleanup?: { requested_at: string; profile_id: number; status: string } | null;
+  outcomes?: { uncertain: boolean; state?: string } | null;
   reason?: string | null;
   configured_id?: string | null;
   resolved_id?: string | null;
@@ -44,6 +45,7 @@ export function decodeMorekState(raw: unknown): MorekState | null {
     (state.verification.next_check_at != null && typeof state.verification.next_check_at !== "string") ||
     (state.verification.coverage_end != null && typeof state.verification.coverage_end !== "string"))) return null;
   if (state.cleanup_supported !== undefined && typeof state.cleanup_supported !== "boolean") return null;
+  if (state.outcomes != null && (typeof state.outcomes !== "object" || typeof state.outcomes.uncertain !== "boolean")) return null;
   if (state.cleanup != null && (typeof state.cleanup !== "object" || state.cleanup.profile_id !== 42001 ||
     typeof state.cleanup.status !== "string" || typeof state.cleanup.requested_at !== "string")) return null;
   if (state.sent !== null && (
@@ -154,6 +156,11 @@ export function morekPanel(
     : state.verification?.pending ? " · Awaiting follow-up readback — NOT verified" : " · NOT verified";
   status.textContent = ack + verification;
   section.append(status);
+  if (state.outcomes?.uncertain) {
+    const warning = doc.createElement("p");
+    warning.textContent = "A profile action or its stored outcome is uncertain and may have applied. Further sends are blocked; readback cannot prove which profiles are installed.";
+    section.append(warning);
+  }
   if (state.verification) {
     const detail = doc.createElement("p");
     const reasons: Record<string, string> = {
@@ -164,6 +171,7 @@ export function morekPanel(
       verification_interrupted: "Automatic checks were interrupted, for example by an HA restart. Refresh from Morek.",
       cleanup_requested: "The sent schedule is historical after a removal request.",
       upload_unconfirmed: "The upload was not confirmed; its effect is unknown.",
+      outcome_uncertain: "An earlier profile action has an unresolved outcome; readback cannot resolve it.",
       matched: "Limits and transitions match at the last read; physical charging is not verified.",
       matched_with_drift: "Limits match within the time tolerance; physical charging is not verified.",
     };
@@ -230,7 +238,7 @@ export function morekPanel(
       button.type = "button";
       button.className = C.button;
       button.textContent = label;
-      button.disabled = busy || (action === "send" && (state.preview === undefined || state.preview.reason !== null || !state.preview.profile || !state.preview.preview_id));
+      button.disabled = busy || (action === "send" && (state.outcomes?.uncertain === true || state.preview === undefined || state.preview.reason !== null || !state.preview.profile || !state.preview.preview_id));
       button.addEventListener("click", () => {
         if (action === "send" && !doc.defaultView?.confirm(
           "Recalculate and send the CURRENT plan to Morek? Times may differ from this preview. Its final 0 A limit stays installed until explicitly cleared, even if SpotNav Auto resumes."

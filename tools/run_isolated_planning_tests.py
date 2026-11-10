@@ -40,6 +40,7 @@ tests = [
     "tests/test_capped_auto_execution_isolated.py",
     "tests/test_morek_schedule.py",
     "tests/test_morek_worker.py",
+    "tests/test_morek_outcomes.py",
     "tests/test_planner.py",
     "tests/test_planner_invariants.py",
     "tests/test_planner_deadline_dst.py",

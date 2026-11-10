@@ -234,6 +234,44 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2.5.27 — Stage 3.3 shared manual actions and evidence (unarmed; review required)
+
+- Manual Send and selective removal now take the existing physical connector
+  admission lock; the manual-only entry point does not use or activate the
+  permanently unarmed `owned_profile` gate. Admin, pause, preview fingerprint,
+  settings revision and Morek identity checks remain; Send rechecks after each
+  pre-dispatch persistence await. Refresh uses the connector read-only path and
+  sends only `GetCompositeSchedule`, though it persists readback evidence.
+- A connector-scoped atomic outcome document complements the old per-entry
+  manual record. It records desired fixed-time intent, a pre-dispatch attempt,
+  acknowledgement, a separately verified readback fingerprint, and removal
+  outcome. It is bound to the first entry; a different entry is refused. Existing
+  manual records are read conservatively: unknown legacy upload/removal outcomes
+  remain uncertain, and old Accepted profiles do not supply a dedup fingerprint.
+  This is not proof of installed profiles, transaction authorization or charging.
+- A timed-out, unknown, cancelled or interrupted attempt remains uncertain on
+  disk; automatic **and manual** sends are refused, including after restart.
+  There is no automatic retry or reset. Explicit selective removal is still
+  available, targets only ID 42001, invalidates deduplication and cannot clear a
+  pre-existing uncertain-upload latch. Readback cannot resolve that latch. Failed
+  or cancelled ledger writes poison the current process; writes are checked by
+  reading the stored envelope back before dispatch. A lost entire outcome file
+  remains indistinguishable from first use; missing-document recovery and robust
+  transition protocols remain mandatory activation blockers, not solved here.
+- The worker uses the same durable record and connector lock; manual replacement
+  and removal cannot leave a stale worker success fingerprint. Status exposes the
+  record or an unavailable/uncertain state, and the panel warns and disables
+  Send when uncertain. No automatic sends are enabled, and no mode API, active
+  readback verification, broader restart/reconnect recovery or exit policy was
+  added. Electrical protection and transaction authorization remain unresolved.
+- Validation: the isolated actual-module planning suite passed 451 tests with
+  one deselected and two warnings; the isolated lifecycle suite passed 26 tests
+  with six warnings. The focused Morek panel suite passed 12 tests. Frontend
+  build, `npm run check-dist`, type-check, targeted Ruff, compileall and
+  `git diff --check` passed; diff check reported Windows line-ending warnings.
+  Persistence, HA and OCPP boundaries were mocked; these are not full HA or
+  physical validation. No live HA, deployment or charger action was performed.
+
 ### 2.5.26 — Stage 3.2 backend worker (unarmed; review required)
 
 - Each charger with an Auto planner attaches a worker to its calculation

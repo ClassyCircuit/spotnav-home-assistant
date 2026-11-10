@@ -11,6 +11,7 @@ import pytest
 from custom_components.spotnav.api import morek_schedule
 from custom_components.spotnav.execution import morek_worker
 from custom_components.spotnav.execution.command_admission import AdmissionResult, CommandAdmission, physical_connector
+from .morek_fakes import MemoryOutcomes
 
 NOW = datetime(2026, 11, 6, 20, tzinfo=timezone.utc)
 IDENTITY = {"supported": True, "resolved_id": morek_schedule.MOREK_STATION_ID,
@@ -72,6 +73,13 @@ def setup(monkeypatch, *, active=False, admission=None):
     planner = Planner(snapshot)
     settings = SimpleNamespace(revision=4, amps=16)
     hass = SimpleNamespace(data={}, async_create_task=asyncio.create_task)
+    ledger = MemoryOutcomes()
+    disk = SimpleNamespace(async_save=AsyncMock())
+    async def record(h, entry_id):
+        if entry_id not in h.data.setdefault(morek_schedule._DATA_KEY, {}):
+            h.data[morek_schedule._DATA_KEY][entry_id] = ({}, disk, asyncio.Lock())
+        data, store, _ = h.data[morek_schedule._DATA_KEY][entry_id]
+        return data, store
     point = SimpleNamespace(call=AsyncMock(return_value=SimpleNamespace(status="Accepted")))
     target = SimpleNamespace(connector_id=1)
     state = SimpleNamespace(identity=dict(IDENTITY), settings=settings, planner=planner, point=point,
@@ -86,6 +94,9 @@ def setup(monkeypatch, *, active=False, admission=None):
     monkeypatch.setattr(morek_schedule, "preview_for", lambda *_: planner)
     monkeypatch.setattr(morek_worker, "preview_for", lambda *_: planner)
     monkeypatch.setattr(morek_worker, "command_admission", lambda _: state.admission)
+    monkeypatch.setattr(morek_schedule, "_state", record)
+    monkeypatch.setattr(morek_schedule, "outcomes_for", lambda _: ledger)
+    state.ledger = ledger
     import sys
     monkeypatch.setitem(sys.modules, "ocpp.v16", SimpleNamespace(call=SimpleNamespace(
         SetChargingProfile=lambda **kw: SimpleNamespace(payload=kw))))
@@ -236,7 +247,7 @@ async def test_two_workers_serialize_and_share_deduplication(monkeypatch):
         return SimpleNamespace(status="Accepted")
 
     w.point.call.side_effect = slow_send
-    other = morek_worker.MorekScheduleWorker(w.hass, "second-entry", w.planner)
+    other = morek_worker.MorekScheduleWorker(w.hass, "charger", w.planner)
     w.worker.start()
     await entered.wait()
     other.start()
@@ -343,3 +354,188 @@ async def test_real_planner_publications_drive_worker_without_browser(monkeypatc
 def auto_controller_zone(name):
     from custom_components.spotnav import time_zones
     return time_zones.require_zone(name)
+
+
+def manual_setup(monkeypatch):
+    import sys
+    w = setup(monkeypatch)
+    w.settings.pause = SimpleNamespace(choice="until_resumed")
+    entry = SimpleNamespace(entry_id="charger", async_on_unload=lambda _: None)
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=w.target))
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda _: w.admission)
+    monkeypatch.setattr(morek_schedule, "async_call_later", lambda *_: lambda: None)
+    class Clock:
+        now = staticmethod(lambda _: NOW)
+        fromisoformat = staticmethod(datetime.fromisoformat)
+    monkeypatch.setattr(morek_schedule, "datetime", Clock)
+    monkeypatch.setitem(sys.modules, "ocpp.v16", SimpleNamespace(call=SimpleNamespace(
+        SetChargingProfile=lambda **kw: SimpleNamespace(action="send", payload=kw),
+        GetCompositeSchedule=lambda **kw: SimpleNamespace(action="fetch", payload=kw),
+        ClearChargingProfile=lambda **kw: SimpleNamespace(action="clear", payload=kw))))
+    return w
+
+
+@pytest.mark.asyncio
+async def test_manual_and_worker_share_lock_and_persisted_outcomes(monkeypatch):
+    w = manual_setup(monkeypatch)
+    entered, release = asyncio.Event(), asyncio.Event()
+    calls = []
+
+    async def call(request):
+        calls.append(request.action)
+        if len(calls) == 1:
+            # Durable attempt is present before crossing the charger boundary.
+            assert w.ledger.value["attempt"]["state"] == "uncertain"
+            entered.set()
+            await release.wait()
+        if request.action == "fetch":
+            return SimpleNamespace(status="Accepted", connector_id=1, schedule_start=NOW.isoformat(),
+                                   charging_schedule={"chargingRateUnit": "A", "duration": 14400,
+                                                      "chargingSchedulePeriod": [{"startPeriod": 0, "limit": 16}]})
+        return SimpleNamespace(status="Accepted")
+
+    w.point.call.side_effect = call
+    w.worker.start()
+    await entered.wait()
+    fingerprint = w.worker._intent()[1]
+    manual = asyncio.create_task(morek_schedule.async_schedule_action(w.hass, "charger", "send", fingerprint))
+    await asyncio.sleep(0)
+    assert calls == ["send"]
+    release.set()
+    await drain(w.worker)
+    result = await manual
+    assert calls == ["send", "send", "fetch"]
+    assert result["outcomes"]["attempt"]["source"] == "manual"
+    assert result["outcomes"]["acknowledged"]["fingerprint"] == fingerprint
+    assert result["verified"] is False
+    w.planner.publish()
+    await drain(w.worker)
+    assert w.worker.reason == "unchanged" and calls == ["send", "send", "fetch"]
+    # Selective removal invalidates the accepted fingerprint; it does not clear
+    # any other profile or let a subsequent worker deduplicate against old state.
+    result = await morek_schedule.async_schedule_action(w.hass, "charger", "clear", confirm_profile_id=42001)
+    assert result["outcomes"]["acknowledged"] is None
+    assert calls[-2:] == ["clear", "fetch"]
+    w.planner.publish()
+    await drain(w.worker)
+    assert calls[-1] == "send" and w.worker.reason == "upload_accepted_unverified"
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["Rejected", "timeout", "cancel"])
+async def test_manual_uncertain_or_rejected_outcome_and_no_automatic_retry(monkeypatch, status):
+    w = manual_setup(monkeypatch)
+    entered = asyncio.Event()
+
+    async def call(_request):
+        assert w.ledger.value["attempt"]["state"] == "uncertain"
+        entered.set()
+        if status == "timeout":
+            raise TimeoutError
+        if status == "cancel":
+            await asyncio.Event().wait()
+        return SimpleNamespace(status=status)
+
+    w.point.call.side_effect = call
+    fingerprint = w.worker._intent()[1]
+    task = asyncio.create_task(morek_schedule.async_schedule_action(w.hass, "charger", "send", fingerprint))
+    await entered.wait()
+    if status == "cancel":
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    else:
+        with pytest.raises(morek_schedule.ScheduleRefused):
+            await task
+    assert w.ledger.value["uncertain"] is (status != "Rejected")
+    w.worker.start()
+    await drain(w.worker)
+    assert w.point.call.await_count == 1
+    assert w.worker.reason == ("upload_rejected" if status == "Rejected" else "upload_uncertain")
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_edit_during_attempt_persistence_cannot_dispatch(monkeypatch):
+    w = manual_setup(monkeypatch)
+    entered, release = asyncio.Event(), asyncio.Event()
+    original = w.ledger.write
+
+    async def slow_write(value):
+        if not entered.is_set():
+            await original(value)
+            entered.set()
+            await release.wait()
+        else:
+            await original(value)
+
+    w.ledger.write = slow_write
+    fingerprint = w.worker._intent()[1]
+    send = asyncio.create_task(morek_schedule.async_schedule_action(w.hass, "charger", "send", fingerprint))
+    await entered.wait()
+    w.settings.pause.choice = "none"
+    release.set()
+    with pytest.raises(morek_schedule.ScheduleRefused, match="pause_auto_first"):
+        await send
+    assert w.ledger.value["attempt"]["state"] == "aborted_before_dispatch"
+    assert w.ledger.value["uncertain"] is False
+    w.point.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_other_entry_cannot_take_over_connector_evidence(monkeypatch):
+    w = setup(monkeypatch)
+    w.worker.start()
+    await drain(w.worker)
+    other = morek_worker.MorekScheduleWorker(w.hass, "another", w.planner)
+    other.start()
+    await drain(other)
+    assert other.reason == "outcome_binding_unavailable"
+    assert w.point.call.await_count == 1
+    w.worker.close()
+    other.close()
+
+
+@pytest.mark.asyncio
+async def test_manual_replacement_invalidates_old_worker_fingerprint(monkeypatch):
+    w = manual_setup(monkeypatch)
+
+    async def call(request):
+        if request.action == "fetch":
+            return SimpleNamespace(status="Accepted", connector_id=1, schedule_start=NOW.isoformat(),
+                                   charging_schedule={"chargingRateUnit": "A", "duration": 14400,
+                                                      "chargingSchedulePeriod": [{"startPeriod": 0, "limit": 16}]})
+        return SimpleNamespace(status="Accepted")
+
+    w.point.call.side_effect = call
+    w.worker.start()
+    await drain(w.worker)
+    first = w.planner.current.proposal.shown_periods
+    start, end = first[0]
+    w.planner.current.proposal.shown_periods = ((start, end - timedelta(minutes=5)),)
+    second = w.worker._intent()[1]
+    await morek_schedule.async_schedule_action(w.hass, "charger", "send", second)
+    assert w.ledger.value["acknowledged"]["fingerprint"] == second
+    w.planner.current.proposal.shown_periods = first
+    w.planner.publish()
+    await drain(w.worker)
+    assert w.worker.reason == "upload_accepted_unverified"
+    assert w.point.call.await_count == 4  # worker, manual send/read, worker
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_legacy_uncertain_migration_blocks_manual_and_worker(monkeypatch):
+    w = manual_setup(monkeypatch)
+    data, _ = await morek_schedule._state(w.hass, "charger")
+    data.update({"profile": {"legacy": True}, "ack": "unknown"})
+    fingerprint = w.worker._intent()[1]
+    with pytest.raises(morek_schedule.ScheduleRefused, match="upload_uncertain"):
+        await morek_schedule.async_schedule_action(w.hass, "charger", "send", fingerprint)
+    w.worker.start()
+    await drain(w.worker)
+    assert w.worker.reason == "upload_uncertain"
+    w.point.call.assert_not_awaited()
+    w.worker.close()

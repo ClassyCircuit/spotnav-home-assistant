@@ -23,6 +23,8 @@ from homeassistant.helpers.event import async_call_later
 
 from ..const import DOMAIN, MOREK_CONNECTOR_ID, MOREK_STATION_ID
 from ..execution.execution_ownership import ownership_store
+from ..execution.command_admission import command_admission
+from ..execution.morek_outcomes import OutcomeUnavailable, outcomes_for
 from ..runtime import domain_data, preview_for, controller_for
 from .common import is_admin, lookup_charger, send_unsupported_version
 
@@ -394,6 +396,94 @@ def _preview_id(profile: dict[str, Any], revision: Any) -> str:
     return hashlib.sha256(json.dumps([revision, intent], sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
+async def _outcome_record(hass: HomeAssistant, entry_id: str, data: dict[str, Any]) -> dict[str, Any]:
+    """Load or conservatively migrate the old entry-local manual record."""
+    record = await outcomes_for(hass).read()
+    if record is None:
+        cleanup = data.get("cleanup") or {}
+        legacy_uncertain = bool((data.get("profile") and str(data.get("ack", "unknown")).lower() not in
+                                 ("accepted", "rejected", "notsupported"))
+                                or (cleanup and str(cleanup.get("status", "unknown")).lower() not in
+                                    ("accepted", "rejected", "notsupported")))
+        record = {"schema": 1, "entry_id": entry_id, "desired": None, "attempt": None,
+                  "acknowledged": None, "verified": None, "uncertain": legacy_uncertain,
+                  "removal": None}
+    if record.get("entry_id") != entry_id or type(record.get("uncertain")) is not bool:
+        raise ScheduleRefused("outcome_binding_unavailable")
+    return record
+
+
+async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[str, Any], store: Any,
+                               fingerprint: str, validate: Any, *, automatic: bool) -> str:
+    """Connector lock held. Record first, revalidate after every pre-dispatch await."""
+    ledger = outcomes_for(hass)
+    record = await _outcome_record(hass, entry_id, data)
+    profile, point, target = validate()
+    # This exact wire payload is the one recorded and later dispatched. A
+    # revalidation may rebuild an equivalent profile with a later startSchedule.
+    wire_profile = profile
+    if record["uncertain"]:
+        return "upload_uncertain"
+    acknowledged = record.get("acknowledged") or {}
+    attempt = record.get("attempt") or {}
+    if automatic and acknowledged.get("fingerprint") == fingerprint:
+        return "unchanged"
+    if automatic and attempt.get("state") == "rejected" and attempt.get("fingerprint") == fingerprint:
+        return "upload_rejected"
+    now = datetime.now(timezone.utc).isoformat()
+    record.update({"desired": {"fingerprint": fingerprint, "profile": profile},
+                   "attempt": {"fingerprint": fingerprint, "profile": profile, "at": now,
+                               "source": "worker" if automatic else "manual", "state": "uncertain"},
+                   "uncertain": True, "verified": None})
+    await ledger.write(record)
+    # Recheck after persistence: a settings edit, new calculation, identity or
+    # pause change while the disk was busy must never become an obsolete send.
+    try:
+        profile, point, target = validate()
+    except Exception:
+        record["attempt"]["state"] = "aborted_before_dispatch"
+        record["uncertain"] = False
+        await ledger.write(record)
+        raise
+    _cancel_verification(hass, entry_id)
+    data.update({"sent_at": now, "profile": wire_profile, "ack": "unknown", "verified": False,
+                 "effective": None, "cleanup": None,
+                 "verification": {"pending": False, "reason": "upload_unconfirmed",
+                                  "next_check_at": None, "attempts": 0}})
+    await store.async_save(data)
+    try:
+        profile, point, target = validate()
+    except Exception:
+        record["attempt"]["state"] = "aborted_before_dispatch"
+        record["uncertain"] = False
+        await ledger.write(record)
+        raise
+    from ocpp.v16 import call as ocpp_call
+    try:
+        async with asyncio.timeout(30):
+            response = await point.call(ocpp_call.SetChargingProfile(
+                connector_id=target.connector_id, cs_charging_profiles=wire_profile))
+        ack = _status(response)
+    except asyncio.CancelledError:
+        raise
+    except Exception:  # noqa: BLE001 - dispatch may have applied
+        ack = "unknown"
+    data["ack"] = ack
+    state = ack.lower()
+    if state == "accepted":
+        record.update({"acknowledged": {"fingerprint": fingerprint, "at": now}, "uncertain": False})
+        record["attempt"]["state"] = "accepted"
+    elif state in ("rejected", "notsupported"):
+        record["attempt"]["state"] = "rejected"
+        record["uncertain"] = False
+    # Unknown, cancellation, or interrupted ACK persistence stays uncertain on disk.
+    record["attempt"]["ack"] = ack
+    await ledger.write(record)
+    await store.async_save(data)
+    return "upload_accepted_unverified" if state == "accepted" else (
+        "upload_rejected" if state in ("rejected", "notsupported") else "upload_uncertain")
+
+
 def _preview(hass: HomeAssistant, entry_id: str, target: Any) -> dict[str, Any]:
     """Describe a proposal without contacting OCPP or changing stored charger state."""
     now = datetime.now(timezone.utc)
@@ -428,12 +518,40 @@ async def async_schedule_action(hass: HomeAssistant, entry_id: str, action: str,
                                 preview_id: str | None = None, confirm_profile_id: int | None = None, *,
                                 expected_sent_at: str | None = None,
                                 verification_attempt: int | None = None) -> dict[str, Any]:
+    """Manual operations share connector serialization without enabling owned mode."""
     if action not in ("send", "fetch", "clear"):
         raise ScheduleRefused("invalid_action")
     if action == "clear" and (type(confirm_profile_id) is not int or confirm_profile_id != PROFILE_ID):
         raise ScheduleRefused("cleanup_confirmation_required")
     if action == "send" and not preview_id:
         raise ScheduleRefused("preview_changed")
+    entry, failure = lookup_charger(hass, entry_id)
+    if failure or entry is None:
+        raise ScheduleRefused(failure or "unknown_charger")
+
+    def identity() -> dict[str, Any]:
+        controller = controller_for(hass, entry_id)
+        return _identity_status(hass, getattr(controller, "ocpp_target", None))
+
+    async def run() -> dict[str, Any]:
+        return await _async_schedule_action_locked(hass, entry_id, action, preview_id, confirm_profile_id,
+                                                   expected_sent_at=expected_sent_at,
+                                                   verification_attempt=verification_attempt)
+
+    admission = command_admission(hass)
+    if action == "fetch":
+        result = await admission.async_execute(entry_id, "read_only", identity, run)
+    else:
+        result = await admission.async_manual_profile(identity, run)
+    if not result.allowed:
+        raise ScheduleRefused(result.reason)
+    return result.value
+
+
+async def _async_schedule_action_locked(hass: HomeAssistant, entry_id: str, action: str,
+                                        preview_id: str | None, confirm_profile_id: int | None, *,
+                                        expected_sent_at: str | None,
+                                        verification_attempt: int | None) -> dict[str, Any]:
     entry, failure = lookup_charger(hass, entry_id)
     if failure is not None or entry is None:
         raise ScheduleRefused(failure or "unknown_charger")
@@ -460,24 +578,36 @@ async def async_schedule_action(hass: HomeAssistant, entry_id: str, action: str,
             profile = _proposed_profile(hass, entry_id, now)
             if preview_id is None or preview_id != _preview_id(profile, settings.revision):
                 raise ScheduleRefused("preview_changed")
-            _cancel_verification(hass, entry_id)
-            # Record *before* the request: a timeout can still have installed a profile.
-            data.update({"sent_at": now.isoformat(), "profile": profile, "ack": "unknown", "verified": False,
-                          "effective": None, "cleanup": None,
-                          "verification": {"pending": False, "reason": "upload_unconfirmed",
-                                           "next_check_at": None, "attempts": 0}})
-            await store.async_save(data)
-            try:
-                response = await asyncio.wait_for(cp.call(ocpp_call.SetChargingProfile(
-                    connector_id=target.connector_id, cs_charging_profiles=profile)), timeout=30)
-                data["ack"] = _status(response)
-            except Exception:
-                data["ack"] = "unknown"
-            await store.async_save(data)
-            if data["ack"].lower() != "accepted":
+            def validate():
+                current_controller = controller_for(hass, entry_id)
+                current_target = getattr(current_controller, "ocpp_target", None)
+                if not _identity_status(hass, current_target)["supported"]:
+                    raise ScheduleRefused("not_morek_connector")
+                current_settings = domain_data(hass).auto_store.settings(entry_id)
+                if current_settings.pause.choice != "until_resumed":
+                    raise ScheduleRefused("pause_auto_first")
+                current_profile = _proposed_profile(hass, entry_id, datetime.now(timezone.utc))
+                if preview_id != _preview_id(current_profile, current_settings.revision):
+                    raise ScheduleRefused("preview_changed")
+                return current_profile, _charge_point(hass, current_target), current_target
+
+            outcome = await _send_profile_shared(hass, entry_id, data, store, preview_id, validate, automatic=False)
+            if outcome == "upload_uncertain":
+                raise ScheduleRefused("upload_uncertain")
+            if outcome != "upload_accepted_unverified":
                 raise ScheduleRefused("upload_not_confirmed")
+            profile = data["profile"]
         elif action == "clear":
             _cancel_verification(hass, entry_id)
+            ledger = outcomes_for(hass)
+            record = await _outcome_record(hass, entry_id, data)
+            was_uncertain = record["uncertain"]
+            record.update({"acknowledged": None, "verified": None, "uncertain": True,
+                           "removal": {"at": now.isoformat(), "state": "uncertain"}})
+            await ledger.write(record)
+            if not _identity_status(hass, target)["supported"]:
+                raise ScheduleRefused("not_morek_connector")
+            cp = _charge_point(hass, target)
             # By OCPP 1.6, id alone selects this exact profile. Never send an empty
             # ClearChargingProfile request or use the generic HA clear service.
             data.update({"cleanup": {"requested_at": now.isoformat(), "profile_id": PROFILE_ID,
@@ -485,12 +615,23 @@ async def async_schedule_action(hass: HomeAssistant, entry_id: str, action: str,
                          "verification": {"pending": False, "reason": "cleanup_requested",
                                           "next_check_at": None, "attempts": 0}})
             await store.async_save(data)
+            current_controller = controller_for(hass, entry_id)
+            target = getattr(current_controller, "ocpp_target", None)
+            if not _identity_status(hass, target)["supported"]:
+                raise ScheduleRefused("not_morek_connector")
+            cp = _charge_point(hass, target)
             try:
                 response = await asyncio.wait_for(cp.call(ocpp_call.ClearChargingProfile(id=PROFILE_ID)), timeout=30)
                 data["cleanup"]["status"] = _status(response)
             except Exception:
                 # A timeout does not prove the station did not remove the profile.
                 data["cleanup"]["status"] = "unknown"
+            status = data["cleanup"]["status"].lower()
+            if status in ("accepted", "rejected", "notsupported"):
+                record["uncertain"] = was_uncertain
+                record["removal"]["state"] = status
+            record["removal"]["ack"] = data["cleanup"]["status"]
+            await ledger.write(record)
             await store.async_save(data)
         query_at = datetime.now(timezone.utc)
         duration = 43200
@@ -517,6 +658,21 @@ async def async_schedule_action(hass: HomeAssistant, entry_id: str, action: str,
         elif data.get("ack", "").lower() != "accepted":
             comparison.update({"matched": False, "exact": False, "reason": "upload_unconfirmed"})
         data["verified"] = comparison["matched"]
+        record = await outcomes_for(hass).read()
+        if record is not None and record.get("entry_id") != entry_id:
+            comparison.update({"matched": False, "exact": False, "reason": "outcome_uncertain"})
+            data["verified"] = False
+        elif record is not None:
+            if record.get("uncertain"):
+                comparison.update({"matched": False, "exact": False, "reason": "outcome_uncertain"})
+                data["verified"] = False
+            acknowledged = record.get("acknowledged") or {}
+            if comparison["matched"] and acknowledged.get("fingerprint"):
+                record["verified"] = {"fingerprint": acknowledged["fingerprint"],
+                                      "at": datetime.now(timezone.utc).isoformat()}
+            else:
+                record["verified"] = None
+            await outcomes_for(hass).write(record)
         verification = data.setdefault("verification", {})
         verification.update(comparison)
         verification["checked_at"] = datetime.now(timezone.utc).isoformat()
@@ -542,7 +698,8 @@ async def async_schedule_action(hass: HomeAssistant, entry_id: str, action: str,
         await store.async_save(data)
         return {"supported": True, "sent_at": data.get("sent_at"), "ack": data.get("ack"), "verified": data.get("verified", False),
                 "sent": profile, "effective": data.get("effective"), "cleanup": data.get("cleanup"),
-                "cleanup_supported": True, "verification": _verification_state(hass, entry_id, data)}
+                "cleanup_supported": True, "outcomes": record,
+                "verification": _verification_state(hass, entry_id, data)}
 
 
 @websocket_api.websocket_command({vol.Required("type"): "spotnav/morek_schedule", vol.Required("api_version"): int,
@@ -566,8 +723,13 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
             target = getattr(controller, "ocpp_target", None)
             identity = _identity_status(hass, target)
             ownership = await ownership_store(hass).async_status(entry.entry_id, identity)
+            try:
+                outcomes = await _outcome_record(hass, entry.entry_id, data)
+            except (OutcomeUnavailable, ScheduleRefused):
+                outcomes = {"state": "storage_unavailable", "uncertain": True}
             result = {**identity,
                       "ownership": ownership,
+                      "outcomes": outcomes,
                       "sent_at": data.get("sent_at"), "ack": data.get("ack"), "verified": data.get("verified", False),
                       "sent": data.get("profile"), "effective": data.get("effective"),
                       "preview": _preview(hass, entry.entry_id, target),

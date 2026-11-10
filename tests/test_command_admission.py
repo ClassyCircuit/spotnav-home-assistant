@@ -290,4 +290,4 @@ def test_admission_is_reused_at_shared_boundaries_not_profile_writer():
             if isinstance(node, ast.ImportFrom) and node.module and "command_admission" in node.module:
                 imports.add(path.relative_to(root).as_posix())
     assert imports == {"__init__.py", "execution/charger_handback.py", "execution/chargers/adapter.py",
-                       "execution/morek_worker.py"}
+                       "execution/morek_worker.py", "api/morek_schedule.py"}

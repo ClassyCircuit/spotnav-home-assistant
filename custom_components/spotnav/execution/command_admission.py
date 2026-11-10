@@ -216,6 +216,32 @@ class CommandAdmission:
                 return AdmissionResult(False, "connector_quiescing")
             return AdmissionResult(True, "allowed_legacy", await operation())
 
+    async def async_manual_profile(
+        self, resolve_identity: Callable[[], Mapping[str, Any]], operation: Callable[[], Awaitable[T]]
+    ) -> AdmissionResult[T]:
+        """Serialize the existing explicitly requested experiment, not autonomous ownership.
+
+        The caller retains its admin, pause, preview and selective-clear checks.
+        This is not an activation path and does not admit owned_profile work.
+        """
+        try:
+            identity = dict(resolve_identity())
+            connector = physical_connector(identity)
+            if connector is None or classify_morek_identity(identity) != "supported_morek":
+                return AdmissionResult(False, "identity_unresolved")
+        except Exception:  # noqa: BLE001
+            return AdmissionResult(False, "identity_unresolved")
+        async with self._lock_for(connector):
+            if connector in self._quiescing:
+                return AdmissionResult(False, "connector_quiescing")
+            try:
+                identity = dict(resolve_identity())
+                if classify_morek_identity(identity) != "supported_morek" or physical_connector(identity) != connector:
+                    return AdmissionResult(False, "identity_changed")
+            except Exception:  # noqa: BLE001
+                return AdmissionResult(False, "identity_changed")
+            return AdmissionResult(True, "manual_profile", await operation())
+
 
 def command_admission(hass: HomeAssistant) -> CommandAdmission:
     """Share the same connector locks across all future callers in this HA instance."""

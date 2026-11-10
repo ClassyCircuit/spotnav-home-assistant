@@ -104,9 +104,11 @@ tests are documented there; full HA collection is still blocked on Windows.
     connector admission serializes and rejects stale work, with process-local
     deduplication and an uncertainty latch. Production owned-profile admission
     still refuses all sends; no transition or activation is implemented.
-- [ ] **3.3 Shared manual actions and persisted outcomes**
-  - Route manual Send through the same safeguards; keep Refresh read-only.
-  - Persist desired/attempted/ACK/verified versions; bound uncertain-upload retries.
+- [x] **3.3 Shared manual actions and persisted outcomes** (unarmed; review required)
+  - Manual actions and the worker serialize on the physical connector and share
+    persisted intent/attempt/ACK/readback evidence; Refresh sends only a read.
+  - An uncertain attempt blocks further sends without automatic retries; no
+    activation, complete recovery or safe retained-profile exit is implied.
 
 ### Stage 4 — Recovery and health (old A4)
 

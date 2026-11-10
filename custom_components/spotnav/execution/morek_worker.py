@@ -8,7 +8,6 @@ durable attempt ledger; production owned-profile admission always refuses.
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
 from datetime import datetime, timezone
 import logging
 from typing import Any
@@ -20,18 +19,7 @@ from ..runtime import controller_for, domain_data, preview_for
 from .command_admission import classify_morek_identity, command_admission, physical_connector
 
 _LOGGER = logging.getLogger(__name__)
-_DATA_KEY = "spotnav_morek_worker_attempts"
 _COALESCE_SECONDS = 0.1
-_UPLOAD_TIMEOUT = 30
-
-
-@dataclass
-class _ConnectorAttempts:
-    """Process-local only; unknown is latched across worker/entry reloads."""
-
-    accepted: str | None = None
-    rejected: str | None = None
-    uncertain: bool = False
 
 
 class MorekScheduleWorker:
@@ -105,6 +93,7 @@ class MorekScheduleWorker:
             self.reason = "identity_unresolved"
             return
         _, fingerprint = self._intent()
+        data, store = await morek_schedule._state(self._hass, self._entry_id)
         admission = command_admission(self._hass)
         generation = admission.generation(connector)
 
@@ -113,41 +102,23 @@ class MorekScheduleWorker:
             # physical connector lock. Do not await between this recheck and call.
             if self._closed or serial != self._serial:
                 return "stale_work"
-            profile, current = self._intent()
-            if current != fingerprint:
-                # A time boundary or unpublished edit changed the wire intent.
-                self.trigger()
-                return "stale_work"
-            attempts = self._hass.data.setdefault(_DATA_KEY, {}).setdefault(connector, _ConnectorAttempts())
-            if attempts.uncertain:
-                return "upload_uncertain"
-            if current == attempts.accepted:
-                return "unchanged"
-            if current == attempts.rejected:
-                return "upload_rejected"
-            controller = controller_for(self._hass, self._entry_id)
-            target = getattr(controller, "ocpp_target", None)
-            point = morek_schedule._charge_point(self._hass, target)
-            from ocpp.v16 import call as ocpp_call
+            def validate():
+                if self._closed or serial != self._serial:
+                    raise morek_schedule.ScheduleRefused("stale_work")
+                identity_now = self._identity()
+                if classify_morek_identity(identity_now) != "supported_morek" or physical_connector(identity_now) != connector:
+                    raise morek_schedule.ScheduleRefused("identity_changed")
+                profile, current = self._intent()
+                if current != fingerprint:
+                    self.trigger()
+                    raise morek_schedule.ScheduleRefused("stale_work")
+                controller = controller_for(self._hass, self._entry_id)
+                target = getattr(controller, "ocpp_target", None)
+                return profile, morek_schedule._charge_point(self._hass, target), target
 
-            request = ocpp_call.SetChargingProfile(connector_id=target.connector_id, cs_charging_profiles=profile)
-            # Cancellation/timeout can outlive this task and may have applied.
-            attempts.uncertain = True
-            try:
-                async with asyncio.timeout(_UPLOAD_TIMEOUT):
-                    response = await point.call(request)
-            except asyncio.CancelledError:
-                raise
-            except Exception:  # noqa: BLE001 - unknown outcome is never a failed upload
-                return "upload_uncertain"
-            status = morek_schedule._status(response).lower()
-            if status == "accepted":
-                attempts.accepted, attempts.rejected, attempts.uncertain = current, None, False
-                return "upload_accepted_unverified"
-            if status in ("rejected", "notsupported"):
-                attempts.rejected, attempts.uncertain = current, False
-                return "upload_rejected"
-            return "upload_uncertain"
+            async with self._hass.data[morek_schedule._DATA_KEY][self._entry_id][2]:
+                return await morek_schedule._send_profile_shared(
+                    self._hass, self._entry_id, data, store, fingerprint, validate, automatic=True)
 
         result = await admission.async_execute(
             self._entry_id, "owned_profile", self._identity, dispatch, expected_generation=generation

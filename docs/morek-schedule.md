@@ -39,6 +39,14 @@ does not start another OCPP server. Only an administrator can send, fetch, or re
    means they differ or the read failed. Watch actual charger measurements at
    the transitions as a separate check.
 
+From 2.5.27, an interrupted or unconfirmed profile action is retained as an
+uncertain outcome, including after a restart. Further Sends are refused rather
+than automatically retried; the request may still have applied. Refresh is a
+read-only composite query, not a profile inventory and not a way to resolve this
+uncertainty. Explicit selective removal remains available, but its acknowledgement
+does not prove an earlier uncertain request cannot still take effect. There is no
+automatic recovery or reset of the uncertainty latch in this release.
+
 ### Readback verification (2.5.6+)
 
 Send keeps the real schedule at **stack level 1** and checks it immediately.

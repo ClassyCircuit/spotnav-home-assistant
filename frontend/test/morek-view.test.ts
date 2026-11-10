@@ -23,6 +23,14 @@ const state = {
 };
 
 describe("Morek manual test panel", () => {
+  it("exposes uncertain stored outcomes and blocks send without blocking readback", () => {
+    const panel = morekPanel(document, { ...state, outcomes: { uncertain: true } }, true, false, null, vi.fn());
+    expect(panel.textContent).toContain("may have applied");
+    expect(panel.textContent).toContain("readback cannot prove which profiles are installed");
+    const buttons = Array.from(panel.querySelectorAll("button"));
+    expect(buttons.find((button) => button.textContent === "Send current plan")?.disabled).toBe(true);
+    expect(buttons.find((button) => button.textContent === "Refresh from Morek")?.disabled).toBe(false);
+  });
   it("explains that shortened plan windows are sent as fixed times, not live energy control", () => {
     const panel = morekPanel(document, state, true, false, null, vi.fn());
     expect(panel.textContent).toContain("fixed start/stop times from the displayed plan");
