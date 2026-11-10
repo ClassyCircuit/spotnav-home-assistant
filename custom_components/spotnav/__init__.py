@@ -314,9 +314,21 @@ async def _async_setup_ownership_metadata(
     @callback
     def control_available(event: Event) -> None:
         old, new = event.data.get("old_state"), event.data.get("new_state")
-        if (new is not None and new.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN)
-                and (old is None or old.state in (STATE_UNAVAILABLE, STATE_UNKNOWN))):
-            entry.async_create_background_task(hass, ensure(), "spotnav ownership initialization")
+        was_available = old is not None and old.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN)
+        is_available = new is not None and new.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN)
+        if was_available == is_available:
+            return
+        # Invalidate queued worker work synchronously, including on disconnect.
+        worker = getattr(getattr(entry, "runtime_data", None), "morek_worker", None)
+        generation = worker.suspend_for_availability_change() if worker is not None else None
+        if is_available:
+            async def initialize_and_reconcile() -> None:
+                await ensure()  # Never acquire admission recursively in the worker.
+                current = getattr(getattr(entry, "runtime_data", None), "morek_worker", None)
+                if current is worker and current is not None:
+                    current.resume_after_availability_change(generation)
+
+            entry.async_create_background_task(hass, initialize_and_reconcile(), "spotnav ownership initialization")
 
     entry.async_on_unload(async_track_state_change_event(hass, [controller.charge_control], control_available))
     await ensure()
@@ -717,7 +729,11 @@ async def _async_setup_auto_preview(
     # This worker is wired but owned-profile admission remains unconditionally unarmed.
     from .execution.morek_worker import MorekScheduleWorker
 
-    worker = data.morek_worker = MorekScheduleWorker(hass, entry_id, preview)
+    def charger_available() -> bool:
+        state = hass.states.get(data.controller.charge_control)
+        return state is not None and state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN)
+
+    worker = data.morek_worker = MorekScheduleWorker(hass, entry_id, preview, charger_available)
     worker.start()
     entry.async_on_unload(worker.close)
 

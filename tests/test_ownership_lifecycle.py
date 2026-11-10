@@ -56,8 +56,21 @@ async def test_offline_startup_then_control_availability(tmp_path, monkeypatch):
     assert (await store.async_status("c", current[0]))["record_state"] == "missing"
     current[0] = {"supported": True, "resolved_id": MOREK_STATION_ID, "connector_id": 1,
                   "match_count": 1, "ocpp_version": "1.6"}
+    events = []
+    class Worker:
+        def suspend_for_availability_change(self):
+            events.append("suspend")
+            return 1
+
+        def resume_after_availability_change(self, generation):
+            assert (tmp_path / execution_ownership.STORAGE_KEY).exists()
+            events.append(("resume", generation))
+
+    entry.runtime_data = SimpleNamespace(morek_worker=Worker())
     calls[0][1](SimpleNamespace(data={"old_state": SimpleNamespace(state="unavailable"),
                                       "new_state": SimpleNamespace(state="off")}))
+    assert events == ["suspend"]
     await asyncio.gather(*tasks)
+    assert events == ["suspend", ("resume", 1)]
     assert (await store.async_status("c", current[0]))["record_state"] == "valid"
     hass.services.async_call.assert_not_awaited()

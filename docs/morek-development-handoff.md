@@ -234,6 +234,39 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2.5.28 — Stage 4.1 restart and reconnect (unarmed; review required)
+
+- The startup worker subscribes to the current planner publication. The existing
+  control-entity availability listener now invalidates queued worker work on both
+  disconnect and reconnect, and resumes reconciliation after connector ownership
+  initialization. A transition generation prevents an older initialization from
+  resuming after a newer disconnect. Worker startup and pre-dispatch checks require
+  the control entity to be available, and identity and current planner intent are
+  rechecked through the existing connector admission and shared Send path. A later
+  reconnect needs neither a browser nor another settings edit. The listener depends
+  on HA OCPP exposing reconnect as a control-entity availability transition; other
+  reconnect signals are not independently monitored.
+- The ledger is evidence and deduplication, not a cached profile to replay or proof
+  of installation. An unchanged acknowledged fingerprint is not re-sent on restart
+  or reconnect; a changed valid intent can be reconciled only under simulated test
+  authority. Unknown/interrupted attempts stay latched across restart; there is no
+  automatic retry or reset. Identity ambiguity and duplicate discovered contenders
+  fail closed. As previously documented, an unrecorded duplicate cannot be detected
+  before it initializes. Lost outcome/ownership documents remain indistinguishable
+  from first use; neither is solved by this substage.
+- Production `owned_profile` admission remains unconditionally unarmed. Activation,
+  durable ownership transitions, lost-state recovery, electrical protection,
+  transaction authorization and retained-profile exit remain blockers. Stage 4.2
+  active-window verification and Stage 4.3 operator recovery/health remain open.
+  No composite readback is a profile inventory, and no ACK proves physical flow.
+- Validation: isolated planning suite 460 passed, one deselected, two warnings;
+  focused worker selection 32 passed, 429 deselected, two warnings; isolated
+  lifecycle suite 26 passed, six warnings. The functional reconciliation tests
+  use simulated authorization and mocked persistence/OCPP; the production gate
+  is separately exercised and refuses. Frontend build and `npm run check-dist`,
+  targeted Ruff and compileall passed. These are not full HA or physical tests;
+  no live HA, deployment, restart or charger action was performed.
+
 ### 2.5.27 — Stage 3.3 shared manual actions and evidence (unarmed; review required)
 
 - Manual Send and selective removal now take the existing physical connector

@@ -110,6 +110,142 @@ async def drain(worker):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("changed", [False, True])
+async def test_restart_uses_current_intent_not_cached_profile(monkeypatch, changed):
+    w = setup(monkeypatch)
+    w.worker.start()
+    await drain(w.worker)
+    old = w.ledger.value["acknowledged"]["fingerprint"]
+    w.worker.close()
+    if changed:
+        start, end = w.planner.current.proposal.shown_periods[0]
+        w.planner.current.proposal.shown_periods = ((start, end - timedelta(minutes=10)),)
+    # New worker and process-local HA data, but the durable ledger survives.
+    w.hass.data = {}
+    worker = morek_worker.MorekScheduleWorker(w.hass, "charger", w.planner)
+    worker.start()
+    await drain(worker)
+    assert w.point.call.await_count == 1 + int(changed)
+    assert (w.ledger.value["acknowledged"]["fingerprint"] != old) is changed
+    worker.close()
+
+
+@pytest.mark.asyncio
+async def test_offline_start_settings_change_and_reconnect_without_browser(monkeypatch):
+    w = setup(monkeypatch)
+    available = [False]
+    w.worker._available = lambda: available[0]
+    w.identity = {"supported": False}
+    w.worker.start()
+    await drain(w.worker)
+    w.settings.revision = w.planner.current.settings_revision = 5
+    start, end = w.planner.current.proposal.shown_periods[0]
+    w.planner.current.proposal.shown_periods = ((start, end - timedelta(minutes=15)),)
+    w.planner.publish()
+    await drain(w.worker)
+    assert w.point.call.await_count == 0
+    token = w.worker.suspend_for_availability_change()
+    available[0] = True
+    w.identity = dict(IDENTITY)
+    w.worker.resume_after_availability_change(token)
+    await drain(w.worker)
+    assert w.point.call.await_count == 1
+    assert w.ledger.value["acknowledged"]["fingerprint"] == w.worker._intent()[1]
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_offline_start_reconnects_with_unchanged_plan_and_alias(monkeypatch):
+    w = setup(monkeypatch)
+    available = [False]
+    w.worker._available = lambda: available[0]
+    w.identity = {"supported": False, "connector_id": 1}
+    w.worker.start()
+    await drain(w.worker)
+    token = w.worker.suspend_for_availability_change()
+    available[0] = True
+    w.identity = {**IDENTITY, "configured_id": "friendly-alias"}
+    w.worker.resume_after_availability_change(token)
+    await drain(w.worker)
+    assert w.point.call.await_count == 1
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_restart_refuses_stale_snapshot_even_if_old_ledger_exists(monkeypatch):
+    w = setup(monkeypatch)
+    w.worker.start()
+    await drain(w.worker)
+    w.worker.close()
+    w.hass.data = {}
+    w.settings.revision += 1  # The current settings have no matching publication yet.
+    worker = morek_worker.MorekScheduleWorker(w.hass, "charger", w.planner)
+    worker.start()
+    await drain(worker)
+    assert worker.reason == "no_current_plan"
+    assert w.point.call.await_count == 1
+    worker.close()
+
+
+@pytest.mark.asyncio
+async def test_disconnect_invalidates_queued_work_and_old_reconnect_completion(monkeypatch):
+    w = setup(monkeypatch)
+    available = [True]
+    w.worker._available = lambda: available[0]
+    w.admission.entered, w.admission.release = asyncio.Event(), asyncio.Event()
+    w.worker.start()
+    await w.admission.entered.wait()
+    old = w.worker.suspend_for_availability_change()
+    available[0] = False
+    w.worker.suspend_for_availability_change()
+    w.worker.resume_after_availability_change(old)
+    w.admission.release.set()
+    await drain(w.worker)
+    w.point.call.assert_not_awaited()
+    assert w.worker.reason == "charger_unavailable"
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("identity", [
+    {"supported": False, "connector_id": 1},
+    {**IDENTITY, "match_count": 2, "reason": "ambiguous_station"},
+])
+async def test_reconnect_unresolved_or_duplicate_identity_never_dispatches(monkeypatch, identity):
+    w = setup(monkeypatch)
+    w.identity = identity
+    w.worker.start()
+    await drain(w.worker)
+    token = w.worker.suspend_for_availability_change()
+    w.worker.resume_after_availability_change(token)
+    await drain(w.worker)
+    assert w.worker.reason == "identity_unresolved"
+    w.point.call.assert_not_awaited()
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_uncertain_persisted_attempt_blocks_restart_and_reconnect(monkeypatch):
+    w = setup(monkeypatch)
+    w.point.call.side_effect = TimeoutError
+    w.worker.start()
+    await drain(w.worker)
+    w.worker.close()
+    w.hass.data = {}
+    w.settings.revision = w.planner.current.settings_revision = 5
+    worker = morek_worker.MorekScheduleWorker(w.hass, "charger", w.planner)
+    worker.start()
+    await drain(worker)
+    token = worker.suspend_for_availability_change()
+    worker.resume_after_availability_change(token)
+    await drain(worker)
+    assert worker.reason == "upload_uncertain"
+    assert w.ledger.value["uncertain"] is True
+    assert w.point.call.await_count == 1
+    worker.close()
+
+
+@pytest.mark.asyncio
 async def test_coalesce_deduplicate_and_changed_active_intent(monkeypatch):
     w = setup(monkeypatch, active=True)
     w.worker.start()
@@ -230,6 +366,10 @@ async def test_real_production_admission_unconditionally_unarmed(monkeypatch):
     admission = CommandAdmission(SimpleNamespace(async_status=AsyncMock(return_value=status)))
     w = setup(monkeypatch, admission=admission)
     w.worker.start()
+    await drain(w.worker)
+    assert w.worker.reason == "schedule_mode_unarmed"
+    token = w.worker.suspend_for_availability_change()
+    w.worker.resume_after_availability_change(token)
     await drain(w.worker)
     assert w.worker.reason == "schedule_mode_unarmed"
     w.point.call.assert_not_awaited()

@@ -112,9 +112,11 @@ tests are documented there; full HA collection is still blocked on Windows.
 
 ### Stage 4 — Recovery and health (old A4)
 
-- [ ] **4.1 Restart and reconnect**
-  - Reconcile current valid intent, not cached stale profiles; test offline startup.
-  - Cover duplicate identities and uncertain persisted attempts before enabling mode.
+- [x] **4.1 Restart and reconnect** (unarmed groundwork; review required)
+  - Startup and control-entity availability transitions reconcile the current valid
+    planner intent and identity, not cached profiles; offline work waits for reconnect.
+  - Connector admission and durable uncertainty remain in force. Simulated-authority
+    tests cover stale work and duplicate identities; production dispatch stays unarmed.
 - [ ] **4.2 Verification**
   - Extend existing bounded checks to active/remaining windows and delayed replies.
   - Preserve coverage, drift, freshness and mismatch reasons; reject stale results.

@@ -1,8 +1,8 @@
 """Unarmed, event-driven Morek intent reconciliation.
 
-Admission is the final physical-connector lock. No profile, controller or
-assignment lock is taken inside it. This is not an ownership transition or a
-durable attempt ledger; production owned-profile admission always refuses.
+Admission is the final physical-connector lock. No controller or assignment
+lock is taken inside it. The shared outcome ledger is not an ownership
+transition; production owned-profile admission always refuses.
 """
 
 from __future__ import annotations
@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timezone
 import logging
+from collections.abc import Callable
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -25,14 +26,18 @@ _COALESCE_SECONDS = 0.1
 class MorekScheduleWorker:
     """Subscribe to planner publications and reconcile the newest valid intent."""
 
-    def __init__(self, hass: HomeAssistant, entry_id: str, planner: Any) -> None:
+    def __init__(self, hass: HomeAssistant, entry_id: str, planner: Any,
+                 available: Callable[[], bool] | None = None) -> None:
         self._hass = hass
         self._entry_id = entry_id
         self._planner = planner
+        self._available = available or (lambda: True)
         self._serial = 0
         self._task: asyncio.Task | None = None
         self._remove = None
         self._closed = False
+        self._availability_generation = 0
+        self._suspended = False
         self.reason = "not_started"
 
     def start(self) -> None:
@@ -45,6 +50,18 @@ class MorekScheduleWorker:
         self._serial += 1
         if self._task is None or self._task.done():
             self._task = self._hass.async_create_task(self._run())
+
+    def suspend_for_availability_change(self) -> int:
+        """Invalidate queued work until this transition's initialization completes."""
+        self._availability_generation += 1
+        self._suspended = True
+        self.trigger()
+        return self._availability_generation
+
+    def resume_after_availability_change(self, generation: int) -> None:
+        if not self._closed and generation == self._availability_generation:
+            self._suspended = False
+            self.trigger()
 
     def close(self) -> None:
         """Unsubscribe and cancel pending work; an in-flight send remains uncertain."""
@@ -87,6 +104,9 @@ class MorekScheduleWorker:
             self._task = None
 
     async def _reconcile(self, serial: int) -> None:
+        if self._suspended or not self._available():
+            self.reason = "charger_unavailable"
+            return
         identity = self._identity()
         connector = physical_connector(identity)
         if classify_morek_identity(identity) != "supported_morek" or connector is None:
@@ -105,6 +125,8 @@ class MorekScheduleWorker:
             def validate():
                 if self._closed or serial != self._serial:
                     raise morek_schedule.ScheduleRefused("stale_work")
+                if self._suspended or not self._available():
+                    raise morek_schedule.ScheduleRefused("charger_unavailable")
                 identity_now = self._identity()
                 if classify_morek_identity(identity_now) != "supported_morek" or physical_connector(identity_now) != connector:
                     raise morek_schedule.ScheduleRefused("identity_changed")
