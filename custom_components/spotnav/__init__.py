@@ -710,6 +710,20 @@ async def _async_setup_auto_preview(
             entry.async_create_task(hass, preview.async_recalculate(), f"{entry_id} recalculate")
 
     data.soc_reader.set_on_reading(_soc_moved)
+    entry.async_on_unload(lambda: data.soc_reader.set_on_reading(None))
+
+    def _soc_unavailable() -> None:
+        settings = settings_store.settings(entry_id)
+        if settings.driver == DRIVER_TARGET_SOC and settings.soft_price_cap is not None:
+            entry.async_create_task(hass, preview.async_recalculate(), f"{entry_id} recalculate")
+
+    data.soc_reader.set_on_source_unavailable(_soc_unavailable)
+    entry.async_on_unload(lambda: data.soc_reader.set_on_source_unavailable(None))
+    data.soc_reader.set_notify_every_reading(
+        lambda: settings_store.settings(entry_id).driver == DRIVER_TARGET_SOC
+        and settings_store.settings(entry_id).soft_price_cap is not None
+    )
+    entry.async_on_unload(lambda: data.soc_reader.set_notify_every_reading(None))
 
     def _car_ended(vehicle_id: str | None, _full: bool) -> None:
         # The car stopped taking the plan's charge by itself: hear of its next reading, ask its integration once to

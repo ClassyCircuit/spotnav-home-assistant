@@ -1,6 +1,6 @@
 # SpotNav Enhanced / Morek development handoff
 
-Last checked: 2026-11-08. This file is a **public-repository handoff**, not a place for
+Last updated: 2026-11-10. This file is a **public-repository handoff**, not a place for
 passwords, access tokens, HA configuration exports, logs, or private household information.
 Re-check the live system and Git state before acting; observations below may become stale.
 
@@ -8,9 +8,9 @@ Re-check the live system and Git state before acting; observations below may bec
 
 **2026-11-09 coordination update:** the roadmap now begins with a concise numbered
 task checklist. Completed audit/ownership/admission/identity/start-evidence work
-through 2.5.13 is Stage 0, not work to repeat. **1.1 settings/API and 1.2 cheapest-price
-planner/Auto integration are implemented through 2.5.20. Next is 1.3: reactive
-planning and explanation.** Actual isolation is Stage 2 and remains
+through 2.5.13 is Stage 0, not work to repeat. **Stage 1 price-policy settings,
+planning and reactive explanations are implemented through 2.5.21, pending
+coordinator review.** Actual isolation is Stage 2 and remains
 incomplete/unarmed. The proposed additional unwired durable
 pre-dispatch helper was never assigned and is not the next task. Detailed historical
 versions/deployment facts below must not override current Git or the new checklist.
@@ -233,6 +233,41 @@ requirements, not features claimed implemented in the manual baseline below.
   Do not assume `GetCompositeSchedule` lists stored profiles.
 
 ## Tests, build, and next steps
+
+### 2.5.21 — Stage 1.3 reactive planning and explanation
+
+- Settings API writes continue through the existing store/reconciliation path;
+  price events reuse the existing subscription. For capped target-SOC plans the
+  existing SOC reader now reports even small actual changes and source loss;
+  uncapped plans retain their original notification threshold. No browser is
+  required and no Morek upload trigger was added.
+- Calculations and subscription reconciliation are ordered; new attempts
+  invalidate older work before price-event pause-lock waits. Snapshots retain
+  their originating attempt, publication checks the settings revision, and a
+  proposal-summary write checks its revision. Stale/refused work cannot relabel
+  a prior plan as a newer settings revision. The shared Morek preview/Send
+  builder also refuses a snapshot while a newer calculation is pending or its
+  calculation reports an error such as a failed proposal-summary save;
+  its existing manual Send interlock and identity checks remain intact. Manual
+  and floor behavior and protection were not changed.
+- Dashboard `plan.price_policy` and preview `price_policy` share one serializer:
+  cap/basis, minimum/target/deadline, reason codes, exception periods/energy,
+  minimum and target shortfalls, and estimated plan/exception costs and energy.
+  `minimum_covered` is a projection, not a guarantee. Exception cost is the
+  estimated total cost of exception energy, not a saving or incremental cost
+  against a baseline; cost uses configured variable fees/taxes even if the cap
+  uses the source price. Missing/refused data stays null, never measured energy.
+- `python tools/run_isolated_planning_tests.py`: 334 passed, one HA-fixture test
+  deselected, with two warnings. Tests exercise actual repository modules and
+  the settings API, store, controller, SOC reader, planner and real execution
+  boundary with mocked transport/persistence/charger; they are not full HA tests.
+  The added HA SOC wiring tests and full HA collection remain unrun on Windows:
+  the HA pytest plugin imports Unix-only `fcntl`. Run them on supported Linux/HA.
+- Frontend build, check-dist and type-check, Ruff and compileall passed. The full
+  frontend suite passed 2,342 tests (99 files) with two workers; the earlier
+  unrestricted run timed out, and its reported timer-test timeout passed alone.
+  `npm ci` reported five dependency vulnerabilities (two moderate, three high).
+  No HA access, deployment, Morek profile action or hardware test was performed.
 
 ### 2.5.20 — Stage 1.2c capped Auto planning
 

@@ -140,3 +140,47 @@ async def test_with_no_vehicle_to_wait_for_nothing_is_listened_to(hass: HomeAssi
 
     assert reader._arrival_cancel is None and reader._arrival_watched == ()  # noqa: SLF001
     reader.async_shutdown()
+
+
+async def test_watched_soc_source_loss_notifies_policy_consumer(hass: HomeAssistant) -> None:
+    car = _car_device(hass)
+    reader = _reader(hass, "sensor.ev6_battery")
+    await reader.async_load()
+    lost: list[int] = []
+    reader.set_on_source_unavailable(lambda: lost.append(1))
+    hass.states.async_set("sensor.ev6_battery", "50", _BATTERY)
+    reader.ensure_watch(car)
+    hass.states.async_set("sensor.ev6_battery", "unavailable", _BATTERY)
+    await hass.async_block_till_done()
+    assert lost == [1]
+    hass.states.async_set("sensor.ev6_battery", "unknown", _BATTERY)
+    await hass.async_block_till_done()
+    assert lost == [1]
+    reader.async_shutdown()
+
+
+async def test_capped_target_replans_on_small_soc_change_without_browser(
+    hass: HomeAssistant, transport: Any
+) -> None:
+    """Exercise the integration's actual reader-to-planner wiring, not a card request."""
+    with freeze_time(NOW) as frozen:
+        serve_prices(transport)
+        charger, _car, entity = await charger_and_car(
+            hass, soc_percent="25", soft_price_cap=-10000, cap_price_basis="nord_pool",
+            minimum_ready_by_soc=40,
+        )
+        preview = preview_for(hass, charger.entry_id)
+        before = preview.snapshot()
+        assert before.proposal is not None and before.proposal.exception_kwh > 0
+        frozen.tick(timedelta(seconds=1))
+        hass.states.async_set(entity, "25.5", _BATTERY)
+        await hass.async_block_till_done()
+        after = preview.snapshot()
+        assert after.attempt > before.attempt
+        assert after.proposal is not None
+        assert after.proposal.exception_kwh < before.proposal.exception_kwh
+
+        frozen.tick(timedelta(seconds=1))
+        hass.states.async_set(entity, "unavailable", _BATTERY)
+        await hass.async_block_till_done()
+        assert preview.snapshot().attempt > after.attempt

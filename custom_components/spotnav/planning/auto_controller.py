@@ -12,6 +12,7 @@ proposal is delegated to the injected `AutoExecutor`; without one this only calc
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import math
 from dataclasses import dataclass, replace
@@ -677,6 +678,7 @@ class AutoSnapshot:
             None if self.room_kwh is None else round(self.room_kwh, 1),
             self.room_limited,
             self.fill,
+            self.departure_at,
             None if self.proposal is None else self._proposal_key(self.proposal),
         )
 
@@ -689,6 +691,9 @@ class AutoSnapshot:
         return (
             proposal.reason,
             proposal.slots_needed,
+            proposal.requested_kwh,
+            proposal.delivered_kwh,
+            proposal.power_kw,
             proposal.estimated_cost,
             proposal.policy_shortfall_kwh,
             proposal.minimum_shortfall_kwh,
@@ -814,6 +819,10 @@ class AutoPlannerController:
         self._executor: AutoExecutor | None = executor
         # Attempt id of the calculation behind `self._snapshot`; a newer attempt makes older ones inert.
         self._attempt = 0
+        # Attempts are claimed before this lock: a newer event invalidates an in-flight
+        # calculation immediately, while their timers and proposal writes remain ordered.
+        self._calculation_lock = asyncio.Lock()
+        self._reconcile_lock = asyncio.Lock()
         # The power the car really draws, learned from the plan's own clean minutes (`planning/learned_power.py`),
         # and the once-a-minute look at an open window that feeds it and plans again when the charge falls behind
         # (`planning/plan_watch.py`), with its one appointment and when that is due.
@@ -918,6 +927,14 @@ class AutoPlannerController:
             )
         return self._snapshot
 
+    def snapshot_is_current(self, snapshot: AutoSnapshot) -> bool:
+        """Whether a snapshot is still the latest calculation for current settings."""
+        return (
+            not self._shutdown and snapshot is self._snapshot
+            and self._attempt_current(snapshot.attempt)
+            and snapshot.settings_revision == self._store.settings(self._entry_id).revision
+        )
+
     @property
     def entry_id(self) -> str:
         return self._entry_id
@@ -946,6 +963,9 @@ class AutoPlannerController:
             # A refused edit is not a new state: keep the previous snapshot and add the refusal and
             # the current execution facts.
             current = self._store.settings(self._entry_id)
+            if self.snapshot().settings_revision != current.revision:
+                # A newer committed edit is reconciling; never relabel its predecessor.
+                raise
             execution, applied_identity, pending_identity, latest = self._execution_facts()
             snapshot = replace(
                 self.snapshot(),
@@ -1089,7 +1109,7 @@ class AutoPlannerController:
         if self._executor is not None:
             await self._executor.async_pause(choice)
         snapshot = await self._calculate(self._store.settings(self._entry_id))
-        self._publish(snapshot, force=True)
+        self._publish(snapshot)
         return self.snapshot()
 
     async def async_resume(self) -> AutoSnapshot:
@@ -1117,7 +1137,7 @@ class AutoPlannerController:
         try:
             if action == ACTION_STOP:
                 snapshot = await self._calculate(self._store.settings(self._entry_id))
-                self._publish(snapshot, force=True)
+                self._publish(snapshot)
             elif action == ACTION_RESUME:
                 await self.async_recalculate()
         except AutoControlError:
@@ -1158,6 +1178,10 @@ class AutoPlannerController:
         if current is None:
             return self.snapshot()
         execution, applied_identity, pending_identity, latest = self._execution_facts()
+        if current.attempt != latest or current.settings_revision != self._store.settings(self._entry_id).revision:
+            # A new calculation owns the next snapshot; do not promote an older
+            # proposal to its attempt just to report an execution-only change.
+            return current
         if (execution, applied_identity, pending_identity) == (
             current.execution,
             current.applied_identity,
@@ -1166,7 +1190,6 @@ class AutoPlannerController:
             return current
         updated = replace(
             current,
-            attempt=latest,
             execution=execution,
             applied_identity=applied_identity,
             pending_identity=pending_identity,
@@ -1176,14 +1199,20 @@ class AutoPlannerController:
 
     async def _reconcile(self, settings: AutoSettings) -> None:
         """Match the subscription to the settings and their price source, then recalculate."""
-        settings = self._matched_source(settings)
-        self._generation += 1
-        if settings.area_id:
-            await self._subscribe_for(settings)
-        else:
-            self._drop_subscription()
-        await self._reconcile_observation(settings)
-        self._publish(await self._calculate(settings))
+        async with self._reconcile_lock:
+            if self._shutdown:
+                return
+            # A later write can finish while an earlier reconciliation is waiting.
+            settings = self._matched_source(self._store.settings(self._entry_id))
+            self._generation += 1
+            if settings.area_id:
+                await self._subscribe_for(settings)
+            else:
+                self._drop_subscription()
+            await self._reconcile_observation(settings)
+            if self._shutdown or self._store.settings(self._entry_id).revision != settings.revision:
+                return
+            self._publish(await self._calculate(settings))
 
     async def _reconcile_observation(self, settings: AutoSettings) -> None:
         """Move the entry's display subscription to the area these settings name.
@@ -1240,8 +1269,15 @@ class AutoPlannerController:
         """
         if self._shutdown or generation != self._generation:
             return
+        # Invalidate an older calculation before waiting for the executor's
+        # pause lock. After that wait, calculate from the then-current inputs.
+        self._attempt = (
+            self._executor.begin_attempt() if self._executor is not None else self._attempt + 1
+        )
         if self._executor is not None:
             await self._executor.async_settle_pause()
+        if self._shutdown or generation != self._generation:
+            return
         self._publish(await self._calculate(self._store.settings(self._entry_id)))
 
     async def _calculate(self, settings: AutoSettings) -> AutoSnapshot:
@@ -1258,15 +1294,27 @@ class AutoPlannerController:
             self._executor.begin_attempt() if self._executor is not None else self._attempt + 1
         )
         attempt = self._attempt
-        # The price source's area and fees, read once per calculation: everything below plans with them.
-        source = self._source()
-        settings = with_source(settings, source)
-        self._price_revision = None if source is None else source.plan_revision
-        self._lapse_target_stop(settings)
-        snapshot = await self._compute(settings, attempt)
-        await self._apply(settings, snapshot, attempt)
-        self._arm_watch()
-        return self._republish_execution(snapshot)
+        async with self._calculation_lock:
+            if not self._attempt_current(attempt) or self._shutdown:
+                return replace(self.snapshot(), attempt=attempt)
+            # A settings write may have committed while this task waited for the lock.
+            if self._store.settings(self._entry_id).revision != settings.revision:
+                return replace(self.snapshot(), attempt=attempt)
+            source = self._source()
+            settings = with_source(settings, source)
+            self._price_revision = None if source is None else source.plan_revision
+            self._lapse_target_stop(settings)
+            snapshot = replace(await self._compute(settings, attempt), attempt=attempt)
+            if not self._attempt_current(attempt) or self._shutdown:
+                return snapshot
+            await self._apply(settings, snapshot, attempt)
+            if not self._attempt_current(attempt) or self._shutdown:
+                return snapshot
+            self._arm_watch()
+            return self._republish_execution(snapshot)
+
+    def _attempt_current(self, attempt: int) -> bool:
+        return self._executor.current(attempt) if self._executor is not None else self._attempt == attempt
 
     def _lapse_target_stop(self, settings: AutoSettings) -> None:
         """Let the controller end a target stop's record that no longer describes the car the charger plans for:
@@ -1292,8 +1340,9 @@ class AutoPlannerController:
         # entry reloaded) is in the count this calculation uses.
         self._arm_energy_watch(settings)
         snapshot = await self._compute_plan(settings, attempt, energy)
-        self._arm_departure(settings)
-        self._arm_charge_watch()
+        if self._attempt_current(attempt) and not self._shutdown:
+            self._arm_departure(settings)
+            self._arm_charge_watch()
         return replace(snapshot, **energy) if energy else snapshot
 
     async def _compute_plan(
@@ -1539,11 +1588,10 @@ class AutoPlannerController:
             # Best effort: the departure leaves too little time for the need, so every slot up to it is
             # planned and charged. A warning, not a refusal; the status says what the car will reach.
             snapshot = replace(snapshot, expected_soc_percent=expected_soc_percent(resolved, result.delivered_kwh))
-        if not preview and not await self._persist_proposal(settings, snapshot):
+        if not preview and self._attempt_current(attempt) and not await self._persist_proposal(settings, snapshot):
             # A proposal whose summary could not be saved is shown with a stable code and installed by
             # nobody. The code is the fact; the exception text is not.
             failed = replace(snapshot, last_error_code="proposal_not_saved")
-            self._publish(failed, force=True)
             return failed
         return snapshot
 
@@ -3262,8 +3310,13 @@ class AutoPlannerController:
         A snapshot from an older attempt than the boundary's latest is dropped. `force` is for states
         not about a calculation (a refusal, a shutdown).
         """
-        if not force and self._executor is not None and not self._executor.current(snapshot.attempt):
-            return
+        if not force:
+            if self._executor is not None and not self._executor.current(snapshot.attempt):
+                return
+            if self._executor is None and snapshot.attempt != self._attempt:
+                return
+            if snapshot.settings_revision != self._store.settings(self._entry_id).revision:
+                return
         self._snapshot = snapshot
         key = snapshot.meaningful_key()
         if not force and key == self._last_key:
@@ -3323,7 +3376,13 @@ class AutoPlannerController:
             unpriced=proposal.unpriced,
         )
         try:
-            await self._store.async_update(self._entry_id, proposal=stored)
+            await self._store.async_update(self._entry_id, proposal=stored, expected_revision=settings.revision)
+        except AutoSettingsError as err:
+            if err.code == "revision_conflict":
+                # A newer settings write owns the next summary, not this calculation.
+                return True
+            _LOGGER.warning("Storing an Auto proposal summary failed: %s", err.code)
+            return False
         except Exception as err:  # noqa: BLE001 - becomes a stable, redacted code
             _LOGGER.warning("Storing an Auto proposal summary failed: %s", type(err).__name__)
             return False

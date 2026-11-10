@@ -51,6 +51,7 @@ from .common import (
     send_unsupported_version,
 )
 from .dashboard import planning_facts
+from .price_policy import encode_price_policy
 from .settings import (
     body_mutator,
     decode_settings,
@@ -224,17 +225,7 @@ def encode_preview(snapshot: AutoSnapshot, settings: AutoSettings) -> dict[str, 
         "strip": _strip(snapshot),
     }
     if settings.soft_price_cap is not None:
-        proposal = snapshot.proposal
-        result["price_policy"] = {
-            "basis": settings.cap_price_basis,
-            "reason": snapshot.reason,
-            "minimum_shortfall_kwh": None if proposal is None else finite_number(proposal.minimum_shortfall_kwh),
-            "target_shortfall_kwh": None if proposal is None else finite_number(proposal.policy_shortfall_kwh),
-            "exception_kwh": None if proposal is None else finite_number(proposal.exception_kwh),
-            "exception_periods": [] if proposal is None else [
-                {"start": aware_iso(start), "end": aware_iso(end)} for start, end in proposal.exception_periods
-            ],
-        }
+        result["price_policy"] = encode_price_policy(settings, snapshot)
     return result
 
 

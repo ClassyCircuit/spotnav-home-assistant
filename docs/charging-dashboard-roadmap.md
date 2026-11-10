@@ -1,7 +1,7 @@
 # Morek autonomous charging and dashboard roadmap
 
 Status: **in progress; manual baseline and ownership groundwork complete; autonomous mode not active**.
-Updated 2026-11-09. The checklist below is the authoritative work queue.
+Updated 2026-11-10. The checklist below is the authoritative work queue.
 
 This is the forward-looking plan for SpotNav Enhanced. Implement **one work block
 at a time**, not a dashboard rewrite and controller rewrite in one release.
@@ -23,7 +23,7 @@ Detailed requirements and acceptance cases follow outside this checklist.
 | Stage | Outcome | Dependency / status |
 | --- | --- | --- |
 | 0 | Existing functionality and groundwork | Complete; reuse it |
-| 1 | Price cap and minimum ready-by SOC planning | 1.1–1.2 implemented; **next: 1.3** |
+| 1 | Price cap and minimum ready-by SOC planning | 1.1–1.3 implemented; review pending |
 | 2 | Isolate Morek from legacy control | Groundwork done; actual isolation remains |
 | 3 | Automatically send changed schedules | Stages 1 and 2 before activation |
 | 4 | Recover and report execution health | Stage 3 |
@@ -63,7 +63,7 @@ tests are documented there; full HA collection is still blocked on Windows.
   - **1.2c complete:** cheapest-price Auto resolves fresh vehicle facts, plans and
     reconciles strict capped windows. Capped solar/hybrid strategies are refused.
     The separate immediate SOC floor and manual actions are not governed by the cap.
-- [ ] **1.3 Reactive planning and explanation**
+- [x] **1.3 Reactive planning and explanation**
   - Replan on cap/minimum/target/SOC/ready-by changes without a browser.
   - Expose policy reasons and consistent plan energy/cost; test API-to-plan flow.
 
@@ -169,9 +169,9 @@ tests are documented there; full HA collection is still blocked on Windows.
 
 ### Execution boundaries — avoid another prerequisite spiral
 
-- **Next implementation is 1.3**, reactive planning and explanation. Reuse the
-  completed 1.1 settings and 1.2 planner/Auto integration; do not rebuild them.
-  Stage 1 can proceed while Stage 2 activation questions remain open.
+- Stage 1 is implemented for coordinator review; the next implementation block is
+  2.1. Reuse the planner and Auto execution boundary; Stage 2 activation questions
+  remain open. Stage 1 does not automatically upload Morek schedules.
 - The previously proposed durable pre-dispatch callback wrapper was **not assigned**
   and is **not a required task**. Do not implement it automatically.
 - Reuse the completed evidence store if the selected execution path needs it.

@@ -339,7 +339,8 @@ def _proposed_profile(hass: HomeAssistant, entry_id: str, now: datetime) -> dict
     planner = preview_for(hass, entry_id)
     snapshot = planner.snapshot() if planner is not None else None
     proposal = snapshot.proposal if snapshot is not None and snapshot.in_process else None
-    if (proposal is None or snapshot.settings_revision != settings.revision
+    if (proposal is None or not planner.snapshot_is_current(snapshot) or snapshot.settings_revision != settings.revision
+            or getattr(snapshot, "last_error_code", None) is not None
             or not proposal.has_plan or proposal.unpriced or not proposal.shown_periods):
         raise ScheduleRefused("no_current_plan")
     # The stored profile is a fixed-time snapshot of exactly what the card shows,

@@ -1926,18 +1926,9 @@ def serialize_plan(capture: CapturedDashboard) -> dict[str, Any]:
         **_need_progress(capture.snapshot),
     }
     if capture.settings is not None and capture.settings.soft_price_cap is not None:
-        snapshot = capture.snapshot
-        proposal = None if snapshot is None or snapshot.settings_revision != capture.settings.revision else snapshot.proposal
-        result["price_policy"] = {
-            "basis": capture.settings.cap_price_basis,
-            "reason": None if snapshot is None else snapshot.reason,
-            "minimum_shortfall_kwh": None if proposal is None else finite_number(proposal.minimum_shortfall_kwh),
-            "target_shortfall_kwh": None if proposal is None else finite_number(proposal.policy_shortfall_kwh),
-            "exception_kwh": None if proposal is None else finite_number(proposal.exception_kwh),
-            "exception_periods": [] if proposal is None else [
-                {"start": aware_iso(start), "end": aware_iso(end)} for start, end in proposal.exception_periods
-            ],
-        }
+        from .price_policy import encode_price_policy
+
+        result["price_policy"] = encode_price_policy(capture.settings, capture.snapshot)
     return result
 
 

@@ -177,13 +177,18 @@ def test_preview_reuses_send_calculation_without_contacting_station(monkeypatch)
     settings = SimpleNamespace(amps=16, revision=4, pause=SimpleNamespace(choice="until_resumed"))
     monkeypatch.setattr(morek_schedule, "domain_data", lambda hass: SimpleNamespace(
         auto_store=SimpleNamespace(settings=lambda entry: settings)))
-    monkeypatch.setattr(morek_schedule, "preview_for", lambda hass, entry: SimpleNamespace(snapshot=lambda: snapshot))
+    monkeypatch.setattr(morek_schedule, "preview_for", lambda hass, entry: SimpleNamespace(
+        snapshot=lambda: snapshot, snapshot_is_current=lambda _: True))
     point = SimpleNamespace(_ocpp_version="1.6", status="ok")
     hass = SimpleNamespace(data={"ocpp": {"entry": SimpleNamespace(
         cpids={"garage": "3020002509120029"}, charge_points={"3020002509120029": point})}})
     target = SimpleNamespace(devid="garage", connector_id=1)
     expected = morek_schedule._proposed_profile(hass, "charger", NOW)
     assert [p["limit"] for p in expected["chargingSchedule"]["chargingSchedulePeriod"]] == [0, 16, 0]
+    snapshot.last_error_code = "proposal_not_saved"
+    with pytest.raises(ScheduleRefused, match="no_current_plan"):
+        morek_schedule._proposed_profile(hass, "charger", NOW)
+    snapshot.last_error_code = None
     # Pin the clock so the preview and send helper must calculate the exact same wire payload.
     original_datetime = morek_schedule.datetime
     class FrozenDatetime:
@@ -376,7 +381,8 @@ async def test_send_uses_displayed_shortened_blocks_not_whole_slot_ends(monkeypa
     snapshot = SimpleNamespace(in_process=True, proposal=proposal, settings_revision=4)
     settings = SimpleNamespace(amps=16, revision=4, pause=SimpleNamespace(choice="until_resumed"))
     monkeypatch.setattr(morek_schedule, "_proposed_profile", real_proposed_profile)
-    monkeypatch.setattr(morek_schedule, "preview_for", lambda hass, entry: SimpleNamespace(snapshot=lambda: snapshot))
+    monkeypatch.setattr(morek_schedule, "preview_for", lambda hass, entry: SimpleNamespace(
+        snapshot=lambda: snapshot, snapshot_is_current=lambda _: True))
     monkeypatch.setattr(morek_schedule, "domain_data", lambda hass: SimpleNamespace(
         auto_store=SimpleNamespace(settings=lambda entry: settings)))
     preview = morek_schedule._preview(h.hass, "charger", None)
@@ -409,7 +415,8 @@ def test_shortened_windows_keep_existing_eligibility_guards(monkeypatch, case):
                                       for i in range(4))
     monkeypatch.setattr(morek_schedule, "domain_data", lambda h: SimpleNamespace(
         auto_store=SimpleNamespace(settings=lambda e: SimpleNamespace(amps=16, revision=4))))
-    monkeypatch.setattr(morek_schedule, "preview_for", lambda h, e: SimpleNamespace(snapshot=lambda: snapshot))
+    monkeypatch.setattr(morek_schedule, "preview_for", lambda h, e: SimpleNamespace(
+        snapshot=lambda: snapshot, snapshot_is_current=lambda _: True))
     with pytest.raises(ScheduleRefused):
         morek_schedule._proposed_profile(None, "charger", NOW)
 
