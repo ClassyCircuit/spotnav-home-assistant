@@ -1,7 +1,7 @@
 """Connector-scoped command admission; it does not activate an owner.
 
-Only internal callers may classify an operation. The Auto boundary uses a
-preparation check; final physical writers and safety stops are not guarded here.
+Only internal callers may classify an operation. Ordinary physical writes use
+this admission; regulator protection and external writers remain separate.
 """
 
 from __future__ import annotations
@@ -80,6 +80,7 @@ class CommandAdmission:
         self._store = store
         self._locks: dict[PhysicalConnector, asyncio.Lock] = {}
         self._generations: dict[PhysicalConnector, int] = {}
+        self._quiescing: set[PhysicalConnector] = set()
 
     def _lock_for(self, connector: PhysicalConnector) -> asyncio.Lock:
         # Do not discard idle locks: a waiting task may still hold a reference.
@@ -91,6 +92,21 @@ class CommandAdmission:
 
     async def async_invalidate(self, connector: PhysicalConnector) -> Generation:
         """Invalidate previously captured work after preceding connector operations finish."""
+        async with self._lock_for(connector):
+            self._generations[connector] = self._generations.get(connector, 0) + 1
+            return self.generation(connector)
+
+    async def async_quiesce_for_reload(self, connector: PhysicalConnector) -> Generation:
+        """Close ordinary admission and drain its lock for a future handover design.
+
+        The latch is set before waiting for the lock, so queued work cannot overtake
+        the drain. Cancellation leaves it closed. This does not cancel a dispatched
+        command, stop producers, persist a transition, or authorize a new owner.
+        The latch belongs to the HA-process-wide service: an entry reload alone
+        does not clear it. No current production path calls this seam.
+        Call without holding controller, assignment, profile or connector locks.
+        """
+        self._quiescing.add(connector)
         async with self._lock_for(connector):
             self._generations[connector] = self._generations.get(connector, 0) + 1
             return self.generation(connector)
@@ -112,6 +128,8 @@ class CommandAdmission:
         if classification != "supported_morek" or connector is None:
             return "identity_unresolved"
         async with self._lock_for(connector):
+            if connector in self._quiescing:
+                return "connector_quiescing"
             try:
                 identity = dict(resolve_identity())
                 if classify_morek_identity(identity) != "supported_morek" or physical_connector(identity) != connector:
@@ -159,6 +177,8 @@ class CommandAdmission:
             return AdmissionResult(False, "identity_unresolved")
 
         async with self._lock_for(connector):
+            if connector in self._quiescing:
+                return AdmissionResult(False, "connector_quiescing")
             if expected_generation is not None and expected_generation != self.generation(connector):
                 return AdmissionResult(False, "stale_generation")
             try:
@@ -191,6 +211,9 @@ class CommandAdmission:
                 return AdmissionResult(False, "legacy_not_owner")
             if status.get("armed") is not False:
                 return AdmissionResult(False, "ownership_inconsistent")
+            # Quiescing may have begun while the store read was in progress.
+            if connector in self._quiescing:
+                return AdmissionResult(False, "connector_quiescing")
             return AdmissionResult(True, "allowed_legacy", await operation())
 
 

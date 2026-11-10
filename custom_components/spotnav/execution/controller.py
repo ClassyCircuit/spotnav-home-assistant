@@ -1274,7 +1274,11 @@ class ChargingController:
             # disk say otherwise than the record (an earlier build saved its record after them): written again, derived
             # from it, so a rollback reads the same.
             await self._async_save_quietly()
-        await self._reschedule_locked()
+        # Restore runs under the controller lock, not the Auto boundary. Check
+        # admission before its immediate re-arm decision; future timer callbacks
+        # still take their usual Auto and final-dispatch guards. Keep the saved
+        # plan and observations even when ownership is unresolved.
+        await self._reschedule_locked(execute_rearm=await self.adapter.async_legacy_permitted())
         # Armed for the controller's whole life, not only while a plan is: a manual Start has no
         # plan, and a scheduled one is observed from acceptance.
         self._async_arm_progress_listener()
@@ -2287,6 +2291,10 @@ class ChargingController:
         legacy = self._legacy_person_stopped
         self._legacy_person_stopped = False
         return legacy
+
+    def retain_legacy_person_stop(self) -> None:
+        """Keep the old Stop if migrating it into the Auto store failed."""
+        self._legacy_person_stopped = True
 
     async def async_rearm(self) -> None:
         """Arm the plan in force again, as a restore does: a window open now starts through its veto and the
@@ -5333,6 +5341,10 @@ class ChargingController:
             },
             "solar_car_ended": self._solar_car_ended,
         }
+        if self._legacy_person_stopped:
+            # Keep the original evidence across any intervening save until the
+            # Auto settings store has durably taken over the person's Stop.
+            record["person_stopped"] = True
         phases = self._phases.to_store()
         if phases is not None:
             # Only while there is something to keep: a charger that never switched keeps exactly its old record.
@@ -5496,7 +5508,7 @@ class ChargingController:
         self._session_dirty_since = None
         return waiting
 
-    async def _reschedule_locked(self) -> None:
+    async def _reschedule_locked(self, *, execute_rearm: bool = True) -> None:
         """Arm the plan's timers, or clear a plan that is over. The lock is held.
 
         Private because every caller already holds the operation lock (`async_install`,
@@ -5511,7 +5523,9 @@ class ChargingController:
         self._async_arm_target_listener()
         now = dt_util.utcnow()
         windows = self.plan.windows
-        if now >= windows[-1][1]:
+        # Do not feed legacy re-arm decisions or create retries on restore
+        # while another owner (or uncertain metadata) blocks execution.
+        if execute_rearm and now >= windows[-1][1]:
             token = self._runner.begin()
             facts = self._core_facts(
                 lambda: {
@@ -5554,7 +5568,9 @@ class ChargingController:
                     outcome=outcome,
                 )
         active = any(start <= now < end for start, end in windows)
-        if active and self._car_ended_holds_window():
+        if not execute_rearm:
+            pass
+        elif active and self._car_ended_holds_window():
             # The car ended a person's charge in this plug-in: the window open then is not started again,
             # nor any later one while the car is known full and its need has not grown.
             pass

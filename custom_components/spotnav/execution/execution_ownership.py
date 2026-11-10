@@ -1,4 +1,4 @@
-"""Persisted execution ownership metadata; this release never enforces or arms it.
+"""Persisted execution ownership metadata; this release never arms schedule mode.
 
 The document is independent of Auto settings, charge sessions and Morek profile
 records. Only a first-use legacy record can be created here. Status never writes.
@@ -122,6 +122,11 @@ class ExecutionOwnershipStore:
                 if (existing["station_id"], existing["connector_id"]) != physical:
                     return "ownership_identity_mismatch"
                 return "already_initialized"
+            # A document that already exists but lacks this binding is not the
+            # first installation of the ownership schema. Do not turn lost or
+            # partial per-entry evidence into permission for legacy writes.
+            if self._state == "valid":
+                return "ownership_missing"
             records = {**self._records, entry_id: {
                 "station_id": station, "connector_id": connector, "owner": "legacy",
             }}
@@ -178,8 +183,7 @@ class ExecutionOwnershipStore:
             return {
                 "schema_version": SCHEMA_VERSION,
                 "record_state": state,
-                "recorded_owner": (record["owner"] if record is not None and state == "valid"
-                                   else "legacy" if state == "missing" else None),
+                "recorded_owner": record["owner"] if record is not None and state == "valid" else None,
                 "station_id": record["station_id"] if record else None,
                 "connector_id": record["connector_id"] if record else None,
                 "schedule_mode_available": False,

@@ -182,6 +182,51 @@ async def test_cancellation_exceptions_and_generation_release_connector():
 
 
 @pytest.mark.asyncio
+async def test_quiesce_drains_inflight_and_refuses_queued_and_new_work():
+    gate = CommandAdmission(StatusStore())
+    connector = physical_connector(identity())
+    entered, release = asyncio.Event(), asyncio.Event()
+    queued_write = AsyncMock()
+
+    async def dispatched():
+        entered.set()
+        await release.wait()
+
+    active = asyncio.create_task(gate.async_execute("a", "legacy_actuator", identity, dispatched))
+    await entered.wait()
+    queued = asyncio.create_task(gate.async_execute("a", "legacy_actuator", identity, queued_write))
+    await asyncio.sleep(0)
+    drain = asyncio.create_task(gate.async_quiesce_for_reload(connector))
+    await asyncio.sleep(0)
+    assert not drain.done()  # An already dispatched operation cannot be recalled.
+    release.set()
+    assert (await active).allowed
+    assert (await queued).reason == "connector_quiescing"
+    assert (await drain).revision == 1
+    assert (await gate.async_execute("a", "legacy_actuator", identity, queued_write)).reason == "connector_quiescing"
+    queued_write.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_cancelled_quiesce_remains_closed_without_affecting_other_connector():
+    gate = CommandAdmission(StatusStore())
+    connector = physical_connector(identity())
+    lock = gate._lock_for(connector)
+    await lock.acquire()
+    task = asyncio.create_task(gate.async_quiesce_for_reload(connector))
+    await asyncio.sleep(0)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    lock.release()
+    write = AsyncMock()
+    assert (await gate.async_execute("a", "legacy_actuator", identity, write)).reason == "connector_quiescing"
+    # A read remains available and is not classified as an actuator.
+    assert (await gate.async_execute("a", "read_only", identity, write)).allowed
+    write.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_real_store_missing_entry_cannot_bypass_other_physical_record(tmp_path, monkeypatch):
     class FakeStore:
         def __init__(self, hass, version, key, **kwargs):

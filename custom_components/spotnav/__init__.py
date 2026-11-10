@@ -379,7 +379,7 @@ async def _async_setup_charger_entry(hass: HomeAssistant, entry: ChargerConfigEn
     )
     data = entry.runtime_data = ChargerData(controller=controller, soc_reader=soc_reader)
     entry.async_on_unload(controller.async_shutdown)
-    # Initialize metadata before constructing the Auto boundary; lifecycle isolation remains Stage 2.3.
+    # Establish ownership before Auto startup, initial planning or controller restore can write.
     await _async_setup_ownership_metadata(hass, entry, controller)
     await _async_start_debug_day(hass, entry, data, controller)
 

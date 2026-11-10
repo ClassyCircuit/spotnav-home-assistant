@@ -234,6 +234,65 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2.5.24 — Stage 2.3 unarmed lifecycle and regression (review required)
+
+- Shared connector admission has an internal, unexposed reload-oriented quiesce:
+  it latches before waiting for the connector lock, drains admitted operations,
+  refuses queued/new ordinary writes and advances the generation. Cancellation
+  leaves it closed. It neither cancels an already dispatched command nor stops
+  producers, persists a transition, changes owner, or arms schedule mode. A future
+  handover must coordinate all producers and durable state before any reload. The
+  admission service belongs to the HA process: reloading an entry does not reset
+  the latch. No production path invokes this future seam.
+- An existing valid ownership document missing the entry binding is no longer
+  silently filled in as legacy; status reports no recorded owner. A wholly absent
+  document is still migrated as first use, but absence alone cannot distinguish
+  a genuinely pre-ownership installation from a deleted/lost ownership document.
+  Coordinator permits this first-use migration in this release because no integration
+  action can activate schedule ownership. Resolving lost-document ambiguity is a
+  mandatory blocker before any activation-capable release or safe recovery claim;
+  a new marker by itself cannot prove a missing document was never lost.
+- Startup installs the adapter guard and awaits metadata initialization before Auto
+  startup, planning and restore. The controller restore consults admission before
+  its immediate re-arm decision, retaining the saved plan and later guarded timers
+  if denied. An older person's Stop is preserved if its transfer to Auto settings
+  fails, including across intervening controller-record saves. Ordinary target
+  dispatch is refused for simulated Morek-owned, corrupt, unresolved or known
+  conflicting state.
+- This release only initializes the supported Morek physical connector. An unrelated
+  new charger requires no Morek record and does not create the document; a first
+  supported connector can still initialize when the document is absent. A valid
+  document with a missing binding is left untouched as uncertain, including an empty
+  document (not produced by normal initialization). A stale record for the same
+  physical connector or a duplicate entry is a conflict, not a new legacy binding.
+- Offline/unresolved OCPP connector identity still fails closed unless a different
+  connector number is established; no new assumption about aliases or unrelated
+  offline stations was introduced: a configured alias, cpids mapping or past record
+  alone is not a verified current physical binding. Duplicate contenders are held
+  in memory; after restart an unrecorded duplicate is rediscovered only when it
+  initializes, so a command admitted before discovery cannot be recalled.
+  If restore denied an already-open window while offline, late metadata initialization
+  does not itself replay that immediate start; future guarded timers remain. A
+  reconnect/reload recovery policy is still future work, not an automatic retry.
+  Regulator protection continues unchanged and can compete with schedule control;
+  external HA/OCPP actors are outside these guards.
+- Schedule mode remains unavailable and unarmed. A retained profile may continue
+  enforcing its final 0 A after reload, pause or exit; no automatic clear or upload
+  was added. Composite readback is not a profile inventory; a profile does not
+  authorize a new transaction. Electrical protection, transaction authorization,
+  retained-profile handling and safe exit require separate decisions.
+- Checks: `python tools/run_isolated_lifecycle_tests.py` passed 26 tests with six
+  warnings; `python tools/run_isolated_planning_tests.py` passed 416 tests, with
+  one deselected and two warnings. The lifecycle suite loads actual integration,
+  ownership, controller, Auto and handback modules with mocked HA/storage/charger
+  I/O. The actual entry setup function is exercised through restore with mocked
+  collaborators, not as a real HA config-entry setup. Neither suite is full HA or
+  physical testing. `python -m pytest -q
+  tests/test_ownership_lifecycle.py` failed before collection because the HA
+  plugin imports Unix-only `fcntl` on Windows. Targeted Ruff and compileall,
+  frontend build, `npm run check-dist`, and `git diff --check` passed; diff
+  check reported Windows line-ending warnings. No live system was contacted.
+
 ### 2.5.23 — Stage 2.2 shared writer guards (review required)
 
 - Corrected controller callbacks that ignored a denied Auto turn: hold, stray,

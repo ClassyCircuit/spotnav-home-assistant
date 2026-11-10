@@ -24,7 +24,7 @@ Detailed requirements and acceptance cases follow outside this checklist.
 | --- | --- | --- |
 | 0 | Existing functionality and groundwork | Complete; reuse it |
 | 1 | Price cap and minimum ready-by SOC planning | 1.1–1.3 implemented; review pending |
-| 2 | Isolate Morek from legacy control | Groundwork done; actual isolation remains |
+| 2 | Isolate Morek from legacy control | Unarmed lifecycle groundwork complete; activation blocked |
 | 3 | Automatically send changed schedules | Stages 1 and 2 before activation |
 | 4 | Recover and report execution health | Stage 3 |
 | 5 | One usable daily dashboard | Layout may start early; live status needs 3–4 |
@@ -81,12 +81,16 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Keep protection unchanged; expose an activation blocker if live site regulation
     conflicts with schedule-only control. Do not redesign the regulator here.
   - Shared adapter admission covers ordinary dispatch, not regulator protection or
-    external integrations. Ownership transitions and startup remain unimplemented.
-- [ ] **2.3 Mode lifecycle and end-to-end regression**
-  - Establish ownership before legacy startup/restore; quiesce old work before any
-    explicit handover. Prefer a deliberate reload over seamless hot switching.
-  - Test all audited writer categories against the shared guards, including aliases,
-    restart and unrelated chargers. Explain retained profiles and activation blockers.
+    external integrations. Durable ownership transitions remain unimplemented.
+- [x] **2.3 Mode lifecycle and end-to-end regression** (unarmed scope; review required)
+  - Establish and consult ownership before ordinary startup/restore writes. A process-local
+    drain is a future handover seam, not a completed handover or producer shutdown.
+  - Combined mocked regressions exercise startup, restore, aliases, conflicting/missing
+    metadata, queued writes, ordinary adapters, deletion handback and other chargers;
+    regulator protection remains an explicit exception and activation blocker.
+  - A wholly missing document still migrates as legacy in this unarmed release. Resolving
+    lost-document ambiguity, durable transitions, safe recovery and retained-profile exit
+    is mandatory before any activation-capable release. Offline identity remains conservative.
 
 ### Stage 3 — Autonomous schedule updates (old A3)
 
@@ -172,8 +176,8 @@ tests are documented there; full HA collection is still blocked on Windows.
 
 ### Execution boundaries — avoid another prerequisite spiral
 
-- Stage 1, 2.1 and 2.2 are implemented for coordinator review; the next implementation block is
-  2.3. Reuse the planner and Auto execution boundary; Stage 2 activation questions
+- Stage 1 and the unarmed scope of Stage 2 are implemented for coordinator review.
+  Reuse the planner and Auto execution boundary; Stage 2 activation questions
   remain open. Stage 1 does not automatically upload Morek schedules.
 - The previously proposed durable pre-dispatch callback wrapper was **not assigned**
   and is **not a required task**. Do not implement it automatically.

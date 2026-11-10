@@ -2285,10 +2285,13 @@ class AutoExecutor:
         async with self._lock:
             legacy = self._controller.take_legacy_person_stop()
             if legacy:
+                migrated = True
                 if not self.pause_intent.admitted:
                     try:
                         await self._store_pause(self._manual_intent(MANUAL_STOP, MANUAL_SCOPE_PLUG_IN))
                     except Exception as err:  # noqa: BLE001 - logged; nothing is started by this either way
+                        migrated = False
+                        self._controller.retain_legacy_person_stop()
                         _LOGGER.warning("Carrying over a stored person's Stop failed: %s", type(err).__name__)
                     else:
                         _LOGGER.info(
@@ -2296,7 +2299,8 @@ class AutoExecutor:
                             self._entry_id,
                         )
                 # The charger's record is saved without the older key from here on.
-                await self._controller.async_save_record()
+                if migrated:
+                    await self._controller.async_save_record()
             self._sync_manual_watch()
         # A charge running under a person's Stop (the charger began it while Home Assistant was down) is
         # stopped now, not at the charger's next report.

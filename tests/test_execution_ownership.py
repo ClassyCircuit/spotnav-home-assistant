@@ -61,7 +61,7 @@ def test_first_use_is_legacy_persists_and_does_not_touch_other_stores(setup_stor
     morek.write_text('{"profile":"retained"}', encoding="utf-8")
     store = ownership.ownership_store(hass)
     missing = run(store.async_status("charger", IDENTITY))
-    assert missing["record_state"] == "missing" and missing["recorded_owner"] == "legacy"
+    assert missing["record_state"] == "missing" and missing["recorded_owner"] is None
     assert store._store.saves == 0  # status is read-only
     initialize(store, "charger", IDENTITY)
     status = run(store.async_status("charger", IDENTITY))
@@ -77,6 +77,22 @@ def test_first_use_is_legacy_persists_and_does_not_touch_other_stores(setup_stor
     assert morek.read_text(encoding="utf-8") == '{"profile":"retained"}'
     hass.services.async_call.assert_not_awaited()
     hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_existing_empty_document_does_not_migrate_missing_binding(setup_store):
+    path = setup_store.root / ownership.STORAGE_KEY
+    original = json.dumps({"version": 1, "data": {"schema_version": 1, "records": {}}})
+    path.write_text(original, encoding="utf-8")
+    store = ownership.ExecutionOwnershipStore(setup_store)
+    gate = CommandAdmission(store)
+    assert await gate.async_ensure_initialized("charger", lambda: IDENTITY) == "ownership_missing"
+    assert (await store.async_status("charger", IDENTITY))["recorded_owner"] is None
+    write = AsyncMock()
+    result = await gate.async_execute("charger", "legacy_actuator", lambda: IDENTITY, write)
+    assert result.reason == "ownership_missing"
+    write.assert_not_awaited()
+    assert path.read_text(encoding="utf-8") == original
 
 
 @pytest.mark.parametrize(("content", "state"), [
