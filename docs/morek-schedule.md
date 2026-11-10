@@ -11,7 +11,12 @@ does not start another OCPP server. Only an administrator can send, fetch, or re
    controller is sending start/stop or current-limit commands. Do not disable
    household load protection for this test.
 2. Set SpotNav's plan current to **16 A** and charge periods to **3** or fewer. Choose a plan whose first
-   charging window is still in the future, within the next 48 hours. From 2.5.7,
+   remaining charging windows are within the next 48 hours. From 2.5.25, an
+   active window can be continued from the request time rounded up to a whole
+   second, until its original end;
+   elapsed windows are omitted, not replaced with extra charging time. Readback
+   verification of an active-start profile is not yet supported and stays unverified.
+   From 2.5.7,
    the sent schedule uses the **displayed windows**, including an estimated
    shorter final block. Morek follows those fixed times; it does not adjust the
    stop based on actual energy delivered. OCPP uses whole seconds: any fractional

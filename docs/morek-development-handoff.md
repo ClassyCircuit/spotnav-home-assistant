@@ -234,6 +234,78 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2.5.26 — Stage 3.2 backend worker (unarmed; review required)
+
+- Each charger with an Auto planner attaches a worker to its calculation
+  publications, including equal-result calculations. Existing planning paths
+  supply settings, deadline, SOC and price updates; the current snapshot is
+  delivered on subscription. The worker coalesces bursts, evaluates the 3.1
+  displayed-window intent and fingerprint, and queues through the existing
+  physical-connector admission lock. Inside that lock it rechecks generation,
+  identity/ownership via admission, the planner instance, current intent,
+  settings revision and calculation freshness before the OCPP boundary. No
+  controller, assignment or profile lock is acquired inside admission.
+- **Production dispatch is impossible:** `owned_profile` admission still always
+  returns `schedule_mode_unarmed`, including for a purported Morek owner. No
+  activation API, ownership change or weakening of manual Send was added. Tests
+  use a deliberately simulated admission with mocked OCPP for the worker's
+  functional send path. No active-window readback verification was added.
+- Successful ACKs and definite rejections are deduplicated in process memory per
+  physical connector. Before a send the worker latches uncertainty; timeout,
+  unknown reply, exception or cancellation can mean the request applied, so all
+  further sends for that connector are blocked in this HA process, even for a
+  changed intent or entry reload. This is not durable across HA restart, does not
+  reconcile manual Send/clear, and has no retry or recovery mechanism. Stage 3.3
+  must establish durable attempted/ACK/verified outcomes and safe uncertainty
+  handling and integrate manual actions before any activation-capable release.
+- Unavailable, stale, expired or invalid intent performs no clear or replacement;
+  an existing final 0 A may remain. The worker records only an in-memory reason,
+  not persisted operator health. ACK is not verification, authorization or proof
+  of physical charging; composite schedules are not profile inventories. Lost
+  ownership state, durable transitions, electrical protection, authorization and
+  safe retained-profile exit remain activation blockers. Reconnect/restart
+  reconciliation and active-window verification remain Stage 4 work.
+- Validation: the isolated actual-module planning suite passed 439 tests, one
+  deselected and two warnings; the isolated lifecycle suite passed 26 tests with
+  six warnings. The first planning run failed one existing import-inventory test
+  because it did not yet name the new worker; after updating that assertion the
+  suite passed. Frontend build and `npm run check-dist`, targeted Ruff and
+  compileall, and `git diff --check` passed (the latter reported Windows line
+  ending warnings). Tests use mocked HA/OCPP boundaries and simulated admission;
+  they are not full HA integration or physical validation. No live HA, deployment,
+  restart or charger action was performed.
+
+### 2.5.25 — Stage 3.1 shared schedule intent (review required)
+
+- The existing `_proposed_profile` is the shared current-intent entry point for
+  manual preview and Send and a future backend caller. It uses the displayed
+  fixed-time windows and existing profile builder; elapsed windows are dropped,
+  active windows start at the request time rounded up to a whole second, and
+  all ends round down. No energy is added to compensate for elapsed time; the
+  original estimated kWh is not a measurement or an estimate of remaining energy.
+  An active initial 16 A profile cannot be verified by the current future-only
+  comparator; it remains unverified, with active readback work deferred to 4.2.
+- Fingerprints include profile attributes, initial limit/phases, absolute future
+  transitions and settings revision, but not the moving initial timestamp. A
+  future-to-active transition changes the fingerprint and requires a new preview;
+  changes to a shortened end, profile attributes or revision also invalidate it.
+  Pause, admin, identity, current, revision and preview checks remain in place.
+- No plan, expired plan, invalid windows, unpriced or stale/unavailable prices
+  are refusals, not instructions to clear or release a limit. Only price states
+  `ready` and `waiting_for_tomorrow` are accepted; `degraded` and `incomplete`
+  are conservatively refused because the snapshot lacks per-window freshness.
+  Freshness relies on the planner's current snapshot and price-state reporting,
+  not an independent price-source fetch at Send. A retained final 0 A can persist
+  after expiration. Composite readback is not a profile inventory; Accepted does
+  not prove transaction authorization or physical charging.
+- No worker, automatic send/retry/clear, ownership activation or durable transition
+  was added. Lost-state recovery, electrical protection, authorization and safe
+  retained-profile exit remain activation blockers. Stage 3.2 is next only after
+  coordinator review; this intent is not itself an actuator admission protocol.
+- Isolated actual-module regressions with mocked boundaries: planning suite 424
+  passed, one deselected, two warnings; lifecycle suite 26 passed, six warnings.
+  These are not full HA or physical tests. No live HA or charger was contacted.
+
 ### 2.5.24 — Stage 2.3 unarmed lifecycle and regression (review required)
 
 - Shared connector admission has an internal, unexposed reload-oriented quiesce:

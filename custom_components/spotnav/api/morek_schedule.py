@@ -48,30 +48,48 @@ def _utc(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
-def profile_for(periods: tuple[tuple[datetime, datetime], ...], amps: int, now: datetime) -> dict[str, Any]:
-    """One future-only, paused-before/after TxDefaultProfile; never discard a block."""
+def profile_for(periods: tuple[tuple[datetime, datetime], ...], amps: int, now: datetime, *,
+                allow_active: bool = False) -> dict[str, Any]:
+    """Build fixed-time limits, optionally continuing an active displayed window."""
     requested_at = _utc(now)
     now = requested_at.replace(microsecond=0)
+    if allow_active and requested_at.microsecond:
+        now += timedelta(seconds=1)
     if not isinstance(amps, int) or isinstance(amps, bool) or not 6 <= amps <= 16:
         raise ScheduleRefused("invalid_current")
-    if not periods or len(periods) > 3:
+    if not periods:
+        raise ScheduleRefused("no_current_plan")
+    # Validate the entire original plan before discarding elapsed windows.
+    normalized = []
+    previous_end = None
+    try:
+        for start, end in periods:
+            start, end = _utc(start), _utc(end)
+            if end <= start or (previous_end is not None and start <= previous_end):
+                raise ScheduleRefused("invalid_plan")
+            normalized.append((start, end))
+            previous_end = end
+    except (TypeError, ValueError, AttributeError):
+        raise ScheduleRefused("invalid_plan") from None
+    if allow_active:
+        normalized = [(start, end) for start, end in normalized if end > requested_at]
+        if not normalized:
+            raise ScheduleRefused("plan_expired")
+    if len(normalized) > 3:
         raise ScheduleRefused("too_many_blocks")
-    transitions: list[dict[str, int]] = [{"startPeriod": 0, "limit": 0}]
-    previous_end = now
-    for start, end in periods:
-        start, end = _utc(start), _utc(end)
-        if start <= requested_at or start <= previous_end or end <= start or end - now > MAX_HORIZON:
+    active = allow_active and normalized[0][0] <= requested_at
+    transitions: list[dict[str, int]] = [{"startPeriod": 0, "limit": amps if active else 0}]
+    for index, (start, end) in enumerate(normalized):
+        if (not (active and index == 0) and start <= requested_at) or end - now > MAX_HORIZON:
             raise ScheduleRefused("invalid_plan")
         # OCPP offsets are whole seconds: never start before or end after a displayed window.
         start_offset = math.ceil((start - now).total_seconds())
         end_offset = math.floor((end - now).total_seconds())
-        if end_offset <= start_offset:
+        if end_offset <= (0 if active and index == 0 else start_offset):
             raise ScheduleRefused("invalid_plan")
-        transitions.extend((
-            {"startPeriod": start_offset, "limit": amps},
-            {"startPeriod": end_offset, "limit": 0},
-        ))
-        previous_end = end
+        if not (active and index == 0):
+            transitions.append({"startPeriod": start_offset, "limit": amps})
+        transitions.append({"startPeriod": end_offset, "limit": 0})
     if len(transitions) > MAX_PERIODS or len({p["startPeriod"] for p in transitions}) != len(transitions):
         raise ScheduleRefused("invalid_plan")
     return {
@@ -150,7 +168,7 @@ def matches(profile: dict[str, Any], actual: dict[str, Any], *, tolerance_s: int
     first = observed[0]
     # A composite response starts at the query time. After a charging window
     # has started we cannot reconstruct its earlier effective limits from it.
-    if first[0] > expected[1][0] or first[1] != 0:
+    if expected[0][1] != 0 or first[0] > expected[1][0] or first[1] != 0:
         return False
     # GetCompositeSchedule can repeat an identical limit without changing the
     # effective current. Ignore such repeats, not a real extra ON/OFF window.
@@ -332,29 +350,48 @@ async def _state(hass: HomeAssistant, entry_id: str) -> tuple[dict[str, Any], St
 
 
 def _proposed_profile(hass: HomeAssistant, entry_id: str, now: datetime) -> dict[str, Any]:
-    """One calculation shared by the read-only preview and the actual send."""
+    """Current fixed-time intent for preview, manual Send and future backend callers.
+
+    Refusal means no proposed action, never permission to clear or release a limit.
+    """
     settings = domain_data(hass).auto_store.settings(entry_id)
     if settings.amps != 16:
         raise ScheduleRefused("current_must_be_16")
     planner = preview_for(hass, entry_id)
     snapshot = planner.snapshot() if planner is not None else None
     proposal = snapshot.proposal if snapshot is not None and snapshot.in_process else None
-    if (proposal is None or not planner.snapshot_is_current(snapshot) or snapshot.settings_revision != settings.revision
-            or getattr(snapshot, "last_error_code", None) is not None
-            or not proposal.has_plan or proposal.unpriced or not proposal.shown_periods):
+    if proposal is None:
+        if snapshot is not None and getattr(snapshot, "price_state", None) in ("stale", "unavailable", "invalid", "loading", "degraded"):
+            raise ScheduleRefused("prices_stale_or_unavailable")
+        raise ScheduleRefused("no_current_plan")
+    if (not planner.snapshot_is_current(snapshot) or snapshot.settings_revision != settings.revision
+            or getattr(snapshot, "last_error_code", None) is not None):
+        raise ScheduleRefused("no_current_plan")
+    price_state = getattr(snapshot, "price_state", None)
+    if price_state not in ("ready", "waiting_for_tomorrow"):
+        raise ScheduleRefused("prices_unavailable" if price_state is None else "prices_stale_or_unavailable")
+    if proposal.unpriced:
+        raise ScheduleRefused("prices_unavailable")
+    if not proposal.has_plan or not proposal.shown_periods:
         raise ScheduleRefused("no_current_plan")
     # The stored profile is a fixed-time snapshot of exactly what the card shows,
     # including the estimated shorter final block. It does not implement feedback-based energy stopping.
-    return profile_for(tuple(proposal.shown_periods), settings.amps, now)
+    return profile_for(tuple(proposal.shown_periods), settings.amps, now, allow_active=True)
 
 
 def _preview_id(profile: dict[str, Any], revision: Any) -> str:
-    """Commit to the absolute ON/OFF transitions and settings revision, not the moving 0 A start."""
+    """Commit to wire attributes and absolute changes, excluding the moving initial timestamp."""
     schedule = profile["chargingSchedule"]
     start = datetime.fromisoformat(schedule["startSchedule"].replace("Z", "+00:00"))
-    transitions = [(start + timedelta(seconds=period["startPeriod"])).isoformat() + f":{period['limit']}"
-                   for period in schedule["chargingSchedulePeriod"][1:]]
-    return hashlib.sha256(json.dumps([str(revision), transitions]).encode()).hexdigest()
+    periods = schedule["chargingSchedulePeriod"]
+    transitions = [{**period, "startPeriod": (start + timedelta(seconds=period["startPeriod"])).isoformat()}
+                   for period in periods[1:]]
+    intent = {key: value for key, value in profile.items() if key != "chargingSchedule"}
+    intent["chargingSchedule"] = {key: value for key, value in schedule.items()
+                                   if key not in ("startSchedule", "chargingSchedulePeriod")}
+    intent["initial"] = {key: value for key, value in periods[0].items() if key != "startPeriod"}
+    intent["transitions"] = transitions
+    return hashlib.sha256(json.dumps([revision, intent], sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
 def _preview(hass: HomeAssistant, entry_id: str, target: Any) -> dict[str, Any]:

@@ -713,6 +713,13 @@ async def _async_setup_auto_preview(
     )
     entry.async_on_unload(preview.async_shutdown)
     await preview.async_start()
+    # Planner publications include price, settings, SOC and deadline recalculations.
+    # This worker is wired but owned-profile admission remains unconditionally unarmed.
+    from .execution.morek_worker import MorekScheduleWorker
+
+    worker = data.morek_worker = MorekScheduleWorker(hass, entry_id, preview)
+    worker.start()
+    entry.async_on_unload(worker.close)
 
     def _soc_moved() -> None:
         # New session or real progress: plan again from the current state of charge.

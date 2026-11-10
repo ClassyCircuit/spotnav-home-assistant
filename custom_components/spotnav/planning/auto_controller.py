@@ -800,6 +800,7 @@ class AutoPlannerController:
         self._last_failure: tuple[str, str, PlanRequest] | None = None
 
         self._listeners: list[Callable[[AutoSnapshot], None]] = []
+        self._publication_listeners: list[Callable[[AutoSnapshot], None]] = []
         self._unsubscribe: Callable[[], None] | None = None
         self._subscribed_area: str | None = None
         # The price source (`pricing/price_source.py`) the subscription and observation were last matched to, as
@@ -902,6 +903,7 @@ class AutoPlannerController:
         # Forced: shutdown takes a new attempt, so the gate would otherwise drop the stopped state.
         self._publish(await self._state_only("planning_unavailable", "shutdown"), force=True)
         self._listeners.clear()
+        self._publication_listeners.clear()
 
     def add_listener(self, listener: Callable[[AutoSnapshot], None]) -> Callable[[], None]:
         """A listener for meaningful snapshot changes; the returned handle is idempotent."""
@@ -912,6 +914,22 @@ class AutoPlannerController:
         def remove() -> None:
             if listener in self._listeners:
                 self._listeners.remove(listener)
+
+        return remove
+
+    def add_publication_listener(self, listener: Callable[[AutoSnapshot], None]) -> Callable[[], None]:
+        """Hear each completed calculation, even one equal to the previous snapshot.
+
+        A queued consumer may have rejected the preceding snapshot while this
+        calculation was pending; meaningful-change-only delivery would strand it.
+        """
+        self._publication_listeners.append(listener)
+        if self._snapshot is not None:
+            self._deliver(listener, self._snapshot)
+
+        def remove() -> None:
+            if listener in self._publication_listeners:
+                self._publication_listeners.remove(listener)
 
         return remove
 
@@ -3318,6 +3336,8 @@ class AutoPlannerController:
             if snapshot.settings_revision != self._store.settings(self._entry_id).revision:
                 return
         self._snapshot = snapshot
+        for listener in list(self._publication_listeners):
+            self._deliver(listener, snapshot)
         key = snapshot.meaningful_key()
         if not force and key == self._last_key:
             return

@@ -94,12 +94,16 @@ tests are documented there; full HA collection is still blocked on Windows.
 
 ### Stage 3 — Autonomous schedule updates (old A3)
 
-- [ ] **3.1 Shared schedule intent**
-  - Reuse the existing builder/fingerprint; support remaining active windows.
-  - Define expired/no-plan/missing-price behavior without silently releasing limits.
-- [ ] **3.2 Backend worker and triggers**
-  - Coalesce price/SOC/settings/deadline changes; send only changed wire intent.
-  - Serialize and reject stale work; test deduplication and concurrent edits.
+- [x] **3.1 Shared schedule intent** (implemented for review; no worker or activation)
+  - Manual preview/Send and future backend callers reuse the builder/fingerprint for
+    current fixed-time intent, including the remainder of active displayed windows.
+  - Expired/no-plan/unpriced/stale or unavailable prices and invalid inputs refuse
+    without releasing retained limits. Active-window readback verification remains 4.2.
+- [x] **3.2 Backend worker and triggers** (unarmed groundwork; review required)
+  - Planner publications trigger coalesced reconciliation without a browser;
+    connector admission serializes and rejects stale work, with process-local
+    deduplication and an uncertainty latch. Production owned-profile admission
+    still refuses all sends; no transition or activation is implemented.
 - [ ] **3.3 Shared manual actions and persisted outcomes**
   - Route manual Send through the same safeguards; keep Refresh read-only.
   - Persist desired/attempted/ACK/verified versions; bound uncertain-upload retries.
@@ -466,10 +470,8 @@ the charger becoming available. Include a deliberate initial reconciliation.
   Manual Send cannot bypass identity, ownership, electrical or freshness checks.
 - Bound retries/backoff and keep desired, attempted, acknowledged and verified
   versions separate. A refresh or dashboard reload never forces an upload.
-- Define handling for **currently active windows**. The experimental builder
-  refuses starts in the past; daily operation needs a tested continuation policy
-  that does not restart a whole block or extend its original end. Never resend an
-  old expired plan just because the charger reconnects.
+- Continue only the remainder of **currently active windows** (3.1), without
+   extending the original end. Never resend an old expired plan on reconnect.
 - Define expired/no-plan/unpriced-data behavior and how pending 0 A limits are
   handled. Do not silently release all limits when tomorrow's prices are absent.
 
