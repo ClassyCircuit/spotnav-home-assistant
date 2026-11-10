@@ -16,7 +16,7 @@ export interface MorekState {
   verified: boolean;
   verification?: {
     pending?: boolean; reason?: string; exact?: boolean; tolerance_s?: number;
-    max_delta_s?: number | null; coverage_end?: string | null; next_check_at?: string | null;
+    max_delta_s?: number | null; coverage_start?: string | null; coverage_end?: string | null; next_check_at?: string | null;
   };
   sent: MorekProfile | null;
   effective: { status: string; fetched_at: string; periods: { at: string; amps: number }[];
@@ -43,6 +43,7 @@ export function decodeMorekState(raw: unknown): MorekState | null {
     (state.verification.tolerance_s !== undefined && (typeof state.verification.tolerance_s !== "number" ||
       !Number.isFinite(state.verification.tolerance_s))) ||
     (state.verification.next_check_at != null && typeof state.verification.next_check_at !== "string") ||
+    (state.verification.coverage_start != null && typeof state.verification.coverage_start !== "string") ||
     (state.verification.coverage_end != null && typeof state.verification.coverage_end !== "string"))) return null;
   if (state.cleanup_supported !== undefined && typeof state.cleanup_supported !== "boolean") return null;
   if (state.outcomes != null && (typeof state.outcomes !== "object" || typeof state.outcomes.uncertain !== "boolean")) return null;
@@ -152,7 +153,7 @@ export function morekPanel(
   const status = doc.createElement("p");
   const ack = state.ack === null ? "No plan sent from this card" : `Last upload: ${state.ack} at ${localTime(state.sent_at)}`;
   const verification = state.sent === null ? "" : state.verified
-    ? state.verification?.reason === "matched_with_drift" ? " · Matched within tolerance, NOT exact" : " · Matched at last read"
+     ? state.verification?.reason === "matched_with_drift" ? " · Remaining schedule matched within tolerance, NOT exact" : " · Remaining schedule matched at last read"
     : state.verification?.pending ? " · Awaiting follow-up readback — NOT verified" : " · NOT verified";
   status.textContent = ack + verification;
   section.append(status);
@@ -168,17 +169,22 @@ export function morekPanel(
       readback_unavailable: "Morek has not returned a usable current schedule.",
       coverage_missing: "Morek did not report a duration; coverage cannot be verified.",
       coverage_too_short: "Morek's reported duration does not cover the final stop plus one hour.",
+      coverage_stale: "The reported schedule coverage has already expired.",
+      coverage_boundary_ambiguous: "Readback starts too close to a transition to establish the initial limit safely.",
+      no_remaining_transitions: "No remaining transitions can be verified from this readback.",
+      verification_superseded: "The readback belongs to an older or unavailable attempt or plan.",
       verification_interrupted: "Automatic checks were interrupted, for example by an HA restart. Refresh from Morek.",
       cleanup_requested: "The sent schedule is historical after a removal request.",
       upload_unconfirmed: "The upload was not confirmed; its effect is unknown.",
       outcome_uncertain: "An earlier profile action has an unresolved outcome; readback cannot resolve it.",
-      matched: "Limits and transitions match at the last read; physical charging is not verified.",
-      matched_with_drift: "Limits match within the time tolerance; physical charging is not verified.",
+      matched: "Remaining effective limits and transitions match at the last read; past intervals and physical charging are not verified.",
+      matched_with_drift: "Remaining limits match within the time tolerance; past intervals and physical charging are not verified.",
     };
     detail.textContent = reasons[state.verification.reason ?? ""] ?? "";
     if (state.verification.max_delta_s != null) {
       detail.textContent += ` Maximum transition drift: ${Math.round(state.verification.max_delta_s)} s; tolerance: ${state.verification.tolerance_s ?? 90} s.`;
     }
+    if (state.verification.coverage_start) detail.textContent += ` Compared from ${localTime(state.verification.coverage_start)}.`;
     if (state.verification.coverage_end) detail.textContent += ` Readback covers through ${localTime(state.verification.coverage_end)}.`;
     if (state.verification.pending) detail.textContent += ` Automatic read-only check ${localTime(state.verification.next_check_at ?? null)}. No profile will be resent or cleared. Do not assume the sent limits are active yet.`;
     section.append(detail);

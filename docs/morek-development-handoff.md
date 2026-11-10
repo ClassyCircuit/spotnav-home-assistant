@@ -234,6 +234,37 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2.5.29 — Stage 4.2 remaining-schedule verification (unarmed; review required)
+
+- The existing comparator checks the remaining effective limits and transitions
+  from the later of reported start, response receipt and sent-profile start.
+  It refuses missing/stale/short coverage, an initial boundary within 90 seconds
+  of a planned transition, or no remaining transitions. It reports coverage,
+  maximum drift and the 90-second tolerance. A match says nothing about elapsed
+  periods, installed-profile inventory, authorization or physical charging.
+- Accepted worker uploads enter the same bounded read-only check path only after
+  connector admission is released. Manual actions retain their existing admission
+  and interlocks. Attempts have unique IDs and revisions; readback is checked
+  against the accepted attempt, current intent, identity and entry lifecycle, with
+  checks around network and storage awaits. Superseded evidence is not reported as
+  verification of the current plan. Repeated publications may conservatively mark
+  a previous match historical; no automatic resend, clear or uncertainty reset is
+  introduced. Legacy evidence without the new attempt ID is not treated as current
+  verification and requires a fresh eligible action/read.
+- Production owned-profile admission remains unconditionally unarmed. Ownership
+  transitions, lost-state recovery, electrical protection, transaction authorization
+  and retained-profile exit remain activation blockers. Operator recovery/health is
+  Stage 4.3. These changes have not been validated against live HA or hardware.
+- Validation: isolated actual-module planning suite 481 passed, one deselected and
+  two warnings; focused Morek selection 102 passed, 380 deselected, two warnings;
+  isolated lifecycle suite 26 passed, six warnings. Focused frontend panel tests
+  passed 12 tests; frontend build, check-dist and type-check, targeted Ruff,
+  compileall and diff check passed (diff check reported Windows line-ending
+  warnings). During development the panel test twice failed on obsolete expected
+  wording; the expectations were updated and the final run passed. Tests use
+  simulated worker authority and mocked HA/OCPP/persistence, not full HA or
+  physical validation. No live HA, deployment, restart or charger action occurred.
+
 ### 2.5.28 — Stage 4.1 restart and reconnect (unarmed; review required)
 
 - The startup worker subscribes to the current planner publication. The existing

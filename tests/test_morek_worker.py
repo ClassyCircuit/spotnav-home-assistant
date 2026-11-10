@@ -27,6 +27,8 @@ class SimulatedAdmission(CommandAdmission):
         self.release = None
 
     async def async_execute(self, entry_id, kind, resolve_identity, operation, *, expected_generation=None):
+        if kind == "read_only":
+            return await super().async_execute(entry_id, kind, resolve_identity, operation)
         assert kind == "owned_profile"
         connector = physical_connector(resolve_identity())
         async with self._lock_for(connector):
@@ -96,6 +98,7 @@ def setup(monkeypatch, *, active=False, admission=None):
     monkeypatch.setattr(morek_worker, "command_admission", lambda _: state.admission)
     monkeypatch.setattr(morek_schedule, "_state", record)
     monkeypatch.setattr(morek_schedule, "outcomes_for", lambda _: ledger)
+    monkeypatch.setattr(morek_schedule, "async_call_later", lambda *_: lambda: None)
     state.ledger = ledger
     import sys
     monkeypatch.setitem(sys.modules, "ocpp.v16", SimpleNamespace(call=SimpleNamespace(
@@ -514,6 +517,63 @@ def manual_setup(monkeypatch):
         GetCompositeSchedule=lambda **kw: SimpleNamespace(action="fetch", payload=kw),
         ClearChargingProfile=lambda **kw: SimpleNamespace(action="clear", payload=kw))))
     return w
+
+
+@pytest.mark.asyncio
+async def test_worker_starts_bounded_read_after_releasing_connector(monkeypatch):
+    w = manual_setup(monkeypatch)
+    callbacks, delays = [], []
+    def later(_hass, delay, callback):
+        assert not w.admission._lock_for(physical_connector(IDENTITY)).locked()
+        callbacks.append(callback)
+        delays.append(delay)
+        return lambda: None
+    monkeypatch.setattr(morek_schedule, "async_call_later", later)
+    async def call(request):
+        if request.action == "send":
+            return SimpleNamespace(status="Accepted")
+        return SimpleNamespace(status="Accepted", connector_id=1, schedule_start=NOW.isoformat(),
+                               charging_schedule={"chargingRateUnit": "A", "duration": 14400,
+                                                  "chargingSchedulePeriod": [
+                                                      {"startPeriod": 0, "limit": 0},
+                                                      {"startPeriod": 3600, "limit": 16},
+                                                      {"startPeriod": 7200, "limit": 0}]})
+    w.point.call.side_effect = call
+    w.worker.start()
+    await drain(w.worker)
+    assert delays == [0]
+    await callbacks[0](NOW)
+    assert w.point.call.await_count == 2
+    assert w.ledger.value["verified"]["attempt_id"] == w.ledger.value["attempt"]["id"]
+    assert delays == [0]
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_worker_mismatch_checks_are_bounded_and_read_only(monkeypatch):
+    w = manual_setup(monkeypatch)
+    callbacks, delays, calls = [], [], []
+    def later(_hass, delay, callback):
+        callbacks.append(callback)
+        delays.append(delay)
+        return lambda: None
+    monkeypatch.setattr(morek_schedule, "async_call_later", later)
+    async def call(request):
+        calls.append(request.action)
+        if request.action == "send":
+            return SimpleNamespace(status="Accepted")
+        return SimpleNamespace(status="Accepted", connector_id=1, schedule_start=NOW.isoformat(),
+                               charging_schedule={"chargingRateUnit": "A", "duration": 14400,
+                                                  "chargingSchedulePeriod": [{"startPeriod": 0, "limit": 16}]})
+    w.point.call.side_effect = call
+    w.worker.start()
+    await drain(w.worker)
+    for i in range(4):
+        await callbacks[i](NOW)
+    assert delays == [0, 30, 45, 45]
+    assert calls == ["send", "fetch", "fetch", "fetch", "fetch"]
+    assert w.ledger.value["verified"] is None
+    w.worker.close()
 
 
 @pytest.mark.asyncio

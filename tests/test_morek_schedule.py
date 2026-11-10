@@ -161,7 +161,8 @@ async def test_status_exposes_read_only_unarmed_ownership(monkeypatch):
     store = SimpleNamespace(async_status=AsyncMock(return_value=ownership))
     hass = SimpleNamespace(data={})
     connection = SimpleNamespace(send_result=Mock(), send_error=Mock())
-    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda h, e: (SimpleNamespace(entry_id=e), None))
+    entry = SimpleNamespace(entry_id="charger", async_on_unload=lambda _: None)
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda h, e: (entry, None))
     monkeypatch.setattr(morek_schedule, "controller_for", lambda h, e: SimpleNamespace(ocpp_target=target))
     monkeypatch.setattr(morek_schedule, "_identity_status", lambda h, t: identity)
     monkeypatch.setattr(morek_schedule, "ownership_store", lambda h: store)
@@ -347,7 +348,8 @@ async def test_selective_cleanup_only_names_test_id_and_fetches_afterwards(monke
     data = {"ack": "Accepted", "profile": profile_for(((NOW + timedelta(hours=1), NOW + timedelta(hours=2)),), 16, NOW)}
     store = SimpleNamespace(async_save=AsyncMock())
     hass = SimpleNamespace(data={morek_schedule._DATA_KEY: {"charger": (data, store, asyncio.Lock())}})
-    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda h, e: (SimpleNamespace(entry_id=e), None))
+    entry = SimpleNamespace(entry_id="charger", async_on_unload=lambda _: None)
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda h, e: (entry, None))
     monkeypatch.setattr(morek_schedule, "controller_for", lambda h, e: SimpleNamespace(ocpp_target=target))
     monkeypatch.setattr(morek_schedule, "_identity_status", lambda h, t: _supported_identity())
     from custom_components.spotnav.execution.command_admission import CommandAdmission
@@ -414,6 +416,50 @@ def test_verification_requires_reported_duration_and_discloses_drift():
     assert morek_schedule.compare_schedule(profile, actual)["matched"] is False
 
 
+@pytest.mark.parametrize(("offset", "initial", "drift", "reason"), [
+    (0, 0, 0, "matched"),
+    (3700, 16, 0, "matched"),
+    (3700, 16, 57, "matched_with_drift"),
+    (3700, 16, 91, "limits_or_transitions_differ"),
+    (3650, 16, 0, "coverage_boundary_ambiguous"),
+    (7300, 0, 0, "no_remaining_transitions"),
+    (3700, 0, 0, "limits_or_transitions_differ"),
+])
+def test_remaining_schedule_comparison(offset, initial, drift, reason):
+    profile = profile_for(((NOW + timedelta(hours=1), NOW + timedelta(hours=2)),), 16, NOW)
+    start = NOW + timedelta(seconds=offset)
+    periods = [{"startPeriod": 0, "limit": initial}, {"startPeriod": 1, "limit": initial}]
+    if offset == 0:
+        periods += [{"startPeriod": 3600, "limit": 16}]
+    if offset < 7200:
+        periods += [{"startPeriod": 7200 + drift - offset, "limit": 0}]
+    actual = readback(SimpleNamespace(status="Accepted", schedule_start=start.isoformat(), charging_schedule={
+        "chargingRateUnit": "A", "duration": 14400, "chargingSchedulePeriod": periods}), start)
+    comparison = morek_schedule.compare_schedule(profile, actual)
+    assert comparison["reason"] == reason
+    assert comparison["scope"] == "remaining"
+
+
+def test_active_initial_limit_can_verify_remaining_stop():
+    profile = profile_for(((NOW - timedelta(hours=1), NOW + timedelta(hours=1)),), 16, NOW, allow_active=True)
+    actual = readback(SimpleNamespace(status="Accepted", schedule_start=NOW.isoformat(), charging_schedule={
+        "chargingRateUnit": "A", "duration": 10800, "chargingSchedulePeriod": [
+            {"startPeriod": 0, "limit": 16}, {"startPeriod": 3600, "limit": 0}]}), NOW)
+    assert morek_schedule.compare_schedule(profile, actual)["reason"] == "matched"
+
+
+def test_stale_or_expired_composite_coverage_is_not_verified():
+    profile = profile_for(((NOW + timedelta(hours=1), NOW + timedelta(hours=2)),), 16, NOW)
+    response = SimpleNamespace(status="Accepted", schedule_start=NOW.isoformat(), charging_schedule={
+        "chargingRateUnit": "A", "duration": 14400, "chargingSchedulePeriod": [
+            {"startPeriod": 0, "limit": 0}, {"startPeriod": 3600, "limit": 16},
+            {"startPeriod": 7200, "limit": 0}]})
+    stale = readback(response, NOW + timedelta(minutes=10))
+    assert morek_schedule.compare_schedule(profile, stale)["reason"] == "coverage_stale"
+    delayed = readback(response, NOW + timedelta(hours=5), requested_at=NOW)
+    assert morek_schedule.compare_schedule(profile, delayed)["reason"] == "coverage_stale"
+
+
 def _send_harness(monkeypatch, read_results):
     import asyncio
     from collections import deque
@@ -477,7 +523,138 @@ def _send_harness(monkeypatch, read_results):
     monkeypatch.setitem(sys.modules, "ocpp.v16", protocol)
     return SimpleNamespace(hass=hass, data=data, callbacks=callbacks, cancelled=cancelled,
                            delays=delays, calls=calls, unload=unload, clock=clock, requests=requests,
-                           preview_id=morek_schedule._preview_id(profile, 4), ledger=ledger, store=store, point=point)
+                           preview_id=morek_schedule._preview_id(profile, 4), ledger=ledger, store=store, point=point,
+                           settings=settings, entry=entry)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("supersession", ["settings", "intent", "uncertain", "identity", "unload"])
+async def test_inflight_readback_cannot_verify_superseded_attempt(monkeypatch, supersession):
+    import asyncio
+
+    h = _send_harness(monkeypatch, ["mismatch", "matched"])
+    await morek_schedule.async_schedule_action(h.hass, "charger", "send", h.preview_id)
+    entered, release = asyncio.Event(), asyncio.Event()
+    original = h.point.call
+    async def delayed(request):
+        entered.set()
+        await release.wait()
+        return await original(request)
+    h.point.call = delayed
+    task = asyncio.create_task(h.callbacks[0](NOW))
+    await entered.wait()
+    if supersession == "settings":
+        h.settings.revision += 1
+    elif supersession == "intent":
+        changed = profile_for(((NOW + timedelta(hours=1), NOW + timedelta(hours=3)),), 16, NOW)
+        monkeypatch.setattr(morek_schedule, "_proposed_profile", lambda *_: changed)
+    elif supersession == "uncertain":
+        h.ledger.value["uncertain"] = True
+        h.ledger.value["attempt"]["state"] = "uncertain"
+    elif supersession == "identity":
+        monkeypatch.setattr(morek_schedule, "_identity_status", lambda *_: {"supported": False})
+    else:
+        h.unload[0]()
+    release.set()
+    await task
+    assert h.data["verified"] is False
+    assert h.ledger.value["verified"] is None
+
+
+@pytest.mark.asyncio
+async def test_status_does_not_expose_old_match_as_current_after_settings_edit(monkeypatch):
+    h = _send_harness(monkeypatch, ["matched"])
+    await morek_schedule.async_schedule_action(h.hass, "charger", "send", h.preview_id)
+    assert h.ledger.value["verified"] is not None
+    h.settings.revision += 1
+    monkeypatch.setattr(morek_schedule, "ownership_store", lambda _: SimpleNamespace(async_status=AsyncMock(return_value={})))
+    monkeypatch.setattr(morek_schedule, "_preview", lambda *_: {})
+    connection = SimpleNamespace(send_result=Mock(), send_error=Mock())
+    await morek_schedule.websocket_morek_schedule.__wrapped__(
+        h.hass, connection, {"id": 1, "api_version": 1, "charger_id": "charger", "action": "status"})
+    result = connection.send_result.call_args.args[1]["schedule"]
+    assert result["verified"] is False
+    assert result["outcomes"]["verified"] is None
+    assert result["verification"]["reason"] == "verification_superseded"
+    assert h.ledger.value["verified"] is not None  # Historical evidence is retained on disk.
+
+
+@pytest.mark.asyncio
+async def test_settings_change_during_verified_evidence_write_is_discarded(monkeypatch):
+    import asyncio
+
+    h = _send_harness(monkeypatch, ["mismatch", "matched"])
+    await morek_schedule.async_schedule_action(h.hass, "charger", "send", h.preview_id)
+    previous_effective = h.data["effective"]
+    entered, release = asyncio.Event(), asyncio.Event()
+    write = h.ledger.write
+    async def delayed(record):
+        await write(record)
+        if record.get("verified"):
+            entered.set()
+            await release.wait()
+    h.ledger.write = delayed
+    task = asyncio.create_task(h.callbacks[0](NOW))
+    await entered.wait()
+    h.settings.revision += 1
+    release.set()
+    await task
+    assert h.data["verified"] is False
+    assert h.ledger.value["verified"] is None
+    assert h.data["effective"] is previous_effective
+
+
+@pytest.mark.asyncio
+async def test_settings_change_during_readback_store_save_is_discarded(monkeypatch):
+    import asyncio
+
+    h = _send_harness(monkeypatch, ["mismatch", "matched"])
+    await morek_schedule.async_schedule_action(h.hass, "charger", "send", h.preview_id)
+    previous = h.data["effective"]
+    entered, release = asyncio.Event(), asyncio.Event()
+    async def save(data):
+        if data.get("verified"):
+            entered.set()
+            await release.wait()
+    h.store.async_save.side_effect = save
+    task = asyncio.create_task(h.callbacks[0](NOW))
+    await entered.wait()
+    h.settings.revision += 1
+    release.set()
+    await task
+    assert h.data["verified"] is False
+    assert h.data["effective"] is previous
+    assert h.ledger.value["verified"] is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action", ["send", "clear"])
+async def test_queued_new_profile_action_supersedes_previous_read(monkeypatch, action):
+    import asyncio
+
+    h = _send_harness(monkeypatch, ["mismatch", "matched", "mismatch"])
+    await morek_schedule.async_schedule_action(h.hass, "charger", "send", h.preview_id)
+    entered, release = asyncio.Event(), asyncio.Event()
+    original = h.point.call
+    async def delayed(request):
+        if request.action == "fetch" and not entered.is_set():
+            entered.set()
+            await release.wait()
+        return await original(request)
+    h.point.call = delayed
+    read = asyncio.create_task(h.callbacks[0](NOW))
+    await entered.wait()
+    old_id = h.data["attempt_id"]
+    h.clock[0] += timedelta(seconds=1)
+    kwargs = {"confirm_profile_id": 42001} if action == "clear" else {"preview_id": h.preview_id}
+    replacement = asyncio.create_task(morek_schedule.async_schedule_action(h.hass, "charger", action, **kwargs))
+    await asyncio.sleep(0)
+    release.set()
+    await asyncio.gather(read, replacement)
+    assert h.data["verified"] is False
+    assert h.ledger.value["verified"] is None
+    if action == "send":
+        assert h.ledger.value["attempt"]["id"] != old_id
 
 
 @pytest.mark.asyncio

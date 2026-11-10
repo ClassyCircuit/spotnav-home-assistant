@@ -66,6 +66,7 @@ class MorekScheduleWorker:
     def close(self) -> None:
         """Unsubscribe and cancel pending work; an in-flight send remains uncertain."""
         self._closed = True
+        morek_schedule._cancel_verification(self._hass, self._entry_id)
         self._serial += 1
         if self._remove is not None:
             self._remove()
@@ -117,11 +118,11 @@ class MorekScheduleWorker:
         admission = command_admission(self._hass)
         generation = admission.generation(connector)
 
-        async def dispatch() -> str:
+        async def dispatch() -> tuple[str, str | None, str | None]:
             # Admission has checked identity, ownership and generation under the
             # physical connector lock. Do not await between this recheck and call.
             if self._closed or serial != self._serial:
-                return "stale_work"
+                return "stale_work", None, None
             def validate():
                 if self._closed or serial != self._serial:
                     raise morek_schedule.ScheduleRefused("stale_work")
@@ -139,12 +140,21 @@ class MorekScheduleWorker:
                 return profile, morek_schedule._charge_point(self._hass, target), target
 
             async with self._hass.data[morek_schedule._DATA_KEY][self._entry_id][2]:
-                return await morek_schedule._send_profile_shared(
+                outcome = await morek_schedule._send_profile_shared(
                     self._hass, self._entry_id, data, store, fingerprint, validate, automatic=True)
+                return outcome, data.get("sent_at"), data.get("attempt_id")
 
         result = await admission.async_execute(
             self._entry_id, "owned_profile", self._identity, dispatch, expected_generation=generation
         )
         if self._closed:
             return
-        self.reason = result.value if result.allowed else result.reason
+        if not result.allowed:
+            self.reason = result.reason
+            return
+        outcome, sent_at, attempt_id = result.value
+        self.reason = outcome
+        if (outcome == "upload_accepted_unverified" and sent_at and attempt_id
+                and not self._closed):
+            # Admission has been released. The read-only path reacquires it itself.
+            morek_schedule._schedule_verification(self._hass, self._entry_id, sent_at, -1, attempt_id)

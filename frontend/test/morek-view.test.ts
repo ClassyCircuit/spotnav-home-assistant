@@ -53,10 +53,10 @@ describe("Morek manual test panel", () => {
       pending: false, reason: "matched_with_drift", max_delta_s: 57, tolerance_s: 90,
       coverage_end: "2026-11-07T08:00:00Z",
     } }, true, false, null, vi.fn());
-    expect(panel.textContent).toContain("Matched within tolerance, NOT exact");
+    expect(panel.textContent).toContain("Remaining schedule matched within tolerance, NOT exact");
+    expect(panel.textContent).toContain("past intervals and physical charging are not verified");
     expect(panel.textContent).toContain("Maximum transition drift: 57 s; tolerance: 90 s");
     expect(panel.textContent).toContain("Readback covers through");
-    expect(panel.textContent).toContain("physical charging is not verified");
   });
 
   it("reports interrupted and missing-coverage checks without claiming verification", () => {

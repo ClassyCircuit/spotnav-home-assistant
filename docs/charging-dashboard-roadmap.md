@@ -117,9 +117,11 @@ tests are documented there; full HA collection is still blocked on Windows.
     planner intent and identity, not cached profiles; offline work waits for reconnect.
   - Connector admission and durable uncertainty remain in force. Simulated-authority
     tests cover stale work and duplicate identities; production dispatch stays unarmed.
-- [ ] **4.2 Verification**
-  - Extend existing bounded checks to active/remaining windows and delayed replies.
-  - Preserve coverage, drift, freshness and mismatch reasons; reject stale results.
+- [x] **4.2 Verification** (unarmed groundwork; review required)
+  - Compare the observable remaining effective schedule for active and future windows,
+    including delayed replies, with bounded read-only checks and explicit coverage.
+  - Attempt-bound evidence, freshness checks and conservative ambiguous-boundary
+    refusals prevent a superseded readback from verifying a newer proposal.
 - [ ] **4.3 Operator state and unresolved actions**
   - Expose waiting/ready/sending/checking/mismatch/offline/intervention states.
   - Finish only the unresolved-command handling needed by the chosen Morek path;

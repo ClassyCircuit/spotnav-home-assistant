@@ -14,8 +14,9 @@ does not start another OCPP server. Only an administrator can send, fetch, or re
    remaining charging windows are within the next 48 hours. From 2.5.25, an
    active window can be continued from the request time rounded up to a whole
    second, until its original end;
-   elapsed windows are omitted, not replaced with extra charging time. Readback
-   verification of an active-start profile is not yet supported and stays unverified.
+    elapsed windows are omitted, not replaced with extra charging time. From 2.5.29,
+    verification may compare the remaining effective schedule of an active window;
+    it does not verify intervals before the readback.
    From 2.5.7,
    the sent schedule uses the **displayed windows**, including an estimated
    shorter final block. Morek follows those fixed times; it does not adjust the
@@ -67,6 +68,11 @@ Verification requires that reported coverage reaches one hour past the final
 stop; a missing duration is **not** assumed to equal the requested duration.
 Matching transitions may differ by up to **90 seconds**: the maximum observed
 drift and tolerance are displayed, and a drifting match is labelled **NOT exact**.
+The comparison starts no earlier than the response coverage, receipt time and sent
+profile. It requires a remaining transition and refuses starts within 90 seconds
+of a planned transition, where the initial limit is ambiguous. Stale, missing or
+short coverage is unverified. A new intent, connection or entry lifecycle can
+supersede a prior readback; an older match does not verify the new proposal.
 This tolerance is not a correction of Morek's clock or a guarantee of precise
 switching. Neither Accepted nor a matching readback proves physical charging.
 
