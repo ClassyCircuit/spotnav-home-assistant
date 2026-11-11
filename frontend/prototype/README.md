@@ -18,14 +18,23 @@ installation, deployment or restart is involved. `prototype/dist/` is generated
 and ignored. To rebuild after editing, rerun the build command and reload.
 
 The local **Sample scenario** selector reloads only this prototype with `?state=`:
-`mismatch`, `waiting`, `charging`, `unavailable`, `infeasible`, `partial` or
-`exception`. These are hand-authored illustrations, not a planner or measurements
+`mismatch`, `waiting`, `charging`, `unavailable`, `infeasible`, `partial`,
+`exception` or `stale`. These are hand-authored illustrations, not a planner or measurements
 from a charger. The exception adds a 15:00–15:30 above-cap sample window; the
 infeasible example means the displayed illustrative proposal falls short, not proof
 that all possible plans are infeasible. Inputs do not save settings or control charging.
 The recent-session selector is disabled; its sent window and separately authored
 sample readings demonstrate a 22:30–22:45 gap and 21:45 out-of-plan flow. Coverage
 is 3 of 4 quarter-hour readings in the sent hour, not complete measurement history.
+
+The vehicle battery illustration uses a fictional 60 kWh usable capacity and 90%
+wall-to-battery efficiency. Battery energy and target need are estimates, not meter
+readings; plan active time is not a predicted finish. The `infeasible` sample alone
+defines a separate illustrative 20% low-SOC warning, unrelated to the 40% ready-by
+minimum or protection. The `stale` sample displays its last SOC but does not use it
+to calculate energy or future SOC. Evidence times, ACK and coverage are fictional;
+readback is not a profile inventory and cannot prove charging. Live field availability
+and freshness must be verified during 5.2, not inferred from this design.
 
 For local rendering checks, append `?plan=missing` (unavailable plan tariff and
 efficiency), `?plan=invalid` (invalid plan values), or `?plan=long` (eight windows).
@@ -136,5 +145,5 @@ individual-card, zoomed-card, modal and rendered edge-fixture screenshots under 
 temporary `opencode` folder. The check reports whether emulated taps needed its
 programmatic tooltip fallback; pinch emulation is not physical-touch validation.
 It does not validate real touch, accessibility tree or actual HA shadow roots. Run
-`node --test prototype/sample.test.mjs prototype/insights.test.mjs prototype/daily-sample.test.mjs`
+`node --test prototype/sample.test.mjs prototype/insights.test.mjs prototype/daily-sample.test.mjs prototype/vehicle-evidence.test.mjs`
 for sample arithmetic, price insights, scenario and history checks.

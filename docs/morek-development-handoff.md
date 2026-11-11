@@ -234,6 +234,35 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### Stage 5.1e — sample vehicle and evidence (review pending)
+
+- The sample vehicle card shows a battery with a target marker, estimated usable
+  battery energy, battery- and wall-side target deficits, and plan active time.
+  The fictional assumptions are 60 kWh usable and 90% efficiency; estimates are not
+  measurements or guaranteed completion. Only the `infeasible` fixture independently
+  defines a 20% low-SOC warning; it is not the 40% minimum or a protection threshold.
+  The `stale` fixture shows the last SOC with a stale label and suppresses SOC-based
+  projections/estimates; its older proposal and readback are also labelled stale.
+- The fictional activity view separately identifies proposal calculation/reason, last
+  send and ACK, effective-readback time/coverage, and SOC/power freshness, with mismatch,
+  matching, unavailable and stale examples. It explicitly leaves the association
+  between the current proposal and last sent plan unknown. Readback is not a profile
+  inventory and neither ACK nor readback proves charging. These fields are design
+  examples, not evidence of live system capability.
+- In 5.2 verify actual availability and freshness of usable capacity, efficiency,
+  independently configured low-SOC warning, SOC/power timestamps, proposal time/reason,
+  sent-plan/ACK times and identity, readback timestamp/coverage and comparison/association.
+  Missing fields must remain unknown; do not assume this sample schema exists in the API.
+- Prototype build and 19 focused tests passed. Desktop 1440×1000 and emulated mobile
+  390×844 checked battery/plan/modal, missing/stale/low-SOC scenarios, evidence, both
+  charts and overflow; the battery-note color contrast check passed. 156 observed
+  requests were local/data only. Screenshots inspected in temporary `opencode` folder:
+  `spotnav-51e-{desktop|mobile}-{vehicle|evidence}.png` and
+  `spotnav-51e-{desktop|mobile}-{stale|unavailable|infeasible}-{vehicle|evidence}.png`.
+  Existing debugging browser used; physical touch, complete accessibility and HA
+  integration remain unverified. No HA or hardware access; dispatch remains unarmed.
+  Stop for coordinator/user review before 5.2; overall 5.1 and chart choice await approval.
+
 ### Stage 5.1d — daily sample dashboard (review pending)
 
 - The daily area shows sample measured power, the next proposal and estimated wall

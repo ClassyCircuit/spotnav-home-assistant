@@ -9,6 +9,29 @@ For existing code, HA access, hardware observations and credentials handling, re
 [the development handoff](morek-development-handoff.md) and `AGENTS.md` first.
 This document is not permission to deploy, restart HA, or issue hardware commands.
 
+## Initial working-release goal
+
+The user wants a usable installed dashboard and automatic charging, not a permanent
+unarmed demo. Complete Stage 5 with the core daily frontend and backend connected to
+real data, reactive planning and a deliberately enabled, safe Morek schedule executor.
+Historical charging comparisons, monthly analytics, savings and other later features
+may remain explicitly unavailable; they are not prerequisites for this initial release.
+
+Current production dispatch is **unarmed**, not because that is the desired final
+behavior, but because safe ownership transitions, lost-state/uncertainty recovery,
+load protection, transaction authorization and retained-profile exit are unresolved.
+The Stage 5.6–5.8 work must resolve these blockers rather than merely display them.
+Do not remove the fail-closed gate before the complete reviewed activation path is safe.
+If a required hardware capability or installation-specific decision prevents safe
+operation, surface it and get a decision; do not label the initial release complete.
+
+An initial dashboard can be installed for real-data integration checking before
+activation. **The complete initial working release is not done until the user has a
+deliberately enabled automatic path and supervised, separately authorized live checks
+show real planning, schedule operation and measured charging**, subject to actual
+charger/vehicle availability. Specific approval remains required for each live action;
+the roadmap does not grant it. ACK/readback alone is not physical-flow evidence.
+
 ## Task overview — start here
 
 One **substage** is one implementation session followed by coordinator review.
@@ -27,11 +50,11 @@ Detailed requirements and acceptance cases follow outside this checklist.
 | 2 | Isolate Morek from legacy control | Unarmed lifecycle groundwork complete; activation blocked |
 | 3 | Automatically send changed schedules | Stages 1 and 2 before activation |
 | 4 | Recover and report execution health | Stage 3 |
-| 5 | One usable daily dashboard | Layout may start early; live status needs 3–4 |
-| 6 | Genuine charging history | Source inventory can start early |
-| 7 | Interactive ECharts prices and tracks | Stage 5; actual track uses Stage 6 |
-| 8 | Yesterday, costs and savings | Stages 6–7 |
-| 9 | Product polish and installation | Stages 5–8 |
+| 5 | Installable real-data daily dashboard and safe route to charging | Priority after prototype; automatic Morek dispatch remains unarmed |
+| 6 | Genuine charging history | Later; not a prerequisite for initial installation |
+| 7 | Extended charts, tracks and price insights | After initial real-data chart; actual track uses Stage 6 |
+| 8 | Yesterday, costs and savings | Later; depends on genuine data |
+| 9 | Further polish and installation documentation | Initial install path is in Stage 5; final polish follows |
 
 ### Stage 0 — Completed baseline: preserve and reuse
 
@@ -353,7 +376,10 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Reconcile control units/cap enablement and sample explanations, and review desktop,
     mobile and HA-like constrained widths. Coordinate final visual review with 5.1e;
     overall 5.1 remains pending user approval. No live bindings or hardware actions.
-- [ ] **5.1e Vehicle and plan-evidence design** (sample-only)
+- [x] **5.1e Vehicle and plan-evidence design** (sample-only; coordinator and user visual review pending)
+  - Local battery estimates, separately defined low-SOC warning sample and fictional
+    proposal/sent/readback/measurement freshness views are implemented; see handoff for
+    checks and 5.2 source-verification needs. Overall 5.1 and chart choice remain pending.
   - Enrich and polish the vehicle overview without visual clutter. Show current SOC,
     target marker and, only when a separately defined valid value is available, a
     clearly labelled low-SOC warning threshold. Do not equate that threshold with the
@@ -376,11 +402,75 @@ tests are documented there; full HA collection is still blocked on Windows.
     bindings, new telemetry, protective behavior changes or charger actions; verify any
     eventual live source availability during 5.2 rather than assuming it exists.
 - [ ] **5.2 Overview and operation status**
-  - Bind connection/SOC/measured power/next window and proposal/sent/readback health.
-  - Make missing data and critical failures visible without expanding details.
+  - Convert approved prototype components into locally bundled HA custom cards; reuse
+    existing dashboard/status APIs and a coherent backend snapshot, not sample fixtures.
+  - Bind actual connection, SOC, measured power, next window and proposal/sent/readback
+    health. Show missing/stale data and critical failures without expanding details.
+  - Test HA card lifecycle, Sections, localization/theme and mocked API-to-render behavior;
+    no browser render may trigger charger actions or be required for planning.
 - [ ] **5.3 Plan controls and actions**
-  - Add target/minimum/cap/ready-by controls, costs and policy explanations.
-  - Keep Send/Refresh accessible; distinguish upload suspension/pause/removal/exit.
+  - Bind target/minimum/cap/ready-by controls, complete windows, per-window/total
+    estimated costs and policy explanations to existing backend settings/planner APIs.
+  - Preserve manual Send/Refresh and their existing interlocks; do not present unimplemented
+    suspension, charging pause, selective removal or mode exit as equivalent or operational.
+  - Regression-test settings save → backend trigger → replan → coherent dashboard update,
+    without browser-dependent planning; preserve uncapped and safety behavior.
+- [ ] **5.4 Minimum production price chart and installation path**
+  - After the user chooses a visual direction, bundle ECharts locally and bind the chosen
+    chart to real available prices and proposed windows, with correct units, price basis,
+    timezone/DST, missing/negative prices and source interval resolution. Reuse Stage 5
+    prototype; do not implement full historical tracks or monthly insights here.
+  - Provide one non-destructive HA Sections composition and practical installation/update
+    instructions; retain existing card behavior and do not overwrite user views.
+  - Test actual-module API-to-card contract with mocks, browser rendering, build/artifacts
+    and unavailable/error states. Distinguish these from a running HA integration test.
+- [ ] **5.5 Initial install and real-data integration checkpoint**
+  - Once 5.2–5.4 are ready for review, support the user's preferred installation/update.
+    Obtain specific approval for each deployment, share modification, restart or other
+    live action; this roadmap is not authorization. Do not print credentials or private data.
+  - Check the installed version and, read-only first, verify real frontend/backend data,
+    price availability, vehicle/charger status, settings and replan behavior. Report
+    missing entities, stale data, unavailable prices or unresolved communication errors.
+  - A dashboard installation can be validated while Morek automatic mode is unarmed; do
+    not claim that installing the card enables automatic charging. The user chooses
+    whether and when to perform any supervised charger operation.
+- [ ] **5.6 Durable Morek ownership and recovery**
+  - Resolve and implement safe ownership entry/exit, producer drain and durable transitions,
+    lost-document versus first-use ambiguity, uncertain in-flight outcomes, restart/reconnect
+    and retained-profile handling. Do not bypass existing uncertainty or identity guards.
+  - Test actual modules with mocked HA/OCPP/storage across crashes, races, migration,
+    rollback and competing ordinary writers. Keep production dispatch unarmed until the
+    full activation path is reviewed and all remaining blockers are resolved.
+- [ ] **5.7 Protection, authorization and safe operating policy**
+  - Resolve how household load protection remains effective, how a new charging
+    transaction is authorized, how person Stop and competing writers are respected,
+    and how retained 0 A, invalid/no-price plans and leaving the mode are handled.
+  - Implement only an explicitly reviewed, fail-closed policy; identify any user or
+    installation-specific decisions and stop for them rather than assuming safety.
+    A stored current limit cannot start or authorize charging by itself.
+- [ ] **5.8 Reviewed autonomous execution and end-to-end validation**
+  - Only after 5.6–5.7 and explicit activation approval, implement a deliberate,
+    reversible activation path using the existing guarded worker, planner triggers and
+    durable evidence; do not weaken interlocks or automatically retry unknown outcomes.
+  - Test changed and unchanged settings/prices/SOC → backend replan → guarded schedule
+    reconciliation, startup/reconnect and conflict/uncertainty cases. Show proposal,
+    sent ACK, effective readback and real measured flow separately on the live dashboard.
+  - When the user specifically authorizes individual live operations, use the installed
+    system to check actual behavior and measured charging. ACK or matching effective
+    limits are not proof of physical flow; report separately what is software-tested,
+    live-read, sent, read back and physically observed. No overnight test is mandatory.
+  - **Initial release acceptance:** real prices, vehicle/charger state and plan controls
+    display accurately; saved changes and relevant price/SOC/deadline triggers cause a
+    backend replan without an open dashboard; changed valid intent is automatically
+    reconciled when enabled, while unchanged or unsafe intent does not cause duplicate
+    or unsafe dispatch. The installed dashboard shows truthful health and recoverable
+    errors; under an authorized supervised live scenario, an authorized transaction and
+    real measured charging are observed separately from schedule ACK/readback.
+  - Verify restart/reconnect and safe person Stop/protection behavior with automated
+    coverage and only specifically approved live checks. If approval, hardware,
+    connectivity, actual flow or any safety blocker is unavailable, state precisely
+    what remains unverified and leave initial-release acceptance open; do not postpone
+    basic daily operation merely for Stage 6–9 history or optional visual enhancements.
 
 ### Stage 6 — Real history data (old B1)
 
@@ -397,9 +487,8 @@ tests are documented there; full HA collection is still blocked on Windows.
 ### Stage 7 — ECharts prices and schedule tracks (old B3)
 
 - [ ] **7.1 Price chart**
-  - Reuse the Stage 5 sample ECharts work; bundle it for the shipped card locally and bind
-    real source-resolution prices, units, cap and markers.
-  - Handle negative/missing prices, timezone and DST correctly.
+  - Extend the real-data chart already delivered in 5.4; do not rebuild or rebind it.
+    Add remaining advanced display features and test negative/missing prices and DST.
 - [ ] **7.2 Interaction**
   - Reuse prototype interactions; add Yesterday/Today/available future/All,
     touch/mouse zoom, overview/reset and exact tooltips for real data.
@@ -436,8 +525,9 @@ tests are documented there; full HA collection is still blocked on Windows.
   keyboard/touch, copyable text and reduced motion.
 - [ ] **9.2 Responsive integration:** browser-test the whole dashboard, empty/error
   states and repeated updates; remove duplicate daily controls within the new UI.
-- [ ] **9.3 Installation and documentation:** one dashboard template, migration and
-  diagnostics guidance; never overwrite user views or claim unperformed hardware tests.
+- [ ] **9.3 Installation and documentation polish:** improve the initial 5.4–5.5
+  dashboard template, migration and diagnostics guidance; never overwrite user views
+  or claim unperformed hardware tests.
 
 ### Execution boundaries — avoid another prerequisite spiral
 

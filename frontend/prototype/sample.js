@@ -61,7 +61,7 @@ const blocks = [[24,24.25], [24.25,24.5], [24.5,24.625], [25,25.375]].map(([star
 // Wall energy is converted to stored battery energy once; these are projections, not observations.
 export const scenario = typeof location === 'undefined' ? 'default' : new URLSearchParams(location.search).get('plan') || 'default';
 export const dailyScenario = typeof location === 'undefined' ? 'mismatch' : new URLSearchParams(location.search).get('state') || 'mismatch';
-const sampleSoc = dailyScenario === 'unavailable' ? null : dailyScenario === 'infeasible' ? 15 : dailyScenario === 'exception' ? 35.5 : 48;
+const sampleSoc = dailyScenario === 'unavailable' || dailyScenario === 'stale' ? null : dailyScenario === 'infeasible' ? 15 : dailyScenario === 'exception' ? 35.5 : 48;
 export const socAssumptions = { startingSoc: sampleSoc, capacityKwh: 60, efficiency: scenario === 'missing' || scenario === 'invalid' ? null : 0.9 };
 export const validSocAssumptions = ({ startingSoc, capacityKwh, efficiency } = {}) => Number.isFinite(startingSoc) && startingSoc >= 0 && startingSoc <= 100 && Number.isFinite(capacityKwh) && capacityKwh > 0 && Number.isFinite(efficiency) && efficiency > 0 && efficiency <= 1;
 export function projectSoc(rows, { startingSoc, capacityKwh, efficiency } = {}) {
