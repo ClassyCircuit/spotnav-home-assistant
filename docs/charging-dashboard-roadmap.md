@@ -401,13 +401,15 @@ tests are documented there; full HA collection is still blocked on Windows.
     overlay. Review desktop/mobile visual hierarchy and ask the user to approve. No live
     bindings, new telemetry, protective behavior changes or charger actions; verify any
     eventual live source availability during 5.2 rather than assuming it exists.
-- [ ] **5.2 Overview and operation status**
-  - Convert approved prototype components into locally bundled HA custom cards; reuse
-    existing dashboard/status APIs and a coherent backend snapshot, not sample fixtures.
-  - Bind actual connection, SOC, measured power, next window and proposal/sent/readback
-    health. Show missing/stale data and critical failures without expanding details.
-  - Test HA card lifecycle, Sections, localization/theme and mocked API-to-render behavior;
-    no browser render may trigger charger actions or be required for planning.
+- [x] **5.2 Overview and operation status** (implemented locally; coordinator review pending)
+  - The existing card now shows a localized real-dashboard overview and read-only Morek
+    health, using separate, timestamped requests rather than claiming an atomic snapshot.
+    Measurements without a trustworthy Morek power source are explicitly unavailable;
+    sent ACK, effective readback and physical charging remain distinct. See the 2.5.31
+    handoff for freshness, source and testing limitations. Planning remains backend-owned.
+  - Focused lifecycle/race and action-safety tests and local desktop/mobile browser checks
+    use mocked HA/OCPP boundaries. No live HA or physical charging was checked. Overall
+    5.1 visual approval and the bar-versus-step choice remain pending; 5.3 is not started.
 - [ ] **5.3 Plan controls and actions**
   - Bind target/minimum/cap/ready-by controls, complete windows, per-window/total
     estimated costs and policy explanations to existing backend settings/planner APIs.

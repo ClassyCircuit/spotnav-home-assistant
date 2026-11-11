@@ -772,6 +772,10 @@ export const VISUAL_STYLES = `
   /* For a label that must exist for assistive technology and not be seen: the standard clip rectangle. */
   .spotnav-visually-hidden {
     position: absolute;
+    width: 0.0625rem;
+    height: 0.0625rem;
+    padding: 0;
+    border: 0;
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;

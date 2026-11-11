@@ -234,6 +234,68 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2.5.31 — Stage 5.2 daily overview (coordinator review pending)
+
+- The existing shipped card displays a localized daily overview from its decoded
+  dashboard: connection, SOC and reading age, next remaining proposed window,
+  estimated proposal energy/cost, and planner calculation time/age and historical
+  flag. It uses no prototype data and does not label legacy `plan.installed` as
+  Morek inventory. SOC age advances from the dashboard generation time; missing or
+  future timestamps give unknown age. Dates use the market zone, or labelled UTC
+  when no market zone is available. The manual Morek preview has its own separate
+  calculation time and is not the planner timestamp.
+- Morek status is read separately after a successful dashboard read, without waiting
+  for it to render. The read coalesces, times out after 10 seconds, and is invalidated
+  on config change, disconnect or a newer manual action. Late manual and follow-up
+  results are guarded by lifecycle, charger and operation. Existing evidence ages on
+  the normal card timer even if the next dashboard read stalls. Status updates replace only
+  the overview (unless the diagnostic panel is open); no OCPP fetch is performed.
+  Dashboard and status are not atomic. The summary reports observation, last send/ACK
+  and effective-readback times, and expressly leaves association with the displayed
+  proposal unknown. A match is shown only for internally consistent, recent accepted
+  evidence with valid remaining coverage; it is a last-read fact, not a current plan
+  verification or proof of physical flow. Offline, mismatch, uncertainty and stale,
+  superseded, missing and unsupported states remain visible without opening details.
+- There is no verified, fresh general Morek power source in this API. The overview says
+  measured power unavailable, including when current is zero; it does not infer power
+  from the plan or current limit. Capacity and estimated efficiency are not used for
+  new projections, and no separate low-SOC warning threshold is inferred. Automatic
+  dispatch remains unarmed and all existing manual authorization/interlocks remain.
+- Local checks: the full frontend suite passed 2,376 tests with two workers before the
+  final matching-evidence consistency check; focused daily, panel, lifecycle, ownership
+  and card tests passed 91 after it. Isolated actual-module backend planning/Morek tests
+  passed 492, one deselected, two warnings; the isolated lifecycle suite passed 26
+  with six warnings. Desktop 1440×1000 and emulated mobile
+  390×844 rendered the shipped bundle with a backend-produced dashboard fixture and
+  mocked status, with only dashboard/status requests and no horizontal overflow.
+  Screenshots are in the temporary `opencode/spotnav-52-{desktop,mobile}.png` files.
+  A mobile overflow in the existing visually-hidden text was corrected. Physical touch,
+  actual HA Sections/theme behavior, real OCPP and physical charging are unverified.
+  No HA access, deployment or hardware operation occurred. Stop after 5.2 for review;
+  5.1 visual approval and chart choice remain pending and 5.3 has not begun.
+- Actual contracts: `get_dashboard` captures the planner, connection, SOC and plan
+  together. `planning.calculated_at`, `reason` and `historical` belong to that planner
+  snapshot; `morek_schedule`'s `preview.calculated_at` is instead the time its manual
+  preview was built. These are separate requests, not an atomic combined snapshot.
+  Proposal windows, energy and estimated cost are backend-derived; the legacy
+  `plan.installed` is the controller's plan, not Morek profile inventory.
+- `soc` supplies value, source, estimated flag and age in seconds, plus capacity,
+  backend efficiency and wall-energy need when available. Capacity is reported or
+  configured, and efficiency can be a default or learned estimate, not an independently
+  measured current efficiency. An independently defined low-SOC warning threshold has
+  not been established; do not substitute a ready-by minimum or the protection floor.
+- Current dashboard live facts include charging and measured current, but charging is
+  serialized as a boolean even without a controller, so availability/startup must be
+  considered. Captured `measured_power_kw` comes from the smart-plug power entity and
+  feeds progress; it is not a general Morek power reading in the live API. No verified
+  source timestamp or freshness for general Morek measured power has been established.
+  Do not use planned power as measured power or turn unavailable into zero.
+- Morek status exposes sent profile/time/ACK, effective readback/time, coverage,
+  verification and operator/uncertainty state. Backend checks attempt identity,
+  current intent and supersession before reporting verification. ACK and readback do
+  not establish physical charging, and composite readback is not a profile inventory.
+  Status builds a preview but does not contact OCPP; the separate `fetch` does.
+
 ### Stage 5.1e — sample vehicle and evidence (review pending)
 
 - The sample vehicle card shows a battery with a target marker, estimated usable

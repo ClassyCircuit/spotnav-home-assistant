@@ -151,6 +151,7 @@ describe("Morek manual test panel", () => {
   it("keeps the styled opener and a useful diagnosis when the station does not match", async () => {
     vi.useFakeTimers();
     const transport = new FakeHass();
+    transport.trackMorek = true;
     const hass = transport.snapshot("admin", "en");
     hass.user = { is_admin: true };
     const card = mountCard({ type: "custom:spotnav-card", charger: "entry_a" }, hass);

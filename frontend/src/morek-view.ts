@@ -32,7 +32,9 @@ interface MorekProfile {
 }
 
 export function decodeMorekState(raw: unknown): MorekState | null {
-  if (raw === null || typeof raw !== "object") return null;
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const version = (raw as { api_version?: unknown }).api_version;
+  if (version !== undefined && version !== 1) return null;
   const value = (raw as { schedule?: unknown }).schedule;
   if (value === null || typeof value !== "object") return null;
   const state = value as MorekState;

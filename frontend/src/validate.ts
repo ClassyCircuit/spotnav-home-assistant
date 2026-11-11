@@ -60,6 +60,9 @@ export interface Fiscal {
 export interface Planning {
   state: string | null;
   reason: string | null;
+  /** Time and process provenance of the planner snapshot, not the Morek preview time. */
+  calculated_at: string | null;
+  historical: boolean | null;
   settings_revision: number | null;
   price_state: string | null;
   execution_state: string | null;
@@ -903,6 +906,9 @@ function decodePlanning(source: Record<string, unknown>): Planning {
   return {
     state: textOrNull(source, "state"),
     reason: textOrNull(source, "reason"),
+    calculated_at: typeof source.calculated_at === "string" && Number.isFinite(Date.parse(source.calculated_at))
+      ? source.calculated_at : null,
+    historical: typeof source.historical === "boolean" ? source.historical : null,
     settings_revision: numberOrNull(source, "settings_revision"),
     price_state: textOrNull(source, "price_state"),
     execution_state: textOrNull(source, "execution_state"),
