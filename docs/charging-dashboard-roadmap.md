@@ -1,7 +1,7 @@
 # Morek autonomous charging and dashboard roadmap
 
 Status: **in progress; manual baseline and ownership groundwork complete; autonomous mode not active**.
-Updated 2026-11-10. The checklist below is the authoritative work queue.
+Updated 2026-11-11. The checklist below is the authoritative work queue.
 
 This is the forward-looking plan for SpotNav Enhanced. Implement **one work block
 at a time**, not a dashboard rewrite and controller rewrite in one release.
@@ -142,7 +142,7 @@ tests are documented there; full HA collection is still blocked on Windows.
 - [x] **5.1a Initial prototype refinement** (sample groundwork; overall visual approval pending)
   - Refined local prototype and example ECharts are available; verification and
     unresolved limitations are in the development handoff. The user requested further
-    refinement in 5.1b–5.1d; don't repeat completed groundwork.
+    refinement in later Stage 5 substages; don't repeat completed groundwork.
   - Balance desktop columns and eliminate unused chart-column space; review the same
     cards stacked on mobile. Improve visual hierarchy and polish without decoration.
   - Make current charging state, measured power, next window start–end, reason for
@@ -165,7 +165,7 @@ tests are documented there; full HA collection is still blocked on Windows.
     gaps; do not imply continuous measurements where none exist. Present the chart roles
     and visual choices for user approval, without adding charts merely as decoration.
     Preserve actual interval widths, including negative values where illustrated.
-  - The work remains sample-only; final visual approval follows 5.1b–5.1d.
+  - The work remains sample-only; final visual approval follows the remaining Stage 5 design work.
 - [x] **5.1b Initial dark price-chart comparison** (sample groundwork; revision required)
   - Local comparison was implemented in `frontend/prototype/`; the user reviewed and
     rejected its small chart, layout gaps, monochromatic palette and visual treatment.
@@ -244,7 +244,7 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Browser-review both charts, modal and desktop/mobile layouts; verify tests, local
     dependencies and reported limitations. Overall 5.1 and chart choice remain pending
     user approval; no live data, planner changes, deployment or hardware actions.
-- [ ] **5.1b3 Chart fidelity and interval navigation** (sample-only; coordinator review pending)
+- [x] **5.1b3 Chart fidelity and interval navigation** (sample groundwork; visual approval pending)
   - Proposal windows now use a bottom-bright green gradient and an aligned pale plan
     track instead of dashed borders; window boundaries remain exact. Visual approval
     remains pending; see handoff.
@@ -253,10 +253,9 @@ tests are documented there; full HA collection is still blocked on Windows.
     mobile checks are documented in the handoff. User visual approval remains pending.
     Production must verify available historical and published future prices and use the
     configured local timezone, including midnight and 23/25-hour DST days.
-  - Local implementation now uses anchored responsive labels, future-focused default,
-    exact outlined plan windows and snapped navigation. Headless emulated pinch and taps
-    worked; physical touch and visual approval remain unverified. See handoff; do not
-    advance to 5.1b4 automatically.
+  - Local implementation uses anchored responsive labels, future-focused default and
+    snapped navigation. Headless emulated pinch and taps worked; physical touch and
+    visual approval remain unverified. 5.1b4 and 5.1b4a subsequently added plan work.
   - Bring BOTH full-width price charts much closer to `samples/bar-chart.js` and
     `samples/stepline-chart.js`: meaningful price-dependent colors on bars and stepped
     line/area, clearly visible plotted min/max callouts and a legible proposed-window
@@ -323,7 +322,9 @@ tests are documented there; full HA collection is still blocked on Windows.
 - [x] **5.1c Sample price insights and monthly statistics** (sample-only; coordinator and visual review pending)
   - Local fictional insights use duration-weighted historical quartiles, a complete
     one-hour known-price opportunity and an October summary; see handoff for coverage,
-    checks and limitations. Overall 5.1 and chart choice remain pending approval.
+    checks and limitations. The opportunity searches only Now and interval starts;
+    its 5.1d label explicitly qualifies this restriction. Overall 5.1 and chart
+    choice remain pending approval.
   - Prototype concise, explainable assessments of current/upcoming prices against a
     stated illustrative longer-term baseline, plus best upcoming price windows and
     useful monthly statistics. Clearly distinguish cheapest opportunities from the
@@ -334,8 +335,12 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Explore a useful comparison method, including same-day-of-week only if sample
     coverage supports it; make assumptions and limitations easy to inspect. Obtain
     feedback on which insights are useful, without implementing the live pipeline.
-- [ ] **5.1d Daily dashboard polish and visual review** (sample-only)
-  - Refine the full dark dashboard around the selected chart direction: strengthen
+- [x] **5.1d Daily dashboard polish and visual review** (sample-only; coordinator and user visual review pending)
+  - Local daily hierarchy, explicitly simulated scenarios and independent illustrative
+    sent-versus-measured history are available; see handoff for checks and limitations.
+    Both chart alternatives remain for user choice; overall 5.1 is not approved.
+  - Refine the full dark dashboard while retaining both chart alternatives until the user
+    selects a direction: strengthen
     hierarchy, legibility and card balance; remove duplicated cost/status content;
     keep important warnings visible and technical evidence accessible. Distinguish a
     schedule mismatch from measured charging state in clear, actionable wording. Use
@@ -392,7 +397,7 @@ tests are documented there; full HA collection is still blocked on Windows.
 ### Stage 7 — ECharts prices and schedule tracks (old B3)
 
 - [ ] **7.1 Price chart**
-  - Reuse the 5.1a sample ECharts work; bundle it for the shipped card locally and bind
+  - Reuse the Stage 5 sample ECharts work; bundle it for the shipped card locally and bind
     real source-resolution prices, units, cap and markers.
   - Handle negative/missing prices, timezone and DST correctly.
 - [ ] **7.2 Interaction**
@@ -498,10 +503,11 @@ The user accepted Apache ECharts after comparing it with ApexCharts. ECharts is
 the selected chart library; visual similarity to evcc does not require running
 evcc or another controller alongside SpotNav.
 
-## 2. Current baseline, not the finished product
+## 2. Historical manual baseline, not the finished product
 
-The manual baseline below describes **2.5.7**. Source has since reached **2.5.13**
-with unarmed groundwork; see Stage 0 and the execution audit. Verify runtime versions.
+The baseline below describes **2.5.7**, not the current implementation. Source manifest
+is **2.5.30** at this update; see the checklist and recent development handoff for later
+unarmed groundwork. Source, installed HA version and charger state are separate facts.
 
 - The manual Morek API can preview, send, fetch and selectively clear profile
   `42001`, station `3020002509120029`, connector `1`, through HA OCPP.

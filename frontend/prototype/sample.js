@@ -60,7 +60,9 @@ export function priceWindow(window, intervals) {
 const blocks = [[24,24.25], [24.25,24.5], [24.5,24.625], [25,25.375]].map(([start,end]) => ({ start, end, power: 6, control: 'normal' }));
 // Wall energy is converted to stored battery energy once; these are projections, not observations.
 export const scenario = typeof location === 'undefined' ? 'default' : new URLSearchParams(location.search).get('plan') || 'default';
-export const socAssumptions = { startingSoc: 48, capacityKwh: 60, efficiency: scenario === 'missing' || scenario === 'invalid' ? null : 0.9 };
+export const dailyScenario = typeof location === 'undefined' ? 'mismatch' : new URLSearchParams(location.search).get('state') || 'mismatch';
+const sampleSoc = dailyScenario === 'unavailable' ? null : dailyScenario === 'infeasible' ? 15 : dailyScenario === 'exception' ? 35.5 : 48;
+export const socAssumptions = { startingSoc: sampleSoc, capacityKwh: 60, efficiency: scenario === 'missing' || scenario === 'invalid' ? null : 0.9 };
 export const validSocAssumptions = ({ startingSoc, capacityKwh, efficiency } = {}) => Number.isFinite(startingSoc) && startingSoc >= 0 && startingSoc <= 100 && Number.isFinite(capacityKwh) && capacityKwh > 0 && Number.isFinite(efficiency) && efficiency > 0 && efficiency <= 1;
 export function projectSoc(rows, { startingSoc, capacityKwh, efficiency } = {}) {
   let soc = validSocAssumptions({ startingSoc, capacityKwh, efficiency }) ? startingSoc : null;
@@ -70,7 +72,7 @@ export function projectSoc(rows, { startingSoc, capacityKwh, efficiency } = {}) 
     return { ...row, projectedSoc: soc };
   });
 }
-const sampleBlocks = scenario === 'long' ? Array.from({length: 8}, (_, i) => ({start: 24 + i * .5, end: 24.25 + i * .5, power: 6, control: 'normal'})) : blocks;
+const sampleBlocks = scenario === 'long' ? Array.from({length: 8}, (_, i) => ({start: 24 + i * .5, end: 24.25 + i * .5, power: 6, control: 'normal'})) : dailyScenario === 'exception' ? [{start:15,end:15.5,power:6,control:'minimum-exception'}, ...blocks] : blocks;
 const pricedWindows = groupBlocks(sampleBlocks).map((w, i) => {
   const result = priceWindow(w, scenario === 'missing' && i === 0 ? [] : prices);
   return scenario === 'invalid' && i === 0 ? { ...result, energy: NaN, cost: Infinity, centsPerKwh: NaN } : result;

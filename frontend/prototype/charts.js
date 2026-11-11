@@ -3,6 +3,7 @@ import { CustomChart, LineChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent, MarkLineComponent, MarkAreaComponent, MarkPointComponent, DataZoomComponent, VisualMapComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 import { prices, windows, time, sampleDate, sampleDays, priceGaps, now, deadline, horizon, stepSegments, stepPoints, cap, snapRange, initialRange, timeTicks } from './sample.js';
+import { readings, sentHistory } from './daily-sample.js';
 
 echarts.use([CustomChart, LineChart, GridComponent, TooltipComponent, MarkLineComponent, MarkAreaComponent, MarkPointComponent, VisualMapComponent, DataZoomComponent, CanvasRenderer]);
 const axis = { axisLine: { lineStyle: { color: '#536b76' } }, axisLabel: { color: '#bed0d5', fontSize: 12 }, splitLine: { lineStyle: { color: '#34444d' } } };
@@ -145,7 +146,8 @@ export function mountCharts() {
     yAxis: { ...axis, type: 'value', name: 'kW', max: 8, min: 0, nameTextStyle: { color: '#bed0d5', align: 'left' } },
     series: [{ type: 'line', step: 'end', connectNulls: false, symbol: 'circle', symbolSize: 5, lineStyle: { color: '#188c79', width: 2 }, itemStyle: { color: '#188c79' },
       areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(31,165,137,.45)' }, { offset: 1, color: 'rgba(31,165,137,.04)' }]) },
-      data: [[21.5, 0], [21.75, 0], [22, 6], [22.25, 6], [22.5, null], [22.75, 6], [23, 0], [23.25, 0], [23.5, 0]] }] });
+      markArea:{silent:true,label:{show:false},itemStyle:{color:'rgba(112,153,222,.15)'},data:[[{xAxis:sentHistory.start},{xAxis:sentHistory.end}]]},
+      data: readings.map(r=>[r.time,r.kw]) }] });
   const resize = new ResizeObserver(() => { Object.values(priceCharts).forEach(chart => chart.resize()); powerChart.resize(); });
   for (const mode of ['bar', 'step']) resize.observe(document.getElementById(`price-${mode}`)); resize.observe(document.getElementById('power-chart'));
 }

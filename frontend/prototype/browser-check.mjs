@@ -19,7 +19,7 @@ for (const [name,width,height] of [['desktop',1440,1000],['mobile',390,844]]) {
   const loaded = new Promise(resolve => { const prev=ws.onmessage; ws.onmessage=e=>{prev(e); if(JSON.parse(e.data).method==='Page.loadEventFired'){ws.onmessage=prev;resolve();}}; });
   await cmd('Page.navigate',{url:'http://127.0.0.1:8765/prototype/'}); await loaded;
   const state=await evaluate(`(async()=>{await Promise.all([...document.querySelectorAll('wa-button,wa-input,wa-badge,wa-progress-bar,wa-details')].map(e=>e.updateComplete));return {width:document.documentElement.scrollWidth,viewport:innerWidth,panels:document.querySelectorAll('.panel').length,charts:document.querySelectorAll('.chart canvas').length,rows:document.querySelectorAll('.plan-row').length,disabled:[...document.querySelectorAll('.controls wa-button,.details-body wa-button')].every(e=>e.disabled),text:document.body.innerText,rects:[...document.querySelectorAll('.prices')].map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}})};})()`);
-  assert.ok(state.width<=state.viewport,`${name} overflow ${state.width}/${state.viewport}`); assert.equal(state.panels,8); assert.equal(state.charts,3); assert.equal(state.rows,8); assert.ok(state.disabled); assert.ok(state.rects[1].y>state.rects[0].y); assert.ok(Math.abs(state.rects[0].width-state.rects[1].width)<1);
+  assert.ok(state.width<=state.viewport,`${name} overflow ${state.width}/${state.viewport}`); assert.equal(state.panels,7); assert.equal(state.charts,3); assert.equal(state.rows,8); assert.ok(state.disabled); assert.ok(state.rects[1].y>state.rects[0].y); assert.ok(Math.abs(state.rects[0].width-state.rects[1].width)<1);
   for(const text of ['unverified','unarmed','26.45 c/kwh','00:37:30','not an optimized']) assert.ok(state.text.toLowerCase().includes(text),text);
   const layout=await evaluate(`(()=>{let a=document.querySelector('.overview').getBoundingClientRect(),b=document.querySelector('.controls').getBoundingClientRect();return {ax:a.x,ay:a.y,aw:a.width,ab:a.bottom,bx:b.x,by:b.y,bw:b.width,bb:b.bottom}})()`);
   if(name==='desktop') {assert.ok(Math.abs(layout.ay-layout.by)<1 && layout.bx>layout.ax && Math.abs(layout.aw-layout.bw)<1 && Math.abs(layout.ab-layout.bb)<1,'overview and controls aligned');} else assert.ok(layout.by>=layout.ab,'controls follow overview');
@@ -55,7 +55,7 @@ for (const [name,width,height] of [['desktop',1440,1000],['mobile',390,844]]) {
   await evaluate(`document.querySelector('#close-plan').click()`); assert.equal(await evaluate(`document.activeElement.id`),'open-plan-details');
   const metrics=await cmd('Page.getLayoutMetrics');
   const full=await cmd('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:{x:0,y:0,width:metrics.cssContentSize.width,height:metrics.cssContentSize.height,scale:1}});
-  await writeFile(`${process.env.TEMP}/opencode/spotnav-51b4-${name}-full.png`,Buffer.from(full.data,'base64'));
+  await writeFile(`${process.env.TEMP}/opencode/spotnav-51d-${name}-full.png`,Buffer.from(full.data,'base64'));
   for(const mode of ['bar','step']) {
     assert.deepEqual(await snapped(mode),[13,48]);
     const defaultTicks=await labels(mode);
@@ -181,6 +181,24 @@ for (const [name,width,height] of [['desktop',1440,1000],['mobile',390,844]]) {
   assert.equal(await evaluate(`document.querySelector('#plan-dialog').open`),true);
   await cmd('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27}); await cmd('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
   assert.equal(await evaluate(`document.activeElement.id`),'open-plan');
+  const history=await evaluate(`(()=>{const e=document.querySelector('.history'),r=e.getBoundingClientRect();return {text:e.innerText,disabled:e.querySelector('select').disabled,clip:{x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1}}})()`);
+  assert.match(history.text,/3\/4 intervals · 75%/); assert.match(history.text,/21:45–22:00/); assert.match(history.text,/22:30–22:45 is unknown/); assert.ok(history.disabled);
+  const historyImage=await cmd('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:history.clip}); await writeFile(`${process.env.TEMP}/opencode/spotnav-51d-${name}-history.png`,Buffer.from(historyImage.data,'base64'));
+  for (const [daily,expected] of [['waiting','waiting to charge'],['charging','6.0 kW'],['unavailable','Vehicle state unavailable'],['infeasible','falls short'],['partial','01:22:30'],['exception','Above cap']]) {
+    const loadedDaily=new Promise(resolve=>{const prev=ws.onmessage;ws.onmessage=e=>{prev(e);if(JSON.parse(e.data).method==='Page.loadEventFired'){ws.onmessage=prev;resolve();}};});
+    await cmd('Page.navigate',{url:`http://127.0.0.1:8765/prototype/?state=${daily}`}); await loadedDaily;
+    const result=await evaluate(`(async()=>{await Promise.all([...document.querySelectorAll('wa-button,wa-input,wa-badge')].map(e=>e.updateComplete));const a=document.querySelector('.overview').getBoundingClientRect(),b=document.querySelector('.controls').getBoundingClientRect();return {text:document.body.innerText,width:document.documentElement.scrollWidth,viewport:innerWidth,charts:document.querySelectorAll('.price-chart canvas').length,buttons:[...document.querySelectorAll('.controls wa-button,.details-body wa-button')].every(e=>e.disabled),clip:{x:Math.min(a.left,b.left)+scrollX,y:a.top+scrollY,width:Math.max(a.right,b.right)-Math.min(a.left,b.left),height:Math.max(a.bottom,b.bottom)-a.top,scale:1}}})()`);
+    assert.ok(result.width<=result.viewport && result.buttons); assert.equal(result.charts,2); assert.ok(result.text.includes(expected),`${daily}: ${expected}`);
+    assert.equal(await evaluate(`Boolean(document.querySelector('.alert'))`),['unavailable','infeasible'].includes(daily),`${daily} warning visibility`);
+    if(daily==='unavailable') assert.match(result.text,/Battery level unavailable/);
+    if(daily==='exception') { assert.match(result.text,/15:00–15:30/); assert.match(result.text,/40\.0%/); assert.match(result.text,/ABOVE-CAP MINIMUM/); assert.ok(await evaluate(`['.controls','.prices-bar','.prices-step','#plan-dialog'].every(s=>document.querySelector(s).textContent.includes('ABOVE-CAP MINIMUM'))`)); }
+    if(['charging','unavailable','exception','infeasible','partial','waiting'].includes(daily)) { const img=await cmd('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:result.clip}); await writeFile(`${process.env.TEMP}/opencode/spotnav-51d-${name}-${daily}.png`,Buffer.from(img.data,'base64')); }
+    await evaluate(`document.querySelector('#open-plan').focus()`); await cmd('Input.dispatchKeyEvent',{type:'keyDown',key:' ',code:'Space',windowsVirtualKeyCode:32}); await cmd('Input.dispatchKeyEvent',{type:'keyUp',key:' ',code:'Space',windowsVirtualKeyCode:32});
+    assert.equal(await evaluate(`document.querySelector('#plan-dialog').open`),true); await cmd('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27}); await cmd('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27}); assert.equal(await evaluate(`document.activeElement.id`),'open-plan');
+  }
+  const selectedLoad=new Promise(resolve=>{const prev=ws.onmessage;ws.onmessage=e=>{prev(e);if(JSON.parse(e.data).method==='Page.loadEventFired'){ws.onmessage=prev;resolve();}};});
+  await evaluate(`(()=>{const e=document.querySelector('#sample-state');e.value='charging';e.dispatchEvent(new Event('change',{bubbles:true}))})()`); await selectedLoad;
+  assert.equal(await evaluate(`document.querySelector('#sample-state').value`),'charging'); assert.match(await evaluate(`document.querySelector('.overview').innerText`),/6\.0 kW/);
   console.log(`${name}: full page and both cards, no horizontal overflow`);
 }
 assert.deepEqual(errors,[]); assert.ok(urls.every(u=>u.startsWith('http://127.0.0.1:8765/')||u.startsWith('data:')),'unexpected network request'); console.log(`${urls.length} local/data requests`); ws.close();

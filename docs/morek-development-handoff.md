@@ -234,6 +234,34 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### Stage 5.1d — daily sample dashboard (review pending)
+
+- The daily area shows sample measured power, the next proposal and estimated wall
+  energy/cost beside compact simulated controls. A visible mismatch warning separates
+  sample effective-limit disagreement from measured power. Technical evidence stays
+  available in a disclosure; duplicated cost and status cards were removed. Both
+  chart alternatives remain. Above-cap exceptions are labelled in all plan displays.
+- The local scenario selector demonstrates mismatch, normal waiting, charging,
+  unavailable vehicle/current price, minimum shortfall, partial stop and an above-cap
+  minimum exception. It changes only local sample data. The shortfall is a hand-authored
+  proposal, not proof that every possible schedule is infeasible. The missing-price
+  insight deliberately masks its inputs while the chart/plan retain separate fictional
+  prices. Cap is explicitly enabled at 35 c/kWh (€0.35/kWh) on the stated price basis.
+- Recent charging compares an independently authored last-sent 22:00–23:00 sample
+  window and fictional quarter-hour readings: 21:45 sample out-of-plan flow and a
+  22:30–22:45 unknown gap. Three of four sent-window readings are available; selection
+  is disabled and this is not real history. The 5.1c opportunity label now explicitly
+  limits the comparison to Now/interval-boundary starts, not all continuous starts.
+- Prototype build and 16 focused tests passed. Desktop 1440×1000 and emulated mobile
+  390×844 checked both charts, modal/focus, all six alternate states, sample selector,
+  missing data, history labels and no horizontal overflow; 144 observed requests were
+  local/data only. Screenshots inspected in temporary `opencode` folder:
+  `spotnav-51d-{desktop|mobile}-{full|history|waiting|charging|unavailable|infeasible|partial|exception}.png`.
+  Browser was an existing debugging session; emulated touch is not physical touch.
+  Full accessibility, HA integration and real telemetry remain unverified. No HA or
+  hardware access; dispatch remains unarmed. Stop for coordinator/user review, not 5.1e;
+  overall 5.1 and chart preference remain unapproved.
+
 ### Stage 5.1c — sample price insights (review pending)
 
 - A compact local panel compares current chart price to the preceding 30 fictional

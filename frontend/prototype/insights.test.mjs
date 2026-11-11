@@ -45,4 +45,5 @@ test('fixture labels and rendered values match chart, historical coverage and mi
   assert.ok(html.includes(`${m.average.toFixed(2)} c/kWh`));
   assert.match(html,/not the proposed plan/i); assert.match(html,/744 hours/);
   const missing=renderInsights(true); assert.match(missing,/Unknown/); assert.match(missing,/No complete 1-hour window/); assert.doesNotMatch(missing,/NaN|Infinity/);
+  assert.match(html,/not every possible start/); assert.match(html,/Now or interval boundaries/);
 });

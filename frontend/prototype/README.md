@@ -17,6 +17,16 @@ Open <http://127.0.0.1:8765/prototype/>. Stop the server with Ctrl+C. No HA
 installation, deployment or restart is involved. `prototype/dist/` is generated
 and ignored. To rebuild after editing, rerun the build command and reload.
 
+The local **Sample scenario** selector reloads only this prototype with `?state=`:
+`mismatch`, `waiting`, `charging`, `unavailable`, `infeasible`, `partial` or
+`exception`. These are hand-authored illustrations, not a planner or measurements
+from a charger. The exception adds a 15:00–15:30 above-cap sample window; the
+infeasible example means the displayed illustrative proposal falls short, not proof
+that all possible plans are infeasible. Inputs do not save settings or control charging.
+The recent-session selector is disabled; its sent window and separately authored
+sample readings demonstrate a 22:30–22:45 gap and 21:45 out-of-plan flow. Coverage
+is 3 of 4 quarter-hour readings in the sent hour, not complete measurement history.
+
 For local rendering checks, append `?plan=missing` (unavailable plan tariff and
 efficiency), `?plan=invalid` (invalid plan values), or `?plan=long` (eight windows).
 The missing-plan scenario deliberately leaves the separate chart price fixture intact;
@@ -126,5 +136,5 @@ individual-card, zoomed-card, modal and rendered edge-fixture screenshots under 
 temporary `opencode` folder. The check reports whether emulated taps needed its
 programmatic tooltip fallback; pinch emulation is not physical-touch validation.
 It does not validate real touch, accessibility tree or actual HA shadow roots. Run
-`node --test prototype/sample.test.mjs prototype/insights.test.mjs` for sample
-arithmetic, price insights and missing inputs.
+`node --test prototype/sample.test.mjs prototype/insights.test.mjs prototype/daily-sample.test.mjs`
+for sample arithmetic, price insights, scenario and history checks.
