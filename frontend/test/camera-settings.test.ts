@@ -75,7 +75,7 @@ async function openSettings(payload: Record<string, unknown>, language = "en") {
     message["type"] === "spotnav/get_entity_config" ? read("vehicle", "v1", "update_vehicle_success.json") : new Promise(() => undefined);
   hass.cameraHandler = async (message) => (message["type"] === "spotnav/camera_snapshot" ? picture() : picture(240, 90));
   shadow(element)
-    .querySelector<HTMLButtonElement>(`[aria-label="${translate(language as "en", "header.settings")}"]`)!
+    .querySelector<HTMLButtonElement>(`[aria-label="${translate("en", "header.settings")}"]`)!
     .click();
   await settle();
   return { hass, element };
@@ -328,8 +328,8 @@ describe("a car's reference pictures", () => {
     const night = ev6.querySelector<HTMLElement>("[data-reference-tile='night']")!;
     expect(night.dataset["state"]).toBe("empty");
     expect(night.querySelector<HTMLElement>(".spotnav-reference-slot-empty")!.hidden).toBe(false);
-    expect(night.textContent).toContain("Natt");
-    expect(night.textContent).toContain("Ingen bild");
+    expect(night.textContent).toContain("Night");
+    expect(night.textContent).toContain("No picture");
     expect(night.querySelector<HTMLImageElement>("img")!.hidden).toBe(true);
     expect(hass.cameraMessages.filter((message) => message.type === "spotnav/reference_picture")).toHaveLength(1);
     const niro = carSection(openDialog(element)!, NIRO);
@@ -354,17 +354,17 @@ describe("a car's reference pictures", () => {
     payload["camera_identification"]["references"][EV6] = [{ kind: "day", taken_at: "2026-10-07T12:00:00+00:00", colour: true }];
     const { element } = await openSettings(payload, "sv");
     const form = await openEditor(element);
-    expect(openDialog(element)!.querySelector("h2, h3")?.textContent).toBe("Referensbild — EV6");
-    expect(form.textContent).toContain("Ta bilden när bilen står vid laddaren.");
+    expect(openDialog(element)!.querySelector("h2, h3")?.textContent).toBe("Reference picture — EV6");
+    expect(form.textContent).toContain(translate("en", "reference.intro"));
     const day = slot(form, "day");
     const night = slot(form, "night");
     expect(day.dataset["state"]).toBe("taken");
-    expect(day.querySelector("[data-reference-action='take']")?.textContent).toBe("Ta om");
+    expect(day.querySelector("[data-reference-action='take']")?.textContent).toBe("Retake");
     expect(day.querySelector<HTMLElement>("[data-reference-action='delete']")!.hidden).toBe(false);
     expect(day.querySelector<HTMLImageElement>("img")!.hidden).toBe(false);
     expect(night.dataset["state"]).toBe("empty");
-    expect(night.textContent).toContain("Ingen bild");
-    expect(night.querySelector("[data-reference-action='take']")?.textContent).toBe("Ta nattbild");
+    expect(night.textContent).toContain("No picture");
+    expect(night.querySelector("[data-reference-action='take']")?.textContent).toBe("Take night picture");
     expect(night.querySelector<HTMLElement>("[data-reference-action='delete']")!.hidden).toBe(true);
     // A car with a picture is recognised: the warning is for a car with none.
     expect(form.querySelector<HTMLElement>("[data-reference-help]")!.hidden).toBe(true);
@@ -429,7 +429,7 @@ describe("a car's reference pictures", () => {
     payload["camera_identification"]["references"][EV6][0]["stale"] = true;
     const { element } = await openSettings(payload, "sv");
     const ev6 = carSection(openDialog(element)!, EV6);
-    expect(ev6.querySelector("[data-row='reference']")?.textContent).toContain("Dag, Natt");
+    expect(ev6.querySelector("[data-row='reference']")?.textContent).toContain("Day, Night");
     expect(ev6.querySelector("[data-help='reference']")).toBeNull();
   });
 

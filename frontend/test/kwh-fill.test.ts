@@ -210,7 +210,7 @@ describe("the kWh slider with a known room", () => {
     expect(slider(element).getAttribute("aria-label")).toBe("Energy slider, 0.5 to 30 kWh in half-kWh steps");
     document.body.innerHTML = "";
     const sv = await openPlan(fixture(), manual(), "sv");
-    expect(slider(sv.element).getAttribute("aria-label")).toBe("Energireglage, 0,5 till 30 kWh i halvkWh-steg");
+    expect(slider(sv.element).getAttribute("aria-label")).toBe("Energy slider, 0.5 to 30 kWh in half-kWh steps");
   });
 
   it("above full still shows the amount and the same line", async () => {
@@ -259,15 +259,15 @@ describe("the kWh slider with a known room", () => {
     expect(help(element)!.textContent).toBe("Charges until the battery is full (to the car's charge limit of 90 %), 7.5 kWh now.");
   });
 
-  it("speaks Swedish", async () => {
+  it("uses English with Swedish HA", async () => {
     const { element } = await openPlan(fixture({ value: 80, room_kwh: 7.5, vehicle_max_percent: 90 }), manual({ requested_kwh: 4 }), "sv");
-    expect(mark(element)!.textContent).toBe("fullt");
-    expect(shown(element).textContent).toBe("4,0 kWh");
-    expect(help(element)!.textContent).toBe("Det behövs 7,5 kWh för att fylla batteriet (till bilens laddgräns 90 %).");
+    expect(mark(element)!.textContent).toBe("full");
+    expect(shown(element).textContent).toBe("4.0 kWh");
+    expect(help(element)!.textContent).toBe("7.5 kWh fills the battery (to the car's charge limit of 90 %).");
     drag(element, slider(element).max);
-    expect(shown(element).textContent).toBe("Fyll");
-    expect(slider(element).getAttribute("aria-valuetext")).toBe("Fyll");
-    expect(help(element)!.textContent).toBe("Laddar tills batteriet är fullt (till bilens laddgräns 90 %), nu 7,5 kWh.");
+    expect(shown(element).textContent).toBe("Fill");
+    expect(slider(element).getAttribute("aria-valuetext")).toBe("Fill");
+    expect(help(element)!.textContent).toBe("Charges until the battery is full (to the car's charge limit of 90 %), 7.5 kWh now.");
   });
 
   it("keeps a stored amount above the top where it is, as an amount", async () => {
@@ -278,9 +278,9 @@ describe("the kWh slider with a known room", () => {
   });
 
   it.each<[number, string, string, string]>([
-    [7.3, "7.5", "7.3 kWh", "7,3 kWh"],
-    [20.25, "20.5", "20.25 kWh", "20,25 kWh"],
-    [0.1, "0.5", "0.1 kWh", "0,1 kWh"],
+    [7.3, "7.5", "7.3 kWh", "7.3 kWh"],
+    [20.25, "20.5", "20.25 kWh", "20.25 kWh"],
+    [0.1, "0.5", "0.1 kWh", "0.1 kWh"],
   ])("shows a stored %s kWh off the half-kWh step exactly, the slider at its nearest step, and keeps it on Save", async (stored, at, en, sv) => {
     for (const [language, text] of [["en", en], ["sv", sv]] as const) {
       document.body.innerHTML = "";

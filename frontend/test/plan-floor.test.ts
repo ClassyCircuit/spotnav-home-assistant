@@ -139,10 +139,10 @@ describe("the level now and the car's limit on the plan's target slider", () => 
     const now = mark(block, "now-mark");
     const limit = mark(block, "limit-mark");
     expect(now.hidden).toBe(false);
-    expect(now.textContent).toBe("nu");
+    expect(now.textContent).toBe("now");
     expect(now.style.getPropertyValue("--spotnav-mark")).toBe("0.4");
     expect(limit.hidden).toBe(false);
-    expect(limit.textContent).toBe("gräns");
+    expect(limit.textContent).toBe("limit");
     expect(limit.style.getPropertyValue("--spotnav-mark")).toBe("0.8");
     // The same tick as the kWh slider's "fullt", in the slider's own track.
     expect(now.classList.contains(C.settingsFullMark)).toBe(true);
@@ -153,7 +153,7 @@ describe("the level now and the car's limit on the plan's target slider", () => 
     const body = payload(null);
     body.soc.estimated = true;
     const block = await openPlan(body);
-    expect(mark(block, "now-mark").textContent).toBe("≈ nu");
+    expect(mark(block, "now-mark").textContent).toBe("≈ now");
   });
 
   it("leave out the limit when the car states none, and the level now for another car picked", async () => {

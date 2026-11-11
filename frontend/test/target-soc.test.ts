@@ -211,7 +211,7 @@ describe("the Plan popover in target mode", () => {
     Object.assign(payload["soc"], { estimated: false, age_s: 30 });
     const { element } = await openPlan(payload, aRecord({ target: { vehicle_id: "<id>", target_percent: 80 } }), "sv");
     // A fresh reading has no age to state, and is not called an estimate.
-    expect(q(element, "[data-soc='facts']")?.textContent).toBe("Nu 75,1 %");
+    expect(q(element, "[data-soc='facts']")?.textContent).toBe("Now 75.1 %");
     expect(q(element, "[data-soc='facts']")?.dataset["estimated"]).toBe("false");
   });
 
@@ -222,7 +222,7 @@ describe("the Plan popover in target mode", () => {
     const { element } = await openPlan(payload, record);
     expect(q(element, "[data-soc='facts']")?.textContent).toBe("Now 75.1 % · Charge limit 80 % · 8 min ago");
     const sv = await openPlan(payload, record, "sv");
-    expect(q(sv.element, "[data-soc='facts']")?.textContent).toBe("Nu 75,1 % · Laddgräns 80 % · för 8 min sedan");
+    expect(q(sv.element, "[data-soc='facts']")?.textContent).toBe("Now 75.1 % · Charge limit 80 % · 8 min ago");
   });
 
   it("does not ask for the battery capacity in the plan: one sentence, no link", async () => {
@@ -232,9 +232,9 @@ describe("the Plan popover in target mode", () => {
     const { hass, element } = await openPlan(payload, aRecord(), "sv");
     expect(q(element, "input[id$='-capacity']")).toBeNull();
     expect(q(element, "[data-soc='capacity-missing']")?.textContent).toBe(
-      "Batterikapacitet saknas \u2014 ange den i Inst\u00e4llningar",
+      "Battery capacity is missing \u2014 enter it in Settings",
     );
-    expect(rowText(element, "need")).toContain("Ok\u00e4nd");
+    expect(rowText(element, "need")).toContain("Unknown");
     expect(updates(hass)).toHaveLength(0);
     expect(q(element, "[data-soc='settings-link']")).toBeNull();
   });
@@ -451,7 +451,7 @@ describe("the target slider at its top", () => {
     expect(verdict(element).hidden).toBe(true);
     drag(element, 80);
     expect(targetText(element)).toBe("80 %");
-    expect(verdict(element).textContent).toBe("Laddar till bilens gräns, 80 %");
+    expect(verdict(element).textContent).toBe("Charging to the vehicle's limit, 80 %");
     expect(q(element, "[data-soc='car-ends']")).toBeNull();
   });
 
@@ -501,8 +501,8 @@ describe("the target slider's value on its label row", () => {
   });
 
   it.each<[number, string, string, string]>([
-    [80.5, "81", "80.5 %", "80,5 %"],
-    [72.25, "72", "72.25 %", "72,25 %"],
+    [80.5, "81", "80.5 %", "80.5 %"],
+    [72.25, "72", "72.25 %", "72.25 %"],
   ])("shows a stored %s percent off the slider's step exactly, the slider at its nearest step, and keeps it on Save", async (stored, at, en, sv) => {
     for (const [language, text] of [["en", en], ["sv", sv]] as const) {
       document.body.innerHTML = "";

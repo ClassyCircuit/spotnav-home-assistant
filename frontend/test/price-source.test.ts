@@ -81,7 +81,7 @@ async function open(
   hass.resolveNext(payload);
   await settle();
   shadow(element)
-    .querySelector<HTMLButtonElement>(`[aria-label="${translate((options.language ?? "en") as "en", "header.settings")}"]`)
+    .querySelector<HTMLButtonElement>(`[aria-label="${translate("en", "header.settings")}"]`)
     ?.click();
   await settle();
   return { hass, element };
@@ -173,7 +173,7 @@ describe("the Electricity price section", () => {
     const { element } = await open(dashboard(priceSource({ charger_count: 1 })), { language: "sv" });
     await settle();
     const section = priceSection(element);
-    expect(section.querySelector("[data-price-source]")?.textContent).toBe("Elpris SE4");
+    expect(section.querySelector("[data-price-source]")?.textContent).toBe("Electricity price SE4");
     expect(section.querySelector("[data-price-shared]")).toBeNull();
   });
 
@@ -183,18 +183,18 @@ describe("the Electricity price section", () => {
     });
     await settle();
     const section = priceSection(element);
-    expect(section.querySelector("[data-price-source]")?.textContent).toBe("Elpris SE4 · används av alla 2 laddare");
-    expect(section.querySelector("[data-row='price_from']")?.textContent).toContain("Pris från");
+    expect(section.querySelector("[data-price-source]")?.textContent).toBe("Electricity price SE4 · used by all 2 chargers");
+    expect(section.querySelector("[data-row='price_from']")?.textContent).toContain("Price from");
     const question = section.querySelector<HTMLElement>("[data-price-duplicate]")!;
-    expect(question.textContent).toContain("Två elpriser för SE4 med olika avgifter. Använd ett?");
+    expect(question.textContent).toContain("Two electricity prices for SE4 with different fees. Use one?");
     expect(Array.from(question.querySelectorAll(".spotnav-choice-label")).map((label) => label.textContent)).toEqual([
-      "Använd Elpris SE4",
-      "Använd Elpris SE4 (company)",
-      "Behåll båda",
+      "Use Electricity price SE4",
+      "Use Electricity price SE4 (company)",
+      "Keep both",
     ]);
     expect(Array.from(question.querySelectorAll("[data-fees]")).map((line) => line.textContent)).toEqual([
-      "moms 25 % · skatt 36 öre/kWh · nät 30 öre/kWh",
-      "moms 25 % · skatt 43 öre/kWh · nät 30 öre/kWh",
+      "VAT 25 % · tax 36 öre/kWh · grid 30 öre/kWh",
+      "VAT 25 % · tax 43 öre/kWh · grid 30 öre/kWh",
     ]);
   });
 

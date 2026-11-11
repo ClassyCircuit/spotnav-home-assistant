@@ -66,7 +66,7 @@ async function openSettings(
   hass.resolveNext(body);
   await settle();
   shadow(element)
-    .querySelector<HTMLButtonElement>(`[aria-label='${translate(language as "en", "header.settings")}']`)!
+    .querySelector<HTMLButtonElement>(`[aria-label='${translate("en", "header.settings")}']`)!
     .click();
   await settle();
   return { hass, element };
@@ -104,12 +104,12 @@ describe("the page", () => {
     ]);
     expect(headings).toEqual(
       expect.arrayContaining([
-        ["price", "Elpris"],
-        ["car", "Bil"],
-        ["charger", "Laddare · HALO Charger"],
-        ["site", "Anläggning · My Home"],
-        ["solar", "Sol"],
-        ["notifications", "Aviseringar"],
+        ["price", "Electricity price"],
+        ["car", "Car"],
+        ["charger", "Charger · HALO Charger"],
+        ["site", "Site · My Home"],
+        ["solar", "Solar"],
+        ["notifications", "Notifications"],
       ]),
     );
   });
@@ -130,7 +130,7 @@ describe("the page", () => {
   it("shows the setup in short words, never entity ids", async () => {
     const { element } = await openSettings("sv");
     const charger = dialog(element).querySelector<HTMLElement>("[data-section='entities']")!;
-    expect(charger.querySelector("[data-row='start_stop']")?.textContent).toBe("Start och stoppAktiv");
+    expect(charger.querySelector("[data-row='start_stop']")?.textContent).toBe("Start and stopActive");
     expect(charger.textContent).not.toContain("switch.");
   });
 
@@ -193,9 +193,9 @@ describe("the number editor", () => {
     await settle();
     const form = dialog(element).querySelector<HTMLFormElement>("form[data-value-editor='number']")!;
     const offer = form.querySelector<HTMLButtonElement>("[data-value-suggestion]")!;
-    expect(offer.textContent).toContain("Förslag: 36,5");
+    expect(offer.textContent).toContain("Suggestion: 36.5");
     offer.click();
-    expect(form.querySelector<HTMLInputElement>("[data-value-field='number']")?.value).toBe("36,5");
+    expect(form.querySelector<HTMLInputElement>("[data-value-field='number']")?.value).toBe("36.5");
   });
 });
 
@@ -270,10 +270,10 @@ describe("the app's status words", () => {
     const cases: Array<[string, boolean, string]> = [
       ["ocpp", true, "OCPP"],
       ["service", true, "Easee"],
-      ["number", true, "Styrs"],
-      ["none", false, "Styrs inte"],
+      ["number", true, "Controlled"],
+      ["none", false, "Not controlled"],
       // Not enabled is not controlled, whatever the path (the dashboard summary's own rule).
-      ["ocpp", false, "Styrs inte"],
+      ["ocpp", false, "Not controlled"],
     ];
     for (const [kind, enabled, word] of cases) {
       document.body.innerHTML = "";
@@ -296,7 +296,7 @@ describe("the app's status words", () => {
 
   it("says a found energy register as the app does", async () => {
     const { element } = await openSettings("sv");
-    expect(dialog(element).querySelector("[data-row='energy_register'] button")?.textContent).toBe("Hittad automatiskt");
+    expect(dialog(element).querySelector("[data-row='energy_register'] button")?.textContent).toBe("Found automatically");
   });
 
   it("says a car's plug sensor and position in status words, never the entity's name, and opens the source choice", async () => {
@@ -322,10 +322,10 @@ describe("the app's status words", () => {
       dialog(element).querySelector<HTMLButtonElement>(`[data-vehicle-tab='${car}'][aria-selected='false']`)?.click();
       return dialog(element).querySelector(`[data-vehicle='${car}'] [data-row='${row}'] button`)?.textContent;
     };
-    expect(value("vehicle_ev6", "plug")).toBe("Finns");
-    expect(value("vehicle_ev6", "location")).toBe("Välj en");
-    expect(value("vehicle_niro", "plug")).toBe("Ingen");
-    expect(value("vehicle_niro", "location")).toBe("Saknas");
+    expect(value("vehicle_ev6", "plug")).toBe("Present");
+    expect(value("vehicle_ev6", "location")).toBe("Choose one");
+    expect(value("vehicle_niro", "plug")).toBe("None");
+    expect(value("vehicle_niro", "location")).toBe("Missing");
     dialog(element).querySelector<HTMLButtonElement>("[data-vehicle-tab='vehicle_ev6']")!.click();
     expect(dialog(element).textContent).not.toContain("EV6 Plugged in");
     await tap(element, "[data-vehicle='vehicle_ev6'] [data-edit='plug']");
@@ -339,7 +339,7 @@ describe("the car's charge limit", () => {
     body.vehicles[0].max_percent = 90;
     const { element } = await openSettings("sv", true, body);
     const row = dialog(element).querySelector<HTMLElement>("[data-vehicle='vehicle_ev6'] [data-row='charge_limit']")!;
-    expect(row.textContent).toContain("Laddgräns");
+    expect(row.textContent).toContain("Charge limit");
     expect(row.textContent).toContain("90 %");
     dialog(element).querySelector<HTMLButtonElement>("[data-vehicle-tab='vehicle_niro']")!.click();
     expect(dialog(element).querySelector("[data-vehicle='vehicle_niro'] [data-row='charge_limit']")).toBeNull();
@@ -389,7 +389,7 @@ describe("the car's charge limit", () => {
     const form = dialog(element).querySelector<HTMLFormElement>("form[data-value-editor='limit']")!;
     const slider = form.querySelector<HTMLInputElement>("input[type='range']")!;
     expect([slider.min, slider.max, slider.step, slider.value]).toEqual(["50", "100", "10", "90"]);
-    expect(slider.getAttribute("aria-label")).toBe(translate("sv", "settings.vehicle.limitSlider"));
+    expect(slider.getAttribute("aria-label")).toBe(translate("en", "settings.vehicle.limitSlider"));
     const amount = form.querySelector<HTMLElement>(`.${VISUAL_CLASSES.valueAmount}`)!;
     expect(amount.textContent).toBe("90 %");
     expect(amount.compareDocumentPosition(slider) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -397,7 +397,7 @@ describe("the car's charge limit", () => {
       "50 %",
       "100 %",
     ]);
-    expect(form.textContent).toContain(translate("sv", "settings.vehicle.limitHelp"));
+    expect(form.textContent).toContain(translate("en", "settings.vehicle.limitHelp"));
     expect(limitWrites(hass)).toHaveLength(0);
     await submit(element);
     expect(limitWrites(hass)).toHaveLength(0);
@@ -549,8 +549,8 @@ describe("phase switching for solar", () => {
   it("is worded in Swedish", async () => {
     const { element } = await openSettings("sv", true, payload(), offered(true));
     const row = dialog(element).querySelector<HTMLElement>("[data-row='phase_switching']")!;
-    expect(row.textContent).toContain("Fasväxling vid solladdning");
-    expect(row.textContent).toContain("Automatiskt");
+    expect(row.textContent).toContain("Phase switching for solar");
+    expect(row.textContent).toContain("Automatic");
   });
 
   it("has no row where Home Assistant does not list it", async () => {

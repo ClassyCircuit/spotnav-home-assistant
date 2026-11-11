@@ -155,6 +155,7 @@ export function dailyOverview(doc: Document, dashboard: Dashboard, language: Lan
     opener.addEventListener("click", () => { if (typeof dialog.showModal === "function") dialog.showModal(); });
   }
   const health = doc.createElement("div"); health.className = "spotnav-daily-health";
+  health.setAttribute("role", "status"); health.setAttribute("aria-live", "polite");
   const title = doc.createElement("strong"); title.textContent = t("daily.health.title"); health.append(title);
   const key = healthKey(state, observedAt, failed, busy, now);
   const message = doc.createElement("p"); message.dataset["health"] = key;
@@ -176,5 +177,6 @@ export function dailyOverview(doc: Document, dashboard: Dashboard, language: Lan
   const stale = observedAt !== null && (now < observedAt || now - observedAt > STATUS_MAX_AGE || failed);
   evidence.textContent = `${t("daily.observed")}: ${observed}${stale ? ` (${t("daily.health.stale")})` : ""} · ${t("daily.sent")}: ${sent} (${ack}) · ${t("daily.readback")}: ${read}. ${t("daily.separate")}`;
   health.append(evidence); root.append(health);
+  root.querySelector("dialog")?.append(health.cloneNode(true));
   return root;
 }

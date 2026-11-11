@@ -345,7 +345,7 @@ describe("in the Plan dialog", () => {
     expect(sent).not.toHaveProperty("expected_revision");
     const slot = dialog.querySelector<HTMLElement>(`.${C.planPreview}`)!;
     expect(slot.hidden).toBe(false);
-    expect(slot.querySelector(`.${C.planPreviewLine}`)?.textContent).toContain("klar 13:00");
+    expect(slot.querySelector(`.${C.planPreviewLine}`)?.textContent).toContain("ready 13:00");
     // Nothing was saved.
     expect(hass.messages.filter((message) => message["type"] === "spotnav/update_settings")).toEqual([]);
   });

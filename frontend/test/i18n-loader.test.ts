@@ -1,13 +1,11 @@
 // Loading a language: English is in the bundle, every other language is one file fetched from Home
-// Assistant, once per page. The card waits for it with a wordless loading state, falls back to English
-// when it cannot be had, and follows a language changed later.
+// Assistant, once per page. The shipped card itself always uses English.
 
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { SpotnavCard } from "../src/card";
 import { LANGUAGE_FILES } from "../src/generated/languages";
 import {
   LANGUAGES,
@@ -133,46 +131,18 @@ describe("the card's language", () => {
     return snapshot;
   }
 
-  it("shows the wordless loading state to a Swedish reader until Swedish is in, never English", async () => {
+  it.each(["en", "sv-SE", "fr-FR"])("uses English and does not fetch a translation for %s", async (language) => {
     const hand = handFetch();
     vi.stubGlobal("fetch", hand.fetcher);
     const hass = new FakeHass();
-    const element = mountCard(CONFIG, swedishHass(hass)) as SpotnavCard;
-    await settle();
-    expect(hand.calls).toEqual([urlOf("sv")]);
-    expect(text(element)).not.toContain(TRANSLATIONS.en["state.loading"]);
-    expect(element.shadowRoot?.querySelector("[aria-busy='true']")).not.toBeNull();
-
-    // The dashboard arrives first: still waiting for the words.
-    hass.resolveNext(dashboard());
-    await settle();
-    expect(text(element)).not.toContain("Planned from");
-    expect(element.shadowRoot?.querySelector("[aria-busy='true']")).not.toBeNull();
-
-    hand.answer(TRANSLATIONS.sv);
-    await settle();
-    expect(text(element)).toContain("Planerat från");
-    expect(element.shadowRoot?.querySelector("[aria-busy='true']")).toBeNull();
-  });
-
-  it("falls back to English when the file cannot be had, and a second card does not ask again", async () => {
-    const hand = handFetch();
-    vi.stubGlobal("fetch", hand.fetcher);
-    const hass = new FakeHass();
-    const element = mountCard(CONFIG, swedishHass(hass, "sv"));
-    await settle();
-    hand.answer("unavailable", 500);
+    const element = mountCard(CONFIG, swedishHass(hass, language));
     await settle();
     expect(text(element)).toContain(TRANSLATIONS.en["state.loading"]);
     hass.resolveNext(dashboard());
     await settle();
     expect(text(element)).toContain("Planned from");
-
-    const other = new FakeHass();
-    const second = mountCard(CONFIG, swedishHass(other, "sv"));
-    await settle();
-    expect(hand.calls).toHaveLength(1);
-    expect(text(second)).toContain(TRANSLATIONS.en["state.loading"]);
+    expect(text(element)).toContain("Daily overview");
+    expect(hand.calls).toEqual([]);
   });
 
   it("shows English at once, with no request, for a language it does not have", async () => {
@@ -188,7 +158,7 @@ describe("the card's language", () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
-  it("loads a language chosen later, keeping the old one shown until the new one is in", async () => {
+  it("keeps the existing English view when the HA language changes", async () => {
     const hand = handFetch();
     vi.stubGlobal("fetch", hand.fetcher);
     const hass = new FakeHass();
@@ -203,13 +173,9 @@ describe("the card's language", () => {
     element.hass = hass.snapshot("two", "fr-FR");
     element.hass = hass.snapshot("three", "fr-FR");
     await settle();
-    expect(hand.calls).toEqual([urlOf("fr")]);
+    expect(hand.calls).toEqual([]);
     expect(text(element)).toContain("Planned from");
 
-    hand.answer(TRANSLATIONS.fr);
-    await settle();
-    expect(text(element)).toContain("Planifiée à partir de");
-    expect(text(element)).not.toContain("Planned from");
     expect(hass.messages).toHaveLength(before);
   });
 });

@@ -61,7 +61,7 @@ async function open(
   hass.resolveNext(payload);
   await settle();
   shadow(element)
-    .querySelector<HTMLButtonElement>(`[aria-label="${translate(options.language ?? "en", "header.settings")}"]`)
+    .querySelector<HTMLButtonElement>(`[aria-label="${translate("en", "header.settings")}"]`)
     ?.click();
   await settle();
   return { hass, element };
@@ -179,8 +179,8 @@ describe("the source line", () => {
   it("speaks Swedish", async () => {
     const { element } = await open(dashboard(provider(SOURCE, "add_nordpool")), { language: "sv" });
     await settle();
-    expect(priceSection(element).querySelector("[data-price-provider]")?.textContent).toBe(SV_ENTSOE);
-    expect(labels(notice(element))).toEqual(["Lägg till Nord Pool", "Använd min ENTSO-E-nyckel i stället"]);
+    expect(priceSection(element).querySelector("[data-price-provider]")?.textContent).toBe("Prices from ENTSO-E (your key)");
+    expect(labels(notice(element))).toEqual(["Add Nord Pool", "Use my ENTSO-E key instead"]);
   });
 });
 
@@ -278,9 +278,9 @@ describe("the notices", () => {
   it("the Zonneplan hint speaks Swedish", async () => {
     const { element } = await open(dashboard(provider(SOURCE, "zonneplan_area")), { language: "sv" });
     expect(notice(element)?.querySelector(".spotnav-suggestion-text")?.textContent).toBe(
-      "Zonneplan finns i Home Assistant. Välj området Netherlands – Zonneplan för att planera efter ditt Zonneplan-pris, med energiskatt och moms inräknade.",
+      "Zonneplan is set up in Home Assistant. To plan on your Zonneplan tariff, with energy tax and VAT included, choose the area Netherlands – Zonneplan.",
     );
-    expect(labels(notice(element))).toEqual(["Välj område"]);
+    expect(labels(notice(element))).toEqual(["Choose the area"]);
   });
 
   it("the region mismatch names the meter's region and opens the area", async () => {

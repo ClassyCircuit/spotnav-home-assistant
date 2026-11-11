@@ -56,15 +56,15 @@ describe("Release the import target for this charge", () => {
     await settle();
     const root = shadow(element);
     const offer = root.querySelector<HTMLButtonElement>("[data-part='release-import-target'] button");
-    expect(offer?.textContent).toBe("Släpp effektmålet för den här laddningen");
+    expect(offer?.textContent).toBe("Release the import target for this charge");
     offer!.click();
     await settle();
     const dialogText = (): string =>
       [...root.querySelectorAll<HTMLElement>("[role='dialog']")]
         .map((dialog) => ((dialog.parentElement as HTMLElement).hidden ? "" : dialog.textContent))
         .join("");
-    expect(dialogText()).toContain("Släppa effektmålet?");
-    expect(dialogText()).toContain("Månadens topp kan bli upp till 11 kW, mot 6,0 kW i dag.");
+    expect(dialogText()).toContain("Release the import target?");
+    expect(dialogText()).toContain("This month's peak may reach up to 11 kW, against 6.0 kW today.");
     const sent = (): number => hass.messages.filter((message) => message["type"] === "spotnav/release_import_target").length;
     root.querySelector<HTMLButtonElement>("[data-action='cancel']")!.click();
     await settle();

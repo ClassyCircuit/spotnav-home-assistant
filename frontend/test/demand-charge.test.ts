@@ -138,7 +138,7 @@ async function open(
   hass.resolveNext(dashboard(block));
   await settle();
   shadow(element)
-    .querySelector<HTMLButtonElement>(`[aria-label="${translate((options.language ?? "en") as "en", "header.settings")}"]`)
+    .querySelector<HTMLButtonElement>(`[aria-label="${translate("en", "header.settings")}"]`)
     ?.click();
   await settle();
   return { hass, element };
@@ -186,7 +186,7 @@ describe("the demand charge in the Electricity price section", () => {
     const keys = rowKeys(element, "market");
     expect(keys.slice(-3)).toEqual(["demand_0", "demand_1", "demand_add"]);
     const help = section(element, "market").querySelector("[data-help='demand_0_1']")!;
-    expect(help.textContent).toContain("Den här månaden: 7,0 kW");
+    expect(help.textContent).toContain("This month: 7.0 kW");
   });
 
   it("adds a component with its own hours, peaks and prices in one write", async () => {
@@ -246,9 +246,9 @@ describe("the import target beside the main fuse", () => {
   it("shows the running hour against the target", async () => {
     const { element } = await open(PILOT, { language: "sv", target: 6 });
     expect(rowKeys(element, "site").slice(0, 2)).toEqual(["main_fuse_a", "import_target_kw"]);
-    expect(section(element, "site").querySelector("[data-row='import_target_kw']")!.textContent).toBe("Effektmål6,0 kW");
+    expect(section(element, "site").querySelector("[data-row='import_target_kw']")!.textContent).toBe("Import target6.0 kW");
     expect(section(element, "site").querySelector("[data-help='import_target_hour']")!.textContent).toBe(
-      "Den här timmen: 3,1 av 7,0 kW – månadens topp (effektmål 6,0 kW)",
+      "This hour: 3.1 of 7.0 kW – the month's peak (import target 6.0 kW)",
     );
   });
 
@@ -290,11 +290,11 @@ describe("the suggested import target in its editor", () => {
     const advice = dialog.querySelector<HTMLElement>("[data-value-advice]")!;
     expect(advice.dataset["valueAdvice"]).toBe("suggestion");
     expect(advice.textContent).toContain(
-      "Huset ensamt: oftast högst 2,4 kW en timme per dygn, som mest 7,5 kW (fre 4 sep.). Förslag: 7,0 kW – bilen får då omkring 6,4 kW de flesta timmar.",
+      "The house alone: usually at most 2.4 kW in an hour each day, at most 7.5 kW (Fri 4 Sept). Suggestion: 7.0 kW – the car then gets about 6.4 kW in most hours.",
     );
-    expect(advice.textContent).toContain("Laddarens egen effekt finns inte i statistiken");
+    expect(advice.textContent).toContain("The charger's own power is not in the statistics");
     const use = dialog.querySelector<HTMLButtonElement>("[data-value-advice-use]")!;
-    expect(use.textContent).toBe("Använd");
+    expect(use.textContent).toBe("Use");
     use.click();
     const field = dialog.querySelector<HTMLInputElement>("[data-value-field='number']")!;
     expect(field.value).toBe("7");

@@ -62,10 +62,10 @@ describe("the start-up grace in the card", () => {
 
   it.each([
     ["en", "Starting up…"],
-    ["sv", "Startar upp…"],
-    ["nb", "Starter opp…"],
-    ["da", "Starter op…"],
-    ["fi", "Käynnistyy…"],
+    ["sv", "Starting up…"],
+    ["nb", "Starting up…"],
+    ["da", "Starting up…"],
+    ["fi", "Starting up…"],
   ])("says it in the status line in %s and offers no Start", async (language, words) => {
     const { element } = await mounted(starting("start_idle.json"), language);
     expect(shadow(element).textContent).toContain(words);

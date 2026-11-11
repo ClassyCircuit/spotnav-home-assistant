@@ -234,6 +234,57 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2.5.33 — 5.3 complete locally (coordinator review pending)
+
+- Final follow-up reconciled card tests with the English-only contract, retaining
+  independent translation utility tests and settings, action and accessibility
+  checks. Full frontend suite: **2,383 passed across 100 files**. Type-check, build,
+  check-dist and diff check passed (Windows line-ending warnings). Isolated real-module
+  planning tests passed 492 with one deselected; isolated lifecycle tests passed 26.
+  Mocked boundaries are not live HA or charger tests.
+- The built card was tested with mocked boundaries at 1440×1000 and 390×844,
+  Swedish HA language, successful and rejected/conflicting saves, refresh, dialog
+  close/Escape/backdrop/focus and open-dialog mismatch/uncertainty. Unsaved edits
+  and settings saves issued no Morek action. Physical touch, HA theme/Sections,
+  live HA and physical charging were not tested. Per-window energy, price and cost
+  remain unknown because the API does not supply them. Dispatch remains unarmed.
+  Stop after 5.3 for coordinator review; do not proceed to 5.3a automatically.
+
+- Earlier follow-up: revised the settings-editor, card lifecycle and language-loader
+  expectations for English while preserving their save, accessibility and loading
+  assertions. Added an open-dialog disconnect/reconnect and late-evidence test.
+  Corrected a real regression: a changed HA administrator status now causes a
+  card refresh even though a language change alone does not. The five focused
+  suites passed 169 tests before the additional daily lifecycle test, which passed
+  in its 25-test suite. An intermediate full frontend suite passed 2,274 and failed
+  109 in 27 files; those failures were subsequently reconciled in the final run above.
+  Build, type-check and check-dist passed;
+  isolated planning passed 492 (one deselected), lifecycle 26. The built-card local
+  desktop/mobile mock browser check passed, including successful/rejected saves and
+  Swedish HA language. Physical touch, HA themes, live HA and charging remain untested.
+- User decision: the shipped card, dashboard and dialogs use English regardless
+  of HA language. Existing translation resources and backend localization are not
+  deleted. The card forces English at its existing language-selection boundary.
+- Open proposal dialogs now receive Morek health changes without replacement,
+  including simultaneous uncertainty and mismatch, in a persistent live region.
+  A focused actual-card test exercises that state and forced charger replacement.
+  A policy-save test verifies revision, committed result, dashboard refresh and
+  re-read. Existing backend tests exercise real settings/controller/planner with
+  mocked boundaries and no open browser.
+- An earlier frontend run: 2,259 passed and 122 failed across 30 files because legacy card
+  tests explicitly expect non-English card text/number formats, language loads and
+  language-change rerenders. These tests were subsequently revised for the English-only
+  contract, not suppressed. Focused new
+  policy save and health tests passed. Isolated planner 492 passed, one deselected;
+  lifecycle 26 passed. A built-card browser test with Swedish HA language exercised
+  desktop/mobile modal, focus, Escape/backdrop, refresh, conflict, refusal and
+  successful mocked save/confirmation without a Morek action. This is not a live
+  HA, physical touchscreen, theme or charger test.
+- The prior instruction below to translate new strings is superseded by the English-
+  only decision. Per-window energy, cost and price remain unavailable; no browser
+  cost model was added. Automatic Morek dispatch remains unarmed. No HA access,
+  deployment, profile operation or other hardware action occurred.
+
 ### 2.5.32 — Stage 5.3 partial implementation (not complete)
 
 - The existing revision-checked Plan editor now decodes and preserves the policy

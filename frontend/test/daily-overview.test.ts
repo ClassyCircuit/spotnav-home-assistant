@@ -128,6 +128,44 @@ describe("real daily overview", () => {
 });
 
 describe("card status lifecycle and safety", () => {
+  it("rejects late evidence after disconnecting an open proposal and reconnecting", async () => {
+    const transport = new FakeHass(); transport.trackMorek = true;
+    const card = mountCard({ type: "custom:spotnav-card", charger: "entry_a" }, transport.snapshot("reader", "sv"));
+    const raw = dashboard();
+    (raw.plan as { proposal: { periods: unknown[] } }).proposal.periods = [
+      { start: "2026-11-06T21:00:00Z", end: "2026-11-06T22:00:00Z" },
+    ];
+    await tick(); transport.resolveNext(raw); await tick();
+    const dialog = card.shadowRoot!.querySelector<HTMLDialogElement>(".spotnav-daily dialog")!;
+    dialog.setAttribute("open", "");
+    card.remove(); document.body.append(card); await tick();
+    expect(dialog.isConnected).toBe(false);
+    transport.resolveAt(0, status({ outcomes: { uncertain: true } })); await tick();
+    transport.resolveNext(raw); await tick();
+    transport.resolveNext(status({ operator: { state: "mismatch" }, verified: false })); await tick();
+    expect(cardText(card)).toContain("mismatch the sent schedule");
+    expect(cardText(card)).not.toContain("Intervention needed");
+    expect(transport.messages.some((m) => m.type === "spotnav/manual_action" || (m.type === "spotnav/morek_schedule" && m.action !== "status"))).toBe(false);
+  });
+  it("shows new uncertainty and mismatch inside an open plan dialog without replacing it", async () => {
+    const transport = new FakeHass(); transport.trackMorek = true;
+    const card = mountCard({ type: "custom:spotnav-card", charger: "entry_a" }, transport.snapshot("reader", "sv"));
+    await tick();
+    const raw = dashboard();
+    const proposal = (raw.plan as { proposal: { periods: unknown[] } }).proposal;
+    proposal.periods = [{ start: "2026-11-06T21:00:00Z", end: "2026-11-06T22:00:00Z" }];
+    transport.resolveNext(raw); await tick();
+    const dialog = card.shadowRoot!.querySelector<HTMLDialogElement>(".spotnav-daily dialog")!;
+    dialog.setAttribute("open", "");
+    transport.resolveNext(status({ outcomes: { uncertain: true }, operator: { state: "mismatch" }, verification: { reason: "limits_or_transitions_differ" } })); await tick();
+    expect(dialog.isConnected).toBe(true);
+    expect(dialog.textContent).toContain("Intervention needed");
+    expect(dialog.textContent).toContain("mismatch the sent schedule");
+    expect(cardText(card)).toContain("Daily overview");
+    expect(cardText(card)).not.toContain("Dagsöversikt");
+    card.setConfig({ type: "custom:spotnav-card", charger: "entry_b" }); await tick();
+    expect(dialog.isConnected).toBe(false);
+  });
   async function setup(admin = false) {
     const transport = new FakeHass(); transport.trackMorek = true;
     const hass = transport.snapshot("reader", "en"); hass.user = { is_admin: admin };

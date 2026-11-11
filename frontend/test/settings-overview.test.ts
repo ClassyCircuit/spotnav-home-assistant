@@ -83,7 +83,7 @@ function openDialog(element: Element): HTMLElement | null {
 
 function settingsGeneralButton(element: Element, language: Language = "en"): HTMLButtonElement {
   const found = shadow(element).querySelector<HTMLButtonElement>(
-    `[aria-label="${translate(language, "header.settings")}"]`,
+    `[aria-label="${translate("en", "header.settings")}"]`,
   );
   if (found === null) {
     throw new Error("no general settings button");
@@ -232,15 +232,15 @@ describe("the general Settings popover", () => {
     expect(shadow(element).activeElement).toBe(settingsGeneralButton(element));
   });
 
-  it("labels every section in Swedish and Finnish, not only in English", async () => {
+  it("labels every section in English even with Swedish or Finnish HA", async () => {
     for (const language of ["sv", "fi"] as const) {
       const { element } = await mounted(fixture("start_idle"), true, language);
       settingsGeneralButton(element, language).click();
       const dialog = openDialog(element);
-      expect(dialog?.textContent, language).toContain(translate(language, "settings.heading.site"));
-      expect(dialog?.textContent, language).toContain(translate(language, "site.none"));
-      expect(dialog?.textContent, language).toContain(translate(language, "settings.section.vehicle"));
-      expect(dialog?.textContent, language).toContain(translate(language, "settings.heading.price"));
+      expect(dialog?.textContent, language).toContain(translate("en", "settings.heading.site"));
+      expect(dialog?.textContent, language).toContain(translate("en", "site.none"));
+      expect(dialog?.textContent, language).toContain(translate("en", "settings.section.vehicle"));
+      expect(dialog?.textContent, language).toContain(translate("en", "settings.heading.price"));
     }
   });
 });
@@ -579,7 +579,7 @@ describe("Support says when the card here is older than the one served", () => {
     expect(hass.cardInfoMessages.at(-1)).toMatchObject({ type: "spotnav/get_card_info", api_version: 1 });
     const note = section(element, "support")?.querySelector<HTMLElement>("[data-card-outdated]");
     expect(note?.hidden).toBe(false);
-    expect(note?.textContent).toBe(translate("sv", "debug.cardOutdated"));
+    expect(note?.textContent).toBe(translate("en", "debug.cardOutdated"));
   });
 
   it("stays quiet when they match", async () => {
@@ -638,17 +638,17 @@ describe("Automations", () => {
     const paths = navigations(element);
     const dialog = await openAutomations(element, language);
 
-    expect(dialog?.textContent).toContain(translate(language, "settings.automations.label"));
-    expect(dialog?.textContent).toContain(translate(language, "automations.intro"));
+    expect(dialog?.textContent).toContain(translate("en", "settings.automations.label"));
+    expect(dialog?.textContent).toContain(translate("en", "automations.intro"));
     const boxes = Array.from(dialog?.querySelectorAll<HTMLElement>("[data-blueprint]") ?? []);
     expect(boxes.map((box) => box.dataset["blueprint"])).toEqual(BLUEPRINTS.map((blueprint) => blueprint.file));
-    expect(boxes[0]?.textContent).toContain(translate(language, "automations.priceSetpoint.name"));
-    expect(boxes[0]?.textContent).toContain(translate(language, "automations.priceSetpoint.text"));
-    expect(boxes[1]?.textContent).toContain(translate(language, "automations.solarSurplus.name"));
-    expect(boxes[1]?.textContent).toContain(translate(language, "automations.solarSurplus.text"));
+    expect(boxes[0]?.textContent).toContain(translate("en", "automations.priceSetpoint.name"));
+    expect(boxes[0]?.textContent).toContain(translate("en", "automations.priceSetpoint.text"));
+    expect(boxes[1]?.textContent).toContain(translate("en", "automations.solarSurplus.name"));
+    expect(boxes[1]?.textContent).toContain(translate("en", "automations.solarSurplus.text"));
 
     const button = boxes[1]?.querySelector<HTMLButtonElement>("[data-blueprint-create]");
-    expect(button?.textContent).toBe(translate(language, "automations.add"));
+    expect(button?.textContent).toBe(translate("en", "automations.add"));
     button?.click();
     await settle();
     expect(paths).toEqual([BLUEPRINTS_PATH]);
@@ -663,7 +663,7 @@ describe("Automations", () => {
     expect(hass.blueprintMessages).toEqual([{ type: "spotnav/get_blueprints", api_version: 1 }]);
 
     const used = dialog?.querySelector<HTMLAnchorElement>("[data-blueprint-use='price_setpoint.yaml']");
-    expect(used?.textContent).toBe("Används av 2 automationer");
+    expect(used?.textContent).toBe("Used by 2 automations");
     expect(dialog?.querySelector("[data-blueprint-use='solar_surplus_switch.yaml']")).toBeNull();
     used?.click();
     await settle();

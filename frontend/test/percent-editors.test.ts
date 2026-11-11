@@ -53,7 +53,7 @@ async function openSettings(body: Record<string, any>, language = "en", admin = 
   hass.resolveNext(body);
   await settle();
   shadow(element)
-    .querySelector<HTMLButtonElement>(`[aria-label='${translate(language as "en", "header.settings")}']`)!
+    .querySelector<HTMLButtonElement>(`[aria-label='${translate("en", "header.settings")}']`)!
     .click();
   await settle();
   return { hass, element };
@@ -90,7 +90,7 @@ describe("the rows", () => {
     const { element } = await openSettings(payload(80, null), "sv");
     const car = dialog(element).querySelector<HTMLElement>("[data-vehicle='vehicle_ev6']")!;
     expect(car.querySelector("[data-row='target'] button")!.textContent).toBe("80 %");
-    expect(car.querySelector("[data-row='min_percent'] button")!.textContent).toBe("Av");
+    expect(car.querySelector("[data-row='min_percent'] button")!.textContent).toBe("Off");
     expect(car.querySelector("input[type='range']")).toBeNull();
   });
 
@@ -138,13 +138,13 @@ describe("the target's editor", () => {
   it("opens a car with none stored at the default, marked as such, and writes nothing until moved", async () => {
     const { hass, element } = await openSettings(payload(null, null, 70), "sv");
     const row = dialog(element).querySelector<HTMLElement>("[data-vehicle='vehicle_ev6'] [data-row='target'] button")!;
-    expect(row.textContent).toBe(translate("sv", "entity.notSet"));
+    expect(row.textContent).toBe(translate("en", "entity.notSet"));
     let form = await openEditor(element, "target");
     let slider = form.querySelector<HTMLInputElement>("input[type='range']")!;
     expect(slider.value).toBe("70");
     const amount = form.querySelector<HTMLElement>(`.${C.valueAmount}`)!;
-    expect(amount.textContent).toBe(`70 % ${translate("sv", "settings.vehicle.targetDefault")}`);
-    expect(amount.querySelector(`.${C.valueDefault}`)?.textContent).toBe("(standard)");
+    expect(amount.textContent).toBe(`70 % ${translate("en", "settings.vehicle.targetDefault")}`);
+    expect(amount.querySelector(`.${C.valueDefault}`)?.textContent).toBe("(default)");
     form.requestSubmit();
     await settle();
     expect(writes(hass)).toHaveLength(0);
@@ -207,7 +207,7 @@ describe("the minimum's editor", () => {
     expect(blocked).not.toBeNull();
     expect(blocked.style.getPropertyValue("--spotnav-from")).toBe(String(floorIndex(50) / 15));
     const mark = form.querySelector<HTMLElement>("[data-part='target-mark']")!;
-    expect(mark.textContent).toBe("laddmål 50 %");
+    expect(mark.textContent).toBe("charge target 50 %");
     const slider = form.querySelector<HTMLInputElement>("input[type='range']")!;
     slide(slider, 15);
     expect(slider.value).toBe(String(floorIndex(50)));
@@ -220,7 +220,7 @@ describe("the minimum's editor", () => {
   it("is capped by the default target when the car has none stored", async () => {
     const { element } = await openSettings(payload(null, null, 60), "sv");
     const form = await openEditor(element, "min_percent");
-    expect(form.querySelector("[data-part='target-mark']")!.textContent).toBe("laddmål 60 %");
+    expect(form.querySelector("[data-part='target-mark']")!.textContent).toBe("charge target 60 %");
   });
 
   it("opens a stored level above the target at the target, and writes nothing unless moved", async () => {

@@ -1,4 +1,4 @@
-// The card notices that SpotNav was updated: an answer it cannot read, or a language file it cannot fetch,
+// The card notices that SpotNav was updated: an answer it cannot read
 // makes it ask which card is served. A newer one shows the "SpotNav has been updated" line with a Reload
 // button, and the page reloads only when the reader presses it, never by itself; the same one is retried
 // (a read, not a page reload) before the card says it cannot read.
@@ -102,10 +102,10 @@ describe("an unreadable dashboard from an outdated card", () => {
 
     expect(hass.cardInfoMessages).toHaveLength(1);
     expect(notice(element)?.dataset["cardUpdated"]).toBe("button");
-    expect(text(element)).toContain(UPDATE_WORDS.sv.updated);
-    expect(text(element)).not.toContain(translate("sv", "state.malformed"));
+    expect(text(element)).toContain(UPDATE_WORDS.en.updated);
+    expect(text(element)).not.toContain(translate("en", "state.malformed"));
     const button = notice(element)?.querySelector<HTMLButtonElement>("button");
-    expect(button?.textContent).toBe(UPDATE_WORDS.sv.reload);
+    expect(button?.textContent).toBe(UPDATE_WORDS.en.reload);
 
     // However long the card stays, the page is not reloaded and nothing is counted in browser storage.
     await vi.advanceTimersByTimeAsync(LONG_WAIT_MS);
@@ -167,20 +167,20 @@ describe("an unreadable dashboard from the card that is served", () => {
     expect(reads()).toBe(1);
     hass.resolveNext(MALFORMED);
     await settle();
-    expect(text(element)).toContain(translate("sv", "state.loading"));
+    expect(text(element)).toContain(translate("en", "state.loading"));
     expect(notice(element)).toBeNull();
 
     await vi.advanceTimersByTimeAsync(MALFORMED_RETRY_DELAYS_MS[0]!);
     expect(reads()).toBe(2);
     hass.resolveNext(MALFORMED);
     await settle();
-    expect(text(element)).toContain(translate("sv", "state.loading"));
+    expect(text(element)).toContain(translate("en", "state.loading"));
 
     await vi.advanceTimersByTimeAsync(MALFORMED_RETRY_DELAYS_MS[1]!);
     expect(reads()).toBe(3);
     hass.resolveNext(MALFORMED);
     await settle();
-    expect(text(element)).toContain(translate("sv", "state.malformed"));
+    expect(text(element)).toContain(translate("en", "state.malformed"));
     expect(reloads).toBe(0);
     // The retries read the dashboard again; they never reload the page.
     await vi.advanceTimersByTimeAsync(LONG_WAIT_MS);
@@ -195,7 +195,7 @@ describe("an unreadable dashboard from the card that is served", () => {
     hass.resolveNext(dashboard());
     await settle();
     expect(shadow(element).querySelector(".spotnav-card")).not.toBeNull();
-    expect(text(element)).not.toContain(translate("sv", "state.malformed"));
+    expect(text(element)).not.toContain(translate("en", "state.malformed"));
   });
 
   it("says it cannot read at once when the integration does not answer which card it serves", async () => {
@@ -203,7 +203,7 @@ describe("an unreadable dashboard from the card that is served", () => {
     hass.cardInfoHandler = null;
     hass.resolveNext(MALFORMED);
     await vi.advanceTimersByTimeAsync(CARD_INFO_TIMEOUT_MS);
-    expect(text(element)).toContain(translate("sv", "state.malformed"));
+    expect(text(element)).toContain(translate("en", "state.malformed"));
     expect(reloads).toBe(0);
   });
 });
@@ -252,8 +252,8 @@ describe("a dialog with unsaved input", () => {
   });
 });
 
-describe("a language file that cannot be had", () => {
-  it("takes the same path when a newer card is served, in the reader's own words", async () => {
+describe("English-only card language", () => {
+  it("does not request a language file or check for updates just for the HA locale", async () => {
     forgetLanguages();
     vi.stubGlobal(
       "fetch",
@@ -261,9 +261,9 @@ describe("a language file that cannot be had", () => {
     );
     const { hass, element } = await mounted();
     await settle();
-    expect(hass.cardInfoMessages).toHaveLength(1);
-    expect(notice(element)?.dataset["cardUpdated"]).toBe("button");
-    expect(text(element)).toContain(UPDATE_WORDS.sv.updated);
+    expect(hass.cardInfoMessages).toHaveLength(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(notice(element)).toBeNull();
     await vi.advanceTimersByTimeAsync(LONG_WAIT_MS);
     expect(reloads).toBe(0);
   });
@@ -276,7 +276,7 @@ describe("a language file that cannot be had", () => {
     );
     const { hass, element } = await mounted(OWN);
     await settle();
-    expect(hass.cardInfoMessages).toHaveLength(1);
+    expect(hass.cardInfoMessages).toHaveLength(0);
     hass.resolveNext(dashboard());
     await settle();
     expect(notice(element)).toBeNull();

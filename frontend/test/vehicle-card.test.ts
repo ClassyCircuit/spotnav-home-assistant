@@ -131,7 +131,7 @@ describe("the Plan popover's target editor", () => {
 
   it("says it in Swedish", async () => {
     const { element } = await openPlan(twoVehicles(), aRecord(), "sv");
-    expect(q(element, "[data-soc='facts']")?.textContent).toBe("Nu 40 % · Laddgräns 80 %");
+    expect(q(element, "[data-soc='facts']")?.textContent).toBe("Now 40 % · Charge limit 80 %");
   });
 
   it("recomputes the energy while the slider moves, with the backend's formula", async () => {
@@ -182,11 +182,11 @@ describe("the Plan popover's target editor", () => {
   it("says it in Swedish, with a decimal comma", async () => {
     const { element } = await openPlan(twoVehicles(), aRecord(), "sv");
     drag(element, 100);
-    expect(verdict(element).textContent).toBe("Laddar till bilens gräns, 80 %");
+    expect(verdict(element).textContent).toBe("Charging to the vehicle's limit, 80 %");
     drag(element, 30);
-    expect(verdict(element).textContent).toBe("Ingen laddning behövs nu");
+    expect(verdict(element).textContent).toBe("No charging needed now");
     drag(element, 60);
-    expect(needText(element)).toContain("17,1 kWh");
+    expect(needText(element)).toContain("17.1 kWh");
   });
 
   it("says 'unknown' without a battery size, at every position of the slider", async () => {
@@ -260,7 +260,7 @@ async function openSettings(
     };
   }
   shadow(element)
-    .querySelector<HTMLButtonElement>(`[aria-label="${translate((options.language ?? "en") as "en", "header.settings")}"]`)!
+    .querySelector<HTMLButtonElement>(`[aria-label="${translate("en", "header.settings")}"]`)!
     .click();
   await settle();
   return { hass, element };
@@ -303,7 +303,7 @@ describe("the Settings page's vehicles", () => {
     const { element } = await openSettings(twoVehicles(), { entities: entityConfig() });
     expect(dlg(element).textContent).toContain("Card settings · Wallbox");
     const swedish = await openSettings(twoVehicles(), { language: "sv", entities: entityConfig() });
-    expect(dlg(swedish.element).textContent).toContain("Kortinställningar · Wallbox");
+    expect(dlg(swedish.element).textContent).toContain("Card settings · Wallbox");
   });
 
   it("shows one Car section with a tab per car, the planned car's first, and edits nothing inline", async () => {
@@ -371,9 +371,9 @@ describe("the Settings page's vehicles", () => {
     payload["vehicles"][0]["capacity_source"] = "reported";
     const { element } = await openSettings(payload, { language: "sv" });
     const row = block(element, "vehicle_ev6").querySelector("[data-row='capacity']");
-    expect(row?.textContent).toContain("77,0 kWh");
+    expect(row?.textContent).toContain("77.0 kWh");
     expect(row?.querySelector("button")).toBeNull();
-    expect(block(element, "vehicle_ev6").textContent).toContain("rapporterad av bilen");
+    expect(block(element, "vehicle_ev6").textContent).toContain("reported by the vehicle");
     expect(block(element, "vehicle_ev6").querySelector("[data-edit='consumption']")).not.toBeNull();
   });
 

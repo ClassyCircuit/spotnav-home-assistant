@@ -120,19 +120,19 @@ describe("the vehicle line", () => {
     expect(line(element)!.textContent).not.toContain("→");
     // Above the target, the line never reads as if the level would drop to it.
     const above = await mounted(withSoc({ value: 100 }), "sv");
-    expect(line(above.element)!.textContent).toContain("100 % av 80 % mål");
+    expect(line(above.element)!.textContent).toContain("100 % of 80 % target");
   });
 
   it.each([
-    ["sv", "62 % av 80 % mål"],
+    ["sv", "62 % of 80 % target"],
     ["en", "62 % of 80 % target"],
-    ["da", "62 % af 80 % mål"],
-    ["nb", "62 % av 80 % mål"],
-    ["fi", "62 % / 80 % tavoite"],
-    ["de", "62 % von 80 % Ziel"],
-    ["nl", "62 % van 80 % doel"],
-    ["es", "62 % de un objetivo de 80 %"],
-    ["fr", "62 % sur un objectif de 80 %"],
+    ["da", "62 % of 80 % target"],
+    ["nb", "62 % of 80 % target"],
+    ["fi", "62 % of 80 % target"],
+    ["de", "62 % of 80 % target"],
+    ["nl", "62 % of 80 % target"],
+    ["es", "62 % of 80 % target"],
+    ["fr", "62 % of 80 % target"],
   ])("words the charge of the target in %s", async (language, words) => {
     const { element } = await mounted(withSoc({ value: 62 }), language as "en");
     const text = (line(element)!.textContent ?? "").replace(/\s/g, " ");
@@ -164,8 +164,8 @@ describe("the vehicle line", () => {
       withSoc({ value: 62, age_s: 7200 }, { driver: "manual_kwh", vehicle_ids: ["vehicle_ev6"] }),
       "sv",
     );
-    expect(line(element)!.getAttribute("aria-label")).toBe("EV6, 62 %, för 2 h sedan");
-    expect(line(element)!.textContent).toContain("för 2 h sedan");
+    expect(line(element)!.getAttribute("aria-label")).toBe("EV6, 62 %, 2 h ago");
+    expect(line(element)!.textContent).toContain("2 h ago");
   });
 
   it.each<[string, Record<string, unknown>]>([
@@ -201,15 +201,15 @@ describe("the charger status in the header line", () => {
     ["paused", "en", "Paused"],
     ["finished", "en", "Finished"],
     ["error", "en", "Error"],
-    ["disconnected", "sv", "Ej ansluten"],
-    ["connected", "sv", "Ansluten"],
-    ["charging", "sv", "Laddar"],
-    ["paused", "sv", "Pausad"],
-    ["finished", "sv", "Klar"],
-    ["error", "sv", "Fel"],
-    ["connected", "da", "Tilsluttet"],
-    ["connected", "nb", "Tilkoblet"],
-    ["connected", "fi", "Kytketty"],
+    ["disconnected", "sv", "Not connected"],
+    ["connected", "sv", "Connected"],
+    ["charging", "sv", "Charging"],
+    ["paused", "sv", "Paused"],
+    ["finished", "sv", "Finished"],
+    ["error", "sv", "Error"],
+    ["connected", "da", "Connected"],
+    ["connected", "nb", "Connected"],
+    ["connected", "fi", "Connected"],
   ])("appends the %s status after the charge in %s", async (state, language, words) => {
     const { element } = await mounted(withConnection(state), language as "en");
     expect(line(element)!.textContent).toBe(`EV6· 96 %· ${words}`);

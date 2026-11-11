@@ -20,17 +20,19 @@ may remain explicitly unavailable; they are not prerequisites for this initial r
 Current production dispatch is **unarmed**, not because that is the desired final
 behavior, but because safe ownership transitions, lost-state/uncertainty recovery,
 load protection, transaction authorization and retained-profile exit are unresolved.
-The Stage 5.6–5.8 work must resolve these blockers rather than merely display them.
+The Stage 5.5–5.7 work must resolve these blockers rather than merely display them.
 Do not remove the fail-closed gate before the complete reviewed activation path is safe.
 If a required hardware capability or installation-specific decision prevents safe
 operation, surface it and get a decision; do not label the initial release complete.
 
-An initial dashboard can be installed for real-data integration checking before
-activation. **The complete initial working release is not done until the user has a
-deliberately enabled automatic path and supervised, separately authorized live checks
-show real planning, schedule operation and measured charging**, subject to actual
-charger/vehicle availability. Specific approval remains required for each live action;
-the roadmap does not grant it. ACK/readback alone is not physical-flow evidence.
+**Complete the necessary development in order before installation.** The final Stage 5
+milestone, 5.8, installs the working release, deliberately enables its reviewed automatic
+path and performs supervised live validation with the user's
+specific approval for each operation. The release is not done until real planning,
+schedule operation and measured charging are observed, subject to charger/vehicle
+availability. ACK/readback alone is not physical-flow evidence. If a safety blocker or
+required approval remains unresolved, stop and report it rather than bypassing the gate
+or presenting an unarmed install as completion of 5.8.
 
 ## Task overview — start here
 
@@ -409,13 +411,13 @@ tests are documented there; full HA collection is still blocked on Windows.
     handoff for freshness, source and testing limitations. Planning remains backend-owned.
   - Focused lifecycle/race and action-safety tests and local desktop/mobile browser checks
     use mocked HA/OCPP boundaries. No live HA or physical charging was checked. Overall
-    5.1 visual approval and the bar-versus-step choice remain pending; 5.3 is not started.
-- [ ] **5.3 Plan controls and actions**
-  - Local 2.5.32 work connects the existing Plan editor to the stored soft cap,
-    basis and minimum ready-by SOC and adds a complete daily proposal view. Review
-    is still needed: new wording currently falls back to English in non-English
-    languages, and full save-confirmation and dialog lifecycle coverage is incomplete.
-    See the 2.5.32 handoff; do not treat this as a completed substage yet.
+    5.1 visual approval and the bar-versus-step choice remain pending.
+- [x] **5.3 Plan controls and actions** (implemented locally; coordinator review pending)
+  - The user chose English-only card presentation regardless of HA language; do not
+    translate the 5.3 strings. The 2.5.33 work implements this and improves open-modal
+    health updates and save coverage. Card tests now use English expectations while
+    independent translation utility tests remain. The full suite passes; see the
+    2.5.33 handoff for mocked-boundary results and limitations.
   - Bind target/minimum/cap/ready-by controls, complete windows, per-window/total
     estimated costs and policy explanations to existing backend settings/planner APIs.
   - Preserve manual Send/Refresh and their existing interlocks; do not present unimplemented
@@ -456,41 +458,43 @@ tests are documented there; full HA collection is still blocked on Windows.
     instructions; retain existing card behavior and do not overwrite user views.
   - Test actual-module API-to-card contract with mocks, browser rendering, build/artifacts
     and unavailable/error states. Distinguish these from a running HA integration test.
-- [ ] **5.5 Initial install and real-data integration checkpoint**
-  - Once 5.2–5.4 are ready for review, support the user's preferred installation/update.
-    Obtain specific approval for each deployment, share modification, restart or other
-    live action; this roadmap is not authorization. Do not print credentials or private data.
-  - Check the installed version and, read-only first, verify real frontend/backend data,
-    price availability, vehicle/charger status, settings and replan behavior. Report
-    missing entities, stale data, unavailable prices or unresolved communication errors.
-  - A dashboard installation can be validated while Morek automatic mode is unarmed; do
-    not claim that installing the card enables automatic charging. The user chooses
-    whether and when to perform any supervised charger operation.
-- [ ] **5.6 Durable Morek ownership and recovery**
+- [ ] **5.5 Durable Morek ownership and recovery**
   - Resolve and implement safe ownership entry/exit, producer drain and durable transitions,
     lost-document versus first-use ambiguity, uncertain in-flight outcomes, restart/reconnect
     and retained-profile handling. Do not bypass existing uncertainty or identity guards.
   - Test actual modules with mocked HA/OCPP/storage across crashes, races, migration,
     rollback and competing ordinary writers. Keep production dispatch unarmed until the
     full activation path is reviewed and all remaining blockers are resolved.
-- [ ] **5.7 Protection, authorization and safe operating policy**
+- [ ] **5.6 Protection, authorization and safe operating policy**
   - Resolve how household load protection remains effective, how a new charging
     transaction is authorized, how person Stop and competing writers are respected,
     and how retained 0 A, invalid/no-price plans and leaving the mode are handled.
   - Implement only an explicitly reviewed, fail-closed policy; identify any user or
     installation-specific decisions and stop for them rather than assuming safety.
     A stored current limit cannot start or authorize charging by itself.
-- [ ] **5.8 Reviewed autonomous execution and end-to-end validation**
-  - Only after 5.6–5.7 and explicit activation approval, implement a deliberate,
-    reversible activation path using the existing guarded worker, planner triggers and
-    durable evidence; do not weaken interlocks or automatically retry unknown outcomes.
+- [ ] **5.7 Activation implementation and pre-install automated validation**
+  - After 5.5–5.6, implement and review a deliberate, reversible
+    activation path using the existing guarded worker, planner triggers and durable
+    evidence. Do not weaken interlocks or automatically retry unknown outcomes; live
+    activation itself still requires the user's specific approval in 5.8.
   - Test changed and unchanged settings/prices/SOC → backend replan → guarded schedule
     reconciliation, startup/reconnect and conflict/uncertainty cases. Show proposal,
     sent ACK, effective readback and real measured flow separately on the live dashboard.
-  - When the user specifically authorizes individual live operations, use the installed
-    system to check actual behavior and measured charging. ACK or matching effective
-    limits are not proof of physical flow; report separately what is software-tested,
-    live-read, sent, read back and physically observed. No overnight test is mandatory.
+  - Prepare the supervised live acceptance procedure for 5.8 without contacting HA or
+    operating hardware absent specific approval. ACK or matching effective limits are
+    not proof of physical flow; no overnight test is mandatory.
+  - Verify restart/reconnect and safe person Stop/protection behavior with automated
+    coverage. Prepare explicit supervised checks for the installation milestone.
+- [ ] **5.8 Install, activate and validate the working release**
+  - After 5.2–5.7 and 5.3a are complete and reviewed, support the user's preferred
+    installation/update. Obtain specific approval for each deployment, share modification,
+    restart, activation or other live action; this roadmap is not authorization. Do not
+    print credentials or private data.
+  - Check the installed version and, read-only first, verify real frontend/backend data,
+    price availability, vehicle/charger status, settings, notifications and replan behavior.
+    After approval of the relevant operations, deliberately enable the reviewed automatic
+    mode and check plug-in → backend replan → guarded schedule update, transaction
+    authorization and actual measured charging. Report each observation separately.
   - **Initial release acceptance:** real prices, vehicle/charger state and plan controls
     display accurately; saved changes and relevant price/SOC/deadline triggers cause a
     backend replan without an open dashboard; changed valid intent is automatically
@@ -498,8 +502,7 @@ tests are documented there; full HA collection is still blocked on Windows.
     or unsafe dispatch. The installed dashboard shows truthful health and recoverable
     errors; under an authorized supervised live scenario, an authorized transaction and
     real measured charging are observed separately from schedule ACK/readback.
-  - Verify restart/reconnect and safe person Stop/protection behavior with automated
-    coverage and only specifically approved live checks. If approval, hardware,
+  - Perform only specifically approved live checks. If approval, hardware,
     connectivity, actual flow or any safety blocker is unavailable, state precisely
     what remains unverified and leave initial-release acceptance open; do not postpone
     basic daily operation merely for Stage 6–9 history or optional visual enhancements.
@@ -557,7 +560,7 @@ tests are documented there; full HA collection is still blocked on Windows.
   keyboard/touch, copyable text and reduced motion.
 - [ ] **9.2 Responsive integration:** browser-test the whole dashboard, empty/error
   states and repeated updates; remove duplicate daily controls within the new UI.
-- [ ] **9.3 Installation and documentation polish:** improve the initial 5.4–5.5
+- [ ] **9.3 Installation and documentation polish:** improve the initial 5.4–5.8
   dashboard template, migration and diagnostics guidance; never overwrite user views
   or claim unperformed hardware tests.
 

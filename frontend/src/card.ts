@@ -471,8 +471,10 @@ export class SpotnavCard extends HTMLElement {
   }
 
   set hass(hass: HomeAssistantLike) {
-    const nextLanguage = resolveLanguage(hass.locale?.language ?? hass.language);
+    // The shipped dashboard deliberately uses English regardless of the HA locale.
+    const nextLanguage: Language = "en";
     const previous = this.language;
+    const wasAdmin = this.isAdmin;
     this.hassObject = hass;
     this.view?.setEntityHass(hass);
     this.followLanguage(nextLanguage);
@@ -486,15 +488,12 @@ export class SpotnavCard extends HTMLElement {
       this.startWork();
       return;
     }
-    if (changed) {
+    if (changed || wasAdmin !== this.isAdmin) {
       this.renderLocal();
     }
   }
 
-  /**
-   * Show `next` now if its words are here (or cannot be had), else keep what is shown and load it: the
-   * card renders again when it is in. One request per language and page, however often `hass` changes.
-   */
+  /** Select the card language. The shipped card passes English, which is bundled and needs no fetch. */
   private followLanguage(next: Language): void {
     if (this.wantedLanguage === next) {
       return;
@@ -2716,9 +2715,19 @@ export class SpotnavCard extends HTMLElement {
     if (this.view === null || this.cardState.kind !== "ready") return;
     const previous = Array.from(this.view.element.children).find((child) => child.classList.contains("spotnav-daily"));
     if (previous === undefined) return;
-    if (previous.querySelector("dialog[open]")) return;
-    previous.replaceWith(dailyOverview(this.ownerDocument, this.cardState.dashboard, this.languageOrFallback,
-      this.morekState, this.morekObservedAt, this.morekReadFailed, this.morekBusy, Date.now(), () => { void this.openSettings("plan"); }, () => this.dailyPlanClosed()));
+    const fresh = dailyOverview(this.ownerDocument, this.cardState.dashboard, this.languageOrFallback,
+      this.morekState, this.morekObservedAt, this.morekReadFailed, this.morekBusy, Date.now(), () => { void this.openSettings("plan"); }, () => this.dailyPlanClosed());
+    const open = previous.querySelector("dialog[open]");
+    if (open) {
+      const health = fresh.querySelector(".spotnav-daily-health");
+      if (health) {
+        for (const target of [previous.querySelector(":scope > .spotnav-daily-health"), open.querySelector(".spotnav-daily-health")]) {
+          target?.replaceChildren(...Array.from(health.childNodes, (node) => node.cloneNode(true)));
+        }
+      }
+      return;
+    }
+    previous.replaceWith(fresh);
     this.view.refit();
   }
 
