@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { prices, windows, total, money, time, stepSegments, stepPoints, horizon, groupBlocks, priceWindow, snapRange } from './sample.js';
+import { prices, windows, total, money, time, stepSegments, stepPoints, horizon, groupBlocks, priceWindow, snapRange, initialRange, timeTicks, sampleDate, sampleDays, priceGaps } from './sample.js';
 
 test('reference-derived sample and hand-authored plan arithmetic', () => {
   assert.equal(prices.length, 288);
@@ -17,6 +17,15 @@ test('reference-derived sample and hand-authored plan arithmetic', () => {
   assert.equal(time(windows[0].end), '00:37:30');
   assert.equal(time(-1), '23:00');
 });
+test('initial coverage and time ticks are anchored independently of panning', () => {
+  assert.deepEqual(initialRange(14.5), [13,48]);
+  assert.deepEqual(initialRange(-30,[0,.25,.5]),[0,.5]);
+  assert.deepEqual(initialRange(3,[0,.25,.5]),[0,.5]);
+  assert.equal(initialRange(0,[]),null);
+  assert.deepEqual(timeTicks(13.5,25.5,600),[14,16,18,20,22,24]);
+  assert.deepEqual(timeTicks(14.25,26.25,600),[16,18,20,22,24,26]);
+  assert.equal(time(24),'00:00');
+});
 test('negative and missing intervals remain exact segments, not zero or interpolation', () => {
   const fixture = [{start: -1, end: 0, cents: -5}, {start: 1, end: 1.5, cents: 7}];
   const segments = stepSegments(fixture);
@@ -24,6 +33,14 @@ test('negative and missing intervals remain exact segments, not zero or interpol
   assert.ok(segments[0][1][0] < segments[1][0][0]);
   assert.deepEqual(stepPoints(fixture), [[-1,-5],[0,-5],[0.5,null],[1,7],[1.5,7]]);
   assert.deepEqual(stepSegments(prices).at(-1), [[47.75, prices.at(-1).cents], [48, prices.at(-1).cents]]);
+});
+test('fictional date bands and missing coverage remain explicit across midnight', () => {
+  assert.equal(sampleDate(-24), 'Sun 8 Nov');
+  assert.equal(sampleDate(0), 'Mon 9 Nov');
+  assert.equal(sampleDate(24), 'Tue 10 Nov');
+  assert.deepEqual(sampleDays(23.5,24.5).map(d => [d.start,d.end,d.label]), [[23.5,24,'Today · Mon 9 Nov'],[24,24.5,'Tomorrow · Tue 10 Nov']]);
+  assert.deepEqual(priceGaps(-1,3,[{start:0,end:1},{start:2,end:2.5}]),[[-1,0],[1,2],[2.5,3]]);
+  assert.deepEqual(priceGaps(0,3,[]),[[0,3]]);
 });
 test('grouping keeps pauses and control changes; missing tariffs are unknown', () => {
   const b = (start,end,control='a') => ({start,end,control,power:6});

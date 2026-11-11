@@ -234,6 +234,70 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### Stage 5.1b3 — proposal gradient (visual review pending)
+
+- The sample charts replace dashed proposal borders with a bottom-bright green
+  gradient and an aligned pale plan track, identified in the legend. Their widths
+  use exact clipped window boundaries, including 00:37:30. The complete plan and
+  price tooltip remain available; the gradient does not identify cheap prices as a plan.
+  Earlier 5.1b3 entries describing dashed proposal borders are superseded.
+- Prototype build, seven sample tests and headless Edge browser checks passed;
+  the browser asserts the rendered track and gradient pixel boundaries. Desktop
+  1440×1000 and emulated mobile 390×844 screenshots were inspected; narrow windows
+  remain narrow on mobile. Emulated touch is not physical touchscreen validation.
+  Screenshots are in the temp opencode folder as
+  `spotnav-51b3-gradient-{desktop|mobile}-{bar|step}-{default|zoom}.png`.
+  The prototype is local-only; no HA or hardware access occurred. Keep 5.1b3,
+  overall 5.1 and chart choice pending review and visual approval.
+
+### Stage 5.1b3 — sample day/date band (review pending)
+
+- Both charts show a slim aligned day band and midnight lines. The fixed fictional
+  dates are Sun 8, Mon 9 and Tue 10 Nov 2026; exact interval dates appear in tooltips.
+  Partial day labels shorten or disappear when too narrow. Missing price spans use
+  hatching, with a text label where space permits and an explanatory note on each card.
+  The default fixture has all three days; separate rendered test fixtures contain gaps
+  and negative prices and do not replace the surrounding plan or price summary.
+- Prototype build and seven sample tests passed. Headless Edge 1440×1000 and emulated
+  mobile 390×844 checked both charts, day-band and midnight pixel alignment through
+  zoom/pan, dated tooltips, missing intervals, no page overflow and local-only requests.
+  Emulated pinch and taps worked; physical touch remains unverified. Screenshots were
+  inspected; the first capture exposed band overlap with pins/units and was corrected.
+  Captures are in the temp opencode directory, named
+  `spotnav-51b3-dates-{desktop|mobile}-{bar|step}-{default|zoom|missing}.png`.
+- This is not timezone or DST validation. Production must use the configured local
+  timezone, handle local dates/midnight and 23/25-hour DST days, and verify actual
+  historical and published future price availability before binding. No HA or hardware
+  access occurred; Morek dispatch remains unarmed. Keep 5.1b3 and overall 5.1 pending
+  coordinator review and user visual approval; do not advance automatically.
+
+### Stage 5.1b3 — follow-up (sample-only; coordinator and visual review pending)
+
+- Both cards open 1.5 sample hours before Now through the available sample horizon;
+  Full horizon restores all 72 hours. Anchored responsive DOM labels remain aligned to
+  sample clock boundaries as the chart pans; desktop default uses two-hour ticks and
+  mobile uses sparser ticks, each with a day. The 10 c/kWh axis includes negatives.
+  The prior unanchored-axis limitation below is superseded. Future real data requires
+  source boundaries and timezone/DST-aware labels, not this fixed-day sample.
+- Black past and dark-blue future, solid blue Now, green dashed proposal areas and
+  numerical horizon-extrema pins are shown with the existing price-colored bars and
+  stepped line. The exact partial 00:37:30 plan end is untouched. Touch taps select
+  the exact interval by horizontal coordinate; two-finger scaling uses snapped viewport
+  boundaries. Chart gestures consume touch on the plot; scroll elsewhere on the page.
+- Prototype build and six focused sample tests passed; one intermediate test expectation
+  failed after changing the responsive cadence and was corrected. Edge headless at
+  1440×1000 and emulated 390×844 exercised both charts, mouse wheel/plot/slider,
+  keyboard zoom and reset, snapping, rendered labels, modal and local-only requests.
+  Simulated pinch changed [13,48] to [20.25,39] for both; emulated taps showed actual
+  interval tooltips without test fallback. Neither is physical-touch validation.
+  Full-card screenshots for each chart/default and zoomed view are in the temp opencode
+  directory as `spotnav-51b3-final-{desktop|mobile}-{bar|step}-{default|zoom}.png`.
+  Captures were inspected; mobile uses sparse time ticks and narrow windows retain
+  outlines. Full accessibility, HA shadow-root integration, actual source updates,
+  production timezones and real devices remain unverified. No HA or hardware access;
+  dispatch stays unarmed. Overall 5.1 and chart choice await user visual approval;
+  stop for coordinator review before 5.1b4.
+
 ### Stage 5.1b3 — partial chart fidelity and navigation (review required)
 
 - Both sample charts show price-colored intervals, complete-horizon low/high pins,

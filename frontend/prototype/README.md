@@ -22,22 +22,26 @@ this is a temporary comparison, not a proposal for two final cards. The overview
 slider and chart dragging pan; ordinary wheel over a chart zooms, and the labelled
 zoom/reset buttons are keyboard accessible. Wheel over the chart is consumed for
 zoom, so scroll the page with the scrollbar, keyboard, or outside the chart.
-The simulated pinch did not change the zoom in the headless check; pinch and
-physical touch therefore remain unverified.
-Viewport changes snap to the sample's interval boundaries; plan boundaries and now are
-not snapped. Ticks adapt to width/zoom, but after panning ECharts can anchor them at
-half-hour offsets and omit midnight context; the requested even-hour cadence is not
-yet met. This fixed-day sample is not a timezone/DST implementation.
+The initial view starts 1.5 sample hours before Now; Full horizon reveals all available
+prices. Viewport changes snap to sample interval boundaries; plan boundaries and Now
+are not snapped. Labels are clock-anchored and adapt to width/zoom, with day context.
+The band shows the fictional 2026 dates and midnight lines; missing price spans are
+hatched and are never zero. Labels are shortened or omitted for very narrow day slices.
+The plot consumes touch gestures; scroll outside it. Emulated pinch and taps worked in
+headless Edge, but physical touch remains unverified. This fixed-day sample is not a
+timezone/DST implementation.
 The fictitious 08–10 Nov fixture is based on the supplied example hourly values;
 as in the bar example, quarter-hour fluctuations are synthetic, not verified
 Nord Pool data. EUR c/kWh is an illustrative variable-cost basis including fees
 and taxes. Fixed 24-hour days are not real timezone/DST handling. All three days
 are available in this sample, not a promise that future prices are always available.
 The 30/45/60 c/kWh color bands are illustrative only. A 35 c/kWh soft cap,
-low-price opportunities and blue-shaded hand-authored proposal windows are
+low-price opportunities and green-gradient hand-authored proposal windows are
 distinct concepts. A continuous window spans several prices and ends partway
 through an interval; another starts after a real pause. The next-window button
 opens the same complete plan in a native browser modal; Escape or Close dismisses it.
+The pale track above each plot also marks the exact proposal boundaries; the legend
+identifies it separately from price colors.
 It is not optimizer output. Negative and missing price fixtures are tested
 separately, rather than represented as real prices.
 
@@ -83,6 +87,8 @@ uses a fixed sample hour axis, not real timestamps, timezone/DST handling or sou
 data. The custom bars use interval start/end; the line uses explicit horizontal
 endpoints and null breaks rather than joining gaps. The
 fictional axis uses relative hours (24-hour days), not real calendar or DST logic.
+Production must use the configured local timezone and handle midnight and 23/25-hour
+DST days, and verify actual historical and future publication availability first.
 The separate sample power chart holds each reading for at most 15 minutes for
 display and leaves the explicit missing interval blank; the independent meter
 counter fixture is not calculated from the curve or the plan.
@@ -96,7 +102,7 @@ tests desktop and mobile sizing, overflow, both variants, chart data endpoints,
 mouse wheel, slider, zoom/reset, desktop hover, modal keyboard/close/focus,
 simulated touch, disabled charger actions and request origins. It saves full-page,
 individual-card, zoomed-card, modal and rendered edge-fixture screenshots under the user's
-temporary `opencode` folder. Simulated touch at full overview did not reliably
-hit the narrow intervals; a programmatic tooltip check is used as a fallback.
+temporary `opencode` folder. The check reports whether emulated taps needed its
+programmatic tooltip fallback; pinch emulation is not physical-touch validation.
 It does not validate real touch, accessibility tree or actual HA shadow roots. Run
 `node --test prototype/sample.test.mjs` for sample arithmetic and missing inputs.

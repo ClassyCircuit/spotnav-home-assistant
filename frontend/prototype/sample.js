@@ -18,6 +18,21 @@ export function snapRange(start, end, boundaries = sampleBoundaries) {
   if (a >= b) { const i = boundaries.indexOf(a); if (i < boundaries.length-1) b = boundaries[i+1]; else a = boundaries[i-1]; }
   return [a,b];
 }
+// Fixed-hour sample only: real sources need timestamp/timezone-aware boundaries.
+export function initialRange(current, boundaries = sampleBoundaries) {
+  if (boundaries.length < 2) return null;
+  const first = boundaries[0], last = boundaries.at(-1);
+  if (current < first) return [first, last];
+  if (current >= last) return snapRange(Math.max(first, last - 12), last, boundaries);
+  return snapRange(Math.max(first, current - 1.5), last, boundaries);
+}
+export function timeTicks(start, end, width) {
+  const target = (end - start) / Math.max(1, Math.floor(width / 60));
+  const interval = [0.25, 0.5, 1, 2, 4, 6, 12, 24, 48].find(n => n >= target) || 48;
+  const ticks = [];
+  for (let h = Math.ceil((start + 1e-8) / interval) * interval; h < end - 1e-8; h += interval) ticks.push(h);
+  return ticks;
+}
 export const cap = 35;
 // Sample-only grouping: touching blocks merge only when their control is identical.
 export function groupBlocks(blocks) {
@@ -52,6 +67,29 @@ export const total = rows => {
 };
 export const time = h => { const seconds = Math.round((((h % 24) + 24) % 24) * 3600); const hh = Math.floor(seconds / 3600), mm = Math.floor(seconds % 3600 / 60), ss = seconds % 60; return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}${ss ? `:${String(ss).padStart(2,'0')}` : ''}`; };
 export const day = h => h < 0 ? 'Yesterday' : h < 24 ? 'Today' : h < 48 ? 'Tomorrow' : 'Next day';
+// Fictional fixed calendar, not local timestamps or a DST model.
+export function sampleDate(h) {
+  const d = new Date(Date.UTC(2026, 10, 9 + Math.floor(h / 24)));
+  const weekdays = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${weekdays[d.getUTCDay()]} ${d.getUTCDate()} ${months[d.getUTCMonth()]}`;
+}
+export function sampleDays(start, end) {
+  const result = [];
+  for (let h = Math.floor(start / 24) * 24; h < end; h += 24)
+    result.push({ start: Math.max(start,h), end: Math.min(end,h+24), midnight:h, label:`${day(h)} · ${sampleDate(h)}` });
+  return result;
+}
+export function priceGaps(start, end, items) {
+  const gaps = []; let cursor = start;
+  for (const p of items) {
+    if (p.end <= cursor || p.start >= end) continue;
+    if (p.start > cursor) gaps.push([cursor, Math.min(p.start,end)]);
+    cursor = Math.max(cursor, Math.min(p.end,end));
+  }
+  if (cursor < end) gaps.push([cursor,end]);
+  return gaps;
+}
 export const money = value => value == null ? 'Unknown' : `${value < 0 ? '−' : ''}€${Math.abs(value).toFixed(2)}`;
 export const priceAt = h => prices.find(p => p.start <= h && h < p.end);
 // Each interval has its own segment, including the final end; gaps stay gaps.

@@ -244,11 +244,19 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Browser-review both charts, modal and desktop/mobile layouts; verify tests, local
     dependencies and reported limitations. Overall 5.1 and chart choice remain pending
     user approval; no live data, planner changes, deployment or hardware actions.
-- [ ] **5.1b3 Chart fidelity and interval navigation** (sample-only; assigned/in progress)
-  - Partial implementation for review: price-colored step line, horizon-extrema pins,
-    outlined proposal and sample-boundary snapping. Panned ticks can be offset from
-    even hours and omit midnight context; simulated pinch did not zoom. See handoff.
-    Do not mark complete or advance to 5.1b4.
+- [ ] **5.1b3 Chart fidelity and interval navigation** (sample-only; coordinator review pending)
+  - Proposal windows now use a bottom-bright green gradient and an aligned pale plan
+    track instead of dashed borders; window boundaries remain exact. Visual approval
+    remains pending; see handoff.
+  - Both charts now have a viewport-aligned fictional day/date band, midnight lines
+    and dated interval tooltips; missing intervals are hatched. Desktop and emulated
+    mobile checks are documented in the handoff. User visual approval remains pending.
+    Production must verify available historical and published future prices and use the
+    configured local timezone, including midnight and 23/25-hour DST days.
+  - Local implementation now uses anchored responsive labels, future-focused default,
+    exact outlined plan windows and snapped navigation. Headless emulated pinch and taps
+    worked; physical touch and visual approval remain unverified. See handoff; do not
+    advance to 5.1b4 automatically.
   - Bring BOTH full-width price charts much closer to `samples/bar-chart.js` and
     `samples/stepline-chart.js`: meaningful price-dependent colors on bars and stepped
     line/area, clearly visible plotted min/max callouts and a legible proposed-window
@@ -256,19 +264,30 @@ tests are documented there; full HA collection is still blocked on Windows.
     final boundaries and a truthful legend; do not apply arbitrary sample price bands
     as real-world judgments. Place callouts at actual extrema, clarify whether they
     refer to the visible range or entire horizon, and handle offscreen extrema honestly.
+    Callout pins show only the numerical price, not LOW/HIGH text; explain their meaning
+    accessibly elsewhere. Use black for past plot background, dark blue for present/future,
+    green for exact proposed-window background and a solid blue Now line as in the sample;
+    preserve contrast, price readability and non-colour differentiation of plan windows.
+  - On initial load focus on the relevant future: start approximately one or two hours
+    before Now, within available data, and show the published future where feasible.
+    Allow zooming out/panning to older data using the overview. Handle little/no future
+    data and Now outside coverage without inventing prices or hiding known gaps. Define
+    a clear full-horizon reset and preserve separate user-chosen views on updates.
   - Snap the viewed time range to 15-minute boundaries on wheel/pinch zoom, drag/pan,
     overview slider and keyboard/reset actions for the 15-minute sample; clamp at horizon
     edges, avoid feedback loops and test repeated movement. This is viewport navigation,
     NOT rounding published data, the current-time marker or partial charging windows.
     For future real data use source interval boundaries and timezone/DST-aware timestamps
     rather than assuming every dataset or charging stop is aligned to 15 minutes.
-  - Show a readable two-hour time-axis cadence (e.g. 14:00, 16:00, 18:00) for the normal
-    chart view, with date/midnight context; handle responsive widths and zoom without
+  - Anchor time ticks to even two-hour boundaries (e.g. 14:00, 16:00, 18:00) for the
+    normal chart view, including after panning; keep date/midnight context. Use 5 or 10
+    c/kWh price-axis increments when legible. Handle responsive widths and zoom without
     overlapping or misleading labels. Exact interval tooltips remain available.
   - Browser-test both variants with real wheel/drag and zoom/reset, boundary snapping,
-    plot coloring, visible callouts, overlay contrast and desktop/mobile screenshots.
-    Clearly report real-touch versus emulated-touch limitations. Keep charts and plan
-    sample-only; ask for visual feedback before choosing a final chart.
+    initial focus, even-hour alignment, plot coloring, visible callouts, overlay contrast
+    and desktop/mobile screenshots. Investigate simulated pinch/tooltip targeting and
+    improve mobile card density; report real-touch versus emulated-touch limitations.
+    Keep charts and plan sample-only; ask for feedback before choosing a final chart.
 - [ ] **5.1b4 Compact controls and plan presentation** (sample-only)
   - Make Plan Controls more compact and place a readable complete proposed plan below
     them within the right-hand desktop column; keep the overview beside them. Avoid
