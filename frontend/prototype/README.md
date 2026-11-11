@@ -24,6 +24,17 @@ it is not a claim that the plan has been priced from that chart. Controls remain
 The compact controls list shows each window and projected SOC; use “View full window
 details” or the next-window control for the complete modal, also present in both charts.
 
+The sample Price insights panel uses the chart fixture for current and upcoming prices,
+and a separate synthetic hourly historical fixture joined to the chart's past. Its
+30-day classification uses duration-weighted 25th/75th percentiles, with at least
+90% duration coverage and 24 intervals required. The lowest known one-hour opportunity
+searches starts at Now or source interval boundaries; it is not a proposed plan.
+October 2026 averages available prices by interval duration and states coverage.
+The expandable method explains dates, counts and limitations. Add `?insights=missing`
+to mask the insight inputs for a missing-data example; the separate chart remains intact
+and the scenario is labelled. These are fictional fixed-day samples, not live history,
+market forecasts, charging costs or savings; same-weekday comparisons are not used.
+
 Both **Prices & plan** alternatives appear together, sharing a fixture and plan;
 this is a temporary comparison, not a proposal for two final cards. The overview
 slider and chart dragging pan; ordinary wheel over a chart zooms, and the labelled
@@ -115,4 +126,5 @@ individual-card, zoomed-card, modal and rendered edge-fixture screenshots under 
 temporary `opencode` folder. The check reports whether emulated taps needed its
 programmatic tooltip fallback; pinch emulation is not physical-touch validation.
 It does not validate real touch, accessibility tree or actual HA shadow roots. Run
-`node --test prototype/sample.test.mjs` for sample arithmetic and missing inputs.
+`node --test prototype/sample.test.mjs prototype/insights.test.mjs` for sample
+arithmetic, price insights and missing inputs.

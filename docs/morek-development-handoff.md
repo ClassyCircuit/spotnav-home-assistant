@@ -234,6 +234,30 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### Stage 5.1c — sample price insights (review pending)
+
+- A compact local panel compares current chart price to the preceding 30 fictional
+  days. The synthetic history joins the chart's historical fixture; duration-weighted
+  quartiles define lower/typical/higher, requiring 90% coverage and 24 intervals.
+  One lowest-known fully priced one-hour opportunity uses starts at Now or source
+  boundaries and the same future chart prices. Missing spans are not zero, and the
+  opportunity is explicitly not the proposal or a feasibility/charging guarantee.
+  October 2026 shows available-price duration-weighted average, range and coverage;
+  it is neither charging cost nor savings. No same-weekday claim is made.
+- `?insights=missing` deliberately masks insight inputs, not the unchanged chart,
+  and labels the distinction. Historical samples are synthetic, fixed-day, not
+  retrieved Nord Pool data; real timezone/DST, price basis and source coverage need
+  Stage 7.4/7.5 validation. No live binding, planner or charger code changed.
+- Prototype build and 14 focused tests passed, including gap, negative-price,
+  duration, insufficient-baseline and no-future cases. Desktop 1440×1000 and
+  emulated mobile 390×844 browser checks passed normal/missing states, no overflow,
+  modal and chart regressions and local-only requests; 60 requests observed were
+  local/data. Screenshots inspected in temporary `opencode` folder:
+  `spotnav-51c-{desktop|mobile}-{insights|missing}.png`. The existing debugging
+  browser was used; physical touchscreen, full accessibility and HA remain untested.
+  No HA access or hardware action; dispatch remains unarmed. Overall 5.1 and chart
+  choice await visual approval; stop for coordinator review before 5.1d.
+
 ### Stage 5.1b4a — balanced cards and unknown values (review pending)
 
 - The two desktop cards use equal-width, naturally stretched grid items; mobile stacks.

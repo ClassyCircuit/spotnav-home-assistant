@@ -320,7 +320,10 @@ tests are documented there; full HA collection is still blocked on Windows.
     only the calculation helper; preserve the existing shared sample representation.
   - Test desktop/mobile layout, long plans, missing data and modal accessibility; retain
     sample-only safety and await user visual approval. No live or charger changes.
-- [ ] **5.1c Sample price insights and monthly statistics** (sample-only)
+- [x] **5.1c Sample price insights and monthly statistics** (sample-only; coordinator and visual review pending)
+  - Local fictional insights use duration-weighted historical quartiles, a complete
+    one-hour known-price opportunity and an October summary; see handoff for coverage,
+    checks and limitations. Overall 5.1 and chart choice remain pending approval.
   - Prototype concise, explainable assessments of current/upcoming prices against a
     stated illustrative longer-term baseline, plus best upcoming price windows and
     useful monthly statistics. Clearly distinguish cheapest opportunities from the
