@@ -234,6 +234,50 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### Stage 5.1b2 — chart and sample-plan corrections (review pending)
+
+- The local prototype keeps both full-width alternatives below side-by-side overview
+  and controls. The step view now uses a continuous interval-correct line with a
+  subtle gradient and explicit gap breaks. The bar renderer keeps narrow mobile
+  intervals visible. Both views use the same fictional reference-derived fixture.
+- Adjacent same-control, same-power blocks are grouped; a real pause separates the
+  second window. Estimated window costs integrate overlapping prices, including
+  partial intervals. The hand-authored two-window example totals 6.00 kWh,
+  €1.59 and 26.45 c/kWh weighted. The next-window button opens a native modal
+  reusing the same plan display. No production planner or charger behavior changed.
+- Local prototype build, sample tests and browser checks passed. Edge headless at
+  1440×1000 and 390×844 checked card layout, overflow, plan consistency, ordinary
+  wheel events on each chart, slider drag, zoom/reset, desktop tooltips, modal
+  keyboard activation, Escape, close, focus return and local-only requests. Rendered
+  variable-width negative/missing fixtures were visually checked for both charts;
+  screenshot files are in the local temporary `opencode` directory. The simulated
+  pinch did not change zoom; full-overview emulated taps missed their narrow target
+  and required a programmatic tooltip fallback. Physical touch, full accessibility,
+  HA shadow roots and hardware remain unverified. Wheel zoom consumes page wheel
+  scrolling over the plots; scroll outside the chart or use the scrollbar/keyboard.
+  No HA access, deployment or hardware action occurred; dispatch stays unarmed.
+  Overall 5.1 and chart choice remain pending user approval; stop for review.
+
+### Stage 5.1b1 — full-width comparison (review pending)
+
+- The local prototype displays bar and stepped-area alternatives concurrently with
+  the same sample, markers, overview and complete hand-authored plan. Hourly values
+  come from the supplied examples; their 15-minute fluctuations are synthetic and
+  fictional, not verified Nord Pool data. The example is fixed-day, not DST-aware.
+  The 35 c/kWh cap is separate from illustrative price bands and proposed windows.
+  The three estimated windows total 3.75 kWh, €0.85 and 22.61 c/kWh weighted;
+  the last ends at 00:37:30. No optimization or live price pipeline is claimed.
+- Prototype build and sample unit tests passed. Edge headless desktop 1440×1000
+  and mobile 390×844 checked layout, no horizontal overflow, both charts' endpoints,
+  zoom/reset, focused Space-key zoom, desktop hover, disabled actions and local-only requests. Focused
+  negative/missing fixtures check data segments but are not rendered browser
+  fixtures. Simulated mobile touch at full overview did not reliably show a tooltip;
+  the browser check falls back to a programmatic tooltip. Real touchscreen,
+  pinch/drag, full keyboard navigation, HA integration and hardware remain unverified.
+  Screenshots are in the local temporary `opencode` directory. No HA access,
+  deployment or hardware operation occurred; production dispatch remains unarmed.
+  Overall 5.1 and chart choice remain pending user approval; stop for review.
+
 ### Stage 5.1b — dark chart comparison (choice and approval pending)
 
 - The same local prototype now offers switchable interval-width bars and a

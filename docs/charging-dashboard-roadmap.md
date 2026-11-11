@@ -139,7 +139,7 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Start with Web Awesome Core for polished shared controls, with shared tokens and
     HA Sections composition; no second dashboard. Validate visual quality and HA
     compatibility. If it does not work, stop and reevaluate alternatives with the user.
-- [ ] **5.1a Initial prototype refinement** (implemented; further review and approval pending)
+- [x] **5.1a Initial prototype refinement** (sample groundwork; overall visual approval pending)
   - Refined local prototype and example ECharts are available; verification and
     unresolved limitations are in the development handoff. The user requested further
     refinement in 5.1b–5.1d; don't repeat completed groundwork.
@@ -166,9 +166,10 @@ tests are documented there; full HA collection is still blocked on Windows.
     and visual choices for user approval, without adding charts merely as decoration.
     Preserve actual interval widths, including negative values where illustrated.
   - The work remains sample-only; final visual approval follows 5.1b–5.1d.
-- [ ] **5.1b Dark price-chart comparison** (sample-only)
-  - Local comparison is implemented for review in `frontend/prototype/`; choice
-    of chart treatment and overall visual approval remain pending.
+- [x] **5.1b Initial dark price-chart comparison** (sample groundwork; revision required)
+  - Local comparison was implemented in `frontend/prototype/`; the user reviewed and
+    rejected its small chart, layout gaps, monochromatic palette and visual treatment.
+    Its implementation is complete as groundwork, not visually approved; revise in 5.1b1.
   - Present two Prices & Plan card variants using the same coherent sample data and
     features: interval-width bars versus a gradient-filled stepped price line/area,
     inspired by the user's example. These are temporary visual alternatives within
@@ -184,6 +185,99 @@ tests are documented there; full HA collection is still blocked on Windows.
     data gaps. Both variants show the complete multi-window plan, per-window price,
     energy and cost, plus this-charge totals and weighted average. Reuse shared sample
     data/components; ask the user which chart direction to keep.
+- [ ] **5.1b1 Full-width chart comparison revision** (partial; corrective work in 5.1b2)
+  - Both full-width comparison cards and the reference-derived fictional fixture exist;
+    local ECharts and sample-data groundwork are in place. Review identified visually
+    inadequate step rendering, undersized plot, contiguous windows wrongly presented as
+    separate, and Ctrl-only wheel zoom. Do not mark accepted or visually approved; finish
+    these outstanding requirements in 5.1b2. Synthetic quarter-hour fluctuations and
+    the hand-authored plan are not verified market data or optimizer output.
+  - Show both bar and gradient stepped-area Prices & Plan alternatives concurrently,
+    one below the other, each on a full-width row with a substantially larger plot;
+    remove the A/B switch. These are comparison-only, not duplicate final dashboards.
+  - Use `samples/bar-chart.js` and `samples/stepline-chart.js` as direct visual and
+    sample-data inspiration: neutral dark surfaces, expressive price colors, clear now
+    and soft-cap markers, low/high callouts, useful window shading and overview slider.
+    Reuse one shared, labelled illustrative dataset, scales and features for a fair
+    comparison. The bar sample's 15-minute fluctuations are synthetic; do not present
+    sample data as verified Nord Pool Latvia prices or as a calculated optimal plan.
+  - Include accurate interval boundaries, negative-price and missing-data test cases,
+    the full proposed plan, per-window price/energy/cost and coherent totals. Distinguish
+    price opportunities from proposed windows; explain price-band thresholds and avoid
+    hard-coded sample thresholds masquerading as universal real-world judgments.
+  - Use gesture/slider navigation and compact accessible zoom/reset alternatives; avoid
+    redundant buttons or verbose chart instructions. Check wheel scrolling versus page
+    scroll, keyboard access and touch; report unverified physical-touch behavior.
+  - Restructure the surrounding layout to eliminate grid-induced gaps and accommodate
+    full-width charts. Improve readable contrast and introduce restrained semantic color
+    and locally bundled icons; retain Web Awesome and a consistent dark design. Leave
+    broader dashboard polish and alternate states to 5.1d.
+  - Browser-review desktop and mobile, provide screenshots of both complete charts and
+    ask the user to choose a direction. No live data, HA connection or charger actions.
+- [ ] **5.1b2 Chart, plan and layout corrections** (sample-only; coordinator and visual review pending)
+  - Local corrections and focused checks are in place, including adjacent-window grouping,
+    a plan modal, wheel zoom and the desktop two-column overview. User review identified
+    remaining visual/interaction work in 5.1b3–5.1b4; this is not visually approved.
+    Simulated pinch did not change zoom and touch targeting remains unreliable; see handoff.
+  - Place overview and plan controls side by side at equal desktop widths, stack on
+    mobile; retain both large, full-width comparison cards below and avoid empty gaps.
+  - Make the step variant a visually continuous stepped line with a subtle gradient
+    area, not per-interval filled bars. Preserve actual price interval boundaries,
+    negative values, gaps and final interval. Bring both chart variants closer to the
+    user's samples in size, visual clarity, price colors, min/max callouts, cap, now,
+    window shading and overview; use truthful, labelled sample thresholds and data.
+    On both charts clearly overlay the exact proposed charging windows with a distinct
+    color and non-colour cue, separate from price coloring and cheap opportunities;
+    match the complete plan and explain the overlay in the legend/tooltip.
+  - Enable ordinary mouse-wheel zoom as requested (without Ctrl), plus slider, touch and
+    keyboard-accessible navigation/reset. Test real wheel events and document the page
+    scroll tradeoff; do not equate simulated touch with physical touchscreen validation.
+  - Present contiguous charging intervals as one continuous window when there is no
+    stop; separate windows when charging actually pauses. Do not merge across gaps,
+    change planner behavior or erase genuinely different control semantics. Calculate
+    per-window estimated energy/cost and energy-weighted price across tariff intervals,
+    including partial intervals, and keep chart shading, next window, totals and text
+    consistent. Sample fixtures should show both continuous and separated windows.
+  - Make the next proposed window open an accessible modal with the same complete plan
+    and cost details that remain visible in both chart cards. Provide keyboard/focus,
+    close and mobile behavior; sample controls cannot contact HA or control charging.
+  - Browser-review both charts, modal and desktop/mobile layouts; verify tests, local
+    dependencies and reported limitations. Overall 5.1 and chart choice remain pending
+    user approval; no live data, planner changes, deployment or hardware actions.
+- [ ] **5.1b3 Chart fidelity and interval navigation** (sample-only)
+  - Bring BOTH full-width price charts much closer to `samples/bar-chart.js` and
+    `samples/stepline-chart.js`: meaningful price-dependent colors on bars and stepped
+    line/area, clearly visible plotted min/max callouts and a legible proposed-window
+    overlay distinct from the price colors. Retain exact intervals, gaps, negative prices,
+    final boundaries and a truthful legend; do not apply arbitrary sample price bands
+    as real-world judgments. Place callouts at actual extrema, clarify whether they
+    refer to the visible range or entire horizon, and handle offscreen extrema honestly.
+  - Snap the viewed time range to 15-minute boundaries on wheel/pinch zoom, drag/pan,
+    overview slider and keyboard/reset actions for the 15-minute sample; clamp at horizon
+    edges, avoid feedback loops and test repeated movement. This is viewport navigation,
+    NOT rounding published data, the current-time marker or partial charging windows.
+    For future real data use source interval boundaries and timezone/DST-aware timestamps
+    rather than assuming every dataset or charging stop is aligned to 15 minutes.
+  - Show a readable two-hour time-axis cadence (e.g. 14:00, 16:00, 18:00) for the normal
+    chart view, with date/midnight context; handle responsive widths and zoom without
+    overlapping or misleading labels. Exact interval tooltips remain available.
+  - Browser-test both variants with real wheel/drag and zoom/reset, boundary snapping,
+    plot coloring, visible callouts, overlay contrast and desktop/mobile screenshots.
+    Clearly report real-touch versus emulated-touch limitations. Keep charts and plan
+    sample-only; ask for visual feedback before choosing a final chart.
+- [ ] **5.1b4 Compact controls and plan presentation** (sample-only)
+  - Make Plan Controls more compact and place a readable complete proposed plan below
+    them within the right-hand desktop column; keep the overview beside them. Avoid
+    blank gaps and preserve responsive stacking. Retain the complete plan in the chart
+    cards and the existing next-window modal using a shared sample representation.
+  - Show an estimated battery SOC after each proposed window where the sample starting
+    SOC, usable capacity, wall energy and efficiency support it. Clearly identify it as
+    a projection, not a measurement or guarantee; account for cumulative energy and
+    battery-versus-wall basis, cap at feasible bounds, and show unknown if inputs are
+    missing. Do not infer SOC changes from a plan as actual observed charging.
+  - Clicking outside a modal closes it as well as its close button and Escape, without
+    closing on clicks inside. Preserve focus trapping/return and test keyboard and mobile
+    behavior. This does not authorize new charger actions or live bindings.
 - [ ] **5.1c Sample price insights and monthly statistics** (sample-only)
   - Prototype concise, explainable assessments of current/upcoming prices against a
     stated illustrative longer-term baseline, plus best upcoming price windows and
@@ -199,14 +293,38 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Refine the full dark dashboard around the selected chart direction: strengthen
     hierarchy, legibility and card balance; remove duplicated cost/status content;
     keep important warnings visible and technical evidence accessible. Distinguish a
-    schedule mismatch from measured charging state in clear, actionable wording.
+    schedule mismatch from measured charging state in clear, actionable wording. Use
+    neutral dark surfaces, purposeful semantic colors and a restrained set of local
+    icons instead of an overwhelmingly green interface; avoid large layout gaps.
   - Show recent sent-versus-measured history, explicit gaps and useful alternate
     scenarios: charging, normal waiting, unavailable data/prices, infeasible minimum,
     partial final window and above-cap exception. Include date/session selection,
     coverage and out-of-plan flow in the design; do not invent observations.
   - Reconcile control units/cap enablement and sample explanations, and review desktop,
-    mobile and HA-like constrained widths. Obtain user visual approval; 5.1 and 5.1a
-    remain pending until approved. No live bindings or hardware actions.
+    mobile and HA-like constrained widths. Coordinate final visual review with 5.1e;
+    overall 5.1 remains pending user approval. No live bindings or hardware actions.
+- [ ] **5.1e Vehicle and plan-evidence design** (sample-only)
+  - Enrich and polish the vehicle overview without visual clutter. Show current SOC,
+    target marker and, only when a separately defined valid value is available, a
+    clearly labelled low-SOC warning threshold. Do not equate that threshold with the
+    ready-by minimum SOC or immediate protection floor, infer battery damage, or invent
+    a default. Demonstrate unknown and potentially stale values honestly.
+  - Explore a compact battery visual and readable supporting values for estimated kWh
+    presently in the battery, energy needed to reach target and estimated active charge
+    duration, as inputs permit. Distinguish battery-side energy from wall energy and
+    estimates from measurements; label assumptions and never imply a guaranteed finish.
+  - Design a concise plan activity and freshness view: when and why the current proposal
+    was calculated, last send/ACK, effective readback time/coverage and key measurement
+    freshness as available. Present useful summaries by default; keep detailed evidence
+    and less important technical explanations accessible without burying warnings.
+  - Distinguish current proposal, known last sent plan and acknowledgement, effective
+    current-limit readback and actual measured charging. A composite readback is NOT an
+    inventory of installed plans, and ACK/readback cannot prove physical charging; show
+    unknown/stale/superseded evidence rather than claiming what profile is installed.
+  - Use coherent labelled sample scenarios, preserving the complete-plan modal and chart
+    overlay. Review desktop/mobile visual hierarchy and ask the user to approve. No live
+    bindings, new telemetry, protective behavior changes or charger actions; verify any
+    eventual live source availability during 5.2 rather than assuming it exists.
 - [ ] **5.2 Overview and operation status**
   - Bind connection/SOC/measured power/next window and proposal/sent/readback health.
   - Make missing data and critical failures visible without expanding details.
@@ -235,7 +353,9 @@ tests are documented there; full HA collection is still blocked on Windows.
 - [ ] **7.2 Interaction**
   - Reuse prototype interactions; add Yesterday/Today/available future/All,
     touch/mouse zoom, overview/reset and exact tooltips for real data.
-  - Preserve zoom on updates; test resize and keyboard/touch behavior in a browser.
+  - Preserve zoom on updates; snap navigation to real source interval boundaries without
+    rounding underlying data or plan times. Test resize and keyboard/touch behavior in
+    a browser, including timezone/DST and source-resolution changes.
 - [ ] **7.3 Aligned tracks**
   - Distinguish proposal/sent/effective/measured tracks and minimum-SOC exceptions.
   - Show mismatches and missing observations honestly; reuse Stage 6 provenance.

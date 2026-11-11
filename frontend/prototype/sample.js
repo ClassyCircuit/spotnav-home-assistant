@@ -1,35 +1,59 @@
 // Fictional fixed-hour axis: yesterday -24..0, today 0..24, tomorrow 24..48.
 // This is not a planner, real timestamp handling or live data.
-const intervals = [];
-for (let start = -24; start < 36;) {
-  if (start === 14) { start = 15; continue; } // explicitly unavailable sample interval
-  const duration = (start >= 20 && start < 22) || (start >= 26 && start < 27) ? 0.5 : 1;
-  const end = start + duration;
-  let cents = 12 + Math.round(4 * Math.sin(start / 3));
-  if (start === 22) cents = -2;
-  if (start === 24) cents = 6;
-  if (start === 26) cents = 9;
-  intervals.push({ start, end, cents });
-  start = end;
-}
-export const prices = intervals;
-export const now = 21;
+const hourly = [
+  33.62,33.51,33.06,29.29,28.02,28.32,27.96,28.34,30.06,30.57,30.51,30.01,30.11,29.73,39.33,43.73,47.54,47.71,47.55,50.3,50.21,47.09,24.86,35.76,
+  29.49,34.97,33.71,32.68,33.43,33.41,31.58,41.29,52.26,55.39,58.44,53.07,47.16,54.37,58.44,44.65,70.56,62.71,76.73,71.56,66.55,58.44,47.24,43.91,
+  22.55,32.96,32.92,32.76,34.08,38.46,32.49,43.25,53.07,49.95,54.61,49.33,51.68,54.33,47.92,51.43,78.06,70.73,77.42,68.26,67.93,59.57,46.31,41.85
+];
+// The supplied bar sample synthesizes four fluctuations from each hourly value.
+export const prices = hourly.flatMap((base, i) => [-.2,.1,.5,-.1].map((delta, j) => ({ start: i - 24 + j / 4, end: i - 24 + (j + 1) / 4, cents: Math.round((base + delta) * 100) / 100 })));
+export const now = 14.5;
 export const deadline = 31;
 export const horizon = [-24, 48];
-export const windows = [
-  { start: 22, end: 23, energy: 6, cost: -0.12 },
-  { start: 24, end: 25, energy: 6, cost: 0.36 },
-  { start: 26, end: 26.5, energy: 3, cost: 0.27 },
-];
+export const cap = 35;
+// Sample-only grouping: touching blocks merge only when their control is identical.
+export function groupBlocks(blocks) {
+  return blocks.reduce((result, block) => {
+    const last = result.at(-1);
+    if (last && last.end === block.start && last.power === block.power && last.control === block.control) last.end = block.end;
+    else result.push({ ...block });
+    return result;
+  }, []);
+}
+export function priceWindow(window, intervals) {
+  const energy = Number.isFinite(window.power) ? (window.end - window.start) * window.power : null;
+  let covered = window.start, cost = 0;
+  for (const p of intervals) {
+    const start = Math.max(window.start, p.start), end = Math.min(window.end, p.end);
+    if (end <= start) continue;
+    if (start !== covered || !Number.isFinite(p.cents) || energy == null) return { ...window, energy, cost: null, centsPerKwh: null };
+    cost += (end - start) * window.power * p.cents / 100;
+    covered = end;
+  }
+  if (covered !== window.end || energy == null) return { ...window, energy, cost: null, centsPerKwh: null };
+  return { ...window, energy, cost, centsPerKwh: energy ? cost * 100 / energy : null };
+}
+// Hand-authored fixture only; the first three blocks are continuous, then a pause.
+const blocks = [[24,24.25], [24.25,24.5], [24.5,24.625], [25,25.375]].map(([start,end]) => ({ start, end, power: 6, control: 'normal' }));
+export const windows = groupBlocks(blocks).map(w => priceWindow(w, prices));
 export const total = rows => {
   if (!rows.length || rows.some(row => row.energy == null || row.cost == null)) return null;
   const energy = rows.reduce((s, row) => s + row.energy, 0);
   const cost = rows.reduce((s, row) => s + row.cost, 0);
   return { energy, cost, centsPerKwh: energy ? cost * 100 / energy : null };
 };
-export const time = h => `${String(((Math.floor(h) % 24) + 24) % 24).padStart(2, '0')}:${String(Math.round((h - Math.floor(h)) * 60)).padStart(2, '0')}`;
+export const time = h => { const seconds = Math.round((((h % 24) + 24) % 24) * 3600); const hh = Math.floor(seconds / 3600), mm = Math.floor(seconds % 3600 / 60), ss = seconds % 60; return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}${ss ? `:${String(ss).padStart(2,'0')}` : ''}`; };
 export const day = h => h < 0 ? 'Yesterday' : h < 24 ? 'Today' : h < 48 ? 'Tomorrow' : 'Next day';
 export const money = value => value == null ? 'Unknown' : `${value < 0 ? '−' : ''}€${Math.abs(value).toFixed(2)}`;
 export const priceAt = h => prices.find(p => p.start <= h && h < p.end);
 // Each interval has its own segment, including the final end; gaps stay gaps.
 export const stepSegments = items => items.map(p => [[p.start, p.cents], [p.end, p.cents]]);
+// Duplicate x coordinates express vertical transitions, nulls explicitly break gaps.
+export function stepPoints(items) {
+  const points = [];
+  items.forEach((p, i) => {
+    if (i && items[i - 1].end !== p.start) points.push([(items[i - 1].end + p.start) / 2, null]);
+    points.push([p.start, p.cents], [p.end, p.cents]);
+  });
+  return points;
+}

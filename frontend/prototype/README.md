@@ -17,22 +17,30 @@ Open <http://127.0.0.1:8765/prototype/>. Stop the server with Ctrl+C. No HA
 installation, deployment or restart is involved. `prototype/dist/` is generated
 and ignored. To rebuild after editing, rerun the build command and reload.
 
-In **Prices & plan**, switch between **A · Bars** and **B · Stepped area**;
-both use the same fixture and plan. The slider provides an overview and drag
-handles for the visible horizon; drag the chart to pan, scroll/pinch to zoom,
-or use Zoom in and Reset overview. This comparison is temporary, not a proposal
-for two final dashboards. Shading means selected proposal; prices at or below
-the sample cap are potential opportunities, not automatically selected windows.
-The sample displays yesterday, today and tomorrow until 12:00; a separate hour
-today is missing. Grey bands mark missing prices, never zero. The last selected
-window is a half-hour; negative costs represent a fictional negative tariff.
+Both **Prices & plan** alternatives appear together, sharing a fixture and plan;
+this is a temporary comparison, not a proposal for two final cards. The overview
+slider and chart dragging pan; ordinary wheel over a chart zooms, and the labelled
+zoom/reset buttons are keyboard accessible. Wheel over the chart is consumed for
+zoom, so scroll the page with the scrollbar, keyboard, or outside the chart.
+The simulated pinch did not change the zoom in the headless check; pinch and
+physical touch therefore remain unverified.
+The fictitious 08–10 Nov fixture is based on the supplied example hourly values;
+as in the bar example, quarter-hour fluctuations are synthetic, not verified
+Nord Pool data. EUR c/kWh is an illustrative variable-cost basis including fees
+and taxes. Fixed 24-hour days are not real timezone/DST handling. All three days
+are available in this sample, not a promise that future prices are always available.
+The 30/45/60 c/kWh color bands are illustrative only. A 35 c/kWh soft cap,
+low-price opportunities and blue-shaded hand-authored proposal windows are
+distinct concepts. A continuous window spans several prices and ends partway
+through an interval; another starts after a real pause. The next-window button
+opens the same complete plan in a native browser modal; Escape or Close dismisses it.
+It is not optimizer output. Negative and missing price fixtures are tested
+separately, rather than represented as real prices.
 
 ## Intended single HA Sections dashboard
 
-Conceptually, one Sections view would put the overview, plan controls, charger
-health and costs in a narrow left section, Prices & Plan and recent charging in
-a wider right section. On mobile the same cards stack in the
-prototype's document order: overview, prices, controls, Morek, history, costs.
+The local comparison puts overview and simulated controls side by side above two full-width price alternatives,
+with other sample cards flowing below. On mobile the same cards stack.
 This is a composition proposal, not installable YAML or a modification to any
 existing view; final Sections column spans and HA behavior need in-HA validation.
 
@@ -44,7 +52,8 @@ build output. The prototype bundles selected button, input, badge and progress-b
 components and the package theme CSS with esbuild; no Pro package is used. The
 build includes dependency license comments where provided. The package's icon
 resolver can default to a remote Font Awesome host: this prototype avoids icon
-components and its browser check verifies no off-origin requests. Do not assume
+components and uses an original inline geometric lightning SVG (project-authored,
+no third-party icon license). Its browser check verifies no off-origin requests. Do not assume
 other Web Awesome controls are offline-safe without checking their assets.
 
 For a future HA card, bundle selected modules and CSS locally into the distributed
@@ -54,9 +63,9 @@ cards use shadow DOM, so theme CSS would need to be included in each card's shad
 root; inherited documented CSS custom properties can map HA theme colors to the
 shared tokens. Do not reach into private HA or component DOM. Global element
 registration/version collisions, light/dark theme mapping, and CSS isolation need
-testing in a real HA instance before shipping. The standalone page only verifies
-the components used here; dialogs, popovers, focus trapping, clipping, overlays,
-touch interaction and HA's actual Sections layout remain unverified. Avoid
+testing in a real HA instance before shipping. This standalone study uses the
+browser's native modal dialog, not a Web Awesome dialog; HA shadow-root behavior,
+popovers, overlays, physical touch and HA's actual Sections layout remain unverified. Avoid
 assuming those are compatible until separately tested.
 
 The prototype pins Apache ECharts **6.1.0** (Apache-2.0), using a locally bundled
@@ -67,8 +76,8 @@ No chart resources come from a CDN. Future shipped cards must include these file
 and audit all bundled transitive notices, and should load chart code only where
 needed. The sample chart module is a starting point, not production Stage 7: it
 uses a fixed sample hour axis, not real timestamps, timezone/DST handling or source
-data. The custom renderer uses interval start/end for actual sample width, and
-each stepped segment ends at its own interval end rather than joining gaps. The
+data. The custom bars use interval start/end; the line uses explicit horizontal
+endpoints and null breaks rather than joining gaps. The
 fictional axis uses relative hours (24-hour days), not real calendar or DST logic.
 The separate sample power chart holds each reading for at most 15 minutes for
 display and leaves the explicit missing interval blank; the independent meter
@@ -79,10 +88,11 @@ counter fixture is not calculated from the curve or the plan.
 With the local server above running, launch a Chromium-family browser in headless
 mode with DevTools on port 9227 and a **separate temporary profile**, opening the
 prototype URL. Run `node prototype/browser-check.mjs` from `frontend/`. The check
-tests desktop and mobile sizing, order, horizontal overflow, both variants, chart
-data boundaries, actual zoom/reset and mouse slider drag, negative-price mouse and
-emulated-touch tooltips, library inputs, disabled charger actions, sample text,
-local edits, disclosure and request origins; it saves four screenshots under the user's
-temporary `opencode` folder. It sends an emulated touch event but does not validate
-a real touchscreen, touch-drag/pinch, accessibility tree, actual HA shadow roots or dialogs. Run
+tests desktop and mobile sizing, overflow, both variants, chart data endpoints,
+mouse wheel, slider, zoom/reset, desktop hover, modal keyboard/close/focus,
+simulated touch, disabled charger actions and request origins. It saves full-page,
+individual-card, modal and rendered edge-fixture screenshots under the user's
+temporary `opencode` folder. Simulated touch at full overview did not reliably
+hit the narrow intervals; a programmatic tooltip check is used as a fallback.
+It does not validate real touch, accessibility tree or actual HA shadow roots. Run
 `node --test prototype/sample.test.mjs` for sample arithmetic and missing inputs.
