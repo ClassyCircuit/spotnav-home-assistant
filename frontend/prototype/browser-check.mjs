@@ -21,8 +21,10 @@ for (const [name,width,height] of [['desktop',1440,1000],['mobile',390,844]]) {
   const state=await evaluate(`(async()=>{await Promise.all([...document.querySelectorAll('wa-button,wa-input,wa-badge,wa-progress-bar,wa-details')].map(e=>e.updateComplete));return {width:document.documentElement.scrollWidth,viewport:innerWidth,panels:document.querySelectorAll('.panel').length,charts:document.querySelectorAll('.chart canvas').length,rows:document.querySelectorAll('.plan-row').length,disabled:[...document.querySelectorAll('.controls wa-button,.details-body wa-button')].every(e=>e.disabled),text:document.body.innerText,rects:[...document.querySelectorAll('.prices')].map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}})};})()`);
   assert.ok(state.width<=state.viewport,`${name} overflow ${state.width}/${state.viewport}`); assert.equal(state.panels,7); assert.equal(state.charts,3); assert.equal(state.rows,8); assert.ok(state.disabled); assert.ok(state.rects[1].y>state.rects[0].y); assert.ok(Math.abs(state.rects[0].width-state.rects[1].width)<1);
   for(const text of ['unverified','unarmed','26.45 c/kwh','00:37:30','not an optimized']) assert.ok(state.text.toLowerCase().includes(text),text);
-  const layout=await evaluate(`(()=>{let a=document.querySelector('.overview').getBoundingClientRect(),b=document.querySelector('.controls').getBoundingClientRect();return {ax:a.x,ay:a.y,aw:a.width,bx:b.x,by:b.y,bw:b.width}})()`);
-  if(name==='desktop') {assert.ok(Math.abs(layout.ay-layout.by)<1 && layout.bx>layout.ax && Math.abs(layout.aw-layout.bw)<1,'overview and controls side by side');} else assert.ok(layout.by>layout.ay,'controls follow overview');
+  const layout=await evaluate(`(()=>{let a=document.querySelector('.overview').getBoundingClientRect(),b=document.querySelector('.controls').getBoundingClientRect();return {ax:a.x,ay:a.y,aw:a.width,ab:a.bottom,bx:b.x,by:b.y,bw:b.width,bb:b.bottom}})()`);
+  if(name==='desktop') {assert.ok(Math.abs(layout.ay-layout.by)<1 && layout.bx>layout.ax && Math.abs(layout.aw-layout.bw)<1 && Math.abs(layout.ab-layout.bb)<1,'overview and controls aligned');} else assert.ok(layout.by>=layout.ab,'controls follow overview');
+  const cardsClip=await evaluate(`(()=>{const a=document.querySelector('.overview').getBoundingClientRect(),b=document.querySelector('.controls').getBoundingClientRect();return {x:Math.min(a.x,b.x)+scrollX,y:a.y+scrollY,width:Math.max(a.right,b.right)-Math.min(a.left,b.left),height:Math.max(a.bottom,b.bottom)-a.top,scale:1}})()`);
+  const cardsImage=await cmd('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:cardsClip}); await writeFile(`${process.env.TEMP}/opencode/spotnav-51b4a-${name}-cards.png`,Buffer.from(cardsImage.data,'base64'));
   const consistency=await evaluate(`(()=>{let nodes=['.controls','.prices-bar','.prices-step','#plan-dialog'].map(s=>document.querySelector(s));return nodes.map(n=>({rows:[...n.querySelectorAll('.plan-row')].map(e=>e.textContent),total:n.querySelector('.plan-total').textContent}))})()`);
   assert.deepEqual(consistency[0],consistency[1]); assert.deepEqual(consistency[0],consistency[2]); assert.deepEqual(consistency[0],consistency[3]);
   await evaluate(`document.querySelector('#open-plan').focus()`);
@@ -41,6 +43,11 @@ for (const [name,width,height] of [['desktop',1440,1000],['mobile',390,844]]) {
   assert.equal(await evaluate(`document.querySelector('#plan-dialog').open`),false,'outside click closes'); assert.equal(await evaluate(`document.activeElement.id`),'open-plan');
   await evaluate(`document.querySelector('#open-plan').click();document.querySelector('#close-plan').click()`);
   assert.equal(await evaluate(`document.querySelector('#plan-dialog').open`),false);
+  await evaluate(`new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))`);
+  await evaluate(`document.querySelector('#open-plan-details').focus()`);
+  await cmd('Input.dispatchKeyEvent',{type:'keyDown',key:' ',code:'Space',windowsVirtualKeyCode:32}); await cmd('Input.dispatchKeyEvent',{type:'keyUp',key:' ',code:'Space',windowsVirtualKeyCode:32});
+  assert.equal(await evaluate(`document.querySelector('#plan-dialog').open`),true);
+  await evaluate(`document.querySelector('#close-plan').click()`); assert.equal(await evaluate(`document.activeElement.id`),'open-plan-details');
   const metrics=await cmd('Page.getLayoutMetrics');
   const full=await cmd('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:{x:0,y:0,width:metrics.cssContentSize.width,height:metrics.cssContentSize.height,scale:1}});
   await writeFile(`${process.env.TEMP}/opencode/spotnav-51b4-${name}-full.png`,Buffer.from(full.data,'base64'));
@@ -136,6 +143,27 @@ for (const [name,width,height] of [['desktop',1440,1000],['mobile',390,844]]) {
       const img=await cmd('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:rect}); await writeFile(`${process.env.TEMP}/opencode/spotnav-51b3-dates-${name}-${mode}-missing.png`,Buffer.from(img.data,'base64'));
     }
     console.log(`${name} ${mode}: interval endpoints, zoom/reset, tooltip and screenshot passed`);
+  }
+  for (const scenario of ['missing','invalid','long']) {
+    const loadedScenario = new Promise(resolve => { const prev=ws.onmessage; ws.onmessage=e=>{prev(e); if(JSON.parse(e.data).method==='Page.loadEventFired'){ws.onmessage=prev;resolve();}}; });
+    await cmd('Page.navigate',{url:`http://127.0.0.1:8765/prototype/?plan=${scenario}`}); await loadedScenario;
+    const result=await evaluate(`(async()=>{await Promise.all([...document.querySelectorAll('wa-button,wa-input,wa-badge')].map(e=>e.updateComplete));const nodes=['.controls','.prices-bar','.prices-step','#plan-dialog'].map(s=>document.querySelector(s));const a=document.querySelector('.overview').getBoundingClientRect(),b=document.querySelector('.controls').getBoundingClientRect(),chart=document.querySelector('.prices-bar').getBoundingClientRect();return {width:document.documentElement.scrollWidth,viewport:innerWidth,plans:nodes.map(n=>({rows:[...n.querySelectorAll('.plan-row')].map(e=>e.textContent),total:n.querySelector('.plan-total').textContent,note:n.querySelector('.projection-note').textContent})),a:a.toJSON(),b:b.toJSON(),chart:chart.toJSON(),disabled:[...document.querySelectorAll('.controls wa-button,.details-body wa-button')].every(e=>e.disabled),text:document.body.innerText}})()`);
+    assert.ok(result.width<=result.viewport); assert.ok(result.disabled); assert.ok(result.chart.top>=Math.max(result.a.bottom,result.b.bottom));
+    if(name==='desktop') assert.ok(Math.abs(result.a.bottom-result.b.bottom)<1 && Math.abs(result.a.width-result.b.width)<1); else assert.ok(result.b.top>=result.a.bottom);
+    for(const p of result.plans.slice(1)) assert.deepEqual(p,result.plans[0]);
+    assert.doesNotMatch(JSON.stringify(result.plans),/NaN|Infinity/);
+    assert.equal(result.plans[0].rows.length,scenario==='long'?8:2);
+    if(scenario==='missing') { assert.match(result.plans[0].rows[0],/3\.75 kWh/); assert.match(result.plans[0].rows[0],/Unknown/); assert.match(result.plans[0].total,/6\.00 kWh/); assert.match(result.plans[0].total,/Unknown/); assert.match(result.plans[0].note,/Unknown efficiency/); }
+    if(scenario==='invalid') { assert.match(result.plans[0].rows[0],/Unknown/); assert.match(result.plans[0].total,/Unknown/); assert.match(result.text,/Target feasibility is unknown/); }
+    if(scenario==='long') assert.ok(result.plans[0].rows.at(-1).includes('03:30'));
+    const clip=await evaluate(`(()=>{const a=document.querySelector('.overview').getBoundingClientRect(),b=document.querySelector('.controls').getBoundingClientRect();return {x:Math.min(a.x,b.x)+scrollX,y:a.y+scrollY,width:Math.max(a.right,b.right)-Math.min(a.left,b.left),height:Math.max(a.bottom,b.bottom)-a.top,scale:1}})()`);
+    const image=await cmd('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip}); await writeFile(`${process.env.TEMP}/opencode/spotnav-51b4a-${name}-${scenario}.png`,Buffer.from(image.data,'base64'));
+    await evaluate(`document.querySelector('#open-plan').focus()`);
+    await cmd('Input.dispatchKeyEvent',{type:'keyDown',key:' ',code:'Space',windowsVirtualKeyCode:32}); await cmd('Input.dispatchKeyEvent',{type:'keyUp',key:' ',code:'Space',windowsVirtualKeyCode:32});
+    assert.equal(await evaluate(`document.querySelector('#plan-dialog').open`),true); assert.equal(await evaluate(`document.activeElement.id`),'close-plan');
+    if(scenario==='missing') { const image=await cmd('Page.captureScreenshot',{format:'png'}); await writeFile(`${process.env.TEMP}/opencode/spotnav-51b4a-${name}-missing-modal.png`,Buffer.from(image.data,'base64')); }
+    await cmd('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27}); await cmd('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+    assert.equal(await evaluate(`document.activeElement.id`),'open-plan');
   }
   console.log(`${name}: full page and both cards, no horizontal overflow`);
 }

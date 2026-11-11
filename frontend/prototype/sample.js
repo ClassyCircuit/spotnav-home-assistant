@@ -44,7 +44,7 @@ export function groupBlocks(blocks) {
   }, []);
 }
 export function priceWindow(window, intervals) {
-  const energy = Number.isFinite(window.power) ? (window.end - window.start) * window.power : null;
+  const energy = Number.isFinite(window.power) && window.power >= 0 && Number.isFinite(window.start) && Number.isFinite(window.end) && window.end > window.start ? (window.end - window.start) * window.power : null;
   let covered = window.start, cost = 0;
   for (const p of intervals) {
     const start = Math.max(window.start, p.start), end = Math.min(window.end, p.end);
@@ -59,26 +59,33 @@ export function priceWindow(window, intervals) {
 // Hand-authored fixture only; the first three blocks are continuous, then a pause.
 const blocks = [[24,24.25], [24.25,24.5], [24.5,24.625], [25,25.375]].map(([start,end]) => ({ start, end, power: 6, control: 'normal' }));
 // Wall energy is converted to stored battery energy once; these are projections, not observations.
-export const socAssumptions = { startingSoc: 48, capacityKwh: 60, efficiency: 0.9 };
+export const scenario = typeof location === 'undefined' ? 'default' : new URLSearchParams(location.search).get('plan') || 'default';
+export const socAssumptions = { startingSoc: 48, capacityKwh: 60, efficiency: scenario === 'missing' || scenario === 'invalid' ? null : 0.9 };
+export const validSocAssumptions = ({ startingSoc, capacityKwh, efficiency } = {}) => Number.isFinite(startingSoc) && startingSoc >= 0 && startingSoc <= 100 && Number.isFinite(capacityKwh) && capacityKwh > 0 && Number.isFinite(efficiency) && efficiency > 0 && efficiency <= 1;
 export function projectSoc(rows, { startingSoc, capacityKwh, efficiency } = {}) {
-  let soc = Number.isFinite(startingSoc) && startingSoc >= 0 && startingSoc <= 100 &&
-    Number.isFinite(capacityKwh) && capacityKwh > 0 && Number.isFinite(efficiency) &&
-    efficiency > 0 && efficiency <= 1 ? startingSoc : null;
+  let soc = validSocAssumptions({ startingSoc, capacityKwh, efficiency }) ? startingSoc : null;
   return rows.map(row => {
     if (soc == null || !Number.isFinite(row.energy) || row.energy < 0) soc = null;
     else soc = Math.min(100, soc + row.energy * efficiency / capacityKwh * 100);
     return { ...row, projectedSoc: soc };
   });
 }
-export const windows = projectSoc(groupBlocks(blocks).map(w => priceWindow(w, prices)), socAssumptions);
+const sampleBlocks = scenario === 'long' ? Array.from({length: 8}, (_, i) => ({start: 24 + i * .5, end: 24.25 + i * .5, power: 6, control: 'normal'})) : blocks;
+const pricedWindows = groupBlocks(sampleBlocks).map((w, i) => {
+  const result = priceWindow(w, scenario === 'missing' && i === 0 ? [] : prices);
+  return scenario === 'invalid' && i === 0 ? { ...result, energy: NaN, cost: Infinity, centsPerKwh: NaN } : result;
+});
+export const windows = projectSoc(pricedWindows, socAssumptions);
 export const total = rows => {
-  if (!rows.length || rows.some(row => row.energy == null || row.cost == null)) return null;
-  const energy = rows.reduce((s, row) => s + row.energy, 0);
-  const cost = rows.reduce((s, row) => s + row.cost, 0);
-  return { energy, cost, centsPerKwh: energy ? cost * 100 / energy : null };
+  const energy = rows.length > 0 && rows.every(row => Number.isFinite(row.energy) && row.energy >= 0) ? rows.reduce((s, row) => s + row.energy, 0) : null;
+  const cost = rows.length > 0 && rows.every(row => Number.isFinite(row.cost)) ? rows.reduce((s, row) => s + row.cost, 0) : null;
+  const validEnergy = Number.isFinite(energy) ? energy : null;
+  const validCost = Number.isFinite(cost) ? cost : null;
+  const average = validEnergy > 0 && validCost != null ? validCost * 100 / validEnergy : null;
+  return { energy: validEnergy, cost: validCost, centsPerKwh: Number.isFinite(average) ? average : null };
 };
-export const time = h => { const seconds = Math.round((((h % 24) + 24) % 24) * 3600); const hh = Math.floor(seconds / 3600), mm = Math.floor(seconds % 3600 / 60), ss = seconds % 60; return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}${ss ? `:${String(ss).padStart(2,'0')}` : ''}`; };
-export const day = h => h < 0 ? 'Yesterday' : h < 24 ? 'Today' : h < 48 ? 'Tomorrow' : 'Next day';
+export const time = h => { if (!Number.isFinite(h)) return 'Unknown'; const seconds = Math.round((((h % 24) + 24) % 24) * 3600); const hh = Math.floor(seconds / 3600), mm = Math.floor(seconds % 3600 / 60), ss = seconds % 60; return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}${ss ? `:${String(ss).padStart(2,'0')}` : ''}`; };
+export const day = h => !Number.isFinite(h) ? 'Unknown' : h < 0 ? 'Yesterday' : h < 24 ? 'Today' : h < 48 ? 'Tomorrow' : 'Next day';
 // Fictional fixed calendar, not local timestamps or a DST model.
 export function sampleDate(h) {
   const d = new Date(Date.UTC(2026, 10, 9 + Math.floor(h / 24)));
@@ -102,7 +109,7 @@ export function priceGaps(start, end, items) {
   if (cursor < end) gaps.push([cursor,end]);
   return gaps;
 }
-export const money = value => value == null ? 'Unknown' : `${value < 0 ? '−' : ''}€${Math.abs(value).toFixed(2)}`;
+export const money = value => !Number.isFinite(value) ? 'Unknown' : `${value < 0 ? '−' : ''}€${Math.abs(value).toFixed(2)}`;
 export const priceAt = h => prices.find(p => p.start <= h && h < p.end);
 // Each interval has its own segment, including the final end; gaps stay gaps.
 export const stepSegments = items => items.map(p => [[p.start, p.cents], [p.end, p.cents]]);

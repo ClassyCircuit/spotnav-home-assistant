@@ -17,6 +17,13 @@ Open <http://127.0.0.1:8765/prototype/>. Stop the server with Ctrl+C. No HA
 installation, deployment or restart is involved. `prototype/dist/` is generated
 and ignored. To rebuild after editing, rerun the build command and reload.
 
+For local rendering checks, append `?plan=missing` (unavailable plan tariff and
+efficiency), `?plan=invalid` (invalid plan values), or `?plan=long` (eight windows).
+The missing-plan scenario deliberately leaves the separate chart price fixture intact;
+it is not a claim that the plan has been priced from that chart. Controls remain inert.
+The compact controls list shows each window and projected SOC; use “View full window
+details” or the next-window control for the complete modal, also present in both charts.
+
 Both **Prices & plan** alternatives appear together, sharing a fixture and plan;
 this is a temporary comparison, not a proposal for two final cards. The overview
 slider and chart dragging pan; ordinary wheel over a chart zooms, and the labelled

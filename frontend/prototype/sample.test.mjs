@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { prices, windows, total, money, time, stepSegments, stepPoints, horizon, groupBlocks, priceWindow, snapRange, initialRange, timeTicks, sampleDate, sampleDays, priceGaps, projectSoc } from './sample.js';
+import { renderPlan, number } from './plan-view.js';
 
 test('reference-derived sample and hand-authored plan arithmetic', () => {
   assert.equal(prices.length, 288);
@@ -52,9 +53,9 @@ test('grouping keeps pauses and control changes; missing tariffs are unknown', (
   assert.ok(Math.abs(weighted.cost) < 1e-10); assert.equal(weighted.centsPerKwh,0);
 });
 test('unknown inputs do not become zero', () => {
-  assert.equal(total([{ energy: null, cost: 0 }]), null);
-  assert.equal(total([{ energy: 1, cost: null }]), null);
-  assert.equal(total([]), null);
+  assert.deepEqual(total([{ energy: null, cost: 0 }]), {energy:null,cost:0,centsPerKwh:null});
+  assert.deepEqual(total([{ energy: 1, cost: null }]), {energy:1,cost:null,centsPerKwh:null});
+  assert.deepEqual(total([]), {energy:null,cost:null,centsPerKwh:null});
   assert.equal(money(null), 'Unknown');
   assert.equal(total([{ energy: 0, cost: 0 }]).centsPerKwh, null);
 });
@@ -82,4 +83,18 @@ test('SOC projections refuse missing and invalid inputs and propagate missing en
   for (const invalid of [{startingSoc:null},{startingSoc:-1},{startingSoc:101},{capacityKwh:0},{capacityKwh:NaN},{efficiency:0},{efficiency:1.1},{efficiency:null}])
     assert.equal(projectSoc([{energy: 1}], {...valid, ...invalid})[0].projectedSoc, null);
   for (const energy of [null, NaN, -1, Infinity]) { const result = projectSoc([{energy:1},{energy},{energy:1}], valid).map(r=>r.projectedSoc); assert.ok(Math.abs(result[0]-1.5)<1e-9); assert.deepEqual(result.slice(1), [null,null]); }
+});
+
+test('shared plan renderer reports unavailable, invalid and partially known values', () => {
+  const rows = [{start:24,end:24.5,energy:3,cost:null,centsPerKwh:NaN,projectedSoc:Infinity}, {start:25,end:25.5,energy:2,cost:1,centsPerKwh:50,projectedSoc:null}];
+  const html = renderPlan(rows, {startingSoc:48,capacityKwh:60,efficiency:null});
+  assert.match(html, /5\.00 kWh/); assert.match(html, /Unknown efficiency/);
+  assert.match(html, /<small>TOTAL COST<\/small><strong>Unknown/);
+  assert.match(html, /<small>WEIGHTED AVERAGE<\/small><strong>Unknown/);
+  assert.doesNotMatch(html, /NaN|Infinity/);
+  const invalid = renderPlan([{start:null,end:Infinity,energy:-1,cost:Infinity,centsPerKwh:null,projectedSoc:101}], {startingSoc:-1,capacityKwh:0,efficiency:2});
+  assert.doesNotMatch(invalid, /NaN|Infinity|-1\.00|101\.0%/);
+  assert.equal((invalid.match(/Unknown/g) || []).length >= 8, true);
+  assert.equal(number(Infinity,2), 'Unknown'); assert.equal(money(NaN), 'Unknown');
+  assert.deepEqual(total([{energy:Infinity,cost:NaN}]), {energy:null,cost:null,centsPerKwh:null});
 });

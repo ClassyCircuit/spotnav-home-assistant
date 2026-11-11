@@ -24,3 +24,10 @@ dialog[open]{align-items:stretch}
 @media(max-width:800px){.price-context{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin:8px 0}.price-context span{padding:5px 7px;font-size:11px;line-height:1.3}.chart-intro p{margin:5px 0}.chart-actions span{width:auto}.prices .subtext{font-size:12px;line-height:1.4}.prices .legend{line-height:1.35;gap:5px}}
 .controls .panel-head{margin-bottom:10px}.controls .fields{gap:10px;margin:10px 0}.controls-plan{border-top:1px solid var(--line);margin-top:16px;padding-top:14px}.controls-plan .plan-heading{margin-top:0}.plan-row,.plan-label{grid-template-columns:1.5fr 1.1fr 1fr .8fr .9fr}.projection-note{font-size:12px;line-height:1.45;color:var(--muted);margin:10px 0 0}.controls-plan .plan-label{display:none}.controls-plan .plan-row{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.controls-plan .plan-total strong{font-size:15px}
 @media(max-width:800px){.plan-label{display:none}.plan-row,.controls-plan .plan-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}}
+/* Only these two cards share a row; their natural content determines its height. */
+@media(min-width:801px){.overview,.controls{align-self:stretch}.overview{display:flex;flex-direction:column;justify-content:space-between;gap:12px}.overview .hint{margin-top:0}}
+.controls-plan{border-top:0;padding-top:0}
+.controls-plan .plan-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;padding-top:8px;padding-bottom:8px}
+.controls-plan .plan-row>span:nth-child(2),.controls-plan .plan-row>span:nth-child(3),.controls-plan .plan-row>span:nth-child(4){display:none}
+.controls-plan .plan-heading p{max-width:38em}
+#open-plan-details{border:0;background:none;color:#a9ceff;font:inherit;font-weight:700;text-decoration:underline;text-underline-offset:4px;cursor:pointer;padding:10px 0;min-height:44px}#open-plan-details:focus-visible{outline:3px solid #a9ceff;outline-offset:3px}

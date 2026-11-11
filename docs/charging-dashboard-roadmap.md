@@ -304,7 +304,9 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Clicking outside a modal closes it as well as its close button and Escape, without
     closing on clicks inside. Preserve focus trapping/return and test keyboard and mobile
     behavior. This does not authorize new charger actions or live bindings.
-- [ ] **5.1b4a Balanced cards and unknown-value rendering** (sample-only; next)
+- [x] **5.1b4a Balanced cards and unknown-value rendering** (sample-only; coordinator and visual review pending)
+  - Shared rendering, independent unknown totals, balanced desktop cards and local
+    missing/invalid/long-plan scenarios are implemented; see handoff for checks and limits.
   - Keep overview and controls/plan at 50% desktop width with aligned top and bottom and
     naturally similar visual weight. Stretch the shorter card without fixed heights or
     filler; preserve natural mobile stacking and accommodate longer plans accessibly.

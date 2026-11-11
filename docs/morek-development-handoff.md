@@ -234,6 +234,30 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### Stage 5.1b4a — balanced cards and unknown values (review pending)
+
+- The two desktop cards use equal-width, naturally stretched grid items; mobile stacks.
+  The compact list retains all windows, projected SOC and totals, with full pricing,
+  energy and cost in both chart cards and a modal reachable from either card. Very long
+  plans naturally stretch the overview as well; this can leave space in that card, but
+  avoids clipping windows or a fixed height. The sample-only renderer shares formatting
+  and keeps known wall energy separate from unknown cost and weighted price.
+- `?plan=missing`, `?plan=invalid` and `?plan=long` exercise the real prototype UI;
+  the missing pricing fixture is separate from the unchanged sample chart prices.
+  Invalid values and missing assumptions display Unknown; target feasibility is unknown
+  when the projection is unavailable. No production planner or charger code changed.
+- Prototype build and ten sample tests passed. Desktop 1440×1000 and emulated mobile
+  390×844 checked card alignment, four-display consistency, missing/invalid data, eight
+  windows, modal keyboard/focus/inside/outside/Escape and existing chart interactions;
+  48 observed requests were local/data only. Two intermediate browser checks failed
+  while testing Enter via DevTools; using the existing Space-key activation passed.
+  A new Edge process could not bind occupied port 9227; the existing debugging browser
+  ran the checks. Physical touch, full accessibility and HA integration remain unverified.
+- Inspected screenshots in the temporary `opencode` folder use
+  `spotnav-51b4a-{desktop|mobile}-{cards|missing|missing-modal|long}.png`.
+  No HA or hardware access; Morek dispatch remains unarmed. Overall 5.1 and chart
+  choice await user visual approval; stop for coordinator review, not 5.1c.
+
 ### Stage 5.1b4 — compact controls and plan (review pending)
 
 - The sample controls and complete shared plan sit beside the vehicle overview on
