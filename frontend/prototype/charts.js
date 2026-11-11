@@ -1,10 +1,10 @@
 import * as echarts from 'echarts/core';
 import { CustomChart, LineChart } from 'echarts/charts';
-import { GridComponent, TooltipComponent, MarkLineComponent, MarkAreaComponent, DataZoomComponent } from 'echarts/components';
+import { GridComponent, TooltipComponent, MarkLineComponent, MarkAreaComponent, MarkPointComponent, DataZoomComponent, VisualMapComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
-import { prices, windows, time, day, now, deadline, horizon, stepSegments, stepPoints, cap } from './sample.js';
+import { prices, windows, time, day, now, deadline, horizon, stepSegments, stepPoints, cap, snapRange } from './sample.js';
 
-echarts.use([CustomChart, LineChart, GridComponent, TooltipComponent, MarkLineComponent, MarkAreaComponent, DataZoomComponent, CanvasRenderer]);
+echarts.use([CustomChart, LineChart, GridComponent, TooltipComponent, MarkLineComponent, MarkAreaComponent, MarkPointComponent, VisualMapComponent, DataZoomComponent, CanvasRenderer]);
 const axis = { axisLine: { lineStyle: { color: '#536b76' } }, axisLabel: { color: '#bed0d5', fontSize: 12 }, splitLine: { lineStyle: { color: '#34444d' } } };
 export function mountCharts() {
   const priceCharts = {};
@@ -21,15 +21,30 @@ export function mountCharts() {
     return { type: 'group', children };
   };
   priceChart.setOption({ animation: false, grid: { left: 48, right: 20, top: 48, bottom: 82 },
-    tooltip: { trigger: 'item', confine: true, hideDelay: 0, transitionDuration: 0, backgroundColor: '#233942', borderColor: '#5b7b7a', textStyle: { color: '#f0faf8' }, formatter: p => `${day(p.value[0])} ${time(p.value[0])}–${day(p.value[1])} ${time(p.value[1])}<br>${p.value[2].toFixed(2)} c/kWh · fictional sample` },
+    tooltip: { trigger: 'item', confine: true, hideDelay: 0, transitionDuration: 0, backgroundColor: '#233942', borderColor: '#5b7b7a', textStyle: { color: '#f0faf8' }, formatter: p => `${day(p.value[0])} ${time(p.value[0])}–${day(p.value[1])} ${time(p.value[1])}<br>${p.value[2].toFixed(2)} c/kWh · fictional sample${windows.filter(w => w.start < p.value[1] && w.end > p.value[0]).map(w => `<br>Proposal: ${day(w.start)} ${time(w.start)}–${time(w.end)}`).join('')}` },
     xAxis: { ...axis, type: 'value', min: horizon[0], max: horizon[1], interval: 12, axisLabel: { ...axis.axisLabel, hideOverlap: true, formatter: h => h % 24 === 0 ? `${day(h)}\n00:00` : time(h) } },
     yAxis: { ...axis, type: 'value', name: 'c/kWh', nameTextStyle: { color: '#bed0d5', align: 'left' }, min: value => Math.min(0, Math.floor(value.min / 10) * 10), max: value => Math.ceil(value.max / 10) * 10 },
     dataZoom: [{ type: 'inside', xAxisIndex: 0, filterMode: 'weakFilter', zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false, preventDefaultMouseMove: false }, { type: 'slider', xAxisIndex: 0, filterMode: 'weakFilter', height: 28, bottom: 12, borderColor: '#4b6871', backgroundColor: '#142630', fillerColor: 'rgba(91,205,180,.22)', textStyle: { color: '#d0e1df' }, showDetail: false }],
+    ...(mode === 'step' ? { visualMap: { show: false, type: 'piecewise', seriesIndex: 1, dimension: 1, pieces: [{lte:30,color:'#37c48f'},{gt:30,lte:45,color:'#e9b34e'},{gt:45,lte:60,color:'#ef8845'},{gt:60,color:'#ec6266'}] } } : {}),
     series: [{ type: 'custom', clip: true, name: 'Sample price', renderItem, encode: { x: [0, 1], y: 2 }, data: stepSegments(prices).map(([s, e]) => [s[0], e[0], s[1]]) },
-    ...(mode === 'step' ? [{ type: 'line', name: 'Stepped price', data: stepPoints(prices), showSymbol: false, connectNulls: false, silent: true, z: 1, lineStyle: { width: 2.5, color: '#f0ba60' }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{offset: 0, color: 'rgba(239,136,69,.34)'}, {offset: 1, color: 'rgba(239,136,69,.015)'}]) } }] : []),
+    ...(mode === 'step' ? [{ type: 'line', name: 'Stepped price', data: stepPoints(prices), showSymbol: false, connectNulls: false, silent: true, z: 2, lineStyle: { width: 3 }, areaStyle: { opacity: .18 } }] : []),
     { type: 'line', symbol: 'none', data: [[-24, 0], [48, 0]], lineStyle: { opacity: 0 }, tooltip: { show: false },
-      markArea: { silent: true, label: { show: false }, data: [...windows.map(w => [{ xAxis: w.start, itemStyle: { color: 'rgba(118,180,255,.22)' } }, { xAxis: w.end }])] },
+      markArea: { silent: true, label: { show: false }, data: [...windows.map(w => [{ xAxis: w.start, itemStyle: { color: 'rgba(80,156,255,.28)', borderColor: '#9bc8ff', borderWidth: 2, borderType: 'dashed' } }, { xAxis: w.end }])] },
+      markPoint: { symbol: 'pin', symbolSize: 54, label: { color: '#fff', fontSize: 10, fontWeight: 'bold', formatter: p => `${p.name}\n${p.value.toFixed(1)}` }, data: [(() => { const p = prices.reduce((a,b)=>a.cents<b.cents?a:b); return { name: 'LOW', coord: [(p.start+p.end)/2,p.cents], value:p.cents, itemStyle:{color:'#16825d'} }; })(), (() => { const p = prices.reduce((a,b)=>a.cents>b.cents?a:b); return { name: 'HIGH', coord: [(p.start+p.end)/2,p.cents], value:p.cents, itemStyle:{color:'#b93f50'} }; })()] },
       markLine: { silent: true, symbol: 'none', label: { color: '#e5d2ac', fontSize: 11 }, lineStyle: { color: '#d4a969', type: 'dashed' }, data: [{ yAxis: cap, label: { formatter: `Cap ${cap} c/kWh`, position: 'insideEndTop' } }, { xAxis: now, label: { formatter: 'Now', position: 'insideStartTop' }, lineStyle: { color: '#92baf9' } }, { xAxis: deadline, label: { formatter: 'Ready by', position: 'insideStartTop' }, lineStyle: { color: '#e1c390' } }] } }] });
+  let correcting = false;
+  const updateView = () => {
+    if (correcting) return;
+    const z = priceChart.getOption().dataZoom[0];
+    const [start,end] = snapRange(z.startValue, z.endValue);
+    correcting = true;
+    if (Math.abs(start-z.startValue)>1e-7 || Math.abs(end-z.endValue)>1e-7) priceChart.dispatchAction({ type:'dataZoom', startValue:start, endValue:end });
+    const target = (end-start) / Math.max(2, Math.floor(priceChart.getWidth()/95));
+    const interval = [0.25,0.5,1,2,4,6,12,24].find(n=>n>=target) || 24;
+    priceChart.setOption({ xAxis: { interval } });
+    correcting = false;
+  };
+  priceChart.on('datazoom', updateView);
   document.querySelector(`[data-reset="${mode}"]`).addEventListener('click', () => priceChart.dispatchAction({ type: 'dataZoom', start: 0, end: 100 }));
   document.querySelector(`[data-zoom="${mode}"]`).addEventListener('click', () => { const z = priceChart.getOption().dataZoom[0]; const middle = (z.start + z.end) / 2; const range = (z.end - z.start) / 4; priceChart.dispatchAction({ type: 'dataZoom', start: Math.max(0, middle - range), end: Math.min(100, middle + range) }); });
   }

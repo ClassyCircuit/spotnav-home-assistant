@@ -10,6 +10,7 @@ let id = 0; const pending = new Map(), urls = [], errors = [];
 ws.onmessage = ({data}) => { const m = JSON.parse(data); if (m.method === 'Network.requestWillBeSent') urls.push(m.params.request.url); if (m.method === 'Runtime.exceptionThrown') errors.push(m.params.exceptionDetails.text); if (m.id && pending.has(m.id)) { const p = pending.get(m.id); pending.delete(m.id); m.error ? p.reject(new Error(m.error.message)) : p.resolve(m.result); } };
 const cmd = (method, params = {}) => new Promise((resolve,reject) => { const key=++id; pending.set(key,{resolve,reject}); ws.send(JSON.stringify({id:key,method,params})); });
 const evaluate = async expression => { const r = await cmd('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true}); if (r.exceptionDetails) throw new Error(r.exceptionDetails.text); return r.result.value; };
+const snapped = async mode => { const z=await evaluate(`(()=>{let z=window.samplePriceCharts.${mode}.getOption().dataZoom[0];return [z.startValue,z.endValue]})()`); assert.ok(z.every(v=>Math.abs(v*4-Math.round(v*4))<1e-6),`${mode} unsnapped ${z}`); return z; };
 await cmd('Network.enable'); await cmd('Runtime.enable'); await cmd('Page.enable'); await cmd('Network.setCacheDisabled',{cacheDisabled:true});
 for (const [name,width,height] of [['desktop',1440,1000],['mobile',390,844]]) {
   await cmd('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:name==='mobile'});
@@ -46,14 +47,26 @@ for (const [name,width,height] of [['desktop',1440,1000],['mobile',390,844]]) {
     }
     await cmd('Input.dispatchMouseEvent',{type:'mouseWheel',...wheel,deltaX:0,deltaY:-120});
     assert.ok(await evaluate(`window.samplePriceCharts.${mode}.getOption().dataZoom[0].end-window.samplePriceCharts.${mode}.getOption().dataZoom[0].start`)<100,`${mode} real wheel zoom`);
+    await snapped(mode);
     await evaluate(`document.querySelector('[data-reset="${mode}"]').click()`);
     const zoom=await evaluate(`(()=>{document.querySelector('[data-zoom="${mode}"]').click();return window.samplePriceCharts.${mode}.getOption().dataZoom[0].end})()`); assert.ok(zoom<100);
+    await snapped(mode);
     if(name==='desktop') {
+      const before=await snapped(mode);
+      await cmd('Input.dispatchMouseEvent',{type:'mousePressed',...wheel,button:'left',buttons:1,clickCount:1});
+      await cmd('Input.dispatchMouseEvent',{type:'mouseMoved',x:wheel.x+80,y:wheel.y,button:'left',buttons:1});
+      await cmd('Input.dispatchMouseEvent',{type:'mouseReleased',x:wheel.x+80,y:wheel.y,button:'left',buttons:0,clickCount:1});
+      assert.notDeepEqual(await snapped(mode),before,'plot drag pans');
+      const beforeSlider=await snapped(mode);
       const slider=await evaluate(`(()=>{let c=document.querySelector('#price-${mode}');c.scrollIntoView({block:'center'});let r=c.getBoundingClientRect();return {x:r.x+48+(r.width-68)*.5,y:r.bottom-26,dx:(r.width-68)*.08}})()`);
       await cmd('Input.dispatchMouseEvent',{type:'mouseMoved',x:slider.x,y:slider.y}); await cmd('Input.dispatchMouseEvent',{type:'mousePressed',x:slider.x,y:slider.y,button:'left',buttons:1,clickCount:1}); await cmd('Input.dispatchMouseEvent',{type:'mouseMoved',x:slider.x+slider.dx,y:slider.y,button:'left',buttons:1}); await cmd('Input.dispatchMouseEvent',{type:'mouseReleased',x:slider.x+slider.dx,y:slider.y,button:'left',buttons:0,clickCount:1});
-      assert.ok(await evaluate(`window.samplePriceCharts.${mode}.getOption().dataZoom[0].start`)>25,'slider drag pans');
+      assert.notDeepEqual(await snapped(mode),beforeSlider,'slider drag pans');
     }
+    const zoomRect=await evaluate(`(()=>{let r=document.querySelector('.prices-${mode}').getBoundingClientRect();return {x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1}})()`);
+    const zoomImage=await cmd('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:zoomRect});
+    await writeFile(`${process.env.TEMP}/opencode/spotnav-51b3-${name}-${mode}-zoom.png`,Buffer.from(zoomImage.data,'base64'));
     const reset=await evaluate(`(()=>{document.querySelector('[data-reset="${mode}"]').click();let z=window.samplePriceCharts.${mode}.getOption().dataZoom[0];return [z.start,z.end]})()`); assert.deepEqual(reset,[0,100]);
+    await snapped(mode);
     if(name==='desktop') {
       await evaluate(`document.querySelector('[data-zoom="${mode}"]').shadowRoot.querySelector('button').focus()`);
       await cmd('Input.dispatchKeyEvent',{type:'keyDown',key:' ',code:'Space',windowsVirtualKeyCode:32}); await cmd('Input.dispatchKeyEvent',{type:'keyUp',key:' ',code:'Space',windowsVirtualKeyCode:32});
@@ -71,7 +84,7 @@ for (const [name,width,height] of [['desktop',1440,1000],['mobile',390,844]]) {
     await evaluate(`new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))`);
     const rect=await evaluate(`(()=>{let r=document.querySelector('.prices-${mode}').getBoundingClientRect();return {x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1}})()`);
     const image=await cmd('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:rect});
-    await writeFile(`${process.env.TEMP}/opencode/spotnav-51b2-${name}-${mode}.png`,Buffer.from(image.data,'base64'));
+    await writeFile(`${process.env.TEMP}/opencode/spotnav-51b3-${name}-${mode}.png`,Buffer.from(image.data,'base64'));
     if(name==='desktop') {
       await evaluate(`(()=>{let c=window.samplePriceCharts.${mode}; c.setOption({xAxis:{min:-1,max:2,interval:.5},series:[{data:[[-1,0,-5],[.5,1.25,8]]}${mode==='step' ? ",{data:[[-1,-5],[0,-5],[.25,null],[.5,8],[1.25,8]]}" : ''}]});})()`);
       const fixture=await evaluate(`(()=>{let c=window.samplePriceCharts.${mode};return {negative:c.convertToPixel({yAxisIndex:0},-5),zero:c.convertToPixel({yAxisIndex:0},0),data:c.getOption().series[0].data}})()`);

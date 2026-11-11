@@ -24,6 +24,10 @@ zoom/reset buttons are keyboard accessible. Wheel over the chart is consumed for
 zoom, so scroll the page with the scrollbar, keyboard, or outside the chart.
 The simulated pinch did not change the zoom in the headless check; pinch and
 physical touch therefore remain unverified.
+Viewport changes snap to the sample's interval boundaries; plan boundaries and now are
+not snapped. Ticks adapt to width/zoom, but after panning ECharts can anchor them at
+half-hour offsets and omit midnight context; the requested even-hour cadence is not
+yet met. This fixed-day sample is not a timezone/DST implementation.
 The fictitious 08–10 Nov fixture is based on the supplied example hourly values;
 as in the bar example, quarter-hour fluctuations are synthetic, not verified
 Nord Pool data. EUR c/kWh is an illustrative variable-cost basis including fees
@@ -91,7 +95,7 @@ prototype URL. Run `node prototype/browser-check.mjs` from `frontend/`. The chec
 tests desktop and mobile sizing, overflow, both variants, chart data endpoints,
 mouse wheel, slider, zoom/reset, desktop hover, modal keyboard/close/focus,
 simulated touch, disabled charger actions and request origins. It saves full-page,
-individual-card, modal and rendered edge-fixture screenshots under the user's
+individual-card, zoomed-card, modal and rendered edge-fixture screenshots under the user's
 temporary `opencode` folder. Simulated touch at full overview did not reliably
 hit the narrow intervals; a programmatic tooltip check is used as a fallback.
 It does not validate real touch, accessibility tree or actual HA shadow roots. Run

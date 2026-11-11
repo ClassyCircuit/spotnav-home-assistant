@@ -185,12 +185,12 @@ tests are documented there; full HA collection is still blocked on Windows.
     data gaps. Both variants show the complete multi-window plan, per-window price,
     energy and cost, plus this-charge totals and weighted average. Reuse shared sample
     data/components; ask the user which chart direction to keep.
-- [ ] **5.1b1 Full-width chart comparison revision** (partial; corrective work in 5.1b2)
+- [x] **5.1b1 Initial full-width comparison** (implemented groundwork; not visually approved)
   - Both full-width comparison cards and the reference-derived fictional fixture exist;
     local ECharts and sample-data groundwork are in place. Review identified visually
     inadequate step rendering, undersized plot, contiguous windows wrongly presented as
-    separate, and Ctrl-only wheel zoom. Do not mark accepted or visually approved; finish
-    these outstanding requirements in 5.1b2. Synthetic quarter-hour fluctuations and
+    separate, and Ctrl-only wheel zoom. Corrective work began in 5.1b2, with outstanding
+    visual/interaction requirements carried forward to 5.1b3–5.1b4. Synthetic fluctuations and
     the hand-authored plan are not verified market data or optimizer output.
   - Show both bar and gradient stepped-area Prices & Plan alternatives concurrently,
     one below the other, each on a full-width row with a substantially larger plot;
@@ -214,7 +214,7 @@ tests are documented there; full HA collection is still blocked on Windows.
     broader dashboard polish and alternate states to 5.1d.
   - Browser-review desktop and mobile, provide screenshots of both complete charts and
     ask the user to choose a direction. No live data, HA connection or charger actions.
-- [ ] **5.1b2 Chart, plan and layout corrections** (sample-only; coordinator and visual review pending)
+- [x] **5.1b2 Initial chart, plan and layout corrections** (implemented groundwork; not visually approved)
   - Local corrections and focused checks are in place, including adjacent-window grouping,
     a plan modal, wheel zoom and the desktop two-column overview. User review identified
     remaining visual/interaction work in 5.1b3–5.1b4; this is not visually approved.
@@ -244,7 +244,11 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Browser-review both charts, modal and desktop/mobile layouts; verify tests, local
     dependencies and reported limitations. Overall 5.1 and chart choice remain pending
     user approval; no live data, planner changes, deployment or hardware actions.
-- [ ] **5.1b3 Chart fidelity and interval navigation** (sample-only)
+- [ ] **5.1b3 Chart fidelity and interval navigation** (sample-only; assigned/in progress)
+  - Partial implementation for review: price-colored step line, horizon-extrema pins,
+    outlined proposal and sample-boundary snapping. Panned ticks can be offset from
+    even hours and omit midnight context; simulated pinch did not zoom. See handoff.
+    Do not mark complete or advance to 5.1b4.
   - Bring BOTH full-width price charts much closer to `samples/bar-chart.js` and
     `samples/stepline-chart.js`: meaningful price-dependent colors on bars and stepped
     line/area, clearly visible plotted min/max callouts and a legible proposed-window

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { prices, windows, total, money, time, stepSegments, stepPoints, horizon, groupBlocks, priceWindow } from './sample.js';
+import { prices, windows, total, money, time, stepSegments, stepPoints, horizon, groupBlocks, priceWindow, snapRange } from './sample.js';
 
 test('reference-derived sample and hand-authored plan arithmetic', () => {
   assert.equal(prices.length, 288);
@@ -40,4 +40,14 @@ test('unknown inputs do not become zero', () => {
   assert.equal(total([]), null);
   assert.equal(money(null), 'Unknown');
   assert.equal(total([{ energy: 0, cost: 0 }]).centsPerKwh, null);
+});
+test('viewport snapping clamps and remains usable on repeated moves without changing plan', () => {
+  assert.deepEqual(snapRange(-99, 99), horizon);
+  assert.deepEqual(snapRange(24.01, 24.61), [24,24.5]);
+  assert.deepEqual(snapRange(48, 48), [47.75,48]);
+  let range = [0, 4];
+  for (let i=0;i<30;i++) range = snapRange(range[0]+.26,range[1]+.26);
+  assert.deepEqual(range,[7.5,11.5]);
+  assert.equal(windows[0].end,24.625);
+  assert.deepEqual(snapRange(.4,1.7,[0, .5, 2]),[.5,2]);
 });

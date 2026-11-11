@@ -234,6 +234,28 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### Stage 5.1b3 — partial chart fidelity and navigation (review required)
+
+- Both sample charts show price-colored intervals, complete-horizon low/high pins,
+  and blue dashed proposed-window outlines, with exact partial stops in tooltips and
+  plan. Step color uses a piecewise visual map; it is a line/area, not bars. Pins are
+  offscreen when their horizon extrema are offscreen. Snapping uses fixture boundaries,
+  not price, now or plan rounding. No production code, HA or hardware was touched.
+- Prototype build and five sample tests pass. Existing Edge headless browser on desktop
+  1440×1000 and emulated mobile 390×844 passed ordinary wheel, desktop plot drag and
+  slider drag, button/keyboard zoom, reset, snapped boundary assertions, modal checks,
+  and local-only requests (12). Full-card and zoom screenshots are in the temporary
+  `opencode` folder, named `spotnav-51b3-{desktop|mobile}-{bar|step}[-zoom].png`.
+  Desktop and mobile screenshots were inspected: overlays and colors are visible, but
+  the mobile zoom capture can contain a tooltip. Emulated pinch did not zoom; narrow
+  mobile touch targets needed programmatic tooltip fallback. Physical touch is untested.
+- **Outstanding:** ECharts anchors ticks to the viewport edge after a pan, producing
+  e.g. 21:30, 01:30 rather than the requested even-hour cadence, and midnight/day context
+  can therefore disappear. The adaptive interval alone does not satisfy this request.
+  Screenshots do not establish complete accessibility, production timezone/DST handling,
+  or live data behavior. Keep 5.1b3 and overall 5.1 open; chart choice awaits approval.
+  Do not proceed to 5.1b4 without coordinator review. Dispatch remains unarmed.
+
 ### Stage 5.1b2 — chart and sample-plan corrections (review pending)
 
 - The local prototype keeps both full-width alternatives below side-by-side overview

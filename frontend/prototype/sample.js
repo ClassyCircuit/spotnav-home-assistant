@@ -10,6 +10,14 @@ export const prices = hourly.flatMap((base, i) => [-.2,.1,.5,-.1].map((delta, j)
 export const now = 14.5;
 export const deadline = 31;
 export const horizon = [-24, 48];
+// Viewport boundaries come from this fixture, never from plan stops or rounded prices.
+export const sampleBoundaries = [...new Set(prices.flatMap(p => [p.start, p.end]))].sort((a,b) => a-b);
+export function snapRange(start, end, boundaries = sampleBoundaries) {
+  const nearest = value => boundaries.reduce((best, b) => Math.abs(b-value) < Math.abs(best-value) ? b : best, boundaries[0]);
+  let a = nearest(start), b = nearest(end);
+  if (a >= b) { const i = boundaries.indexOf(a); if (i < boundaries.length-1) b = boundaries[i+1]; else a = boundaries[i-1]; }
+  return [a,b];
+}
 export const cap = 35;
 // Sample-only grouping: touching blocks merge only when their control is identical.
 export function groupBlocks(blocks) {
