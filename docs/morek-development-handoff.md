@@ -234,6 +234,37 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2.5.32 — Stage 5.3 partial implementation (not complete)
+
+- The existing revision-checked Plan editor now decodes and preserves the policy
+  fields, exposes minimum ready-by SOC, soft-cap enable/value and price basis, and
+  retains its target, deadline, permissions, conflict and confirmation flow. The
+  cap uses major currency units/kWh (0.10 is 10 cents); negative caps are accepted.
+  Existing browser-independent backend replanning is unchanged. Manual Morek
+  actions and unarmed dispatch are unchanged.
+- The daily view presents all backend `shown_periods`, including seconds and
+  partial ends, and opens the same list in a native dialog from the next window.
+  Touching periods are grouped when no minimum exception is reported; in exception
+  cases boundaries are kept rather than guessing equivalence. Backend policy reason
+  codes are shown. Per-window energy, cost, price and weighted average are unknown:
+  the dashboard API does not provide them. Totals are backend estimates; unpriced
+  cost is hidden. The proposal is not an installed Morek profile or measurement.
+- Validation: full frontend suite passed 2,379 tests; isolated planning tests
+  passed 492 with one deselected and lifecycle tests 26. Type-check, build and
+  check-dist passed. Earlier full runs exposed a no-settings button regression and
+  stale built language hashes; both were corrected before the final run.
+  The actual built card was browser-tested at 1440×1000 and 390×844 with mocked
+  backend boundaries: dialog open/close, Escape, outside click, focus return,
+  refresh while the dialog was open, unsaved draft, rejected revision-checked save
+  and no Morek action. This does not
+  test live HA, physical touch, all themes, successful save confirmation, or charging.
+- **Outstanding before claiming 5.3 complete:** the new strings are English in
+  non-English translation files; translate and review them. Strengthen lifecycle
+  and race tests for forced card replacement and successful save, and per-policy/
+  partial-data coverage. Normal card renders and daily status repaint are deferred
+  while the dialog is open; a forced config change still dismisses it.
+  No HA access, deployment or hardware action was performed.
+
 ### 2.5.31 — Stage 5.2 daily overview (coordinator review pending)
 
 - The existing shipped card displays a localized daily overview from its decoded

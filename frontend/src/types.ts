@@ -140,6 +140,9 @@ export interface SettingsTarget {
  * the body as `expected_revision`.
  */
 export interface SettingsBody {
+  soft_price_cap?: number | null;
+  cap_price_basis?: "nord_pool" | "configured_variable_cost" | null;
+  minimum_ready_by_soc?: number | null;
   area_id: string | null;
   overrides: AreaOverride[];
   phases: number | null;

@@ -25,6 +25,30 @@ beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(NOW); document.body.repl
 afterEach(() => { document.body.replaceChildren(); vi.useRealTimers(); });
 
 describe("real daily overview", () => {
+  it("shows every displayed window and backend explanations without inventing costs", () => {
+    const decoded = decodeDashboard(dashboard());
+    if (!decoded.ok || !decoded.value.plan.proposal) throw new Error("fixture");
+    const proposal = decoded.value.plan.proposal;
+    proposal.periods = [
+      { start: "2026-11-06T21:00:00Z", end: "2026-11-06T22:00:00Z", startMs: Date.parse("2026-11-06T21:00:00Z"), endMs: Date.parse("2026-11-06T22:00:00Z") },
+      { start: "2026-11-06T22:00:00Z", end: "2026-11-06T22:30:30Z", startMs: Date.parse("2026-11-06T22:00:00Z"), endMs: Date.parse("2026-11-06T22:30:30Z") },
+      { start: "2026-11-06T23:00:00Z", end: "2026-11-06T23:15:00Z", startMs: Date.parse("2026-11-06T23:00:00Z"), endMs: Date.parse("2026-11-06T23:15:00Z") },
+    ];
+    proposal.unpriced = true;
+    decoded.value.plan.price_policy = { explanations: ["minimum_exception", "target_shortfall"] };
+    const el = dailyOverview(document, decoded.value, "en", null, null, false, false, NOW);
+    expect(el.querySelectorAll("ol")[0]?.children).toHaveLength(3);
+    expect(el.textContent).toContain("30:30");
+    expect(el.textContent).toContain("Estimated cost: Unknown");
+    expect(el.textContent).toContain("Above-cap energy");
+    expect(el.textContent).toContain("estimated shortfall");
+    expect(el.querySelector("dialog")?.textContent).toContain("Complete proposed plan");
+    decoded.value.plan.price_policy = undefined;
+    const uncapped = dailyOverview(document, decoded.value, "en", null, null, false, false, NOW);
+    expect(uncapped.querySelectorAll("ol")[0]?.children).toHaveLength(2);
+    expect(uncapped.textContent).toContain("30:30");
+    expect(proposal.periods).toHaveLength(3);
+  });
   it("renders the backend serializer's target-SOC contract fixture", () => {
     const raw: unknown = JSON.parse(readFileSync(resolve("../tests/fixtures/dashboard/target_soc_two_vehicles.json"), "utf8"));
     const decoded = decodeDashboard(raw);
@@ -36,7 +60,7 @@ describe("real daily overview", () => {
     expect(el.textContent).toContain("Proposed energy (estimate)");
     expect(el.textContent).toContain("Reading age: 45 d ago");
     const atSnapshot = dailyOverview(document, decoded.value, "en", null, null, false, false, Date.parse("2026-09-22T06:00:00Z"));
-    expect(Array.from(atSnapshot.querySelectorAll("dl")).find((row) => row.textContent?.startsWith("Next proposed window"))?.querySelector("dd")?.textContent).toContain("9:15 AM");
+    expect(Array.from(atSnapshot.querySelectorAll("dl")).find((row) => row.textContent?.startsWith("Next proposed window"))?.querySelector("dd")?.textContent).toContain("9:15:00 AM");
     decoded.value.generated_at = null;
     expect(dailyOverview(document, decoded.value, "en", null, null, false, false, NOW).textContent).toContain("Reading age: Unknown");
   });

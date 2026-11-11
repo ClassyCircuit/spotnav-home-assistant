@@ -184,6 +184,9 @@ const RECORD_KEYS = [...BODY_KEYS, "revision"] as const;
  * read-only (what the area's price already includes): it is read, and never sent back.
  */
 const OPTIONAL_RECORD_KEYS = [
+  "soft_price_cap",
+  "cap_price_basis",
+  "minimum_ready_by_soc",
   "departure_date",
   "departure_weekdays",
   "fiscal_included",
@@ -346,6 +349,9 @@ export function decodeSettingsRecord(raw: unknown): SettingsRecord {
   }
   return {
     revision,
+    ...(present.includes("soft_price_cap") ? { soft_price_cap: source["soft_price_cap"] === null ? null : finite(source, "soft_price_cap") } : {}),
+    ...(present.includes("minimum_ready_by_soc") ? { minimum_ready_by_soc: source["minimum_ready_by_soc"] === null ? null : finite(source, "minimum_ready_by_soc") } : {}),
+    ...(present.includes("cap_price_basis") ? { cap_price_basis: source["cap_price_basis"] === null ? null : oneOf(source, "cap_price_basis", ["nord_pool", "configured_variable_cost"] as const) } : {}),
     area_id: textOrNull(source, "area_id"),
     overrides: list(source, "overrides").map((item) => decodeOverride(record(item))),
     phases: wholeOrNull(source, "phases"),
@@ -486,6 +492,9 @@ export const SETTINGS_EDITOR_KINDS = [
  */
 export function encodeBody(record: SettingsRecord): SettingsBody {
   return {
+    ...(record.soft_price_cap === undefined ? {} : { soft_price_cap: record.soft_price_cap }),
+    ...(record.minimum_ready_by_soc === undefined ? {} : { minimum_ready_by_soc: record.minimum_ready_by_soc }),
+    ...(record.cap_price_basis === undefined ? {} : { cap_price_basis: record.cap_price_basis }),
     area_id: record.area_id,
     overrides: record.overrides.map((item) => ({
       area_id: item.area_id,
@@ -650,6 +659,10 @@ export function vehicleReplacement(record: SettingsRecord, vehicleId: string): R
 }
 
 export interface SettingsFormValues {
+  capEnabled?: boolean;
+  capValue?: string;
+  capBasis?: string;
+  minimumReadySoc?: string;
   energy: string;
   /** The kWh slider's last step, "Fill" (`fill_to_limit`); always `false` against a backend without it. */
   fill: boolean;
@@ -669,6 +682,7 @@ export interface SettingsFormValues {
 
 export function formFromRecord(record: SettingsRecord): SettingsFormValues {
   return {
+    ...(record.soft_price_cap === undefined ? {} : { capEnabled: record.soft_price_cap !== null, capValue: record.soft_price_cap === null ? "" : String(record.soft_price_cap), capBasis: record.cap_price_basis ?? "", minimumReadySoc: record.minimum_ready_by_soc == null ? "" : String(record.minimum_ready_by_soc) }),
     energy: String(record.requested_kwh),
     fill: record.fill_to_limit === true,
     deadlineEnabled: record.departure_enabled,
@@ -1004,6 +1018,20 @@ export function replacementFor(
   }
   let changed = false;
   const next = { ...body };
+  if (kind === "plan" && record.soft_price_cap !== undefined && values.capEnabled !== undefined) {
+    const base = opened ?? record;
+    const cap = values.capEnabled ? decimal(values.capValue ?? "", -1e9, 1e9) : null;
+    if (cap !== null && !cap.ok) return cap;
+    const minimum = (values.minimumReadySoc ?? "").trim() === "" ? null : decimal(values.minimumReadySoc ?? "", 0, 100);
+    if (minimum !== null && !minimum.ok) return minimum;
+    const capValue = cap === null ? null : cap.value;
+    const minValue = minimum === null ? null : minimum.value;
+    const basis = values.capBasis === "nord_pool" || values.capBasis === "configured_variable_cost" ? values.capBasis : null;
+    if (capValue !== null && basis === null) return { ok: false, errorKey: "settings.error.invalid" };
+    if (opened === null || capValue !== base.soft_price_cap) { next.soft_price_cap = capValue; changed ||= capValue !== record.soft_price_cap; }
+    if (opened === null || minValue !== base.minimum_ready_by_soc) { next.minimum_ready_by_soc = minValue; changed ||= minValue !== record.minimum_ready_by_soc; }
+    if (opened === null || basis !== base.cap_price_basis) { next.cap_price_basis = basis; changed ||= basis !== record.cap_price_basis; }
+  }
   if (kind === "plan" && driverOk && (opened === null || values.driver !== opened.driver)) {
     next.driver = values.driver;
     changed = changed || values.driver !== record.driver;

@@ -270,6 +270,22 @@ describe("the resting settings row", () => {
 });
 
 describe("the request lifecycle", () => {
+  it("edits policy as a draft and saves it with the existing revision, without a charger command", async () => {
+    const record = aRecord({ soft_price_cap: 0.1, cap_price_basis: "nord_pool", minimum_ready_by_soc: 40 });
+    const { hass, element } = await openEditor("energy", { record });
+    const dialog = editorDialog(element)!;
+    const cap = dialog.querySelector<HTMLInputElement>("input[id$='-cap-value']")!;
+    const minimum = dialog.querySelector<HTMLInputElement>("input[id$='-minimum-ready']")!;
+    enter(cap, "0.12"); enter(minimum, "35");
+    expect(updates(hass)).toHaveLength(0);
+    expect(hass.messages.some((m) => m.type === "spotnav/morek_schedule" && m.action !== "status")).toBe(false);
+    button(element, "spotnav-settings-save")!.click();
+    await settle();
+    const message = updates(hass)[0]!;
+    expect(message.expected_revision).toBe(record.revision);
+    expect(message.settings).toMatchObject({ soft_price_cap: 0.12, cap_price_basis: "nord_pool", minimum_ready_by_soc: 35 });
+    expect(hass.messages.some((m) => m.type === "spotnav/morek_schedule" && m.action !== "status")).toBe(false);
+  });
   it("reads the full record once when a dialog opens, with the settings contract's own version", async () => {
     const { hass, element } = await openEditor("energy");
 

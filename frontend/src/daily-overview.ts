@@ -14,7 +14,7 @@ function time(value: string | null | undefined, language: Language, zone: string
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return null;
   try {
-    const formatted = new Intl.DateTimeFormat(language, { dateStyle: "short", timeStyle: "short", timeZone: zone ?? "UTC" }).format(date);
+    const formatted = new Intl.DateTimeFormat(language, { dateStyle: "short", timeStyle: "medium", timeZone: zone ?? "UTC" }).format(date);
     return zone === null ? `${formatted} UTC` : formatted;
   } catch { return null; }
 }
@@ -52,7 +52,7 @@ export function healthKey(state: MorekState | null, observedAt: number | null, f
 }
 
 export function dailyOverview(doc: Document, dashboard: Dashboard, language: Language, state: MorekState | null,
-  observedAt: number | null, failed: boolean, busy: boolean, now: number): HTMLElement {
+  observedAt: number | null, failed: boolean, busy: boolean, now: number, openSettings?: () => void, onPlanClose?: () => void): HTMLElement {
   const t = (key: TranslationKey): string => translate(language, key);
   const unknown = t("daily.unknown");
   const zone = dashboard.market?.timezone ?? null;
@@ -63,10 +63,15 @@ export function dailyOverview(doc: Document, dashboard: Dashboard, language: Lan
   style.textContent = `.spotnav-daily{margin:12px 0;padding:14px;border:1px solid var(--divider-color,#777);border-radius:12px;background:var(--secondary-background-color,transparent);color:var(--primary-text-color);min-width:0}.spotnav-daily h3{font-size:1em;margin:0 0 10px}.spotnav-daily-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:10px}.spotnav-daily dl{margin:0;min-width:0}.spotnav-daily dt{color:var(--secondary-text-color);font-size:.82em}.spotnav-daily dd{margin:3px 0 0;overflow-wrap:anywhere;font-weight:600}.spotnav-daily-health{border-top:1px solid var(--divider-color,#777);margin-top:12px;padding-top:10px}.spotnav-daily-health p{margin:4px 0;overflow-wrap:anywhere}.spotnav-daily-health p[data-health='daily.health.mismatch'],.spotnav-daily-health p[data-health='daily.health.uncertain'],.spotnav-daily-health p[data-health='daily.health.offline']{font-weight:700}.spotnav-daily small{color:var(--secondary-text-color)}`;
   root.append(style);
   const heading = doc.createElement("h3"); heading.textContent = t("daily.title"); root.append(heading);
+  if (openSettings && dashboard.settings !== null) {
+    const edit = doc.createElement("button"); edit.type = "button"; edit.textContent = t("daily.editPlan");
+    edit.addEventListener("click", openSettings); root.append(edit);
+  }
   const grid = doc.createElement("div"); grid.className = "spotnav-daily-grid";
-  const row = (label: TranslationKey, value: string): void => {
+  const row = (label: TranslationKey, value: string): HTMLElement => {
     const dl = doc.createElement("dl"), dt = doc.createElement("dt"), dd = doc.createElement("dd");
     dt.textContent = t(label); dd.textContent = value; dl.append(dt, dd); grid.append(dl);
+    return dd;
   };
   const connected = dashboard.charger.available ? connectionLabel(language, dashboard.connection) : t("daily.offline");
   row("daily.connection", connected ?? unknown);
@@ -81,9 +86,9 @@ export function dailyOverview(doc: Document, dashboard: Dashboard, language: Lan
   const proposal = dashboard.plan.proposal;
   const next = proposal?.periods.find((period) => period.endMs > now);
   const start = time(next?.start, language, zone), end = time(next?.end, language, zone);
-  row("daily.next", start && end ? `${start} – ${end}` : unknown);
+  const nextCell = row("daily.next", start && end ? `${start} – ${end}` : unknown);
   row("daily.energy", proposal?.planned_kwh == null ? unknown : `${formatNumber(language, proposal.planned_kwh, 2)} kWh`);
-  const cost = proposal?.cost;
+  const cost = proposal?.unpriced ? null : proposal?.cost;
   row("daily.cost", cost == null || cost.currency == null ? unknown : `${formatNumber(language, cost.value, 2)} ${cost.currency}`);
   const calculated = time(dashboard.planning?.calculated_at, language, zone);
   const historical = dashboard.planning?.historical;
@@ -91,6 +96,64 @@ export function dailyOverview(doc: Document, dashboard: Dashboard, language: Lan
   const calculatedAge = Number.isFinite(calculatedMs) && calculatedMs <= now ? ageSentence(language, (now - calculatedMs) / 1000) : unknown;
   row("daily.calculated", `${calculated ?? unknown} · ${t("daily.age")}: ${calculatedAge} · ${historical === true ? t("daily.historical") : historical === false ? t("daily.inProcess") : unknown}`);
   root.append(grid);
+  const planContent = (): HTMLElement => {
+    const content = doc.createElement("div");
+    const title = doc.createElement("h3"); title.textContent = t("daily.planTitle"); content.append(title);
+    const note = doc.createElement("p"); note.textContent = t("daily.planNote"); content.append(note);
+    if (!proposal || proposal.periods.length === 0) {
+      const empty = doc.createElement("p"); empty.textContent = t("daily.noPlan"); content.append(empty);
+    } else {
+      const list = doc.createElement("ol");
+      // A proposal uses a single power/current. With no policy exception, touching
+      // periods are uninterrupted; keep the original boundaries in the model.
+      // Where an exception exists we cannot attribute its control context here.
+      const periods: typeof proposal.periods = [];
+      const mayMerge = !dashboard.plan.price_policy?.explanations.includes("minimum_exception");
+      for (const period of proposal.periods) {
+        const prior = periods[periods.length - 1];
+        if (mayMerge && prior && prior.endMs === period.startMs) {
+          periods[periods.length - 1] = { ...prior, end: period.end, endMs: period.endMs };
+        } else periods.push({ ...period });
+      }
+      for (const period of periods) {
+        const item = doc.createElement("li");
+        item.textContent = `${time(period.start, language, zone) ?? unknown} – ${time(period.end, language, zone) ?? unknown} · ${t("daily.windowEnergy")}: ${unknown} · ${t("daily.windowCost")}: ${unknown} · ${t("daily.windowPrice")}: ${unknown}`;
+        list.append(item);
+      }
+      content.append(list);
+      if (proposal.unpriced) { const warning = doc.createElement("p"); warning.textContent = t("daily.unpriced"); content.append(warning); }
+    }
+    const total = doc.createElement("p");
+    total.textContent = `${t("daily.energy")}: ${proposal?.planned_kwh == null ? unknown : `${formatNumber(language, proposal.planned_kwh, 2)} kWh`} · ${t("daily.cost")}: ${cost == null || cost.currency == null ? unknown : `${formatNumber(language, cost.value, 2)} ${cost.currency}`} · ${t("daily.average")}: ${unknown}`;
+    content.append(total);
+    const policyKeys: Record<string, TranslationKey> = {
+      minimum_exception: "daily.policy.exception", minimum_shortfall: "daily.policy.minimumShortfall",
+      target_shortfall: "daily.policy.targetShortfall", recalculating: "daily.policy.recalculating",
+      unavailable: "daily.policy.unavailable", minimum_covered: "daily.policy.covered", within_cap: "daily.policy.within", target_met: "daily.policy.targetMet", error: "daily.policy.error",
+    };
+    for (const code of dashboard.plan.price_policy?.explanations ?? []) {
+      const key = policyKeys[code]; if (!key) continue;
+      const line = doc.createElement("p"); line.textContent = t(key); content.append(line);
+    }
+    return content;
+  };
+  root.append(planContent());
+  if (next) {
+    const opener = doc.createElement("button"); opener.type = "button"; opener.textContent = nextCell.textContent;
+    opener.setAttribute("aria-label", `${t("daily.next")}: ${opener.textContent}. ${t("daily.openPlan")}`);
+    nextCell.replaceChildren(opener);
+    const dialog = doc.createElement("dialog");
+    dialog.setAttribute("aria-label", t("daily.planTitle"));
+    const close = doc.createElement("button"); close.type = "button"; close.textContent = t("daily.close");
+    close.addEventListener("click", () => dialog.close());
+    dialog.addEventListener("click", (event) => {
+      const rect = dialog.getBoundingClientRect();
+      if (event.target === dialog && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)) dialog.close();
+    });
+    dialog.addEventListener("close", () => { if (opener.isConnected) opener.focus(); onPlanClose?.(); });
+    dialog.append(close, planContent()); root.append(dialog);
+    opener.addEventListener("click", () => { if (typeof dialog.showModal === "function") dialog.showModal(); });
+  }
   const health = doc.createElement("div"); health.className = "spotnav-daily-health";
   const title = doc.createElement("strong"); title.textContent = t("daily.health.title"); health.append(title);
   const key = healthKey(state, observedAt, failed, busy, now);

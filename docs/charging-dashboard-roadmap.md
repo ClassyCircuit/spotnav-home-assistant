@@ -411,12 +411,42 @@ tests are documented there; full HA collection is still blocked on Windows.
     use mocked HA/OCPP boundaries. No live HA or physical charging was checked. Overall
     5.1 visual approval and the bar-versus-step choice remain pending; 5.3 is not started.
 - [ ] **5.3 Plan controls and actions**
+  - Local 2.5.32 work connects the existing Plan editor to the stored soft cap,
+    basis and minimum ready-by SOC and adds a complete daily proposal view. Review
+    is still needed: new wording currently falls back to English in non-English
+    languages, and full save-confirmation and dialog lifecycle coverage is incomplete.
+    See the 2.5.32 handoff; do not treat this as a completed substage yet.
   - Bind target/minimum/cap/ready-by controls, complete windows, per-window/total
     estimated costs and policy explanations to existing backend settings/planner APIs.
   - Preserve manual Send/Refresh and their existing interlocks; do not present unimplemented
     suspension, charging pause, selective removal or mode exit as equivalent or operational.
   - Regression-test settings save → backend trigger → replan → coherent dashboard update,
     without browser-dependent planning; preserve uncapped and safety behavior.
+- [ ] **5.3a Phone notifications for plug-in and plan**
+  - Reuse the existing per-charger HA mobile notification service, phone selection,
+    event tracker, rate limiting and restart-safe deduplication. Inspect current
+    `plan_installed` and plug-in/quiet-after-write behavior before changing it; do not
+    add a parallel notifier or assume the existing message is already delivered.
+  - After a recognized plug-in and settled replan, notify selected phones of the next
+    proposed charging start–end with local date/time, and compactly show useful known
+    estimates such as target/ready-by and total plan cost. Include estimated SOC by the
+    ready-by deadline when a fresh, validated backend projection is available, clearly
+    labelled as an estimate rather than a measured value or guarantee; distinguish it
+    from the target and warn of a projected shortfall where supported. Reuse backend
+    assumptions, account for battery versus wall energy and show unknown/omit the SOC
+    estimate when inputs are missing or stale. If no valid plan or prices are available,
+    give a concise truthful waiting/blocked reason rather than a stale time.
+    Avoid duplicate or contradictory plug-in/plan notices; make timing bounded and test
+    missed connection events, stale/replanned results, delayed inputs and restart.
+  - Include high-value, bounded notices for material plan changes, minimum/deadline
+    shortfall or schedule mismatch/uncertain outcome when supported; preserve existing
+    person Stop, protection and phone opt-in semantics. Avoid notification storms and
+    do not promise unsupported signals. No charger action is caused by notification.
+  - Clearly distinguish proposed times and estimated costs from sent/ACK, effective
+    readback and measured flow; never say charging has started without genuine flow
+    evidence. Test actual notifier modules with mocked HA/phone delivery, unavailable
+    fields, identity changes, retries/races, no phones and rate-limiting. Physical phone
+    delivery and live actions require the user's separate approval and validation.
 - [ ] **5.4 Minimum production price chart and installation path**
   - After the user chooses a visual direction, bundle ECharts locally and bind the chosen
     chart to real available prices and proposed windows, with correct units, price basis,

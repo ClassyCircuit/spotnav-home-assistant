@@ -906,6 +906,7 @@ export class SpotnavCard extends HTMLElement {
       this.editor = { kind, record, conflict: null, operation, generation, saving: false };
       this.view?.showSettingsEditorForm({
         kind,
+        currency: this.cardState.kind === "ready" ? this.cardState.dashboard.market?.currency : null,
         readOnly: !this.mayPlan,
         values: formFromRecord(record),
         energyReadOnly: manualEnergyReadOnly(record),
@@ -1455,6 +1456,7 @@ export class SpotnavCard extends HTMLElement {
       editor.conflict = null;
       this.view?.showSettingsEditorForm({
         kind,
+        currency: this.cardState.kind === "ready" ? this.cardState.dashboard.market?.currency : null,
         readOnly: !this.mayPlan,
         values: formFromRecord(record),
         energyReadOnly: manualEnergyReadOnly(record),
@@ -2714,8 +2716,9 @@ export class SpotnavCard extends HTMLElement {
     if (this.view === null || this.cardState.kind !== "ready") return;
     const previous = Array.from(this.view.element.children).find((child) => child.classList.contains("spotnav-daily"));
     if (previous === undefined) return;
+    if (previous.querySelector("dialog[open]")) return;
     previous.replaceWith(dailyOverview(this.ownerDocument, this.cardState.dashboard, this.languageOrFallback,
-      this.morekState, this.morekObservedAt, this.morekReadFailed, this.morekBusy, Date.now()));
+      this.morekState, this.morekObservedAt, this.morekReadFailed, this.morekBusy, Date.now(), () => { void this.openSettings("plan"); }, () => this.dailyPlanClosed()));
     this.view.refit();
   }
 
@@ -2967,6 +2970,10 @@ export class SpotnavCard extends HTMLElement {
 
   private renderPending = false;
 
+  private dailyPlanClosed(): void {
+    if (this.connected && this.renderPending) this.render();
+  }
+
   /**
    * One render: destroy the previous view, then mount the accepted view or show a quiet state. Everything
    * is built as nodes with `textContent`; no backend, config or exception value is put into markup.
@@ -2988,7 +2995,7 @@ export class SpotnavCard extends HTMLElement {
   }
 
   private render(options: { force?: boolean } = {}): void {
-    if (options.force !== true && this.view !== null && this.view.anyDialogOpen()) {
+    if (options.force !== true && this.view !== null && (this.view.anyDialogOpen() || this.view.element.querySelector(".spotnav-daily dialog[open]"))) {
       this.renderPending = true;
       return;
     }
@@ -3170,7 +3177,7 @@ export class SpotnavCard extends HTMLElement {
       });
       this.view.element.insertBefore(
         dailyOverview(doc, this.cardState.dashboard, language, this.morekState, this.morekObservedAt,
-          this.morekReadFailed, this.morekBusy, Date.now()),
+          this.morekReadFailed, this.morekBusy, Date.now(), () => { void this.openSettings("plan"); }, () => this.dailyPlanClosed()),
         this.view.element.children[1] ?? null,
       );
       if (this.updateNotice) {
