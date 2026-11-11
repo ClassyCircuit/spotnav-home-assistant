@@ -39,7 +39,10 @@ The 30/45/60 c/kWh color bands are illustrative only. A 35 c/kWh soft cap,
 low-price opportunities and green-gradient hand-authored proposal windows are
 distinct concepts. A continuous window spans several prices and ends partway
 through an interval; another starts after a real pause. The next-window button
-opens the same complete plan in a native browser modal; Escape or Close dismisses it.
+opens the same complete plan in a native browser modal; outside click, Escape or Close
+dismisses it. The plan also appears under the simulated controls. SOC after each window
+is a cumulative estimate using the stated starting SOC, usable capacity and wall-to-battery
+efficiency, not a measurement or guarantee.
 The pale track above each plot also marks the exact proposal boundaries; the legend
 identifies it separately from price colors.
 It is not optimizer output. Negative and missing price fixtures are tested

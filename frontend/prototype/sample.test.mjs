@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { prices, windows, total, money, time, stepSegments, stepPoints, horizon, groupBlocks, priceWindow, snapRange, initialRange, timeTicks, sampleDate, sampleDays, priceGaps } from './sample.js';
+import { prices, windows, total, money, time, stepSegments, stepPoints, horizon, groupBlocks, priceWindow, snapRange, initialRange, timeTicks, sampleDate, sampleDays, priceGaps, projectSoc } from './sample.js';
 
 test('reference-derived sample and hand-authored plan arithmetic', () => {
   assert.equal(prices.length, 288);
@@ -67,4 +67,19 @@ test('viewport snapping clamps and remains usable on repeated moves without chan
   assert.deepEqual(range,[7.5,11.5]);
   assert.equal(windows[0].end,24.625);
   assert.deepEqual(snapRange(.4,1.7,[0, .5, 2]),[.5,2]);
+});
+
+test('SOC projections use cumulative wall energy and efficiency, including partial windows', () => {
+  const assumptions = {startingSoc: 48, capacityKwh: 60, efficiency: .9};
+  const projected = projectSoc([{energy: 3.75}, {energy: 2.25}], assumptions);
+  assert.deepEqual(projected.map(r => r.projectedSoc), [53.625, 57]);
+  assert.deepEqual(windows.map(r => r.projectedSoc), projected.map(r => r.projectedSoc));
+  assert.equal(projectSoc([{energy: 10}], {...assumptions, efficiency: .5})[0].projectedSoc, 48 + 5 / 60 * 100);
+  assert.deepEqual(projectSoc([{energy: 10}, {energy: 1}], {...assumptions, startingSoc: 99}).map(r => r.projectedSoc), [100,100]);
+});
+test('SOC projections refuse missing and invalid inputs and propagate missing energy', () => {
+  const valid = {startingSoc: 0, capacityKwh: 60, efficiency: .9};
+  for (const invalid of [{startingSoc:null},{startingSoc:-1},{startingSoc:101},{capacityKwh:0},{capacityKwh:NaN},{efficiency:0},{efficiency:1.1},{efficiency:null}])
+    assert.equal(projectSoc([{energy: 1}], {...valid, ...invalid})[0].projectedSoc, null);
+  for (const energy of [null, NaN, -1, Infinity]) { const result = projectSoc([{energy:1},{energy},{energy:1}], valid).map(r=>r.projectedSoc); assert.ok(Math.abs(result[0]-1.5)<1e-9); assert.deepEqual(result.slice(1), [null,null]); }
 });

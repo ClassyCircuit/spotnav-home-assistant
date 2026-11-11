@@ -234,6 +234,27 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### Stage 5.1b4 — compact controls and plan (review pending)
+
+- The sample controls and complete shared plan sit beside the vehicle overview on
+  desktop and stack on mobile. Both chart cards and the next-window modal retain
+  identical windows and totals. The fictional 48% start, 60 kWh usable capacity and
+  90% efficiency project 53.6% and 57.0% after the windows, using cumulative wall
+  energy × efficiency for battery energy. Projections are bounded and unknown for
+  invalid or missing inputs; they are not observations or guarantees.
+- Prototype build and nine sample tests passed. One initial test failed because of
+  floating-point precision; the corrected tolerance passes. Desktop 1440×1000 and
+  emulated mobile 390×844 browser checks passed four-display consistency, overflow,
+  keyboard opening, focus, Escape, close and inside/outside mouse clicks, plus the
+  existing chart interactions. Twelve observed requests were local/data only. The
+  check used an already-running debugging browser because port 9227 was occupied;
+  a new Edge instance could not bind. Physical touch, complete accessibility and HA
+  integration remain unverified. Emulated pinch/taps worked; backdrop clicks were
+  mouse-emulated at mobile size, not tested on a physical touchscreen.
+- Screenshots: temporary `opencode/spotnav-51b4-{desktop|mobile}-{full|modal}.png`.
+  No HA access, deployment or charger action; dispatch remains unarmed. Overall 5.1
+  and chart choice await visual approval; stop for coordinator review, not 5.1c.
+
 ### Stage 5.1b3 — proposal gradient (visual review pending)
 
 - The sample charts replace dashed proposal borders with a bottom-bright green

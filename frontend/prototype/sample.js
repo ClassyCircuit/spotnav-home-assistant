@@ -58,7 +58,19 @@ export function priceWindow(window, intervals) {
 }
 // Hand-authored fixture only; the first three blocks are continuous, then a pause.
 const blocks = [[24,24.25], [24.25,24.5], [24.5,24.625], [25,25.375]].map(([start,end]) => ({ start, end, power: 6, control: 'normal' }));
-export const windows = groupBlocks(blocks).map(w => priceWindow(w, prices));
+// Wall energy is converted to stored battery energy once; these are projections, not observations.
+export const socAssumptions = { startingSoc: 48, capacityKwh: 60, efficiency: 0.9 };
+export function projectSoc(rows, { startingSoc, capacityKwh, efficiency } = {}) {
+  let soc = Number.isFinite(startingSoc) && startingSoc >= 0 && startingSoc <= 100 &&
+    Number.isFinite(capacityKwh) && capacityKwh > 0 && Number.isFinite(efficiency) &&
+    efficiency > 0 && efficiency <= 1 ? startingSoc : null;
+  return rows.map(row => {
+    if (soc == null || !Number.isFinite(row.energy) || row.energy < 0) soc = null;
+    else soc = Math.min(100, soc + row.energy * efficiency / capacityKwh * 100);
+    return { ...row, projectedSoc: soc };
+  });
+}
+export const windows = projectSoc(groupBlocks(blocks).map(w => priceWindow(w, prices)), socAssumptions);
 export const total = rows => {
   if (!rows.length || rows.some(row => row.energy == null || row.cost == null)) return null;
   const energy = rows.reduce((s, row) => s + row.energy, 0);

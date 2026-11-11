@@ -288,7 +288,10 @@ tests are documented there; full HA collection is still blocked on Windows.
     and desktop/mobile screenshots. Investigate simulated pinch/tooltip targeting and
     improve mobile card density; report real-touch versus emulated-touch limitations.
     Keep charts and plan sample-only; ask for feedback before choosing a final chart.
-- [ ] **5.1b4 Compact controls and plan presentation** (sample-only)
+- [x] **5.1b4 Compact controls and plan presentation** (sample-only; coordinator and visual review pending)
+  - Implemented locally with shared cumulative SOC projections and modal backdrop dismissal;
+    see handoff for checks and limitations. Review identified missing-value rendering and
+    card-balance follow-up in 5.1b4a. Overall 5.1 and chart choice remain pending approval.
   - Make Plan Controls more compact and place a readable complete proposed plan below
     them within the right-hand desktop column; keep the overview beside them. Avoid
     blank gaps and preserve responsive stacking. Retain the complete plan in the chart
@@ -301,6 +304,20 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Clicking outside a modal closes it as well as its close button and Escape, without
     closing on clicks inside. Preserve focus trapping/return and test keyboard and mobile
     behavior. This does not authorize new charger actions or live bindings.
+- [ ] **5.1b4a Balanced cards and unknown-value rendering** (sample-only; next)
+  - Keep overview and controls/plan at 50% desktop width with aligned top and bottom and
+    naturally similar visual weight. Stretch the shorter card without fixed heights or
+    filler; preserve natural mobile stacking and accommodate longer plans accessibly.
+  - Make the right-hand plan list concise, label estimates once, and retain all windows,
+    projected SOC and totals; keep full per-window price, energy and cost readily
+    accessible in the existing plan modal and chart cards. Do not hide important windows
+    or duplicate business logic. The richer battery overview remains 5.1e.
+  - Render unknown/invalid prices, window energy, costs, totals, projected SOC and other
+    required inputs as unknown throughout controls, charts and modal without exceptions,
+    false zeroes or fabricated estimates. Exercise a rendered missing-data fixture, not
+    only the calculation helper; preserve the existing shared sample representation.
+  - Test desktop/mobile layout, long plans, missing data and modal accessibility; retain
+    sample-only safety and await user visual approval. No live or charger changes.
 - [ ] **5.1c Sample price insights and monthly statistics** (sample-only)
   - Prototype concise, explainable assessments of current/upcoming prices against a
     stated illustrative longer-term baseline, plus best upcoming price windows and
