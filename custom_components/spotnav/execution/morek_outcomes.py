@@ -7,6 +7,7 @@ from typing import Any
 
 from homeassistant.helpers.storage import Store
 
+from ..const import MOREK_CONNECTOR_ID, MOREK_STATION_ID
 from .execution_ownership import _MISSING, _read_envelope
 
 _DATA_KEY = "spotnav_morek_outcomes"
@@ -15,6 +16,42 @@ _STORAGE_KEY = "spotnav.morek_schedule.connector_outcomes"
 
 class OutcomeUnavailable(Exception):
     """Storage cannot be trusted; no profile dispatch is permitted."""
+
+
+def clean_start_origin(record: Any, entry_id: str, migration_id: str | None) -> bool:
+    """Validate the persistent clean-start origin, not the state of later operations."""
+    if not isinstance(record, dict) or record.get("entry_id") != entry_id or record.get("uncertain") is not False:
+        return False
+    proof = record.get("clean_start")
+    if not isinstance(migration_id, str) or len(migration_id) != 32 or any(c not in "0123456789abcdef" for c in migration_id):
+        return False
+    if (not isinstance(proof, dict) or type(proof.get("version")) is not int
+            or type(proof.get("connector_id")) is not int or proof != {"version": 1, "id": migration_id, "station_id": MOREK_STATION_ID,
+                 "connector_id": MOREK_CONNECTOR_ID, "history": "missing"}):
+        return False
+    recovery = record.get("migration_recovery_proof")
+    if (not isinstance(recovery, dict) or type(recovery.get("version")) is not int
+            or type(recovery.get("connector_id")) is not int
+            or recovery != {"version": 1, "migration_id": migration_id,
+                            "station_id": MOREK_STATION_ID, "connector_id": MOREK_CONNECTOR_ID}):
+        return False
+    return True
+
+
+def clean_start_proven(record: Any, entry_id: str, migration_id: str | None) -> bool:
+    """Approved missing-history provenance, never evidence of a previous profile action."""
+    if not clean_start_origin(record, entry_id, migration_id):
+        return False
+    if (record.get("attempt") is not None or record.get("removal") is not None
+            or any(record.get(key) is not None for key in ("desired", "acknowledged", "verified"))):
+        return False
+    pause = record.get("schedule_pause")
+    return (isinstance(pause, dict) and set(pause) == {"version", "type", "id", "station_id", "connector_id"}
+            and type(pause.get("version")) is int and pause["version"] == 1
+            and pause.get("type") in ("pause_until_resumed", "resume_requested")
+            and isinstance(pause.get("id"), str) and bool(pause["id"])
+            and pause.get("station_id") == MOREK_STATION_ID
+            and type(pause.get("connector_id")) is int and pause["connector_id"] == MOREK_CONNECTOR_ID)
 
 
 class MorekOutcomes:

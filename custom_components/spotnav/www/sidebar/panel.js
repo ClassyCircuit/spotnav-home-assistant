@@ -59598,7 +59598,10 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
     retained_profile_exit_held: "Exit is held until retained-profile resolution is reviewed.",
     resume_requires_confirmation: "Confirm Resume again after restart; the retained limit may remain.",
     schedule_mode_unarmed: "Automatic schedule sending is not enabled.",
-    upload_uncertain: "The previous write outcome is unknown; automatic retry is blocked."
+    upload_uncertain: "The previous write outcome is unknown; automatic retry is blocked.",
+    protection_conflict_unresolved: "A linked site regulator may also control this charger; schedule dispatch is blocked until the conflict is reviewed.",
+    paused_until_resume: "Auto remains paused until you explicitly Resume.",
+    legacy_pause_active: "The saved manual pause remains active; the Resume follow-up has not completed."
   };
   if (reconciliation && reconciliationMessages[reconciliation]) {
     const detail = doc.createElement("p");
@@ -59624,6 +59627,22 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
   const recoveryReason = recoveryStates[state.ownership?.recovery?.state ?? ""];
   availability.textContent = state.ownership?.completion_authorized ? "Schedule ownership is confirmed for this process. External OCPP writers and native protection cannot be verified here." : `${blocker ? blockers[blocker] : recoveryReason ?? "Schedule sending is blocked; review ownership and recovery status."} Recorded owner: ${state.ownership?.recorded_owner ?? "unknown"}.`;
   section.append(availability);
+  const migrationReasons = {
+    protection_conflict_unresolved: "Automatic initialization is blocked by a linked site regulator; review the protection conflict.",
+    profile_outcome_uncertain: "Automatic initialization is blocked by a recorded uncertain profile action.",
+    profile_outcome_unavailable: "Automatic initialization is blocked by existing unsettled or unavailable outcome evidence.",
+    legacy_profile_history_invalid: "Automatic initialization is blocked by malformed historical profile evidence.",
+    pause_unavailable: "Automatic initialization requires a durable active pause; its status is unavailable.",
+    settings_unavailable: "Automatic initialization cannot verify the saved settings and pause.",
+    initialization_interrupted: "Automatic initialization was interrupted by a connector, Stop or lifecycle change.",
+    initialization_unavailable: "Automatic initialization could not verify storage; review status before further action."
+  };
+  const migrationReason = migrationReasons[state.ownership?.recovery?.migration_result ?? ""];
+  if (migrationReason) {
+    const detail = doc.createElement("p");
+    detail.textContent = migrationReason;
+    section.append(detail);
+  }
   if (state.ownership?.local_regulator === "linked_may_write") {
     const conflict = doc.createElement("p");
     conflict.textContent = "A local site regulator is linked and may independently write to this charger. Its protection remains in place; effective limits may conflict with the schedule.";
@@ -60027,7 +60046,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.76";
+var CARD_VERSION = "2.5.77";
 
 // sidebar/panel.js
 var settingsWritesByConnection = /* @__PURE__ */ new WeakMap();
@@ -60050,7 +60069,7 @@ function actionFailure(code, action) {
 function admissionDetail(status) {
   const reason = status?.ownership?.legacy_admission?.reason;
   const descriptions = {
-    ownership_missing: "The ownership record is missing. First use and lost records cannot be distinguished; seek a supervised ownership and retained-profile review. A final 0 A may remain.",
+    ownership_missing: "The ownership record is missing. Automatic clean initialization is pending or blocked; an old profile or final 0 A may remain.",
     ownership_transition: "An ownership transition is in progress or incomplete; review migration status before a supervised recovery.",
     retained_profile_exit_held: "Legacy handover is held because a retained profile may remain; review it before any recovery.",
     lifecycle_initializing: "A startup or reconnect lifecycle barrier is active; wait for a fresh status and review recovery if it persists.",
@@ -60064,7 +60083,18 @@ function admissionDetail(status) {
   };
   if (status?.ownership?.legacy_admission?.allowed === true) return "The current read-only admission check is now allowed; it does not establish why the earlier request was refused.";
   const current = descriptions[reason] || `The current admission reason is ${reason || "unknown"}; review Morek diagnostics before a supervised decision.`;
-  return status?.ownership?.record_state === "missing" && reason !== "ownership_missing" ? `${current} ${descriptions.ownership_missing}` : current;
+  const migration = {
+    protection_conflict_unresolved: "Automatic initialization is blocked by a linked site regulator; review the protection conflict.",
+    profile_outcome_uncertain: "A recorded profile outcome is uncertain and may have applied; automatic initialization is blocked.",
+    profile_outcome_unavailable: "Existing outcome evidence is unsettled or unavailable; automatic initialization is blocked.",
+    legacy_profile_history_invalid: "Historical profile evidence is malformed; automatic initialization is blocked.",
+    settings_unavailable: "The saved settings and pause cannot be verified.",
+    pause_unavailable: "A durable active pause is required for clean initialization.",
+    initialization_unavailable: "Initialization could not verify storage; review Morek diagnostics.",
+    initialization_interrupted: "Initialization was interrupted by a Stop, identity or lifecycle change."
+  }[status?.ownership?.recovery?.migration_result];
+  const missing = status?.ownership?.record_state === "missing" && reason !== "ownership_missing" ? ` ${descriptions.ownership_missing}` : "";
+  return `${current}${migration ? ` ${migration}` : ""}${missing}`;
 }
 var SpotnavEnhancedPanel = class extends HTMLElement {
   constructor() {

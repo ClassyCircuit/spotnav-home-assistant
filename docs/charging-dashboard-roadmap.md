@@ -1403,6 +1403,14 @@ action, weaken admission/safety checks, or claim physical behavior is verified.
     old report versus newer HA timestamps, source changes and updates over time.
 
 - [x] **12.7 Resume outcomes and ownership/evidence diagnosis** (2.5.74 local; review pending)
+  - **Follow-up implemented locally in 2.5.77; review pending:** one-time automatic
+    missing-ownership clean start preserves an existing durable active pause, records
+    missing history without a fake attempt, and reuses completion on clean restarts.
+    Explicit Resume routes through schedule ownership. Focused mocked interruption,
+    Stop and restart tests pass; actual HA and charger behavior remain unverified.
+    The user explicitly accepts that absent history could conceal an earlier action;
+    missing history alone is eligible, not evidence that no profile exists. Recorded
+    uncertain or pending actions and other safety blockers must still block dispatch.
   - 2.5.76 recognizes `legacy_execution_ownership_blocked` as a pre-effect refusal,
     not an unknown action, and displays a fresh read-only legacy admission diagnosis.
     A missing owner remains blocked: first use and lost records are indistinguishable

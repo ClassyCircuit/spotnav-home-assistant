@@ -668,6 +668,8 @@ async def async_record_owned_pause(hass: HomeAssistant, entry_id: str, *, resume
     if worker is not None:
         if resume:
             worker.resume_ticket = (intent["id"], generation)
+        else:
+            worker.hold_ticket = (intent["id"], generation)
         worker.trigger()
     return dict(intent)
 
@@ -1265,8 +1267,12 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
                 outcomes = {"state": "storage_unavailable", "uncertain": True}
             attempt = outcomes.get("attempt")
             removal = outcomes.get("removal")
-            settled = (outcomes.get("uncertain") is False and isinstance(attempt, dict)
-                       and attempt.get("state") in ("accepted", "rejected", "aborted_before_dispatch")
+            from ..execution.morek_outcomes import clean_start_origin, clean_start_proven
+            clean_start = clean_start_proven(outcomes, entry.entry_id, ownership.get("handover_id"))
+            if clean_start_origin(outcomes, entry.entry_id, ownership.get("handover_id")):
+                ownership["reconfirmation_required"] = False
+            settled = (outcomes.get("uncertain") is False and (clean_start or (isinstance(attempt, dict)
+                       and attempt.get("state") in ("accepted", "rejected", "aborted_before_dispatch")))
                        and (removal is None or (isinstance(removal, dict) and removal.get("state") in
                                                 ("accepted", "rejected", "notsupported"))))
             removal_unsettled = removal is not None and (not isinstance(removal, dict) or removal.get("state") not in

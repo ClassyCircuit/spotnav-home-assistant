@@ -355,6 +355,67 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-13 — automatic paused clean start (2.5.77; local, review pending)
+
+- The user accepted that missing ownership and outcome history could conceal an
+  earlier action. For a uniquely identified supported Morek with a durably saved
+  active pause, startup now writes a connector-bound clean-start marker and held
+  schedule intent, then a completed owner. It preserves the original pause, does
+  not fabricate a profile attempt, and sends or clears nothing during initialization.
+  Missing history is not evidence that a charger profile is absent.
+- Completion and the existing migration recovery proof are reread; a partial
+  clean-start marker is reused after restart. Known pending/uncertain operations,
+  malformed or conflicting ownership, held exits, ambiguous identity, active Stop
+  reservations and linked site-regulator conflicts remain blocked. Landed writes
+  follow the existing policy: a valid proof on disk is revalidated on restart even
+  if its caller did not observe success. A Stop not durably recorded before a crash
+  cannot be reconstructed. An active durable pause is required; initialization
+  reports `pause_unavailable` instead of silently inventing one.
+- The worker does not send the initial held schedule automatically. Explicit Resume
+  records schedule-owned intent, then clears only the unchanged legacy pause and
+  triggers normal guarded replanning; it never calls the legacy start/stop path.
+  A linked site regulator remains a dispatch blocker. A retained old profile or
+  final 0 A may remain until an explicitly authorized later operation changes it.
+- Focused actual-module mocked tests cover initialization, no fake attempt, explicit
+  Resume, repeated recovery, landed and interrupted writes, cancellation, Stop and
+  identity/lifecycle races, pending/unknown outcomes and ownership blockers. Mocked
+  sidebar and Morek tests, targeted Ruff, frontend build and check-dist passed.
+  Browser, full HA-plugin suite, live HA, physical protection and charger behavior
+  remain unverified. No HA contact, deployment or charger operation occurred.
+
+### 2026-11-12 — one-time automatic migration requested (historical; superseded above)
+
+- The user explicitly accepted the risk that absent ownership/outcome history could
+  conceal an earlier operation. Missing history alone is therefore eligible for a
+  one-time automatic clean start; it is **not** proof that the charger is clear.
+  Recorded uncertain or in-flight operations, malformed or conflicting evidence,
+  held exit, identity conflicts and unresolved protection still must block dispatch.
+  This decision supersedes the earlier suggestion that missing history itself needs
+  a manual recovery decision. The clean-start implementation remains open.
+- The user approved automatic one-time migration without a new confirmation button,
+  and specifically wants a durable completion so it does not repeat on each start.
+  This changes the earlier preference for a supervised button; it does not authorize
+  live HA contact, deployment or charger operations. Preserve the manual Stop, and
+  continue blocking actually uncertain outcomes, identity conflicts and Stop races.
+- A focused actual-module mock reproduces the reported combination: absent owner,
+  no connector outcome attempt, historical accepted legacy upload and durable manual
+  Stop. The accepted legacy record alone does not create a settled connector ledger;
+  the existing startup deliberately leaves ownership missing. The test passes and
+  makes no profile call. No migration implementation was completed in this session.
+- The outstanding implementation needs crash-safe, connector-bound durable migration
+  evidence without fabricating a previous attempt, and an ordered transfer of the
+  existing manual Stop into schedule-owned intent. Existing handover explicitly
+  refuses manual Stop and requires a settled attempt; restart recovery and profile
+  admission independently enforce that same requirement. A partial shortcut would
+  either lose the pause or misrepresent unknown history. The user expects this to be
+  solved automatically; the old refusal remains until a complete implementation and
+  focused restart, crash and Stop-race tests are reviewed.
+- A further focused actual-module regression confirms the existing completed-owner
+  recovery proof can be revalidated across two simulated restarts without rewriting
+  ownership or outcome storage or issuing charger commands. It preserves an existing
+  schedule-owned Stop. This is useful restart groundwork, **not** an implementation
+  of the missing-owner migration or a test of converting the user's legacy manual Stop.
+
 ### 2026-11-12 — Resume ownership refusal (2.5.76; review pending)
 
 - `legacy_execution_ownership_blocked` is a pre-effect refusal from the legacy

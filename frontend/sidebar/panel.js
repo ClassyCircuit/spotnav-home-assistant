@@ -33,7 +33,7 @@ function actionFailure(code, action) {
 function admissionDetail(status) {
   const reason=status?.ownership?.legacy_admission?.reason;
   const descriptions={
-    ownership_missing:'The ownership record is missing. First use and lost records cannot be distinguished; seek a supervised ownership and retained-profile review. A final 0 A may remain.',
+    ownership_missing:'The ownership record is missing. Automatic clean initialization is pending or blocked; an old profile or final 0 A may remain.',
     ownership_transition:'An ownership transition is in progress or incomplete; review migration status before a supervised recovery.',
     retained_profile_exit_held:'Legacy handover is held because a retained profile may remain; review it before any recovery.',
     lifecycle_initializing:'A startup or reconnect lifecycle barrier is active; wait for a fresh status and review recovery if it persists.',
@@ -47,7 +47,18 @@ function admissionDetail(status) {
   };
   if (status?.ownership?.legacy_admission?.allowed === true) return 'The current read-only admission check is now allowed; it does not establish why the earlier request was refused.';
   const current=descriptions[reason] || `The current admission reason is ${reason || 'unknown'}; review Morek diagnostics before a supervised decision.`;
-  return status?.ownership?.record_state==='missing' && reason!=='ownership_missing' ? `${current} ${descriptions.ownership_missing}` : current;
+  const migration={
+    protection_conflict_unresolved:'Automatic initialization is blocked by a linked site regulator; review the protection conflict.',
+    profile_outcome_uncertain:'A recorded profile outcome is uncertain and may have applied; automatic initialization is blocked.',
+    profile_outcome_unavailable:'Existing outcome evidence is unsettled or unavailable; automatic initialization is blocked.',
+    legacy_profile_history_invalid:'Historical profile evidence is malformed; automatic initialization is blocked.',
+    settings_unavailable:'The saved settings and pause cannot be verified.',
+    pause_unavailable:'A durable active pause is required for clean initialization.',
+    initialization_unavailable:'Initialization could not verify storage; review Morek diagnostics.',
+    initialization_interrupted:'Initialization was interrupted by a Stop, identity or lifecycle change.'
+  }[status?.ownership?.recovery?.migration_result];
+  const missing=status?.ownership?.record_state==='missing' && reason!=='ownership_missing' ? ` ${descriptions.ownership_missing}` : '';
+  return `${current}${migration ? ` ${migration}` : ''}${missing}`;
 }
 
 export class SpotnavEnhancedPanel extends HTMLElement {

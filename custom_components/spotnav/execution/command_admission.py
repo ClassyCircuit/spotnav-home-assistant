@@ -11,6 +11,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Generic, Literal, TypeVar
 
 from homeassistant.core import HomeAssistant
@@ -140,7 +141,7 @@ class CommandAdmission:
         store lock; synchronous reservations can invalidate the final check.
         """
         from .execution_ownership import _decode, _read_envelope
-        from .morek_outcomes import outcomes_for
+        from .morek_outcomes import clean_start_proven, outcomes_for
 
         try:
             identity = dict(resolve_identity())
@@ -177,8 +178,9 @@ class CommandAdmission:
                         return False
                 outcome = await outcomes_for(self._store._hass).read()
                 if (outcome is None or outcome.get("entry_id") != entry_id or outcome.get("uncertain") is not False
-                        or not isinstance(outcome.get("attempt"), dict)
-                        or outcome["attempt"].get("state") not in ("accepted", "rejected", "aborted_before_dispatch")
+                        or (not clean_start_proven(outcome, entry_id, status.get("handover_id")) and
+                            (not isinstance(outcome.get("attempt"), dict) or outcome["attempt"].get("state") not in
+                             ("accepted", "rejected", "aborted_before_dispatch")))
                         or (outcome.get("removal") is not None and outcome["removal"].get("state") not in
                             ("accepted", "rejected", "notsupported")) or not current()):
                     return False
@@ -233,7 +235,7 @@ class CommandAdmission:
     ) -> str:
         """Explicitly reconfirm a completed owner; never operate the charger."""
         from .execution_ownership import _decode, _read_envelope
-        from .morek_outcomes import outcomes_for
+        from .morek_outcomes import clean_start_proven, outcomes_for
 
         try:
             identity = dict(resolve_identity())
@@ -273,8 +275,9 @@ class CommandAdmission:
                         return "ownership_unavailable"
                 outcome = await outcomes_for(self._store._hass).read()
                 if (outcome is None or outcome.get("entry_id") != entry_id or outcome.get("uncertain") is not False
-                        or not isinstance(outcome.get("attempt"), dict)
-                        or outcome["attempt"].get("state") not in ("accepted", "rejected", "aborted_before_dispatch")
+                        or (not clean_start_proven(outcome, entry_id, status.get("handover_id")) and
+                            (not isinstance(outcome.get("attempt"), dict) or outcome["attempt"].get("state") not in
+                             ("accepted", "rejected", "aborted_before_dispatch")))
                         or (outcome.get("removal") is not None and outcome["removal"].get("state") not in
                             ("accepted", "rejected", "notsupported"))):
                     return "profile_outcome_unavailable"
@@ -657,7 +660,9 @@ class CommandAdmission:
                                     else "not_proven_by_owner_record")
                             else:
                                 result["state"] = "ownership_unavailable"
-                            result["profile_history"] = "missing_not_inventory" if outcome is None else "recorded"
+                            result["profile_history"] = ("missing_not_inventory" if outcome is None or
+                                                         (outcome.get("clean_start") and outcome.get("attempt") is None)
+                                                         else "recorded")
                         current = dict(resolve_identity())
                         if classify_morek_identity(current) != "supported_morek" or physical_connector(current) != connector:
                             result["state"] = "identity_changed"
@@ -758,6 +763,135 @@ class CommandAdmission:
             finally:
                 if self._entry_draining.get(connector) == "exiting":
                     del self._entry_draining[connector]
+
+    async def async_initialize_missing_owner(
+        self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]], executor: Any,
+    ) -> str:
+        """Initialize a paused owner from explicitly approved missing history, without charger I/O."""
+        from uuid import uuid4
+        from homeassistant.helpers.storage import Store
+        from .auto_execution import AutoExecutor
+        from .controller import ChargingController
+        from .execution_ownership import _MISSING, _decode, _read_envelope
+        from .morek_outcomes import clean_start_proven, outcomes_for
+        from ..planning.auto_settings import AutoSettings, SUPPORTED_SCHEMAS
+
+        try:
+            identity = dict(resolve_identity())
+            connector = physical_connector(identity)
+            if classify_morek_identity(identity) != "supported_morek" or connector is None:
+                return "identity_unresolved"
+            if not isinstance(executor, AutoExecutor) or not isinstance(executor.controller, ChargingController):
+                return "producer_unavailable"
+            controller = executor.controller
+            if controller.entry_id != entry_id:
+                return "producer_unavailable"
+            generation = self.generation(connector)
+            revision = self._lifecycle_revisions.get(entry_id, 0)
+            stop_revision = self._stop_revisions.get(entry_id, 0)
+
+            def current() -> bool:
+                fresh = dict(resolve_identity())
+                return (entry_id in self._lifecycle_barriers and self._lifecycle_revisions.get(entry_id, 0) == revision
+                        and self._stop_revisions.get(entry_id, 0) == stop_revision
+                        and self.generation(connector) == generation and not self._person_stops.get(connector)
+                        and not any(other != entry_id and bound == connector for other, bound in self._lifecycle_barriers.items())
+                        and connector not in self._entry_draining and connector not in self._quiescing
+                        and connector not in self._uncertain_operations
+                        and not self._store._hass.data.get("spotnav_morek_sending", {}).get(entry_id)
+                        and classify_morek_identity(fresh) == "supported_morek" and physical_connector(fresh) == connector)
+
+            async with executor._lock, executor._store._lock, controller._lock, controller._assign_lock, self._lock_for(connector):
+                if not current() or executor._shutdown or controller._shut_down:
+                    return "initialization_interrupted"
+                if callable(getattr(controller, "_start_cap", None)):
+                    return "protection_conflict_unresolved"
+                if not executor._store.loaded or executor._store.unsaved:
+                    return "settings_unavailable"
+                settings = executor._store.settings(entry_id)
+                # Start held; do not invent a pause for a different state.
+                if not settings.pause.admitted or settings.pause.ended_at(datetime.now(timezone.utc)):
+                    return "pause_unavailable"
+                raw = await self._store._hass.async_add_executor_job(_read_envelope, executor._store._store.path)
+                if (not isinstance(raw, dict) or raw.get("version") != 1 or raw.get("minor_version", 1) != 1
+                        or not isinstance(raw.get("data"), dict) or raw["data"].get("schema") not in SUPPORTED_SCHEMAS
+                        or not isinstance(raw["data"].get("chargers"), dict)):
+                    return "settings_unavailable"
+                stored = raw["data"]["chargers"].get(entry_id)
+                if not isinstance(stored, dict) or AutoSettings.from_stored(stored.get("settings")) != settings:
+                    return "settings_unavailable"
+                if executor._start_pending or controller._start_in_flight or (
+                        controller._last_start_attempt is not None and controller._last_start_attempt.start_dispatch == "unknown"):
+                    return "legacy_operation_uncertain"
+                status = await self._store.async_status(entry_id, identity)
+                if status.get("record_state") != "missing":
+                    return "ownership_unavailable"
+                # A known unresolved legacy upload or removal is not missing history.
+                old_store = Store(self._store._hass, 1, f"spotnav.morek_schedule.{entry_id}")
+                old = await self._store._hass.async_add_executor_job(_read_envelope, old_store.path)
+                if old is not _MISSING:
+                    if (not isinstance(old, dict) or old.get("version") != 1 or old.get("minor_version", 1) != 1
+                            or not isinstance(old.get("data"), dict)):
+                        return "legacy_profile_history_invalid"
+                    old_data = old["data"]
+                    profile, removal = old_data.get("profile"), old_data.get("cleanup")
+                    if ((profile is not None and not isinstance(profile, dict)) or
+                            (removal is not None and not isinstance(removal, dict))):
+                        return "legacy_profile_history_invalid"
+                    if (((profile is not None or old_data.get("sent_at") is not None or old_data.get("ack") is not None)
+                         and str(old_data.get("ack", "unknown")).lower() not in ("accepted", "rejected", "notsupported"))
+                            or (removal is not None and str(removal.get("status", "unknown")).lower() not in
+                                ("accepted", "rejected", "notsupported"))):
+                        return "profile_outcome_uncertain"
+                ledger = outcomes_for(self._store._hass)
+                outcome = await ledger.read()
+                if outcome is None:
+                    migration_id = uuid4().hex
+                    outcome = {"schema": 1, "entry_id": entry_id, "uncertain": False,
+                               "attempt": None, "removal": None,
+                               "clean_start": {"version": 1, "id": migration_id, "station_id": connector.station_id,
+                                               "connector_id": connector.connector_id, "history": "missing"},
+                               "schedule_pause": {"version": 1, "type": "pause_until_resumed", "id": uuid4().hex,
+                                                  "station_id": connector.station_id, "connector_id": connector.connector_id},
+                               "migration_recovery_proof": {"version": 1, "migration_id": migration_id,
+                                                            "station_id": connector.station_id, "connector_id": connector.connector_id}}
+                    if not current():
+                        return "initialization_interrupted"
+                    await ledger.write(outcome)
+                else:
+                    proof = outcome.get("clean_start") if isinstance(outcome, dict) else None
+                    migration_id = proof.get("id") if isinstance(proof, dict) else None
+                    if not clean_start_proven(outcome, entry_id, migration_id) or outcome["schedule_pause"]["type"] != "pause_until_resumed":
+                        return "profile_outcome_unavailable"
+                if not current() or executor._store.settings(entry_id) != settings:
+                    return "initialization_interrupted"
+                async with self._store._lock:
+                    await self._store._load()
+                    state, disk = _decode(await self._store._hass.async_add_executor_job(_read_envelope, self._store._store.path))
+                    if (state not in ("missing", "valid") or state != self._store._state or disk != self._store._records
+                            or entry_id in disk or self._store._cancelled_write or self._store._transition_save_uncertain
+                            or any((item["station_id"], item["connector_id"]) == (connector.station_id, connector.connector_id)
+                                   for item in disk.values()) or bool(self._store._contenders.get((connector.station_id, connector.connector_id), set()) - {entry_id})
+                            or not current()):
+                        return "ownership_unavailable"
+                    records = {**disk, entry_id: {"station_id": connector.station_id, "connector_id": connector.connector_id,
+                               "owner": "morek_schedule", "handover": {"version": 1, "state": "completed", "id": migration_id}}}
+                    try:
+                        await self._store._store.async_save({"schema_version": 1, "records": records})
+                        saved_state, saved = _decode(await self._store._hass.async_add_executor_job(_read_envelope, self._store._store.path))
+                        if saved_state != "valid" or saved != records:
+                            raise OSError("clean-start verification failed")
+                    except BaseException:
+                        self._store._state = "save_failed"
+                        self._store._transition_save_uncertain = self._store._cancelled_write = True
+                        raise
+                    self._store._state, self._store._records = "valid", records
+                if not current():
+                    return "initialization_interrupted"
+                self._completion_tickets[entry_id] = (connector, migration_id, revision, generation)
+                return "initialized_paused"
+        except Exception:  # noqa: BLE001 - no retry in this process after an uncertain save
+            return "initialization_unavailable"
 
     async def async_handover_unarmed(
         self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]], executor: Any, *,
@@ -1069,7 +1203,7 @@ class CommandAdmission:
                         or not self.ticket_current(entry_id, connector, status.get("handover_id"))):
                     return AdmissionResult(False, "schedule_mode_unarmed")
                 from .execution_ownership import _decode, _read_envelope
-                from .morek_outcomes import outcomes_for
+                from .morek_outcomes import clean_start_proven, outcomes_for
                 try:
                     async with self._store._lock:
                         raw = await self._store._hass.async_add_executor_job(_read_envelope, self._store._store.path)
@@ -1079,8 +1213,9 @@ class CommandAdmission:
                             return AdmissionResult(False, "ownership_unavailable")
                     outcome = await outcomes_for(self._store._hass).read()
                     if (outcome is None or outcome.get("entry_id") != entry_id or outcome.get("uncertain") is not False
-                            or not isinstance(outcome.get("attempt"), dict)
-                            or outcome["attempt"].get("state") not in ("accepted", "rejected", "aborted_before_dispatch")
+                            or (not clean_start_proven(outcome, entry_id, status.get("handover_id")) and
+                                (not isinstance(outcome.get("attempt"), dict) or outcome["attempt"].get("state") not in
+                                 ("accepted", "rejected", "aborted_before_dispatch")))
                             or (outcome.get("removal") is not None and outcome["removal"].get("state") not in
                                 ("accepted", "rejected", "notsupported"))):
                         return AdmissionResult(False, "profile_outcome_unavailable")

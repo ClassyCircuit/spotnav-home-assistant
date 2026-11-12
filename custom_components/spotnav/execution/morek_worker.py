@@ -41,6 +41,7 @@ class MorekScheduleWorker:
         self.reason = "not_started"
         self.reason_serial = -1
         self.resume_ticket = None
+        self.hold_ticket = None
 
     def start(self) -> None:
         """The listener delivers the current snapshot immediately, including on startup."""
@@ -150,12 +151,24 @@ class MorekScheduleWorker:
                     self.trigger()
                     raise morek_schedule.ScheduleRefused("stale_work")
                 controller = controller_for(self._hass, self._entry_id)
+                if record.get("clean_start") and callable(getattr(controller, "_start_cap", None)):
+                    raise morek_schedule.ScheduleRefused("protection_conflict_unresolved")
+                settings = domain_data(self._hass).auto_store.settings(self._entry_id)
+                if (record.get("clean_start") and pause is not None and pause.get("type") == "resume_requested"
+                        and getattr(getattr(settings, "pause", None), "admitted", False)):
+                    raise morek_schedule.ScheduleRefused("legacy_pause_active")
                 target = getattr(controller, "ocpp_target", None)
                 return profile, morek_schedule._charge_point(self._hass, target), target
 
             async with self._hass.data[morek_schedule._DATA_KEY][self._entry_id][2]:
                 record = await morek_schedule._outcome_record(self._hass, self._entry_id, data)
                 pause = record.get("schedule_pause")
+                if record.get("clean_start") and callable(getattr(controller_for(self._hass, self._entry_id), "_start_cap", None)):
+                    return "protection_conflict_unresolved", None, None
+                if (record.get("clean_start") and record.get("attempt") is None and pause
+                        and pause.get("type") == "pause_until_resumed"
+                        and self.hold_ticket != (pause.get("id"), generation)):
+                    return "paused_until_resume", None, None
                 if pause is not None and pause["type"] == "resume_requested" and self.resume_ticket != (pause["id"], generation):
                     return "resume_requires_confirmation", None, None
                 _, fingerprint = self._intent(pause)

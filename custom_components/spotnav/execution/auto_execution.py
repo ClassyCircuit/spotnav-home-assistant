@@ -567,6 +567,7 @@ class AutoExecutor:
         person_stop_scope: Callable[[], Any] | None = None,
         person_stop_admission: Callable[[], Awaitable[bool]] | None = None,
         owned_manual_action: Callable[[str], Awaitable[bool]] | None = None,
+        owned_resume_complete: Callable[[], None] | None = None,
     ) -> None:
         self._hass = hass
         self._controller = controller
@@ -580,6 +581,7 @@ class AutoExecutor:
         self._person_stop_scope = person_stop_scope or nullcontext
         self._person_stop_admission = person_stop_admission
         self._owned_manual_action = owned_manual_action
+        self._owned_resume_complete = owned_resume_complete
         self._lock = asyncio.Lock()
         self._attempt = 0
         self._shutdown = False
@@ -1875,6 +1877,7 @@ class AutoExecutor:
         """Resume: the next calculation may apply again, through the same boundary."""
         async with self._lock:
             if self._owned_manual_action is not None and await self._owned_manual_action(ACTION_RESUME):
+                await self._finish_owned_resume()
                 return
             await self._require_legacy()
             await self._resume_locked()
@@ -1901,6 +1904,30 @@ class AutoExecutor:
         self._last_error = None
         await self._rearm_kept_plan()
         await self._notify_change()
+
+    async def _finish_owned_resume(self) -> None:
+        """Clear only the matching legacy pause after schedule Resume was durably recorded."""
+        before = self._store.settings(self._entry_id).pause
+        if not before.admitted:
+            if self._owned_resume_complete is not None:
+                self._owned_resume_complete()
+            return
+        try:
+            def clear_if_unchanged(settings: Any) -> Any:
+                if settings.pause != before:
+                    raise AutoControlCommitted(EXECUTION_RECONCILE_FAILED)
+                return replace(settings, pause=PauseIntent())
+            await self._store.async_update(
+                self._entry_id, mutate=clear_if_unchanged,
+            )
+            self._arm_pause_expiry(None)
+            self._end_stop_pending()
+            self._sync_manual_watch()
+            await self._notify_change()
+            if self._owned_resume_complete is not None:
+                self._owned_resume_complete()
+        except Exception as error:
+            raise AutoControlCommitted(EXECUTION_RECONCILE_FAILED) from error
 
     async def _rearm_kept_plan(self) -> None:
         """A pause ended while a plan it could not clear stayed (its stop failed): arm that plan again, so a
@@ -1953,6 +1980,8 @@ class AutoExecutor:
             if self._owned_manual_action is not None and action in (ACTION_STOP, ACTION_RESUME) and choice in (None, PAUSE_UNTIL_RESUMED):
                 async with self._lock:
                     if await self._owned_manual_action(action):
+                        if action == ACTION_RESUME:
+                            await self._finish_owned_resume()
                         return ControlDecision(action, None, ())
             return await self._async_manual_action(action, choice)
 

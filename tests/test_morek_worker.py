@@ -125,6 +125,75 @@ async def drain(worker):
 
 
 @pytest.mark.asyncio
+async def test_clean_start_remains_paused_without_an_automatic_profile_write(monkeypatch):
+    w = setup(monkeypatch)
+    w.ledger.value = {"schema": 1, "entry_id": "charger", "uncertain": False, "attempt": None,
+                      "clean_start": {"version": 1}, "schedule_pause": {"version": 1,
+                      "type": "pause_until_resumed", "id": "p", "station_id": IDENTITY["resolved_id"],
+                      "connector_id": 1}}
+    w.worker.start()
+    await drain(w.worker)
+    assert w.worker.reason == "paused_until_resume"
+    w.point.call.assert_not_awaited()
+    entry = SimpleNamespace(entry_id="charger", runtime_data=SimpleNamespace(morek_worker=w.worker))
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=w.target))
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda *_: w.admission)
+    monkeypatch.setattr(morek_schedule, "_intent_identity_status", lambda *_: w.identity)
+    status = {"record_state": "valid", "recorded_owner": "morek_schedule", "armed": False,
+              "transition_state": None, "station_id": IDENTITY["resolved_id"], "connector_id": 1}
+    monkeypatch.setattr(morek_schedule, "ownership_store", lambda *_: SimpleNamespace(async_status=AsyncMock(return_value=status)))
+    w.settings.pause = SimpleNamespace(admitted=True)
+    await morek_schedule.async_record_owned_pause(w.hass, "charger", resume=True)
+    await drain(w.worker)
+    assert w.worker.reason == "legacy_pause_active"
+    w.point.call.assert_not_awaited()
+    w.settings.pause.admitted = False
+    w.worker.trigger()
+    await drain(w.worker)
+    assert w.point.call.await_count == 1
+    assert w.ledger.value["attempt"]["source"] == "worker"
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_clean_start_worker_blocks_linked_regulator(monkeypatch):
+    w = setup(monkeypatch)
+    w.ledger.value = {"schema": 1, "entry_id": "charger", "uncertain": False, "attempt": None,
+                      "clean_start": {"version": 1}, "schedule_pause": {"version": 1,
+                      "type": "pause_until_resumed", "id": "p", "station_id": IDENTITY["resolved_id"],
+                      "connector_id": 1}}
+    monkeypatch.setattr(morek_worker, "controller_for", lambda *_: SimpleNamespace(ocpp_target=w.target, _start_cap=lambda: 10))
+    w.worker.start()
+    await drain(w.worker)
+    assert w.worker.reason == "protection_conflict_unresolved"
+    w.point.call.assert_not_awaited()
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_clean_start_explicit_pause_can_request_held_schedule(monkeypatch):
+    w = setup(monkeypatch)
+    w.ledger.value = {"schema": 1, "entry_id": "charger", "uncertain": False, "attempt": None,
+                      "clean_start": {"version": 1}, "schedule_pause": {"version": 1,
+                      "type": "pause_until_resumed", "id": "p", "station_id": IDENTITY["resolved_id"],
+                      "connector_id": 1}}
+    entry = SimpleNamespace(entry_id="charger", runtime_data=SimpleNamespace(morek_worker=w.worker))
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=w.target))
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda *_: w.admission)
+    monkeypatch.setattr(morek_schedule, "_intent_identity_status", lambda *_: w.identity)
+    status = {"record_state": "valid", "recorded_owner": "morek_schedule", "armed": False,
+              "transition_state": None, "station_id": IDENTITY["resolved_id"], "connector_id": 1}
+    monkeypatch.setattr(morek_schedule, "ownership_store", lambda *_: SimpleNamespace(async_status=AsyncMock(return_value=status)))
+    await morek_schedule.async_record_owned_pause(w.hass, "charger")
+    await drain(w.worker)
+    assert w.point.call.await_count == 1
+    assert w.ledger.value["attempt"]["source"] == "worker"
+    w.worker.close()
+
+
+@pytest.mark.asyncio
 async def test_explicit_owned_pause_is_durable_and_worker_requests_held_off(monkeypatch):
     w = setup(monkeypatch)
     entry = SimpleNamespace(entry_id="charger")

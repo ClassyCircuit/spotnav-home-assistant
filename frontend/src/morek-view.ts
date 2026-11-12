@@ -10,7 +10,7 @@ export interface MorekState {
   reconciliation?: { reason: string };
   schedule_pause?: { intent?: string; request?: string; ack?: string | null; readback?: string; measured?: string; coverage_start?: string | null; coverage_end?: string | null };
   readiness?: { control?: string; vehicle?: string; transaction?: string; measurement?: string; vehicle_observed_at?: string | null };
-  ownership?: { recorded_owner?: string | null; blockers?: string[]; schedule_mode_available?: boolean; completion_authorized?: boolean; reconfirmation_required?: boolean; local_regulator?: string; recovery?: { state?: string } };
+  ownership?: { recorded_owner?: string | null; blockers?: string[]; schedule_mode_available?: boolean; completion_authorized?: boolean; reconfirmation_required?: boolean; local_regulator?: string; recovery?: { state?: string; migration_result?: string } };
   reason?: string | null;
   configured_id?: string | null;
   resolved_id?: string | null;
@@ -190,6 +190,9 @@ export function morekPanel(
     resume_requires_confirmation: "Confirm Resume again after restart; the retained limit may remain.",
     schedule_mode_unarmed: "Automatic schedule sending is not enabled.",
     upload_uncertain: "The previous write outcome is unknown; automatic retry is blocked.",
+    protection_conflict_unresolved: "A linked site regulator may also control this charger; schedule dispatch is blocked until the conflict is reviewed.",
+    paused_until_resume: "Auto remains paused until you explicitly Resume.",
+    legacy_pause_active: "The saved manual pause remains active; the Resume follow-up has not completed.",
   };
   if (reconciliation && reconciliationMessages[reconciliation]) {
     const detail = doc.createElement("p");
@@ -217,6 +220,22 @@ export function morekPanel(
     ? "Schedule ownership is confirmed for this process. External OCPP writers and native protection cannot be verified here."
     : `${blocker ? blockers[blocker] : recoveryReason ?? "Schedule sending is blocked; review ownership and recovery status."} Recorded owner: ${state.ownership?.recorded_owner ?? "unknown"}.`;
   section.append(availability);
+  const migrationReasons: Record<string, string> = {
+    protection_conflict_unresolved: "Automatic initialization is blocked by a linked site regulator; review the protection conflict.",
+    profile_outcome_uncertain: "Automatic initialization is blocked by a recorded uncertain profile action.",
+    profile_outcome_unavailable: "Automatic initialization is blocked by existing unsettled or unavailable outcome evidence.",
+    legacy_profile_history_invalid: "Automatic initialization is blocked by malformed historical profile evidence.",
+    pause_unavailable: "Automatic initialization requires a durable active pause; its status is unavailable.",
+    settings_unavailable: "Automatic initialization cannot verify the saved settings and pause.",
+    initialization_interrupted: "Automatic initialization was interrupted by a connector, Stop or lifecycle change.",
+    initialization_unavailable: "Automatic initialization could not verify storage; review status before further action.",
+  };
+  const migrationReason = migrationReasons[state.ownership?.recovery?.migration_result ?? ""];
+  if (migrationReason) {
+    const detail = doc.createElement("p");
+    detail.textContent = migrationReason;
+    section.append(detail);
+  }
   if (state.ownership?.local_regulator === "linked_may_write") {
     const conflict = doc.createElement("p");
     conflict.textContent = "A local site regulator is linked and may independently write to this charger. Its protection remains in place; effective limits may conflict with the schedule.";

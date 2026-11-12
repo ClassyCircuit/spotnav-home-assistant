@@ -336,6 +336,10 @@ async def _async_setup_ownership_metadata(
         evidence = await admission.async_recovery_status(entry.entry_id, identity)
         if expected_epoch != lifecycle_epoch:
             return
+        if migrate and existing.get("record_state") == "missing":
+            executor = getattr(getattr(entry, "runtime_data", None), "executor", None)
+            if executor is not None:
+                await _async_finish_morek_migration(hass, entry, controller, executor)
         if (migrate and existing.get("record_state") == "valid"
                 and existing.get("recorded_owner") == "legacy" and existing.get("transition_state") is None):
             restart_pending = False
@@ -436,6 +440,12 @@ async def _async_finish_morek_migration(hass, entry, controller, executor) -> No
 
     from .execution.command_admission import physical_connector
     connector = physical_connector(identity())
+    status = await admission._store.async_status(entry.entry_id, identity())
+    if status.get("record_state") == "missing":
+        result = await admission.async_initialize_missing_owner(entry.entry_id, identity, executor)
+        evidence = await admission.async_recovery_status(entry.entry_id, identity)
+        admission._recovery_status[entry.entry_id] = {**evidence, "migration_result": result}
+        return
     if (connector is None or admission._entry_draining.get(connector) != "drained_unarmed"
             or admission._migration_controllers.get(connector) is not controller):
         return
@@ -527,11 +537,17 @@ async def _async_setup_charger_entry(hass: HomeAssistant, entry: ChargerConfigEn
             except ScheduleRefused as error:
                 raise AutoControlRefused(error.code) from None
 
+        def owned_resume_complete() -> None:
+            worker = getattr(entry.runtime_data, "morek_worker", None)
+            if worker is not None:
+                worker.trigger()
+
         executor = data.executor = AutoExecutor(
             hass, controller, settings_store, legacy_admission=legacy_allowed,
             person_stop_scope=controller.adapter.person_stop_scope,
             person_stop_admission=lambda: controller.adapter.async_legacy_permitted(person_stop=True),
             owned_manual_action=owned_manual_action,
+            owned_resume_complete=owned_resume_complete,
         )
         entry.async_on_unload(executor.async_shutdown)
         await _async_finish_morek_migration(hass, entry, controller, executor)
