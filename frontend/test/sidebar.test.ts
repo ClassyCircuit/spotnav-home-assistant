@@ -90,6 +90,18 @@ describe('actual sidebar read-only host', () => {
     expect(warning.detail).toMatch(/may have applied/i);
     expect(warning.detail).toMatch(/mismatch/i);
   });
+  it('withdraws cached dashboard observations immediately after a failed refresh and restores them on recovery', () => {
+    const now=Date.now(), raw=fixture(); raw.generated_at=new Date(now).toISOString();
+    raw.plan.proposal.periods=[{start:new Date(now+3600000).toISOString(),end:new Date(now+7200000).toISOString()}];
+    const current=()=>dashboardAdapter(raw,status,now,now,false,false).model;
+    expect(current().windows).toHaveLength(1);
+    const failed=dashboardAdapter(raw,status,now,now,false,true).model;
+    expect(failed.vehicle.status).toMatch(/unavailable.*stale/i);
+    expect(failed.vehicle.soc).toBeNull();
+    expect(failed.windows).toBeNull();
+    expect(failed.totals).toBeNull();
+    expect(current().windows).toHaveLength(1);
+  });
   it('mounts shared UI, ignores old responses on switch and never sends writes', async () => {
     const a=fixture(), b=fixture(); a.generated_at=b.generated_at=new Date().toISOString();
     a.charger.charger_id='a'; b.charger.charger_id='b';

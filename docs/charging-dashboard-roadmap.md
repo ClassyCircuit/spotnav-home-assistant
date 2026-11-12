@@ -783,8 +783,8 @@ tests are documented there; full HA collection is still blocked on Windows.
     fresh confirmation. The held-exit interlock has no release path and must not be
     bypassed; resolve or explicitly carry it as an activation blocker into 5.7.
 - [ ] **5.7 Activation implementation and pre-install automated validation**
-  - Umbrella only: assign 5.7a–5.7b individually; deployed activation and testing
-    are the user's own 5.8 milestone, not LLM implementation tasks.
+  - Assign 5.7a or the focused 5.7b1–5.7b3 continuations individually; deployed
+    activation and testing are the user's own 5.8 milestone, not LLM tasks.
   - Replace legacy execution for the supported Morek connector with the existing
     guarded schedule worker and planner triggers, using a safe migration and durable
     evidence. Do not build a runtime switch back to the old controller. Preserve
@@ -938,6 +938,13 @@ tests are documented there; full HA collection is still blocked on Windows.
     ambiguity, external writers and installation protection; do not treat the removal
     of a mode switch as evidence that the charger is in a safe state.
 - [ ] **5.7b End-to-end local regression and release handoff**
+  - 2.5.67 is a partial local continuation, not a reviewed release candidate.
+    Failed dashboard refreshes now withdraw cached connection, SOC and proposal
+    observations immediately. The practical reported-charging and measured-power
+    binding and the full requested wired regression matrix remain unfinished. The
+    broad worker run fails on timezone initialization, and the mocked browser check
+    fails its pause-status assertion; resolve and rerun before completion. The full
+    HA-plugin suite cannot start on this Windows host (`fcntl` missing). See handoff.
   - Exercise settings/price/SOC → plan → guarded reconciliation, stable-plan
     deduplication, restart/reconnect, uncertainty and operator status with mocks;
     include the deferred 5.4c suite if a supported local host is available.
@@ -947,6 +954,41 @@ tests are documented there; full HA collection is still blocked on Windows.
     unavailable/stale data, offline status, errors and schedule mismatch; show what is
     known and what is not without treating status alone as measured power. Document
     available source limitations for the user's own deployed checks.
+
+  **Focused continuations:** preserve all in-progress work and assign these in order;
+  5.7b is complete only when their applicable local checks and review are complete.
+
+- [ ] **5.7b1 Sidebar custom-element collision**
+  - The user observed installed 2.5.66's sidebar blank with a duplicate `wa-icon`
+    registration exception; the sampled HA Core log also contained the error. Top-level
+    Web Awesome registration guards do not necessarily cover transitive dependencies.
+    A separate scoped-registry source-map 404 may be non-fatal; investigate independently.
+  - Inspect and preserve the existing in-progress registration fix and browser fixtures.
+    Verify the built panel mounts with a clean registry and with `wa-icon` and relevant
+    components already registered, including use alongside the existing card where
+    applicable. Do not globally weaken HA's custom-element registry or conceal real
+    import errors. Local browser tests do not prove the installed HA fix.
+- [ ] **5.7b2 Live charging and health binding**
+  - The existing sidebar adapter still reports measured power as unavailable. Inspect
+    the backend's existing reported charger state, measured-power, energy-register
+    and integration paths; bind only evidence with an appropriate source, connector
+    association and freshness. Show unknown when unavailable; distinguish reported
+    charging, measured power, actual zero, stale data, sent ACK and effective limits.
+  - Include mocked backend/frontend tests for normal, unavailable, stale, offline,
+    error and mismatch states. No rendering-triggered charger writes, invented readings
+    or assumed installed measurement source. Reuse 2.5.67's failed-refresh handling.
+- [ ] **5.7b3 Local acceptance and release handoff**
+  - Investigate the mocked browser check's failed Pause-status assertion against the
+    current UI/fixture; fix the real defect or stale test, not just its expectation.
+    Rerun it through desktop and emulated mobile and all remaining interactions.
+  - Fix the local worker-suite timezone initialization and rerun the full worker suite;
+    complete real-module mocked plan → admission → worker regressions including Stop,
+    restart, stale inputs and unknown outcomes. Run the 5.4c HA-plugin dashboard suite
+    on a supported host if available; its Windows `fcntl` import failure means unrun,
+    not a pass or an application failure. Report any remaining test gap precisely.
+  - Prepare a concise handoff for the user's own installation and manual testing;
+    do not deploy or contact HA. Actual HA rendering, external writers, protection
+    and physical charging remain unverified until separately observed.
 
 ### 5.8 — User-owned installation and deployed validation milestone
 

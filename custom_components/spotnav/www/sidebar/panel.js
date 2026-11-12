@@ -2712,7 +2712,9 @@ var init_chunk_LXLE4T4D = __esm({
       watch("loading", { waitUntilFirstUpdate: true })
     ], WaButton.prototype, "handleLoadingChange", 1);
     WaButton = __decorateClass([
-      t3("wa-button")
+      ((...args) => {
+        if (!customElements.get("wa-button")) return t3("wa-button")(...args);
+      })
     ], WaButton);
     WaButton.disableWarning?.("change-in-update");
   }
@@ -2833,7 +2835,9 @@ var init_chunk_EGBUT3HG = __esm({
     };
     WaSpinner.css = spinner_styles_default;
     WaSpinner = __decorateClass([
-      t3("wa-spinner")
+      ((...args) => {
+        if (!customElements.get("wa-spinner")) return t3("wa-spinner")(...args);
+      })
     ], WaSpinner);
   }
 });
@@ -4258,7 +4262,9 @@ var init_chunk_JAAVYFGY = __esm({
       })
     ], WaIcon.prototype, "setIcon", 1);
     WaIcon = __decorateClass([
-      t3("wa-icon")
+      ((...args) => {
+        if (!customElements.get("wa-icon")) return t3("wa-icon")(...args);
+      })
     ], WaIcon);
   }
 });
@@ -4470,7 +4476,9 @@ var init_chunk_EVUNHVNL = __esm({
       n4({ reflect: true })
     ], WaBadge.prototype, "attention", 2);
     WaBadge = __decorateClass([
-      t3("wa-badge")
+      ((...args) => {
+        if (!customElements.get("wa-badge")) return t3("wa-badge")(...args);
+      })
     ], WaBadge);
   }
 });
@@ -4646,7 +4654,9 @@ var init_chunk_KAXSVNIO = __esm({
       n4()
     ], WaProgressBar.prototype, "label", 2);
     WaProgressBar = __decorateClass([
-      t3("wa-progress-bar")
+      ((...args) => {
+        if (!customElements.get("wa-progress-bar")) return t3("wa-progress-bar")(...args);
+      })
     ], WaProgressBar);
   }
 });
@@ -5519,7 +5529,9 @@ var init_chunk_R6M2PXD4 = __esm({
       watch("step", { waitUntilFirstUpdate: true })
     ], WaInput.prototype, "handleStepChange", 1);
     WaInput = __decorateClass([
-      t3("wa-input")
+      ((...args) => {
+        if (!customElements.get("wa-input")) return t3("wa-input")(...args);
+      })
     ], WaInput);
     WaInput.disableWarning?.("change-in-update");
   }
@@ -6044,7 +6056,9 @@ var init_chunk_Z7CHPABS = __esm({
       watch("open", { waitUntilFirstUpdate: true })
     ], WaDetails.prototype, "handleOpenChange", 1);
     WaDetails = __decorateClass([
-      t3("wa-details")
+      ((...args) => {
+        if (!customElements.get("wa-details")) return t3("wa-details")(...args);
+      })
     ], WaDetails);
   }
 });
@@ -59806,7 +59820,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
   if (!decoded.ok) return null;
   const d3 = decoded.value, zone = d3.market?.timezone || null;
   const generated = Date.parse(d3.generated_at || "");
-  const stale = !Number.isFinite(generated) || generated > now || now - generated > 9e4;
+  const stale = dashboardFailed || !Number.isFinite(generated) || generated > now || now - generated > 9e4;
   const socAge = d3.soc?.age_s;
   const socStale = stale || !Number.isFinite(socAge) || socAge < 0 || socAge + (now - generated) / 1e3 > 180;
   const status = decodeMorekState(statusRaw);
@@ -59851,7 +59865,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.66";
+var CARD_VERSION = "2.5.68";
 
 // sidebar/panel.js
 var settingsWritesByConnection = /* @__PURE__ */ new WeakMap();

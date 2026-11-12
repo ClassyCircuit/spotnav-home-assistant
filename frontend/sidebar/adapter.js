@@ -21,7 +21,7 @@ export function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), f
   if (!decoded.ok) return null;
   const d = decoded.value, zone = d.market?.timezone || null;
   const generated = Date.parse(d.generated_at || '');
-  const stale = !Number.isFinite(generated) || generated > now || now - generated > 90000;
+  const stale = dashboardFailed || !Number.isFinite(generated) || generated > now || now - generated > 90000;
   const socAge = d.soc?.age_s;
   // Match the backend's target_stop.SOC_FRESH_MAX_AGE_S, not a warning threshold.
   const socStale = stale || !Number.isFinite(socAge) || socAge < 0 || socAge + (now-generated)/1000 > 180;

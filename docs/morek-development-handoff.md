@@ -6,6 +6,14 @@ Re-check the live system and Git state before acting; observations below may bec
 
 ## Approved next direction (planning, not implemented)
 
+**5.7b continuation:** 2.5.67 withdraws stale dashboard data after failed refresh,
+but charging/power binding and full local acceptance remain open. Roadmap 5.7b1–b3
+track the installed 2.5.66 `wa-icon` blank-sidebar collision (preserve the in-progress
+fix), truthful live monitoring, and the failing Pause browser assertion/worker-test
+timezone setup plus end-to-end checks. The HA-plugin suite could not start on Windows
+because `fcntl` is unavailable; it remains unrun. These are local development tasks,
+not permission to deploy or operate the user's charger.
+
 **Automatic restart recovery requested:** the user does not want to press a
 reconfirmation button after ordinary HA restarts. The current process-ticket design
 still requires it, so normal automatic restart recovery remains open. Implement and
@@ -346,6 +354,74 @@ requirements, not features claimed implemented in the manual baseline below.
   Do not assume `GetCompositeSchedule` lists stored profiles.
 
 ## Tests, build, and next steps
+
+### 2026-11-12 — sidebar Web Awesome collision (2.5.68; local only)
+
+- The installed 2.5.66 blank panel's reported duplicate `wa-icon` exception was
+  reproduced in a browser against the previously built sidebar by registering the
+  icon first. Web Awesome 3.14.0's Lit decorators register components on module
+  evaluation, including transitive dependencies; guarding only the dashboard's
+  top-level imports did not protect those dependencies.
+- The sidebar and shared-preview esbuild rules now guard Web Awesome's own bundled
+  `wa-*` decorators individually. No global registry patch or blanket import-error
+  suppression is used. An existing element wins: a different or incompatible Web
+  Awesome version (or another implementation) may still have different behavior
+  or appearance. The build transform is specific to the pinned 3.14.0 chunk and
+  decorator format and must be rechecked when upgrading Web Awesome.
+- The shipped sidebar and card contain no `sourceMappingURL` or
+  `scoped-custom-element-registry` reference; the sidebar build does not emit source
+  maps. A missing source-map request is normally a non-fatal developer-tools lookup,
+  not a JavaScript module load. Its precise origin in the installed browser was not
+  established; no 404 was concealed and no HA assets were inspected.
+- Local Edge regression against the built panel covers clean registry, pre-existing
+  icon, pre-existing icon plus button, repeat bundle load, and card coexistence. It
+  checks mounted dashboard content, dialog use, preserved registrations, page errors,
+  and mocked read-only calls. Full frontend suite: 102 files / 2,428 tests passed;
+  type-check, build and check-dist passed. Desktop/mobile preview and panel browser
+  checks passed in read-only mode (write interaction cases skipped); the separate
+  mocked desktop/mobile price chart check passed. The existing browser check had
+  stale Pause wording/disabled expectations, corrected to match current code; no
+  Pause, Resume, profile or settings write was sent in the read-only runs. jsdom CSS
+  parse and Git line-ending warnings remain. Initial browser attempts also encountered
+  an occupied debugging port, stale cached bundle and Edge extension resources.
+- No live HA, deployment or charger operation occurred. Actual HA rendering and
+  compatibility with other installed component versions remain unverified. 5.7b's
+  monitoring and broader acceptance work remains open; preserve its parallel edits.
+
+### 2026-11-12 — 5.7b partial local continuation (2.5.67; not complete)
+
+- The sidebar now treats a failed dashboard refresh as stale immediately, withdrawing
+  cached connection, SOC and proposal observations until a successful refresh. A
+  focused mocked adapter test covers failure and recovery. This does not add charger
+  writes or establish a measured-power or reported-charging binding.
+- Source inspection: `execution/power_energy.py` reads configured W/kW power
+  entities and checks device class; its integration path uses `last_reported` and
+  source-dependent age limits. The controller can use a smart-plug or discovered
+  charger power entity, while an energy register may take precedence. The adapter's
+  `charging_state()` falls back to a control state and is not proof of charging;
+  `charging_observation()` also falls back when no status entity is configured.
+  The live sidebar still displays measured power as unavailable. Connector association,
+  source/freshness handling and charging-status display need a careful wired and
+  tested implementation; availability in the user's installation is unknown.
+- Planning runner: 584 passed, 1 skipped, 1 deselected. Lifecycle runner: 198
+  passed; expanded ownership/admission/schedule/outcomes/readiness run: 347 passed.
+  Focused actual bootstrap/worker recovery run: 7 passed, 299 deselected. Broad
+  worker run stopped after 242 passed: `test_real_planner_publications_drive_worker_without_browser`
+  failed because `Europe/Stockholm` was not initialized in that harness. This is
+  not a passing full end-to-end regression. The HA-plugin dashboard suite fails
+  before collection on Windows with `ModuleNotFoundError: No module named 'fcntl'`.
+- Frontend type-check, build, check-dist and focused sidebar/Morek tests (63 passed)
+  pass. The existing mocked browser check fails at the pause-status assertion: it
+  expects an uncertain Pause and old unarmed wording but receives unknown intent.
+  It did not complete mobile or interaction acceptance. Targeted Ruff passed.
+  Pytest timeout-option and dependency deprecations, jsdom CSS parse messages and
+  Git line-ending warnings remain. No live access or deployment was performed.
+- 5.7b remains open: complete practical monitoring, full real-admission regression,
+  browser checks and coordinator review. Older eligible owners may require one admin
+  reconfirmation; a Stop not durably recorded before a crash can be lost. Unknown
+  writes remain blocked. Disabling the integration may leave a stored schedule or
+  0 A limit. ACK and effective readback are neither profile inventory nor physical
+  charging; external writers and native protection remain unverified.
 
 ### 2026-11-12 — non-profile automatic recovery (2.5.66; coordinator review pending)
 
