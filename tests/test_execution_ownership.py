@@ -223,7 +223,7 @@ async def test_identity_changes_while_waiting_and_entry_never_rebound(setup_stor
 
 
 @pytest.mark.asyncio
-async def test_save_failure_retry_and_silent_failure_are_conservative(setup_store):
+async def test_save_failure_blocks_blind_retry(setup_store):
     store = ownership.ExecutionOwnershipStore(setup_store)
     gate = CommandAdmission(store)
     save = store._store.async_save
@@ -234,12 +234,12 @@ async def test_save_failure_retry_and_silent_failure_are_conservative(setup_stor
     assert await gate.async_ensure_initialized("c", lambda: IDENTITY) == "save_uncertain"
     assert (await store.async_status("c", IDENTITY))["record_state"] == "save_failed"
     store._store.async_save = save
-    assert await gate.async_ensure_initialized("c", lambda: IDENTITY) == "initialized"
-    assert (await store.async_status("c", IDENTITY))["record_state"] == "valid"
+    assert await gate.async_ensure_initialized("c", lambda: IDENTITY) == "save_uncertain"
+    assert (await store.async_status("c", IDENTITY))["record_state"] == "save_failed"
 
 
 @pytest.mark.asyncio
-async def test_save_error_after_write_is_unknown_until_reread(setup_store):
+async def test_save_error_after_write_is_unknown_until_restart(setup_store):
     store = ownership.ExecutionOwnershipStore(setup_store)
     gate = CommandAdmission(store)
     save = store._store.async_save
@@ -252,9 +252,11 @@ async def test_save_error_after_write_is_unknown_until_reread(setup_store):
     assert await gate.async_ensure_initialized("c", lambda: IDENTITY) == "save_uncertain"
     assert (await store.async_status("c", IDENTITY))["record_state"] == "save_failed"
     store._store.async_save = AsyncMock()
-    assert await gate.async_ensure_initialized("c", lambda: IDENTITY) == "already_initialized"
+    assert await gate.async_ensure_initialized("c", lambda: IDENTITY) == "save_uncertain"
     store._store.async_save.assert_not_awaited()
-    assert (await store.async_status("c", IDENTITY))["record_state"] == "valid"
+    assert (await store.async_status("c", IDENTITY))["record_state"] == "save_failed"
+    restarted = ownership.ExecutionOwnershipStore(setup_store)
+    assert (await restarted.async_status("c", IDENTITY))["record_state"] == "valid"
 
 
 @pytest.mark.asyncio

@@ -909,6 +909,14 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
             target = getattr(controller, "ocpp_target", None)
             identity = _identity_status(hass, target)
             ownership = await ownership_store(hass).async_status(entry.entry_id, identity)
+            admission = command_admission(hass)
+            previous_recovery = admission._recovery_status.get(entry.entry_id, {})
+            ownership["recovery"] = await admission.async_recovery_status(
+                entry.entry_id, lambda: _identity_status(hass, getattr(controller_for(hass, entry.entry_id), "ocpp_target", None))
+            )
+            if "recovery_result" in previous_recovery:
+                ownership["recovery"]["last_recovery_result"] = previous_recovery["recovery_result"]
+                admission._recovery_status[entry.entry_id]["recovery_result"] = previous_recovery["recovery_result"]
             try:
                 outcomes = await _outcome_record(hass, entry.entry_id, data)
             except (OutcomeUnavailable, ScheduleRefused):

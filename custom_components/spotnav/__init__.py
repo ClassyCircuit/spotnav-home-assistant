@@ -314,9 +314,18 @@ async def _async_setup_ownership_metadata(
         return
 
     async def ensure() -> None:
-        await command_admission(hass).async_ensure_initialized(
-            entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target)
-        )
+        admission = command_admission(hass)
+        def identity():
+            return _identity_status(hass, controller.ocpp_target)
+        await admission.async_ensure_initialized(entry.entry_id, identity)
+        evidence = await admission.async_recovery_status(entry.entry_id, identity)
+        if evidence["state"] in ("entry_requested", "entry_interrupted", "entry_drained_unarmed"):
+            # This only clears an unarmed legacy marker when the existing abort
+            # proves an indefinite durable Auto pause and known outcomes.
+            recovered = await admission.async_recover_unarmed(entry.entry_id, identity)
+            evidence = await admission.async_recovery_status(entry.entry_id, identity)
+            evidence["recovery_result"] = recovered
+            admission._recovery_status[entry.entry_id] = evidence
 
     @callback
     def control_available(event: Event) -> None:

@@ -87,6 +87,7 @@ class CommandAdmission:
         self._entry_draining: dict[PhysicalConnector, str] = {}
         self._person_stops: dict[PhysicalConnector, int] = {}
         self._uncertain_operations: set[PhysicalConnector] = set()
+        self._recovery_status: dict[str, dict[str, Any]] = {}
 
     @contextmanager
     def person_stop_reservation(self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]]):
@@ -201,6 +202,8 @@ class CommandAdmission:
                 return "person_stop_active"
             if generation != self.generation(connector):
                 return "stale_generation"
+            if connector in self._uncertain_operations:
+                return "legacy_operation_uncertain"
             self._entry_draining[connector] = "recovering"
             self._generations[connector] = generation.revision + 1
             generation = self.generation(connector)
@@ -294,6 +297,88 @@ class CommandAdmission:
             finally:
                 if self._entry_draining.get(connector) == "recovering":
                     del self._entry_draining[connector]
+
+    async def async_recovery_status(
+        self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]],
+    ) -> dict[str, Any]:
+        """Read current evidence under connector admission; never change charger or storage.
+
+        A valid record is not proof that a missing document was never recreated.
+        This unarmed release has no durable first-use provenance.
+        """
+        from .morek_outcomes import OutcomeUnavailable, outcomes_for
+
+        result: dict[str, Any] = {"state": "identity_unresolved", "activation_provenance": "unverified",
+                                  "activation_allowed": False}
+        try:
+            identity = dict(resolve_identity())
+            classification = classify_morek_identity(identity)
+            connector = physical_connector(identity)
+            if classification == "non_target":
+                result["state"] = "non_target"
+            elif classification == "target_unsupported":
+                result["state"] = "identity_target_unsupported"
+            elif classification == "supported_morek" and connector is not None:
+                generation = self.generation(connector)
+                async with self._lock_for(connector):
+                    fresh = dict(resolve_identity())
+                    if classify_morek_identity(fresh) != "supported_morek" or physical_connector(fresh) != connector:
+                        result["state"] = "identity_changed"
+                    elif generation != self.generation(connector):
+                        result["state"] = "stale_generation"
+                    elif self._person_stops.get(connector):
+                        result["state"] = "person_stop_active"
+                    elif connector in self._uncertain_operations:
+                        result["state"] = "legacy_operation_uncertain"
+                    elif connector in self._entry_draining or connector in self._quiescing:
+                        result["state"] = "entry_active_or_uncertain"
+                    else:
+                        status = await self._store.async_status(entry_id, fresh)
+                        state = status.get("record_state")
+                        if state != "valid":
+                            result["state"] = f"ownership_{state}" if state in (
+                                "missing", "malformed", "unsupported_version", "save_failed", "conflict",
+                                "identity_unresolved", "identity_mismatch") else "ownership_unavailable"
+                        else:
+                            outcome = await outcomes_for(self._store._hass).read()
+                            if outcome is not None and outcome.get("entry_id") != entry_id:
+                                result["state"] = "profile_outcome_identity_mismatch"
+                            elif outcome is not None and (outcome.get("uncertain") is not False
+                                    or (outcome.get("attempt") is not None and outcome["attempt"].get("state") not in
+                                        ("accepted", "rejected", "aborted_before_dispatch"))
+                                    or (outcome.get("removal") is not None and outcome["removal"].get("state") not in
+                                        ("accepted", "rejected", "notsupported"))):
+                                result["state"] = "profile_outcome_uncertain"
+                            elif status.get("transition_state") is not None:
+                                result["state"] = "entry_" + status["transition_state"]
+                            elif status.get("recorded_owner") == "legacy":
+                                result["state"] = "legacy_unarmed"
+                            elif status.get("recorded_owner") == "morek_schedule":
+                                result["state"] = "morek_owned_unarmed"
+                                result["handover_completion"] = "not_proven_by_owner_record"
+                            else:
+                                result["state"] = "ownership_unavailable"
+                            result["profile_history"] = "missing_not_inventory" if outcome is None else "recorded"
+                        current = dict(resolve_identity())
+                        if classify_morek_identity(current) != "supported_morek" or physical_connector(current) != connector:
+                            result["state"] = "identity_changed"
+                        elif generation != self.generation(connector) or self._person_stops.get(connector):
+                            result["state"] = "person_stop_or_generation_changed"
+        except OutcomeUnavailable as error:
+            result["state"] = str(error) if str(error) in ("outcome_storage_uncertain", "outcome_storage_invalid") else "outcome_storage_invalid"
+        except Exception:  # noqa: BLE001 - unavailable evidence never becomes permission
+            result["state"] = "recovery_evidence_unavailable"
+        self._recovery_status[entry_id] = result
+        return dict(result)
+
+    async def async_recover_unarmed(
+        self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]], *, settings_store: Any = None,
+    ) -> str:
+        """Explicitly recover only eligible legacy entry markers via the guarded abort."""
+        evidence = await self.async_recovery_status(entry_id, resolve_identity)
+        if evidence["state"] not in ("entry_requested", "entry_interrupted", "entry_drained_unarmed"):
+            return evidence["state"]
+        return await self.async_abort_unarmed_entry(entry_id, resolve_identity, settings_store=settings_store)
 
     async def async_handover_unarmed(
         self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]], executor: Any,

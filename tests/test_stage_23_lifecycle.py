@@ -84,6 +84,220 @@ async def paused_settings_for_recovery(hass, monkeypatch):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("marker", ["requested", "interrupted", "drained_unarmed"])
+async def test_recovery_status_and_guarded_abort_after_restart(environment, monkeypatch, marker):
+    from custom_components.spotnav.execution import morek_outcomes
+    from homeassistant.helpers import storage
+
+    hass, _, gate, target, _, entry = environment
+    monkeypatch.setattr(morek_outcomes, "Store", FakeStore)
+    monkeypatch.setattr(storage, "Store", FakeStore)
+    persist(hass, {"a": {**record(), "transition": {"version": 1, "state": marker}}})
+    settings = await paused_settings_for_recovery(hass, monkeypatch)
+    def identity():
+        return morek_schedule._identity_status(hass, target)
+    await integration._async_setup_ownership_metadata(
+        hass, entry, SimpleNamespace(ocpp_target=target, charge_control="switch.charger"))
+    assert gate._recovery_status["a"]["state"] == "entry_" + marker
+    assert gate._recovery_status["a"]["activation_allowed"] is False
+    assert await gate.async_recover_unarmed("a", identity, settings_store=settings) == "aborted"
+    status = await execution_ownership.ExecutionOwnershipStore(hass).async_status("a", identity())
+    assert status["recorded_owner"] == "legacy" and status["transition_state"] is None
+    assert settings.settings("a").pause.choice == "until_resumed"
+    hass.services.async_call.assert_not_awaited()
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("owner", "expected"), [("legacy", "legacy_unarmed"),
+                                                  ("morek_schedule", "morek_owned_unarmed")])
+async def test_recovery_status_keeps_valid_owners_unarmed(environment, monkeypatch, owner, expected):
+    from custom_components.spotnav.execution import morek_outcomes
+    hass, _, gate, target, _, entry = environment
+    monkeypatch.setattr(morek_outcomes, "Store", FakeStore)
+    persist(hass, {"a": record(owner)})
+    def identity():
+        return morek_schedule._identity_status(hass, target)
+    await integration._async_setup_ownership_metadata(
+        hass, entry, SimpleNamespace(ocpp_target=target, charge_control="switch.charger"))
+    status = await gate.async_recovery_status("a", identity)
+    assert status["state"] == expected and status["activation_provenance"] == "unverified"
+    assert status["activation_allowed"] is False and status["profile_history"] == "missing_not_inventory"
+    if owner == "morek_schedule":
+        assert status["handover_completion"] == "not_proven_by_owner_record"
+    assert await gate.async_recover_unarmed("a", identity) == expected
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("case", "expected"), [("missing", "ownership_missing"),
+    ("corrupt", "ownership_malformed"), ("unsupported", "ownership_unsupported_version"),
+    ("uncertain", "profile_outcome_uncertain"), ("stale_attempt", "profile_outcome_uncertain"),
+    ("duplicate", "ownership_conflict")])
+async def test_recovery_status_refuses_untrusted_evidence(environment, monkeypatch, case, expected):
+    from custom_components.spotnav.execution import morek_outcomes
+    hass, _, gate, target, _, _ = environment
+    monkeypatch.setattr(morek_outcomes, "Store", FakeStore)
+    path = hass.root / execution_ownership.STORAGE_KEY
+    if case == "corrupt":
+        path.write_text("{broken", encoding="utf-8")
+    elif case == "unsupported":
+        path.write_text(json.dumps({"version": 2, "data": {}}), encoding="utf-8")
+    elif case != "missing":
+        persist(hass, {"a": record(), **({"b": record()} if case == "duplicate" else {})})
+    if case in ("uncertain", "stale_attempt"):
+        (hass.root / "spotnav.morek_schedule.connector_outcomes").write_text(json.dumps({
+            "version": 1, "data": {"schema": 1, "entry_id": "a", "uncertain": case == "uncertain",
+                                    "attempt": {"state": "sending"} if case == "stale_attempt" else None}}), encoding="utf-8")
+    def identity():
+        return morek_schedule._identity_status(hass, target)
+    assert (await gate.async_recovery_status("a", identity))["state"] == expected
+    assert await gate.async_recover_unarmed("a", identity) == expected
+    assert (await gate.async_recovery_status("a", identity))["activation_allowed"] is False
+    hass.services.async_call.assert_not_awaited()
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_startup_performs_only_evidence_checked_abort(environment, monkeypatch):
+    from custom_components.spotnav import runtime
+    from custom_components.spotnav.execution import morek_outcomes
+    from homeassistant.helpers import storage
+
+    hass, store, gate, target, _, entry = environment
+    monkeypatch.setattr(morek_outcomes, "Store", FakeStore)
+    monkeypatch.setattr(storage, "Store", FakeStore)
+    persist(hass, {"a": {**record(), "transition": {"version": 1, "state": "interrupted"}}})
+    settings = await paused_settings_for_recovery(hass, monkeypatch)
+    monkeypatch.setattr(runtime, "domain_data", lambda _: SimpleNamespace(auto_store=settings))
+    await integration._async_setup_ownership_metadata(
+        hass, entry, SimpleNamespace(ocpp_target=target, charge_control="switch.charger"))
+    assert gate._recovery_status["a"]["recovery_result"] == "aborted"
+    status = await store.async_status("a", morek_schedule._identity_status(hass, target))
+    assert status["recorded_owner"] == "legacy" and status["transition_state"] is None
+    assert settings.settings("a").pause.choice == "until_resumed"
+    hass.services.async_call.assert_not_awaited()
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_missing_document_compatibility_never_establishes_activation_provenance(environment, monkeypatch):
+    from custom_components.spotnav.execution import morek_outcomes
+    hass, _, gate, target, _, entry = environment
+    monkeypatch.setattr(morek_outcomes, "Store", FakeStore)
+    def identity():
+        return morek_schedule._identity_status(hass, target)
+    assert (await gate.async_recovery_status("a", identity))["state"] == "ownership_missing"
+    await integration._async_setup_ownership_metadata(
+        hass, entry, SimpleNamespace(ocpp_target=target, charge_control="switch.charger"))
+    result = await gate.async_recovery_status("a", identity)
+    assert result["state"] == "legacy_unarmed"
+    assert result["activation_provenance"] == "unverified" and not result["activation_allowed"]
+    restarted = command_admission.CommandAdmission(execution_ownership.ExecutionOwnershipStore(hass))
+    result = await restarted.async_recovery_status("a", identity)
+    assert result["state"] == "legacy_unarmed" and not result["activation_allowed"]
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_failed_startup_recovery_is_not_blindly_retried(environment, monkeypatch):
+    from custom_components.spotnav import runtime
+    from custom_components.spotnav.execution import morek_outcomes
+    from homeassistant.helpers import storage
+
+    hass, store, gate, target, _, entry = environment
+    monkeypatch.setattr(morek_outcomes, "Store", FakeStore)
+    monkeypatch.setattr(storage, "Store", FakeStore)
+    persist(hass, {"a": {**record(), "transition": {"version": 1, "state": "requested"}}})
+    settings = await paused_settings_for_recovery(hass, monkeypatch)
+    monkeypatch.setattr(runtime, "domain_data", lambda _: SimpleNamespace(auto_store=settings))
+    store._store.async_save = AsyncMock(side_effect=OSError("synthetic uncertain save"))
+    controller = SimpleNamespace(ocpp_target=target, charge_control="switch.charger")
+    await integration._async_setup_ownership_metadata(hass, entry, controller)
+    assert gate._recovery_status["a"]["recovery_result"] == "save_uncertain"
+    await integration._async_setup_ownership_metadata(hass, entry, controller)
+    store._store.async_save.assert_awaited_once()
+    assert gate._recovery_status["a"]["state"] == "ownership_save_failed"
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_reconnect_rechecks_new_uncertain_profile_evidence(environment, monkeypatch):
+    from custom_components.spotnav.execution import morek_outcomes
+
+    hass, _, gate, target, _, entry = environment
+    monkeypatch.setattr(morek_outcomes, "Store", FakeStore)
+    persist(hass, {"a": record("morek_schedule")})
+    callbacks = []
+    monkeypatch.setattr(integration, "async_track_state_change_event", lambda _h, _ids, cb: callbacks.append(cb) or (lambda: None))
+    tasks = []
+    def create_task(_hass, coroutine, _name):
+        task = asyncio.create_task(coroutine)
+        tasks.append(task)
+        return task
+    entry.async_create_background_task = create_task
+    await integration._async_setup_ownership_metadata(
+        hass, entry, SimpleNamespace(ocpp_target=target, charge_control="switch.charger"))
+    assert gate._recovery_status["a"]["state"] == "morek_owned_unarmed"
+    (hass.root / "spotnav.morek_schedule.connector_outcomes").write_text(json.dumps({
+        "version": 1, "data": {"schema": 1, "entry_id": "a", "uncertain": True}}), encoding="utf-8")
+    callbacks[0](SimpleNamespace(data={"old_state": SimpleNamespace(state="unavailable"),
+                                       "new_state": SimpleNamespace(state="off")}))
+    await asyncio.gather(*tasks)
+    assert gate._recovery_status["a"]["state"] == "profile_outcome_uncertain"
+    hass.station.call.assert_not_awaited()
+    hass.services.async_call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("change", ["stop", "identity"])
+async def test_recovery_rechecks_stop_and_identity_after_delayed_outcome(environment, monkeypatch, change):
+    from custom_components.spotnav.execution import morek_outcomes
+
+    hass, _, gate, target, system, _ = environment
+    persist(hass, {"a": {**record(), "transition": {"version": 1, "state": "interrupted"}}})
+    entered, release = asyncio.Event(), asyncio.Event()
+    async def read():
+        entered.set()
+        await release.wait()
+        return None
+    monkeypatch.setattr(morek_outcomes, "outcomes_for", lambda _: SimpleNamespace(read=read))
+    def identity():
+        return morek_schedule._identity_status(hass, target)
+    task = asyncio.create_task(gate.async_recovery_status("a", identity))
+    await entered.wait()
+    if change == "stop":
+        with gate.person_stop_reservation("a", identity):
+            release.set()
+            assert (await task)["state"] == "person_stop_or_generation_changed"
+    else:
+        hass.data["ocpp"]["two"] = system
+        release.set()
+        assert (await task)["state"] == "identity_changed"
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_recovery_rejects_stale_generation_while_waiting(environment, monkeypatch):
+    from custom_components.spotnav.execution import morek_outcomes
+
+    hass, _, gate, target, _, _ = environment
+    monkeypatch.setattr(morek_outcomes, "Store", FakeStore)
+    persist(hass, {"a": record()})
+    def identity():
+        return morek_schedule._identity_status(hass, target)
+    connector = command_admission.physical_connector(identity())
+    lock = gate._lock_for(connector)
+    await lock.acquire()
+    task = asyncio.create_task(gate.async_recovery_status("a", identity))
+    await asyncio.sleep(0)
+    gate._generations[connector] = gate.generation(connector).revision + 1
+    lock.release()
+    assert (await task)["state"] == "stale_generation"
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(("state", "allowed"), [
     ("first", True), ("legacy", True), ("morek", False), ("corrupt", False),
     ("missing_binding", False), ("duplicate", False),

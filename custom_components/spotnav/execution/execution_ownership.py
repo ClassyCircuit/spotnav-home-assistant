@@ -240,9 +240,10 @@ class ExecutionOwnershipStore:
     ) -> str:
         """Ensure a legacy record; caller must hold the shared physical connector lock."""
         async with self._lock:
-            if self._cancelled_write:
+            if self._cancelled_write or self._transition_save_uncertain:
                 # An executor-backed write can outlive cancellation; rereading now
-                # cannot prove it will not land later. Never race it with a retry.
+                # cannot prove it will not land later. An uncertain transition
+                # must not be turned into a fresh legacy initialization either.
                 return "save_uncertain"
             # A failed or silently unsuccessful save has an unknown outcome. Reread
             # the durable document before any retry; never publish cached intent.
@@ -290,6 +291,7 @@ class ExecutionOwnershipStore:
                 saved_state, saved_records = _decode(raw)
                 if saved_state != "valid" or saved_records != records:
                     self._state = "save_failed"
+                    self._cancelled_write = True
                     return "save_uncertain"
             except asyncio.CancelledError:
                 self._state = "save_failed"
@@ -299,6 +301,7 @@ class ExecutionOwnershipStore:
                 # HA Store may report success after a write error; cancellation can
                 # also leave a write in flight. Do not publish success from memory.
                 self._state = "save_failed"
+                self._cancelled_write = True
                 raise
             self._records, self._state = records, "valid"
             fresh = resolve_identity()

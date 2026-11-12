@@ -628,7 +628,12 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Model and refuse incomplete/uncertain writes and Stop races; no activation,
     automatic profile sends, clears, or user-facing mode switch. A drained connector
     alone is not proof that producers or unknown external operations are settled.
-- [ ] **5.5e Missing and uncertain evidence recovery** (unarmed)
+- [x] **5.5e Missing and uncertain evidence recovery** (2.5.46; unarmed, coordinator review pending)
+  - Startup and control-availability recovery inspect connector-bound ownership and
+    profile outcomes, report specific blocked states and may invoke the existing
+    evidence-checked unarmed abort only with a disk-verified indefinite Auto pause.
+    Missing/lost versus first-use provenance remains unverified and activation blocked;
+    no profile inventory or physical charging is inferred. See handoff for limits.
   - Handle interrupted handovers, lost/malformed ownership documents, stale attempts
     and unknown outcomes using existing durable evidence. First use and lost state
     must not be silently conflated for activation. Expose bounded, explicit refusal

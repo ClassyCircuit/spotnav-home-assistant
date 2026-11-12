@@ -173,6 +173,9 @@ async def test_status_exposes_read_only_unarmed_ownership(monkeypatch):
     monkeypatch.setattr(morek_schedule, "controller_for", lambda h, e: SimpleNamespace(ocpp_target=target))
     monkeypatch.setattr(morek_schedule, "_identity_status", lambda h, t: identity)
     monkeypatch.setattr(morek_schedule, "ownership_store", lambda h: store)
+    recovery = {"state": "legacy_unarmed", "activation_allowed": False, "activation_provenance": "unverified"}
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda _: SimpleNamespace(
+        _recovery_status={}, async_recovery_status=AsyncMock(return_value=recovery)))
     monkeypatch.setattr(morek_schedule, "_state", AsyncMock(return_value=({}, None)))
     monkeypatch.setattr(morek_schedule, "_preview", lambda h, e, t: {})
     monkeypatch.setattr(morek_schedule, "outcomes_for", lambda h: MemoryOutcomes())
@@ -180,6 +183,7 @@ async def test_status_exposes_read_only_unarmed_ownership(monkeypatch):
     await morek_schedule.websocket_morek_schedule.__wrapped__(
         hass, connection, {"id": 1, "api_version": 1, "charger_id": "charger", "action": "status"})
     assert connection.send_result.call_args.args[1]["schedule"]["ownership"] == ownership
+    assert ownership["recovery"] == recovery
     store.async_status.assert_awaited_once_with("charger", identity)
     morek_schedule.async_schedule_action.assert_not_awaited()
     connection.send_error.assert_not_called()

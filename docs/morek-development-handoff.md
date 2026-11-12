@@ -273,6 +273,40 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-12 — 5.5e missing/uncertain evidence recovery (2.5.46; review pending)
+
+- Startup and the existing control-availability callback now inspect connector,
+  ownership, transition and durable Morek outcome evidence. The read-only Morek
+  status includes `ownership.recovery` with a bounded state and unconditionally
+  false activation permission. A missing ownership document is still migrated
+  to legacy for compatibility, but neither that migration nor any existing record
+  proves first-use rather than lost-state provenance; activation provenance is
+  always reported unverified. The control-availability event remains only the
+  existing availability proxy, not proof of every OCPP reconnect.
+- For a legacy entry marker, startup/availability recovery calls the existing
+  guarded abort: it requires unique identity, verified durable until-resumed Auto
+  pause and no known uncertain profile outcomes, checks old manual evidence, and
+  verifies the resulting ownership document. It removes only the marker and
+  leaves Auto paused. Missing profile history is not evidence of absence. Unknown
+  outcomes, corrupt/missing ownership, identity conflicts, active Stop and uncertain
+  saves remain blocked; no uncertain ownership write is automatically retried.
+  Existing process-local uncertain legacy operation evidence also blocks abort.
+- No charger, profile, clear or resume operation is caused by recovery. A prior
+  external command cannot be recalled. Retained profiles, missing-document
+  provenance resolution for activation, safe handback, authorization and the
+  retained-schedule Stop policy remain 5.5f–5.6; owned-profile dispatch stays
+  unarmed. These are mocked tests, not proof of physical charging.
+- Verification: `python tools/run_isolated_lifecycle_tests.py`: 113 passed;
+  `python tools/run_isolated_lifecycle_tests.py tests/test_command_admission.py
+  tests/test_execution_ownership.py tests/test_morek_schedule.py
+  tests/test_morek_outcomes.py`: 231 passed; `python tools/run_isolated_planning_tests.py`:
+  492 passed, 1 deselected. Targeted Ruff, frontend `npm run build`,
+  `npm run check-dist` and `git diff --check` passed. The first planning run had
+  one status test failure from an unmocked new admission dependency; the fixture
+  was updated and the rerun passed. Pytest reports existing timeout-option and
+  dependency deprecation warnings. The full 5.4c HA-plugin dashboard suite
+  remains unrun. No live HA was accessed.
+
 ### 2026-11-12 — 5.5d handover (2.5.45; coordinator review pending)
 
 - The internal handover consumes a process-local completed drain. It obtains Auto,
