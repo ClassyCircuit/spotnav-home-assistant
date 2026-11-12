@@ -11,7 +11,7 @@ sys.path.insert(0, str(ROOT))
 package = types.ModuleType("custom_components.spotnav")
 package.__path__ = [str(ROOT / "custom_components" / "spotnav")]
 sys.modules[package.__name__] = package
-from custom_components.spotnav.api.dashboard import serialize_published_intervals, serialize_intervals
+from custom_components.spotnav.api.dashboard import serialize_published_intervals, serialize_intervals, serialize_prices
 from custom_components.spotnav.planning.planner import ChartInterval
 
 
@@ -27,6 +27,13 @@ class PublishedIntervals(unittest.TestCase):
         self.assertEqual([r['raw_price'] for r in result], [-0.12, 0.45])
         self.assertEqual(result[1]['end'], rows[1].end.isoformat())
         self.assertEqual(len(serialize_intervals(c)), 2)
+        c.area = None
+        c.days = ()
+        c.source_status = None
+        prices = serialize_prices(c)
+        self.assertEqual(prices["intervals"], serialize_intervals(c))
+        self.assertEqual(prices["interval_count"], 2)
+        self.assertEqual(prices["published_intervals"], result)
         c.intervals = (rows[0], row(start + timedelta(minutes=30), start + timedelta(hours=2), 10))
         self.assertIsNone(serialize_published_intervals(c))
         c.intervals = None

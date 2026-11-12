@@ -498,7 +498,7 @@ tests are documented there; full HA collection is still blocked on Windows.
     old prototype and shared preview at equivalent widths; no HA deployment or commands.
 - [x] **5.4b HA sidebar host and live overview/controls** (local implementation and mocked verification; coordinator review pending)
   - 5.4b1–5.4b2 are complete locally. Actual HA integration, physical touch and
-    hardware behavior remain unverified; 5.4c remains separate and unstarted.
+    hardware behavior remain unverified; 5.4c remains a separate substage.
   - Register one integration-provided HA custom sidebar panel and mount the shared UI,
     with a practical non-destructive setup/update path. Use HA's supported panel interface;
     handle sidebar/mobile navigation, safe areas, lifecycle, access and CSS isolation.
@@ -546,13 +546,16 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Test successful/rejected saves, admin/non-admin, lifecycle/races and no charger writes
     except explicitly requested and authorized existing actions. No deployment or live
     charger operation; coordinator review of both slices remains pending.
-- [ ] **5.4c Real stepped-area price chart and install preparation**
-  - 2.5.38 adds a published-interval contract and sidebar binding locally, with
-    neutral raw-price rendering and in-place updates. Mocked desktop/mobile checks
-    and focused tests are recorded in the handoff. Keep open: full HA-plugin backend
-    contract/golden tests were not run on this Windows host, and browser coverage
-    does not yet verify real pointer-triggered tooltips or wheel zoom. Future
-    installation guidance is in `sidebar-installation-preparation.md`.
+- [x] **5.4c Real stepped-area price chart and install preparation** (local implementation and mocked checks; full backend suite deferred)
+  - 2.5.39 includes the published-interval binding and a coarse-interval wheel
+    zoom correction. Built-panel mocked desktop and emulated-mobile pointer-tooltip,
+    wheel and reset checks pass; see handoff for evidence. The full HA-plugin
+    dashboard API/contract/golden suite has not run and remains a validation item,
+    not a reason to halt implementation of 5.5–5.7. WSL Python 3.12 lacks
+    ensurepip and the pinned HA pytest plugin requires Python 3.14 or newer; the
+    isolated WSL setup attempt failed before tests ran. On a supported host with the HA
+    test dependencies installed, run `python -m pytest tests/test_dashboard_api.py -q`.
+    Future installation guidance is in `sidebar-installation-preparation.md`.
   - Bind the shared ECharts chart to real available prices and proposed windows, with
     correct units/basis, timezone/DST, missing/negative prices and source resolution.
     Show unavailable history honestly; defer historical tracks and monthly insights.
@@ -592,6 +595,10 @@ tests are documented there; full HA collection is still blocked on Windows.
     not proof of physical flow; no overnight test is mandatory.
   - Verify restart/reconnect and safe person Stop/protection behavior with automated
     coverage. Prepare explicit supervised checks for the installation milestone.
+  - Carry forward the unrun 5.4c HA-plugin dashboard API/contract/golden suite;
+    run it on a supported local host if available. If not, report the exact gap
+    and evidence to the user before installation; do not claim it passed or halt
+    unrelated implementation just to provision the test environment.
 - [ ] **5.8 Install, activate and validate the working release**
   - After 5.2–5.7 and 5.3a are complete and reviewed, support the user's preferred
     installation/update. Obtain specific approval for each deployment, share modification,

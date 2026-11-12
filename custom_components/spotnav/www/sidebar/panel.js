@@ -52355,6 +52355,17 @@ ${sampleDate(h3)}` : time(h3);
     let pinch = null;
     const distance2 = (touches) => Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
     const node = priceChart.getDom();
+    node.addEventListener("wheel", (e9) => {
+      if (!format2.chartTime || !e9.deltaY) return;
+      const z2 = priceChart.getOption().dataZoom[0], rect = node.getBoundingClientRect();
+      const anchor = priceChart.convertFromPixel({ xAxisIndex: 0 }, e9.clientX - rect.left);
+      if (!Number.isFinite(anchor)) return;
+      const factor = e9.deltaY < 0 ? 0.55 : 1 / 0.55;
+      const [start2, end2] = snapRange(anchor + (z2.startValue - anchor) * factor, anchor + (z2.endValue - anchor) * factor);
+      priceChart.dispatchAction({ type: "dataZoom", startValue: start2, endValue: end2 });
+      e9.preventDefault();
+      e9.stopImmediatePropagation();
+    }, { capture: true, passive: false, signal });
     node.addEventListener("touchstart", (e9) => {
       if (e9.touches.length !== 2) return;
       const z2 = priceChart.getOption().dataZoom[0], rect = node.getBoundingClientRect();
@@ -59802,7 +59813,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.38";
+var CARD_VERSION = "2.5.39";
 
 // sidebar/panel.js
 var settingsWritesByConnection = /* @__PURE__ */ new WeakMap();

@@ -116,6 +116,19 @@ export function mountCharts(root, data, format, modes) {
   let pinch = null;
   const distance = touches => Math.hypot(touches[0].clientX-touches[1].clientX, touches[0].clientY-touches[1].clientY);
   const node = priceChart.getDom();
+  // For source-boundary navigation the default small ECharts wheel step can
+  // snap straight back to the previous range on coarse hourly data. Apply a
+  // larger anchored step before snapping, without changing interval geometry.
+  node.addEventListener('wheel', e => {
+    if (!format.chartTime || !e.deltaY) return;
+    const z=priceChart.getOption().dataZoom[0], rect=node.getBoundingClientRect();
+    const anchor=priceChart.convertFromPixel({xAxisIndex:0},e.clientX-rect.left);
+    if (!Number.isFinite(anchor)) return;
+    const factor=e.deltaY<0 ? 0.55 : 1/0.55;
+    const [start,end]=snapRange(anchor+(z.startValue-anchor)*factor,anchor+(z.endValue-anchor)*factor);
+    priceChart.dispatchAction({type:'dataZoom',startValue:start,endValue:end});
+    e.preventDefault();e.stopImmediatePropagation();
+  }, {capture:true,passive:false,signal});
   node.addEventListener('touchstart', e => {
     if (e.touches.length !== 2) return;
     const z = priceChart.getOption().dataZoom[0], rect = node.getBoundingClientRect();

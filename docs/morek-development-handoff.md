@@ -245,7 +245,72 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
-### Stage 5.4c — partial implementation (not yet accepted)
+### 2026-11-12 — continue implementation before live testing
+
+- The user wants remaining implementation completed before installing and testing
+  in HA. Continue with the roadmap after coordinator review, one bounded substage
+  at a time; do not contact HA, deploy or operate charging until specifically
+  approved. Live installation and user-directed testing remain in 5.8.
+- 5.4c is complete for local implementation and its recorded mocked checks; its
+  full HA-plugin dashboard API/contract/golden suite is **not run**. That suite is
+  offline automated validation, not live HA testing. Carry it to 5.7 and run it
+  on a supported local environment if available; otherwise tell the user exactly
+  what remains unverified before installation. Do not block 5.5–5.7 implementation
+  on provisioning that environment, and do not report the suite as passed.
+- This sequencing does not arm dispatch, waive authorization, resolve ownership,
+  alter existing protection or grant permission to deploy. 5.5–5.7 safety and
+  mocked regression requirements remain; 5.8 live actions require specific approval.
+
+### Stage 5.4c — Linux test environment attempt
+
+- Historical environment limitation: the full HA-plugin dashboard API/contract/golden suite has
+  **not run** in Linux. WSL Ubuntu reports Python 3.12.3. The pinned
+  `pytest-homeassistant-custom-component==0.13.365` declares Python >=3.14.
+  No Python 3.14 executable was found in the WSL command path.
+- The isolated setup attempt
+  `wsl -d Ubuntu -- python3 -m venv /mnt/c/Users/simso/AppData/Local/Temp/opencode/spotnav-ha-54c-venv`
+  failed: `ensurepip` is unavailable (Ubuntu reports `python3.12-venv` is needed).
+  No dependencies were installed, no system Python was changed, and no suite
+  tests ran in this attempt. On a supported local Linux Python >=3.14 environment
+  with `requirements_test.txt` installed, run
+  `python -m pytest tests/test_dashboard_api.py -q` from the repository root.
+- The earlier Windows failure and local mocked verification are recorded below;
+  neither is a passing Linux HA-plugin suite. Actual HA integration, physical
+  touchscreen, charger behavior and charging remain unverified. No live HA or
+  charger was contacted; automatic Morek dispatch remains unarmed. The sequencing
+  clarification above supersedes the earlier instruction to stop before 5.5.
+
+### Stage 5.4c — verification continuation, backend suite outstanding
+
+- Version 2.5.39 fixes wheel zoom on coarse source intervals: the former small
+  wheel step snapped back to the same range. The built-panel mock check now sends
+  Chromium pointer and ordinary wheel events on desktop and emulated mobile,
+  asserts the visible tooltip's exact interval dates/times, UTC offset, price and
+  unit, verifies range change and full-horizon reset, and checks local-only traffic
+  and no charger writes. Previously covered update, zoom retention and degraded
+  transitions also pass. Physical touchscreen and real HA remain unverified.
+- Screenshots inspected: `C:\Users\simso\AppData\Local\Temp\opencode\spotnav-54c\desktop.png`
+  and `mobile.png` (mock fixture, not household data). The mobile image is an
+  emulated viewport, not evidence of physical touch behavior.
+- Final frontend Vitest: 2,423 passed across 102 files; focused chart/sidebar/
+  bundle: 81 passed; shared/sample Node tests: 23 passed. Build, type-check,
+  check-dist, mocked sidebar registration (2) and diff check passed. jsdom emits
+  CSS parsing warnings, and Git emits Windows line-ending warnings.
+- `python -m pytest tests/test_dashboard_api.py -q` failed before collection on
+  Windows: `ModuleNotFoundError: No module named 'fcntl'` from HA's pytest plugin.
+  Ubuntu WSL exists, but its Python 3.12 environment has no `pytest`; no packages
+  were installed. Run that same command on a supported host with the repository's
+  HA test dependencies, without connecting to live HA. This full suite remains
+  unverified under the sequencing clarification above. The isolated serializer and planning suite
+  passed locally (492 passed, 1 deselected); they are not the full plugin suite.
+  The isolated run reports an unknown pytest timeout option and HA deprecation
+  warning; the serializer run reports a voluptuous import-order warning.
+- User reports Morek handles household protection natively; this has not been
+  independently verified. No load-balancing or dynamic amp control was added.
+  No HA, deployment, hardware, commit or push operation occurred; automatic
+  Morek dispatch remains unarmed. Stop for coordinator review; do not start 5.5.
+
+### Historical 5.4c implementation (superseded by verification above)
 
 - Version 2.5.38 adds `prices.published_intervals`, separate from the unchanged
   merged rows. It exposes captured published boundaries and source prices in
