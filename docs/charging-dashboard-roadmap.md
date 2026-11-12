@@ -747,7 +747,10 @@ tests are documented there; full HA collection is still blocked on Windows.
     outcomes and measurements without claiming physical stopping from ACK/readback.
     The optional Stage 10 **Return to Auto** cancels only Charge Now; it is not
     Pause and may allow charging immediately if the automatic plan calls for it.
-- [x] **5.6c Invalid-plan and competing-writer policy** (2.5.54 local, mocked; coordinator review pending)
+- [x] **5.6c Invalid-plan and competing-writer policy** (2.5.54 local, mocked; quick coordinator review)
+  - Quick review found no blocker to proceeding to 5.7a; independently reran the
+    isolated planning suite (544 passed, 1 deselected) and listed lifecycle suite
+    (270 passed). This is not a comprehensive safety audit or deployed verification.
   - The unarmed worker now checks process-local planner provenance against current
     selected source and revisions, authoritative per-day documents and UTC window
     coverage, relevant vehicle/settings/connection facts and the existing SOC freshness
@@ -808,6 +811,11 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Implement the reviewed, reversible and explicitly enabled ownership/worker path
     after 5.5–5.6; default unarmed and enforce all blockers. Test with mocked charger,
     HA and persistence boundaries. No live activation or deployment is authorized.
+  - Replace the unconditional owned-profile refusal only if the complete applicable
+    admission, durable ownership, enable/disable, restart and safety invariants are
+    implemented and tested; otherwise retain it and report the exact blocker. Target-SOC
+    cheapest-price plans are the only currently provenance-checked scope; do not silently
+    enable manual-kWh or solar/hybrid modes. Surface supported scope and refusal reasons.
   - The held-exit interlock has no release path. Retained-profile resolution and any
     required user decision are activation blockers; do not silently release a limit
     or bypass the interlock. Existing protection and external-writer conflicts also
