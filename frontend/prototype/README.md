@@ -1,6 +1,9 @@
 # SpotNav Enhanced dashboard prototype
 
-This is a local, sample-only design study, not a Home Assistant card. It has no
+This is a local, sample-only design study, not a Home Assistant card. It mounts
+`../shared-dashboard/dashboard.js` using `sample-adapter.js`; the shared
+entry point, model contract, lifecycle and integration constraints are documented
+in `../shared-dashboard/README.md`. It has no
 HA/OCPP client and cannot control charging. Inputs are editable in memory only;
 the action buttons are disabled. Both ECharts visualizations use fictional data,
 not actual prices or measurements. All times, values, responses and states are examples.
@@ -54,8 +57,9 @@ to mask the insight inputs for a missing-data example; the separate chart remain
 and the scenario is labelled. These are fictional fixed-day samples, not live history,
 market forecasts, charging costs or savings; same-weekday comparisons are not used.
 
-Both **Prices & plan** alternatives appear together, sharing a fixture and plan;
-this is a temporary comparison, not a proposal for two final cards. The overview
+The selected stepped-area **Prices & plan** is shown by default. Append
+`?comparison=bar` to also inspect the old bar alternative; both use the same
+shared chart implementation, fixture and plan. The overview
 slider and chart dragging pan; ordinary wheel over a chart zooms, and the labelled
 zoom/reset buttons are keyboard accessible. Wheel over the chart is consumed for
 zoom, so scroll the page with the scrollbar, keyboard, or outside the chart.
@@ -85,12 +89,12 @@ identifies it separately from price colors.
 It is not optimizer output. Negative and missing price fixtures are tested
 separately, rather than represented as real prices.
 
-## Intended single HA Sections dashboard
+## Intended single HA sidebar dashboard
 
-The local comparison puts overview and simulated controls side by side above two full-width price alternatives,
-with other sample cards flowing below. On mobile the same cards stack.
-This is a composition proposal, not installable YAML or a modification to any
-existing view; final Sections column spans and HA behavior need in-HA validation.
+The shared dashboard puts overview and simulated controls side by side, with the
+selected full-width chart and other cards below. On mobile the same cards stack.
+This is not an HA panel registration or a modification to any existing view;
+actual sidebar and HA behavior need in-HA validation in 5.4b.
 
 ## Components and assets
 
@@ -104,19 +108,21 @@ components and uses an original inline geometric lightning SVG (project-authored
 no third-party icon license). Its browser check verifies no off-origin requests. Do not assume
 other Web Awesome controls are offline-safe without checking their assets.
 
-For a future HA card, bundle selected modules and CSS locally into the distributed
-card assets, retain the Web Awesome MIT license and audit/include all applicable
+For the future HA sidebar, bundle selected modules and CSS locally into distributed
+assets, retain the Web Awesome MIT license and audit/include all applicable
 transitive licenses and any local icon/font notices. Do not use a CDN. HA custom
-cards use shadow DOM, so theme CSS would need to be included in each card's shadow
+panels may use shadow DOM, so theme CSS would need to be included in the panel's shadow
 root; inherited documented CSS custom properties can map HA theme colors to the
 shared tokens. Do not reach into private HA or component DOM. Global element
 registration/version collisions, light/dark theme mapping, and CSS isolation need
 testing in a real HA instance before shipping. This standalone study uses the
 browser's native modal dialog, not a Web Awesome dialog; HA shadow-root behavior,
-popovers, overlays, physical touch and HA's actual Sections layout remain unverified. Avoid
+popovers, overlays, physical touch and HA's actual sidebar layout remain unverified. Avoid
 assuming those are compatible until separately tested.
 
-The prototype pins Apache ECharts **6.1.0** (Apache-2.0), using a locally bundled
+The bundled CSS also includes inline Font Awesome Free icons; attribution and
+license links are copied in `THIRD-PARTY-NOTICES.txt`. The prototype pins Apache
+ECharts **6.1.0** (Apache-2.0), using a locally bundled
 subset and Canvas renderer; its Apache LICENSE and NOTICE are copied to the build
 output. ECharts depends on zrender **6.1.0** (BSD-3-Clause), whose license is also
 copied. esbuild retains available dependency legal comments in the generated JS.
@@ -145,5 +151,11 @@ individual-card, zoomed-card, modal and rendered edge-fixture screenshots under 
 temporary `opencode` folder. The check reports whether emulated taps needed its
 programmatic tooltip fallback; pinch emulation is not physical-touch validation.
 It does not validate real touch, accessibility tree or actual HA shadow roots. Run
-`node --test prototype/sample.test.mjs prototype/insights.test.mjs prototype/daily-sample.test.mjs prototype/vehicle-evidence.test.mjs`
+`node --test prototype/sample.test.mjs prototype/insights.test.mjs prototype/daily-sample.test.mjs prototype/vehicle-evidence.test.mjs shared-dashboard/*.test.mjs`
 for sample arithmetic, price insights, scenario and history checks.
+
+`node prototype/shared-browser-check.mjs` exercises the default selected chart,
+scenario states, modal, fake-host adapter, updates/disposal, escaping and callbacks.
+Set `SPOTNAV_CDP_PORT` if the isolated browser's DevTools port is not 9238; disable
+browser extensions for the local-only network assertion. The older
+`browser-check.mjs` uses `?comparison=bar` and defaults to port 9227.

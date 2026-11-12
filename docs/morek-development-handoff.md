@@ -234,6 +234,71 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### Stage 5.4a — shared dashboard foundation (coordinator review pending)
+
+- `frontend/shared-dashboard/dashboard.js` exports `mountDashboard(root, adapter)`
+  with `update` and `dispose`. Shared components, native modal, stepped-area
+  ECharts and CSS are used by the thin `frontend/prototype/dashboard.js` host.
+  `frontend/prototype/sample-adapter.js` injects all fictional scenarios, values,
+  display context and the local scenario callback. Preview Save/Send/Refresh are
+  disabled; no HA/OCPP client or charger action was added. The default now shows
+  only the selected stepped chart; `?comparison=bar` adds the old comparison.
+  The required model/format/action contract, missing-data behavior, local assets,
+  licenses and lifecycle are in `frontend/shared-dashboard/README.md`.
+- Run from `frontend/`: `npm run prototype:build`, then
+  `python -m http.server 8765 --bind 127.0.0.1`; open
+  `http://127.0.0.1:8765/prototype/`. The build copies Web Awesome MIT, ECharts
+  Apache license/notice, zrender BSD license and Font Awesome inline-icon notice.
+  It does not build or change the shipped integration/card.
+- Focused node tests: 22 passed using the command in `frontend/prototype/README.md`.
+  `shared-browser-check.mjs` passed at 1440×1000 and emulated 390×844: sample
+  scenarios, unknown/invalid inputs, dialog focus/Escape/backdrop, wheel/reset,
+  overlays, tooltip, fake-host mount/update/dispose/remount, unsafe text, callback
+  wiring, observer/chart cleanup and 162 local/data requests. The comparison
+  `browser-check.mjs` passed desktop/mobile (both chart modes, endpoints, missing
+  gap, zoom/pan/reset, tooltips, emulated pinch/taps, scenarios and 156 local/data
+  requests). An initial browser run contained extension resource requests and was
+  rerun successfully with extensions disabled; emulation is not physical touch.
+  `git diff --check` passed with Windows line-ending warnings.
+- Visual comparison used the earlier 5.1d full-page mismatch baseline at the same
+  desktop/mobile widths and current comparison-mode captures, plus new default
+  single-chart captures. Files are under the temporary `opencode/spotnav-54a/`:
+  `baseline-{desktop,mobile}-comparison.png`, `shared-{desktop,mobile}-comparison.png`,
+  and `shared-{desktop,mobile}-full.png`. The dark layout, plan, stepped chart and
+  hierarchy remain recognizable; default removal of the bar is intentional.
+  Minor wording/formatting in insights and evidence changed when sample-specific
+  prose moved into the adapter. No pixel-identity claim is made. The baseline is
+  an earlier saved capture, not a fresh render of a preserved old source tree.
+- Remaining: 5.4b registers the panel and maps real 5.2/5.3 sources and guarded
+  actions, addressing global CSS/shadow isolation, theme, registrations, safe
+  areas, asynchronous lifecycle and actual HA behavior. 5.4c supplies actual
+  intervals, timezone/DST-aware dates, source-boundary navigation and real chart
+  data; the current sample axis is not a live implementation. Updates currently
+  close the modal and reset chart zoom. No real HA, mobile app, physical touch,
+  phone, charger or physical charging was tested. Dispatch remains unarmed.
+  Stop for coordinator review; do not proceed to 5.4b or 5.4c automatically.
+
+### Stage 5.4a — partial extraction, not complete
+
+Historical partial entry; superseded by the completed foundation above.
+
+- `frontend/shared-dashboard/plan-view.js` and `plan-data.js` extract the existing
+  plan renderer and its arithmetic. The prototype wrapper supplies its sample
+  time/day formatters; formatter output is escaped. Missing or invalid estimates
+  remain unknown. The renderer retains sample-specific labels and is not yet a
+  complete real-data adapter or a production-ready dashboard entry point.
+- `npm run prototype:build` passed; `node --test prototype/sample.test.mjs
+  prototype/insights.test.mjs prototype/daily-sample.test.mjs
+  prototype/vehicle-evidence.test.mjs shared-dashboard/plan-view.test.mjs` passed
+  21 tests. No browser comparison, screenshots, lifecycle/network check, production
+  build, HA or physical-device test was performed for this partial change.
+- 5.4a remains open: dashboard layout, styles, chart, dialogs, sample-only evidence,
+  insights and history still need extraction with an explicit host contract, safe
+  text handling and teardown. In particular, current charts and other views directly
+  import fictional fixtures and the preview still displays both comparisons. Do not
+  use the existing prototype as a live host. Complete the requested browser/visual
+  checks and adapter documentation before coordinator review; 5.4b/5.4c are untouched.
+
 ### 2.5.34 — 5.3a plug-in proposal notifications
 
 - A recognized connection records an owed notification. The planner increments a

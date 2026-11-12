@@ -1,0 +1,10 @@
+The locally bundled Web Awesome CSS contains inline Font Awesome Free 7.0.0
+SVG icons by Fonticons, Inc., copyright 2025 Fonticons, Inc. The icons are
+licensed under Creative Commons Attribution 4.0 International (CC BY 4.0):
+https://creativecommons.org/licenses/by/4.0/legalcode
+Source and license information: https://fontawesome.com/license/free
+They are included as inline SVG masks in the upstream Web Awesome CSS.
+
+Web Awesome Core is MIT licensed; see WEB-AWESOME-LICENSE.txt in the build.
+Apache ECharts is Apache-2.0 licensed; see ECHARTS-LICENSE.txt and
+ECHARTS-NOTICE.txt. zrender is BSD-3-Clause; see ZRENDER-LICENSE.txt.

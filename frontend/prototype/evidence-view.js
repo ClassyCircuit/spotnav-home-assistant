@@ -1,3 +1,4 @@
+import { renderEvidence as sharedEvidence } from '../shared-dashboard/evidence-view.js';
 // Fixed fictional timestamps; this is a presentation fixture, not backend evidence.
 export function evidenceFixture(state) {
   if (state === 'unavailable') return {proposal:'Sample proposal · calculation time unknown',sent:'Unknown',readback:'Unavailable',measurement:'Unavailable',status:'Evidence unavailable' };
@@ -8,6 +9,5 @@ export function evidenceFixture(state) {
 }
 
 export function renderEvidence(state, power, windows) {
-  const e = evidenceFixture(state);
-  return `<div class="evidence-status"><strong>${e.status}</strong><span>Fictional sample · Now Mon 9 Nov 14:30</span></div><div class="evidence-grid"><div><small>Proposal calculated</small><b>${e.proposal}</b></div><div><small>Last sent / ACK</small><b>${e.sent}</b></div><div><small>Effective limits read</small><b>${e.readback}</b></div><div><small>Vehicle / power received</small><b>${e.measurement}</b></div></div><p class="subtext">Whether the current proposal was sent is unknown. Readback is effective limits, not a profile inventory. An ACK or match does not prove physical charging; power is a separate sample observation. Autonomous dispatch is unarmed.</p><wa-details id="details" summary="View sample evidence & debug controls"><div class="details-body"><p><b>Current proposal:</b> ${windows.length} sample windows; not necessarily sent. The fixture does not establish whether the last sent plan is the current proposal.</p><p><b>Last sent and acknowledgement:</b> ${e.sent} · response only.</p><p><b>Effective readback:</b> ${e.readback} · starts at read time; not an inventory.</p><p><b>Measured power:</b> ${power} · ${e.measurement}.</p><p>Missing, stale and superseded evidence must not be treated as current.</p><div class="actions"><wa-button size="small" disabled>Send · unavailable</wa-button><wa-button size="small" disabled>Refresh · unavailable</wa-button></div></div></wa-details>`;
+  return sharedEvidence({...evidenceFixture(state),context:'Fictional sample · Now Mon 9 Nov 14:30',dispatch:'Autonomous dispatch is unarmed.'},power,windows.length);
 }

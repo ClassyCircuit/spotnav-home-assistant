@@ -1,6 +1,3 @@
-import { historyFacts } from './daily-sample.js';
-
-export function renderHistory() {
-  const facts = historyFacts();
-  return `<div class="history-head"><div><strong>Yesterday · sample session</strong><p class="subtext">Illustrative observations, not real charger history</p></div><label class="history-select">Session <select disabled aria-label="Sample session selector unavailable"><option>08 Nov · 21:30–23:30</option></select></label></div><div class="history-comparison"><span><b>Last sent:</b> 22:00–23:00</span><span><b>Observed outside sent window:</b> 21:45–22:00 · 2.0 kW sample</span><span><b>Coverage in sent window:</b> ${facts.known}/${facts.total} intervals · ${100*facts.known/facts.total}%</span></div><div id="power-chart" class="chart power" role="img" aria-label="Fictional measured power and shaded last sent plan: sample flow outside the plan and a missing measurement"></div><p class="subtext">Blue shading = last sent window; green line = independent 15-minute sample readings held until the next reading. 22:30–22:45 is unknown, not zero; out-of-plan flow is a sample observation. Coverage is limited and cannot establish complete behavior.</p><div class="missing"><strong>Missing session example</strong><span>Previous session: energy unknown, not 0 kWh. A proposed window is not measured history.</span></div>`;
-}
+import { historyFixture } from './daily-sample.js';
+import { renderHistory as sharedHistory } from '../shared-dashboard/history-view.js';
+export const renderHistory = () => sharedHistory(historyFixture(), true);

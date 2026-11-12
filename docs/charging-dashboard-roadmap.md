@@ -17,6 +17,14 @@ real data, reactive planning and a deliberately enabled, safe Morek schedule exe
 Historical charging comparisons, monthly analytics, savings and other later features
 may remain explicitly unavailable; they are not prerequisites for this initial release.
 
+**Frontend decision:** the user chose an integration-provided HA custom sidebar panel,
+using the same UI components, styling and stepped-area ECharts chart as the local sample
+preview. The preview supplies fixtures and the panel supplies real HA/backend data;
+they are not two independently maintained UIs. Preserve the existing integration domain
+and working backend/card compatibility without requiring the old card as a second daily
+interface. Comparable viewport/fixture parity is required; actual HA/mobile rendering
+and its sidebar/header remain subject to integration testing, not assumed pixel-identical.
+
 Current production dispatch is **unarmed**, not because that is the desired final
 behavior, but because safe ownership transitions, lost-state/uncertainty recovery,
 load protection, transaction authorization and retained-profile exit are unresolved.
@@ -161,8 +169,8 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Local sample prototype is available in `frontend/prototype/`; browser checks
     and HA integration limitations are recorded in the development handoff. Visual
     approval remains pending; this does not complete 5.1.
-  - Start with Web Awesome Core for polished shared controls, with shared tokens and
-    HA Sections composition; no second dashboard. Validate visual quality and HA
+  - Start with Web Awesome Core for polished shared controls and tokens; the selected
+    production host is now the HA sidebar panel, not a Sections composition. Validate visual quality and HA
     compatibility. If it does not work, stop and reevaluate alternatives with the user.
 - [x] **5.1a Initial prototype refinement** (sample groundwork; overall visual approval pending)
   - Refined local prototype and example ECharts are available; verification and
@@ -209,7 +217,7 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Preserve time-interval truth in the step chart, including final interval and missing
     data gaps. Both variants show the complete multi-window plan, per-window price,
     energy and cost, plus this-charge totals and weighted average. Reuse shared sample
-    data/components; ask the user which chart direction to keep.
+    data/components; the user subsequently chose the stepped-area chart for production.
 - [x] **5.1b1 Initial full-width comparison** (implemented groundwork; not visually approved)
   - Both full-width comparison cards and the reference-derived fictional fixture exist;
     local ECharts and sample-data groundwork are in place. Review identified visually
@@ -267,8 +275,8 @@ tests are documented there; full HA collection is still blocked on Windows.
     and cost details that remain visible in both chart cards. Provide keyboard/focus,
     close and mobile behavior; sample controls cannot contact HA or control charging.
   - Browser-review both charts, modal and desktop/mobile layouts; verify tests, local
-    dependencies and reported limitations. Overall 5.1 and chart choice remain pending
-    user approval; no live data, planner changes, deployment or hardware actions.
+    dependencies and reported limitations. Overall 5.1 visual approval remains pending;
+    the user subsequently chose the stepped-area chart. No live data or hardware actions.
 - [x] **5.1b3 Chart fidelity and interval navigation** (sample groundwork; visual approval pending)
   - Proposal windows now use a bottom-bright green gradient and an aligned pale plan
     track instead of dashed borders; window boundaries remain exact. Visual approval
@@ -315,7 +323,8 @@ tests are documented there; full HA collection is still blocked on Windows.
 - [x] **5.1b4 Compact controls and plan presentation** (sample-only; coordinator and visual review pending)
   - Implemented locally with shared cumulative SOC projections and modal backdrop dismissal;
     see handoff for checks and limitations. Review identified missing-value rendering and
-    card-balance follow-up in 5.1b4a. Overall 5.1 and chart choice remain pending approval.
+    card-balance follow-up in 5.1b4a. Overall 5.1 visual approval remains pending;
+    the user subsequently chose the stepped-area chart.
   - Make Plan Controls more compact and place a readable complete proposed plan below
     them within the right-hand desktop column; keep the overview beside them. Avoid
     blank gaps and preserve responsive stacking. Retain the complete plan in the chart
@@ -381,7 +390,8 @@ tests are documented there; full HA collection is still blocked on Windows.
 - [x] **5.1e Vehicle and plan-evidence design** (sample-only; coordinator and user visual review pending)
   - Local battery estimates, separately defined low-SOC warning sample and fictional
     proposal/sent/readback/measurement freshness views are implemented; see handoff for
-    checks and 5.2 source-verification needs. Overall 5.1 and chart choice remain pending.
+    checks and 5.2 source-verification needs. Overall 5.1 visual approval remains pending;
+    the user subsequently chose the stepped-area chart.
   - Enrich and polish the vehicle overview without visual clutter. Show current SOC,
     target marker and, only when a separately defined valid value is available, a
     clearly labelled low-SOC warning threshold. Do not equate that threshold with the
@@ -404,14 +414,14 @@ tests are documented there; full HA collection is still blocked on Windows.
     bindings, new telemetry, protective behavior changes or charger actions; verify any
     eventual live source availability during 5.2 rather than assuming it exists.
 - [x] **5.2 Overview and operation status** (implemented locally; coordinator review pending)
-  - The existing card now shows a localized real-dashboard overview and read-only Morek
+  - The existing card now shows an English real-dashboard overview and read-only Morek
     health, using separate, timestamped requests rather than claiming an atomic snapshot.
     Measurements without a trustworthy Morek power source are explicitly unavailable;
     sent ACK, effective readback and physical charging remain distinct. See the 2.5.31
     handoff for freshness, source and testing limitations. Planning remains backend-owned.
   - Focused lifecycle/race and action-safety tests and local desktop/mobile browser checks
     use mocked HA/OCPP boundaries. No live HA or physical charging was checked. Overall
-    5.1 visual approval and the bar-versus-step choice remain pending.
+    overall 5.1 visual approval remains pending; the user selected the stepped-area chart.
 - [x] **5.3 Plan controls and actions** (implemented locally; coordinator review pending)
   - The user chose English-only card presentation regardless of HA language; do not
     translate the 5.3 strings. The 2.5.33 work implements this and improves open-modal
@@ -455,15 +465,43 @@ tests are documented there; full HA collection is still blocked on Windows.
     evidence. Test actual notifier modules with mocked HA/phone delivery, unavailable
     fields, identity changes, retries/races, no phones and rate-limiting. Physical phone
     delivery and live actions require the user's separate approval and validation.
-- [ ] **5.4 Minimum production price chart and installation path**
-  - After the user chooses a visual direction, bundle ECharts locally and bind the chosen
-    chart to real available prices and proposed windows, with correct units, price basis,
-    timezone/DST, missing/negative prices and source interval resolution. Reuse Stage 5
-    prototype; do not implement full historical tracks or monthly insights here.
-  - Provide one non-destructive HA Sections composition and practical installation/update
-    instructions; retain existing card behavior and do not overwrite user views.
-  - Test actual-module API-to-card contract with mocks, browser rendering, build/artifacts
-    and unavailable/error states. Distinguish these from a running HA integration test.
+- [ ] **5.4 Shared sidebar UI and production price chart** (umbrella; 5.4a–5.4c in order)
+  - One maintained dashboard UI, hosted by an HA custom sidebar panel and by the local
+    sample preview. The stepped-area chart is selected; no second daily dashboard is
+    required. Preserve existing 5.2/5.3 backend contracts, interlocks and compatibility.
+- [x] **5.4a Extract the tested UI into shared components** (local visual foundation; coordinator review pending)
+  - The preview mounts `frontend/shared-dashboard/dashboard.js` through an explicit
+    sample adapter; shared styles, dialog, stepped chart and views have lifecycle
+    cleanup. Local browser checks and baseline comparisons are recorded in the handoff.
+    The bar chart is an optional comparison only. No sidebar or real data is connected.
+    Updates currently reset chart zoom and close the dialog; real-data timestamp/DST,
+    HA CSS isolation, registration and integration are 5.4b/5.4c work.
+  - Refactor the existing prototype layout, styles, Web Awesome controls, modal and
+    selected stepped-area chart into one production-ready shared UI code path. Local
+    preview uses explicit sample fixtures via an adapter; no sample data or simulated
+    actions can leak into the real adapter. Reuse the same UI source in both hosts.
+  - Preserve the tested desktop/mobile appearance, dark design, interaction and English
+    wording; bundle assets locally with notices. Test fixture rendering, responsive
+    behavior, accessible controls, safe untrusted text and component cleanup. Compare
+    old prototype and shared preview at equivalent widths; no HA deployment or commands.
+- [ ] **5.4b HA sidebar host and live overview/controls**
+  - Register one integration-provided HA custom sidebar panel and mount the shared UI,
+    with a practical non-destructive setup/update path. Use HA's supported panel interface;
+    handle sidebar/mobile navigation, safe areas, lifecycle, access and CSS isolation.
+  - Connect existing 5.2/5.3 real dashboard/settings/Morek read-only paths through a real
+    adapter. Reuse revision checks, permissions, race guards and manual interlocks; never
+    render mock values or cause a charger write when opening the panel. Missing measured
+    power, historical data and unsupported fields remain visibly unavailable.
+  - Test actual-module contracts, mock HA panel lifecycle, action safety and visual parity
+    with preview under identical fixture/viewport, desktop and mobile. HA-host behavior
+    is not proven until installation; don't overwrite user views or remove the old card.
+- [ ] **5.4c Real stepped-area price chart and install preparation**
+  - Bind the shared ECharts chart to real available prices and proposed windows, with
+    correct units/basis, timezone/DST, missing/negative prices and source resolution.
+    Show unavailable history honestly; defer historical tracks and monthly insights.
+  - Bundle ECharts and all needed assets/notices locally, test render/interactions and
+    API contracts, and document panel installation/update. Don't reimplement a second UI
+    or assume local preview proves actual HA integration.
 - [ ] **5.5 Durable Morek ownership and recovery**
   - Resolve and implement safe ownership entry/exit, producer drain and durable transitions,
     lost-document versus first-use ambiguity, uncertain in-flight outcomes, restart/reconnect
@@ -528,7 +566,7 @@ tests are documented there; full HA collection is still blocked on Windows.
 ### Stage 7 — ECharts prices and schedule tracks (old B3)
 
 - [ ] **7.1 Price chart**
-  - Extend the real-data chart already delivered in 5.4; do not rebuild or rebind it.
+  - Extend the real-data chart already delivered in 5.4c; do not rebuild or rebind it.
     Add remaining advanced display features and test negative/missing prices and DST.
 - [ ] **7.2 Interaction**
   - Reuse prototype interactions; add Yesterday/Today/available future/All,
@@ -596,10 +634,9 @@ and progress. Do not treat an old broad block as a single implementation session
 
 ## 1. What the user wants
 
-- **One charging dashboard in Home Assistant, containing multiple coordinated
-  cards.** No second charging dashboard for the stock SpotNav card, and no separate
-  compact-dashboard deliverable. Reuse/redesign existing card components where
-  useful; do not build two parallel charging interfaces.
+- **One charging dashboard in a Home Assistant custom sidebar panel.** Use the same
+  UI code in the local sample preview and HA, with different data adapters. Existing
+  card compatibility may remain but is not a second required daily interface.
 - A comprehensive, modern, evcc-inspired charging overview: clear large values,
   useful charts, polished controls, compact status badges and tables—not long
   paragraphs or an initially hidden Morek section.
@@ -1001,12 +1038,13 @@ Build a browser-rendered prototype with sample data first, then obtain visual
 approval. Do not require HA update/restart for every spacing adjustment. Use
 desktop and mobile layouts with the same cards and shared design tokens.
 
-Use HA Sections as the intended responsive layout. Bundle ECharts locally with
+Use the HA custom sidebar panel as the intended responsive host; Sections references
+in historical notes are superseded. Bundle ECharts locally with
 licence/notice files; load heavy chart code only where needed. Start with Web Awesome
 **Core** as the primary library for polished ready-made controls, rather than styling
 all controls from scratch. Verify the selected package version, licence, bundled assets,
-theme integration, dialogs/popovers, responsive behavior and compatibility with HA
-custom cards. HA-native components may be used selectively where appropriate; avoid
+theme integration, dialogs/popovers, responsive behavior and compatibility with the HA
+panel host. HA-native components may be used selectively where appropriate; avoid
 depending on undocumented internals. Do not require paid Pro components or runtime
 CDN access. If Web Awesome does not work technically or visually, stop and reevaluate
 alternatives with the user, including React-based libraries if appropriate, rather than

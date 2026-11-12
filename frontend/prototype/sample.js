@@ -1,3 +1,6 @@
+import { projectSoc } from '../shared-dashboard/plan-data.js';
+export { projectSoc, validSocAssumptions, total, money } from '../shared-dashboard/plan-data.js';
+
 // Fictional fixed-hour axis: yesterday -24..0, today 0..24, tomorrow 24..48.
 // This is not a planner, real timestamp handling or live data.
 const hourly = [
@@ -63,29 +66,12 @@ export const scenario = typeof location === 'undefined' ? 'default' : new URLSea
 export const dailyScenario = typeof location === 'undefined' ? 'mismatch' : new URLSearchParams(location.search).get('state') || 'mismatch';
 const sampleSoc = dailyScenario === 'unavailable' || dailyScenario === 'stale' ? null : dailyScenario === 'infeasible' ? 15 : dailyScenario === 'exception' ? 35.5 : 48;
 export const socAssumptions = { startingSoc: sampleSoc, capacityKwh: 60, efficiency: scenario === 'missing' || scenario === 'invalid' ? null : 0.9 };
-export const validSocAssumptions = ({ startingSoc, capacityKwh, efficiency } = {}) => Number.isFinite(startingSoc) && startingSoc >= 0 && startingSoc <= 100 && Number.isFinite(capacityKwh) && capacityKwh > 0 && Number.isFinite(efficiency) && efficiency > 0 && efficiency <= 1;
-export function projectSoc(rows, { startingSoc, capacityKwh, efficiency } = {}) {
-  let soc = validSocAssumptions({ startingSoc, capacityKwh, efficiency }) ? startingSoc : null;
-  return rows.map(row => {
-    if (soc == null || !Number.isFinite(row.energy) || row.energy < 0) soc = null;
-    else soc = Math.min(100, soc + row.energy * efficiency / capacityKwh * 100);
-    return { ...row, projectedSoc: soc };
-  });
-}
 const sampleBlocks = scenario === 'long' ? Array.from({length: 8}, (_, i) => ({start: 24 + i * .5, end: 24.25 + i * .5, power: 6, control: 'normal'})) : dailyScenario === 'exception' ? [{start:15,end:15.5,power:6,control:'minimum-exception'}, ...blocks] : blocks;
 const pricedWindows = groupBlocks(sampleBlocks).map((w, i) => {
   const result = priceWindow(w, scenario === 'missing' && i === 0 ? [] : prices);
   return scenario === 'invalid' && i === 0 ? { ...result, energy: NaN, cost: Infinity, centsPerKwh: NaN } : result;
 });
 export const windows = projectSoc(pricedWindows, socAssumptions);
-export const total = rows => {
-  const energy = rows.length > 0 && rows.every(row => Number.isFinite(row.energy) && row.energy >= 0) ? rows.reduce((s, row) => s + row.energy, 0) : null;
-  const cost = rows.length > 0 && rows.every(row => Number.isFinite(row.cost)) ? rows.reduce((s, row) => s + row.cost, 0) : null;
-  const validEnergy = Number.isFinite(energy) ? energy : null;
-  const validCost = Number.isFinite(cost) ? cost : null;
-  const average = validEnergy > 0 && validCost != null ? validCost * 100 / validEnergy : null;
-  return { energy: validEnergy, cost: validCost, centsPerKwh: Number.isFinite(average) ? average : null };
-};
 export const time = h => { if (!Number.isFinite(h)) return 'Unknown'; const seconds = Math.round((((h % 24) + 24) % 24) * 3600); const hh = Math.floor(seconds / 3600), mm = Math.floor(seconds % 3600 / 60), ss = seconds % 60; return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}${ss ? `:${String(ss).padStart(2,'0')}` : ''}`; };
 export const day = h => !Number.isFinite(h) ? 'Unknown' : h < 0 ? 'Yesterday' : h < 24 ? 'Today' : h < 48 ? 'Tomorrow' : 'Next day';
 // Fictional fixed calendar, not local timestamps or a DST model.
@@ -111,7 +97,6 @@ export function priceGaps(start, end, items) {
   if (cursor < end) gaps.push([cursor,end]);
   return gaps;
 }
-export const money = value => !Number.isFinite(value) ? 'Unknown' : `${value < 0 ? '−' : ''}€${Math.abs(value).toFixed(2)}`;
 export const priceAt = h => prices.find(p => p.start <= h && h < p.end);
 // Each interval has its own segment, including the final end; gaps stay gaps.
 export const stepSegments = items => items.map(p => [[p.start, p.cents], [p.end, p.cents]]);

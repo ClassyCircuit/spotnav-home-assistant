@@ -19,3 +19,7 @@ export function historyFacts() {
   return { known:inPlan.filter(r=>Number.isFinite(r.kw)).length, total:inPlan.length,
     outside:readings.filter(r=>Number.isFinite(r.kw) && r.kw>0 && (r.time<sentHistory.start || r.time>=sentHistory.end)) };
 }
+export function historyFixture() {
+  const facts = historyFacts();
+  return {title:'Yesterday · sample session',subtitle:'Illustrative observations, not real charger history',session:'08 Nov · 21:30–23:30',sent:'22:00–23:00',outside:'21:45–22:00 · 2.0 kW sample',coverage:`${facts.known}/${facts.total} intervals · ${100*facts.known/facts.total}%`,note:'Blue shading = last sent window; green line = independent 15-minute sample readings held until the next reading. 22:30–22:45 is unknown, not zero; out-of-plan flow is a sample observation. Coverage is limited and cannot establish complete behavior.',readings,sentHistory,axis:{interval:.5,max:8}};
+}

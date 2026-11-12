@@ -1,7 +1,7 @@
 // Run against the local server and an isolated Chromium DevTools profile.
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
-const tabs = await (await fetch('http://127.0.0.1:9227/json')).json();
+const tabs = await (await fetch(`http://127.0.0.1:${process.env.SPOTNAV_CDP_PORT || '9227'}/json`)).json();
 const tab = tabs.find(t => t.type === 'page' && t.url.includes('127.0.0.1:8765'));
 assert.ok(tab, 'open prototype in debugging browser');
 const ws = new WebSocket(tab.webSocketDebuggerUrl);
@@ -14,10 +14,11 @@ const snapped = async mode => { const z=await evaluate(`(()=>{let z=window.sampl
 const labels = async mode => { const ticks=await evaluate(`[...document.querySelectorAll('#price-${mode} .time-ticks span')].map(e=>({hour:Number(e.dataset.hour),text:e.innerText,rect:e.getBoundingClientRect().toJSON()}))`); assert.ok(ticks.length>0,'visible time labels'); for(const t of ticks) {assert.ok(Number.isInteger(t.hour/2) || ticks.length>8 && Number.isInteger(t.hour*4),`unaligned tick ${t.hour}`); if(t.hour===24) assert.match(t.text,/Tue 10 Nov/);} for(let i=1;i<ticks.length;i++) assert.ok(ticks[i].rect.left>=ticks[i-1].rect.right-1,'overlapping time labels'); return ticks; };
 const band = async mode => { const info=await evaluate(`(()=>{const c=window.samplePriceCharts.${mode},root=c.getDom().getBoundingClientRect();return {cells:[...root && c.getDom().querySelectorAll('.day-cell')].map(e=>({start:+e.dataset.start,end:+e.dataset.end,text:e.textContent,left:e.getBoundingClientRect().left-root.left,right:e.getBoundingClientRect().right-root.left,expectedLeft:c.convertToPixel({xAxisIndex:0},+e.dataset.start),expectedRight:c.convertToPixel({xAxisIndex:0},+e.dataset.end)})),lines:[...c.getDom().querySelectorAll('.midnight-line')].map(e=>({hour:+e.dataset.hour,left:e.getBoundingClientRect().left-root.left,expected:c.convertToPixel({xAxisIndex:0},+e.dataset.hour)}))}})()`); assert.ok(info.cells.length); for(const c of info.cells){assert.ok(Math.abs(c.left-c.expectedLeft)<1 && Math.abs(c.right-c.expectedRight)<1,'day band alignment'); if(c.right-c.left>=140) assert.match(c.text,/Nov/);} for(const l of info.lines) assert.ok(Math.abs(l.left-l.expected)<1,'midnight line alignment'); return info; };
 await cmd('Network.enable'); await cmd('Runtime.enable'); await cmd('Page.enable'); await cmd('Network.setCacheDisabled',{cacheDisabled:true});
+await cmd('Page.bringToFront');
 for (const [name,width,height] of [['desktop',1440,1000],['mobile',390,844]]) {
   await cmd('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:name==='mobile'});
   const loaded = new Promise(resolve => { const prev=ws.onmessage; ws.onmessage=e=>{prev(e); if(JSON.parse(e.data).method==='Page.loadEventFired'){ws.onmessage=prev;resolve();}}; });
-  await cmd('Page.navigate',{url:'http://127.0.0.1:8765/prototype/'}); await loaded;
+  await cmd('Page.navigate',{url:'http://127.0.0.1:8765/prototype/?comparison=bar'}); await loaded;
   const state=await evaluate(`(async()=>{await Promise.all([...document.querySelectorAll('wa-button,wa-input,wa-badge,wa-progress-bar,wa-details')].map(e=>e.updateComplete));return {width:document.documentElement.scrollWidth,viewport:innerWidth,panels:document.querySelectorAll('.panel').length,charts:document.querySelectorAll('.chart canvas').length,rows:document.querySelectorAll('.plan-row').length,disabled:[...document.querySelectorAll('.controls wa-button,.details-body wa-button')].every(e=>e.disabled),text:document.body.innerText,rects:[...document.querySelectorAll('.prices')].map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}})};})()`);
   assert.ok(state.width<=state.viewport,`${name} overflow ${state.width}/${state.viewport}`); assert.equal(state.panels,7); assert.equal(state.charts,3); assert.equal(state.rows,8); assert.ok(state.disabled); assert.ok(state.rects[1].y>state.rects[0].y); assert.ok(Math.abs(state.rects[0].width-state.rects[1].width)<1);
   for(const text of ['unverified','unarmed','26.45 c/kwh','00:37:30','not an optimized']) assert.ok(state.text.toLowerCase().includes(text),text);
@@ -158,7 +159,7 @@ for (const [name,width,height] of [['desktop',1440,1000],['mobile',390,844]]) {
   }
   for (const scenario of ['missing','invalid','long']) {
     const loadedScenario = new Promise(resolve => { const prev=ws.onmessage; ws.onmessage=e=>{prev(e); if(JSON.parse(e.data).method==='Page.loadEventFired'){ws.onmessage=prev;resolve();}}; });
-    await cmd('Page.navigate',{url:`http://127.0.0.1:8765/prototype/?plan=${scenario}`}); await loadedScenario;
+    await cmd('Page.navigate',{url:`http://127.0.0.1:8765/prototype/?comparison=bar&plan=${scenario}`}); await loadedScenario;
     const result=await evaluate(`(async()=>{await Promise.all([...document.querySelectorAll('wa-button,wa-input,wa-badge')].map(e=>e.updateComplete));const nodes=['.controls','.prices-bar','.prices-step','#plan-dialog'].map(s=>document.querySelector(s));const a=document.querySelector('.overview').getBoundingClientRect(),b=document.querySelector('.controls').getBoundingClientRect(),chart=document.querySelector('.prices-bar').getBoundingClientRect();return {width:document.documentElement.scrollWidth,viewport:innerWidth,plans:nodes.map(n=>({rows:[...n.querySelectorAll('.plan-row')].map(e=>e.textContent),total:n.querySelector('.plan-total').textContent,note:n.querySelector('.projection-note').textContent})),a:a.toJSON(),b:b.toJSON(),chart:chart.toJSON(),disabled:[...document.querySelectorAll('.controls wa-button,.details-body wa-button')].every(e=>e.disabled),text:document.body.innerText}})()`);
     assert.ok(result.width<=result.viewport); assert.ok(result.disabled); assert.ok(result.chart.top>=Math.max(result.a.bottom,result.b.bottom));
     if(name==='desktop') assert.ok(Math.abs(result.a.bottom-result.b.bottom)<1 && Math.abs(result.a.width-result.b.width)<1); else assert.ok(result.b.top>=result.a.bottom);
@@ -178,7 +179,7 @@ for (const [name,width,height] of [['desktop',1440,1000],['mobile',390,844]]) {
     assert.equal(await evaluate(`document.activeElement.id`),'open-plan');
   }
   const missingLoaded = new Promise(resolve => { const prev=ws.onmessage; ws.onmessage=e=>{prev(e); if(JSON.parse(e.data).method==='Page.loadEventFired'){ws.onmessage=prev;resolve();}}; });
-  await cmd('Page.navigate',{url:'http://127.0.0.1:8765/prototype/?insights=missing&plan=missing'}); await missingLoaded;
+  await cmd('Page.navigate',{url:'http://127.0.0.1:8765/prototype/?comparison=bar&insights=missing&plan=missing'}); await missingLoaded;
   const missingInsight=await evaluate(`(async()=>{let el=document.querySelector('.insights');await el.querySelector('wa-details').updateComplete;const r=el.getBoundingClientRect();return {text:el.innerText,width:document.documentElement.scrollWidth,viewport:innerWidth,clip:{x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1},disabled:[...document.querySelectorAll('.controls wa-button,.details-body wa-button')].every(e=>e.disabled)}})()`);
   assert.ok(missingInsight.width<=missingInsight.viewport && missingInsight.disabled); assert.match(missingInsight.text,/Unknown/); assert.match(missingInsight.text,/No complete 1-hour window/); assert.match(missingInsight.text,/insight inputs masked/); assert.doesNotMatch(missingInsight.text,/NaN|Infinity/);
   const missingImage=await cmd('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:missingInsight.clip}); await writeFile(`${process.env.TEMP}/opencode/spotnav-51c-${name}-missing.png`,Buffer.from(missingImage.data,'base64'));
@@ -193,7 +194,7 @@ for (const [name,width,height] of [['desktop',1440,1000],['mobile',390,844]]) {
   const historyImage=await cmd('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:history.clip}); await writeFile(`${process.env.TEMP}/opencode/spotnav-51d-${name}-history.png`,Buffer.from(historyImage.data,'base64'));
   for (const [daily,expected] of [['waiting','waiting to charge'],['charging','6.0 kW'],['unavailable','Vehicle state unavailable'],['infeasible','falls short'],['partial','01:22:30'],['exception','Above cap'],['stale','Vehicle data stale']]) {
     const loadedDaily=new Promise(resolve=>{const prev=ws.onmessage;ws.onmessage=e=>{prev(e);if(JSON.parse(e.data).method==='Page.loadEventFired'){ws.onmessage=prev;resolve();}};});
-    await cmd('Page.navigate',{url:`http://127.0.0.1:8765/prototype/?state=${daily}`}); await loadedDaily;
+    await cmd('Page.navigate',{url:`http://127.0.0.1:8765/prototype/?comparison=bar&state=${daily}`}); await loadedDaily;
     const result=await evaluate(`(async()=>{await Promise.all([...document.querySelectorAll('wa-button,wa-input,wa-badge')].map(e=>e.updateComplete));const a=document.querySelector('.overview').getBoundingClientRect(),b=document.querySelector('.controls').getBoundingClientRect();return {text:document.body.innerText,width:document.documentElement.scrollWidth,viewport:innerWidth,charts:document.querySelectorAll('.price-chart canvas').length,buttons:[...document.querySelectorAll('.controls wa-button,.details-body wa-button')].every(e=>e.disabled),clip:{x:Math.min(a.left,b.left)+scrollX,y:a.top+scrollY,width:Math.max(a.right,b.right)-Math.min(a.left,b.left),height:Math.max(a.bottom,b.bottom)-a.top,scale:1}}})()`);
     assert.ok(result.width<=result.viewport && result.buttons); assert.equal(result.charts,2); assert.ok(result.text.includes(expected),`${daily}: ${expected}`);
     assert.equal(await evaluate(`Boolean(document.querySelector('.alert'))`),['unavailable','infeasible','stale'].includes(daily),`${daily} warning visibility`);
