@@ -570,7 +570,11 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Bundle ECharts and all needed assets/notices locally, test render/interactions and
     API contracts, and document panel installation/update. Don't reimplement a second UI
     or assume local preview proves actual HA integration.
-- [ ] **5.5 Durable Morek ownership and recovery**
+- [x] **5.5 Durable Morek ownership and recovery** (unarmed local implementation and mocked verification; coordinator review pending)
+  - This completes the unarmed groundwork only. Retained-profile resolution,
+    first-use versus lost-state provenance, transaction authorization, protection
+    conflicts and activation remain blockers in 5.6–5.7; the full 5.4c HA-plugin
+    dashboard suite is still unrun. No live behavior is claimed.
   - Umbrella only: assign 5.5a–5.5f individually, not all of 5.5 in one session.
     The checked groundwork is not active ownership or permission to send a profile.
   - **Unarmed-entry abort (2.5.43; coordinator review pending):** an internal
@@ -640,7 +644,11 @@ tests are documented there; full HA collection is still blocked on Windows.
     or recovery reasons; do not add generic journaling as an automatic prerequisite.
   - Mock restart/reconnect, delayed responses, persistence failures and duplicate
     identity; do not retry uncertain writes or infer profile inventory from readback.
-- [ ] **5.5f Safe ownership exit and handback** (unarmed/mocked)
+- [x] **5.5f Safe ownership exit and handback** (2.5.47; unarmed/mocked, coordinator review pending)
+  - The internal exit persists a legacy-owned `exit_held_unarmed` interlock; ordinary
+    legacy, manual profile, Resume and deletion handback stay blocked, even after
+    restart. The interlock cannot be removed by entry recovery. Known profile evidence
+    stays intact; a stored schedule or final 0 A is neither removed nor assumed absent.
   - Implement/test a guarded exit transition and legacy handback without silently
     removing or releasing an owned profile or its persistent 0 A limit. Keep known
     sent/unknown evidence and person Stop distinct; expose unresolved decisions rather

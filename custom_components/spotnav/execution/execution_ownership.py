@@ -1,7 +1,7 @@
 """Persisted execution ownership metadata; this release never arms schedule mode.
 
 The document is independent of Auto settings, charge sessions and Morek profile
-records. Only a first-use legacy record can be created here. Status never writes.
+records. Unarmed transitions are connector-serialized by admission; status never writes.
 """
 
 from __future__ import annotations
@@ -63,7 +63,7 @@ def _decode(raw: Any) -> tuple[str, dict[str, dict[str, Any]]]:
             if (record["owner"] != "legacy" or not isinstance(transition, dict)
                     or set(transition) != {"version", "state"} or type(transition["version"]) is not int
                     or transition["version"] != 1 or transition["state"] not in
-                    ("requested", "interrupted", "drained_unarmed")):
+                    ("requested", "interrupted", "drained_unarmed", "exit_held_unarmed")):
                 return "malformed", {}
     return "valid", records
 
@@ -224,6 +224,42 @@ class ExecutionOwnershipStore:
                 return "save_uncertain"
             self._records = records
             return "aborted"
+
+    async def async_exit_unarmed_held(
+        self, entry_id: str, identity: Mapping[str, Any], can_commit: Callable[[], bool],
+    ) -> str:
+        """Persist legacy bookkeeping under a durable interlock; caller holds connector lock."""
+        async with self._lock:
+            await self._load()
+            physical = (identity.get("resolved_id"), identity.get("connector_id"))
+            record = self._records.get(entry_id)
+            if (self._state != "valid" or self._transition_save_uncertain or self._cancelled_write
+                    or not record or record.get("owner") != "morek_schedule"
+                    or (record["station_id"], record["connector_id"]) != physical
+                    or len(self._contenders.get(physical, set())) > 1
+                    or any(other != entry_id and (item["station_id"], item["connector_id"]) == physical
+                           for other, item in self._records.items())):
+                return "ownership_unavailable"
+            try:
+                state, disk = _decode(await self._hass.async_add_executor_job(_read_envelope, self._store.path))
+                if state != "valid" or disk != self._records or not can_commit():
+                    return "exit_interrupted"
+                held = {**record, "owner": "legacy", "transition": {"version": 1, "state": "exit_held_unarmed"}}
+                records = {**self._records, entry_id: held}
+                await self._store.async_save({"schema_version": SCHEMA_VERSION, "records": records})
+                state, disk = _decode(await self._hass.async_add_executor_job(_read_envelope, self._store.path))
+                if state != "valid" or disk != records:
+                    raise OSError("exit verification failed")
+                self._records = records
+                return "exited_held" if can_commit() else "exited_held_interrupted"
+            except asyncio.CancelledError:
+                self._state = "save_failed"
+                self._transition_save_uncertain = self._owner_save_uncertain = self._cancelled_write = True
+                raise
+            except Exception:  # noqa: BLE001 - a save may have landed; never retry blindly
+                self._state = "save_failed"
+                self._transition_save_uncertain = self._owner_save_uncertain = True
+                return "save_uncertain"
 
     async def _load(self) -> None:
         if self._loaded:

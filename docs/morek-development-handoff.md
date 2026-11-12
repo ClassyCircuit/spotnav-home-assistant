@@ -273,6 +273,41 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-12 — 5.5f held unarmed exit (2.5.47; coordinator review pending)
+
+- The internal connector-serialized exit changes a unique, verified unarmed Morek
+  record to legacy bookkeeping with a durable `exit_held_unarmed` transition. The
+  transition blocks ordinary legacy writes, manual profile Send/Clear, automatic
+  or explicit Resume, and deletion handback. It is not accepted by the existing
+  entry-abort recovery. The read-only recovery status reports the held exit and
+  unresolved retained profile. Older readers reject the new marker as malformed,
+  not as permission to run legacy control. No release path is implemented here.
+- Exit checks identity, contenders, connector generation and known in-process and
+  durable profile uncertainty under connector admission; it checks legacy profile
+  history without assuming missing history means an empty inventory. It waits for
+  already admitted work, but cannot recall a dispatched or external command.
+  Known accepted profile evidence, including possible persistent 0 A, is preserved.
+  Failed or cancelled saves poison the current process; after restart either the
+  Morek owner or the held legacy marker continues to block ordinary writes.
+- A reserved person Stop interrupts the transition or, if it races the save, leaves
+  the held record in place. Existing Auto handling records the Stop intent while
+  refusing the unresolved retained-schedule Stop; no physical Stop is claimed.
+  Regulator protection and unrelated chargers are unchanged. No Start, Stop, send,
+  clear or automatic resume is issued by exit. Owned-profile dispatch remains unarmed.
+- Combined mocked entry → handover → exit/recovery, durable retained evidence,
+  Stop/save races, uncertain persistence, duplicate/ambiguous identity, stale work,
+  unrelated chargers, protection and deletion-handback checks pass. This completes
+  **5.5 unarmed local groundwork only**, not activation, actual profile resolution,
+  proof of first use, transaction authorization or live hardware validation. The
+  user-directed 5.6–5.8 work and deferred full 5.4c HA-plugin suite remain open.
+- Checks: `python tools/run_isolated_lifecycle_tests.py`: 130 passed;
+  `python tools/run_isolated_lifecycle_tests.py tests/test_command_admission.py
+  tests/test_execution_ownership.py tests/test_morek_schedule.py
+  tests/test_morek_outcomes.py`: 248 passed; `python tools/run_isolated_planning_tests.py`:
+  492 passed, 1 deselected. Targeted Ruff, frontend `npm run build`, and
+  `npm run check-dist` passed. Existing pytest timeout-option/deprecation warnings
+  were reported. No HA or hardware was contacted. Stop for coordinator review.
+
 ### 2026-11-12 — 5.5e missing/uncertain evidence recovery (2.5.46; review pending)
 
 - Startup and the existing control-availability callback now inspect connector,
