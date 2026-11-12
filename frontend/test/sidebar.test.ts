@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // @ts-nocheck
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dashboardAdapter } from '../sidebar/adapter.js';
 import { renderBattery } from '../shared-dashboard/vehicle-view.js';
@@ -20,8 +20,61 @@ const status = {api_version:1,schedule:{supported:false,verified:false,sent:null
 const record = () => ({revision:7,area_id:'SE4',overrides:[],phases:3,amps:10,requested_kwh:20,max_periods:3,departure_enabled:true,departure_time:'06:30',departure_date:null,departure_weekdays:[1,2,3,4,5,6,7],strategy:'cheapest',driver:'target_soc',target:{vehicle_id:null,target_percent:80},soft_price_cap:0.1,cap_price_basis:'nord_pool',minimum_ready_by_soc:40});
 const envelope = (settings,ok=true,error=null) => ({api_version:1,ok,error,settings,pause:{choice:null,admitted_at:null,expires_at:null}});
 const tick = async () => { for(let i=0;i<20;i++) await Promise.resolve(); };
+beforeEach(()=>sessionStorage.clear());
 
 describe('actual sidebar read-only host', () => {
+  it('selects only a sole charger, preserves a valid selection, and never writes on open', async () => {
+    const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';const calls=[];
+    let chargers=[{charger_id:'a',charger_name:'A'}];
+    const hass={connected:true,user:{is_admin:true},callWS:msg=>{calls.push(msg);return Promise.resolve(msg.type==='spotnav/list_chargers'?{api_version:1,chargers}:msg.type==='spotnav/get_dashboard'?raw:msg.type==='spotnav/get_settings'?envelope(record()):status);}};
+    const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();
+    expect(panel.charger).toBe('a');expect(panel.shadowRoot.querySelector('.shell')).toBeTruthy();
+    chargers=[...chargers,{charger_id:'b',charger_name:'B'}];panel.hass={...hass,connected:false};panel.hass=hass;await tick();expect(panel.charger).toBe('a');
+    panel.remove();const next=document.createElement('spotnav-enhanced-panel');next.hass=hass;document.body.append(next);await tick();expect(next.charger).toBe('a');next.remove();
+    expect(calls.every(m=>['spotnav/list_chargers','spotnav/get_dashboard','spotnav/get_settings'].includes(m.type)||(m.type==='spotnav/morek_schedule'&&m.action==='status'))).toBe(true);
+  });
+  it('handles multiple, empty, changed and failed lists without stale dashboard', async () => {
+    let chargers=[{charger_id:'a',charger_name:'A'},{charger_id:'b',charger_name:'B'}], fail=false;
+    const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';
+    const hass={connected:true,callWS:msg=>msg.type==='spotnav/list_chargers'?(fail?Promise.reject(Error()):Promise.resolve({api_version:1,chargers})):Promise.resolve(msg.type==='spotnav/get_dashboard'?raw:status)};
+    const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();expect(panel.charger).toBe('');
+    const select=panel.shadowRoot.querySelector('#charger');select.value='a';select.dispatchEvent(new Event('change'));await tick();
+    chargers=[];panel.hass={...hass,connected:false};panel.hass=hass;await tick();expect(panel.charger).toBe('');expect(panel.shadowRoot.textContent).toContain('No chargers available.');expect(panel.shadowRoot.querySelector('.shell')).toBeNull();
+    fail=true;await panel.loadChargers();expect(panel.shadowRoot.textContent).toContain('Charger list unavailable.');panel.remove();
+  });
+  it('ignores stale list replies after reconnect and teardown', async () => {
+    const pending=[];const hass={connected:true,callWS:msg=>msg.type==='spotnav/list_chargers'?new Promise(r=>pending.push(r)):Promise.resolve(status)};
+    const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();panel.hass={...hass,connected:false};panel.hass=hass;await tick();
+    pending[1]({api_version:1,chargers:[]});await tick();pending[0]({api_version:1,chargers:[{charger_id:'a',charger_name:'A'}]});await tick();expect(panel.charger).toBe('');expect(panel.shadowRoot.textContent).toContain('No chargers available.');
+    const p=panel.loadChargers();await tick();panel.remove();pending[2]({api_version:1,chargers:[{charger_id:'a',charger_name:'A'}]});await p;expect(panel.charger).toBe('');
+  });
+  it('retains drafts across reconnect but blocks saving against a changed revision', async () => {
+    const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';let saved=record();
+    const hass={connected:true,user:{is_admin:true},callWS:msg=>Promise.resolve(msg.type==='spotnav/list_chargers'?{api_version:1,chargers:[{charger_id:'a',charger_name:'A'}]}:msg.type==='spotnav/get_dashboard'?raw:msg.type==='spotnav/get_settings'?envelope(saved):status)};
+    const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();const input=panel.shadowRoot.querySelector('[data-setting="target"]');input.value='85';input.dispatchEvent(new Event('input',{bubbles:true}));
+    panel.hass={...hass,connected:false};expect(panel.shadowRoot.querySelector('main').hidden).toBe(true);saved={...saved,revision:8};panel.hass=hass;await tick();
+    expect(panel.shadowRoot.querySelector('[data-setting="target"]').value).toBe('85');expect(panel.settingsConflict).toBe(true);expect(panel.shadowRoot.querySelector('#save-plan').disabled).toBe(true);panel.remove();
+  });
+  it('shows missing settings and keeps suggested basis out of an unrelated save', async () => {
+    const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';const calls=[];
+    const initial={...record(),driver:'target_soc',target:{vehicle_id:null,target_percent:null},soft_price_cap:null,cap_price_basis:null,minimum_ready_by_soc:null,departure_enabled:false};
+    const hass={connected:true,user:{is_admin:true},callWS:msg=>{calls.push(msg);return Promise.resolve(msg.type==='spotnav/list_chargers'?{api_version:1,chargers:[{charger_id:'a',charger_name:'A'}]}:msg.type==='spotnav/get_dashboard'?raw:msg.type==='spotnav/get_settings'?envelope(initial):msg.type==='spotnav/update_settings'?envelope({...msg.settings,revision:8}):status);}};
+    const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();const root=panel.shadowRoot;
+    expect(root.textContent).toContain('not set (optional)');expect(root.textContent).toContain('suggested: Nord Pool');expect(root.textContent).toContain('does not select the price provider');expect(root.textContent).toContain('Ready-by: off');
+    expect(calls.filter(m=>m.type==='spotnav/update_settings')).toHaveLength(0);
+    await panel.savePlan({target:'',minimum:'',cap:'',capEnabled:false,capBasis:'',deadlineEnabled:true,readyBy:'06:30'});await tick();
+    const write=calls.find(m=>m.type==='spotnav/update_settings');expect(write.expected_revision).toBe(7);expect(write.settings.cap_price_basis).toBeNull();expect(write.settings.target.target_percent).toBeNull();panel.remove();
+  });
+  it('explains manual mode and preserves saved cap basis and target on a revision-checked save', async () => {
+    const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';const calls=[];
+    const initial={...record(),driver:'manual_kwh',cap_price_basis:'configured_variable_cost'};
+    const hass={connected:true,user:{is_admin:true},callWS:msg=>{calls.push(msg);return Promise.resolve(msg.type==='spotnav/list_chargers'?{api_version:1,chargers:[{charger_id:'a',charger_name:'A'}]}:msg.type==='spotnav/get_dashboard'?raw:msg.type==='spotnav/get_settings'?envelope(initial):msg.type==='spotnav/update_settings'?envelope({...msg.settings,revision:8}):status);}};
+    const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();const root=panel.shadowRoot;
+    expect(root.textContent).toMatch(/Manual energy mode.*SpotNav card’s Plan settings/s);expect(root.querySelector('[data-setting="target"]').disabled).toBe(true);
+    expect(root.querySelector('[data-setting="capBasis"]').value).toBe('configured_variable_cost');
+    await panel.savePlan({target:'80',minimum:'40',cap:'0.1',capEnabled:true,capBasis:'configured_variable_cost',deadlineEnabled:false,readyBy:'06:30'});await tick();
+    const write=calls.find(m=>m.type==='spotnav/update_settings');expect(write.expected_revision).toBe(7);expect(write.settings.driver).toBe('manual_kwh');expect(write.settings.target.target_percent).toBe(80);expect(write.settings.cap_price_basis).toBe('configured_variable_cost');panel.remove();
+  });
   it('offers admin reconfirmation without sending on render', async () => {
     const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';
     const owned={api_version:1,schedule:{...status.schedule,supported:true,ownership:{recorded_owner:'morek_schedule',reconfirmation_required:true,completion_authorized:false}}};

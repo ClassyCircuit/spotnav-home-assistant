@@ -347,6 +347,26 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-12 — Stage 12.1 sidebar controls (2.5.67; review pending)
+
+- The sidebar selects a sole charger, restores a valid session selection, handles
+  list failures and stale replies, and preserves an unsaved draft on reconnect;
+  a changed settings revision blocks its save until explicit reload. Opening only
+  performs read requests. The shared dark controls include explicit shadow-root
+  colors and clearer saved values, units, mode, ready-by and optional cap/minimum
+  guidance. Nord Pool is suggested as a cap basis only; it is not selected or
+  saved automatically and does not identify the actual provider. Manual energy
+  mode points to the existing SpotNav card Plan settings for SOC configuration.
+- A valid SOC-mode settings record with a missing target can now save an unrelated
+  edit without creating a target. Existing permission, revision and Morek action
+  checks remain. No planner policy or charger safety interlock changed.
+- Mocked sidebar and settings tests: 170 passed; frontend type-check, build and
+  check-dist passed. Existing jsdom CSS parser warnings occur. A local browser
+  smoke attempt did not reach its fixture; further browser tests were not run at
+  the user's request. Actual HA rendering, mobile touch and hardware remain
+  unverified; no HA access, deployment or charger operation occurred. The full
+  HA-plugin dashboard suite remains unrun. 12.2–12.4 and 5.7b remain open.
+
 ### 2026-11-12 — non-profile automatic recovery (2.5.66; coordinator review pending)
 
 - The existing connector outcome store now carries a minimal versioned recovery

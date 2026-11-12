@@ -1012,7 +1012,10 @@ export function replacementFor(
     return { ok: false, errorKey: "settings.error.invalid" };
   }
   const soc = kind === "plan" && values.driver === SETTINGS_DRIVER_TARGET_SOC;
-  const targetPercent = soc ? checkTargetPercent(values.targetPercent) : null;
+  // An absent saved target is valid incomplete intent. Do not block unrelated
+  // edits or manufacture a target merely because SOC mode is selected.
+  const targetPercent = soc && (values.targetPercent.trim() !== "" || record.target.target_percent !== null)
+    ? checkTargetPercent(values.targetPercent) : null;
   if (targetPercent !== null && !targetPercent.ok) {
     return targetPercent;
   }

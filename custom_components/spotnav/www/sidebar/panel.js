@@ -52666,12 +52666,13 @@ function mountDashboard(root, adapter) {
     const option = (s4) => `<option value="${escapeText(s4.value)}" ${s4.value === scenario.selected ? "selected" : ""}>${escapeText(s4.label)}</option>`;
     const capCurrency = f3.currency === void 0 ? "EUR" : f3.currency;
     const fields = [["Target SOC (%)", "target", "number"], ["Minimum SOC (%)", "minimum", "number"], [`Soft cap (${typeof capCurrency === "string" && /^[A-Z]{3}$/.test(capCurrency) ? capCurrency : "currency unknown"}/kWh)`, "cap", "number"], ["Ready by", "readyBy", "time"]].map(([label, key3, type]) => `<wa-input data-setting="${key3}" label="${escapeText(label)}" value="${escapeText(value(settings[key3]))}" type="${type}"${key3 === "cap" ? ' step="0.01"' : ""}${m4.canSave === true && !(m4.settingsEditor && (key3 === "target" && !m4.targetSupported || ["minimum", "cap"].includes(key3) && !m4.policySupported)) ? "" : " disabled"}></wa-input>`).join("");
-    const policyFields = m4.settingsEditor ? `<label><input type="checkbox" data-setting="capEnabled" ${settings.capEnabled ? "checked" : ""} ${m4.canSave && m4.policySupported ? "" : "disabled"}> Enable soft cap</label><label>Price basis <select data-setting="capBasis" ${m4.canSave && m4.policySupported ? "" : "disabled"}><option value="">Unknown</option><option value="nord_pool" ${settings.capBasis === "nord_pool" ? "selected" : ""}>Nord Pool</option><option value="configured_variable_cost" ${settings.capBasis === "configured_variable_cost" ? "selected" : ""}>Configured variable cost</option></select></label><label><input type="checkbox" data-setting="deadlineEnabled" ${settings.deadlineEnabled ? "checked" : ""} ${m4.canSave ? "" : "disabled"}> Enable ready-by</label>` : "";
+    const policyFields = m4.settingsEditor ? `<label><input type="checkbox" data-setting="capEnabled" ${settings.capEnabled ? "checked" : ""} ${m4.canSave && m4.policySupported ? "" : "disabled"}> Enable soft cap</label><label>Cap price basis <select data-setting="capBasis" ${m4.canSave && m4.policySupported ? "" : "disabled"}><option value="">Not set (suggested: Nord Pool)</option><option value="nord_pool" ${settings.capBasis === "nord_pool" ? "selected" : ""}>Nord Pool</option><option value="configured_variable_cost" ${settings.capBasis === "configured_variable_cost" ? "selected" : ""}>Configured variable cost</option></select></label><label><input type="checkbox" data-setting="deadlineEnabled" ${settings.deadlineEnabled ? "checked" : ""} ${m4.canSave ? "" : "disabled"}> Enable ready-by</label>` : "";
+    const policyHelp = m4.settingsEditor ? `<div class="settings-help"><p>Saved target: ${escapeText(settings.target == null ? "not set" : `${settings.target}%`)}. Minimum ready-by SOC: ${escapeText(settings.minimum == null ? "not set (optional)" : `${settings.minimum}%`)}.</p><p>Soft cap: ${settings.capEnabled ? `enabled, ${escapeText(settings.cap)} ${escapeText(capCurrency || "currency unknown")}/kWh` : "off (no saved cap)"}. Enter a cap and choose its basis to enable it. The cap basis defines which price is compared; it does not select the price provider.</p><p>Ready-by: ${settings.deadlineEnabled ? `enabled at ${escapeText(settings.readyBy)}` : `off (saved time ${escapeText(settings.readyBy)})`}. Changes are saved only when you choose Save plan.</p></div>` : "";
     const html = `<div class="shell"><header class="masthead"><div><div class="brand">SPOTNAV <span>ENHANCED</span></div><h1>Charging, in focus.</h1><p>A single view of your vehicle, plan and charger.</p></div>${labels.banner ? `<div class="sample-banner">${escapeText(labels.banner)}<br><span>${escapeText(labels.bannerDetail)}</span></div>` : ""}</header>
       ${scenario ? `<div class="scenario-picker"><label for="sample-state">${escapeText(scenario.label)}</label><select id="sample-state">${(scenario.options || []).map(option).join("")}</select><span>${escapeText(scenario.note)}</span></div>` : ""}
       <div id="critical-live" role="status" aria-live="polite">${m4.warning ? `<div class="alert"><div><strong>${escapeText(m4.warning.title)}</strong><p>${escapeText(m4.warning.detail)}</p></div><a href="#details">View details \u2193</a></div>` : ""}</div><div class="dashboard">
       ${card("Your vehicle", "OVERVIEW", `<div class="status-line"><span class="dot ${!Number.isFinite(state.soc) || state.soc < 0 || state.soc > 100 || state.stale ? "dot-unknown" : ""}"></span> ${escapeText(state.status)}</div>${renderBattery({ soc: state.soc, target: settings.target, minimum: settings.minimum, deadline: settings.readyBy, capacityKwh: assumptions.capacityKwh, efficiency: assumptions.efficiency, stale: !!state.stale, lowSocWarning: state.lowSocWarning, windows, sample, minutesPerTimeUnit: f3.minutesPerTimeUnit })}<p class="waiting">${escapeText(state.detail)}</p><div class="metrics">${metric("Measured now", state.power, labels.powerNote)}<div class="metric next-metric"><div class="muted">${state.stale ? "Next window \xB7 stale proposal" : "Next proposed window"}</div><button type="button" id="open-plan" aria-haspopup="dialog">${next ? `${escapeText(time(next.start))}\u2013${escapeText(time(next.end))}` : "Unknown"} <span aria-hidden="true">\u2197</span></button><div class="muted">${escapeText(next ? day(next.start) : "Unknown")} \xB7 view complete plan</div></div>${metric(state.stale ? "Last plan cost \xB7 stale" : "Estimated charge cost", money(summary.cost, f3.currency), `${number(summary.energy, 2, " kWh", (n6) => n6 >= 0)} wall energy`)}${metric("Until deadline", m4.untilDeadline, labels.deadlineNote)}</div><div class="hint"><b>${escapeText(labels.planLabel)}</b> ${escapeText(state.policy)} ${escapeText(m4.targetNote)}</div>`, "overview", tag)}
-      ${card("Plan controls", labels.settingsEyebrow || "SETTINGS", `<p class="subtext">${escapeText(labels.settingsNote)}</p><div class="fields">${fields}${policyFields}</div><p id="settings-notice" role="status">${escapeText(m4.settingsNotice || "")}</p><wa-button id="save-plan" variant="brand" ${typeof actions2.save !== "function" || m4.canSave !== true ? "disabled" : ""}>${escapeText(labels.saveLabel || "Save plan \xB7 unavailable")}</wa-button>${m4.settingsEditor ? '<button type="button" id="reload-settings">Reload settings</button>' : ""}<div class="controls-plan">${plan}<button type="button" id="open-plan-details" aria-haspopup="dialog">View full window details \u2197</button></div>`, "controls", tag)}
+      ${card("Plan controls", labels.settingsEyebrow || "SETTINGS", `<p class="subtext">${escapeText(labels.settingsNote)}</p><div class="fields">${fields}${policyFields}</div>${policyHelp}<p id="settings-notice" role="status">${escapeText(m4.settingsNotice || "")}</p><wa-button id="save-plan" variant="brand" ${typeof actions2.save !== "function" || m4.canSave !== true ? "disabled" : ""}>${escapeText(labels.saveLabel || "Save plan \xB7 unavailable")}</wa-button>${m4.settingsEditor ? '<button type="button" id="reload-settings">Reload settings</button>' : ""}<div class="controls-plan">${plan}<button type="button" id="open-plan-details" aria-haspopup="dialog">View full window details \u2197</button></div>`, "controls", tag)}
       ${card("Price insights", labels.insightEyebrow || "PRICE DATA", renderInsights(m4.insights), "insights", tag)}
       ${modes.map(priceCard).join("")}
       ${card("Plan activity & freshness", labels.evidenceEyebrow || "EVIDENCE", renderEvidence(m4.evidence, state.power, knownPlan ? windows.length : null), "morek", tag)}
@@ -57664,7 +57665,7 @@ function replacementFor(kind, record3, values, range = null, opened = null, days
     return { ok: false, errorKey: "settings.error.invalid" };
   }
   const soc2 = kind === "plan" && values.driver === SETTINGS_DRIVER_TARGET_SOC;
-  const targetPercent = soc2 ? checkTargetPercent(values.targetPercent) : null;
+  const targetPercent = soc2 && (values.targetPercent.trim() !== "" || record3.target.target_percent !== null) ? checkTargetPercent(values.targetPercent) : null;
   if (targetPercent !== null && !targetPercent.ok) {
     return targetPercent;
   }
@@ -59851,7 +59852,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.66";
+var CARD_VERSION = "2.5.67";
 
 // sidebar/panel.js
 var settingsWritesByConnection = /* @__PURE__ */ new WeakMap();
@@ -59861,6 +59862,8 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this.attachShadow({ mode: "open" });
     this.generation = 0;
     this.permissionEpoch = 0;
+    this.dashboardEpoch = 0;
+    this.statusEpoch = 0;
     this.pendingSettingsWrites = /* @__PURE__ */ new Map();
     this.unknownSettingsWrites = /* @__PURE__ */ new Set();
     this.connected = false;
@@ -59870,15 +59873,17 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this.classList.add("wa-dark");
     this.shadowRoot.innerHTML = `<link rel="stylesheet" href="/spotnav-sidebar/panel.css?v=${CARD_VERSION}"><style>:host{display:block;min-height:100%;padding-bottom:env(safe-area-inset-bottom)}.hostbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top));background:#11151d;color:white}.hostbar label{flex:1 1 180px}.hostbar select{max-width:100%}.hostbar button,.hostbar select{font:inherit;padding:8px}.message{padding:16px;color:white;background:#11151d}</style><div class="hostbar"><button id="menu" aria-label="Open navigation">\u2630</button><strong>SpotNav Enhanced</strong><label>Charger <select id="charger"><option value="">Select charger</option></select></label><button id="refresh">Refresh observations</button><div id="automatic-controls"><span id="pause-state">Auto state unknown.</span> <button id="pause-auto" disabled>Pause Auto until resumed</button> <button id="resume-auto" disabled>Resume Auto</button><span id="pause-notice" role="status"></span></div></div><div class="message" role="status">Select a charger.</div><main></main>`;
     const hostStyle = document.createElement("style");
-    hostStyle.textContent = "#automatic-controls{display:flex;flex-wrap:wrap;gap:6px;min-width:0;max-width:100%} #automatic-controls button{max-width:100%;white-space:normal}";
+    hostStyle.textContent = ".hostbar label{color:#f0f3f8}.hostbar select{color:#f0f3f8;background:#202b39;border:1px solid #8191a4;border-radius:8px;min-height:42px} #automatic-controls{display:flex;flex-wrap:wrap;gap:6px;min-width:0;max-width:100%} #automatic-controls button{max-width:100%;white-space:normal}";
     this.shadowRoot.append(hostStyle);
     this.shadowRoot.querySelector("#menu").onclick = () => this.dispatchEvent(new CustomEvent("hass-toggle-menu", { bubbles: true, composed: true }));
     this.shadowRoot.querySelector("#charger").onchange = (e9) => {
+      if (e9.target.value === this.charger) return;
       this.stopObservations();
       this.charger = e9.target.value;
+      this.rememberCharger();
       this.refresh();
     };
-    this.shadowRoot.querySelector("#refresh").onclick = () => this.refresh();
+    this.shadowRoot.querySelector("#refresh").onclick = () => this.loaded ? this.refresh() : this.loadChargers();
     this.shadowRoot.querySelector("#pause-auto").onclick = () => void this.automaticAction("stop", "until_resumed");
     this.shadowRoot.querySelector("#resume-auto").onclick = () => void this.automaticAction("resume", null);
     if (this._hass) this.loadChargers();
@@ -59900,7 +59905,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this._hass = value2;
     if (!this.connected) return;
     if (value2?.connected === false) {
-      this.stopObservations();
+      if (was) this.stopObservations(true);
       this.message("Home Assistant disconnected.");
     } else if (!this.loaded || !was) this.loadChargers();
     else if (wasAdmin !== (value2?.user?.is_admin === true)) {
@@ -59931,7 +59936,10 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     el.textContent = text3;
     el.hidden = !text3;
   }
-  stopObservations() {
+  stopObservations(preserveDraft = false) {
+    const dirty = preserveDraft && this.settingsDirty;
+    if (dirty && this.settingsRecord) this.draftRevision = this.settingsRecord.revision;
+    else if (!preserveDraft) this.draftRevision = null;
     if (this.settingsBusy && this.charger) this.unknownSettingsWrites.add(this.charger);
     this.generation++;
     clearInterval(this.ageTimer);
@@ -59949,7 +59957,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this.settingsLoading = false;
     this.settingsBusy = false;
     this.settingsConflict = false;
-    this.settingsDirty = false;
+    this.settingsDirty = !!dirty;
     this.settingsNotice = "";
     this.morekBusy = false;
     this.morekError = null;
@@ -59967,8 +59975,12 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       const button = this.shadowRoot.querySelector(`#${id}`);
       if (button) button.disabled = true;
     }
-    this.view?.dispose();
-    this.view = null;
+    if (!preserveDraft) {
+      this.view?.dispose();
+      this.view = null;
+    }
+    const main = this.shadowRoot.querySelector("main");
+    if (main) main.hidden = preserveDraft;
   }
   paint() {
     if (!this.rawDashboard) return;
@@ -59996,7 +60008,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       adapter.model.policySupported = record3.soft_price_cap !== void 0;
       adapter.model.canSave = allowed && !this.settingsBusy && !this.settingsConflict;
       adapter.model.settingsNotice = this.settingsNotice || (!allowed ? "You do not have permission to change this plan." : "");
-      adapter.model.labels.settingsNote = record3.driver === "target_soc" ? "Edits use revision-checked SpotNav settings." : "Target SOC is unavailable in manual energy mode.";
+      adapter.model.labels.settingsNote = record3.driver === "target_soc" ? "SOC-based planning. The planning target is separate from the car\u2019s charge limit." : "Manual energy mode uses a requested kWh amount, so target SOC cannot be edited here. In the SpotNav card\u2019s Plan settings, choose target SOC mode and configure a vehicle and target.";
       adapter.model.labels.saveLabel = this.settingsBusy ? "Saving\u2026" : "Save plan";
       adapter.actions.save = (values) => this.savePlan(values);
       adapter.actions.reloadSettings = () => this.reloadSettings();
@@ -60008,6 +60020,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this.message(this.dashboardFailed ? "Dashboard refresh failed; the last observation may be stale." : "");
     if (this.view) this.view.update(adapter);
     else this.view = mountDashboard(this.shadowRoot.querySelector("main"), adapter);
+    this.shadowRoot.querySelector("main").hidden = false;
     this.paintMorek();
   }
   paintAutomatic(dashboard) {
@@ -60072,6 +60085,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     if (!this.connected || this.settingsBusy || !this.charger || this.pendingSettingsWrites.has(this.charger)) return;
     if (!window.confirm("Discard the current draft and reload the latest settings?")) return;
     this.view?.resetDrafts();
+    this.draftRevision = null;
     this.settingsRecord = null;
     this.settingsConflict = false;
     this.settingsDirty = false;
@@ -60167,8 +60181,9 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
         return;
       }
       this.settingsRecord = decoded.value.settings;
-      this.settingsConflict = this.unknownSettingsWrites.has(charger) || this.pendingSettingsWrites.has(charger);
-      this.settingsNotice = this.settingsConflict ? "A previous dispatched save has an unknown outcome. Wait for it to settle, then explicitly reload settings." : "";
+      const unknown = this.unknownSettingsWrites.has(charger) || this.pendingSettingsWrites.has(charger);
+      this.settingsConflict = unknown || this.settingsDirty && this.draftRevision != null && this.draftRevision !== this.settingsRecord.revision;
+      this.settingsNotice = unknown ? "A previous dispatched save has an unknown outcome. Wait for it to settle, then explicitly reload settings." : this.settingsConflict ? "Settings changed while disconnected. Reload settings before saving this draft." : "";
     } catch {
       if (this.connected && generation === this.generation) this.settingsNotice = "Settings unavailable.";
     } finally {
@@ -60224,6 +60239,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       } else if (answer.value.ok) {
         this.settingsRecord = answer.value.settings;
         this.settingsDirty = false;
+        this.draftRevision = null;
         this.settingsNotice = "Saved and confirmed.";
         this.view?.resetDrafts();
         this.dashboardEpoch++;
@@ -60261,27 +60277,46 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       cancellations.delete(cancel);
     });
   }
+  rememberCharger() {
+    try {
+      if (this.charger) sessionStorage.setItem("spotnav.sidebar.charger", this.charger);
+      else sessionStorage.removeItem("spotnav.sidebar.charger");
+    } catch {
+    }
+  }
   async loadChargers() {
     const generation = ++this.generation;
     this.loaded = true;
     try {
       const result = await listChargers(this._hass);
-      if (!this.connected || generation !== this.generation) return;
-      const chargers = result?.api_version === 1 && Array.isArray(result.chargers) ? result.chargers.filter((c5) => typeof c5?.charger_id === "string" && typeof c5?.charger_name === "string") : [];
+      if (!this.connected || this._hass?.connected === false || generation !== this.generation) return;
+      if (result?.api_version !== 1 || !Array.isArray(result.chargers)) throw new Error("Invalid charger list");
+      const chargers = result.chargers.filter((c5) => typeof c5?.charger_id === "string" && c5.charger_id && typeof c5?.charger_name === "string");
       const select = this.shadowRoot.querySelector("#charger");
       select.replaceChildren(new Option("Select charger", ""));
       for (const charger of chargers) select.add(new Option(charger.charger_name, charger.charger_id));
-      if (chargers.some((c5) => c5.charger_id === this.charger)) {
-        select.value = this.charger;
+      let remembered = "";
+      try {
+        remembered = sessionStorage.getItem("spotnav.sidebar.charger") || "";
+      } catch {
+      }
+      const previous = this.charger || remembered;
+      const chosen = chargers.some((c5) => c5.charger_id === previous) ? previous : chargers.length === 1 ? chargers[0].charger_id : "";
+      if (chosen !== this.charger && this.view) this.stopObservations();
+      this.charger = chosen;
+      select.value = chosen;
+      if (chosen) {
+        this.rememberCharger();
         this.refresh();
       } else {
-        this.charger = "";
+        this.rememberCharger();
         this.message(chargers.length ? "Select a charger." : "No chargers available.");
       }
     } catch {
       if (this.connected && generation === this.generation) {
+        this.stopObservations(true);
         this.loaded = false;
-        this.message("Charger list unavailable.");
+        this.message("Charger list unavailable. Use Refresh observations to retry.");
       }
     }
   }
