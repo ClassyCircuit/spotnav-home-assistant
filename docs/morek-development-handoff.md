@@ -355,6 +355,28 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-12 — Stage 12.8 last-known SOC planning (2.5.72; review pending)
+
+- Capped target/minimum planning accepts a valid last-known actual SOC regardless
+  of age, including unknown age; it still refuses energy-derived SOC estimates,
+  invalid SOC and invalid age metadata. Uncapped planning retains its existing
+  estimate behavior. Morek provenance no longer refuses solely on age or because
+  a reading predates plug-in; its price, ownership, lifecycle, identity, Stop and
+  uncertainty checks remain. The immediate SOC protection floor keeps its own
+  original freshness rules. Old readings can be inaccurate after driving.
+- Vehicle report timestamps and SOC entity identity are included in the in-process
+  planner evidence. The existing reader watches an unambiguous report-time sensor;
+  a newer timestamp triggers recalculation, while unchanged HA state writes and
+  restored values do not claim a new report. Unchanged schedule intents remain
+  deduplicated. When an integration supplies no trustworthy vehicle timestamp,
+  same-value HA rewrites cannot establish a genuinely new report. The sidebar
+  preserves 12.6's age/source labels and warns that plan results are estimates.
+- Focused actual-module planner, reader, Morek worker/admission and mocked sidebar
+  checks, Ruff, frontend build and check-dist were run; see session results. The
+  Python harness reports existing pytest/dependency warnings. No browser, full
+  HA-plugin suite, live HA, vehicle refresh, deployment or charger action occurred.
+  No physical charging or installed automatic execution is established by mocks.
+
 ### 2026-11-12 — Stage 12.6 SOC provenance (2.5.71; review pending)
 
 - The existing selected-vehicle reader prefers a live charger SOC when available,

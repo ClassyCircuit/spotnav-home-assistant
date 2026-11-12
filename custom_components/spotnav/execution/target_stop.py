@@ -117,6 +117,8 @@ class SocReading:
     state_age_s: float | None = None
     #: The car's report-time sensor `age_s` was read from (`vehicle_timestamp`); internal, never in a payload.
     time_entity_id: str | None = None
+    #: Exact vehicle report timestamp, never the HA state-write time.
+    reported_at: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -363,6 +365,7 @@ def _reading_for_entity(
         time_basis="vehicle_timestamp",
         state_age_s=state_age,
         time_entity_id=time_entity_id,
+        reported_at=reported_at,
     )
 
 

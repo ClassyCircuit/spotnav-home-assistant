@@ -28,7 +28,7 @@ def test_fractional_minimum() -> None:
     assert minimum == pytest.approx(2.4 / 0.9)
 
 
-@pytest.mark.parametrize("age,estimated", [(None, False), (181, False), (0, True), (-1, False)])
+@pytest.mark.parametrize("age,estimated", [(0, True), (-1, False), (float("nan"), False)])
 def test_untrusted_soc(age, estimated) -> None:
     facts = LiveVehicleFacts(
         vehicle_id="veh-1", soc_percent=25, soc_age_s=age, soc_estimated=estimated, reported_capacity_kwh=60,
@@ -36,6 +36,19 @@ def test_untrusted_soc(age, estimated) -> None:
     assert capped_vehicle_energy(facts, target_percent=80, minimum_percent=40, learned=NOTHING_LEARNED) == (
         "target_soc_stale", None, None,
     )
+
+
+@pytest.mark.parametrize("age", [None, 1, 181, 3600, 86400 * 7])
+def test_last_known_soc_has_no_age_cutoff(age) -> None:
+    facts = LiveVehicleFacts(vehicle_id="veh-1", soc_percent=25, soc_age_s=age, reported_capacity_kwh=60)
+    reason, target, minimum = capped_vehicle_energy(facts, target_percent=80, minimum_percent=40, learned=NOTHING_LEARNED)
+    assert reason == "ok" and target == pytest.approx(33 / .9) and minimum == pytest.approx(9 / .9)
+
+
+@pytest.mark.parametrize("soc", [None, -1, 101, float("nan"), True])
+def test_invalid_soc_is_never_a_last_known_reading(soc) -> None:
+    facts = LiveVehicleFacts(vehicle_id="veh-1", soc_percent=soc, soc_age_s=99999, reported_capacity_kwh=60)
+    assert capped_vehicle_energy(facts, target_percent=80, minimum_percent=40, learned=NOTHING_LEARNED)[0] != "ok"
 
 
 def test_minimum_above_resolved_target() -> None:

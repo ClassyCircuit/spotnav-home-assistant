@@ -67,7 +67,7 @@ from ..vehicles.guest import is_guest
 from ..vehicles.vehicle_discovery import resolve_target_vehicle
 from ..vehicles.vehicle_properties import resolved_vehicle_id, stored_properties
 from ..execution.min_soc_floor import effective_floor, known_soc
-from ..execution.target_stop import car_ended_full_percent, SOC_FRESH_MAX_AGE_S
+from ..execution.target_stop import car_ended_full_percent
 from .auto_settings import (
     AutoSettings,
     AutoSettingsError,
@@ -434,6 +434,9 @@ class LiveVehicleFacts:
     soc_source: str | None = None
     soc_age_s: float | None = None
     soc_estimated: bool = False
+    #: A vehicle-provided timestamp, not an HA state-write timestamp.
+    soc_report_at: datetime | None = None
+    soc_entity_id: str | None = None
     #: The car's minimum charge level (`vehicle_properties`), `None` when off.
     min_percent: float | None = None
 
@@ -462,6 +465,8 @@ def live_vehicle_facts(
         soc_source=None if reading is None else reading.source,
         soc_age_s=None if reading is None else reading.age_s,
         soc_estimated=bool(reading is not None and reading.estimated),
+        soc_report_at=None if reading is None else reading.reported_at,
+        soc_entity_id=None if reading is None else reading.entity_id,
         min_percent=stored_properties(hass, vehicle_id).min_percent,
     )
 
@@ -514,7 +519,7 @@ def capped_vehicle_energy(
     minimum_percent: float | None,
     learned: LearnedEnergy,
 ) -> tuple[str, float | None, float | None]:
-    """Resolve capped target and minimum wall energy from a fresh actual reading.
+    """Resolve capped target and minimum wall energy from a valid actual reading.
 
     This does not assume that the independent immediate SOC floor has charged
     the vehicle. Both deficits use the same existing learned-energy conversion.
@@ -525,8 +530,8 @@ def capped_vehicle_energy(
     if (
         facts.soc_estimated or isinstance(soc, bool) or not isinstance(soc, (int, float))
         or not math.isfinite(soc) or not 0 <= soc <= 100
-        or isinstance(age, bool) or not isinstance(age, (int, float))
-        or not math.isfinite(age) or not 0 <= age <= SOC_FRESH_MAX_AGE_S
+        or (age is not None and (isinstance(age, bool) or not isinstance(age, (int, float))
+                                or not math.isfinite(age) or age < 0))
     ):
         return ("target_soc_stale", None, None)
     if (
@@ -978,10 +983,10 @@ class AutoPlannerController:
         source = self._source()
         effective = with_source(settings, source)
         facts = None if self._vehicle_reader is None else self._vehicle_reader(effective.target.vehicle_id or "")
-        # Age changes continuously; retain value/source identity and validate age separately.
+        # Age advances continuously; a car's exact report timestamp does not.
         vehicle = None if facts is None else (facts.vehicle_id, facts.soc_percent,
             facts.reported_capacity_kwh, facts.max_percent, facts.min_percent,
-            facts.soc_source, facts.soc_estimated)
+            facts.soc_source, facts.soc_estimated, facts.soc_report_at, facts.soc_entity_id)
         controller = None if self._executor is None else self._executor.controller
         return (settings.revision, self._key_of(source), effective.area_id, vehicle,
                 self._notification_vehicle(), self._connection_generation, self._connection_ready_generation,
@@ -1007,21 +1012,12 @@ class AutoPlannerController:
             checked, vehicle_id = self._notification_vehicle()
             if not checked or not vehicle_id or facts.vehicle_id != vehicle_id:
                 return "vehicle_identity_unavailable"
-            if settings.soft_price_cap is not None:
-                age = facts.soc_age_s
-                if (facts.soc_estimated or isinstance(age, bool) or not isinstance(age, (int, float))
-                        or not math.isfinite(age) or not 0 <= age <= SOC_FRESH_MAX_AGE_S):
-                    return "vehicle_input_stale"
-            else:
-                controller = None if self._executor is None else self._executor.controller
-                age = facts.soc_age_s
-                if (not facts.soc_estimated and (isinstance(age, bool) or not isinstance(age, (int, float))
-                        or not math.isfinite(age) or age < 0)):
-                    return "vehicle_input_stale"
-                if known_soc(soc_percent=facts.soc_percent, estimated=facts.soc_estimated, age_s=age,
-                             plugged_in_at=None if controller is None else controller.plugged_in_for_count,
-                             now=now) is None:
-                    return "vehicle_input_stale"
+            age = facts.soc_age_s
+            if (settings.soft_price_cap is not None and facts.soc_estimated) or (
+                age is not None and (isinstance(age, bool) or not isinstance(age, (int, float))
+                                     or not math.isfinite(age) or age < 0)
+            ):
+                return "vehicle_input_stale"
             area = self._manager.area_snapshot(settings.area_id)
             if area is None or snapshot.morek_price_evidence is None:
                 return "price_evidence_unavailable"
@@ -2498,7 +2494,8 @@ class AutoPlannerController:
             )
         facts = None if self._vehicle_reader is None else self._vehicle_reader(settings.target.vehicle_id or "")
         live_soc = None if facts is None else facts.soc_percent
-        if live_soc is None:
+        if (live_soc is None or isinstance(live_soc, bool) or not isinstance(live_soc, (int, float))
+                or not math.isfinite(live_soc) or not 0 <= live_soc <= 100):
             return self._fresh_snapshot(
                 settings, "incomplete_settings", "target_soc_unknown", calculated_at,
                 missing=("live_soc",), entry=entry, price_snapshot=price_snapshot,

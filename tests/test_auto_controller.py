@@ -109,7 +109,7 @@ async def test_capped_target_uses_fresh_actual_soc(harness: Harness, no_executio
     assert_nothing_executed(no_execution)
 
 
-async def test_capped_target_rejects_stale_soc(harness: Harness, no_execution: dict[str, Any]) -> None:
+async def test_capped_target_accepts_old_soc(harness: Harness, no_execution: dict[str, Any]) -> None:
     serve(harness.transport)
     harness.vehicle_reader = lambda vehicle_id: LiveVehicleFacts(
         vehicle_id=vehicle_id, soc_percent=25, soc_age_s=181, reported_capacity_kwh=60,
@@ -118,7 +118,7 @@ async def test_capped_target_rejects_stale_soc(harness: Harness, no_execution: d
         driver=DRIVER_TARGET_SOC, target=TargetSocIntent(vehicle_id="veh-1", target_percent=80),
         soft_price_cap=.1, cap_price_basis="nord_pool", minimum_ready_by_soc=40,
     )
-    assert controller.snapshot().reason == "target_soc_stale"
+    assert controller.snapshot().reason != "target_soc_stale"
     assert_nothing_executed(no_execution)
 
 

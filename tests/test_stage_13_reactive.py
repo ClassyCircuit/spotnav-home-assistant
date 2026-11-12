@@ -170,11 +170,9 @@ def test_independent_soc_and_price_events_change_policy(monkeypatch):
         policy = encode_preview(price, w.store.settings("test"))["price_policy"]
         assert "minimum_exception" not in {item["code"] for item in policy["explanations"]}
         w.facts[0] = replace(w.facts[0], soc_age_s=10000)
-        stale = await w.controller.async_recalculate()
-        unavailable = encode_preview(stale, w.store.settings("test"))["price_policy"]
-        assert unavailable["reason"] == "target_soc_stale"
-        assert unavailable["estimated_plan_kwh"] is None
-        assert unavailable["explanations"][0]["code"] == "unavailable"
+        older = await w.controller.async_recalculate()
+        policy = encode_preview(older, w.store.settings("test"))["price_policy"]
+        assert policy["estimated_plan_kwh"] == pytest.approx(price.proposal.delivered_kwh)
 
     asyncio.run(run())
 
@@ -416,13 +414,17 @@ def test_reader_source_loss_notifies_once_on_transition():
     reader._note_source_state = MagicMock()  # noqa: SLF001
     reader.read = MagicMock(return_value=None)
     reader._watch_vehicle = "veh-1"  # noqa: SLF001
+    reader._watched_report_time = None  # noqa: SLF001
+    reader._last_reading = None  # noqa: SLF001
+    reader._last_signal_reading = None  # noqa: SLF001
+    reader._anchor = None  # noqa: SLF001
     lost = []
     reader.set_on_source_unavailable(lambda: lost.append(True))
     reader._on_source_changed(SimpleNamespace(data={  # noqa: SLF001
-        "old_state": SimpleNamespace(state="25"), "new_state": SimpleNamespace(state="unavailable"),
+        "entity_id": "sensor.soc", "old_state": SimpleNamespace(state="25"), "new_state": SimpleNamespace(state="unavailable"),
     }))
     reader._on_source_changed(SimpleNamespace(data={  # noqa: SLF001
-        "old_state": SimpleNamespace(state="unavailable"), "new_state": SimpleNamespace(state="unknown"),
+        "entity_id": "sensor.soc", "old_state": SimpleNamespace(state="unavailable"), "new_state": SimpleNamespace(state="unknown"),
     }))
     assert lost == [True]
 

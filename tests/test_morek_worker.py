@@ -1,7 +1,7 @@
 """Actual intent/worker modules; HA, OCPP and simulated ownership are boundaries."""
 
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, Mock
@@ -953,7 +953,7 @@ async def real_admission_planner_worker(monkeypatch, tmp_path):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("boundary", ["ledger", "entry_store"])
 @pytest.mark.parametrize("change", ["authority", "state", "document", "coverage", "generation", "source",
-                                    "soc", "age", "vehicle", "settings", "connection"])
+                                    "soc", "age", "report", "soc_source", "vehicle", "settings", "connection"])
 async def test_real_admission_rechecks_planner_inputs_after_persistence(monkeypatch, tmp_path, boundary, change):
     w, world, disk = await real_admission_planner_worker(monkeypatch, tmp_path)
     reached, proceed = asyncio.Event(), asyncio.Event()
@@ -986,6 +986,10 @@ async def test_real_admission_rechecks_planner_inputs_after_persistence(monkeypa
         world.facts[0] = replace(world.facts[0], soc_percent=30)
     elif change == "age":
         world.facts[0] = replace(world.facts[0], soc_age_s=100000)
+    elif change == "report":
+        world.facts[0] = replace(world.facts[0], soc_report_at=world.request.now)
+    elif change == "soc_source":
+        world.facts[0] = replace(world.facts[0], soc_entity_id="sensor.other")
     elif change == "vehicle":
         world.facts[0] = replace(world.facts[0], vehicle_id="other")
     elif change == "settings":
@@ -994,6 +998,10 @@ async def test_real_admission_rechecks_planner_inputs_after_persistence(monkeypa
         world.controller._connection_generation += 1
     proceed.set()
     await drain(w.worker)
+    if change == "age":
+        assert w.point.call.await_count == 1
+        w.worker.close()
+        return
     assert w.worker.reason in ("price_inputs_changed", "plan_inputs_changed", "vehicle_input_stale", "no_current_plan")
     outcome = await w.ledger.read()
     assert outcome["attempt"]["state"] == "aborted_before_dispatch"
@@ -1317,15 +1325,59 @@ async def test_pause_ignores_missing_prices_and_resume_preserves_held_limit(monk
 
 
 @pytest.mark.asyncio
-async def test_unchanged_vehicle_age_does_not_change_provenance_but_expiry_blocks(monkeypatch):
+async def test_unchanged_vehicle_age_does_not_block_reconciliation(monkeypatch):
     w, world = await real_planner_worker(monkeypatch)
     world.facts[0] = replace(world.facts[0], soc_age_s=2)
     assert world.controller.morek_plan_blocker(world.controller.snapshot(), world.request.now) is None
     world.facts[0] = replace(world.facts[0], soc_age_s=100000)
     w.worker.start()
     await drain(w.worker)
-    assert w.worker.reason == "vehicle_input_stale"
-    w.point.call.assert_not_awaited()
+    assert w.point.call.await_count == 1
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_last_known_soc_reconciles_and_new_report_invalidates_then_replans(monkeypatch, tmp_path):
+    w, world, _ = await real_admission_planner_worker(monkeypatch, tmp_path)
+    old = world.request.now - timedelta(days=4)
+    world.facts[0] = replace(world.facts[0], soc_age_s=4 * 86400, soc_report_at=old, soc_entity_id="sensor.soc")
+    await world.controller.async_recalculate()
+    assert world.controller.morek_plan_blocker(world.controller.snapshot(), world.request.now) is None
+    w.worker.start()
+    await drain(w.worker)
+    assert w.point.call.await_count == 1
+    world.facts[0] = replace(world.facts[0], soc_age_s=4 * 86400 + 30)
+    w.worker.trigger()
+    await drain(w.worker)
+    assert w.worker.reason == "unchanged" and w.point.call.await_count == 1
+    world.facts[0] = replace(world.facts[0], soc_report_at=world.request.now, soc_age_s=0)
+    assert world.controller.morek_plan_blocker(world.controller.snapshot(), world.request.now) == "plan_inputs_changed"
+    await world.controller.async_recalculate()
+    await drain(w.worker)
+    assert w.point.call.await_count == 1  # same intent; a real report does not force a resend
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_preplug_last_known_soc_and_uncapped_estimates_remain_admissible(monkeypatch):
+    w, world = await real_planner_worker(monkeypatch)
+    facts = replace(world.facts[0], soc_age_s=86400 * 3, soc_estimated=False)
+    world.facts[0] = facts
+    await world.controller.async_recalculate()
+    old_executor = world.controller._executor
+    world.controller._executor = SimpleNamespace(controller=SimpleNamespace(
+        plugged_in_for_count=world.request.now - timedelta(hours=1), target_stop_record=None))
+    snapshot = replace(world.controller.snapshot(), morek_input_evidence=world.controller._morek_input_evidence(
+        world.store.settings("test")))
+    assert world.controller.morek_plan_blocker(snapshot, world.request.now) is None
+    world.controller._executor = old_executor
+    await world.store.async_update("test", mutate=lambda s: replace(s, soft_price_cap=None))
+    world.facts[0] = replace(facts, soc_estimated=True)
+    world.area.catalogue.market_tz = world.area.catalogue.tz
+    world.area.catalogue.publication = SimpleNamespace(tz=world.area.catalogue.tz, local_time=time(13))
+    await world.controller.async_recalculate()
+    assert world.controller.snapshot().proposal is not None
+    assert world.controller.morek_plan_blocker(world.controller.snapshot(), world.request.now) is None
     w.worker.close()
 
 

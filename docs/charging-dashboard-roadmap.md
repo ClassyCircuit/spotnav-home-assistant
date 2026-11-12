@@ -99,7 +99,7 @@ Detailed requirements and acceptance cases follow outside this checklist.
 | 9 | Targeted dashboard fixes | Only where needed; initial installation is in Stage 5 |
 | 10 | Optional Charge Now override | After the initial 5.8 installation and user-directed validation; independent of Stages 6–9 |
 | 11 | Adaptive charging estimates for Morek | Later work; reuse existing learning and genuine measurement sources |
-| 12 | Fix real sidebar usability, price presentation and evidence | Prioritize before 5.8; implement bounded 12.1–12.7 separately alongside remaining 5.7b work |
+| 12 | Fix real sidebar usability, price presentation and evidence | Prioritize before 5.8; implement bounded 12.1–12.8 separately alongside remaining 5.7b work |
 
 ### Stage 0 — Completed baseline: preserve and reuse
 
@@ -1295,6 +1295,12 @@ action, weaken admission/safety checks, or claim physical behavior is verified.
     shared chart/sidebar rendering and backend contract compatibility.
 
 - [ ] **12.3 Useful plan details and honest missing data**
+  - **Scope after 12.6 and 12.8:** 12.6 already displays last-known SOC, its
+    provenance/age and available capacity/efficiency (local implementation;
+    review pending). Reuse those paths rather than reimplementing them. 12.8's
+    flexible last-known-SOC planning policy is in progress, not yet established:
+    coordinate with its completed implementation before depending on it, and do
+    not revert its agreed no-age-cutoff policy or claim it already works.
   - Investigate each prominent Unknown using the real dashboard contract. Bind
     available deadline and planning information; provide the total weighted average
     when valid priced total cost, positive wall energy, currency and cost basis support
@@ -1307,10 +1313,14 @@ action, weaken admission/safety checks, or claim physical behavior is verified.
     tariff basis, partial windows and total; extend the existing contract if needed.
     Explain missing inputs instead of fabricating results. Test consistency across
     the compact plan, full plan, modal and chart, including partial and unpriced plans.
-  - For SOC projections, identify missing usable capacity, efficiency, fresh SOC or
-    mode and guide the user to supported configuration; never invent assumptions or
-    report estimates as measured. Preserve the distinction between the car's own
-    target and SpotNav's planning target.
+  - For SOC projections, identify missing or invalid usable capacity, efficiency,
+    SOC or mode and guide the user to supported configuration. Once 12.8 is
+    implemented, do not suppress an otherwise supported projection solely because
+    its valid SOC is old: label it as an estimate based on the last-known value,
+    including age/source when available, and make clear it may be inaccurate.
+    Never invent assumptions or report estimates as measured. Preserve the
+    distinction between the car's own target and SpotNav's planning target; do not
+    change planner or execution admission rules as a shortcut for display.
   - Keep measured power, genuine history and price insights unavailable where reliable
     sources or sufficient coverage do not exist. Reuse 5.7b and later Stages 6–8;
     do not infer measured charging from planned windows or duplicate those stages.
@@ -1403,6 +1413,39 @@ action, weaken admission/safety checks, or claim physical behavior is verified.
     final 0 A and protection interlocks. Test missing/settled/uncertain records,
     migration, restart, refusal, committed-follow-up failure, transport uncertainty,
     stale responses and no automatic writes using mocked HA/OCPP boundaries.
+
+- [x] **12.8 Flexible last-known SOC for planning and Morek reconciliation** (local implementation; review pending)
+  - 2.5.72 accepts valid old actual SOC for capped and uncapped target plans and
+    Morek plan provenance without an age or plug-in cutoff. Capped planning still
+    refuses estimated SOC; uncapped estimate handling is unchanged. A genuinely
+    newer vehicle timestamp invalidates the prior proposal and triggers replanning;
+    unchanged HA writes do not imply a new report or force another schedule send.
+    Other safety, identity and price checks remain. Mocked tests are not live proof.
+  - The user explicitly wants the old uncapped planner's flexibility: a valid
+    last-known BMW/vehicle SOC may be used for target-SOC planning regardless of
+    age, including soft-cap/minimum-SOC planning. Do not introduce a fixed age
+    cutoff or reject solely because the reading predates the current plug-in.
+    Preserve its actual age, source and stale/estimated status in the UI and label
+    calculated energy, projected SOC and cost as estimates based on the last-known
+    value. Old data may be inaccurate after driving; do not claim otherwise.
+  - Trace the actual uncapped and capped planning and Morek worker provenance paths;
+    align the age-only admission checks so a valid older reading used for a current
+    plan can also support guarded reconciliation. Replan when a genuinely newer SOC
+    arrives. Do not conflate an unchanged HA refresh or restored value with a new
+    vehicle report, trigger a wake, or repeatedly send unchanged schedules.
+  - Preserve validation of SOC range, vehicle/connector identity, capacity, target,
+    minimum, price source and coverage, settings revision, lifecycle, person Stop,
+    protection, uncertain outcomes and all other admission safeguards. A missing,
+    invalid or unavailable SOC is not a valid old reading; handle estimates and
+    stale-versus-unavailable evidence explicitly. Do not assume an old value proves
+    current SOC or physical charging. This change does not authorize a profile send,
+    live operation, or bypass ownership and recovery blockers.
+  - Test actual backend planner and worker/admission paths for fresh and hours/days
+    old valid SOC, pre-plug readings, missing/invalid data, price-cap/minimum policy,
+    newer reports triggering replanning, unchanged refreshes, source/vehicle/settings
+    changes, pause/Stop and uncertain outcomes. Verify that normal uncapped behavior
+    is not regressed and estimates and age are accurately exposed in the sidebar.
+    Coordinate with 12.6 rather than duplicating its display or source-provenance work.
 
 Each substage includes focused automated tests and documentation. For integration or
 card changes, bump the manifest, build the frontend and verify `npm run check-dist`

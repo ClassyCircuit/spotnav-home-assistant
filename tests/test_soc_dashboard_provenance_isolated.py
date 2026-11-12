@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from custom_components.spotnav.api import dashboard
 from custom_components.spotnav.execution import target_stop
 from custom_components.spotnav.vehicles.soc_estimate import SocAnchor, SocReader, is_fresh, resolve_soc
+from custom_components.spotnav.vehicles import soc_estimate
 
 
 NOW = datetime(2026, 11, 12, 12, tzinfo=timezone.utc)
@@ -65,3 +66,62 @@ def test_capture_and_serialize_keep_raw_and_effective_separate(monkeypatch):
     reader.last_raw_reading = target_stop.SocReading(101, "charger", "sensor.other", None, 3)
     assert dashboard.serialize_soc_observation(dashboard.capture_soc(object(), "charger", settings))["raw_value"] is None
     assert dashboard.serialize_soc_observation(None) is None
+
+
+def test_soc_watch_notifies_for_new_vehicle_report_not_unchanged_ha_write():
+    reader = object.__new__(SocReader)
+    report = NOW - timedelta(days=1)
+    old = target_stop.SocReading(42, "vehicle", "sensor.soc", "car", 86400,
+                                 time_basis="vehicle_timestamp", reported_at=report)
+    reader._last_reading = old
+    reader._last_signal_reading = old
+    reader._anchor = None
+    reader._watch_vehicle = "car"
+    reader._watched_report_time = "sensor.report_time"
+    reader._last_notified = 42
+    reader._notify_next = False
+    reader._notify_every_reading = lambda: True
+    reader._drop_arrival = lambda: None
+    calls = []
+    reader._on_reading = lambda: calls.append("replan")
+    reader._on_source_unavailable = None
+    reader._note_source_state = lambda _: None
+    current = [old]
+    def read(_vehicle):
+        reader._last_reading = current[0]
+        return current[0]
+    reader.read = read
+    event = SimpleNamespace(data={"entity_id": "sensor.soc", "old_state": SimpleNamespace(state="42"),
+                                  "new_state": SimpleNamespace(state="42")})
+    reader._on_source_changed(event)
+    assert calls == []
+    current[0] = target_stop.SocReading(42, "vehicle", "sensor.soc", "car", 60,
+                                      time_basis="vehicle_timestamp", reported_at=NOW - timedelta(minutes=1))
+    reader._last_reading = current[0]  # a dashboard read happened before the event
+    reader._anchor = SocAnchor(42, 100, current[0].reported_at, "vehicle", "car", "sensor.energy", time_basis="vehicle_timestamp")
+    event.data["entity_id"] = "sensor.report_time"
+    reader._on_source_changed(event)
+    assert calls == ["replan"]
+    current[0] = target_stop.SocReading(42, "charger", "sensor.charger", None, 3)
+    event.data["entity_id"] = "sensor.soc"
+    reader._on_source_changed(event)
+    assert calls == ["replan", "replan"]
+    reader._on_source_changed(event)
+    assert calls == ["replan", "replan"]
+
+
+def test_watch_subscribes_to_vehicle_report_time_sensor(monkeypatch):
+    reader = object.__new__(SocReader)
+    reader._closed = False
+    reader._hass = object()
+    reader._charge_control = lambda: "control"
+    reader._watch_vehicle = None
+    reader._watched = ()
+    reader._watch_cancel = None
+    monkeypatch.setattr(soc_estimate, "vehicle_soc_entity_id", lambda *_: "sensor.soc")
+    monkeypatch.setattr(soc_estimate, "charger_soc_entity_id", lambda *_: None)
+    monkeypatch.setattr(soc_estimate, "report_time_entity_id", lambda *_: "sensor.report_time")
+    watched = []
+    monkeypatch.setattr(soc_estimate, "async_track_state_change_event", lambda _, ids, cb: watched.extend(ids) or (lambda: None))
+    reader.ensure_watch("car")
+    assert watched == ["sensor.soc", "sensor.report_time"]

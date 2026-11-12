@@ -180,6 +180,7 @@ describe('actual sidebar read-only host', () => {
     let m=dashboardAdapter(raw,status,now,now).model;
     expect(m.vehicle.soc).toBe(62);expect(m.vehicle.stale).toBe(false);expect(m.vehicle.socDetail).toMatch(/bavariandata.*Vehicle report 30 s ago/);expect(m.assumptions.capacityKwh).toBe(70);
     m=dashboardAdapter(raw,status,now,now+300000).model;expect(m.vehicle.soc).toBe(62);expect(m.vehicle.stale).toBe(true);expect(m.vehicle.socDetail).toMatch(/5 min ago/);expect(m.assumptions.startingSoc).toBeNull();
+    expect(m.targetNote).toMatch(/estimates based on the last-known SOC/);
     expect(renderBattery({soc:62,stale:true,planStale:false,windows:[{start:0,end:3600000}],minutesPerTimeUnit:1/60000})).toContain('60 min');
     raw.generated_at=new Date(now+300000).toISOString();raw.soc.age_s=330;raw.soc_observation.raw_age_s=330;
     m=dashboardAdapter(raw,status,now,now+300000).model;expect(m.vehicle.socDetail).toMatch(/5 min ago/);

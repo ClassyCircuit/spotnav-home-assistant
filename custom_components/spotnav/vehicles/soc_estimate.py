@@ -68,6 +68,7 @@ from ..execution.target_stop import (
 )
 from ..planning.planner import resolve_target_energy, TargetEnergyRequest
 from ..util import finite_number
+from .report_time import report_time_entity_id
 from .vehicle_discovery import (
     _device_name,
     charger_vehicle_ids,
@@ -599,7 +600,7 @@ def resolve_soc(
             and reading.state_age_s is not None
         ):
             # The value moved but the car's report time did not: the state's own time says when it came.
-            reading = replace(reading, age_s=reading.state_age_s, time_basis="last_updated", time_entity_id=None)
+            reading = replace(reading, age_s=reading.state_age_s, time_basis="last_updated", time_entity_id=None, reported_at=None)
             read_at = _read_at(reading, now)
     restored = (
         usable
@@ -653,6 +654,7 @@ def resolve_soc(
             estimated=True,
             restored=restored,
             time_basis="anchor",
+            reported_at=anchor.read_at if anchor.time_basis == "vehicle_timestamp" else None,
         ),
         anchor,
     )
@@ -915,6 +917,7 @@ class SocReader:
         self._peak_saved_at: datetime | None = None
         # What the last resolution was made of, for the diagnostics.
         self._last_reading: SocReading | None = None
+        self._last_signal_reading: SocReading | None = None
         self._last_vehicle_id: str | None = None
         self._last_since_restart = False
         self._store: Store[dict[str, Any]] = Store(hass, _STORE_VERSION, f"{_STORE_KEY_PREFIX}.{entry_id}")
@@ -922,6 +925,7 @@ class SocReader:
         self._facts_cache: dict[str, tuple[datetime, float | None, float | None]] = {}
         self._watch_cancel: Callable[[], None] | None = None
         self._watched: tuple[str, ...] = ()
+        self._watched_report_time: str | None = None
         self._watch_vehicle: str | None = None
         self._on_reading: Callable[[], None] | None = None
         self._on_source_unavailable: Callable[[], None] | None = None
@@ -1188,6 +1192,8 @@ class SocReader:
         register_entity_id = self._register_entity_id()
         self._watch_register(register_entity_id)
         reading, throughout = self._with_comeback(self._raw_reader(vehicle_id))
+        if self._last_signal_reading is None:
+            self._last_signal_reading = reading
         since_restart = self._since_restart(reading)
         self._last_reading, self._last_since_restart = reading, since_restart
         register_kwh, register_updated_at = read_energy_register(self._hass, register_entity_id)
@@ -1342,18 +1348,24 @@ class SocReader:
         """Watch the source entities so a fresh reading is anchored the moment it arrives."""
         if self._closed:
             return
-        entity_ids = tuple(
+        vehicle_entity = vehicle_soc_entity_id(self._hass, vehicle_id)
+        self._watched_report_time = report_time_entity_id(self._hass, vehicle_entity)
+        entity_ids = tuple(dict.fromkeys(
             entity_id
             for entity_id in (
                 charger_soc_entity_id(self._hass, self._charge_control()),
-                vehicle_soc_entity_id(self._hass, vehicle_id),
+                vehicle_entity,
+                self._watched_report_time,
             )
             if entity_id
-        )
+        ))
+        if self._watch_vehicle != vehicle_id:
+            self._last_signal_reading = None
         self._watch_vehicle = vehicle_id
         if entity_ids == self._watched:
             return
         self._drop_watch()
+        self._last_signal_reading = None
         self._watched = entity_ids
         if entity_ids:
             self._watch_cancel = async_track_state_change_event(
@@ -1368,25 +1380,49 @@ class SocReader:
 
     @callback
     def _on_source_changed(self, event: Event[EventStateChangedData]) -> None:
-        self._note_source_state(event)
+        is_report_time = event.data["entity_id"] == self._watched_report_time
+        previous = self._last_signal_reading
+        anchor = self._anchor
+        if not is_report_time:
+            self._note_source_state(event)
         new = event.data["new_state"]
         old = event.data["old_state"]
-        if (new is None or new.state in (STATE_UNAVAILABLE, STATE_UNKNOWN)) and (
+        if not is_report_time and (new is None or new.state in (STATE_UNAVAILABLE, STATE_UNKNOWN)) and (
             old is not None and old.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN)
         ):
             if self._on_source_unavailable is not None:
                 self._on_source_unavailable()
         reading = self.read(self._watch_vehicle)
-        if reading is None or reading.soc_percent is None or reading.estimated:
+        current = self._last_reading
+        self._last_signal_reading = current
+        if reading is None or reading.soc_percent is None:
             return
-        self._tell(reading)
+        prior_report = None if previous is None else previous.reported_at
+        if (prior_report is None and anchor is not None and anchor.vehicle_id == self._watch_vehicle
+                and anchor.time_basis == "vehicle_timestamp"):
+            prior_report = anchor.read_at
+        newer_report = bool(current is not None and current.reported_at is not None
+                            and prior_report is not None and current.reported_at > prior_report)
+        source_changed = bool(previous is not None and current is not None and (
+            previous.source, previous.entity_id, previous.vehicle_id
+        ) != (current.source, current.entity_id, current.vehicle_id))
+        if reading.estimated and not newer_report and not source_changed:
+            return
+        if reading.restored and not newer_report and not source_changed:
+            return
+        if (previous is not None and current is not None and previous.source == current.source
+                and previous.entity_id == current.entity_id and previous.soc_percent == current.soc_percent
+                and not newer_report):
+            return
+        self._tell(reading, new_report=newer_report or source_changed)
 
-    def _tell(self, reading: SocReading) -> None:
+    def _tell(self, reading: SocReading, *, new_report: bool = False) -> None:
         """Ask for a new calculation on `reading`: always while one lacked a level, else when it moved."""
         assert reading.soc_percent is not None
         last = self._last_notified
         if (
             not self._notify_next
+            and not new_report
             and not (self._notify_every_reading is not None and self._notify_every_reading())
             and last is not None
             and abs(reading.soc_percent - last) < RECALCULATE_DELTA_PERCENT

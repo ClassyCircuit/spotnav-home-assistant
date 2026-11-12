@@ -59914,7 +59914,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
       settings: { target: d3.soc?.target_percent, minimum: d3.settings?.minimum_ready_by_soc, cap: d3.settings?.soft_price_cap, readyBy: d3.settings?.departure_time },
       canSave: false,
       untilDeadline: U,
-      targetNote: "",
+      targetNote: d3.settings?.driver === "target_soc" && d3.soc?.value != null ? `Plan energy, projected SOC and cost are estimates based on the last-known SOC${d3.soc.estimated ? " and an energy-derived SOC estimate" : ""}; an old reading may not reflect driving since then.` : "",
       warning: warning ? { title: "Morek health requires attention", detail: `${health}${status?.outcomes?.uncertain && (status?.operator?.state === "mismatch" || status?.verification?.reason === "limits_or_transitions_differ") ? " \xB7 Effective limits mismatch the sent schedule." : ""}` } : null,
       evidence: { status: health, context: `Morek status observed ${date(observedAt, zone)}${failed ? " \xB7 unavailable" : ""}; separate from dashboard`, readiness, proposal: date(d3.planning?.calculated_at, zone), sent: `${date(status?.sent_at, zone)} \xB7 ${status?.ack || U}`, readback: date(status?.effective?.fetched_at, zone), measurement: "SOC age and measured power unavailable when stale or unsupported", dispatch: `${status?.ownership?.completion_authorized ? "Schedule ownership confirmed for this process." : "Schedule dispatch blocked; recovery needs valid durable ownership and outcome evidence. Older completed ownership may need one admin reconfirmation."} External OCPP writers and native protection are not verified; the historical mismatch does not establish current state. A held exit or uncertain outcome remains blocked. Disabling the integration may leave a schedule or 0 A limit; no physical stop or profile removal is implied.` },
       labels: { settingsNote: "Read-only preview. Plan controls are unavailable in this slice.", saveLabel: "Save plan \xB7 unavailable", powerNote: "No verified general Morek power source", planLabel: "Backend policy:", chartIntro: "Published source price before configured fiscal additions; source-included charges may apply.", chartNote: `Held published intervals only. ${priceFreshness} Unpublished future and history are unavailable. Cap is omitted if its basis differs or is unknown.`, bands: "", dialogNote: "Proposal only; not necessarily sent.", footer: "Dashboard and Morek status are separate observations." }
@@ -59924,7 +59924,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.71";
+var CARD_VERSION = "2.5.72";
 
 // sidebar/panel.js
 var settingsWritesByConnection = /* @__PURE__ */ new WeakMap();
