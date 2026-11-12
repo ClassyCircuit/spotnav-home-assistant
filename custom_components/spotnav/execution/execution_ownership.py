@@ -52,11 +52,19 @@ def _decode(raw: Any) -> tuple[str, dict[str, dict[str, Any]]]:
     records = data["records"]
     for entry_id, record in records.items():
         if (not isinstance(entry_id, str) or not entry_id or not isinstance(record, dict)
-                or set(record) != {"station_id", "connector_id", "owner"}
+                or set(record) not in ({"station_id", "connector_id", "owner"},
+                                       {"station_id", "connector_id", "owner", "transition"})
                 or not isinstance(record["station_id"], str) or not record["station_id"]
                 or type(record["connector_id"]) is not int or record["connector_id"] < 1
                 or record["owner"] not in ("legacy", "morek_schedule")):
             return "malformed", {}
+        if "transition" in record:
+            transition = record["transition"]
+            if (record["owner"] != "legacy" or not isinstance(transition, dict)
+                    or set(transition) != {"version", "state"} or type(transition["version"]) is not int
+                    or transition["version"] != 1 or transition["state"] not in
+                    ("requested", "interrupted", "drained_unarmed")):
+                return "malformed", {}
     return "valid", records
 
 
@@ -72,6 +80,97 @@ class ExecutionOwnershipStore:
         self._records: dict[str, dict[str, Any]] = {}
         self._contenders: dict[tuple[str, int], set[str]] = {}
         self._cancelled_write = False
+        self._transition_save_uncertain = False
+
+    async def async_set_entry_transition(
+        self, entry_id: str, identity: dict[str, Any], resolve_identity: Callable[[], Mapping[str, Any]],
+        state: str,
+    ) -> str:
+        """Persist one monotonic unarmed entry marker; never acquire a connector lock here."""
+        async with self._lock:
+            await self._load()
+            if self._state != "valid" or self._cancelled_write:
+                return "ownership_unavailable"
+            record = self._records.get(entry_id)
+            physical = (identity.get("resolved_id"), identity.get("connector_id"))
+            fresh = resolve_identity()
+            if (not record or record["owner"] != "legacy" or not identity.get("supported")
+                    or (record["station_id"], record["connector_id"]) != physical
+                    or not fresh.get("supported") or (fresh.get("resolved_id"), fresh.get("connector_id")) != physical
+                    or len(self._contenders.get(physical, set())) > 1
+                    or any(other != entry_id and (item["station_id"], item["connector_id"]) == physical
+                           for other, item in self._records.items())):
+                return "ownership_unavailable"
+            previous = record.get("transition", {}).get("state")
+            if (state == "requested" and previous is not None) or (
+                    state == "drained_unarmed" and previous != "requested") or (
+                    state == "interrupted" and previous not in ("requested", "drained_unarmed")):
+                return "ownership_unavailable"
+            if state not in ("requested", "interrupted", "drained_unarmed"):
+                return "ownership_unavailable"
+            records = {**self._records, entry_id: {**record, "transition": {"version": 1, "state": state}}}
+            try:
+                await self._store.async_save({"schema_version": SCHEMA_VERSION, "records": records})
+                raw = await self._hass.async_add_executor_job(_read_envelope, self._store.path)
+                saved_state, saved_records = _decode(raw)
+                if saved_state != "valid" or saved_records != records:
+                    self._state = "save_failed"
+                    self._transition_save_uncertain = True
+                    return "save_uncertain"
+            except asyncio.CancelledError:
+                self._state = "save_failed"
+                self._transition_save_uncertain = True
+                self._cancelled_write = True
+                raise
+            except BaseException:
+                self._state = "save_failed"
+                self._transition_save_uncertain = True
+                raise
+            self._records = records
+            return "saved"
+
+    async def async_abort_entry_transition(
+        self, entry_id: str, identity: Mapping[str, Any], expected_state: str,
+        can_commit: Callable[[], bool],
+    ) -> str:
+        """Remove only a verified unarmed marker; caller holds connector admission."""
+        async with self._lock:
+            await self._load()
+            if self._state != "valid" or self._transition_save_uncertain or self._cancelled_write:
+                return "ownership_unavailable"
+            record = self._records.get(entry_id)
+            physical = (identity.get("resolved_id"), identity.get("connector_id"))
+            if (not record or record["owner"] != "legacy"
+                    or (record["station_id"], record["connector_id"]) != physical
+                    or record.get("transition", {}).get("state") != expected_state
+                    or len(self._contenders.get(physical, set())) > 1
+                    or any(other != entry_id and (item["station_id"], item["connector_id"]) == physical
+                           for other, item in self._records.items())):
+                return "ownership_unavailable"
+            try:
+                disk_state, disk_records = _decode(await self._hass.async_add_executor_job(_read_envelope, self._store.path))
+                if disk_state != "valid" or disk_records != self._records or not can_commit():
+                    return "recovery_changed"
+                updated = dict(record)
+                del updated["transition"]
+                records = {**self._records, entry_id: updated}
+                await self._store.async_save({"schema_version": SCHEMA_VERSION, "records": records})
+                disk_state, disk_records = _decode(await self._hass.async_add_executor_job(_read_envelope, self._store.path))
+                if disk_state != "valid" or disk_records != records:
+                    self._state = "save_failed"
+                    self._transition_save_uncertain = True
+                    return "save_uncertain"
+            except asyncio.CancelledError:
+                self._state = "save_failed"
+                self._transition_save_uncertain = True
+                self._cancelled_write = True
+                raise
+            except Exception:  # noqa: BLE001 - a failed write may have landed
+                self._state = "save_failed"
+                self._transition_save_uncertain = True
+                return "save_uncertain"
+            self._records = records
+            return "aborted"
 
     async def _load(self) -> None:
         if self._loaded:
@@ -113,6 +212,8 @@ class ExecutionOwnershipStore:
             physical = (station, connector)
             contenders = self._contenders.setdefault(physical, set())
             contenders.add(entry_id)
+            contenders.update(other for other, item in self._records.items()
+                              if (item["station_id"], item["connector_id"]) == physical)
             if (len(contenders) > 1 or any(other != entry_id and
                     (item["station_id"], item["connector_id"]) == physical
                     for other, item in self._records.items())):
@@ -157,7 +258,7 @@ class ExecutionOwnershipStore:
         """Read metadata only; this is not a command gate or a safety assessment."""
         async with self._lock:
             await self._load()
-            state = self._state
+            state = "valid" if self._transition_save_uncertain else self._state
             record = self._records.get(entry_id)
             if state == "valid":
                 if record is None:
@@ -180,12 +281,17 @@ class ExecutionOwnershipStore:
                       (identity.get("resolved_id"), identity.get("connector_id")) !=
                       (record["station_id"], record["connector_id"])):
                     state = "identity_mismatch"
+            person_stop_safe = self._transition_save_uncertain and state == "valid" and record is not None and record["owner"] == "legacy"
+            if self._transition_save_uncertain:
+                state = "save_failed"
             return {
                 "schema_version": SCHEMA_VERSION,
                 "record_state": state,
                 "recorded_owner": record["owner"] if record is not None and state == "valid" else None,
                 "station_id": record["station_id"] if record else None,
                 "connector_id": record["connector_id"] if record else None,
+                "transition_state": record.get("transition", {}).get("state") if record and state == "valid" else None,
+                "person_stop_safe_during_transition_failure": person_stop_safe,
                 "schedule_mode_available": False,
                 "armed": False,
                 "ready": False,

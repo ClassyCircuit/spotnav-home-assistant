@@ -2,7 +2,7 @@
 
 import ast
 import asyncio
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
@@ -69,6 +69,18 @@ def adapter_for(hass, target, entry_id="a"):
 
     adapter._logged = logged
     return adapter, path, current, phase
+
+
+async def paused_settings_for_recovery(hass, monkeypatch):
+    """Actual settings store, with HA storage mocked on disk."""
+    from homeassistant.helpers import storage
+    from custom_components.spotnav.planning.auto_settings import AutoSettingsStore, PauseIntent, STORAGE_KEY
+
+    monkeypatch.setattr(storage, "Store", FakeStore)
+    settings = AutoSettingsStore(hass, store=FakeStore(hass, 1, STORAGE_KEY))
+    settings._loaded = True
+    await settings.async_update("a", mutate=lambda value: replace(value, pause=PauseIntent(choice="until_resumed")))
+    return settings
 
 
 @pytest.mark.asyncio
@@ -598,3 +610,422 @@ async def test_cancelled_reserved_stop_keeps_entry_interrupted_and_ordinary_writ
     assert not await adapter.async_start()
     path.async_start.assert_not_awaited()
     path.async_stop.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("transition", ["requested", "interrupted", "drained_unarmed"])
+async def test_durable_transition_blocks_startup_and_manual_profile_actions(environment, monkeypatch, transition):
+    hass, _, _, target, _, entry = environment
+    saved = {**record(), "transition": {"version": 1, "state": transition}}
+    persist(hass, {"a": saved})
+    adapter, path, _, _ = adapter_for(hass, target)
+    await integration._async_setup_ownership_metadata(
+        hass, entry, SimpleNamespace(ocpp_target=target, charge_control="switch.charger"))
+    assert not await adapter.async_start()
+    assert not await adapter.async_stop()
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=target))
+    operation = AsyncMock()
+    monkeypatch.setattr(morek_schedule, "_async_schedule_action_locked", operation)
+    for action, args in (("send", {"preview_id": "preview"}), ("clear", {"confirm_profile_id": 42001})):
+        with pytest.raises(morek_schedule.ScheduleRefused, match="ownership_unavailable"):
+            await morek_schedule.async_schedule_action(hass, "a", action, **args)
+    operation.assert_not_awaited()
+    path.async_start.assert_not_awaited()
+    path.async_stop.assert_not_awaited()
+    with adapter.person_stop_scope():
+        assert await adapter.async_stop(person_stop=True)
+    path.async_stop.assert_awaited_once()
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_entry_persists_before_drain_and_stop_race_is_durable(environment):
+    hass, store, gate, target, _, entry = environment
+    await integration._async_setup_ownership_metadata(
+        hass, entry, SimpleNamespace(ocpp_target=target, charge_control="switch.charger"))
+    def identity():
+        return morek_schedule._identity_status(hass, target)
+    connector = command_admission.physical_connector(identity())
+    lock = gate._lock_for(connector)
+    await lock.acquire()
+    task = asyncio.create_task(gate.async_begin_unarmed_entry("a", identity, lambda: False))
+    await asyncio.sleep(0)
+    status = await store.async_status("a", identity())
+    assert status["transition_state"] == "requested"
+    restarted = execution_ownership.ExecutionOwnershipStore(hass)
+    assert (await restarted.async_status("a", identity()))["transition_state"] == "requested"
+    with gate.person_stop_reservation("a", identity):
+        lock.release()
+        assert await task == "interrupted"
+    assert (await store.async_status("a", identity()))["transition_state"] == "interrupted"
+    assert (await execution_ownership.ExecutionOwnershipStore(hass).async_status("a", identity()))["transition_state"] == "interrupted"
+    hass.services.async_call.assert_not_awaited()
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_completed_unarmed_drain_persists_without_active_owner(environment):
+    hass, store, gate, target, _, entry = environment
+    await integration._async_setup_ownership_metadata(
+        hass, entry, SimpleNamespace(ocpp_target=target, charge_control="switch.charger"))
+    def identity():
+        return morek_schedule._identity_status(hass, target)
+    assert await gate.async_begin_unarmed_entry("a", identity, lambda: False) == "drained_unarmed"
+    status = await execution_ownership.ExecutionOwnershipStore(hass).async_status("a", identity())
+    assert status["recorded_owner"] == "legacy" and status["transition_state"] == "drained_unarmed"
+    assert not status["armed"] and not status["ready"]
+    hass.services.async_call.assert_not_awaited()
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_uncertain_transition_save_keeps_stop_possible_and_others_blocked(environment):
+    hass, store, gate, target, _, entry = environment
+    await integration._async_setup_ownership_metadata(
+        hass, entry, SimpleNamespace(ocpp_target=target, charge_control="switch.charger"))
+    def identity():
+        return morek_schedule._identity_status(hass, target)
+    store._store.async_save = AsyncMock(side_effect=TimeoutError("unknown outcome"))
+    assert await gate.async_begin_unarmed_entry("a", identity, lambda: False) == "ownership_unavailable"
+    adapter, path, _, _ = adapter_for(hass, target)
+    assert not await adapter.async_start()
+    with adapter.person_stop_scope():
+        assert await adapter.async_stop(person_stop=True)
+    path.async_start.assert_not_awaited()
+    path.async_stop.assert_awaited_once()
+    store._store.async_save.assert_awaited_once()
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_stop_during_requested_save_marks_interrupted(environment):
+    hass, store, gate, target, _, entry = environment
+    await integration._async_setup_ownership_metadata(
+        hass, entry, SimpleNamespace(ocpp_target=target, charge_control="switch.charger"))
+    def identity():
+        return morek_schedule._identity_status(hass, target)
+    entered, release = asyncio.Event(), asyncio.Event()
+    save = store._store.async_save
+    async def delayed(data):
+        if data["records"]["a"]["transition"]["state"] == "requested":
+            entered.set()
+            await release.wait()
+        await save(data)
+    store._store.async_save = delayed
+    task = asyncio.create_task(gate.async_begin_unarmed_entry("a", identity, lambda: False))
+    await entered.wait()
+    with gate.person_stop_reservation("a", identity):
+        release.set()
+        assert await task == "interrupted"
+    assert (await execution_ownership.ExecutionOwnershipStore(hass).async_status("a", identity()))["transition_state"] == "interrupted"
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_cancel_during_requested_save_is_not_retried(environment):
+    hass, store, gate, target, _, entry = environment
+    await integration._async_setup_ownership_metadata(
+        hass, entry, SimpleNamespace(ocpp_target=target, charge_control="switch.charger"))
+    def identity():
+        return morek_schedule._identity_status(hass, target)
+    entered = asyncio.Event()
+    async def saving(_data):
+        entered.set()
+        await asyncio.Event().wait()
+    store._store.async_save = AsyncMock(side_effect=saving)
+    task = asyncio.create_task(gate.async_begin_unarmed_entry("a", identity, lambda: False))
+    await entered.wait()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert (await store.async_status("a", identity()))["record_state"] == "save_failed"
+    assert await gate.async_begin_unarmed_entry("a", identity, lambda: False) == "entry_unavailable"
+    store._store.async_save.assert_awaited_once()
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("transition", [
+    {"version": 2, "state": "requested"},
+    {"version": 1, "state": "unknown"},
+    {"version": 1, "state": "requested", "extra": True},
+])
+async def test_malformed_transition_is_not_migrated(environment, transition):
+    hass, store, gate, target, _, _ = environment
+    persist(hass, {"a": {**record(), "transition": transition}})
+    original = (hass.root / execution_ownership.STORAGE_KEY).read_text(encoding="utf-8")
+    def identity():
+        return morek_schedule._identity_status(hass, target)
+    assert await gate.async_begin_unarmed_entry("a", identity, lambda: False) == "ownership_unavailable"
+    assert (await store.async_status("a", identity()))["record_state"] == "malformed"
+    assert (hass.root / execution_ownership.STORAGE_KEY).read_text(encoding="utf-8") == original
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("transition", ["requested", "interrupted", "drained_unarmed"])
+@pytest.mark.parametrize(("outcome", "expected"), [
+    (None, "aborted"),
+    ({"entry_id": "a", "uncertain": True}, "profile_outcome_uncertain"),
+    ({"entry_id": "a", "uncertain": False, "acknowledged": {"id": "known"}},
+     "aborted"),
+    ({"entry_id": "a", "uncertain": False}, "aborted"),
+])
+async def test_abort_recovery_after_restart(environment, monkeypatch, transition, outcome, expected):
+    from custom_components.spotnav.execution import morek_outcomes
+
+    hass, store, gate, target, _, entry = environment
+    persist(hass, {"a": {**record(), "transition": {"version": 1, "state": transition}}})
+    def identity():
+        return morek_schedule._identity_status(hass, target)
+    ledger = SimpleNamespace(read=AsyncMock(return_value=outcome))
+    monkeypatch.setattr(morek_outcomes, "outcomes_for", lambda _: ledger)
+    settings = await paused_settings_for_recovery(hass, monkeypatch)
+    adapter, path, _, _ = adapter_for(hass, target)
+    await integration._async_setup_ownership_metadata(hass, entry, SimpleNamespace(
+        ocpp_target=target, charge_control="switch.charger"))
+    assert await gate.async_abort_unarmed_entry("a", identity, settings_store=settings) == expected
+    assert await gate.async_abort_unarmed_entry("a", identity, settings_store=settings) == (
+        "no_transition" if expected == "aborted" else expected)
+    assert (await store.async_status("a", identity()))["transition_state"] == (
+        None if expected == "aborted" else transition)
+    assert settings.settings("a").pause.choice == "until_resumed"
+    if expected != "aborted":
+        assert not await adapter.async_start()
+    path.async_start.assert_not_awaited()
+    path.async_stop.assert_not_awaited()
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_abort_is_interrupted_by_person_stop_while_reading_evidence(environment, monkeypatch):
+    from custom_components.spotnav.execution import morek_outcomes
+
+    hass, store, gate, target, _, _ = environment
+    persist(hass, {"a": {**record(), "transition": {"version": 1, "state": "requested"}}})
+    def identity():
+        return morek_schedule._identity_status(hass, target)
+    entered, release = asyncio.Event(), asyncio.Event()
+    async def read():
+        entered.set()
+        await release.wait()
+        return {"entry_id": "a", "uncertain": False}
+    monkeypatch.setattr(morek_outcomes, "outcomes_for", lambda _: SimpleNamespace(read=read))
+    settings = await paused_settings_for_recovery(hass, monkeypatch)
+    task = asyncio.create_task(gate.async_abort_unarmed_entry("a", identity, settings_store=settings))
+    await entered.wait()
+    with gate.person_stop_reservation("a", identity):
+        release.set()
+        assert await task == "person_stop_or_generation_changed"
+    assert (await store.async_status("a", identity()))["transition_state"] == "requested"
+    assert (await gate.async_execute("a", "legacy_actuator", identity, AsyncMock())).allowed is False
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_first_save_that_definitely_did_not_land_leaves_previous_legacy_record(environment, monkeypatch):
+    hass, store, gate, target, _, entry = environment
+    await integration._async_setup_ownership_metadata(
+        hass, entry, SimpleNamespace(ocpp_target=target, charge_control="switch.charger"))
+    def identity():
+        return morek_schedule._identity_status(hass, target)
+    before = (hass.root / execution_ownership.STORAGE_KEY).read_text(encoding="utf-8")
+    store._store.async_save = AsyncMock(side_effect=OSError("not written by mocked boundary"))
+    assert await gate.async_begin_unarmed_entry("a", identity, lambda: False) == "ownership_unavailable"
+    assert (hass.root / execution_ownership.STORAGE_KEY).read_text(encoding="utf-8") == before
+    restarted = execution_ownership.ExecutionOwnershipStore(hass)
+    status = await restarted.async_status("a", identity())
+    assert status["recorded_owner"] == "legacy" and status["transition_state"] is None
+    # The later reader cannot distinguish this from an ordinary legacy document.
+    settings = await paused_settings_for_recovery(hass, monkeypatch)
+    assert await command_admission.CommandAdmission(restarted).async_abort_unarmed_entry(
+        "a", identity, settings_store=settings) == "no_transition"
+    hass.services.async_call.assert_not_awaited()
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["before", "after", "cancel"])
+async def test_abort_save_uncertainty_preserves_pause_and_blocks_in_process(environment, monkeypatch, failure):
+    from custom_components.spotnav.execution import morek_outcomes
+
+    hass, store, gate, target, _, _ = environment
+    persist(hass, {"a": {**record(), "transition": {"version": 1, "state": "requested"}}})
+    settings = await paused_settings_for_recovery(hass, monkeypatch)
+    settings_bytes = Path(settings._store.path).read_bytes()
+    monkeypatch.setattr(morek_outcomes, "outcomes_for", lambda _: SimpleNamespace(read=AsyncMock(return_value=None)))
+    def identity():
+        return morek_schedule._identity_status(hass, target)
+    saved = store._store.async_save
+    started = asyncio.Event()
+    async def save(data):
+        if failure == "after":
+            await saved(data)
+        if failure == "cancel":
+            started.set()
+            await asyncio.Event().wait()
+        raise OSError("synthetic write outcome")
+    store._store.async_save = AsyncMock(side_effect=save)
+    task = asyncio.create_task(gate.async_abort_unarmed_entry("a", identity, settings_store=settings))
+    if failure == "cancel":
+        await started.wait()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    else:
+        assert await task == "save_uncertain"
+    assert (await store.async_status("a", identity()))["record_state"] == "save_failed"
+    assert not (await gate.async_execute("a", "legacy_actuator", identity, AsyncMock())).allowed
+    restarted = execution_ownership.ExecutionOwnershipStore(hass)
+    status = await restarted.async_status("a", identity())
+    assert status["transition_state"] == (None if failure == "after" else "requested")
+    assert Path(settings._store.path).read_bytes() == settings_bytes
+    assert settings.settings("a").pause.choice == "until_resumed"
+    hass.station.call.assert_not_awaited()
+    hass.services.async_call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_stop_racing_abort_save_never_clears_pause_or_automatically_dispatches(environment, monkeypatch):
+    from custom_components.spotnav.execution import morek_outcomes
+
+    hass, store, gate, target, _, _ = environment
+    persist(hass, {"a": {**record(), "transition": {"version": 1, "state": "requested"}}})
+    settings = await paused_settings_for_recovery(hass, monkeypatch)
+    monkeypatch.setattr(morek_outcomes, "outcomes_for", lambda _: SimpleNamespace(read=AsyncMock(return_value=None)))
+    def identity():
+        return morek_schedule._identity_status(hass, target)
+    entered, release = asyncio.Event(), asyncio.Event()
+    save = store._store.async_save
+    async def delay(data):
+        entered.set()
+        await release.wait()
+        await save(data)
+    store._store.async_save = delay
+    task = asyncio.create_task(gate.async_abort_unarmed_entry("a", identity, settings_store=settings))
+    await entered.wait()
+    adapter, path, _, _ = adapter_for(hass, target)
+    with adapter.person_stop_scope():
+        release.set()
+        assert await task == "aborted_stop_pending"
+        assert await adapter.async_legacy_permitted(person_stop=True)
+    assert settings.settings("a").pause.choice == "until_resumed"
+    assert (await store.async_status("a", identity()))["transition_state"] is None
+    assert not await adapter.async_start()
+    path.async_start.assert_not_awaited()
+    path.async_stop.assert_not_awaited()
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("case", ["no_pause", "unsaved", "uncertain", "identity", "duplicate"])
+async def test_abort_refuses_unsafe_evidence(environment, monkeypatch, case):
+    from custom_components.spotnav.execution import morek_outcomes
+
+    hass, store, gate, target, _, _ = environment
+    persist(hass, {"a": {**record(), "transition": {"version": 1, "state": "requested"}}})
+    settings = await paused_settings_for_recovery(hass, monkeypatch)
+    def identity():
+        return morek_schedule._identity_status(hass, target)
+    if case == "no_pause":
+        from custom_components.spotnav.planning.auto_settings import PauseIntent
+        await settings.async_update("a", mutate=lambda value: replace(value, pause=PauseIntent()))
+    if case == "unsaved":
+        settings._unsaved = True
+    if case == "duplicate":
+        assert await gate.async_ensure_initialized("b", identity) == "ownership_conflict"
+    outcome = {"entry_id": "a", "uncertain": case == "uncertain"}
+    monkeypatch.setattr(morek_outcomes, "outcomes_for", lambda _: SimpleNamespace(read=AsyncMock(return_value=outcome)))
+    resolved = (lambda: {}) if case == "identity" else identity
+    result = await gate.async_abort_unarmed_entry("a", resolved, settings_store=settings)
+    assert result == {"no_pause": "pause_not_indefinite", "unsaved": "pause_unavailable",
+                      "uncertain": "profile_outcome_uncertain", "identity": "identity_unresolved",
+                      "duplicate": "ownership_unavailable"}[case]
+    if case != "duplicate":
+        assert (await store.async_status("a", identity()))["transition_state"] == "requested"
+    hass.services.async_call.assert_not_awaited()
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_abort_preserves_legacy_stop_and_known_profile_evidence_across_reload(environment, monkeypatch):
+    from custom_components.spotnav.execution import morek_outcomes
+    from custom_components.spotnav.planning.auto_settings import AutoSettingsStore
+
+    hass, store, gate, target, _, _ = environment
+    persist(hass, {"a": {**record(), "transition": {"version": 1, "state": "interrupted"}}})
+    settings = await paused_settings_for_recovery(hass, monkeypatch)
+    old_file = hass.root / "spotnav.morek_schedule.a"
+    old_file.write_text(json.dumps({"version": 1, "data": {"profile": {"retained": True}, "ack": "Accepted"}}), encoding="utf-8")
+    old_bytes = old_file.read_bytes()
+    stop_file = hass.root / "spotnav.a"
+    stop_file.write_text('{"version": 1, "data": {"person_stopped": true}}', encoding="utf-8")
+    ledger_record = {"entry_id": "a", "uncertain": False, "acknowledged": {"id": "known"}}
+    ledger = SimpleNamespace(read=AsyncMock(return_value=ledger_record), write=AsyncMock())
+    monkeypatch.setattr(morek_outcomes, "outcomes_for", lambda _: ledger)
+    def identity():
+        return morek_schedule._identity_status(hass, target)
+    assert await gate.async_abort_unarmed_entry("a", identity, settings_store=settings) == "aborted"
+    reloaded = execution_ownership.ExecutionOwnershipStore(hass)
+    status = await reloaded.async_status("a", identity())
+    assert status["recorded_owner"] == "legacy" and status["transition_state"] is None
+    class ReloadStore(FakeStore):
+        async def async_load(self):
+            return json.loads(Path(self.path).read_text(encoding="utf-8"))["data"]
+    reloaded_settings = AutoSettingsStore(hass, store=ReloadStore(hass, 1, "spotnav_auto_settings"))
+    await reloaded_settings.async_load()
+    assert reloaded_settings.settings("a").pause.choice == "until_resumed"
+    assert json.loads(stop_file.read_text(encoding="utf-8"))["data"]["person_stopped"] is True
+    assert old_file.read_bytes() == old_bytes and ledger_record["acknowledged"]["id"] == "known"
+    ledger.write.assert_not_awaited()
+    hass.services.async_call.assert_not_awaited()
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_queued_legacy_generation_is_stale_after_abort(environment, monkeypatch):
+    from custom_components.spotnav.execution import morek_outcomes
+
+    hass, _, gate, target, _, _ = environment
+    persist(hass, {"a": {**record(), "transition": {"version": 1, "state": "requested"}}})
+    settings = await paused_settings_for_recovery(hass, monkeypatch)
+    def identity():
+        return morek_schedule._identity_status(hass, target)
+    connector = command_admission.physical_connector(identity())
+    old = gate.generation(connector)
+    monkeypatch.setattr(morek_outcomes, "outcomes_for", lambda _: SimpleNamespace(read=AsyncMock(return_value=None)))
+    assert await gate.async_abort_unarmed_entry("a", identity, settings_store=settings) == "aborted"
+    write = AsyncMock()
+    result = await gate.async_execute("a", "legacy_actuator", identity, write, expected_generation=old)
+    assert result.reason == "stale_generation"
+    write.assert_not_awaited()
+    assert (await gate.async_execute("a", "owned_profile", identity, write)).reason == "schedule_mode_unarmed"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("case", ["missing", "corrupt", "legacy_unknown"])
+async def test_abort_refuses_missing_or_ambiguous_durable_evidence(environment, monkeypatch, case):
+    from custom_components.spotnav.execution import morek_outcomes
+
+    hass, _, gate, target, _, _ = environment
+    ownership_path = hass.root / execution_ownership.STORAGE_KEY
+    if case == "corrupt":
+        ownership_path.write_text("{broken", encoding="utf-8")
+    elif case == "legacy_unknown":
+        persist(hass, {"a": {**record(), "transition": {"version": 1, "state": "requested"}}})
+        (hass.root / "spotnav.morek_schedule.a").write_text(json.dumps({
+            "version": 1, "data": {"profile": {"id": 1}, "ack": "unknown"},
+        }), encoding="utf-8")
+    settings = await paused_settings_for_recovery(hass, monkeypatch)
+    monkeypatch.setattr(morek_outcomes, "outcomes_for", lambda _: SimpleNamespace(read=AsyncMock(return_value=None)))
+    def identity():
+        return morek_schedule._identity_status(hass, target)
+    result = await gate.async_abort_unarmed_entry("a", identity, settings_store=settings)
+    assert result == ("profile_outcome_uncertain" if case == "legacy_unknown" else "ownership_unavailable")
+    if case == "missing":
+        assert not ownership_path.exists()
+    if case == "corrupt":
+        assert ownership_path.read_text(encoding="utf-8") == "{broken"
+    hass.services.async_call.assert_not_awaited()
+    hass.station.call.assert_not_awaited()

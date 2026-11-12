@@ -22,7 +22,10 @@ class SimulatedAdmission(CommandAdmission):
     """Test-only authorization, with the real connector lock and generation."""
 
     def __init__(self):
-        super().__init__(None)
+        super().__init__(SimpleNamespace(async_status=AsyncMock(return_value={
+            "record_state": "valid", "recorded_owner": "legacy", "transition_state": None,
+            "station_id": morek_schedule.MOREK_STATION_ID, "connector_id": 1, "armed": False,
+        })))
         self.entered = None
         self.release = None
 

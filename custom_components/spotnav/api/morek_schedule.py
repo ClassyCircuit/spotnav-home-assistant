@@ -683,7 +683,7 @@ async def async_schedule_action(hass: HomeAssistant, entry_id: str, action: str,
     if action == "fetch":
         result = await admission.async_execute(entry_id, "read_only", identity, run)
     else:
-        result = await admission.async_manual_profile(identity, run)
+        result = await admission.async_manual_profile(entry_id, identity, run)
     if not result.allowed:
         raise ScheduleRefused(result.reason)
     return result.value

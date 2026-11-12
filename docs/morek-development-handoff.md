@@ -6,6 +6,16 @@ Re-check the live system and Git state before acting; observations below may bec
 
 ## Approved next direction (planning, not implemented)
 
+**2026-11-12 Charge Now decision:** the user wants this as an optional feature
+after initial installation and user-directed testing in 5.8, not a release
+prerequisite. Roadmap Stage 10 records it; it is not implemented. Default to one
+hour with other durations. On expiry or **Cancel Charge Now**, return to the
+latest valid automatic plan and reconcile the Morek schedule. If Auto selects
+the current time, charging may continue or restart immediately; cancellation
+is not a persistent Stop/pause and must not suppress that automatic window.
+Use the same schedule owner; report offline/unknown results honestly. Later
+implementation, deployment and physical tests require separate authorization.
+
 **2026-11-12 user clarification:** Morek is reported to handle household load
 protection natively. The requested SpotNav Morek mode only schedules charging
 on/off windows; do not implement household load balancing or change amps dynamically
@@ -244,6 +254,116 @@ requirements, not features claimed implemented in the manual baseline below.
   Do not assume `GetCompositeSchedule` lists stored profiles.
 
 ## Tests, build, and next steps
+
+### 2026-11-12 — unarmed entry abort (coordinator review pending)
+
+- Version 2.5.43 implements `async_abort_unarmed_entry` for existing schema-1
+  `requested`, `interrupted` and `drained_unarmed` markers on a unique matching
+  **legacy** binding. This is an explicit internal operation, not an activation
+  or user-facing button. It removes only the marker, verifies the entire ownership
+  document on disk before and after the write, and leaves ownership legacy. The
+  prior entry path itself never dispatches a profile or charger command or changes
+  ownership. An absent first marker after a crash remains indistinguishable from no
+  attempt; no detection or retry is claimed.
+- Recovery requires the actual loaded Auto settings store to have no unsaved changes
+  and the disk-verified settings to match memory with `until_resumed` pause. The
+  settings lock is taken before the connector lock; ownership store is taken last.
+  Auto remains paused until a later explicit Resume; the existing pause is the
+  operator-visible state. No pause or person's Stop record is rewritten. A manual
+  Stop or other pause that cannot meet this indefinite-pause check is refused, not
+  silently changed. The operation sends no start/stop, profile, clear or resume.
+- Existing connector-outcome uncertainty, invalid evidence, ambiguous identity,
+  duplicate binding, missing/corrupt ownership and uncertain saves block recovery.
+  Known accepted or retained-profile evidence is left untouched, not claimed absent.
+  Missing profile history is not treated as a profile inventory. The older manual
+  record is checked for known unknown send/clear outcomes and never rewritten.
+  A reserved person Stop interrupts the generation; if a cancellation or Stop races
+  a marker-removal write, the process remains interlocked on uncertainty and the
+  previously verified indefinite pause remains durable if the write landed. On
+  restart the actual stored marker governs admission; no uncertain write is retried.
+  Generation checks reject already queued legacy/manual work after the abort.
+- Mocked lifecycle tests cover all three successful markers, retained evidence,
+  Stop race, stale work, ambiguous/duplicate identity, known unknown outcomes,
+  cancellation and saves failing before/after disk write. The start of a direct
+  pre-existing operation cannot be recalled, and none of these tests proves physical
+  charger behavior. Full 5.5 remains open for actual Morek ownership, safe exit,
+  retained 0 A/future profiles, unknown external outcomes, missing ownership document
+  ambiguity and restart/reconnect. No generic legacy start journal was wired.
+- Validation: `python tools/run_isolated_lifecycle_tests.py`: 75 passed;
+  `python tools/run_isolated_planning_tests.py`: 492 passed, 1 deselected. Targeted
+  Ruff and frontend `npm run build` passed. A first lifecycle run found an existing
+  duplicate-contender detection gap; it was fixed and the rerun passed. Check-dist
+  and `git diff --check` passed. Pytest reports its existing unknown
+  timeout option and dependency deprecations. The 5.4c full HA-plugin suite remains
+  unrun. All boundaries were mocked; no live HA or hardware was contacted.
+
+### 2026-11-12 — unarmed recovery check, safe abort incomplete
+
+- Version 2.5.42 adds an internal connector-serialized abort check. It validates
+  the physical binding and persisted transition, checks the actual Morek outcome
+  and unresolved-start stores, and refuses missing, uncertain, conflicting or
+  potentially retained profile evidence. It also refuses an apparently empty valid
+  unresolved-start document as `legacy_start_evidence_not_wired`: that module's own
+  contract says no controller produces or consumes these records. It therefore cannot
+  establish that an earlier ordinary start had a known outcome. No safe marker-clearing
+  operation is implemented; do not represent the check as recovery to legacy.
+- A reserved person Stop interrupts the check and invalidates its generation. The
+  check neither clears nor rewrites any evidence and never calls a charger or profile
+  operation. A missing outcome document is not proof of no retained profile; even a
+  clean new outcome ledger does not prove an older manual record or an external
+  controller installed nothing. Composite readback cannot resolve that inventory.
+- First-write boundary: before the requested marker is confirmed the entry path only
+  changes its process-local latch/generation and attempts to write ownership metadata;
+  it does not authorize an owner change, charger or profile action. In the mocked
+  definitely-not-written case the prior valid legacy document remains; a later process
+  cannot distinguish it from a normal legacy document. An uncertain write is not
+  retried; after restart its actual durable contents govern admission. This does not
+  prove that a pre-existing external action or retained profile is absent.
+- `python tools/run_isolated_lifecycle_tests.py`: 61 passed. `python
+  tools/run_isolated_planning_tests.py`: 492 passed, 1 deselected. Targeted Ruff
+  and frontend `npm run build` passed; check-dist and diff check were also run for
+  this slice. Pytest reported the existing timeout-option and dependency warnings.
+  Mocked tests are not live HA or physical validation; the full 5.4c HA-plugin
+  suite remains unrun. The safe-abort slice and broader 5.5 remain open for review.
+
+### 2026-11-12 — durable unarmed entry evidence (review required)
+
+- Version 2.5.41 extends an existing schema-1 legacy record with optional
+  `transition: {version: 1, state: requested|interrupted|drained_unarmed}`.
+  Old records remain valid without rewriting. Older code rejects the additional
+  field as malformed rather than interpreting it as legacy permission. Invalid
+  markers and markers on a schedule owner are malformed; no owner is activated.
+  The internal entry path closes its process-local gate, saves and rereads the
+  requested marker, then drains the physical connector and writes interrupted or
+  drained evidence. It does not hold the store lock while waiting for the connector
+  or the connector while waiting for producer/controller/assignment locks.
+- Startup initialization and ordinary physical admission consult the durable
+  marker. Manual Send/Clear now also require a valid matching ownership record with
+  no transition; missing/corrupt/conflicting ownership is refused, not treated as
+  permission. This is intentionally stricter than the earlier manual experiment.
+  A specifically reserved person Stop still checks identity and legacy ownership;
+  a failed transition save retains a separately checked in-process legacy snapshot
+  for that Stop only. Regulator protection is unchanged. No transition save is
+  automatically retried after an uncertain result or cancellation.
+- `requested` after a crash is ambiguous and remains blocked, as do interrupted
+  and drained markers. A Stop during a completed drain may leave `drained_unarmed`
+  as the last durable marker; it is still blocked and is not proof the Stop did not
+  occur. Existing Auto persistence owns Stop intent; transition writes never erase it.
+  A completed local connector drain does not prove all producers or external commands
+  settled. If the **first marker never reaches disk**, a subsequent process sees the
+  old legacy record and cannot infer the attempt; the in-process latch cannot survive
+  that crash. No ownership activation is possible here. Solving that ambiguity and
+  lost documents, durable unknown command outcomes, retained 0 A, safe exit/handback,
+  restart/reconnect and person Stop with an existing future profile remains open.
+- `python tools/run_isolated_lifecycle_tests.py`: 47 passed; `python
+  tools/run_isolated_planning_tests.py`: 492 passed, 1 deselected. Targeted Ruff,
+  frontend `npm run build`, and `npm run check-dist` passed. The first planning run
+  timed out after failures because old mocked Morek fixtures lacked the newly required
+  ownership store; a subsequent `-x` run identified that fixture gap. After updating
+  the mock stores the full isolated planning run passed. Pytest emitted the existing
+  unknown timeout option and dependency deprecation warnings. The full 5.4c HA-plugin
+  suite remains unrun. All I/O was mocked; no live HA or physical behavior was tested.
+  Stop for coordinator review.
 
 ### 2026-11-12 — unarmed person-Stop coordination foundation (review required)
 

@@ -27,6 +27,13 @@ def _supported_identity():
             "connector_id": 1, "match_count": 1, "ocpp_version": "1.6"}
 
 
+def _legacy_ownership():
+    return SimpleNamespace(async_status=AsyncMock(return_value={
+        "record_state": "valid", "recorded_owner": "legacy", "transition_state": None,
+        "station_id": morek_schedule.MOREK_STATION_ID, "connector_id": 1, "armed": False,
+    }))
+
+
 def test_three_blocks_fit_seven_entries_and_start_paused():
     windows = ((NOW + timedelta(hours=1), NOW + timedelta(hours=1, minutes=30)),
                (NOW + timedelta(hours=5), NOW + timedelta(hours=5, minutes=15)),
@@ -370,7 +377,7 @@ async def test_selective_cleanup_only_names_test_id_and_fetches_afterwards(monke
     monkeypatch.setattr(morek_schedule, "controller_for", lambda h, e: SimpleNamespace(ocpp_target=target))
     monkeypatch.setattr(morek_schedule, "_identity_status", lambda h, t: _supported_identity())
     from custom_components.spotnav.execution.command_admission import CommandAdmission
-    admission = CommandAdmission(None)
+    admission = CommandAdmission(_legacy_ownership())
     monkeypatch.setattr(morek_schedule, "command_admission", lambda h: admission)
     monkeypatch.setattr(morek_schedule, "outcomes_for", lambda h: ledger)
     ledger = MemoryOutcomes()
@@ -524,7 +531,7 @@ def _send_harness(monkeypatch, read_results):
     monkeypatch.setattr(morek_schedule, "controller_for", lambda h, e: SimpleNamespace(ocpp_target=target))
     monkeypatch.setattr(morek_schedule, "_identity_status", lambda h, t: _supported_identity())
     from custom_components.spotnav.execution.command_admission import CommandAdmission
-    admission = CommandAdmission(None)
+    admission = CommandAdmission(_legacy_ownership())
     monkeypatch.setattr(morek_schedule, "command_admission", lambda h: admission)
     ledger = MemoryOutcomes()
     monkeypatch.setattr(morek_schedule, "outcomes_for", lambda h: ledger)

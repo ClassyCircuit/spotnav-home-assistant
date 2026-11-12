@@ -117,7 +117,7 @@ class CommandAdmission:
     async def async_begin_unarmed_entry(
         self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]], person_stop_active: Callable[[], bool]
     ) -> str:
-        """Internal drain experiment: never persists an owner, opens admission or sends a command.
+        """Persist entry evidence and drain; never persist an owner or send a command.
 
         Call without outer locks. The latch stays closed on cancellation or interruption.
         A successful drain is not ownership and has no production activation path.
@@ -135,8 +135,15 @@ class CommandAdmission:
             return "entry_unavailable"
         self._entry_draining[connector] = "draining"
         self._generations[connector] = self._generations.get(connector, 0) + 1
+        try:
+            saved = await self._store.async_set_entry_transition(entry_id, identity, resolve_identity, "requested")
+        except Exception:  # noqa: BLE001 - a failed write may have landed
+            return "ownership_unavailable"
+        if saved != "saved":
+            return "ownership_unavailable"
         async with self._lock_for(connector):
             if self._entry_draining[connector] != "draining" or self._person_stops.get(connector):
+                await self._store.async_set_entry_transition(entry_id, identity, resolve_identity, "interrupted")
                 return "interrupted"
             try:
                 fresh = dict(resolve_identity())
@@ -144,6 +151,7 @@ class CommandAdmission:
                 if (classify_morek_identity(fresh) != "supported_morek" or physical_connector(fresh) != connector
                         or physical_connector(resolve_identity()) != connector or person_stop_active()
                         or self._person_stops.get(connector) or self._entry_draining[connector] != "draining"):
+                    await self._store.async_set_entry_transition(entry_id, identity, resolve_identity, "interrupted")
                     return "interrupted"
                 if (status.get("record_state") != "valid" or status.get("recorded_owner") != "legacy"
                         or status.get("armed") is not False or
@@ -151,8 +159,140 @@ class CommandAdmission:
                     return "ownership_unavailable"
             except Exception:  # noqa: BLE001 - unknown state leaves admission closed
                 return "ownership_unavailable"
+            try:
+                saved = await self._store.async_set_entry_transition(entry_id, identity, resolve_identity, "drained_unarmed")
+                if saved != "saved":
+                    return "ownership_unavailable"
+                if self._entry_draining[connector] != "draining" or self._person_stops.get(connector) or person_stop_active():
+                    await self._store.async_set_entry_transition(entry_id, identity, resolve_identity, "interrupted")
+                    return "interrupted"
+            except Exception:  # noqa: BLE001 - leave the durable request or uncertain result blocked
+                return "ownership_unavailable"
             self._entry_draining[connector] = "drained_unarmed"
             return "drained_unarmed"
+
+    async def async_abort_unarmed_entry(
+        self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]], *, settings_store: Any = None
+    ) -> str:
+        """Abort only this unarmed entry while a verified indefinite Auto pause remains.
+
+        This does not establish profile inventory or resolve older unknown commands.
+        Settings lock precedes connector, then ownership store; no producer lock is held.
+        """
+        try:
+            identity = dict(resolve_identity())
+            connector = physical_connector(identity)
+            if classify_morek_identity(identity) != "supported_morek" or connector is None:
+                return "identity_unresolved"
+            if settings_store is None:
+                from ..runtime import domain_data
+                settings_store = domain_data(self._store._hass).auto_store
+            from ..planning.auto_settings import AutoSettingsStore
+            if not isinstance(settings_store, AutoSettingsStore):
+                return "pause_unavailable"
+        except Exception:  # noqa: BLE001 - unknown identity cannot authorize recovery
+            return "pause_unavailable"
+        generation = self.generation(connector)
+        async with settings_store._lock, self._lock_for(connector):
+            if connector in self._quiescing or connector in self._entry_draining:
+                return "entry_active_or_uncertain"
+            if self._person_stops.get(connector):
+                return "person_stop_active"
+            if generation != self.generation(connector):
+                return "stale_generation"
+            self._entry_draining[connector] = "recovering"
+            self._generations[connector] = generation.revision + 1
+            generation = self.generation(connector)
+            try:
+                fresh = dict(resolve_identity())
+                if classify_morek_identity(fresh) != "supported_morek" or physical_connector(fresh) != connector:
+                    return "identity_changed"
+                status = await self._store.async_status(entry_id, fresh)
+                if (status.get("record_state") != "valid" or status.get("recorded_owner") != "legacy"
+                        or (status.get("station_id"), status.get("connector_id")) !=
+                        (connector.station_id, connector.connector_id)):
+                    return "ownership_unavailable"
+                if status.get("transition_state") is None:
+                    return "no_transition"
+                if status.get("transition_state") not in ("requested", "interrupted", "drained_unarmed"):
+                    return "ownership_unavailable"
+                from ..planning.auto_settings import AutoSettings, PAUSE_UNTIL_RESUMED, SUPPORTED_SCHEMAS
+                from .execution_ownership import _MISSING, _read_envelope
+                from .morek_outcomes import outcomes_for
+
+                hass = self._store._hass
+                # HA Store can swallow write errors. Require the exact persisted
+                # settings, not merely its in-memory pause or an unsaved Stop.
+                if not settings_store.loaded or settings_store.unsaved:
+                    return "pause_unavailable"
+                raw = await hass.async_add_executor_job(_read_envelope, settings_store._store.path)
+                if (not isinstance(raw, dict) or type(raw.get("version")) is not int or raw["version"] != 1
+                        or type(raw.get("minor_version", 1)) is not int or raw.get("minor_version", 1) != 1
+                        or not isinstance(raw.get("data"), dict) or type(raw["data"].get("schema")) is not int
+                        or raw["data"].get("schema") not in SUPPORTED_SCHEMAS
+                        or not isinstance(raw["data"].get("chargers"), dict)):
+                    return "pause_unavailable"
+                entry = raw["data"]["chargers"].get(entry_id)
+                if not isinstance(entry, dict):
+                    return "pause_unavailable"
+                persisted = AutoSettings.from_stored(entry.get("settings"))
+                if (persisted != settings_store.settings(entry_id) or persisted.pause.choice != PAUSE_UNTIL_RESUMED
+                        or persisted.pause.expires_at is not None):
+                    return "pause_not_indefinite"
+                outcome = await outcomes_for(hass).read()
+                if outcome is not None and outcome.get("entry_id") != entry_id:
+                    return "profile_outcome_identity_mismatch"
+                if outcome is not None and outcome.get("uncertain") is not False:
+                    return "profile_outcome_uncertain"
+                if outcome is not None:
+                    attempt, removal = outcome.get("attempt"), outcome.get("removal")
+                    if ((attempt is not None and (not isinstance(attempt, dict) or attempt.get("state") not in
+                                                  ("accepted", "rejected", "aborted_before_dispatch"))) or
+                            (removal is not None and (not isinstance(removal, dict) or removal.get("state") not in
+                                                      ("accepted", "rejected", "notsupported")))):
+                        return "profile_outcome_uncertain"
+                # Old manual records predate the connector ledger. Never mutate or
+                # infer profile absence from a missing record or composite readback.
+                from homeassistant.helpers.storage import Store
+                legacy_store = Store(hass, 1, f"spotnav.morek_schedule.{entry_id}")
+                old = await hass.async_add_executor_job(_read_envelope, legacy_store.path)
+                if old is not _MISSING:
+                    if (not isinstance(old, dict) or type(old.get("version")) is not int or old["version"] != 1
+                            or type(old.get("minor_version", 1)) is not int or old.get("minor_version", 1) != 1
+                            or not isinstance(old.get("data"), dict)):
+                        return "legacy_profile_history_invalid"
+                    old_data = old["data"]
+                    cleanup = old_data.get("cleanup")
+                    profile = old_data.get("profile")
+                    if ((cleanup is not None and not isinstance(cleanup, dict)) or
+                            (profile is not None and not isinstance(profile, dict))):
+                        return "legacy_profile_history_invalid"
+                    cleanup = cleanup or {}
+                    if ((old_data.get("profile") and str(old_data.get("ack", "unknown")).lower() not in
+                         ("accepted", "rejected", "notsupported")) or
+                        (cleanup and str(cleanup.get("status", "unknown")).lower() not in
+                         ("accepted", "rejected", "notsupported"))):
+                        return "profile_outcome_uncertain"
+
+                def can_commit() -> bool:
+                    current = dict(resolve_identity())
+                    return (self._entry_draining.get(connector) == "recovering" and not self._person_stops.get(connector)
+                            and generation == self.generation(connector)
+                            and classify_morek_identity(current) == "supported_morek"
+                            and physical_connector(current) == connector)
+
+                if not can_commit():
+                    return "person_stop_or_generation_changed"
+                result = await self._store.async_abort_entry_transition(
+                    entry_id, identity, status["transition_state"], can_commit)
+                if result == "aborted" and not can_commit():
+                    return "aborted_stop_pending"
+                return result
+            except Exception:  # noqa: BLE001 - malformed/unavailable evidence is not permission
+                return "recovery_evidence_unavailable"
+            finally:
+                if self._entry_draining.get(connector) == "recovering":
+                    del self._entry_draining[connector]
 
     def _lock_for(self, connector: PhysicalConnector) -> asyncio.Lock:
         # Do not discard idle locks: a waiting task may still hold a reference.
@@ -275,7 +415,8 @@ class CommandAdmission:
             if not isinstance(status, Mapping):
                 return AdmissionResult(False, "ownership_unavailable")
             state = status.get("record_state")
-            if state != "valid":
+            uncertain_stop = person and state == "save_failed" and status.get("person_stop_safe_during_transition_failure") is True
+            if state != "valid" and not uncertain_stop:
                 return AdmissionResult(False, f"ownership_{state}" if state in (
                     "missing", "malformed", "unsupported_version", "save_failed", "conflict",
                     "identity_unresolved", "identity_mismatch",
@@ -283,7 +424,7 @@ class CommandAdmission:
             if (type(status.get("connector_id")) is not int or
                     (status.get("station_id"), status.get("connector_id")) != (connector.station_id, connector.connector_id)):
                 return AdmissionResult(False, "ownership_identity_mismatch")
-            owner = status.get("recorded_owner")
+            owner = "legacy" if uncertain_stop else status.get("recorded_owner")
             if owner not in ("legacy", "morek_schedule"):
                 return AdmissionResult(False, "ownership_unavailable")
             if kind == "owned_profile":
@@ -292,13 +433,15 @@ class CommandAdmission:
                 return AdmissionResult(False, "legacy_not_owner")
             if status.get("armed") is not False:
                 return AdmissionResult(False, "ownership_inconsistent")
+            if status.get("transition_state") is not None and not person:
+                return AdmissionResult(False, "ownership_transition")
             # Quiescing may have begun while the store read was in progress.
             if connector in self._quiescing or (connector in self._entry_draining and not person):
                 return AdmissionResult(False, "connector_quiescing")
             return AdmissionResult(True, "allowed_legacy", await operation())
 
     async def async_manual_profile(
-        self, resolve_identity: Callable[[], Mapping[str, Any]], operation: Callable[[], Awaitable[T]]
+        self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]], operation: Callable[[], Awaitable[T]]
     ) -> AdmissionResult[T]:
         """Serialize the existing explicitly requested experiment, not autonomous ownership.
 
@@ -312,15 +455,31 @@ class CommandAdmission:
                 return AdmissionResult(False, "identity_unresolved")
         except Exception:  # noqa: BLE001
             return AdmissionResult(False, "identity_unresolved")
+        generation = self.generation(connector)
         async with self._lock_for(connector):
             if connector in self._quiescing or connector in self._entry_draining:
                 return AdmissionResult(False, "connector_quiescing")
+            if generation != self.generation(connector):
+                return AdmissionResult(False, "stale_generation")
             try:
                 identity = dict(resolve_identity())
                 if classify_morek_identity(identity) != "supported_morek" or physical_connector(identity) != connector:
                     return AdmissionResult(False, "identity_changed")
             except Exception:  # noqa: BLE001
                 return AdmissionResult(False, "identity_changed")
+            try:
+                status = await self._store.async_status(entry_id, identity)
+                if (classify_morek_identity(resolve_identity()) != "supported_morek"
+                        or physical_connector(resolve_identity()) != connector):
+                    return AdmissionResult(False, "identity_changed")
+                if status.get("record_state") != "valid" or status.get("transition_state") is not None:
+                    return AdmissionResult(False, "ownership_unavailable")
+                if (status.get("station_id"), status.get("connector_id")) != (connector.station_id, connector.connector_id):
+                    return AdmissionResult(False, "ownership_identity_mismatch")
+                if connector in self._quiescing or connector in self._entry_draining:
+                    return AdmissionResult(False, "connector_quiescing")
+            except Exception:  # noqa: BLE001 - unverified durable state cannot admit profile writes
+                return AdmissionResult(False, "ownership_unavailable")
             return AdmissionResult(True, "manual_profile", await operation())
 
 

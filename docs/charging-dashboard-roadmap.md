@@ -16,6 +16,8 @@ unarmed demo. Complete Stage 5 with the core daily frontend and backend connecte
 real data, reactive planning and a deliberately enabled, safe Morek schedule executor.
 Historical charging comparisons, monthly analytics, savings and other later features
 may remain explicitly unavailable; they are not prerequisites for this initial release.
+The optional **Charge Now** override in Stage 10 is also post-installation work,
+not a prerequisite for the initial release or its 5.8 live validation.
 
 **Frontend decision:** the user chose an integration-provided HA custom sidebar panel,
 using the same UI components, styling and stepped-area ECharts chart as the local sample
@@ -75,6 +77,7 @@ Detailed requirements and acceptance cases follow outside this checklist.
 | 7 | Extended charts, tracks and price insights | After initial real-data chart; actual track uses Stage 6 |
 | 8 | Yesterday, costs and savings | Later; depends on genuine data |
 | 9 | Further polish and installation documentation | Initial install path is in Stage 5; final polish follows |
+| 10 | Optional Charge Now override | After the initial 5.8 installation and user-directed validation; independent of Stages 6–9 |
 
 ### Stage 0 — Completed baseline: preserve and reuse
 
@@ -563,6 +566,18 @@ tests are documented there; full HA collection is still blocked on Windows.
     API contracts, and document panel installation/update. Don't reimplement a second UI
     or assume local preview proves actual HA integration.
 - [ ] **5.5 Durable Morek ownership and recovery**
+  - [x] **Unarmed-entry abort (2.5.43; coordinator review pending):** an internal
+    explicit abort removes only a verified unarmed marker when the existing Auto
+    pause is durably `until_resumed`, identity is unique, and known profile outcomes
+    are not uncertain. It does not clear or claim absence of retained profiles,
+    resume Auto, or recover actual Morek ownership; see handoff for crash limits.
+  - **Durable unarmed entry evidence (2.5.41; coordinator review pending):** the
+    internal entry path persists a versioned requested/interrupted/drained marker
+    on the existing legacy binding before reporting a drain. Startup and manual
+    profile admission consult it; all markers remain unarmed and block ordinary
+    writes. Existing legacy records remain readable. Failure before the first marker
+    lands cannot be distinguished after restart from the previous legacy document;
+    lost-document and unknown-outcome recovery remain open. See the handoff.
   - **Person-Stop coordination foundation implemented for review (2.5.40):** an
     internal, process-local unarmed drain is interrupted by a separately classified
     Stop reservation before the Auto lock. Ordinary admission remains closed; no
@@ -689,6 +704,53 @@ tests are documented there; full HA collection is still blocked on Windows.
 - [ ] **9.3 Installation and documentation polish:** improve the initial 5.4–5.8
   dashboard template, migration and diagnostics guidance; never overwrite user views
   or claim unperformed hardware tests.
+
+### Stage 10 — Optional Charge Now (after initial installation)
+
+This is a user-requested **nice-to-have after 5.8**, not a prerequisite for the
+initial working release, its installation or live validation. It can be prioritized
+after 5.8 independently of Stages 6–9. It is not implemented today. Implementation
+and subsequent deployment or hardware actions require their own assignments and
+specific approvals; this roadmap grants none.
+
+- [ ] **10.1 Bounded override and return to Auto**
+  - Implement a deliberate temporary **Charge Now** override, defaulting to one
+    hour and accepting other user-selected durations/end times. Make any price-cap
+    override explicit and show the current price or honestly report it unavailable;
+    decide how unknown prices are handled with the user rather than inventing a rule.
+  - Reuse the same Morek schedule owner, fixed-current on/off schedule builder and
+    durable execution evidence as Auto. Do not use a competing legacy start/stop
+    loop, household load management or dynamic amp regulation.
+  - On expiry, return to the latest valid automatic plan and reconcile the schedule.
+    Include the override end and feasible subsequent automatic windows in the owned
+    schedule when possible, so the intended handback does not depend solely on HA
+    being online at that instant. Respect actual charger block/horizon limits; never
+    silently drop or broaden plan windows. Define honest degraded behavior when the
+    latest plan or an upload is unavailable.
+  - **Cancel Charge Now** ends the override early, recalculates the automatic plan and
+    sends the new automatic schedule through the same owner. Auto's normal rules then
+    control charging. If Auto selects the current time, charging may continue or
+    restart immediately; do not suppress a valid current window or promise a distinct
+    zero-current pulse. Cancelling Charge Now is not a persistent person Stop/pause.
+  - Preserve person Stop and explicit pause as separate existing semantics. Define
+    override behavior on Stop, concurrent edits, restart, disconnect, stale prices,
+    missing SOC, unknown upload outcome and charger/vehicle authorization without
+    weakening interlocks or automatically retrying uncertain writes. A schedule does
+    not itself authorize a transaction or prove physical flow.
+  - Use focused mocked actual-module tests for expiry, early cancellation, an active
+    automatic window, changed plans, offline/reconnect, unknown outcomes, price/cap
+    basis, selected durations, charger limits and concurrent Stop/pause. No live
+    operation is authorized by these tests.
+- [ ] **10.2 Dashboard controls and post-install review**
+  - Add clear Charge Now duration choices and a **Cancel Charge Now / Return to Auto**
+    control to the existing sidebar. Show override status/end, cap implications,
+    proposal versus sent/readback versus measured state, and explicitly explain that
+    cancelling may leave charging active if the automatic plan selects now.
+  - Test desktop/mobile interaction, confirmation, permission, race, stale and
+    unavailable states, and document the user-directed procedure. Show failed or
+    unknown schedule updates as unconfirmed, not as proof that charging stopped.
+    Any later deployment, restart, profile operation or physical test requires the
+    user's specific approval; do not claim mocked checks verify live behavior.
 
 ### Execution boundaries — avoid another prerequisite spiral
 
