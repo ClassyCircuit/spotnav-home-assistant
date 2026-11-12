@@ -52700,14 +52700,17 @@ function mountDashboard(root, adapter) {
     const option = (s4) => `<option value="${escapeText(s4.value)}" ${s4.value === scenario.selected ? "selected" : ""}>${escapeText(s4.label)}</option>`;
     const capCurrency = m4.capCurrency === void 0 ? f3.currency === void 0 ? "EUR" : f3.currency : m4.capCurrency;
     const capUnit = priceUnit(capCurrency);
-    const fields = [["Target SOC (%)", "target", "number"], ["Minimum SOC (%)", "minimum", "number"], [`Soft cap (${capUnit})`, "cap", "number"], ["Ready by", "readyBy", "time"]].map(([label, key3, type]) => `<wa-input data-setting="${key3}" label="${escapeText(label)}" value="${escapeText(value(settings[key3]))}" type="${type}"${key3 === "cap" ? ' step="any"' : ""}${m4.canSave === true && !(m4.settingsEditor && (key3 === "target" && !m4.targetSupported || ["minimum", "cap"].includes(key3) && !m4.policySupported)) ? "" : " disabled"}></wa-input>`).join("");
+    const fields = [["Target SOC (%)", "target", "number"], ["Minimum SOC (%)", "minimum", "number"], [`Soft cap (${capUnit})`, "cap", "number"], ["Ready by", "readyBy", "time"]].map(([label, key3, type]) => `<span ${m4.settingsEditor && key3 === "target" ? 'data-mode="target_soc"' : ""}><wa-input data-setting="${key3}" label="${escapeText(label)}" value="${escapeText(value(settings[key3]))}" type="${type}"${key3 === "cap" ? ' step="any"' : ""}${m4.canSave === true && !(m4.settingsEditor && (["minimum", "cap"].includes(key3) && !m4.policySupported)) ? "" : " disabled"}></wa-input></span>`).join("");
+    const vehicles = m4.planVehicles || [], savedVehicle = settings.vehicleId || "";
+    const vehicleOptions = vehicles.map((v2) => `<option value="${escapeText(v2.id)}" ${v2.id === savedVehicle ? "selected" : ""}>${escapeText(v2.name || v2.id)}</option>`).join("");
+    const modeFields = m4.settingsEditor ? `<label>Charge by <select data-setting="driver" ${m4.canSave ? "" : "disabled"}><option value="manual_kwh" ${settings.driver === "manual_kwh" ? "selected" : ""}>Requested energy (kWh)</option><option value="target_soc" ${settings.driver === "target_soc" ? "selected" : ""}>Target SOC (%)</option></select></label><span data-mode="manual_kwh"><wa-input data-setting="energy" label="Requested energy (kWh)" type="number" step="any" value="${escapeText(value(settings.energy))}" ${m4.canSave ? "" : "disabled"}></wa-input></span><label data-mode="target_soc">Planning vehicle <select data-setting="vehicleId" ${m4.canSave ? "" : "disabled"}><option value="" ${!savedVehicle ? "selected" : ""}>No saved vehicle</option>${savedVehicle && !vehicles.some((v2) => v2.id === savedVehicle) ? `<option value="${escapeText(savedVehicle)}" selected>Saved vehicle unavailable${savedVehicle === "guest" ? " (guest)" : ""}</option>` : ""}${vehicleOptions}</select></label>` : "";
     const policyFields = m4.settingsEditor ? `<label><input type="checkbox" data-setting="capEnabled" ${settings.capEnabled ? "checked" : ""} ${m4.canSave && m4.policySupported ? "" : "disabled"}> Enable soft cap</label><label>Cap price basis <select data-setting="capBasis" ${m4.canSave && m4.policySupported ? "" : "disabled"}><option value="">Not set (suggested: Nord Pool)</option><option value="nord_pool" ${settings.capBasis === "nord_pool" ? "selected" : ""}>Nord Pool</option><option value="configured_variable_cost" ${settings.capBasis === "configured_variable_cost" ? "selected" : ""}>Configured variable cost</option></select></label><label><input type="checkbox" data-setting="deadlineEnabled" ${settings.deadlineEnabled ? "checked" : ""} ${m4.canSave ? "" : "disabled"}> Enable ready-by</label>` : "";
-    const policyHelp = m4.settingsEditor ? `<div class="settings-help"><p>Saved target: ${escapeText(settings.target == null ? "not set" : `${settings.target}%`)}. Minimum ready-by SOC: ${escapeText(settings.minimum == null ? "not set (optional)" : `${settings.minimum}%`)}.</p><p>Soft cap: ${settings.capEnabled ? `enabled, ${escapeText(priceText(Number(settings.cap)))} ${escapeText(capUnit)}` : "off (no saved cap)"}. Enter a cap and choose its basis to enable it. The cap basis defines which price is compared; it does not select the price provider.</p><p>Ready-by: ${settings.deadlineEnabled ? `enabled at ${escapeText(settings.readyBy)}` : `off (saved time ${escapeText(settings.readyBy)})`}. Changes are saved only when you choose Save plan.</p></div>` : "";
+    const policyHelp = m4.settingsEditor ? `<div class="settings-help"><p>Saved Charge by: ${settings.driver === "target_soc" ? "target SOC" : "requested energy"}. Saved target: ${escapeText(settings.target == null ? "not set \u2014 enter a target for SOC planning" : `${settings.target}%`)}. Minimum ready-by SOC: ${escapeText(settings.minimum == null ? "not set (optional)" : `${settings.minimum}%`)}.</p><p data-mode="target_soc">${escapeText(m4.vehicleHelp || "")}</p><p>Soft cap: ${settings.capEnabled ? `enabled, ${escapeText(priceText(Number(settings.cap)))} ${escapeText(capUnit)}` : "off (no saved cap)"}. Enter a cap and choose its basis to enable it. The cap basis defines which price is compared; it does not select the price provider.</p><p>Ready-by: ${settings.deadlineEnabled ? `enabled at ${escapeText(settings.readyBy)}` : `off (saved time ${escapeText(settings.readyBy)})`}. Changes are saved only when you choose Save plan.</p></div>` : "";
     const html = `<div class="shell"><header class="masthead"><div><div class="brand">SPOTNAV <span>ENHANCED</span></div><h1>Charging, in focus.</h1><p>A single view of your vehicle, plan and charger.</p></div>${labels.banner ? `<div class="sample-banner">${escapeText(labels.banner)}<br><span>${escapeText(labels.bannerDetail)}</span></div>` : ""}</header>
       ${scenario ? `<div class="scenario-picker"><label for="sample-state">${escapeText(scenario.label)}</label><select id="sample-state">${(scenario.options || []).map(option).join("")}</select><span>${escapeText(scenario.note)}</span></div>` : ""}
       <div id="critical-live" role="status" aria-live="polite">${m4.warning ? `<div class="alert"><div><strong>${escapeText(m4.warning.title)}</strong><p>${escapeText(m4.warning.detail)}</p></div><a href="#details">View details \u2193</a></div>` : ""}</div><div class="dashboard">
       ${card("Your vehicle", "OVERVIEW", `<div class="status-line"><span class="dot ${!Number.isFinite(state.soc) || state.soc < 0 || state.soc > 100 || state.stale ? "dot-unknown" : ""}"></span> ${escapeText(state.status)}</div>${renderBattery({ soc: state.soc, target: settings.target, minimum: settings.minimum, deadline: settings.readyBy, capacityKwh: assumptions.capacityKwh, efficiency: assumptions.efficiency, stale: !!state.stale, planStale: !!(state.planStale ?? state.stale), lowSocWarning: state.lowSocWarning, windows, sample, minutesPerTimeUnit: f3.minutesPerTimeUnit, socDetail: state.socDetail, socEstimated: state.socEstimated })}<p class="waiting">${escapeText(state.detail)}</p><div class="metrics">${metric("Measured now", state.power, labels.powerNote)}<div class="metric next-metric"><div class="muted">${state.planStale ?? state.stale ? "Next window \xB7 stale proposal" : "Next proposed window"}</div><button type="button" id="open-plan" aria-haspopup="dialog">${next ? `${escapeText(time(next.start))}\u2013${escapeText(time(next.end))}` : "Unknown"} <span aria-hidden="true">\u2197</span></button><div class="muted">${escapeText(next ? day(next.start) : "Unknown")} \xB7 view complete plan</div></div>${metric(state.planStale ?? state.stale ? "Last plan cost \xB7 stale" : "Estimated charge cost", money(summary.cost, f3.currency), `${number(summary.energy, 2, " kWh", (n6) => n6 >= 0)} wall energy`)}${metric("Until deadline", m4.untilDeadline, labels.deadlineNote)}</div><div class="hint"><b>${escapeText(labels.planLabel)}</b> ${escapeText(state.policy)} ${escapeText(m4.targetNote)}</div>`, "overview", tag)}
-      ${card("Plan controls", labels.settingsEyebrow || "SETTINGS", `<p class="subtext">${escapeText(labels.settingsNote)}</p><div class="fields">${fields}${policyFields}</div>${policyHelp}<p id="settings-notice" role="status">${escapeText(m4.settingsNotice || "")}</p><wa-button id="save-plan" variant="brand" ${typeof actions2.save !== "function" || m4.canSave !== true ? "disabled" : ""}>${escapeText(labels.saveLabel || "Save plan \xB7 unavailable")}</wa-button>${m4.settingsEditor ? '<button type="button" id="reload-settings">Reload settings</button>' : ""}<div class="controls-plan">${plan}<button type="button" id="open-plan-details" aria-haspopup="dialog">View full window details \u2197</button></div>`, "controls", tag)}
+      ${card("Plan controls", labels.settingsEyebrow || "SETTINGS", `<p class="subtext">${escapeText(labels.settingsNote)}</p><div class="fields">${modeFields}${fields}${policyFields}</div>${policyHelp}<p id="settings-notice" role="status">${escapeText(m4.settingsNotice || "")}</p><wa-button id="save-plan" variant="brand" ${typeof actions2.save !== "function" || m4.canSave !== true ? "disabled" : ""}>${escapeText(labels.saveLabel || "Save plan \xB7 unavailable")}</wa-button>${m4.settingsEditor ? '<button type="button" id="reload-settings">Reload settings</button>' : ""}<div class="controls-plan">${plan}<button type="button" id="open-plan-details" aria-haspopup="dialog">View full window details \u2197</button></div>`, "controls", tag)}
       ${card("Price insights", labels.insightEyebrow || "PRICE DATA", renderInsights(m4.insights), "insights", tag)}
       ${modes.map(priceCard).join("")}
       ${card("Plan activity & freshness", labels.evidenceEyebrow || "EVIDENCE", renderEvidence(m4.evidence, state.power, knownPlan ? windows.length : null), "morek", tag)}
@@ -52755,6 +52758,12 @@ function mountDashboard(root, adapter) {
     }, { signal }));
     const scenarioInput = root.querySelector("#sample-state");
     bind3(scenarioInput, () => scenarioInput.addEventListener("change", (event) => current.actions?.selectScenario?.(event.target.value), { signal }));
+    const showMode = () => {
+      const mode = root.querySelector('[data-setting="driver"]')?.value;
+      root.querySelectorAll("[data-mode]").forEach((el) => {
+        el.hidden = el.dataset.mode !== mode;
+      });
+    };
     root.querySelectorAll("[data-setting]").forEach((input) => {
       const get2 = () => input.type === "checkbox" ? input.checked : input.value;
       if (drafts.has(input.dataset.setting)) {
@@ -52769,10 +52778,12 @@ function mountDashboard(root, adapter) {
         }, { signal });
         input.addEventListener("change", () => {
           drafts.set(input.dataset.setting, get2());
+          showMode();
           current.actions?.edit?.();
         }, { signal });
       });
     });
+    showMode();
     const saveButton = root.querySelector("#save-plan");
     bind3(saveButton, () => saveButton.addEventListener("click", () => {
       if (current.model.canSave === true && typeof current.actions?.save === "function") current.actions.save(Object.fromEntries([...root.querySelectorAll("[data-setting]")].map((input) => [input.dataset.setting, input.type === "checkbox" ? input.checked : input.value])));
@@ -59596,7 +59607,7 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
     price_inputs_changed: "Price source changed; waiting for a fresh calculation. The retained limit may remain.",
     price_coverage_unavailable: "Published prices do not cover the proposed windows; the retained limit may remain.",
     price_evidence_unavailable: "Price source evidence is unavailable; the retained limit may remain.",
-    plan_input_provenance_unavailable: "Plan input evidence is unavailable; automatic sending is blocked.",
+    plan_input_provenance_unavailable: "Plan input evidence is unavailable; automatic sending is blocked. Review the saved plan mode, target, vehicle, SOC and capacity; the checked schedule path requires a cheapest-price target-SOC plan. Switching modes does not guarantee Resume or charging.",
     vehicle_input_stale: "Vehicle state of charge is stale; waiting for a fresh reading.",
     vehicle_input_unavailable: "Vehicle state of charge is unavailable or invalid; automatic sending is blocked.",
     vehicle_identity_unavailable: "Vehicle identity is unavailable or changed; automatic sending is blocked.",
@@ -60051,7 +60062,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
       untilDeadline,
       targetNote: d3.settings?.driver === "target_soc" && d3.soc?.value != null ? `Plan energy, projected SOC and cost are estimates based on the last-known SOC${d3.soc.estimated ? " and an energy-derived SOC estimate" : ""}; an old reading may not reflect driving since then.` : "",
       warning: warning ? { title: "Morek health requires attention", detail: `${health}${status?.outcomes?.uncertain && (status?.operator?.state === "mismatch" || status?.verification?.reason === "limits_or_transitions_differ") ? " \xB7 Effective limits mismatch the sent schedule." : ""}` } : null,
-      evidence: { status: evidence.summary, context: `Morek status observed ${date(observedAt, zone)}${statusFresh ? "" : " \xB7 stale or unavailable"}`, readiness, proposal: evidence.proposal, sent: evidence.sent, readback: evidence.readback, measurement: evidence.measurement, dispatch: `${status?.outcomes?.uncertain && status?.outcomes?.state !== "storage_unavailable" ? "A recorded uncertain action may have applied; do not retry blindly. " : ""}A final 0 A limit may remain. Readback is not profile inventory; ACK or readback does not prove physical charging. Preserve person Stop and household protection.` },
+      evidence: { status: evidence.summary, context: `Morek status observed ${date(observedAt, zone)}${statusFresh ? "" : " \xB7 stale or unavailable"}`, readiness, proposal: evidence.proposal, sent: evidence.sent, readback: evidence.readback, measurement: evidence.measurement, dispatch: `${statusFresh && status?.reconciliation?.reason === "plan_input_provenance_unavailable" ? "Plan input provenance unavailable: review mode, target, vehicle, SOC and capacity. The checked schedule path requires a cheapest-price target-SOC plan; switching does not guarantee Resume or charging. " : ""}${status?.outcomes?.uncertain && status?.outcomes?.state !== "storage_unavailable" ? "A recorded uncertain action may have applied; do not retry blindly. " : ""}A final 0 A limit may remain. Readback is not profile inventory; ACK or readback does not prove physical charging. Preserve person Stop and household protection.` },
       labels: { settingsNote: "Read-only preview. Plan controls are unavailable in this slice.", saveLabel: "Save plan \xB7 unavailable", powerNote: "No verified general Morek power source", deadlineNote: d3.settings?.departure_enabled === false ? "Ready-by is off" : deadlineCurrent && Number.isFinite(deadline) ? `Ready by ${date(deadline, zone)}; not a predicted finish` : "Ready-by time or current plan unavailable", planLabel: "Backend policy:", chartIntro: "Published source price before configured fiscal additions; source-included charges may apply.", chartNote: `Held published intervals only. ${priceFreshness} Unpublished future and history are unavailable. Cap is omitted if its basis differs or is unknown.`, bands: "", dialogNote: "Proposal only; not necessarily sent.", footer: "Dashboard and Morek status are separate observations." }
     },
     actions: {}
@@ -60059,7 +60070,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.79";
+var CARD_VERSION = "2.5.80";
 
 // sidebar/panel.js
 var fresh = (timestamp, failed = false) => observationFreshness(timestamp, Date.now(), failed) === "fresh";
@@ -60275,16 +60286,19 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
         this.settingsNotice = "Price currency changed while editing. Reload settings before saving.";
       }
       adapter.model.capCurrency = currency;
-      adapter.model.settings = { target: record3.target.target_percent, minimum: record3.minimum_ready_by_soc, cap: capInput(record3.soft_price_cap, currency), readyBy: record3.departure_time, capEnabled: record3.soft_price_cap != null, capBasis: record3.cap_price_basis, deadlineEnabled: record3.departure_enabled };
+      adapter.model.settings = { driver: record3.driver, energy: record3.requested_kwh, vehicleId: record3.target.vehicle_id || "", target: record3.target.target_percent, minimum: record3.minimum_ready_by_soc, cap: capInput(record3.soft_price_cap, currency), readyBy: record3.departure_time, capEnabled: record3.soft_price_cap != null, capBasis: record3.cap_price_basis, deadlineEnabled: record3.departure_enabled };
+      adapter.model.planVehicles = (dashboard?.soc?.vehicles || []).filter((v2) => v2.id && v2.id !== "guest");
+      const discovered = dashboard?.soc?.vehicle_id, selected = record3.target.vehicle_id;
+      adapter.model.vehicleHelp = selected === "guest" || dashboard?.guest?.active ? "Guest charging uses requested energy; choose a configured vehicle for a target-SOC plan." : selected ? adapter.model.planVehicles.some((v2) => v2.id === selected) ? "Saved vehicle selected." : "Saved vehicle is not currently discovered; check vehicle configuration." : discovered && discovered !== "guest" ? `No vehicle saved; currently discovered: ${dashboard?.soc?.vehicle_name || discovered}. Choose it explicitly if desired.` : "No unambiguous vehicle selected. Choose a discovered vehicle or configure vehicle discovery.";
+      adapter.model.vehicleHelp += ` ${dashboard?.soc?.capacity_kwh > 0 ? "Capacity is available for the observed vehicle." : "Usable battery capacity is unavailable for the observed vehicle; configure it before relying on an SOC plan."} ${adapter.model.vehicle.socDetail} An old reading can be inaccurate after driving.`;
       if (adapter.model.chart && record3.revision === dashboard?.settings?.revision && record3.cap_price_basis === "nord_pool" && Number.isFinite(record3.soft_price_cap)) {
         adapter.model.chart.cap = displayPrice(record3.soft_price_cap, currency);
       }
       adapter.model.settingsEditor = true;
-      adapter.model.targetSupported = record3.driver === "target_soc";
       adapter.model.policySupported = record3.soft_price_cap !== void 0;
       adapter.model.canSave = allowed && !this.settingsBusy && !this.settingsConflict;
       adapter.model.settingsNotice = this.settingsNotice || (!allowed ? "You do not have permission to change this plan." : "");
-      adapter.model.labels.settingsNote = record3.driver === "target_soc" ? "SOC-based planning. The planning target is separate from the car\u2019s charge limit." : "Manual energy mode uses a requested kWh amount, so target SOC cannot be edited here. In the SpotNav card\u2019s Plan settings, choose target SOC mode and configure a vehicle and target.";
+      adapter.model.labels.settingsNote = `Charge by requested energy or a SpotNav target SOC. The planning target is separate from the car\u2019s own charge limit. Saving a mode, target or energy change can recalculate the plan and may trigger normal guarded schedule reconciliation when ownership is armed; it does not guarantee Resume or physical charging.${record3.fill_to_limit ? " Fill-to-limit is saved separately and remains enabled; review it in the existing card if the requested energy is not being used." : ""}`;
       adapter.model.labels.saveLabel = this.settingsBusy ? "Saving\u2026" : "Save plan";
       adapter.actions.save = (values) => this.savePlan(values);
       adapter.actions.reloadSettings = () => this.reloadSettings();
@@ -60489,15 +60503,21 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       this.paint();
       return;
     }
-    if (record3.driver !== "target_soc" && values.target !== String(record3.target.target_percent ?? "")) {
-      this.settingsNotice = "Target SOC cannot be changed in manual energy mode.";
+    const base2 = formFromRecord(record3), driver = values.driver ?? base2.driver, vehicleId = values.vehicleId ?? base2.vehicleId;
+    if (vehicleId !== base2.vehicleId && (!decoded.ok || !decoded.value.soc?.vehicles.some((v2) => v2.id === vehicleId && v2.id !== "guest"))) {
+      this.settingsNotice = "Choose an available discovered vehicle.";
       this.paint();
       return;
     }
-    const form = { ...formFromRecord(record3), targetPercent: values.target, minimumReadySoc: values.minimum, capValue: capForSave(values.cap, decoded.ok ? decoded.value.market?.currency : null, record3.soft_price_cap), capEnabled: values.capEnabled, capBasis: values.capBasis, deadlineEnabled: values.deadlineEnabled, deadlineTime: values.readyBy };
+    const form = { ...base2, driver, energy: values.energy ?? base2.energy, vehicleId, targetPercent: values.target ?? base2.targetPercent, minimumReadySoc: values.minimum, capValue: capForSave(values.cap, decoded.ok ? decoded.value.market?.currency : null, record3.soft_price_cap), capEnabled: values.capEnabled, capBasis: values.capBasis, deadlineEnabled: values.deadlineEnabled, deadlineTime: values.readyBy };
     const check = replacementFor("plan", record3, form);
     if (!check.ok) {
       this.settingsNotice = translate2("en", check.errorKey);
+      this.paint();
+      return;
+    }
+    if (check.body.target.target_percent != null && check.body.minimum_ready_by_soc != null && check.body.minimum_ready_by_soc > check.body.target.target_percent) {
+      this.settingsNotice = "Minimum SOC must not exceed the planning target.";
       this.paint();
       return;
     }

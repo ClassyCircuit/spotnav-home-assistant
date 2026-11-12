@@ -1357,7 +1357,12 @@ action, weaken admission/safety checks, or claim physical behavior is verified.
     stale, superseded, mismatched, missing, offline and uncertain evidence, as well
     as mobile rendering and no-write behavior.
 
-- [ ] **12.5 Plan-mode selection in the shared sidebar**
+- [x] **12.5 Plan-mode selection in the shared sidebar** (2.5.80 local; review pending)
+  - Explicit revision-checked energy/target-SOC mode, requested energy and discovered
+    vehicle controls reuse the existing settings contract. Saved values and drafts
+    remain separate; missing prerequisites and potential guarded reconciliation are
+    explained. Focused mocks include actual settings-to-planner mode changes with an
+    old SOC. Browser, live HA and physical behavior remain unverified.
   - The real settings observation reported `manual_kwh`, which plans a requested
     energy amount rather than an SOC target. The existing card has a revision-checked
     **Charge by** mode choice, but the sidebar only explains that the card must be

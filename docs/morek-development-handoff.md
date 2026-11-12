@@ -355,6 +355,24 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-13 — sidebar plan mode (2.5.80; local, review pending)
+
+- The shared sidebar exposes explicit requested-kWh or target-SOC planning, requested
+  energy, a discovered vehicle choice and target. Canonical revision-checked settings
+  preserve the other mode's inputs and unrelated settings; changes remain drafts until
+  saved. Missing/ambiguous/guest vehicle and observed capacity guidance reuse the
+  dashboard, along with existing SOC age and source; a selected different vehicle's
+  capacity is not inferred. The car's own limit remains separate. Existing fill-to-limit
+  is preserved and noted rather than silently disabled.
+- A saved change can trigger backend replanning and normal guarded reconciliation;
+  it does not guarantee Resume or charging. Missing plan provenance is explained
+  without weakening worker checks. No automatic setting, profile or charger action is
+  issued by opening or editing the panel. Old SOC remains labelled and its planner
+  policy is unchanged. The backend and planner remain the authority on prerequisites.
+- Focused sidebar/settings mocks and an isolated actual settings-to-planner test use
+  mocked HA boundaries. Browser, full HA-plugin suite, live HA, vehicle and hardware
+  validation remain unrun. No HA contact, wake, deployment or charger operation.
+
 ### 2026-11-13 — sidebar clock skew (2.5.79; local, review pending)
 
 - Dashboard and relevant Morek status freshness now accept up to five seconds of

@@ -177,7 +177,7 @@ export function morekPanel(
     price_inputs_changed: "Price source changed; waiting for a fresh calculation. The retained limit may remain.",
     price_coverage_unavailable: "Published prices do not cover the proposed windows; the retained limit may remain.",
     price_evidence_unavailable: "Price source evidence is unavailable; the retained limit may remain.",
-    plan_input_provenance_unavailable: "Plan input evidence is unavailable; automatic sending is blocked.",
+    plan_input_provenance_unavailable: "Plan input evidence is unavailable; automatic sending is blocked. Review the saved plan mode, target, vehicle, SOC and capacity; the checked schedule path requires a cheapest-price target-SOC plan. Switching modes does not guarantee Resume or charging.",
     vehicle_input_stale: "Vehicle state of charge is stale; waiting for a fresh reading.",
     vehicle_input_unavailable: "Vehicle state of charge is unavailable or invalid; automatic sending is blocked.",
     vehicle_identity_unavailable: "Vehicle identity is unavailable or changed; automatic sending is blocked.",

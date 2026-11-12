@@ -95,6 +95,26 @@ async def _save(world, **changes):
     return world.controller.snapshot()
 
 
+def test_mode_settings_round_trip_replans_with_last_known_soc(monkeypatch):
+    async def run():
+        w = await _world(monkeypatch)
+        w.facts[0] = replace(w.facts[0], soc_age_s=86400)
+        target = w.store.settings("test").target
+        manual = await _save(w, driver="manual_kwh", requested_kwh=12)
+        assert w.store.settings("test").target == target
+        assert w.store.settings("test").requested_kwh == 12
+        assert manual.settings_revision == w.store.settings("test").revision
+        restored = await _save(w, driver="target_soc")
+        assert w.store.settings("test").target == target
+        assert w.store.settings("test").requested_kwh == 12
+        assert restored.settings_revision == w.store.settings("test").revision
+        assert restored.projection_soc == 25
+        assert restored.projection_age_s == 86400
+        assert restored.proposal is not None
+
+    asyncio.run(run())
+
+
 def test_settings_api_replans_and_preview_policy_matches_dashboard(monkeypatch):
     async def run():
         w = await _world(monkeypatch)

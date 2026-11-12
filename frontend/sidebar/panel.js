@@ -164,7 +164,11 @@ export class SpotnavEnhancedPanel extends HTMLElement {
       const currency=dashboard?.market?.currency || null;
       if (this.settingsDirty && this.draftCurrency!==undefined && this.draftCurrency!==currency) {this.settingsConflict=true;this.settingsNotice='Price currency changed while editing. Reload settings before saving.';}
       adapter.model.capCurrency=currency;
-      adapter.model.settings={target:record.target.target_percent,minimum:record.minimum_ready_by_soc,cap:capInput(record.soft_price_cap,currency),readyBy:record.departure_time,capEnabled:record.soft_price_cap!=null,capBasis:record.cap_price_basis,deadlineEnabled:record.departure_enabled};
+      adapter.model.settings={driver:record.driver,energy:record.requested_kwh,vehicleId:record.target.vehicle_id || '',target:record.target.target_percent,minimum:record.minimum_ready_by_soc,cap:capInput(record.soft_price_cap,currency),readyBy:record.departure_time,capEnabled:record.soft_price_cap!=null,capBasis:record.cap_price_basis,deadlineEnabled:record.departure_enabled};
+      adapter.model.planVehicles=(dashboard?.soc?.vehicles || []).filter(v=>v.id && v.id!=='guest');
+      const discovered=dashboard?.soc?.vehicle_id, selected=record.target.vehicle_id;
+      adapter.model.vehicleHelp=selected==='guest' || dashboard?.guest?.active ? 'Guest charging uses requested energy; choose a configured vehicle for a target-SOC plan.' : selected ? (adapter.model.planVehicles.some(v=>v.id===selected) ? 'Saved vehicle selected.' : 'Saved vehicle is not currently discovered; check vehicle configuration.') : discovered && discovered!=='guest' ? `No vehicle saved; currently discovered: ${dashboard?.soc?.vehicle_name || discovered}. Choose it explicitly if desired.` : 'No unambiguous vehicle selected. Choose a discovered vehicle or configure vehicle discovery.';
+      adapter.model.vehicleHelp+=` ${dashboard?.soc?.capacity_kwh > 0 ? 'Capacity is available for the observed vehicle.' : 'Usable battery capacity is unavailable for the observed vehicle; configure it before relying on an SOC plan.'} ${adapter.model.vehicle.socDetail} An old reading can be inaccurate after driving.`;
       // The planner's nord_pool basis compares the source's converted published
       // major-unit price, even when that source includes its own charges. A
       // configured-variable-cost cap must not be drawn on this raw series.
@@ -172,11 +176,10 @@ export class SpotnavEnhancedPanel extends HTMLElement {
         adapter.model.chart.cap=displayPrice(record.soft_price_cap,currency);
       }
       adapter.model.settingsEditor=true;
-      adapter.model.targetSupported=record.driver==='target_soc';
       adapter.model.policySupported=record.soft_price_cap!==undefined;
       adapter.model.canSave=allowed && !this.settingsBusy && !this.settingsConflict;
       adapter.model.settingsNotice=this.settingsNotice || (!allowed ? 'You do not have permission to change this plan.' : '');
-      adapter.model.labels.settingsNote=record.driver === 'target_soc' ? 'SOC-based planning. The planning target is separate from the car’s charge limit.' : 'Manual energy mode uses a requested kWh amount, so target SOC cannot be edited here. In the SpotNav card’s Plan settings, choose target SOC mode and configure a vehicle and target.';
+      adapter.model.labels.settingsNote=`Charge by requested energy or a SpotNav target SOC. The planning target is separate from the car’s own charge limit. Saving a mode, target or energy change can recalculate the plan and may trigger normal guarded schedule reconciliation when ownership is armed; it does not guarantee Resume or physical charging.${record.fill_to_limit ? ' Fill-to-limit is saved separately and remains enabled; review it in the existing card if the requested energy is not being used.' : ''}`;
       adapter.model.labels.saveLabel=this.settingsBusy ? 'Saving…' : 'Save plan';
       adapter.actions.save=values=>this.savePlan(values);
       adapter.actions.reloadSettings=()=>this.reloadSettings();
@@ -320,10 +323,12 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     const decoded=decodeDashboard(this.rawDashboard);
     const allowed=hass?.user?.is_admin===true || (decoded.ok && decoded.value.settings?.users_change_plan===true);
     if (!this.connected || hass?.connected===false || !charger || !record || this.settingsBusy || this.pendingSettingsWrites.has(charger) || this.morekBusy || this.autoBusy || this.settingsConflict || !allowed) {this.settingsNotice='Save unavailable or permission denied.';this.paint();return;}
-    if (record.driver!=='target_soc' && values.target!==String(record.target.target_percent ?? '')) {this.settingsNotice='Target SOC cannot be changed in manual energy mode.';this.paint();return;}
-    const form={...formFromRecord(record),targetPercent:values.target,minimumReadySoc:values.minimum,capValue:capForSave(values.cap,decoded.ok ? decoded.value.market?.currency : null,record.soft_price_cap),capEnabled:values.capEnabled,capBasis:values.capBasis,deadlineEnabled:values.deadlineEnabled,deadlineTime:values.readyBy};
+    const base=formFromRecord(record), driver=values.driver ?? base.driver, vehicleId=values.vehicleId ?? base.vehicleId;
+    if (vehicleId!==base.vehicleId && (!decoded.ok || !decoded.value.soc?.vehicles.some(v=>v.id===vehicleId && v.id!=='guest'))) {this.settingsNotice='Choose an available discovered vehicle.';this.paint();return;}
+    const form={...base,driver,energy:values.energy ?? base.energy,vehicleId,targetPercent:values.target ?? base.targetPercent,minimumReadySoc:values.minimum,capValue:capForSave(values.cap,decoded.ok ? decoded.value.market?.currency : null,record.soft_price_cap),capEnabled:values.capEnabled,capBasis:values.capBasis,deadlineEnabled:values.deadlineEnabled,deadlineTime:values.readyBy};
     const check=replacementFor('plan',record,form);
     if (!check.ok) {this.settingsNotice=translate('en',check.errorKey);this.paint();return;}
+    if (check.body.target.target_percent!=null && check.body.minimum_ready_by_soc!=null && check.body.minimum_ready_by_soc>check.body.target.target_percent) {this.settingsNotice='Minimum SOC must not exceed the planning target.';this.paint();return;}
     if (!check.changed) {this.settingsNotice='No changes to save.';this.paint();return;}
     this.settingsBusy=true;this.statusEpoch++;this.statusAt=null;this.settingsNotice='Saving…';this.paint();
     try {
