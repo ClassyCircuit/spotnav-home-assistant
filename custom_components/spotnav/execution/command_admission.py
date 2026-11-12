@@ -93,19 +93,24 @@ class CommandAdmission:
     def person_stop_reservation(self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]]):
         """Reserve before outer locks; interrupt an unarmed entry without reopening writes."""
         current = _STOP_RESERVATION.get()
-        if current is not None and current[0] is self and current[1] == entry_id and current[3] is asyncio.current_task():
+        if current is not None and current[0] is self and current[1] == entry_id and current[2] is not None and current[3] is asyncio.current_task():
             yield
             return
         try:
             identity = resolve_identity()
-            connector = physical_connector(identity) if classify_morek_identity(identity) == "supported_morek" else None
+            offline_intent = (identity.get("reason") == "offline_owned_intent"
+                              and identity.get("offline_binding") in ("direct", "alias")
+                              and identity.get("resolved_id") == MOREK_STATION_ID
+                              and identity.get("connector_id") == MOREK_CONNECTOR_ID
+                              and identity.get("match_count") == 0)
+            connector = physical_connector(identity) if classify_morek_identity(identity) == "supported_morek" or offline_intent else None
         except Exception:  # noqa: BLE001 - the ordinary identity checks still apply
             connector = None
         if connector is not None:
             self._person_stops[connector] = self._person_stops.get(connector, 0) + 1
+            self._generations[connector] = self._generations.get(connector, 0) + 1
             if connector in self._entry_draining:
                 self._entry_draining[connector] = "interrupted"
-                self._generations[connector] = self._generations.get(connector, 0) + 1
         token = _STOP_RESERVATION.set((self, entry_id, connector, asyncio.current_task()))
         try:
             yield
@@ -682,6 +687,8 @@ class CommandAdmission:
 
             if not isinstance(status, Mapping):
                 return AdmissionResult(False, "ownership_unavailable")
+            if not person and expected_generation != self.generation(connector):
+                return AdmissionResult(False, "stale_generation")
             state = status.get("record_state")
             uncertain_stop = person and state == "save_failed" and status.get("person_stop_safe_during_transition_failure") is True
             if state != "valid" and not uncertain_stop:

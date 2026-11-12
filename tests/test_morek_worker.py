@@ -4,7 +4,7 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 from dataclasses import replace
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 
@@ -113,6 +113,400 @@ def setup(monkeypatch, *, active=False, admission=None):
 async def drain(worker):
     while worker._task is not None:
         await worker._task
+
+
+@pytest.mark.asyncio
+async def test_explicit_owned_pause_is_durable_and_worker_requests_held_off(monkeypatch):
+    w = setup(monkeypatch)
+    entry = SimpleNamespace(entry_id="charger")
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=w.target))
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda *_: w.admission)
+    status = {"record_state": "valid", "recorded_owner": "morek_schedule", "armed": False,
+              "transition_state": None, "station_id": IDENTITY["resolved_id"], "connector_id": 1}
+    monkeypatch.setattr(morek_schedule, "ownership_store", lambda *_: SimpleNamespace(
+        async_status=AsyncMock(return_value=status)))
+    intent = await morek_schedule.async_record_owned_pause(w.hass, "charger")
+    assert intent["type"] == "pause_until_resumed" and w.ledger.value["schedule_pause"] == intent
+    assert await morek_schedule.async_record_owned_pause(w.hass, "charger") == intent
+    w.worker.start()
+    await drain(w.worker)
+    assert w.worker.reason == "upload_accepted_unverified"
+    assert w.point.call.await_count == 1
+    sent = w.point.call.await_args.args[0].payload["cs_charging_profiles"]
+    assert [p["limit"] for p in sent["chargingSchedule"]["chargingSchedulePeriod"]] == [0]
+    assert w.ledger.value["attempt"]["pause_id"] == intent["id"]
+    w.worker.close()
+    w.hass.data = {}
+    worker = morek_worker.MorekScheduleWorker(w.hass, "charger", w.planner)
+    worker.start()
+    await drain(worker)
+    assert worker.reason == "unchanged"
+    assert w.point.call.await_count == 1
+    worker.close()
+
+
+@pytest.mark.asyncio
+async def test_legacy_owner_cannot_record_schedule_owned_pause(monkeypatch):
+    w = setup(monkeypatch)
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (SimpleNamespace(entry_id="charger"), None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=w.target))
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda *_: w.admission)
+    store = SimpleNamespace(async_status=AsyncMock(return_value={"record_state": "valid", "recorded_owner": "legacy"}))
+    monkeypatch.setattr(morek_schedule, "ownership_store", Mock(return_value=store))
+    with pytest.raises(morek_schedule.ScheduleRefused, match="schedule_owner_unavailable"):
+        await morek_schedule.async_record_owned_pause(w.hass, "charger")
+    assert w.ledger.value is None
+    w.point.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("change", ["conflict", "held_exit", "identity_change", "save_failure"])
+async def test_owned_pause_refuses_unsafe_binding_and_save_failure(monkeypatch, change):
+    w = setup(monkeypatch)
+    entry = SimpleNamespace(entry_id="charger", runtime_data=SimpleNamespace(morek_worker=w.worker))
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=w.target))
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda *_: w.admission)
+    status = {"record_state": "valid", "recorded_owner": "morek_schedule", "armed": False,
+              "transition_state": None, "station_id": IDENTITY["resolved_id"], "connector_id": 1}
+    if change == "conflict":
+        status["record_state"] = "conflict"
+    elif change == "held_exit":
+        status.update(recorded_owner="legacy", transition_state="exit_held_unarmed")
+    elif change == "identity_change":
+        w.identity = {**IDENTITY, "match_count": 2, "reason": "ambiguous_station"}
+    else:
+        w.ledger.write = AsyncMock(side_effect=OSError("synthetic failure"))
+    monkeypatch.setattr(morek_schedule, "ownership_store", lambda *_: SimpleNamespace(async_status=AsyncMock(return_value=status)))
+    with pytest.raises((morek_schedule.ScheduleRefused, OSError)):
+        await morek_schedule.async_record_owned_pause(w.hass, "charger")
+    assert w.ledger.value is None
+    w.point.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_owned_pause_then_resume_uses_fresh_plan_and_keeps_request(monkeypatch):
+    w = setup(monkeypatch)
+    entry = SimpleNamespace(entry_id="charger", runtime_data=SimpleNamespace(morek_worker=w.worker))
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=w.target))
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda *_: w.admission)
+    status = {"record_state": "valid", "recorded_owner": "morek_schedule", "armed": False,
+              "transition_state": None, "station_id": IDENTITY["resolved_id"], "connector_id": 1}
+    monkeypatch.setattr(morek_schedule, "ownership_store", lambda *_: SimpleNamespace(async_status=AsyncMock(return_value=status)))
+    await morek_schedule.async_record_owned_pause(w.hass, "charger")
+    await drain(w.worker)
+    assert w.point.call.await_count == 1
+    w.planner.current.price_state = "stale"
+    intent = await morek_schedule.async_record_owned_pause(w.hass, "charger", resume=True)
+    await drain(w.worker)
+    assert intent["type"] == "resume_requested" and w.worker.reason == "prices_stale_or_unavailable"
+    assert w.point.call.await_count == 1
+    w.planner.current.price_state = "ready"
+    w.worker.trigger()
+    await drain(w.worker)
+    assert w.point.call.await_count == 2 and w.ledger.value["schedule_pause"] == intent
+    assert w.ledger.value["attempt"]["pause_id"] == intent["id"]
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_resume_request_survives_restart_without_automatic_dispatch(monkeypatch):
+    w = setup(monkeypatch)
+    entry = SimpleNamespace(entry_id="charger", runtime_data=SimpleNamespace(morek_worker=w.worker))
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=w.target))
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda *_: w.admission)
+    status = {"record_state": "valid", "recorded_owner": "morek_schedule", "armed": False,
+              "transition_state": None, "station_id": IDENTITY["resolved_id"], "connector_id": 1}
+    monkeypatch.setattr(morek_schedule, "ownership_store", lambda *_: SimpleNamespace(async_status=AsyncMock(return_value=status)))
+    await morek_schedule.async_record_owned_pause(w.hass, "charger")
+    await drain(w.worker)
+    w.worker._available = lambda: False
+    await morek_schedule.async_record_owned_pause(w.hass, "charger", resume=True)
+    await drain(w.worker)
+    w.worker.close()
+    w.hass.data = {}
+    worker = morek_worker.MorekScheduleWorker(w.hass, "charger", w.planner)
+    worker.start()
+    await drain(worker)
+    assert w.ledger.value["schedule_pause"]["type"] == "resume_requested"
+    assert worker.reason == "resume_requires_confirmation"
+    assert w.point.call.await_count == 1
+    worker.close()
+
+
+@pytest.mark.asyncio
+async def test_stop_during_dispatched_resume_supersedes_late_ack(monkeypatch):
+    w = setup(monkeypatch)
+    entry = SimpleNamespace(entry_id="charger", runtime_data=SimpleNamespace(morek_worker=w.worker))
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=w.target))
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda *_: w.admission)
+    status = {"record_state": "valid", "recorded_owner": "morek_schedule", "armed": False,
+              "transition_state": None, "station_id": IDENTITY["resolved_id"], "connector_id": 1}
+    monkeypatch.setattr(morek_schedule, "ownership_store", lambda *_: SimpleNamespace(async_status=AsyncMock(return_value=status)))
+    await morek_schedule.async_record_owned_pause(w.hass, "charger")
+    await drain(w.worker)
+    entered, release = asyncio.Event(), asyncio.Event()
+    async def delayed(_request):
+        entered.set()
+        await release.wait()
+        return SimpleNamespace(status="Accepted")
+    w.point.call.side_effect = delayed
+    await morek_schedule.async_record_owned_pause(w.hass, "charger", resume=True)
+    await entered.wait()
+    with w.admission.person_stop_reservation("charger", lambda: w.identity):
+        release.set()
+        await drain(w.worker)
+        hidden = morek_schedule._owned_pause_status(w.ledger.value, {}, False, w.worker, stop_pending=True)
+        assert hidden["request"] == "stop_pending" and hidden["ack"] is None
+    w.point.call.side_effect = None
+    await morek_schedule.async_record_owned_pause(w.hass, "charger")
+    await drain(w.worker)
+    assert w.ledger.value["schedule_pause"]["type"] == "pause_until_resumed"
+    assert w.ledger.value["attempt"]["pause_id"] == w.ledger.value["schedule_pause"]["id"]
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("boundary", ["ledger", "entry_store"])
+async def test_stop_during_resume_predispatch_persistence_prevents_send(monkeypatch, boundary):
+    w = setup(monkeypatch)
+    entry = SimpleNamespace(entry_id="charger", runtime_data=SimpleNamespace(morek_worker=w.worker))
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=w.target))
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda *_: w.admission)
+    status = {"record_state": "valid", "recorded_owner": "morek_schedule", "armed": False,
+              "transition_state": None, "station_id": IDENTITY["resolved_id"], "connector_id": 1}
+    monkeypatch.setattr(morek_schedule, "ownership_store", lambda *_: SimpleNamespace(async_status=AsyncMock(return_value=status)))
+    await morek_schedule.async_record_owned_pause(w.hass, "charger")
+    await drain(w.worker)
+    _, disk = await morek_schedule._state(w.hass, "charger")
+    entered, release = asyncio.Event(), asyncio.Event()
+    if boundary == "ledger":
+        original = w.ledger.write
+        async def blocked(value):
+            intent = value.get("schedule_pause") or {}
+            attempt = value.get("attempt") or {}
+            if intent.get("type") == "resume_requested" and attempt.get("pause_id") == intent.get("id") and not entered.is_set():
+                entered.set()
+                await release.wait()
+            await original(value)
+        monkeypatch.setattr(w.ledger, "write", blocked)
+    else:
+        async def blocked_save(_value):
+            entered.set()
+            await release.wait()
+        disk.async_save.side_effect = blocked_save
+    await morek_schedule.async_record_owned_pause(w.hass, "charger", resume=True)
+    await entered.wait()
+    with w.admission.person_stop_reservation("charger", lambda: w.identity):
+        release.set()
+        await drain(w.worker)
+    assert w.point.call.await_count == 1
+    assert w.ledger.value["attempt"]["state"] == "aborted_before_dispatch"
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_manual_api_routes_owned_pause_without_legacy_executor(monkeypatch):
+    from custom_components.spotnav.api import manual_action
+    from custom_components.spotnav.execution.auto_execution import AutoExecutor
+    w = setup(monkeypatch)
+    entry = SimpleNamespace(entry_id="charger", runtime_data=SimpleNamespace(morek_worker=w.worker))
+    controller = MagicMock(ocpp_target=w.target, entry_id="charger")
+    monkeypatch.setattr(manual_action, "resolve_charger_request", lambda *_: entry)
+    async def owned(action):
+        return await morek_schedule.async_maybe_owned_action(w.hass, "charger", action)
+    executor = AutoExecutor(w.hass, controller, SimpleNamespace(), owned_manual_action=owned)
+    monkeypatch.setattr(manual_action, "preview_for", lambda *_: SimpleNamespace(async_manual_action=executor.async_manual_action))
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: controller)
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda *_: w.admission)
+    status = {"record_state": "valid", "recorded_owner": "morek_schedule", "armed": False,
+              "transition_state": None, "station_id": IDENTITY["resolved_id"], "connector_id": 1}
+    monkeypatch.setattr(morek_schedule, "ownership_store", lambda *_: SimpleNamespace(async_status=AsyncMock(return_value=status)))
+    assert await manual_action.async_perform_action(w.hass, "charger", action="stop", choice="until_resumed") == ("stop", "until_resumed")
+    await drain(w.worker)
+    assert w.ledger.value["schedule_pause"]["type"] == "pause_until_resumed"
+    assert w.point.call.await_count == 1
+    assert await manual_action.async_perform_action(w.hass, "charger", action="resume") == ("resume", None)
+    await drain(w.worker)
+    assert w.ledger.value["schedule_pause"]["type"] == "resume_requested"
+    assert w.point.call.await_count == 2
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_offline_direct_physical_pause_persists_without_ocpp(monkeypatch):
+    w = setup(monkeypatch)
+    w.target.devid = morek_schedule.MOREK_STATION_ID
+    w.worker._available = lambda: False
+    entry = SimpleNamespace(entry_id="charger", runtime_data=SimpleNamespace(morek_worker=w.worker))
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=w.target))
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda *_: w.admission)
+    monkeypatch.setattr(morek_schedule, "_identity_status", lambda *_: {"supported": True, "reason": None,
+        "configured_id": morek_schedule.MOREK_STATION_ID, "resolved_id": None, "connector_id": 1,
+        "match_count": 0, "ocpp_version": None})
+    status = {"record_state": "valid", "recorded_owner": "morek_schedule", "armed": False,
+              "transition_state": None, "station_id": morek_schedule.MOREK_STATION_ID, "connector_id": 1}
+    monkeypatch.setattr(morek_schedule, "ownership_store", lambda *_: SimpleNamespace(async_status=AsyncMock(return_value=status)))
+    await morek_schedule.async_record_owned_pause(w.hass, "charger")
+    await drain(w.worker)
+    assert w.ledger.value["schedule_pause"]["type"] == "pause_until_resumed"
+    assert w.worker.reason == "charger_unavailable"
+    w.point.call.assert_not_awaited()
+    w.worker.close()
+
+
+def test_offline_alias_binding_requires_one_unambiguous_mapping():
+    target = SimpleNamespace(devid="alias", connector_id=1)
+    system = SimpleNamespace(cpids={"alias": morek_schedule.MOREK_STATION_ID}, charge_points={})
+    hass = SimpleNamespace(data={"ocpp": {"one": system}})
+    identity = morek_schedule._intent_identity_status(hass, target)
+    assert identity["offline_binding"] == "alias" and morek_schedule._owned_intent_identity_ok(identity)
+    hass.data["ocpp"]["two"] = system
+    assert not morek_schedule._owned_intent_identity_ok(morek_schedule._intent_identity_status(hass, target))
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("outcome", ["Rejected", "timeout"])
+async def test_resume_rejection_and_unknown_do_not_retry(monkeypatch, outcome):
+    w = setup(monkeypatch)
+    entry = SimpleNamespace(entry_id="charger", runtime_data=SimpleNamespace(morek_worker=w.worker))
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=w.target))
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda *_: w.admission)
+    status = {"record_state": "valid", "recorded_owner": "morek_schedule", "armed": False,
+              "transition_state": None, "station_id": IDENTITY["resolved_id"], "connector_id": 1}
+    monkeypatch.setattr(morek_schedule, "ownership_store", lambda *_: SimpleNamespace(async_status=AsyncMock(return_value=status)))
+    await morek_schedule.async_record_owned_pause(w.hass, "charger")
+    await drain(w.worker)
+    if outcome == "timeout":
+        w.point.call.side_effect = TimeoutError
+    else:
+        w.point.call.return_value = SimpleNamespace(status=outcome)
+    await morek_schedule.async_record_owned_pause(w.hass, "charger", resume=True)
+    await drain(w.worker)
+    assert w.worker.reason == ("upload_uncertain" if outcome == "timeout" else "upload_rejected")
+    w.worker.trigger()
+    await drain(w.worker)
+    assert w.point.call.await_count == 2
+    assert w.ledger.value["schedule_pause"]["type"] == "resume_requested"
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_stop_during_resume_save_invalidates_resume_ticket(monkeypatch):
+    w = setup(monkeypatch)
+    entry = SimpleNamespace(entry_id="charger", runtime_data=SimpleNamespace(morek_worker=w.worker))
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=w.target))
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda *_: w.admission)
+    status = {"record_state": "valid", "recorded_owner": "morek_schedule", "armed": False,
+              "transition_state": None, "station_id": IDENTITY["resolved_id"], "connector_id": 1}
+    monkeypatch.setattr(morek_schedule, "ownership_store", lambda *_: SimpleNamespace(async_status=AsyncMock(return_value=status)))
+    await morek_schedule.async_record_owned_pause(w.hass, "charger")
+    await drain(w.worker)
+    entered, release = asyncio.Event(), asyncio.Event()
+    original = w.ledger.write
+    async def blocked(value):
+        if value.get("schedule_pause", {}).get("type") == "resume_requested":
+            entered.set()
+            await release.wait()
+        await original(value)
+    monkeypatch.setattr(w.ledger, "write", blocked)
+    task = asyncio.create_task(morek_schedule.async_record_owned_pause(w.hass, "charger", resume=True))
+    await entered.wait()
+    with w.admission.person_stop_reservation("charger", lambda: w.identity):
+        release.set()
+        with pytest.raises(morek_schedule.ScheduleRefused, match="resume_interrupted"):
+            await task
+    w.worker.trigger()
+    await drain(w.worker)
+    assert w.worker.reason == "resume_requires_confirmation" and w.point.call.await_count == 1
+    await morek_schedule.async_record_owned_pause(w.hass, "charger")
+    await drain(w.worker)
+    assert w.ledger.value["schedule_pause"]["type"] == "pause_until_resumed"
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_cancelled_resume_save_does_not_authorize_worker(monkeypatch):
+    w = setup(monkeypatch)
+    entry = SimpleNamespace(entry_id="charger", runtime_data=SimpleNamespace(morek_worker=w.worker))
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=w.target))
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda *_: w.admission)
+    status = {"record_state": "valid", "recorded_owner": "morek_schedule", "armed": False,
+              "transition_state": None, "station_id": IDENTITY["resolved_id"], "connector_id": 1}
+    monkeypatch.setattr(morek_schedule, "ownership_store", lambda *_: SimpleNamespace(async_status=AsyncMock(return_value=status)))
+    await morek_schedule.async_record_owned_pause(w.hass, "charger")
+    await drain(w.worker)
+    entered = asyncio.Event()
+    original = w.ledger.write
+    async def blocked(value):
+        if value.get("schedule_pause", {}).get("type") == "resume_requested":
+            entered.set()
+            await asyncio.Event().wait()
+        await original(value)
+    monkeypatch.setattr(w.ledger, "write", blocked)
+    task = asyncio.create_task(morek_schedule.async_record_owned_pause(w.hass, "charger", resume=True))
+    await entered.wait()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    w.worker.trigger()
+    await drain(w.worker)
+    assert w.ledger.value["schedule_pause"]["type"] == "pause_until_resumed"
+    assert w.worker.resume_ticket is None and w.point.call.await_count == 1
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_stop_reservation_invalidates_queued_worker(monkeypatch):
+    """A reserved Stop supersedes queued work before its durable save."""
+    w = setup(monkeypatch)
+    w.admission.entered, w.admission.release = asyncio.Event(), asyncio.Event()
+    w.worker.start()
+    await w.admission.entered.wait()
+    with w.admission.person_stop_reservation("charger", lambda: w.identity):
+        w.admission.release.set()
+        await drain(w.worker)
+        assert w.point.call.await_count == 0
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("boundary", ["ledger", "entry_store"])
+async def test_stop_invalidates_after_worker_persistence_await(monkeypatch, boundary):
+    w = setup(monkeypatch)
+    _, disk = await morek_schedule._state(w.hass, "charger")
+    entered, release = asyncio.Event(), asyncio.Event()
+    if boundary == "ledger":
+        original = w.ledger.write
+        async def blocked(value):
+            if not entered.is_set():
+                entered.set()
+                await release.wait()
+            await original(value)
+        monkeypatch.setattr(w.ledger, "write", blocked)
+    else:
+        async def save(_value):
+            entered.set()
+            await release.wait()
+        disk.async_save.side_effect = save
+    w.worker.start()
+    await entered.wait()
+    with w.admission.person_stop_reservation("charger", lambda: w.identity):
+        release.set()
+        await drain(w.worker)
+    w.point.call.assert_not_awaited()
+    assert w.ledger.value["attempt"]["state"] == "aborted_before_dispatch"
+    w.worker.close()
 
 
 @pytest.mark.asyncio
@@ -520,6 +914,32 @@ def manual_setup(monkeypatch):
         GetCompositeSchedule=lambda **kw: SimpleNamespace(action="fetch", payload=kw),
         ClearChargingProfile=lambda **kw: SimpleNamespace(action="clear", payload=kw))))
     return w
+
+
+@pytest.mark.asyncio
+async def test_owned_hold_worker_bounded_readback_is_not_measured_stop(monkeypatch):
+    w = manual_setup(monkeypatch)
+    w.ledger.value = {"schema": 1, "entry_id": "charger", "uncertain": False, "desired": None,
+                      "attempt": None, "acknowledged": None, "verified": None, "removal": None,
+                      "schedule_pause": {"version": 1, "type": "pause_until_resumed", "id": "pause-a",
+                                         "station_id": morek_schedule.MOREK_STATION_ID, "connector_id": 1}}
+    callbacks = []
+    monkeypatch.setattr(morek_schedule, "async_call_later", lambda _h, _delay, callback: callbacks.append(callback) or (lambda: None))
+    async def call(request):
+        if request.action == "send":
+            return SimpleNamespace(status="Accepted")
+        return SimpleNamespace(status="Accepted", connector_id=1, schedule_start=NOW.isoformat(),
+                               charging_schedule={"chargingRateUnit": "A", "duration": 7200,
+                                                  "chargingSchedulePeriod": [{"startPeriod": 0, "limit": 0}]})
+    w.point.call.side_effect = call
+    w.worker.start()
+    await drain(w.worker)
+    await callbacks[0](NOW)
+    data = w.hass.data[morek_schedule._DATA_KEY]["charger"][0]
+    status = morek_schedule._owned_pause_status(w.ledger.value, data["verification"], data["verified"], w.worker)
+    assert status["readback"] == "bounded_match" and status["measured"] == "unknown"
+    assert status["coverage_end"] == (NOW + timedelta(hours=1)).isoformat()
+    w.worker.close()
 
 
 @pytest.mark.asyncio

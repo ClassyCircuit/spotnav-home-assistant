@@ -112,7 +112,23 @@ export class SpotnavEnhancedPanel extends HTMLElement {
   paintAutomatic(dashboard) {
     const control=dashboard?.control, active=control?.pause?.choice;
     const observed=Date.parse(dashboard?.generated_at || ''), fresh=Number.isFinite(observed) && observed<=Date.now() && Date.now()-observed<=90000;
-    this.shadowRoot.querySelector('#pause-state').textContent=control && fresh ? (active ? `Confirmed pause: ${active}.` : 'No pause reported.') : 'Auto state unavailable or stale.';
+    const status=decodeMorekState(this.rawStatus), owner=status?.ownership?.recorded_owner;
+    if(owner==='morek_schedule') {
+      const statusFresh=!this.statusFailed && Number.isFinite(this.statusAt) && this.statusAt<=Date.now() && Date.now()-this.statusAt<=90000;
+      const pause=statusFresh ? status?.schedule_pause : null;
+      const intent=pause?.intent==='pause_until_resumed' ? 'Pause requested' : pause?.intent==='resume_requested' ? 'Resume requested; retained limit may remain' : pause?.intent==='none' ? 'No schedule-owned pause reported' : 'Pause intent unknown';
+      const request=typeof pause?.request==='string' ? pause.request : 'unknown';
+      const ack=typeof pause?.ack==='string' ? pause.ack : 'unknown';
+      const from=Date.parse(pause?.coverage_start || ''), to=Date.parse(pause?.coverage_end || '');
+      const coverage=Number.isFinite(from) && Number.isFinite(to) && to>from ? ` (${new Date(from).toLocaleString()} – ${new Date(to).toLocaleString()})` : ' (coverage unavailable)';
+      const readback=pause?.readback==='bounded_match' ? `bounded effective readback match${coverage}` : 'readback unconfirmed';
+      this.shadowRoot.querySelector('#pause-state').textContent=`${intent}; request ${request}; ACK ${ack}; ${readback}; physical charging unknown. Schedule-owned controls disabled: automatic dispatch unarmed.`;
+      this.shadowRoot.querySelector('#pause-auto').disabled=true;
+      this.shadowRoot.querySelector('#resume-auto').disabled=true;
+      this.shadowRoot.querySelector('#pause-notice').textContent=this.autoNotice || '';
+      return;
+    }
+    this.shadowRoot.querySelector('#pause-state').textContent=control && fresh ? (active ? `Pause intent: ${active}; physical stop not confirmed.` : 'No pause reported.') : 'Auto state unavailable or stale.';
     const can=fresh && !!control?.can_act && !this.controlPermissionPending && !this.autoBusy && !this.autoUncertain && !this.morekBusy && !this.morekUncertain && !this.settingsBusy && this._hass?.connected!==false;
     this.shadowRoot.querySelector('#pause-auto').disabled=!(can && admittedAction(control,'stop','until_resumed'));
     this.shadowRoot.querySelector('#resume-auto').disabled=!(can && admittedAction(control,'resume',null));
@@ -120,6 +136,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
   }
   async automaticAction(action,choice) {
     const generation=this.generation, permissionEpoch=this.permissionEpoch, charger=this.charger, hass=this._hass, decoded=decodeDashboard(this.rawDashboard);
+    if (decodeMorekState(this.rawStatus)?.ownership?.recorded_owner==='morek_schedule') return;
     const observed=decoded.ok ? Date.parse(decoded.value.generated_at || '') : NaN;
     if (!this.connected || !charger || !hass || hass.connected===false || !decoded.ok || !Number.isFinite(observed) || observed>Date.now() || Date.now()-observed>90000 || this.controlPermissionPending || this.autoBusy || this.autoUncertain || this.morekBusy || this.morekUncertain || this.settingsBusy || !decoded.value.control.can_act || !admittedAction(decoded.value.control,action,choice)) return;
     const dispatchedAt=Date.now();this.autoBusy=true;this.autoNotice='Request in progress; state not yet confirmed.';this.dashboardEpoch++;this.statusEpoch++;this.statusAt=null;this.paint();

@@ -566,6 +566,7 @@ class AutoExecutor:
         legacy_admission: Callable[[], Awaitable[bool]] | None = None,
         person_stop_scope: Callable[[], Any] | None = None,
         person_stop_admission: Callable[[], Awaitable[bool]] | None = None,
+        owned_manual_action: Callable[[str], Awaitable[bool]] | None = None,
     ) -> None:
         self._hass = hass
         self._controller = controller
@@ -578,6 +579,7 @@ class AutoExecutor:
         self._legacy_admission = legacy_admission
         self._person_stop_scope = person_stop_scope or nullcontext
         self._person_stop_admission = person_stop_admission
+        self._owned_manual_action = owned_manual_action
         self._lock = asyncio.Lock()
         self._attempt = 0
         self._shutdown = False
@@ -1760,6 +1762,8 @@ class AutoExecutor:
         """A person stopping a charge: it pauses Auto, schedule and strategy, for the plug-in session."""
         with self._person_stop_scope():
             async with self._lock:
+                if self._owned_manual_action is not None and await self._owned_manual_action(ACTION_STOP):
+                    return
                 await self._require_legacy(person_stop=True)
                 await self._immediate_stop_locked()
 
@@ -1767,6 +1771,8 @@ class AutoExecutor:
         """A person cancelling the schedule: a Stop, which clears the plan and pauses Auto for the plug-in."""
         with self._person_stop_scope():
             async with self._lock:
+                if self._owned_manual_action is not None and await self._owned_manual_action(ACTION_STOP):
+                    return
                 await self._require_legacy(person_stop=True)
                 await self._immediate_stop_locked()
 
@@ -1807,6 +1813,8 @@ class AutoExecutor:
         """
         with self._person_stop_scope():
             async with self._lock:
+                if choice == PAUSE_UNTIL_RESUMED and self._owned_manual_action is not None and await self._owned_manual_action(ACTION_STOP):
+                    return
                 await self._require_legacy(person_stop=True)
                 await self._pause_locked(choice)
 
@@ -1866,6 +1874,8 @@ class AutoExecutor:
     async def async_resume(self) -> None:
         """Resume: the next calculation may apply again, through the same boundary."""
         async with self._lock:
+            if self._owned_manual_action is not None and await self._owned_manual_action(ACTION_RESUME):
+                return
             await self._require_legacy()
             await self._resume_locked()
 
@@ -1940,6 +1950,10 @@ class AutoExecutor:
     ) -> ControlDecision:
         """Reserve a person Stop before waiting for the Auto lock."""
         with self._person_stop_scope() if action == ACTION_STOP else nullcontext():
+            if self._owned_manual_action is not None and action in (ACTION_STOP, ACTION_RESUME) and choice in (None, PAUSE_UNTIL_RESUMED):
+                async with self._lock:
+                    if await self._owned_manual_action(action):
+                        return ControlDecision(action, None, ())
             return await self._async_manual_action(action, choice)
 
     async def _async_manual_action(

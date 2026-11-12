@@ -109,6 +109,16 @@ def profile_for(periods: tuple[tuple[datetime, datetime], ...], amps: int, now: 
     }
 
 
+def held_off_profile(now: datetime) -> dict[str, Any]:
+    """The existing profile identity, with one immediate, open-ended 0 A limit."""
+    start = _utc(now).replace(microsecond=0)
+    return {"chargingProfileId": PROFILE_ID, "stackLevel": 1,
+            "chargingProfilePurpose": "TxDefaultProfile", "chargingProfileKind": "Absolute",
+            "chargingSchedule": {"startSchedule": start.isoformat().replace("+00:00", "Z"),
+                                 "chargingRateUnit": "A", "chargingSchedulePeriod": [
+                                     {"startPeriod": 0, "limit": 0, "numberPhases": 3}]}}
+
+
 def _schedule(response: Any) -> dict[str, Any] | None:
     schedule = getattr(response, "charging_schedule", None)
     return schedule if isinstance(schedule, dict) else None
@@ -190,7 +200,7 @@ def _compare_remaining(profile: dict[str, Any] | None, actual: dict[str, Any] | 
                 or coverage_start > fetched + timedelta(seconds=tolerance_s)):
             result["reason"] = "coverage_stale"
             return result
-        if len(expected) < 2 or observed[0][0] != coverage_start:
+        if not expected or observed[0][0] != coverage_start:
             raise ValueError
         if any(a[0] >= b[0] for a, b in zip(observed, observed[1:])):
             raise ValueError
@@ -207,6 +217,29 @@ def _compare_remaining(profile: dict[str, Any] | None, actual: dict[str, Any] | 
         if coverage_end <= boundary:
             result["reason"] = "coverage_stale"
             return result
+        if len(expected) == 1 and expected[0][1] == 0:
+            # Bound the claim to one hour after the observation, never forever.
+            result["scope"] = "bounded_held_off"
+            horizon = boundary + timedelta(hours=1)
+            if ((fetched - requested).total_seconds() > tolerance_s or coverage_start > requested
+                    or expected[0][0] > requested):
+                result["reason"] = "coverage_boundary_ambiguous"
+                return result
+            if type(duration) is not int or duration <= 0:
+                result["reason"] = "coverage_missing"
+                return result
+            if coverage_end < horizon:
+                result["reason"] = "coverage_too_short"
+                return result
+            relevant = [(at, amps) for at, amps in observed if at <= horizon]
+            if any(amps != 0 for _, amps in relevant):
+                result["reason"] = "limits_or_transitions_differ"
+                return result
+            result.update({"matched": True, "exact": True, "reason": "matched", "max_delta_s": 0,
+                           "coverage_end": horizon.isoformat()})
+            return result
+        if len(expected) < 2:
+            raise ValueError
         horizon = expected[-1][0] + timedelta(hours=1)
         if coverage_end < horizon:
             result["reason"] = "coverage_too_short"
@@ -330,6 +363,27 @@ def _verification_state(hass: HomeAssistant, entry_id: str, data: dict[str, Any]
     return verification
 
 
+def _owned_pause_status(outcomes: dict[str, Any], verification: dict[str, Any], verified: bool,
+                        worker: Any, *, stop_pending: bool = False) -> dict[str, Any]:
+    """Separate durable intent from request and bounded observation, not physical flow."""
+    pause = outcomes.get("schedule_pause")
+    if not isinstance(pause, dict):
+        return {"intent": "unknown" if stop_pending or outcomes.get("uncertain") else "none",
+                "request": "stop_pending" if stop_pending else "unknown", "ack": None, "readback": "unknown", "measured": "unknown"}
+    attempt = outcomes.get("attempt") or {}
+    matching = not stop_pending and attempt.get("pause_id") == pause.get("id")
+    # A worker reason may describe the previous intent; never attach it to a new one.
+    request = "stop_pending" if stop_pending else attempt.get("state", "unknown") if matching else "pending"
+    if not matching and not stop_pending and pause.get("type") == "resume_requested" and worker is not None and getattr(worker, "resume_ticket", None) is None:
+        request = "resume_requires_confirmation"
+    return {"intent": pause.get("type", "unknown"), "request": request,
+            "ack": attempt.get("ack") if matching else None,
+            "readback": "bounded_match" if matching and verified and verification.get("scope") in ("bounded_held_off", "remaining")
+            else "unverified", "coverage_start": verification.get("coverage_start") if matching and verified else None,
+            "coverage_end": verification.get("coverage_end") if matching and verified else None,
+            "measured": "unknown"}
+
+
 def _matching_points(hass: HomeAssistant, target: Any) -> list[tuple[str, Any]]:
     """Resolve HA OCPP's configured charger alias to its physical WebSocket station ID."""
     found: list[tuple[str, Any]] = []
@@ -364,7 +418,31 @@ def _identity_status(hass: HomeAssistant, target: Any) -> dict[str, Any]:
     return {"supported": reason is None, "reason": reason, "configured_id": target.devid,
             "resolved_id": resolved if len(found) == 1 else None, "connector_id": target.connector_id,
             "match_count": len(found), "ocpp_version": getattr(found[0][1], "_ocpp_version", None)
-            if len(found) == 1 else None}
+             if len(found) == 1 else None}
+
+
+def _intent_identity_status(hass: HomeAssistant, target: Any) -> dict[str, Any]:
+    """Metadata-only offline binding from a physical ID or one retained alias mapping."""
+    identity = _identity_status(hass, target)
+    if target is not None and target.connector_id == MOREK_CONNECTOR_ID and identity.get("match_count") == 0:
+        alias = getattr(target, "devid", None)
+        mappings = [cpids[alias] for system in hass.data.get("ocpp", {}).values()
+                    if isinstance((cpids := getattr(system, "cpids", None)), dict) and alias in cpids]
+        direct = alias == MOREK_STATION_ID and not mappings
+        mapped = len(mappings) == 1 and mappings[0] == MOREK_STATION_ID
+        if direct or mapped:
+            return {**identity, "supported": True, "resolved_id": MOREK_STATION_ID,
+                    "reason": "offline_owned_intent", "offline_binding": "direct" if direct else "alias"}
+    return identity
+
+
+def _owned_intent_identity_ok(identity: dict[str, Any]) -> bool:
+    from ..execution.command_admission import classify_morek_identity
+    return classify_morek_identity(identity) == "supported_morek" or (
+        identity.get("reason") == "offline_owned_intent" and identity.get("offline_binding") in ("direct", "alias")
+        and isinstance(identity.get("configured_id"), str) and bool(identity.get("configured_id"))
+        and identity.get("resolved_id") == MOREK_STATION_ID and identity.get("connector_id") == MOREK_CONNECTOR_ID
+        and identity.get("match_count") == 0 and identity.get("supported") is True)
 
 
 def _charge_point(hass: HomeAssistant, target: Any) -> Any:
@@ -502,7 +580,98 @@ async def _outcome_record(hass: HomeAssistant, entry_id: str, data: dict[str, An
                   "removal": None}
     if record.get("entry_id") != entry_id or type(record.get("uncertain")) is not bool:
         raise ScheduleRefused("outcome_binding_unavailable")
+    intent = record.get("schedule_pause")
+    if intent is not None and (not isinstance(intent, dict)
+                               or set(intent) != {"version", "type", "id", "station_id", "connector_id"}
+                               or type(intent.get("version")) is not int or intent["version"] != 1
+                               or intent.get("type") not in ("pause_until_resumed", "resume_requested")
+                               or not isinstance(intent.get("id"), str) or not intent["id"]
+                               or intent.get("station_id") != MOREK_STATION_ID
+                               or type(intent.get("connector_id")) is not int
+                               or intent["connector_id"] != MOREK_CONNECTOR_ID):
+        raise ScheduleRefused("schedule_pause_invalid")
     return record
+
+
+async def async_record_owned_pause(hass: HomeAssistant, entry_id: str, *, resume: bool = False) -> dict[str, Any]:
+    """Persist an explicit connector-bound pause; no charger operation is performed.
+
+    A resume remains durable as a request, not proof that a retained limit changed.
+    Production owned-profile admission remains unarmed.
+    """
+    from ..execution.command_admission import physical_connector
+
+    entry, failure = lookup_charger(hass, entry_id)
+    if failure or entry is None:
+        raise ScheduleRefused(failure or "unknown_charger")
+    admission = command_admission(hass)
+
+    def identity() -> dict[str, Any]:
+        controller = controller_for(hass, entry_id)
+        return _intent_identity_status(hass, getattr(controller, "ocpp_target", None))
+
+    from contextlib import nullcontext
+    with nullcontext() if resume else admission.person_stop_reservation(entry_id, identity):
+        original = identity()
+        connector = physical_connector(original)
+        if not _owned_intent_identity_ok(original) or connector is None:
+            raise ScheduleRefused("identity_unresolved")
+        generation = admission.generation(connector)
+        async with admission._lock_for(connector):
+            current = identity()
+            status = await ownership_store(hass).async_status(entry_id, current)
+            if (not _owned_intent_identity_ok(current)
+                    or physical_connector(current) != connector
+                    or status.get("record_state") != "valid"
+                    or status.get("recorded_owner") != "morek_schedule"
+                    or status.get("transition_state") is not None
+                    or status.get("armed") is not False
+                    or (status.get("station_id"), status.get("connector_id")) !=
+                       (connector.station_id, connector.connector_id)):
+                raise ScheduleRefused("schedule_owner_unavailable")
+            data, _ = await _state(hass, entry_id)
+            record = await _outcome_record(hass, entry_id, data)
+            if physical_connector(identity()) != connector:
+                raise ScheduleRefused("identity_changed")
+            intent = record.get("schedule_pause")
+            if resume and (intent is None or record["uncertain"] or admission._person_stops.get(connector)):
+                raise ScheduleRefused("resume_unavailable")
+            desired = "resume_requested" if resume else "pause_until_resumed"
+            if intent is None or intent["type"] != desired:
+                intent = {"version": 1, "type": desired, "id": uuid4().hex,
+                          "station_id": connector.station_id, "connector_id": connector.connector_id}
+                record["schedule_pause"] = intent
+                await outcomes_for(hass).write(record)
+            if resume and (generation != admission.generation(connector) or admission._person_stops.get(connector)):
+                raise ScheduleRefused("resume_interrupted")
+    worker = getattr(getattr(entry, "runtime_data", None), "morek_worker", None)
+    if worker is not None:
+        if resume:
+            worker.resume_ticket = (intent["id"], generation)
+        worker.trigger()
+    return dict(intent)
+
+
+async def async_maybe_owned_action(hass: HomeAssistant, entry_id: str, action: str) -> bool:
+    """Route an explicit Stop/Resume only when a unique Morek owner is established."""
+    from contextlib import nullcontext
+
+    controller = controller_for(hass, entry_id)
+    if getattr(controller, "ocpp_target", None) is None:
+        return False
+    def identity():
+        return _intent_identity_status(hass, getattr(controller, "ocpp_target", None))
+    admission = command_admission(hass)
+    scope = admission.person_stop_reservation(entry_id, identity) if action == "stop" else nullcontext()
+    with scope:
+        current = identity()
+        if not _owned_intent_identity_ok(current):
+            return False
+        status = await ownership_store(hass).async_status(entry_id, current)
+        if status.get("recorded_owner") != "morek_schedule":
+            return False
+        await async_record_owned_pause(hass, entry_id, resume=action == "resume")
+        return True
 
 
 def _verification_current(hass: HomeAssistant, entry_id: str, entry: Any, data: dict[str, Any],
@@ -537,10 +706,17 @@ def _verification_current(hass: HomeAssistant, entry_id: str, entry: Any, data: 
         if attempt.get("revision") != settings.revision:
             return False
         sent = attempt.get("profile")
-        if _preview_id(sent, settings.revision) != fingerprint or sent != data.get("profile"):
+        pause_id = attempt.get("pause_id")
+        pause = record.get("schedule_pause")
+        if pause_id is not None and (not isinstance(pause, dict) or pause.get("id") != pause_id):
+            return False
+        if pause_id is None and attempt.get("source") == "worker" and pause is not None:
+            return False
+        fingerprint_revision = [settings.revision, pause_id] if pause_id is not None else settings.revision
+        if _preview_id(sent, fingerprint_revision) != fingerprint or sent != data.get("profile"):
             return False
         now = datetime.now(timezone.utc)
-        current = _proposed_profile(hass, entry_id, now)
+        current = held_off_profile(now) if pause_id is not None and pause.get("type") == "pause_until_resumed" else _proposed_profile(hass, entry_id, now)
         if ({k: v for k, v in sent.items() if k != "chargingSchedule"}
                 != {k: v for k, v in current.items() if k != "chargingSchedule"}):
             return False
@@ -566,7 +742,7 @@ def _verification_current(hass: HomeAssistant, entry_id: str, entry: Any, data: 
 
 
 async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[str, Any], store: Any,
-                               fingerprint: str, validate: Any, *, automatic: bool) -> str:
+                               fingerprint: str, validate: Any, *, automatic: bool, pause_id: str | None = None) -> str:
     """Connector lock held. Record first, revalidate after every pre-dispatch await."""
     ledger = outcomes_for(hass)
     record = await _outcome_record(hass, entry_id, data)
@@ -590,6 +766,8 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
                                "revision": revision,
                                "source": "worker" if automatic else "manual", "state": "uncertain"},
                    "uncertain": True, "verified": None})
+    if pause_id is not None:
+        record["attempt"]["pause_id"] = pause_id
     await ledger.write(record)
     # Recheck after persistence: a settings edit, new calculation, identity or
     # pause change while the disk was busy must never become an obsolete send.
@@ -997,8 +1175,12 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
                 online = False
             operator = _operator_state(identity, online, outcomes, verification, verified, preview,
                                        hass.data.get("spotnav_morek_sending", {}).get(entry.entry_id))
+            from ..execution.command_admission import physical_connector
+            connector = physical_connector(identity)
+            stop_pending = connector is not None and bool(admission._person_stops.get(connector))
             result = {**identity,
                       "readiness": _session_readiness(hass, controller, identity, online, datetime.now(timezone.utc)),
+                      "schedule_pause": _owned_pause_status(outcomes, verification, verified, worker, stop_pending=stop_pending),
                       "ownership": ownership,
                       "outcomes": outcomes,
                       "operator": operator,

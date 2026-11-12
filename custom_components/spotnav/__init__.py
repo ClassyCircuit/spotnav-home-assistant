@@ -21,7 +21,7 @@ from homeassistant.helpers.start import async_at_started
 from homeassistant.util import dt as dt_util
 
 from .api.dashboard import async_setup_dashboard_api
-from .api.morek_schedule import async_setup_morek_schedule_api, _identity_status
+from .api.morek_schedule import async_setup_morek_schedule_api, _identity_status, async_maybe_owned_action, ScheduleRefused
 from .api.blueprints import async_setup_blueprints_api
 from .api.debug import async_setup_debug_api
 from .blueprint_install import async_install_blueprints
@@ -424,10 +424,18 @@ async def _async_setup_charger_entry(hass: HomeAssistant, entry: ChargerConfigEn
                 command_admission(hass), entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target)
             )
 
+        async def owned_manual_action(action: str) -> bool:
+            from .execution.auto_execution import AutoControlRefused
+            try:
+                return await async_maybe_owned_action(hass, entry.entry_id, action)
+            except ScheduleRefused as error:
+                raise AutoControlRefused(error.code) from None
+
         executor = data.executor = AutoExecutor(
             hass, controller, settings_store, legacy_admission=legacy_allowed,
             person_stop_scope=controller.adapter.person_stop_scope,
             person_stop_admission=lambda: controller.adapter.async_legacy_permitted(person_stop=True),
+            owned_manual_action=owned_manual_action,
         )
         entry.async_on_unload(executor.async_shutdown)
         await executor.async_start()

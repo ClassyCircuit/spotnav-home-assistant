@@ -54,14 +54,16 @@ override early; charging may continue if the automatic plan selects the current
 time. These are target semantics, not a claim that schedule-owned Pause/Resume
 or Charge Now works today. Charge Now is deferred to Stage 10 after 5.8.
 
-**Complete the necessary development in order before installation.** The final Stage 5
-milestone, 5.8, installs the working release, deliberately enables its reviewed automatic
-path and performs supervised live validation with the user's
-specific approval for each operation. The release is not done until real planning,
-schedule operation and measured charging are observed, subject to charger/vehicle
-availability. ACK/readback alone is not physical-flow evidence. If a safety blocker or
-required approval remains unresolved, stop and report it rather than bypassing the gate
-or presenting an unarmed install as completion of 5.8.
+**Complete the necessary development in order before installation.** After development
+and review, the user plans to merge the branch to `main`, install it in HA and perform
+deployed testing personally. 5.8 records that user-owned milestone, not an LLM task
+to merge, install, activate or operate the charger. An LLM may help interpret logs or
+diagnose problems if asked; HA access and live actions still require specific approval.
+Local automated and mocked tests remain LLM development work. Development completion
+does not prove deployed operation: real planning, schedule operation and measured
+charging remain unverified until observed. ACK/readback alone is not physical-flow
+evidence; never bypass an unresolved safety blocker or describe an unarmed installation
+as verified automatic operation.
 
 ## Task overview — start here
 
@@ -85,7 +87,7 @@ Detailed requirements and acceptance cases follow outside this checklist.
 | 6 | Genuine charging history | Later; not a prerequisite for initial installation |
 | 7 | Extended charts, tracks and price insights | After initial real-data chart; actual track uses Stage 6 |
 | 8 | Yesterday, costs and savings | Later; depends on genuine data |
-| 9 | Further polish and installation documentation | Initial install path is in Stage 5; final polish follows |
+| 9 | Targeted dashboard fixes | Only where needed; initial installation is in Stage 5 |
 | 10 | Optional Charge Now override | After the initial 5.8 installation and user-directed validation; independent of Stages 6–9 |
 
 ### Stage 0 — Completed baseline: preserve and reuse
@@ -689,14 +691,38 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Determine the installation's new-session authorization behavior and reliable
     transaction/measurement evidence in user-directed 5.8. Profile ACK, limits and
     plug-in do not prove authorization or flow. No live validation is claimed.
-  - Current working tree contains 2.5.48 readiness/status implementation and tests;
-    it remains in progress until its implementation and validation are reported and
-    reviewed. Preserve that work; do not mark completed based on file presence alone.
+  - The 2.5.48 local implementation and mocked checks were reported; coordinator
+    review remains pending. They do not establish live authorization or flow.
   - Reuse observed charger/transaction facts to report and gate what can actually
     be known about a new charging session. Do not change authorization settings or
     infer that a stored schedule authorizes charging. Test unknown/offline/refused
     cases with mocked boundaries; surface installation-specific decisions for the user.
-- [ ] **5.6b Person Stop and retained-schedule policy**
+- [x] **5.6b Person Stop and retained-schedule policy** (2.5.52 local, unarmed, mocked; coordinator review pending)
+  - Auto's existing Stop/Pause and Resume boundaries route a unique schedule owner
+    to connector-bound durable intent; the worker requests a held-off profile or the
+    latest valid plan under its existing admission and uncertainty guards. Offline
+    intent requires an exact physical ID or one unambiguous retained alias mapping,
+    plus matching durable ownership. A persisted Resume after a process restart
+    requires explicit reconfirmation before dispatch; it is never reported as done.
+  - Production dispatch remains unarmed and schedule-owned sidebar controls remain
+    disabled. Mock tests cover generation races, pending/rejected/uncertain outcomes,
+    bounded readback and restart; ACK/readback do not prove physical flow. The held
+    exit has no release path, and live validation remains user-directed in 5.8.
+  - **2.5.51 partial:** the sidebar explicitly disables schedule-owned Pause/Resume
+    while dispatch is unarmed and distinguishes reported intent, request, ACK,
+    readback and unknown physical charging. The person-facing action, durable Resume,
+    offline recording and complete mocked race verification remain unimplemented.
+  - **2.5.50 partial:** an internal, versioned connector-bound pause record in the
+    existing outcome ledger selects a held-off worker profile under simulated authority;
+    it is not derived from legacy `until_resumed`. It is not exposed as a person-facing
+    action, and Resume is not implemented. Offline pause, durable Stop/Resume races,
+    bounded readback end-to-end and sidebar presentation still need work. Production
+    dispatch is unarmed and this substage remains open.
+  - **2.5.49 partial:** a Stop reservation invalidates older connector work and the
+    worker rechecks after persistence awaits. Flat 0 A readback can match only a
+    bounded one-hour interval. The held-off builder is not wired to Pause; durable
+    schedule-owned Pause/Resume and its operator status remain unimplemented.
+    Production dispatch remains unarmed; this substage is not complete.
   - Implement the user's agreed **Pause / Resume Auto** control under schedule
     ownership. Pause requests charging stop and remain held until explicit Resume;
     Resume returns control to the latest valid automatic plan. A failed, offline or
@@ -714,19 +740,19 @@ tests are documented there; full HA collection is still blocked on Windows.
     test mocked reconnection, person Stop and regulator exceptions. Do not implement
     household load balancing or dynamically adjust amps for house load.
 - [ ] **5.7 Activation implementation and pre-install automated validation**
-  - Umbrella only: assign 5.7a–5.7b individually; live activation stays in 5.8.
+  - Umbrella only: assign 5.7a–5.7b individually; deployed activation and testing
+    are the user's own 5.8 milestone, not LLM implementation tasks.
   - After 5.5–5.6, implement and review a deliberate, reversible
     activation path using the existing guarded worker, planner triggers and durable
-    evidence. Do not weaken interlocks or automatically retry unknown outcomes; live
-    activation itself still requires the user's specific approval in 5.8.
+    evidence. Do not weaken interlocks or automatically retry unknown outcomes; the
+    user chooses whether and when to enable it after installation.
   - Test changed and unchanged settings/prices/SOC → backend replan → guarded schedule
     reconciliation, startup/reconnect and conflict/uncertainty cases. Show proposal,
     sent ACK, effective readback and real measured flow separately on the live dashboard.
-  - Prepare the supervised live acceptance procedure for 5.8 without contacting HA or
-    operating hardware absent specific approval. ACK or matching effective limits are
-    not proof of physical flow; no overnight test is mandatory.
   - Verify restart/reconnect and safe person Stop/protection behavior with automated
-    coverage. Prepare explicit supervised checks for the installation milestone.
+    coverage. Summarize useful manual checks and known limitations for the user;
+    ACK or matching effective limits are not proof of physical flow. No overnight
+    test is mandatory, and no live contact or operation is implied.
   - Carry forward the unrun 5.4c HA-plugin dashboard API/contract/golden suite;
     run it on a supported local host if available. If not, report the exact gap
     and evidence to the user before installation; do not claim it passed or halt
@@ -735,72 +761,89 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Implement the reviewed, reversible and explicitly enabled ownership/worker path
     after 5.5–5.6; default unarmed and enforce all blockers. Test with mocked charger,
     HA and persistence boundaries. No live activation or deployment is authorized.
-- [ ] **5.7b End-to-end regression and installation preparation**
+- [ ] **5.7b End-to-end local regression and release handoff**
   - Exercise settings/price/SOC → plan → guarded reconciliation, stable-plan
     deduplication, restart/reconnect, uncertainty and operator status with mocks;
     include the deferred 5.4c suite if a supported local host is available.
-    Document exact unverified checks and prepare the user-directed 5.8 procedure.
-- [ ] **5.8 Install, activate and validate the working release**
-  - Umbrella: 5.8a and 5.8b are user-directed operations, not authorization or
-    an additional mandatory hardware-testing stage. Each live operation still
-    requires the user's specific approval.
-  - After 5.2–5.7 and 5.3a are complete and reviewed, support the user's preferred
-    installation/update. Obtain specific approval for each deployment, share modification,
-    restart, activation or other live action; this roadmap is not authorization. Do not
-    print credentials or private data.
-  - Check the installed version and, read-only first, verify real frontend/backend data,
-    price availability, vehicle/charger status, settings, notifications and replan behavior.
-    After approval of the relevant operations, deliberately enable the reviewed automatic
-    mode and check plug-in → backend replan → guarded schedule update, transaction
-    authorization and actual measured charging. Report each observation separately.
-  - **Initial release acceptance:** real prices, vehicle/charger state and plan controls
-    display accurately; saved changes and relevant price/SOC/deadline triggers cause a
-    backend replan without an open dashboard; changed valid intent is automatically
-    reconciled when enabled, while unchanged or unsafe intent does not cause duplicate
-    or unsafe dispatch. The installed dashboard shows truthful health and recoverable
-    errors; under an authorized supervised live scenario, an authorized transaction and
-    real measured charging are observed separately from schedule ACK/readback.
-  - Perform only specifically approved live checks. If approval, hardware,
-    connectivity, actual flow or any safety blocker is unavailable, state precisely
-    what remains unverified and leave initial-release acceptance open; do not postpone
-    basic daily operation merely for Stage 6–9 history or optional visual enhancements.
-- [ ] **5.8a Approved installation and read-only checks**
-  - After user approval, support the preferred install/update and any separately
-    approved restart; verify loaded version, dashboard and available data read-only.
-    Report unresolved test/environment limitations without exposing private data.
-  - Confirm the repository/branch selected by the installed updater and publish only
-    a reviewed release with separate approval: the default `main` and development
-    branch may differ. Do not assume a feature-branch push reaches an install tracking
-    `main`, change the default branch, push, merge or deploy without authorization.
-- [ ] **5.8b Approved activation and observed operation**
-  - Only after specific approval and blocker review, enable the reviewed path and
-    distinguish proposal, sent ACK, effective limits and measured physical flow.
-    If approval or required evidence is unavailable, leave acceptance open.
+    Report exact unrun tests, known blockers and useful manual checks to the user;
+    do not install or access the deployed system as part of this substage.
+
+### 5.8 — User-owned installation and deployed validation milestone
+
+This is **not an LLM implementation substage**. After 5.2–5.7 and 5.3a are
+complete and reviewed, the user plans to merge the current branch to `main`, install
+the release in HA, and perform deployed testing themselves. The LLM must not merge,
+push, deploy, restart HA, enable charging or operate the charger as part of this plan.
+The user can ask for help interpreting logs or diagnosing a problem; access or any
+live operation still requires specific approval, with read-only diagnostics first.
+Do not expose credentials or private household data.
+
+Useful observations for the user's own testing include the loaded version, real
+prices and vehicle/charger data, settings and notifications, replanning without an
+open dashboard, and safe behavior on reconnect or errors. When the user chooses to
+enable the reviewed automatic mode, distinguish the calculated proposal, sent ACK,
+effective readback, transaction authorization and actual measured charging. Changed
+valid intent should reconcile; unchanged or unsafe intent must not cause duplicate
+or unsafe dispatch. A request, ACK or readback alone does not prove charging.
+
+Record deployed operation as unverified until the relevant observations are actually
+available; report blockers or gaps honestly. This does not make Stage 6–9 history or
+optional polish a prerequisite for initial installation. The user's merge and test
+plans do not themselves authorize an LLM to perform those actions.
 
 ### Stage 6 — Real history data (old B1)
 
+Stage 6 remains open and is **not required for the initial 5.8 release**. The
+repository already has `sessions/store.py`, `sessions/recorder.py`, session APIs,
+energy-register discovery and `execution/power_energy.py`; inspect and reuse these
+before adding storage or an importer. `debug_day.py` retains limited diagnostic
+rows for debug use, not an established production charging-history source. The
+existing Morek outcome record is not a complete versioned history. None of these
+facts proves which historical or live measurements this installation exposes.
+
 - [ ] **6.1 Source inventory**
-  - Verify actual Morek/OCPP/Recorder measurements, resolution and retained history.
-  - Check Bavarian CarData as fallback/cross-check; document association and gaps.
+  - Inventory existing session, energy-register, integrated-power, OCPP and Recorder
+    paths first; identify exactly what is genuinely measured, derived or unavailable,
+    along with timestamps, resolution, retention, freshness and connector association.
+    The 5.6a readiness view did not establish a trustworthy Morek power or active-
+    transaction source; do not assume either exists from status or offered current.
+  - Consider Bavarian CarData as fallback/cross-check; verify home-session association,
+    battery versus wall energy, coverage and gaps before use. Repository/mock inspection
+    can start locally; installed HA/Recorder or hardware checks require the user's
+    specific approval and remain user-directed, not a separate hardware-testing stage.
 - [ ] **6.2 Capture and provenance**
-  - Reuse existing stores; retain sent-plan versions and genuine power/energy events.
-  - Handle resets/duplicates/gaps; never substitute schedule windows for observations.
+  - Extend/reuse verified existing stores as appropriate to retain immutable sent-plan
+    versions and genuine measured power/energy or validated source events. Existing
+    aggregate/session/debug records must not be assumed to contain a complete trace.
+  - Label measurement-derived energy estimates separately from meter counters; handle
+    resets, duplicates and gaps. Never substitute plans, offered limits, ACKs or
+    schedule windows for observations; unknown is not zero.
 - [ ] **6.3 Queries and retention**
-  - Add bounded historical queries/retention with original tariff and plan context.
-  - Test restart/midnight, charging outside plan and planned blocks with no flow.
+  - Extend existing session/history APIs where suitable with bounded retention and
+    queries carrying original tariff, plan, source and coverage context. Do not use
+    today's plan or changed tariff to silently reconstruct older sessions.
+  - Test restart/midnight, gaps, charging outside the sent plan and a planned block
+    with no observed flow using deterministic fixtures and mocked boundaries.
 
 ### Stage 7 — ECharts prices and schedule tracks (old B3)
 
-- [ ] **7.1 Price chart**
-  - Extend the real-data chart already delivered in 5.4c; do not rebuild or rebind it.
-    Add only remaining advanced display features and regression coverage for
-    negative/missing prices and DST; 5.4c already supplies local mocked groundwork.
-- [ ] **7.2 Interaction**
-  - Extend the existing real-data wheel/tooltip/zoom/reset and zoom-preserving update
-    groundwork; do not reimplement it. Add any missing Yesterday/Today/available
-    future/All navigation only where source coverage supports it. Retain snapping
-    to source boundaries without rounding data or plan times. Test remaining resize,
-    keyboard and physical-touch behavior, timezone/DST and resolution changes.
+The real-data stepped-area price chart and proposal overlay, source boundaries,
+negative/missing/DST mocked cases, wheel zoom, pointer tooltips, reset, snapping
+and zoom-preserving updates are **already implemented locally in 5.4c**. Reuse
+them; do not rebuild, rebind or repeat that work. The full HA-plugin dashboard
+suite remains unrun and is tracked in 5.7b; actual HA and physical-touch behavior
+remain unverified and any live checks are user-directed, not a new test stage.
+
+- [ ] **7.1 Available-day navigation**
+  - Add Yesterday/Today/available future/All shortcuts only for periods the real
+    price source can actually provide. Clearly report missing history or future
+    prices; do not synthesize days or assume tomorrow is always published. Reuse
+    5.4c's existing horizon and source-boundary zoom behavior.
+- [ ] **7.2 Practical chart interaction**
+  - Fix actual usability or responsive-resize problems in the real chart, including
+    source-resolution and timezone/DST changes. Preserve existing zoom, tooltip,
+    wheel and reset features; no separate accessibility-polish project is needed.
+    Physical touch remains unverified until the user chooses to test it.
 - [ ] **7.3 Aligned tracks**
   - Distinguish proposal/sent/effective/measured tracks and minimum-SOC exceptions.
   - Show mismatches and missing observations honestly; reuse Stage 6 provenance.
@@ -815,29 +858,49 @@ tests are documented there; full HA collection is still blocked on Windows.
 
 ### Stage 8 — Yesterday and financial summaries (old B4 + C1)
 
+This is later work, not a prerequisite for the initial 5.8 installation. Reuse the
+existing session store, recorder, history and savings APIs and Stage 6's genuine
+measurement/plan evidence; extend them only where needed. Existing session costs
+use current settings or a stored legacy cost, so do not assume historical tariffs
+were preserved. Coordinate chart tracks with 7.3 and monthly insights with 7.5
+rather than implementing the same feature twice.
+
 - [ ] **8.1 Yesterday comparison**
-  - Date selection, measured-versus-sent chart and out-of-plan charging.
-  - Show unknown coverage separately from confirmed absence of flow.
+  - Default to yesterday with date selection; show measured charging against the
+    plan actually sent, price context, actual energy, timing differences and
+    out-of-plan charging where evidence exists. Reuse the shared chart.
+  - Show gaps and unknown coverage separately from confirmed absence of flow;
+    never use a plan or readback as a substitute for measured charging.
 - [ ] **8.2 Costs**
-  - Extend existing calculations for per-window and session/day/month totals.
-  - Preserve historical tariffs, distinguish estimates and test missing/negative data.
+  - Extend existing calculations for plan energy and estimated cost, per-window
+    costs and measured/estimated session, day and month totals. Preserve the tariff
+    context available at the time and label estimates and missing historical rates;
+    do not silently price past charging using today's tariff. Test missing and
+    negative prices and fee/tax changes.
 - [ ] **8.3 Savings and summary cards**
-  - Compare the same energy against an explicit comparable charging baseline.
-  - Label coverage/assumptions; keep totals consistent across dashboard cards.
+  - Extend existing savings calculations using an explicit comparable baseline for
+    the same energy, such as charging immediately after plugging in at comparable
+    power. Distinguish forecasts from historical estimates, show coverage and
+    assumptions, and report unknown when evidence is insufficient, not zero.
+  - Keep totals consistent across dashboard cards and reuse 7.5 monthly insights.
 
-### Stage 9 — Finish and installation (old C2)
+### Stage 9 — Targeted dashboard fixes (old C2)
 
-- [ ] **9.1 Accessibility and themes:** light/dark, contrast, non-colour states,
-  keyboard/touch, copyable text and reduced motion.
-- [ ] **9.2 Responsive integration:** browser-test the whole dashboard, empty/error
-  states and repeated updates; remove duplicate daily controls within the new UI.
-- [ ] **9.3 Installation and documentation polish:** improve the initial 5.4–5.8
-  sidebar installation, migration and diagnostics guidance; never overwrite user views
-  or claim unperformed hardware tests.
-- [ ] **9.4 Additional execution-health notifications:** consider bounded Morek
-  mismatch/uncertainty phone events beyond the existing 5.3a plug-in and plan notices.
+No separate themes, light/dark modes or extra accessibility-polish project is
+needed for this single-user dashboard. Keep the interface usable on desktop and
+mobile, with readable warnings and working essential controls. Installation and
+user-directed testing belong to 5.8; this stage is not another prerequisite.
+
+- [ ] **9.1 Fix real integration gaps when needed:** check the combined dashboard,
+  empty/error states and repeated updates; fix practical layout or interaction
+  problems and duplicate daily controls rather than performing a general redesign.
+- [ ] **9.2 Documentation only where needed:** correct installation, migration or
+  diagnostics guidance when a real gap is found; never overwrite user views or
+  claim unperformed hardware tests. Reuse the existing 5.4–5.8 guidance.
+- [ ] **9.3 Optional additional execution-health notifications:** consider bounded
+  Morek mismatch/uncertainty phone events beyond the existing 5.3a notices if useful.
   Reuse the existing notifier, opt-in and deduplication; never equate ACK/readback
-  with measured charging. This is later polish, not a prerequisite for 5.8.
+  with measured charging. Not required for 5.8.
 
 ### Stage 10 — Optional Charge Now (after initial installation)
 
@@ -1355,7 +1418,7 @@ charging with the price time axis. Shade planned windows lightly on the chart
 without making prices unreadable. Suggested cheap opportunities are not the
 same thing as a selected plan. Never imply a reported 16 A limit is measured kW.
 
-**Done when:** interactions work on touch/mouse/keyboard, axes/units are clear,
+**Done when:** essential interactions are usable, axes/units are clear,
 plan/readback mismatches remain legible, and browser tests cover resize, zoom,
 missing prices, repeated updates and time-boundary cases. Do not rely solely on
 jsdom for visual or layout acceptance.
@@ -1393,10 +1456,11 @@ Refine the vehicle/target panel, inline plan controls, clear feedback for action
 session table and lightweight diagnostic event list. Raw OCPP/JSON, rare setup
 and destructive actions may use a details drawer; everyday information may not.
 
-Ensure HA light/dark theme support, accessible contrast, non-colour-only states,
-copyable text, touch targets, reduced motion and keyboard navigation. Avoid
-CSS overrides depending on another card's private DOM. Provide a documented
-single-dashboard installation/template without overwriting the user's HA views.
+Keep the dashboard practically usable on desktop and mobile, with readable warnings
+and essential controls. Separate theme modes and extra accessibility polish are not
+required. Avoid CSS overrides depending on another card's private DOM. Reuse the
+Stage 5 installation guidance without overwriting the user's HA views; update it
+only where a real gap is found.
 
 **Done when:** the full dashboard works as one coherent, responsive product with
 no solar clutter, no duplicate charging dashboard, no hidden critical status and

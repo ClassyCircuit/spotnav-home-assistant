@@ -6,6 +6,36 @@ Re-check the live system and Git state before acting; observations below may bec
 
 ## Approved next direction (planning, not implemented)
 
+**Stage 5 deployment clarification:** once development is complete and reviewed,
+the user intends to merge the current branch to `main`, install it in HA and test
+the deployed system personally. 5.8 is a user-owned milestone, not an LLM task or
+authorization to merge, deploy, restart, activate or operate hardware. LLMs still
+perform local automated/mocked tests in 5.6–5.7 and can help interpret logs when
+asked; HA access and live actions require specific approval. Keep deployed behavior
+unverified until observed, and preserve all safety and uncertainty interlocks.
+
+**Stages 8–9 scope:** retain the desired measured-versus-sent history, costs,
+savings and monthly insights, extending existing session/savings APIs and Stage 6
+evidence rather than duplicating them. Existing costs are not proof of preserved
+historical tariffs. The user does not need separate themes or extra accessibility
+polish; keep practical desktop/mobile usability and readable warnings. Stage 9 is
+targeted fixes only, not another installation prerequisite; 5.8 remains the initial
+installation and user-directed testing path.
+
+**Stage 6 wording review:** genuine charging history remains later work. Existing
+session store/recorder/API, energy-register discovery and power integration are
+groundwork to inspect and reuse, not proof of a complete Morek measurement history.
+The limited `debug_day.py` data is diagnostic, not an established production history
+feed. 5.6a did not establish a trustworthy Morek power/active-transaction source.
+Stage 6 remains open and is not a 5.8 installation prerequisite; installed-source
+inspection or hardware access requires the user's specific approval.
+
+**Stage 7 scope clarification:** the 5.4c real-data price chart, proposal overlay
+and its locally tested interaction groundwork already exist. Stage 7 now lists only
+remaining available-day navigation, practical interaction fixes, aligned evidence tracks and
+real-data price insights. Do not rebuild the chart or repeat 5.4c. Its full offline
+HA-plugin suite is still unrun; actual HA and physical touch remain unverified.
+
 **2026-11-12 agreed daily controls:** use two simple sidebar controls in the final
 design: **Pause / Resume Auto** and **Charge Now / Return to Auto**. Pause requests
 that charging remain held until explicit Resume; Return to Auto cancels only the
@@ -14,10 +44,8 @@ Pause/Resume under schedule ownership remains 5.6b; Charge Now remains optional
 Stage 10 after 5.8. Whether Charge Now can override an existing explicit pause
 still requires the user's decision. Neither a request nor ACK proves physical stop.
 
-**Current task status:** 5.5a–5.5f are completed as unarmed mocked groundwork,
-not active operation. The current working tree contains 2.5.48 readiness/status
-work for 5.6a; it is in progress and not yet accepted merely because files exist.
-Check Git status and the latest session report before proceeding. The 5.6b–5.8
+**Current task status:** 5.5a–5.5f and 5.6a are completed as unarmed local
+mocked groundwork, pending coordinator review, not active operation. The 5.6b–5.8
 tasks remain open; no live access or activation is authorized by this note.
 
 **Historical 2026-11-12 roadmap consistency review (superseded by 5.5d–5.5f):** the next assigned work remained 5.5d,
@@ -286,6 +314,133 @@ requirements, not features claimed implemented in the manual baseline below.
   Do not assume `GetCompositeSchedule` lists stored profiles.
 
 ## Tests, build, and next steps
+
+### 2026-11-12 — 5.6b Pause and Resume (2.5.52; local mocked, review pending)
+
+- The existing Auto person Stop, Pause and Resume entry points now route a uniquely
+  identified Morek schedule owner through the connector-bound outcome ledger rather
+  than issuing legacy actuator commands. Legacy owner behavior remains separate.
+  A versioned `resume_requested` intent is not a confirmed replacement: the worker
+  uses a fresh valid plan and binds the attempt to the intent ID; a later Stop replaces
+  it with a new pause ID. Unknown outcomes remain latched, never blindly retried.
+- Stop reserves the connector before the Auto lock. Worker generation checks invalidate
+  old work at each pre-dispatch persistence boundary. Already-dispatched work cannot
+  be recalled; status suppresses an old ACK/readback while Stop is reserved. An offline
+  intent is admitted only when the configured physical ID or a single retained alias
+  mapping and durable owner unambiguously agree. Unknown identity is refused.
+- The Resume authorization ticket is process-local: after restart the durable request
+  remains visible as `resume_requested`, but a fresh explicit Resume is required before
+  it can dispatch. This deliberately fails closed if a Stop raced an interrupted save;
+  a retained 0 A limit is not silently released. The schedule-owned sidebar controls
+  remain disabled because production owned-profile admission is unconditionally
+  unarmed. ACK and bounded effective readback are not physical charging evidence.
+- Mock checks: `python tools/run_isolated_planning_tests.py -x` 522 passed, 1 deselected;
+  `python tools/run_isolated_lifecycle_tests.py tests/test_morek_schedule.py
+  tests/test_command_admission.py tests/test_execution_ownership.py
+  tests/test_morek_outcomes.py -x` 256 passed; targeted Ruff, `npm run type-check`,
+  `npm run build`, `npm run check-dist`, `npm run test -- test/sidebar.test.ts
+  test/morek-view.test.ts` (60 passed), `git diff --check`, and the local desktop/
+  emulated-mobile `node sidebar/browser-check.mjs` passed. Early runs exposed an
+  admission-import boundary test and a fixture lacking `_person_stops`; those were
+  corrected. Pytest emitted existing timeout-option and dependency warnings, jsdom
+  emitted CSS parse warnings and Git emitted line-ending warnings. The full 5.4c
+  HA-plugin suite remains unrun; no HA, charger or physical touch was tested.
+- 5.6c and 5.7–5.8 remain open; held exit still has no release path. The reported
+  native protection is not independently verified. Stop for coordinator review.
+
+### 2026-11-12 — 5.6b sidebar safeguard, incomplete (2.5.51)
+
+- The sidebar now explicitly disables Pause/Resume for a reported Morek schedule
+  owner while production dispatch is unarmed. It separates the last observed
+  owned pause intent, request, ACK and bounded readback from unknown physical flow;
+  the legacy pause label no longer implies a confirmed physical stop. The action
+  method also refuses programmatic invocation for a reported schedule owner.
+- The person-facing owned Pause API, durable Resume, offline identity handling and
+  the complete required race/recovery test matrix remain unimplemented. Do not
+  describe 5.6b as finished or use these disabled controls to operate a charger.
+  The 5.4c full HA-plugin suite remains unrun; no live HA was contacted.
+- Mock checks: `python tools/run_isolated_planning_tests.py` 505 passed, 1
+  deselected; `python tools/run_isolated_lifecycle_tests.py tests/test_morek_schedule.py
+  tests/test_command_admission.py tests/test_execution_ownership.py
+  tests/test_morek_outcomes.py` 256 passed; targeted Ruff passed; `npm run test --
+  test/sidebar.test.ts test/morek-view.test.ts` 60 passed; `npm run type-check`,
+  `npm run build`, `npm run check-dist`, and `git diff --check` passed. Mock browser:
+  `npm run prototype:build`, `npx esbuild sidebar/browser-fixture.js --bundle
+  --format=esm --outfile=prototype/dist/sidebar-browser.js`, then `node
+  sidebar/browser-check.mjs` passed desktop and emulated mobile. Pytest emitted
+  existing timeout-option and dependency warnings; jsdom emitted CSS parse warnings;
+  Git emitted line-ending warnings. Physical touch remains untested.
+
+### 2026-11-12 — 5.6b explicit intent, partial (2.5.50; not complete)
+
+- An internal `async_record_owned_pause` persists a versioned connector-bound
+  `schedule_pause` in the existing outcome ledger after connector and unarmed owner
+  checks. This is separate from legacy `until_resumed`. Under simulated authority,
+  the worker reads that record inside connector admission, selects a one-period 0 A
+  profile and binds the attempt fingerprint and readback to its intent ID. A recorded
+  intent survives the mocked restart; unknown outcomes still block profile sends.
+  The status API includes intent/request/ACK/bounded-readback/measurement fields.
+- **This is not a completed Pause/Resume control:** the internal method is not wired
+  to the person's existing API or sidebar; Resume and its durable pending/replacement
+  semantics are absent. Offline identity resolution cannot yet record a pause. The
+  tests do not establish the complete Stop/Resume/handover race matrix or physical
+  stop. Production owned-profile admission remains unconditionally unarmed. Keep
+  5.6b, 5.6c and 5.7–5.8 open. Do not expose the internal method as operational.
+- Checks: `python tools/run_isolated_planning_tests.py -x` 505 passed, 1 deselected;
+  `python tools/run_isolated_lifecycle_tests.py tests/test_morek_schedule.py
+  tests/test_command_admission.py tests/test_execution_ownership.py
+  tests/test_morek_outcomes.py` 256 passed; targeted Ruff, frontend `npm run build`,
+  `npm run type-check` and `npm run check-dist` passed. Pytest reported existing
+  timeout-option and dependency deprecation warnings. The full 5.4c HA-plugin suite
+  remains unrun. No live HA or charger was contacted.
+
+### 2026-11-12 — 5.6b partial continuation (2.5.49; not complete)
+
+- A person Stop reservation now advances the connector generation before waiting.
+  The worker captures it before its first persistence await and rechecks it and
+  the reservation after the shared send path's awaited persistence boundaries.
+  Already dispatched commands cannot be recalled. Simulated-authority tests cover
+  a queued worker and the ledger and entry-store awaits. Production owned-profile
+  admission remains unconditionally unarmed.
+- A one-period 0 A profile builder and a flat-readback comparator are present but
+  the builder is not wired to a pause operation. A match is bounded to one observed
+  hour; it does not prove infinite persistence, profile inventory or physical stop.
+  Missing, short, nonzero, delayed and ambiguous observations do not match.
+- **5.6b remains incomplete:** no schedule-owned durable Pause/Resume path or
+  status was wired. An initial draft treated every `until_resumed` pause as an owned
+  hold; mocked existing manual-workflow tests exposed that this would conflate the
+  legacy pause used for manual testing with schedule ownership, so that draft was
+  removed. Correct wiring still needs ownership-bound intent and serialized Resume,
+  restart, uncertainty, held-exit, and full race coverage. No activation is allowed.
+- Checks: `python tools/run_isolated_planning_tests.py` 502 passed, 1 deselected;
+  `python tools/run_isolated_lifecycle_tests.py` 130 passed; `python
+  tools/run_isolated_lifecycle_tests.py tests/test_morek_schedule.py
+  tests/test_command_admission.py` 232 passed; targeted Ruff, frontend `npm run
+  type-check`, `npm run build` and `npm run check-dist` passed. An earlier planning
+  run timed out after draft failures; `-x` identified the manual-workflow conflict.
+  Pytest reported existing timeout-option and dependency deprecation warnings.
+  The full 5.4c HA-plugin suite remains unrun. No live HA or charger was contacted.
+
+### 2026-11-12 — 5.6b investigation, not implemented
+
+- Under test-only simulated owned-profile authority, an existing Stop reservation
+  does not increment the connector generation unless an entry drain is in progress.
+  A worker already waiting at admission can consequently dispatch the old plan
+  while Stop is reserved but before the pause is durable. Production owned-profile
+  admission still unconditionally refuses dispatch. A safe implementation needs
+  Stop-wins serialization and revalidation through every pre-dispatch await without
+  breaking the existing handover, held-exit, unrelated-charger and protection paths.
+- A single-period persistent 0 A intent also cannot use the existing readback
+  comparator unchanged: it requires at least two expected transitions and a future
+  transition. Its coverage and mismatch semantics must be defined without claiming
+  physical stop or profile inventory. Resume must not release retained 0 A on an
+  unavailable plan or uncertain outcome. No implementation or activation is claimed.
+- Characterization checks: `python tools/run_isolated_planning_tests.py
+  tests/test_morek_worker.py` 493 passed, 1 deselected; `python
+  tools/run_isolated_lifecycle_tests.py tests/test_morek_schedule.py` 207 passed;
+  `ruff check tests/test_morek_worker.py tests/test_morek_schedule.py` passed.
+  Pytest reported the existing timeout-option and dependency-deprecation warnings.
+  The 5.4c full HA-plugin suite remains unrun. No live HA or charger was contacted.
 
 ### 2026-11-12 — 5.6a readiness (2.5.48; local mocked, review pending)
 

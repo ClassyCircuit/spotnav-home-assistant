@@ -46,6 +46,51 @@ def test_three_blocks_fit_seven_entries_and_start_paused():
     assert all(p["numberPhases"] == 3 for p in periods)
 
 
+def test_single_zero_profile_is_verified_only_over_bounded_coverage():
+    """A match describes one observed hour, not persistent or physical stop."""
+    profile = profile_for(((NOW + timedelta(hours=1), NOW + timedelta(hours=2)),), 16, NOW)
+    profile["chargingSchedule"]["chargingSchedulePeriod"] = [{"startPeriod": 0, "limit": 0, "numberPhases": 3}]
+    reply = SimpleNamespace(status="Accepted", schedule_start=NOW.isoformat(),
+                            charging_schedule={"chargingRateUnit": "A", "duration": 7200,
+                                               "chargingSchedulePeriod": [{"startPeriod": 0, "limit": 0}]})
+    actual = readback(reply, NOW)
+    result = morek_schedule.compare_schedule(profile, actual)
+    assert result["matched"] is True
+    assert result["scope"] == "bounded_held_off"
+    assert result["coverage_end"] == (NOW + timedelta(hours=1)).isoformat()
+
+
+def test_owned_pause_status_never_treats_old_ack_or_match_as_physical_stop():
+    outcome = {"uncertain": False, "schedule_pause": {"id": "new"},
+               "attempt": {"pause_id": "old", "state": "accepted", "ack": "Accepted"}}
+    verification = {"scope": "bounded_held_off", "coverage_start": "a", "coverage_end": "b"}
+    status = morek_schedule._owned_pause_status(outcome, verification, True, None)
+    assert status["ack"] is None and status["readback"] == "unverified" and status["measured"] == "unknown"
+    outcome["attempt"]["pause_id"] = "new"
+    status = morek_schedule._owned_pause_status(outcome, verification, True, None)
+    assert status["ack"] == "Accepted" and status["readback"] == "bounded_match"
+    assert status["coverage_end"] == "b" and status["measured"] == "unknown"
+
+
+@pytest.mark.parametrize(("duration", "periods", "delay", "start_delta", "reason"), [
+    (None, [{"startPeriod": 0, "limit": 0}], 0, 0, "coverage_missing"),
+    (100, [{"startPeriod": 0, "limit": 0}], 0, 0, "coverage_too_short"),
+    (7200, [{"startPeriod": 0, "limit": 16}], 0, 0, "limits_or_transitions_differ"),
+    (7200, [{"startPeriod": 0, "limit": 0}, {"startPeriod": 60, "limit": 16}], 0, 0, "limits_or_transitions_differ"),
+    (7200, [{"startPeriod": 0, "limit": 0}], 100, 0, "coverage_boundary_ambiguous"),
+    (7200, [{"startPeriod": 0, "limit": 0}], 0, 1, "coverage_boundary_ambiguous"),
+])
+def test_flat_zero_refuses_inadequate_evidence(duration, periods, delay, start_delta, reason):
+    schedule = {"chargingRateUnit": "A", "chargingSchedulePeriod": periods}
+    if duration is not None:
+        schedule["duration"] = duration
+    reply = SimpleNamespace(status="Accepted", schedule_start=(NOW + timedelta(seconds=start_delta)).isoformat(),
+                            charging_schedule=schedule)
+    actual = readback(reply, NOW + timedelta(seconds=delay), requested_at=NOW)
+    result = morek_schedule.compare_schedule(morek_schedule.held_off_profile(NOW), actual)
+    assert not result["matched"] and result["reason"] == reason
+
+
 def test_unsafe_plans_are_refused_before_any_upload():
     block = (NOW + timedelta(hours=1), NOW + timedelta(hours=2))
     with pytest.raises(ScheduleRefused, match="too_many_blocks"):
@@ -175,7 +220,7 @@ async def test_status_exposes_read_only_unarmed_ownership(monkeypatch):
     monkeypatch.setattr(morek_schedule, "ownership_store", lambda h: store)
     recovery = {"state": "legacy_unarmed", "activation_allowed": False, "activation_provenance": "unverified"}
     monkeypatch.setattr(morek_schedule, "command_admission", lambda _: SimpleNamespace(
-        _recovery_status={}, async_recovery_status=AsyncMock(return_value=recovery)))
+        _recovery_status={}, _person_stops={}, async_recovery_status=AsyncMock(return_value=recovery)))
     monkeypatch.setattr(morek_schedule, "_state", AsyncMock(return_value=({}, None)))
     monkeypatch.setattr(morek_schedule, "_preview", lambda h, e, t: {})
     monkeypatch.setattr(morek_schedule, "outcomes_for", lambda h: MemoryOutcomes())

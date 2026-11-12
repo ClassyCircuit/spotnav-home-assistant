@@ -39,6 +39,7 @@ class MorekScheduleWorker:
         self._availability_generation = 0
         self._suspended = False
         self.reason = "not_started"
+        self.resume_ticket = None
 
     def start(self) -> None:
         """The listener delivers the current snapshot immediately, including on startup."""
@@ -78,12 +79,15 @@ class MorekScheduleWorker:
         controller = controller_for(self._hass, self._entry_id)
         return morek_schedule._identity_status(self._hass, getattr(controller, "ocpp_target", None))
 
-    def _intent(self) -> tuple[dict[str, Any], str]:
+    def _intent(self, pause: dict[str, Any] | None = None) -> tuple[dict[str, Any], str]:
+        settings = domain_data(self._hass).auto_store.settings(self._entry_id)
+        if pause is not None and pause["type"] == "pause_until_resumed":
+            profile = morek_schedule.held_off_profile(datetime.now(timezone.utc))
+            return profile, morek_schedule._preview_id(profile, [settings.revision, pause["id"]])
         if preview_for(self._hass, self._entry_id) is not self._planner:
             raise morek_schedule.ScheduleRefused("planner_changed")
-        settings = domain_data(self._hass).auto_store.settings(self._entry_id)
         profile = morek_schedule._proposed_profile(self._hass, self._entry_id, datetime.now(timezone.utc))
-        return profile, morek_schedule._preview_id(profile, settings.revision)
+        return profile, morek_schedule._preview_id(profile, [settings.revision, pause["id"]] if pause is not None else settings.revision)
 
     async def _run(self) -> None:
         try:
@@ -113,25 +117,28 @@ class MorekScheduleWorker:
         if classify_morek_identity(identity) != "supported_morek" or connector is None:
             self.reason = "identity_unresolved"
             return
-        _, fingerprint = self._intent()
-        data, store = await morek_schedule._state(self._hass, self._entry_id)
         admission = command_admission(self._hass)
         generation = admission.generation(connector)
+        data, store = await morek_schedule._state(self._hass, self._entry_id)
 
         async def dispatch() -> tuple[str, str | None, str | None]:
             # Admission has checked identity, ownership and generation under the
             # physical connector lock. Do not await between this recheck and call.
             if self._closed or serial != self._serial:
                 return "stale_work", None, None
+            pause: dict[str, Any] | None = None
+            fingerprint = ""
             def validate():
                 if self._closed or serial != self._serial:
                     raise morek_schedule.ScheduleRefused("stale_work")
+                if generation != admission.generation(connector) or admission._person_stops.get(connector):
+                    raise morek_schedule.ScheduleRefused("stale_generation")
                 if self._suspended or not self._available():
                     raise morek_schedule.ScheduleRefused("charger_unavailable")
                 identity_now = self._identity()
                 if classify_morek_identity(identity_now) != "supported_morek" or physical_connector(identity_now) != connector:
                     raise morek_schedule.ScheduleRefused("identity_changed")
-                profile, current = self._intent()
+                profile, current = self._intent(pause)
                 if current != fingerprint:
                     self.trigger()
                     raise morek_schedule.ScheduleRefused("stale_work")
@@ -140,8 +147,14 @@ class MorekScheduleWorker:
                 return profile, morek_schedule._charge_point(self._hass, target), target
 
             async with self._hass.data[morek_schedule._DATA_KEY][self._entry_id][2]:
+                record = await morek_schedule._outcome_record(self._hass, self._entry_id, data)
+                pause = record.get("schedule_pause")
+                if pause is not None and pause["type"] == "resume_requested" and self.resume_ticket != (pause["id"], generation):
+                    return "resume_requires_confirmation", None, None
+                _, fingerprint = self._intent(pause)
                 outcome = await morek_schedule._send_profile_shared(
-                    self._hass, self._entry_id, data, store, fingerprint, validate, automatic=True)
+                    self._hass, self._entry_id, data, store, fingerprint, validate, automatic=True,
+                    pause_id=None if pause is None else pause["id"])
                 return outcome, data.get("sent_at"), data.get("attempt_id")
 
         result = await admission.async_execute(

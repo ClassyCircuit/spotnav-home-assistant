@@ -22,6 +22,23 @@ const envelope = (settings,ok=true,error=null) => ({api_version:1,ok,error,setti
 const tick = async () => { for(let i=0;i<20;i++) await Promise.resolve(); };
 
 describe('actual sidebar read-only host', () => {
+  it('keeps schedule-owned controls unarmed and reports intent separately from flow', async () => {
+    const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';
+    const owned={api_version:1,schedule:{...status.schedule,supported:true,ownership:{recorded_owner:'morek_schedule'},schedule_pause:{intent:'pause_until_resumed',request:'uncertain',ack:null,readback:'unverified',measured:'unknown'}}};
+    const calls=[];
+    const hass={connected:true,user:{is_admin:true},callWS:vi.fn(msg=>{calls.push(msg);if(msg.type==='spotnav/list_chargers')return Promise.resolve({api_version:1,chargers:[{charger_id:'a',charger_name:'A'}]});if(msg.type==='spotnav/get_dashboard')return Promise.resolve(raw);return Promise.resolve(owned);})};
+    const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();
+    const select=panel.shadowRoot.querySelector('#charger');select.value='a';select.dispatchEvent(new Event('change'));await tick();
+    const root=panel.shadowRoot;
+    expect(root.querySelector('#pause-state').textContent).toMatch(/Pause requested.*uncertain.*physical charging unknown.*unarmed/);
+    expect(root.querySelector('#pause-auto').disabled).toBe(true);
+    expect(root.querySelector('#resume-auto').disabled).toBe(true);
+    panel.rawStatus={...owned,schedule:{...owned.schedule,schedule_pause:{intent:'resume_requested',request:'accepted',ack:'Accepted',readback:'bounded_match',measured:'unknown'}}};panel.paint();
+    expect(root.querySelector('#pause-state').textContent).toMatch(/Resume requested; retained limit may remain.*Accepted.*bounded effective readback match.*physical charging unknown/);
+    await panel.automaticAction('stop','until_resumed');
+    expect(calls.some(m=>m.type==='spotnav/manual_action'||(m.type==='spotnav/morek_schedule'&&m.action!=='status'))).toBe(false);
+    panel.remove();
+  });
   it('reports readiness conservatively as observations age or fail', () => {
     const now=Date.now(), raw=fixture(); raw.generated_at=new Date(now).toISOString();
     const current={api_version:1,schedule:{...status.schedule,supported:true,readiness:{control:'available',vehicle:'disconnected',vehicle_observed_at:new Date(now).toISOString()}}};
