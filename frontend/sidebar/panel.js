@@ -9,6 +9,10 @@ import { reconcile } from '../shared-dashboard/reconcile.js';
 import { dashboardAdapter } from './adapter.js';
 import { CARD_VERSION } from '../src/generated/version.ts';
 import { capInput, capForSave, displayPrice } from '../shared-dashboard/price-format.js';
+import { observationFreshness } from '../src/observation-freshness.ts';
+
+const fresh = (timestamp, failed = false) => observationFreshness(timestamp, Date.now(), failed) === 'fresh';
+const dashboardFresh = (dashboard, failed) => fresh(Date.parse(dashboard?.generated_at || ''), failed);
 
 // A dispatched write outlives its host element, including a newly mounted panel.
 const settingsWritesByConnection = new WeakMap();
@@ -186,11 +190,11 @@ export class SpotnavEnhancedPanel extends HTMLElement {
   }
   paintAutomatic(dashboard) {
     const control=dashboard?.control, active=control?.pause?.choice;
-    const observed=Date.parse(dashboard?.generated_at || ''), fresh=!this.dashboardFailed && Number.isFinite(observed) && observed<=Date.now() && Date.now()-observed<=90000;
+    const isFresh=dashboardFresh(dashboard,this.dashboardFailed);
     const status=decodeMorekState(this.rawStatus), owner=status?.ownership?.recorded_owner;
-    const notice=(this.autoNotice || '') + (this.autoRefusalAt && !this.statusFailed && Number.isFinite(this.statusAt) && this.statusAt>=this.autoRefusalAt && Date.now()-this.statusAt<=90000 ? ` ${admissionDetail(status)}` : '');
+    const notice=(this.autoNotice || '') + (this.autoRefusalAt && fresh(this.statusAt,this.statusFailed) && this.statusAt>=this.autoRefusalAt ? ` ${admissionDetail(status)}` : '');
     if(owner==='morek_schedule') {
-      const statusFresh=!this.statusFailed && Number.isFinite(this.statusAt) && this.statusAt<=Date.now() && Date.now()-this.statusAt<=90000;
+      const statusFresh=fresh(this.statusAt,this.statusFailed);
       const pause=statusFresh ? status?.schedule_pause : null;
       const intent=pause?.intent==='pause_until_resumed' ? 'Pause requested' : pause?.intent==='resume_requested' ? 'Resume requested; retained limit may remain' : pause?.intent==='none' ? 'No schedule-owned pause reported' : 'Pause intent unknown';
       const request=typeof pause?.request==='string' ? pause.request : 'unknown';
@@ -198,10 +202,10 @@ export class SpotnavEnhancedPanel extends HTMLElement {
       const from=Date.parse(pause?.coverage_start || ''), to=Date.parse(pause?.coverage_end || '');
       const coverage=Number.isFinite(from) && Number.isFinite(to) && to>from ? ` (${new Date(from).toLocaleString()} – ${new Date(to).toLocaleString()})` : ' (coverage unavailable)';
       const readback=pause?.readback==='bounded_match' ? `bounded effective readback match${coverage}` : 'readback unconfirmed';
-      const canPause=fresh && statusFresh && !!control?.can_act && !this.controlPermissionPending && !this.autoBusy && !this.autoUncertain && !this.morekBusy && !this.morekUncertain && !this.settingsBusy && this._hass?.connected!==false;
+      const canPause=isFresh && statusFresh && !!control?.can_act && !this.controlPermissionPending && !this.autoBusy && !this.autoUncertain && !this.morekBusy && !this.morekUncertain && !this.settingsBusy && this._hass?.connected!==false;
       const can=canPause && status?.ownership?.completion_authorized===true;
       const resumeOffered=ownedResumeOffered(status);
-      const blocker = !fresh ? 'Dashboard observation unavailable or stale.' : !statusFresh ? 'Morek status unavailable or stale.' : !control?.can_act ? 'Control permission or charger availability is unavailable.' : this.controlPermissionPending ? 'Waiting for a fresh permission check.' : this.autoUncertain || this.morekUncertain ? 'A previous action outcome is unknown; do not retry blindly.' : this.autoBusy || this.morekBusy || this.settingsBusy ? 'Another request is in progress.' : status?.schedule_pause?.request==='stop_pending' ? 'A person Stop is pending.' : status?.outcomes?.uncertain===true ? 'A profile outcome is uncertain; do not retry blindly.' : status?.ownership?.completion_authorized!==true ? `Schedule ownership is not currently authorized; reported recovery status: ${status?.ownership?.recovery?.automatic_recovery || status?.ownership?.recovery?.state || status?.ownership?.blockers?.[0] || 'unknown'}.` : !resumeOffered ? ownedResumeReason(status) : '';
+      const blocker = !isFresh ? 'Dashboard observation unavailable or stale.' : !statusFresh ? 'Morek status unavailable or stale.' : !control?.can_act ? 'Control permission or charger availability is unavailable.' : this.controlPermissionPending ? 'Waiting for a fresh permission check.' : this.autoUncertain || this.morekUncertain ? 'A previous action outcome is unknown; do not retry blindly.' : this.autoBusy || this.morekBusy || this.settingsBusy ? 'Another request is in progress.' : status?.schedule_pause?.request==='stop_pending' ? 'A person Stop is pending.' : status?.outcomes?.uncertain===true ? 'A profile outcome is uncertain; do not retry blindly.' : status?.ownership?.completion_authorized!==true ? `Schedule ownership is not currently authorized; reported recovery status: ${status?.ownership?.recovery?.automatic_recovery || status?.ownership?.recovery?.state || status?.ownership?.blockers?.[0] || 'unknown'}.` : !resumeOffered ? ownedResumeReason(status) : '';
       this.shadowRoot.querySelector('#pause-state').textContent=`${intent}; request ${request}; ACK ${ack}; ${readback}; physical charging unknown.${control?.execution_error==='pause_stop_failed' ? ' Stop request failed.' : ''}${blocker ? ` Resume unavailable: ${blocker}` : ''}`;
       this.shadowRoot.querySelector('#pause-auto').disabled=!(canPause && admittedAction(control,'stop','until_resumed'));
       this.shadowRoot.querySelector('#resume-auto').disabled=!(can && resumeOffered);
@@ -209,8 +213,8 @@ export class SpotnavEnhancedPanel extends HTMLElement {
       return;
     }
     const stopFailed=control?.execution_error==='pause_stop_failed' ? ' Stop request failed; physical charging state unknown.' : '';
-    this.shadowRoot.querySelector('#pause-state').textContent=control && fresh ? (active ? `Pause intent: ${active}; physical stop not confirmed.${stopFailed}` : `No pause reported.${stopFailed}`) : 'Auto state unavailable or stale.';
-    const can=fresh && !!control?.can_act && !this.controlPermissionPending && !this.autoBusy && !this.autoUncertain && !this.morekBusy && !this.morekUncertain && !this.settingsBusy && this._hass?.connected!==false;
+    this.shadowRoot.querySelector('#pause-state').textContent=control && isFresh ? (active ? `Pause intent: ${active}; physical stop not confirmed.${stopFailed}` : `No pause reported.${stopFailed}`) : 'Auto state unavailable or stale.';
+    const can=isFresh && !!control?.can_act && !this.controlPermissionPending && !this.autoBusy && !this.autoUncertain && !this.morekBusy && !this.morekUncertain && !this.settingsBusy && this._hass?.connected!==false;
     this.shadowRoot.querySelector('#pause-auto').disabled=!(can && admittedAction(control,'stop','until_resumed'));
     this.shadowRoot.querySelector('#resume-auto').disabled=!(can && admittedAction(control,'resume',null));
     this.shadowRoot.querySelector('#pause-notice').textContent=notice || '';
@@ -218,13 +222,13 @@ export class SpotnavEnhancedPanel extends HTMLElement {
   async automaticAction(action,choice) {
     const generation=this.generation, permissionEpoch=this.permissionEpoch, charger=this.charger, hass=this._hass, decoded=decodeDashboard(this.rawDashboard);
     const morek=decodeMorekState(this.rawStatus), owner=morek?.ownership;
-    const statusFresh=!this.statusFailed && Number.isFinite(this.statusAt) && this.statusAt<=Date.now() && Date.now()-this.statusAt<=90000;
+    const statusFresh=fresh(this.statusAt,this.statusFailed);
+    if (owner?.recorded_owner==='morek_schedule' && !statusFresh) return;
     if (owner?.recorded_owner==='morek_schedule' && action!=='stop' && (owner.completion_authorized!==true || !statusFresh)) return;
-    const observed=decoded.ok ? Date.parse(decoded.value.generated_at || '') : NaN;
     const offered=decoded.ok && (owner?.recorded_owner==='morek_schedule' && action==='resume'
       ? choice===null && statusFresh && ownedResumeOffered(morek)
       : admittedAction(decoded.value.control,action,choice));
-    if (!this.connected || !charger || !hass || hass.connected===false || !decoded.ok || this.dashboardFailed || !Number.isFinite(observed) || observed>Date.now() || Date.now()-observed>90000 || this.controlPermissionPending || this.autoBusy || this.autoUncertain || this.morekBusy || this.morekUncertain || this.settingsBusy || !decoded.value.control.can_act || !offered) return;
+    if (!this.connected || !charger || !hass || hass.connected===false || !decoded.ok || !dashboardFresh(decoded.value,this.dashboardFailed) || this.controlPermissionPending || this.autoBusy || this.autoUncertain || this.morekBusy || this.morekUncertain || this.settingsBusy || !decoded.value.control.can_act || !offered) return;
     const dispatchedAt=Date.now();this.autoRefusalAt=null;this.autoBusy=true;this.autoNotice='Request in progress; state not yet confirmed.';this.dashboardEpoch++;this.statusEpoch++;this.statusAt=null;this.paint();
     try {
       const result=await this.bounded(performAction(hass,charger,action,choice));
@@ -248,9 +252,9 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     const state=decodeMorekState(this.rawStatus);
     if (!target) return;
     if (!state) {target.querySelectorAll('button').forEach(button=>{button.disabled=true;});return;}
-    const fresh=morekPanel(document,state,this._hass?.user?.is_admin===true,this.morekBusy || this.settingsBusy || this.settingsDirty || this.autoBusy,this.morekError,action=>void this.morekAction(action),this.morekActiveAction,false);
-    if (target.firstChild) reconcile(target.firstChild,fresh);
-    else target.append(fresh);
+    const panel=morekPanel(document,state,this._hass?.user?.is_admin===true,this.morekBusy || this.settingsBusy || this.settingsDirty || this.autoBusy,this.morekError,action=>void this.morekAction(action),this.morekActiveAction,false);
+    if (target.firstChild) reconcile(target.firstChild,panel);
+    else target.append(panel);
     if (state.ownership?.reconfirmation_required && state.supported && this._hass?.user?.is_admin===true) {
       const button=document.createElement('button');
       button.type='button';button.textContent='Reconfirm schedule ownership';
@@ -258,7 +262,8 @@ export class SpotnavEnhancedPanel extends HTMLElement {
       button.addEventListener('click',()=>void this.morekAction('reconfirm_migration'));
       target.firstChild.append(button);
     }
-    const send=target.querySelector('[data-morek-action="send"]');if(send && (this.morekUncertain || this.autoUncertain))send.disabled=true;
+    const dashboard=decodeDashboard(this.rawDashboard);
+    const send=target.querySelector('[data-morek-action="send"]');if(send && (this.morekUncertain || this.autoUncertain || !fresh(this.statusAt,this.statusFailed) || !dashboard.ok || !dashboardFresh(dashboard.value,this.dashboardFailed) || dashboard.value.control.pause?.choice!=='until_resumed' || !dashboard.value.control.pause_blocks_execution))send.disabled=true;
   }
   async morekAction(action) {
     const hass=this._hass, charger=this.charger, generation=this.generation, permissionEpoch=this.permissionEpoch, statusSnapshot=this.rawStatus, observedAt=this.statusAt, state=decodeMorekState(statusSnapshot);
@@ -267,7 +272,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     if (action!=='status' && !state.supported) return;
     if (action==='clear' && state.cleanup_supported!==true) return;
     if (this.settingsBusy || (action==='send' && this.settingsDirty)) return;
-    if (action==='send' && (this.morekUncertain || this.autoUncertain || state.outcomes?.uncertain || !state.preview?.profile || state.preview.reason!==null || !state.preview.preview_id || !this.statusAt || Date.now()-this.statusAt>90000)) return;
+    if (action==='send' && (this.morekUncertain || this.autoUncertain || state.outcomes?.uncertain || !state.preview?.profile || state.preview.reason!==null || !state.preview.preview_id || !fresh(this.statusAt,this.statusFailed))) return;
     const previewId=state.preview?.preview_id, configured=state.configured_id, resolved=state.resolved_id, dashboardSnapshot=this.rawDashboard;
     // Recheck at the dispatch boundary, independently of the diagnostic view's
     // confirmation and disabled state. A request already sent cannot be recalled.
@@ -276,9 +281,8 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     if (action==='reconfirm_migration' && !window.confirm('Reconfirm schedule ownership for this connection? This does not verify charger protection, profile inventory or physical charging. A previous schedule or 0 A limit may remain.')) return;
     const latest=decodeMorekState(this.rawStatus);
     const dashboard=decodeDashboard(this.rawDashboard);
-    const generated=dashboard.ok ? Date.parse(dashboard.value.generated_at || '') : NaN;
-    if (action==='send' && (this.rawDashboard!==dashboardSnapshot || !dashboard.ok || !Number.isFinite(generated) || generated>Date.now() || Date.now()-generated>90000 || dashboard.value.control.pause?.choice!=='until_resumed' || !dashboard.value.control.pause_blocks_execution)) return;
-    if (!this.connected || this.generation!==generation || this.permissionEpoch!==permissionEpoch || this.charger!==charger || this.rawStatus!==statusSnapshot || this.statusAt!==observedAt || this._hass?.user?.is_admin!==true || this._hass?.connected===false || this.morekBusy || this.settingsBusy || this.autoBusy || !latest || latest.configured_id!==configured || latest.resolved_id!==resolved || (action!=='status' && !latest.supported) || (action==='send' && (this.morekUncertain || this.autoUncertain || latest.outcomes?.uncertain || !latest.preview?.preview_id || latest.preview.preview_id!==previewId || latest.preview.reason!==null || !latest.preview.profile || this.settingsDirty || !this.statusAt || Date.now()-this.statusAt>90000)) || (action==='clear' && (!latest.supported || latest.cleanup_supported!==true))) return;
+    if (action==='send' && (this.rawDashboard!==dashboardSnapshot || !dashboard.ok || !dashboardFresh(dashboard.value,this.dashboardFailed) || dashboard.value.control.pause?.choice!=='until_resumed' || !dashboard.value.control.pause_blocks_execution)) return;
+    if (!this.connected || this.generation!==generation || this.permissionEpoch!==permissionEpoch || this.charger!==charger || this.rawStatus!==statusSnapshot || this.statusAt!==observedAt || this._hass?.user?.is_admin!==true || this._hass?.connected===false || this.morekBusy || this.settingsBusy || this.autoBusy || !latest || latest.configured_id!==configured || latest.resolved_id!==resolved || (action!=='status' && !latest.supported) || (action==='send' && (this.morekUncertain || this.autoUncertain || latest.outcomes?.uncertain || !latest.preview?.preview_id || latest.preview.preview_id!==previewId || latest.preview.reason!==null || !latest.preview.profile || this.settingsDirty || !fresh(this.statusAt,this.statusFailed))) || (action==='clear' && (!latest.supported || latest.cleanup_supported!==true))) return;
     this.morekBusy=true;this.morekActiveAction=action;this.morekError=null;this.statusEpoch++;
     this.paintMorek();
     try {
@@ -387,7 +391,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
         this.dashboardFailed=false; this.rawDashboard=raw;this.controlPermissionPending=false;
         const control=decodeDashboard(raw).value?.control;
         const generated=Date.parse(raw.generated_at || '');
-        if(this.autoExpected && control && Number.isFinite(generated) && generated>=this.autoExpected.dispatchedAt && generated<=Date.now() && (this.autoExpected.action==='stop' ? control.pause?.choice===this.autoExpected.choice : control.pause?.choice==null)) {this.autoNotice='Confirmed by a fresh dashboard observation.';this.autoExpected=null;}
+        if(this.autoExpected && control && fresh(generated) && generated<=Date.now() && generated>=this.autoExpected.dispatchedAt && (this.autoExpected.action==='stop' ? control.pause?.choice===this.autoExpected.choice : control.pause?.choice==null)) {this.autoNotice='Confirmed by a fresh dashboard observation.';this.autoExpected=null;}
         this.paint();
       }).catch(()=>{if(valid() && epoch===this.dashboardEpoch) {this.dashboardFailed=true;if(this.view)this.paint();else this.message('Dashboard unavailable.');}});
     }

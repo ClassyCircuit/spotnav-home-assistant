@@ -5,6 +5,7 @@ import { translate, type Language, type TranslationKey } from "./i18n";
 import type { MorekState } from "./morek-view";
 import type { Dashboard } from "./validate";
 import { ageSentence, connectionLabel } from "./vehicle-line";
+import { observationFreshness } from "./observation-freshness";
 
 const STATUS_MAX_AGE = 90_000;
 const READBACK_MAX_AGE = 300_000;
@@ -26,7 +27,7 @@ export function healthKey(state: MorekState | null, observedAt: number | null, f
   if (state?.operator?.state === "offline") return "daily.health.offline";
   if (state?.operator?.state === "mismatch" || state?.verification?.reason === "limits_or_transitions_differ") return "daily.health.mismatch";
   if (failed || state === null || observedAt === null) return failed ? "daily.health.unavailable" : "daily.health.loading";
-  if (!Number.isFinite(observedAt) || now < observedAt || now - observedAt > STATUS_MAX_AGE) return "daily.health.stale";
+  if (observationFreshness(observedAt, now) !== "fresh") return "daily.health.stale";
   if (!state.supported) return "daily.health.unsupported";
   if (state.verification?.reason === "verification_superseded") return "daily.health.superseded";
   if (state.operator?.state === "verified" && state.verified === true) {
@@ -40,8 +41,8 @@ export function healthKey(state: MorekState | null, observedAt: number | null, f
       state.effective?.status === "Accepted" && Array.isArray(state.effective.periods) && state.effective.periods.length >= 2 &&
       state.effective.periods.every((period) => period !== null && typeof period === "object" &&
         typeof period.at === "string" && Number.isFinite(Date.parse(period.at)) && Number.isFinite(period.amps)) &&
-      Number.isFinite(preview) && preview <= now && now - preview <= STATUS_MAX_AGE &&
-      Number.isFinite(read) && read <= now && now - read <= READBACK_MAX_AGE &&
+      observationFreshness(preview, now, false, STATUS_MAX_AGE) === "fresh" &&
+      observationFreshness(read, now, false, READBACK_MAX_AGE) === "fresh" &&
       Number.isFinite(start) && start <= now && Number.isFinite(end) && end > now) return "daily.health.matched";
     return "daily.health.stale";
   }
@@ -170,11 +171,11 @@ export function dailyOverview(doc: Document, dashboard: Dashboard, language: Lan
     const line = doc.createElement("p"); line.dataset["health"] = extra; line.textContent = t(extra); health.append(line);
   }
   const evidence = doc.createElement("small");
-  const observed = observedAt === null ? unknown : time(new Date(observedAt).toISOString(), language, zone) ?? unknown;
+  const observed = observedAt === null || !Number.isFinite(observedAt) ? unknown : time(new Date(observedAt).toISOString(), language, zone) ?? unknown;
   const sent = time(state?.sent_at, language, zone) ?? unknown;
   const read = time(state?.effective?.fetched_at, language, zone) ?? unknown;
   const ack = state?.ack === "Accepted" || state?.ack === "Rejected" ? state.ack : unknown;
-  const stale = observedAt !== null && (now < observedAt || now - observedAt > STATUS_MAX_AGE || failed);
+  const stale = observedAt !== null && observationFreshness(observedAt, now, failed) !== "fresh";
   evidence.textContent = `${t("daily.observed")}: ${observed}${stale ? ` (${t("daily.health.stale")})` : ""} · ${t("daily.sent")}: ${sent} (${ack}) · ${t("daily.readback")}: ${read}. ${t("daily.separate")}`;
   health.append(evidence); root.append(health);
   root.querySelector("dialog")?.append(health.cloneNode(true));

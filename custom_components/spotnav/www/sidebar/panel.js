@@ -59475,6 +59475,17 @@ function admittedAction(control, action, choice) {
   return choice === null && control.automatic_action === ACTION_RESUME;
 }
 
+// src/observation-freshness.ts
+var OBSERVATION_MAX_AGE_MS = 9e4;
+var OBSERVATION_CLOCK_SKEW_MS = 5e3;
+function observationFreshness(timestamp, now, failed = false, maxAge = OBSERVATION_MAX_AGE_MS) {
+  if (failed) return "failed";
+  if (timestamp === null || !Number.isFinite(timestamp) || !Number.isFinite(now)) return "invalid";
+  if (timestamp > now + OBSERVATION_CLOCK_SKEW_MS) return "future";
+  if (now - timestamp > maxAge) return "old";
+  return "fresh";
+}
+
 // src/morek-view.ts
 function decodeMorekState(raw) {
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return null;
@@ -59500,10 +59511,10 @@ function localTime(value2) {
 }
 function morekEvidence(state, observedAt, failed, now = Date.now()) {
   const time = (value2) => value2 ? localTime(value2) : "Unavailable";
-  const fresh = (value2) => Number.isFinite(value2) && value2 <= now && now - value2 <= 9e4;
-  const statusFresh = !failed && observedAt != null && fresh(observedAt);
+  const fresh2 = (value2) => observationFreshness(value2, now) === "fresh";
+  const statusFresh = !failed && observedAt != null && fresh2(observedAt);
   const readAt = Date.parse(state?.effective?.fetched_at ?? "");
-  const readFresh = statusFresh && fresh(readAt);
+  const readFresh = statusFresh && fresh2(readAt);
   const start2 = Date.parse(state?.effective?.schedule_start ?? "");
   const duration = state?.effective?.duration_s;
   const end2 = Number.isFinite(start2) && typeof duration === "number" && Number.isFinite(duration) && duration > 0 ? start2 + duration * 1e3 : NaN;
@@ -59816,7 +59827,7 @@ function healthKey(state, observedAt, failed, busy, now) {
   if (state?.operator?.state === "offline") return "daily.health.offline";
   if (state?.operator?.state === "mismatch" || state?.verification?.reason === "limits_or_transitions_differ") return "daily.health.mismatch";
   if (failed || state === null || observedAt === null) return failed ? "daily.health.unavailable" : "daily.health.loading";
-  if (!Number.isFinite(observedAt) || now < observedAt || now - observedAt > STATUS_MAX_AGE) return "daily.health.stale";
+  if (observationFreshness(observedAt, now) !== "fresh") return "daily.health.stale";
   if (!state.supported) return "daily.health.unsupported";
   if (state.verification?.reason === "verification_superseded") return "daily.health.superseded";
   if (state.operator?.state === "verified" && state.verified === true) {
@@ -59825,7 +59836,7 @@ function healthKey(state, observedAt, failed, busy, now) {
     const start2 = Date.parse(state.verification?.coverage_start ?? "");
     const preview = Date.parse(state.preview?.calculated_at ?? "");
     const reason = state.verification?.reason;
-    if ((reason === "matched" || reason === "matched_with_drift") && state.ack === "Accepted" && state.sent !== null && Number.isFinite(Date.parse(state.sent_at ?? "")) && state.effective?.status === "Accepted" && Array.isArray(state.effective.periods) && state.effective.periods.length >= 2 && state.effective.periods.every((period) => period !== null && typeof period === "object" && typeof period.at === "string" && Number.isFinite(Date.parse(period.at)) && Number.isFinite(period.amps)) && Number.isFinite(preview) && preview <= now && now - preview <= STATUS_MAX_AGE && Number.isFinite(read) && read <= now && now - read <= READBACK_MAX_AGE && Number.isFinite(start2) && start2 <= now && Number.isFinite(end2) && end2 > now) return "daily.health.matched";
+    if ((reason === "matched" || reason === "matched_with_drift") && state.ack === "Accepted" && state.sent !== null && Number.isFinite(Date.parse(state.sent_at ?? "")) && state.effective?.status === "Accepted" && Array.isArray(state.effective.periods) && state.effective.periods.length >= 2 && state.effective.periods.every((period) => period !== null && typeof period === "object" && typeof period.at === "string" && Number.isFinite(Date.parse(period.at)) && Number.isFinite(period.amps)) && observationFreshness(preview, now, false, STATUS_MAX_AGE) === "fresh" && observationFreshness(read, now, false, READBACK_MAX_AGE) === "fresh" && Number.isFinite(start2) && start2 <= now && Number.isFinite(end2) && end2 > now) return "daily.health.matched";
     return "daily.health.stale";
   }
   if (state.operator?.state === "checking") return "daily.health.checking";
@@ -59947,7 +59958,9 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
   if (!decoded.ok) return null;
   const d3 = decoded.value, zone = d3.market?.timezone || null;
   const generated = Date.parse(d3.generated_at || "");
-  const stale = dashboardFailed || !Number.isFinite(generated) || generated > now || now - generated > 9e4;
+  const freshness = observationFreshness(generated, now, dashboardFailed);
+  const stale = freshness !== "fresh";
+  const staleReason = { failed: "refresh failed", invalid: "invalid or missing timestamp", future: "timestamp too far in the future", old: "observation too old" }[freshness];
   const meta = raw?.soc_observation && typeof raw.soc_observation === "object" ? raw.soc_observation : null;
   const validPercent = (v2) => Number.isFinite(v2) && v2 >= 0 && v2 <= 100;
   const useRaw = (d3.soc?.estimated === true || d3.soc?.value == null) && validPercent(meta?.raw_value);
@@ -59969,7 +59982,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
   const socDetail = validPercent(soc2) ? `${source}${integration} \xB7 ${report}${restored ? " Restored reading; not a new vehicle report." : ""} ${estimate}` : `SOC unavailable: no valid reading. ${estimate}`;
   const status = decodeMorekState(statusRaw);
   const health = translate2("en", healthKey(status, observedAt, failed, false, now));
-  const statusFresh = !failed && Number.isFinite(observedAt) && observedAt <= now && now - observedAt <= 9e4;
+  const statusFresh = observationFreshness(observedAt, now, failed) === "fresh";
   const evidence = morekEvidence(status, observedAt, failed, now);
   const ready = statusFresh ? status?.readiness : null;
   const control = ready?.control === "available" ? "available" : ready?.control === "unavailable" ? "unavailable" : "unknown";
@@ -60028,7 +60041,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
       nextWindow,
       chart: published?.chart,
       totals: !planStale && proposal ? { energy: proposal.planned_kwh, cost: proposal.unpriced ? null : proposal.cost?.value, pricePerKwh: avg } : null,
-      vehicle: { status: stale ? "Connection unavailable \xB7 stale dashboard" : d3.charger.available ? d3.connection?.state || U : "Charger unavailable", detail: `Dashboard observed ${date(d3.generated_at, zone)}${stale ? " \xB7 stale" : ""}`, power: "Unavailable", soc: validPercent(soc2) ? soc2 : null, stale: socStale, planStale, socDetail, socEstimated: !useRaw && d3.soc?.estimated === true, policy: (d3.plan.price_policy?.explanations || []).map((code) => {
+      vehicle: { status: stale ? "Connection unavailable \xB7 stale dashboard" : d3.charger.available ? d3.connection?.state || U : "Charger unavailable", detail: `Dashboard observed ${date(d3.generated_at, zone)}${stale ? ` \xB7 stale: ${staleReason}` : ""}`, power: "Unavailable", soc: validPercent(soc2) ? soc2 : null, stale: socStale, planStale, socDetail, socEstimated: !useRaw && d3.soc?.estimated === true, policy: (d3.plan.price_policy?.explanations || []).map((code) => {
         const keys2 = { minimum_exception: "exception", minimum_shortfall: "minimumShortfall", target_shortfall: "targetShortfall", recalculating: "recalculating", unavailable: "unavailable", minimum_covered: "covered", within_cap: "within", target_met: "targetMet", error: "error" };
         return keys2[code] ? translate2("en", `daily.policy.${keys2[code]}`) : U;
       }).join(" ") || U },
@@ -60046,9 +60059,11 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.78";
+var CARD_VERSION = "2.5.79";
 
 // sidebar/panel.js
+var fresh = (timestamp, failed = false) => observationFreshness(timestamp, Date.now(), failed) === "fresh";
+var dashboardFresh = (dashboard, failed) => fresh(Date.parse(dashboard?.generated_at || ""), failed);
 var settingsWritesByConnection = /* @__PURE__ */ new WeakMap();
 function actionFailure(code, action) {
   const reasons = {
@@ -60287,11 +60302,11 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
   }
   paintAutomatic(dashboard) {
     const control = dashboard?.control, active = control?.pause?.choice;
-    const observed = Date.parse(dashboard?.generated_at || ""), fresh = !this.dashboardFailed && Number.isFinite(observed) && observed <= Date.now() && Date.now() - observed <= 9e4;
+    const isFresh = dashboardFresh(dashboard, this.dashboardFailed);
     const status = decodeMorekState(this.rawStatus), owner = status?.ownership?.recorded_owner;
-    const notice = (this.autoNotice || "") + (this.autoRefusalAt && !this.statusFailed && Number.isFinite(this.statusAt) && this.statusAt >= this.autoRefusalAt && Date.now() - this.statusAt <= 9e4 ? ` ${admissionDetail(status)}` : "");
+    const notice = (this.autoNotice || "") + (this.autoRefusalAt && fresh(this.statusAt, this.statusFailed) && this.statusAt >= this.autoRefusalAt ? ` ${admissionDetail(status)}` : "");
     if (owner === "morek_schedule") {
-      const statusFresh = !this.statusFailed && Number.isFinite(this.statusAt) && this.statusAt <= Date.now() && Date.now() - this.statusAt <= 9e4;
+      const statusFresh = fresh(this.statusAt, this.statusFailed);
       const pause = statusFresh ? status?.schedule_pause : null;
       const intent = pause?.intent === "pause_until_resumed" ? "Pause requested" : pause?.intent === "resume_requested" ? "Resume requested; retained limit may remain" : pause?.intent === "none" ? "No schedule-owned pause reported" : "Pause intent unknown";
       const request = typeof pause?.request === "string" ? pause.request : "unknown";
@@ -60299,10 +60314,10 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       const from = Date.parse(pause?.coverage_start || ""), to = Date.parse(pause?.coverage_end || "");
       const coverage = Number.isFinite(from) && Number.isFinite(to) && to > from ? ` (${new Date(from).toLocaleString()} \u2013 ${new Date(to).toLocaleString()})` : " (coverage unavailable)";
       const readback = pause?.readback === "bounded_match" ? `bounded effective readback match${coverage}` : "readback unconfirmed";
-      const canPause = fresh && statusFresh && !!control?.can_act && !this.controlPermissionPending && !this.autoBusy && !this.autoUncertain && !this.morekBusy && !this.morekUncertain && !this.settingsBusy && this._hass?.connected !== false;
+      const canPause = isFresh && statusFresh && !!control?.can_act && !this.controlPermissionPending && !this.autoBusy && !this.autoUncertain && !this.morekBusy && !this.morekUncertain && !this.settingsBusy && this._hass?.connected !== false;
       const can2 = canPause && status?.ownership?.completion_authorized === true;
       const resumeOffered = ownedResumeOffered(status);
-      const blocker = !fresh ? "Dashboard observation unavailable or stale." : !statusFresh ? "Morek status unavailable or stale." : !control?.can_act ? "Control permission or charger availability is unavailable." : this.controlPermissionPending ? "Waiting for a fresh permission check." : this.autoUncertain || this.morekUncertain ? "A previous action outcome is unknown; do not retry blindly." : this.autoBusy || this.morekBusy || this.settingsBusy ? "Another request is in progress." : status?.schedule_pause?.request === "stop_pending" ? "A person Stop is pending." : status?.outcomes?.uncertain === true ? "A profile outcome is uncertain; do not retry blindly." : status?.ownership?.completion_authorized !== true ? `Schedule ownership is not currently authorized; reported recovery status: ${status?.ownership?.recovery?.automatic_recovery || status?.ownership?.recovery?.state || status?.ownership?.blockers?.[0] || "unknown"}.` : !resumeOffered ? ownedResumeReason(status) : "";
+      const blocker = !isFresh ? "Dashboard observation unavailable or stale." : !statusFresh ? "Morek status unavailable or stale." : !control?.can_act ? "Control permission or charger availability is unavailable." : this.controlPermissionPending ? "Waiting for a fresh permission check." : this.autoUncertain || this.morekUncertain ? "A previous action outcome is unknown; do not retry blindly." : this.autoBusy || this.morekBusy || this.settingsBusy ? "Another request is in progress." : status?.schedule_pause?.request === "stop_pending" ? "A person Stop is pending." : status?.outcomes?.uncertain === true ? "A profile outcome is uncertain; do not retry blindly." : status?.ownership?.completion_authorized !== true ? `Schedule ownership is not currently authorized; reported recovery status: ${status?.ownership?.recovery?.automatic_recovery || status?.ownership?.recovery?.state || status?.ownership?.blockers?.[0] || "unknown"}.` : !resumeOffered ? ownedResumeReason(status) : "";
       this.shadowRoot.querySelector("#pause-state").textContent = `${intent}; request ${request}; ACK ${ack}; ${readback}; physical charging unknown.${control?.execution_error === "pause_stop_failed" ? " Stop request failed." : ""}${blocker ? ` Resume unavailable: ${blocker}` : ""}`;
       this.shadowRoot.querySelector("#pause-auto").disabled = !(canPause && admittedAction(control, "stop", "until_resumed"));
       this.shadowRoot.querySelector("#resume-auto").disabled = !(can2 && resumeOffered);
@@ -60310,8 +60325,8 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       return;
     }
     const stopFailed = control?.execution_error === "pause_stop_failed" ? " Stop request failed; physical charging state unknown." : "";
-    this.shadowRoot.querySelector("#pause-state").textContent = control && fresh ? active ? `Pause intent: ${active}; physical stop not confirmed.${stopFailed}` : `No pause reported.${stopFailed}` : "Auto state unavailable or stale.";
-    const can = fresh && !!control?.can_act && !this.controlPermissionPending && !this.autoBusy && !this.autoUncertain && !this.morekBusy && !this.morekUncertain && !this.settingsBusy && this._hass?.connected !== false;
+    this.shadowRoot.querySelector("#pause-state").textContent = control && isFresh ? active ? `Pause intent: ${active}; physical stop not confirmed.${stopFailed}` : `No pause reported.${stopFailed}` : "Auto state unavailable or stale.";
+    const can = isFresh && !!control?.can_act && !this.controlPermissionPending && !this.autoBusy && !this.autoUncertain && !this.morekBusy && !this.morekUncertain && !this.settingsBusy && this._hass?.connected !== false;
     this.shadowRoot.querySelector("#pause-auto").disabled = !(can && admittedAction(control, "stop", "until_resumed"));
     this.shadowRoot.querySelector("#resume-auto").disabled = !(can && admittedAction(control, "resume", null));
     this.shadowRoot.querySelector("#pause-notice").textContent = notice || "";
@@ -60319,11 +60334,11 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
   async automaticAction(action, choice) {
     const generation = this.generation, permissionEpoch = this.permissionEpoch, charger = this.charger, hass = this._hass, decoded = decodeDashboard(this.rawDashboard);
     const morek = decodeMorekState(this.rawStatus), owner = morek?.ownership;
-    const statusFresh = !this.statusFailed && Number.isFinite(this.statusAt) && this.statusAt <= Date.now() && Date.now() - this.statusAt <= 9e4;
+    const statusFresh = fresh(this.statusAt, this.statusFailed);
+    if (owner?.recorded_owner === "morek_schedule" && !statusFresh) return;
     if (owner?.recorded_owner === "morek_schedule" && action !== "stop" && (owner.completion_authorized !== true || !statusFresh)) return;
-    const observed = decoded.ok ? Date.parse(decoded.value.generated_at || "") : NaN;
     const offered = decoded.ok && (owner?.recorded_owner === "morek_schedule" && action === "resume" ? choice === null && statusFresh && ownedResumeOffered(morek) : admittedAction(decoded.value.control, action, choice));
-    if (!this.connected || !charger || !hass || hass.connected === false || !decoded.ok || this.dashboardFailed || !Number.isFinite(observed) || observed > Date.now() || Date.now() - observed > 9e4 || this.controlPermissionPending || this.autoBusy || this.autoUncertain || this.morekBusy || this.morekUncertain || this.settingsBusy || !decoded.value.control.can_act || !offered) return;
+    if (!this.connected || !charger || !hass || hass.connected === false || !decoded.ok || !dashboardFresh(decoded.value, this.dashboardFailed) || this.controlPermissionPending || this.autoBusy || this.autoUncertain || this.morekBusy || this.morekUncertain || this.settingsBusy || !decoded.value.control.can_act || !offered) return;
     const dispatchedAt = Date.now();
     this.autoRefusalAt = null;
     this.autoBusy = true;
@@ -60375,9 +60390,9 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       });
       return;
     }
-    const fresh = morekPanel(document, state, this._hass?.user?.is_admin === true, this.morekBusy || this.settingsBusy || this.settingsDirty || this.autoBusy, this.morekError, (action) => void this.morekAction(action), this.morekActiveAction, false);
-    if (target.firstChild) reconcile(target.firstChild, fresh);
-    else target.append(fresh);
+    const panel = morekPanel(document, state, this._hass?.user?.is_admin === true, this.morekBusy || this.settingsBusy || this.settingsDirty || this.autoBusy, this.morekError, (action) => void this.morekAction(action), this.morekActiveAction, false);
+    if (target.firstChild) reconcile(target.firstChild, panel);
+    else target.append(panel);
     if (state.ownership?.reconfirmation_required && state.supported && this._hass?.user?.is_admin === true) {
       const button = document.createElement("button");
       button.type = "button";
@@ -60386,8 +60401,9 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       button.addEventListener("click", () => void this.morekAction("reconfirm_migration"));
       target.firstChild.append(button);
     }
+    const dashboard = decodeDashboard(this.rawDashboard);
     const send = target.querySelector('[data-morek-action="send"]');
-    if (send && (this.morekUncertain || this.autoUncertain)) send.disabled = true;
+    if (send && (this.morekUncertain || this.autoUncertain || !fresh(this.statusAt, this.statusFailed) || !dashboard.ok || !dashboardFresh(dashboard.value, this.dashboardFailed) || dashboard.value.control.pause?.choice !== "until_resumed" || !dashboard.value.control.pause_blocks_execution)) send.disabled = true;
   }
   async morekAction(action) {
     const hass = this._hass, charger = this.charger, generation = this.generation, permissionEpoch = this.permissionEpoch, statusSnapshot = this.rawStatus, observedAt = this.statusAt, state = decodeMorekState(statusSnapshot);
@@ -60396,16 +60412,15 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     if (action !== "status" && !state.supported) return;
     if (action === "clear" && state.cleanup_supported !== true) return;
     if (this.settingsBusy || action === "send" && this.settingsDirty) return;
-    if (action === "send" && (this.morekUncertain || this.autoUncertain || state.outcomes?.uncertain || !state.preview?.profile || state.preview.reason !== null || !state.preview.preview_id || !this.statusAt || Date.now() - this.statusAt > 9e4)) return;
+    if (action === "send" && (this.morekUncertain || this.autoUncertain || state.outcomes?.uncertain || !state.preview?.profile || state.preview.reason !== null || !state.preview.preview_id || !fresh(this.statusAt, this.statusFailed))) return;
     const previewId = state.preview?.preview_id, configured = state.configured_id, resolved = state.resolved_id, dashboardSnapshot = this.rawDashboard;
     if (action === "send" && !window.confirm("Confirm sending the current preview. The final 0 A limit may persist.")) return;
     if (action === "clear" && !window.confirm("Confirm selective removal of SpotNav profile 42001. Effective limits may increase.")) return;
     if (action === "reconfirm_migration" && !window.confirm("Reconfirm schedule ownership for this connection? This does not verify charger protection, profile inventory or physical charging. A previous schedule or 0 A limit may remain.")) return;
     const latest = decodeMorekState(this.rawStatus);
     const dashboard = decodeDashboard(this.rawDashboard);
-    const generated = dashboard.ok ? Date.parse(dashboard.value.generated_at || "") : NaN;
-    if (action === "send" && (this.rawDashboard !== dashboardSnapshot || !dashboard.ok || !Number.isFinite(generated) || generated > Date.now() || Date.now() - generated > 9e4 || dashboard.value.control.pause?.choice !== "until_resumed" || !dashboard.value.control.pause_blocks_execution)) return;
-    if (!this.connected || this.generation !== generation || this.permissionEpoch !== permissionEpoch || this.charger !== charger || this.rawStatus !== statusSnapshot || this.statusAt !== observedAt || this._hass?.user?.is_admin !== true || this._hass?.connected === false || this.morekBusy || this.settingsBusy || this.autoBusy || !latest || latest.configured_id !== configured || latest.resolved_id !== resolved || action !== "status" && !latest.supported || action === "send" && (this.morekUncertain || this.autoUncertain || latest.outcomes?.uncertain || !latest.preview?.preview_id || latest.preview.preview_id !== previewId || latest.preview.reason !== null || !latest.preview.profile || this.settingsDirty || !this.statusAt || Date.now() - this.statusAt > 9e4) || action === "clear" && (!latest.supported || latest.cleanup_supported !== true)) return;
+    if (action === "send" && (this.rawDashboard !== dashboardSnapshot || !dashboard.ok || !dashboardFresh(dashboard.value, this.dashboardFailed) || dashboard.value.control.pause?.choice !== "until_resumed" || !dashboard.value.control.pause_blocks_execution)) return;
+    if (!this.connected || this.generation !== generation || this.permissionEpoch !== permissionEpoch || this.charger !== charger || this.rawStatus !== statusSnapshot || this.statusAt !== observedAt || this._hass?.user?.is_admin !== true || this._hass?.connected === false || this.morekBusy || this.settingsBusy || this.autoBusy || !latest || latest.configured_id !== configured || latest.resolved_id !== resolved || action !== "status" && !latest.supported || action === "send" && (this.morekUncertain || this.autoUncertain || latest.outcomes?.uncertain || !latest.preview?.preview_id || latest.preview.preview_id !== previewId || latest.preview.reason !== null || !latest.preview.profile || this.settingsDirty || !fresh(this.statusAt, this.statusFailed)) || action === "clear" && (!latest.supported || latest.cleanup_supported !== true)) return;
     this.morekBusy = true;
     this.morekActiveAction = action;
     this.morekError = null;
@@ -60633,7 +60648,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
         this.controlPermissionPending = false;
         const control = decodeDashboard(raw).value?.control;
         const generated = Date.parse(raw.generated_at || "");
-        if (this.autoExpected && control && Number.isFinite(generated) && generated >= this.autoExpected.dispatchedAt && generated <= Date.now() && (this.autoExpected.action === "stop" ? control.pause?.choice === this.autoExpected.choice : control.pause?.choice == null)) {
+        if (this.autoExpected && control && fresh(generated) && generated <= Date.now() && generated >= this.autoExpected.dispatchedAt && (this.autoExpected.action === "stop" ? control.pause?.choice === this.autoExpected.choice : control.pause?.choice == null)) {
           this.autoNotice = "Confirmed by a fresh dashboard observation.";
           this.autoExpected = null;
         }

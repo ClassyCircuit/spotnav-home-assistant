@@ -355,6 +355,23 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-13 — sidebar clock skew (2.5.79; local, review pending)
+
+- Dashboard and relevant Morek status freshness now accept up to five seconds of
+  future clock skew, retain their existing age limits, and fail closed for missing,
+  invalid, farther-future, old or failed observations. Sidebar control rendering
+  and dispatch use the same freshness rules; failed dashboard reads immediately
+  withdraw cached controls, including guarded manual Morek send. Messages distinguish
+  failed reads, invalid timestamps, future timestamps and old observations.
+- The fix does not establish that browser clock skew caused the reported failure;
+  permission, ownership, Stop, uncertainty and other independent blockers remain.
+  SOC freshness and worker plan provenance are unchanged. Confirmation of an action
+  still requires a dashboard timestamp no earlier than dispatch and not in the future.
+  Opening or refreshing only reads; no action or action retry is automatic.
+- Focused mocked tests and frontend build/check-dist only; browser rendering, live HA,
+  deployment and physical behavior remain unverified. No HA contact, Resume retry,
+  profile operation or charger action was performed.
+
 ### 2026-11-13 — schedule-owned Resume UI (2.5.78; local, review pending)
 
 - A reported 2.5.77 sidebar showed a pending schedule pause, unavailable Resume

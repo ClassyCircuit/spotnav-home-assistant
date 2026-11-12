@@ -6,6 +6,7 @@ import { dashboardAdapter } from '../sidebar/adapter.js';
 import { renderBattery } from '../shared-dashboard/vehicle-view.js';
 import { renderPlan } from '../shared-dashboard/plan-view.js';
 import '../sidebar/panel.js';
+import { observationFreshness } from '../src/observation-freshness.ts';
 
 // jsdom does not implement form-associated custom-element internals.
 ElementInternals.prototype.setFormValue = function() {};
@@ -24,6 +25,32 @@ const tick = async () => { for(let i=0;i<20;i++) await Promise.resolve(); };
 beforeEach(()=>sessionStorage.clear());
 
 describe('actual sidebar read-only host', () => {
+  it('bounds observation skew and distinguishes stale causes', () => {
+    const now=Date.now(), raw=fixture();
+    for (const [value,reason] of [[now+100,'fresh'],[now+5000,'fresh'],[now+5001,'future'],[now-90000,'fresh'],[now-90001,'old'],[NaN,'invalid'],[null,'invalid']]) {
+      expect(observationFreshness(value,now)).toBe(reason);
+    }
+    for (const [value,reason] of [[new Date(now+100).toISOString(),null],[new Date(now+5001).toISOString(),'future'],[new Date(now-90001).toISOString(),'too old'],['bad','invalid'],[null,'invalid']]) {
+      raw.generated_at=value;
+      const model=dashboardAdapter(raw,status,now,now).model;
+      if (reason) expect(model.vehicle.detail).toContain(reason);
+      else expect(model.vehicle.detail).not.toContain('stale');
+    }
+    raw.generated_at=new Date(now).toISOString();
+    expect(dashboardAdapter(raw,status,now,now,false,true).model.vehicle.detail).toContain('refresh failed');
+  });
+  it.each(['slight','future','old','invalid','missing','failed','status_future','status_failed'])('keeps Resume display and dispatch aligned for %s', async scenario => {
+    const now=Date.now(), raw=fixture();raw.generated_at=new Date(now+(scenario==='slight'?100:scenario==='future'?6000:scenario==='old'?-100000:0)).toISOString();
+    if(scenario==='invalid')raw.generated_at='bad';if(scenario==='missing')raw.generated_at=null;raw.charger.charger_id='a';
+    const owned={api_version:1,schedule:{...status.schedule,supported:true,outcomes:{uncertain:false},ownership:{recorded_owner:'morek_schedule',completion_authorized:true},schedule_pause:{intent:'pause_until_resumed',request:'pending'}}};const calls=[];
+    const hass={connected:true,user:{is_admin:true},callWS:msg=>{calls.push(msg);return Promise.resolve(msg.type==='spotnav/list_chargers'?{api_version:1,chargers:[{charger_id:'a',charger_name:'A'}]}:msg.type==='spotnav/get_dashboard'?raw:msg.type==='spotnav/get_settings'?envelope(record()):msg.type==='spotnav/manual_action'?{api_version:1,ok:true,error:null,action:'resume',choice:null}:owned);}};
+    const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();
+    panel.refresh();await tick();expect(calls.filter(m=>m.type==='spotnav/manual_action'||(m.type==='spotnav/morek_schedule'&&m.action!=='status'))).toHaveLength(0);
+    if(scenario==='failed')panel.dashboardFailed=true;if(scenario==='status_future')panel.statusAt=Date.now()+6000;if(scenario==='status_failed')panel.statusFailed=true;
+    if(scenario==='slight')panel.statusAt=Date.now()+100;
+    panel.paint();expect(panel.shadowRoot.querySelector('#resume-auto').disabled).toBe(scenario!=='slight');
+    await panel.automaticAction('resume',null);expect(calls.filter(m=>m.type==='spotnav/manual_action')).toHaveLength(scenario==='slight'?1:0);panel.remove();
+  });
   it('renders reconciled planner windows, costs, deadline and last-known SOC consistently', async () => {
     const now=Date.now(), raw=fixture();raw.generated_at=new Date(now).toISOString();raw.charger.charger_id='a';
     raw.market.currency='EUR';raw.settings.departure_enabled=true;raw.planning.settings_revision=raw.settings.revision;
@@ -203,6 +230,14 @@ describe('actual sidebar read-only host', () => {
     expect(failed.windows).toBeNull();
     expect(failed.totals).toBeNull();
     expect(current().windows).toHaveLength(1);
+  });
+  it('blocks cached Resume immediately after an actual failed dashboard refresh', async () => {
+    const raw=fixture();raw.generated_at=new Date(Date.now()+100).toISOString();raw.charger.charger_id='a';let fail=false;const calls=[];
+    const owned={api_version:1,schedule:{...status.schedule,supported:true,outcomes:{uncertain:false},ownership:{recorded_owner:'morek_schedule',completion_authorized:true},schedule_pause:{intent:'pause_until_resumed',request:'pending'}}};
+    const hass={connected:true,user:{is_admin:true},callWS:msg=>{calls.push(msg);if(msg.type==='spotnav/get_dashboard')return fail?Promise.reject(Error('private error')):Promise.resolve(raw);return Promise.resolve(msg.type==='spotnav/list_chargers'?{api_version:1,chargers:[{charger_id:'a',charger_name:'A'}]}:msg.type==='spotnav/get_settings'?envelope(record()):owned);}};
+    const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();expect(panel.shadowRoot.querySelector('#resume-auto').disabled).toBe(false);
+    fail=true;panel.refresh();await tick();expect(panel.shadowRoot.querySelector('#resume-auto').disabled).toBe(true);expect(panel.shadowRoot.textContent).toMatch(/refresh failed/i);expect(panel.shadowRoot.textContent).not.toContain('private error');
+    await panel.automaticAction('resume',null);expect(calls.filter(m=>m.type==='spotnav/manual_action')).toHaveLength(0);panel.remove();
   });
   it('offers Resume after clean ownership with a durable manual pause, without an undefined notice', async () => {
     const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';raw.control.automatic_action='resume';raw.control.pause_choices=[];raw.control.pause_blocks_execution=true;raw.control.pause={choice:'manual',admitted_at:raw.generated_at,expires_at:null,action:'stop',scope:'plug_in'};

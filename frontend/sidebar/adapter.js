@@ -5,6 +5,7 @@ import { healthKey } from '../src/daily-overview.ts';
 import { translate } from '../src/i18n/index.ts';
 import { publishedChart } from './price-chart.js';
 import { displayPrice } from '../shared-dashboard/price-format.js';
+import { observationFreshness } from '../src/observation-freshness.ts';
 
 const U = 'Unknown';
 const date = (value, zone) => {
@@ -43,7 +44,9 @@ export function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), f
   if (!decoded.ok) return null;
   const d = decoded.value, zone = d.market?.timezone || null;
   const generated = Date.parse(d.generated_at || '');
-  const stale = dashboardFailed || !Number.isFinite(generated) || generated > now || now - generated > 90000;
+  const freshness = observationFreshness(generated, now, dashboardFailed);
+  const stale = freshness !== 'fresh';
+  const staleReason = {failed:'refresh failed',invalid:'invalid or missing timestamp',future:'timestamp too far in the future',old:'observation too old'}[freshness];
   const meta=raw?.soc_observation && typeof raw.soc_observation==='object' ? raw.soc_observation : null;
   const validPercent=v=>Number.isFinite(v) && v>=0 && v<=100;
   const useRaw=(d.soc?.estimated===true || d.soc?.value==null) && validPercent(meta?.raw_value);
@@ -66,7 +69,7 @@ export function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), f
   const socDetail=validPercent(soc) ? `${source}${integration} · ${report}${restored ? ' Restored reading; not a new vehicle report.' : ''} ${estimate}` : `SOC unavailable: no valid reading. ${estimate}`;
   const status = decodeMorekState(statusRaw);
   const health = translate('en', healthKey(status, observedAt, failed, false, now));
-  const statusFresh = !failed && Number.isFinite(observedAt) && observedAt <= now && now-observedAt <= 90000;
+  const statusFresh = observationFreshness(observedAt, now, failed) === 'fresh';
   const evidence = morekEvidence(status, observedAt, failed, now);
   const ready = statusFresh ? status?.readiness : null;
   const control = ready?.control === 'available' ? 'available' : ready?.control === 'unavailable' ? 'unavailable' : 'unknown';
@@ -116,7 +119,7 @@ export function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), f
       minutesPerTimeUnit:1/60000, time: ms=>part(ms,zone,{timeStyle:'short'}), day: ms=>part(ms,zone,{dateStyle:'medium'}), ...published?.format},
     model: {
       windows, nextWindow, chart:published?.chart, totals: !planStale && proposal ? {energy:proposal.planned_kwh,cost:proposal.unpriced ? null : proposal.cost?.value,pricePerKwh:avg} : null,
-      vehicle: {status: stale ? 'Connection unavailable · stale dashboard' : d.charger.available ? (d.connection?.state || U) : 'Charger unavailable', detail:`Dashboard observed ${date(d.generated_at,zone)}${stale ? ' · stale' : ''}`, power:'Unavailable', soc:validPercent(soc) ? soc : null, stale:socStale, planStale, socDetail, socEstimated:!useRaw && d.soc?.estimated===true, policy: (d.plan.price_policy?.explanations || []).map(code=>{const keys={minimum_exception:'exception',minimum_shortfall:'minimumShortfall',target_shortfall:'targetShortfall',recalculating:'recalculating',unavailable:'unavailable',minimum_covered:'covered',within_cap:'within',target_met:'targetMet',error:'error'};return keys[code] ? translate('en',`daily.policy.${keys[code]}`) : U;}).join(' ') || U},
+      vehicle: {status: stale ? 'Connection unavailable · stale dashboard' : d.charger.available ? (d.connection?.state || U) : 'Charger unavailable', detail:`Dashboard observed ${date(d.generated_at,zone)}${stale ? ` · stale: ${staleReason}` : ''}`, power:'Unavailable', soc:validPercent(soc) ? soc : null, stale:socStale, planStale, socDetail, socEstimated:!useRaw && d.soc?.estimated===true, policy: (d.plan.price_policy?.explanations || []).map(code=>{const keys={minimum_exception:'exception',minimum_shortfall:'minimumShortfall',target_shortfall:'targetShortfall',recalculating:'recalculating',unavailable:'unavailable',minimum_covered:'covered',within_cap:'within',target_met:'targetMet',error:'error'};return keys[code] ? translate('en',`daily.policy.${keys[code]}`) : U;}).join(' ') || U},
       assumptions:{startingSoc:projectionValid ? rawProjection.starting_soc : null,capacityKwh:d.soc?.capacity_kwh,efficiency:d.soc?.efficiency,projectionSupported:projectionValid,projectionKwhPerPercent:rawProjection?.kwh_per_percent,projectionNote},
       settings: {target:d.soc?.target_percent, minimum:d.settings?.minimum_ready_by_soc, cap:d.settings?.soft_price_cap, readyBy:d.settings?.departure_time},
       canSave:false, untilDeadline, targetNote:d.settings?.driver==='target_soc' && d.soc?.value!=null ? `Plan energy, projected SOC and cost are estimates based on the last-known SOC${d.soc.estimated ? ' and an energy-derived SOC estimate' : ''}; an old reading may not reflect driving since then.` : '',

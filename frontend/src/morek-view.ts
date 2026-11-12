@@ -1,5 +1,6 @@
 // Manual Morek profile test panel. Nothing here treats a sent profile as a confirmed schedule.
 import { VISUAL_CLASSES as C } from "./visual-styles";
+import { observationFreshness } from "./observation-freshness";
 
 export interface MorekState {
   supported: boolean;
@@ -84,7 +85,7 @@ function localTime(value: string | null): string {
 /** Status/readback ages are presentation limits, not permission to operate the charger. */
 export function morekEvidence(state: MorekState | null, observedAt: number | null, failed: boolean, now = Date.now()) {
   const time = (value: string | null | undefined) => value ? localTime(value) : "Unavailable";
-  const fresh = (value: number) => Number.isFinite(value) && value <= now && now - value <= 90000;
+  const fresh = (value: number) => observationFreshness(value, now) === "fresh";
   const statusFresh = !failed && observedAt != null && fresh(observedAt);
   const readAt = Date.parse(state?.effective?.fetched_at ?? "");
   const readFresh = statusFresh && fresh(readAt);
