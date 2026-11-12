@@ -22,6 +22,17 @@ const envelope = (settings,ok=true,error=null) => ({api_version:1,ok,error,setti
 const tick = async () => { for(let i=0;i<20;i++) await Promise.resolve(); };
 
 describe('actual sidebar read-only host', () => {
+  it('reports readiness conservatively as observations age or fail', () => {
+    const now=Date.now(), raw=fixture(); raw.generated_at=new Date(now).toISOString();
+    const current={api_version:1,schedule:{...status.schedule,supported:true,readiness:{control:'available',vehicle:'disconnected',vehicle_observed_at:new Date(now).toISOString()}}};
+    const text=(s,t=now,failed=false)=>dashboardAdapter(raw,s,now,t,failed).model.evidence.readiness;
+    expect(text(current)).toMatch(/Control available · vehicle disconnected/);
+    expect(text(current,now+90001)).toMatch(/Control unknown · vehicle unknown/);
+    expect(text(current,now,true)).toMatch(/Control unknown · vehicle unknown/);
+    current.schedule.readiness.vehicle_observed_at=new Date(now-180001).toISOString();
+    expect(text(current)).toMatch(/vehicle unknown/);
+    expect(text(current)).toMatch(/authorization unknown · measured charging unknown/);
+  });
   it('decodes backend fixture without sample data and fails closed on stale or unsupported data', () => {
     const raw=fixture(); raw.generated_at=new Date().toISOString();
     raw.plan.proposal.periods=[{start:new Date(Date.now()+3600000).toISOString(),end:new Date(Date.now()+7200000).toISOString()}];

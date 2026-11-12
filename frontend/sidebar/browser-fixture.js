@@ -15,6 +15,7 @@ if (location.search.includes('prices')) {
   ];
 }
 const status={api_version:1,schedule:{supported:true,cleanup_supported:true,verified:false,sent:null,sent_at:null,ack:null,effective:null,preview:{calculated_at:new Date().toISOString(),reason:null,preview_id:'fixture-preview',profile:{chargingProfileId:42001,chargingSchedule:{startSchedule:new Date().toISOString(),chargingSchedulePeriod:[{startPeriod:0,limit:0}]}}}}};
+status.schedule.readiness={control:'available',vehicle:'disconnected',vehicle_observed_at:new Date().toISOString(),transaction:'unknown',measurement:'unknown'};
 if (location.search.startsWith('?panel')) {
   // Exercise the exact production bundle served by the local test server.
   const panelUrl='/spotnav-sidebar/panel.js';

@@ -45,6 +45,15 @@ electrical limits, regulator configuration or code without explicit authorizatio
 Existing regulator conflicts remain an activation concern, not an instruction to
 build a second load controller. Hardware checks are user-directed.
 
+**Agreed charging controls:** the final daily sidebar has two simple controls:
+**Pause / Resume Auto**, and **Charge Now**, which becomes **Return to Auto**
+while its temporary override is active. Pause requests charging be held until
+the person explicitly resumes; Resume returns to a fresh valid automatic plan.
+Charge Now defaults to one hour with other durations. Return to Auto ends that
+override early; charging may continue if the automatic plan selects the current
+time. These are target semantics, not a claim that schedule-owned Pause/Resume
+or Charge Now works today. Charge Now is deferred to Stage 10 after 5.8.
+
 **Complete the necessary development in order before installation.** The final Stage 5
 milestone, 5.8, installs the working release, deliberately enables its reviewed automatic
 path and performs supervised live validation with the user's
@@ -372,8 +381,8 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Local fictional insights use duration-weighted historical quartiles, a complete
     one-hour known-price opportunity and an October summary; see handoff for coverage,
     checks and limitations. The opportunity searches only Now and interval starts;
-    its 5.1d label explicitly qualifies this restriction. Overall 5.1 and chart
-    choice remain pending approval.
+    its 5.1d label explicitly qualifies this restriction. Overall 5.1 visual
+    approval remains pending; the user subsequently chose the stepped-area chart.
   - Prototype concise, explainable assessments of current/upcoming prices against a
     stated illustrative longer-term baseline, plus best upcoming price windows and
     useful monthly statistics. Clearly distinguish cheapest opportunities from the
@@ -589,11 +598,11 @@ tests are documented there; full HA collection is still blocked on Windows.
     writes. Existing legacy records remain readable. Failure before the first marker
     lands cannot be distinguished after restart from the previous legacy document;
     lost-document and unknown-outcome recovery remain open. See the handoff.
-  - **Person-Stop coordination foundation implemented for review (2.5.40):** an
+  - **Historical person-Stop foundation (2.5.40):** an
     internal, process-local unarmed drain is interrupted by a separately classified
     Stop reservation before the Auto lock. Ordinary admission remains closed; no
-    entry or owner is persisted or activated. Mocked-boundary checks are documented
-    in the handoff; durable transition/restart recovery remains open.
+    entry or owner was persisted or activated in that slice. Later 5.5b–5.5f add
+    durable unarmed transition/recovery groundwork; activation remains open.
   - **Historical entry/drain blocker (2026-11-12):** the existing
     quiesce latch refuses a person's Stop at the ordinary controller guard. The
     separately classified regulator-protection path bypasses that guard. Making
@@ -670,16 +679,35 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Implement only an explicitly reviewed, fail-closed policy; identify any user or
     installation-specific decisions and stop for them rather than assuming safety.
     A stored current limit cannot start or authorize charging by itself.
-- [ ] **5.6a Transaction authorization and connection readiness**
+- [x] **5.6a Transaction authorization and connection readiness** (2.5.48 local, mocked; coordinator review pending)
+  - Read-only status uses uniquely resolved OCPP connection, control availability and
+    fresh connector-scoped status. Missing/stale facts remain unknown; the HA state
+    timestamp can age out an unchanged but still valid status. Authorization and
+    measured flow remain unknown: existing integration paths do not establish a
+    trustworthy active transaction or Morek power measurement. No new active-session
+    requirement was added to future schedule admission; dispatch stays unarmed.
+  - Determine the installation's new-session authorization behavior and reliable
+    transaction/measurement evidence in user-directed 5.8. Profile ACK, limits and
+    plug-in do not prove authorization or flow. No live validation is claimed.
+  - Current working tree contains 2.5.48 readiness/status implementation and tests;
+    it remains in progress until its implementation and validation are reported and
+    reviewed. Preserve that work; do not mark completed based on file presence alone.
   - Reuse observed charger/transaction facts to report and gate what can actually
     be known about a new charging session. Do not change authorization settings or
     infer that a stored schedule authorizes charging. Test unknown/offline/refused
     cases with mocked boundaries; surface installation-specific decisions for the user.
 - [ ] **5.6b Person Stop and retained-schedule policy**
-  - Define and implement the reviewed fail-closed behavior for person Stop, pause,
-    retained 0 A and a future stored profile under schedule ownership. Keep a Stop,
-    upload suspension, profile removal and mode exit distinct; no automatic blanket
-    clear. Test races and unknown outcomes without claiming physical stopping.
+  - Implement the user's agreed **Pause / Resume Auto** control under schedule
+    ownership. Pause requests charging stop and remain held until explicit Resume;
+    Resume returns control to the latest valid automatic plan. A failed, offline or
+    unknown update is not a confirmed physical stop. Do not silently release a
+    retained 0 A limit when the plan or a safe replacement is unavailable.
+  - Define the necessary fail-closed behavior for person Stop and a future stored
+    profile. Keep a Stop/pause, upload suspension, profile removal and mode exit
+    distinct; no automatic blanket clear. Test persistence, races, restart, unknown
+    outcomes and measurements without claiming physical stopping from ACK/readback.
+    The optional Stage 10 **Return to Auto** cancels only Charge Now; it is not
+    Pause and may allow charging immediately if the automatic plan calls for it.
 - [ ] **5.6c Invalid-plan and competing-writer policy**
   - Handle no/stale/invalid prices or plan and existing conflicting writers without
     silently releasing a stored limit or disabling protection. Report blockers and
@@ -848,10 +876,14 @@ specific approvals; this roadmap grants none.
     basis, selected durations, charger limits and concurrent Stop/pause. No live
     operation is authorized by these tests.
 - [ ] **10.2 Dashboard controls and post-install review**
-  - Add clear Charge Now duration choices and a **Cancel Charge Now / Return to Auto**
-    control to the existing sidebar. Show override status/end, cap implications,
+  - Add one **Charge Now** control with duration choices to the existing sidebar;
+    while active, the same control becomes **Return to Auto**. The other daily
+    control is **Pause / Resume Auto** from 5.6b, not an extra cancellation button.
+    Show override status/end, cap implications,
     proposal versus sent/readback versus measured state, and explicitly explain that
     cancelling may leave charging active if the automatic plan selects now.
+    The exact interaction of pressing Charge Now while explicitly paused still
+    needs the user's decision; do not silently override a person Stop/pause.
   - Test desktop/mobile interaction, confirmation, permission, race, stale and
     unavailable states, and document the user-directed procedure. Show failed or
     unknown schedule updates as unconfirmed, not as proof that charging stopped.

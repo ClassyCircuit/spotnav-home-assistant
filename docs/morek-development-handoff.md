@@ -6,7 +6,21 @@ Re-check the live system and Git state before acting; observations below may bec
 
 ## Approved next direction (planning, not implemented)
 
-**2026-11-12 roadmap consistency review:** the next assigned work remains 5.5d,
+**2026-11-12 agreed daily controls:** use two simple sidebar controls in the final
+design: **Pause / Resume Auto** and **Charge Now / Return to Auto**. Pause requests
+that charging remain held until explicit Resume; Return to Auto cancels only the
+temporary Charge Now override, so charging may continue when Auto selects now.
+Pause/Resume under schedule ownership remains 5.6b; Charge Now remains optional
+Stage 10 after 5.8. Whether Charge Now can override an existing explicit pause
+still requires the user's decision. Neither a request nor ACK proves physical stop.
+
+**Current task status:** 5.5a–5.5f are completed as unarmed mocked groundwork,
+not active operation. The current working tree contains 2.5.48 readiness/status
+work for 5.6a; it is in progress and not yet accepted merely because files exist.
+Check Git status and the latest session report before proceeding. The 5.6b–5.8
+tasks remain open; no live access or activation is authorized by this note.
+
+**Historical 2026-11-12 roadmap consistency review (superseded by 5.5d–5.5f):** the next assigned work remained 5.5d,
 not completed. The current uncommitted tree includes the 2.5.44 manual-owner
 admission fix and an additional `async_handover_unarmed` store-method draft;
 the latter is not called by the admission path or covered by handover tests. Preserve
@@ -15,7 +29,7 @@ distinguishes 5.4c's implemented real-data chart from later chart extensions, ca
 the offline HA-plugin suite gap forward, and records the default-branch/update issue.
 No HA access or code change was performed in this documentation review.
 
-**2026-11-12 task sizing:** the user requested explicit, bounded substages instead
+**Historical 2026-11-12 task sizing:** the user requested explicit, bounded substages instead
 of repeatedly assigning an oversized block. The roadmap now records completed
 5.5a–5.5c groundwork and splits remaining 5.5d–5.5f, 5.6a–5.6c and 5.7a–5.7b.
 5.8a–5.8b describe user-directed installation/activation, not permission for live
@@ -272,6 +286,43 @@ requirements, not features claimed implemented in the manual baseline below.
   Do not assume `GetCompositeSchedule` lists stored profiles.
 
 ## Tests, build, and next steps
+
+### 2026-11-12 — 5.6a readiness (2.5.48; local mocked, review pending)
+
+- Morek status now includes read-only `readiness`: uniquely matched OCPP availability
+  and control entity, connector-scoped vehicle state with a 180-second observation
+  age, and separate unknown transaction authorization and measured flow. The sidebar
+  ages out the status response and connector observation separately. A stable HA
+  entity without recent reports can therefore become unknown despite still being
+  correct; neither HA state timestamps nor a status read are a physical heartbeat.
+- The existing connector resolver exposes a transaction-ID sensor key, but no current
+  consumer establishes that sensor's lifecycle, sentinel values or freshness as proof
+  of an authorized active transaction. Do not infer authorization from its mere
+  presence, connector Charging, plug-in, a current limit, ACK or composite readback.
+  A trustworthy Morek power measurement is likewise not established here. Determine
+  new-session authorization configuration and trustworthy transaction/flow evidence
+  with the user in 5.8; this is not a request to change RFID or credentials.
+- No active transaction is required merely to hold a future schedule. This status
+  adds no dispatch or action, and owned-profile admission remains unconditionally
+  unarmed; identity, ownership, Stop, uncertainty and protection guards are unchanged.
+  5.6b, 5.6c and 5.7–5.8 remain open. The 5.5f held exit still has no release path;
+  retained profiles and possible 0 A remain unresolved. Native protection is a user
+  report, not independently verified. The full 5.4c HA-plugin suite remains unrun.
+- Mock checks: `python tools/run_isolated_lifecycle_tests.py` 130 passed;
+  `python tools/run_isolated_lifecycle_tests.py tests/test_morek_readiness.py
+  tests/test_command_admission.py tests/test_execution_ownership.py
+  tests/test_morek_schedule.py tests/test_morek_outcomes.py` 260 passed;
+  `python tools/run_isolated_planning_tests.py` 492 passed, 1 deselected;
+  `ruff check custom_components/spotnav/api/morek_schedule.py tests/test_morek_readiness.py`
+  passed; `npm run test -- test/sidebar.test.ts test/morek-view.test.ts` 59 passed;
+  `npm run type-check`, `npm run build`, `npm run check-dist` passed.
+  Browser checks: `npm run prototype:build`, `npx esbuild sidebar/browser-fixture.js
+  --bundle --format=esm --outfile=prototype/dist/sidebar-browser.js`, and
+  `node sidebar/browser-check.mjs` passed desktop and emulated mobile with local
+  fixtures; the test used an existing local Edge debugger because a new instance
+  could not bind port 9248. No physical touch, live HA or charging was tested.
+  Pytest emitted existing timeout-option and deprecation warnings; jsdom emitted CSS
+  parsing warnings. Stop for coordinator review.
 
 ### 2026-11-12 — 5.5f held unarmed exit (2.5.47; coordinator review pending)
 

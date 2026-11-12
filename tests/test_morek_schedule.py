@@ -183,6 +183,9 @@ async def test_status_exposes_read_only_unarmed_ownership(monkeypatch):
     await morek_schedule.websocket_morek_schedule.__wrapped__(
         hass, connection, {"id": 1, "api_version": 1, "charger_id": "charger", "action": "status"})
     assert connection.send_result.call_args.args[1]["schedule"]["ownership"] == ownership
+    readiness = connection.send_result.call_args.args[1]["schedule"]["readiness"]
+    assert readiness["control"] == "unknown"
+    assert readiness["vehicle"] == readiness["transaction"] == readiness["measurement"] == "unknown"
     assert ownership["recovery"] == recovery
     store.async_status.assert_awaited_once_with("charger", identity)
     morek_schedule.async_schedule_action.assert_not_awaited()

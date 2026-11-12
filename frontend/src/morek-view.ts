@@ -7,6 +7,7 @@ export interface MorekState {
   cleanup?: { requested_at: string; profile_id: number; status: string } | null;
   outcomes?: { uncertain: boolean; state?: string } | null;
   operator?: { state: string; reason?: string | null };
+  readiness?: { control?: string; vehicle?: string; transaction?: string; measurement?: string; vehicle_observed_at?: string | null };
   ownership?: { recorded_owner?: string | null; blockers?: string[]; schedule_mode_available?: boolean };
   reason?: string | null;
   configured_id?: string | null;

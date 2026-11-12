@@ -378,6 +378,56 @@ def _charge_point(hass: HomeAssistant, target: Any) -> Any:
     return point
 
 
+def _session_readiness(hass: HomeAssistant, controller: Any, identity: dict[str, Any], online: bool,
+                       now: datetime) -> dict[str, Any]:
+    """Read connector observations only; no inference of authorization or physical flow.
+
+    HA state timestamps are conservative evidence of freshness, not a heartbeat: an
+    unchanged state may age out even while the charger is connected.
+    """
+    result: dict[str, Any] = {
+        "control": "unknown", "vehicle": "unknown", "transaction": "unknown",
+        "measurement": "unknown", "vehicle_observed_at": None,
+        "activation_blockers": ["production_dispatch_unarmed", "transaction_authorization_unverified"],
+    }
+    if not identity.get("supported") or identity.get("match_count") != 1:
+        if identity.get("supported") and identity.get("match_count") == 0:
+            result["control"] = "unavailable"
+        return result
+    if not online:
+        result["control"] = "unavailable"
+        return result
+    try:
+        control = hass.states.get(controller.charge_control)
+        if control is None or str(control.state).lower() in ("unknown", "unavailable"):
+            result["control"] = "unavailable"
+            return result
+        result["control"] = "available"
+        from ..execution.charger_connection import normalise_ocpp
+        from ..vehicles.ocpp_identity import STATUS_CONNECTOR_KEY, connector_sensor_entity_id
+
+        source = connector_sensor_entity_id(hass, controller.ocpp_target, STATUS_CONNECTOR_KEY)
+        observation = hass.states.get(source)
+        if observation is None or str(observation.state).lower() in ("unknown", "unavailable"):
+            return result
+        timestamp = getattr(observation, "last_reported", None) or getattr(observation, "last_updated", None)
+        if not isinstance(timestamp, datetime) or timestamp.tzinfo is None:
+            return result
+        age = (now - timestamp).total_seconds()
+        if age < 0 or age > 180:
+            return result
+        result["vehicle_observed_at"] = timestamp.isoformat()
+        state = normalise_ocpp(str(observation.state))
+        if state == "disconnected":
+            result["vehicle"] = "disconnected"
+        elif state in ("connected", "charging", "paused", "finished"):
+            result["vehicle"] = "connected"
+    except Exception:  # noqa: BLE001 - unavailable evidence is not an API failure
+        # Missing or malformed HA evidence is not permission to assume readiness.
+        pass
+    return result
+
+
 async def _state(hass: HomeAssistant, entry_id: str) -> tuple[dict[str, Any], Store]:
     cache = hass.data.setdefault(_DATA_KEY, {})
     data, store, lock = cache.setdefault(
@@ -948,6 +998,7 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
             operator = _operator_state(identity, online, outcomes, verification, verified, preview,
                                        hass.data.get("spotnav_morek_sending", {}).get(entry.entry_id))
             result = {**identity,
+                      "readiness": _session_readiness(hass, controller, identity, online, datetime.now(timezone.utc)),
                       "ownership": ownership,
                       "outcomes": outcomes,
                       "operator": operator,

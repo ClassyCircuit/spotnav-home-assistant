@@ -27,6 +27,13 @@ export function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), f
   const socStale = stale || !Number.isFinite(socAge) || socAge < 0 || socAge + (now-generated)/1000 > 180;
   const status = decodeMorekState(statusRaw);
   const health = translate('en', healthKey(status, observedAt, failed, false, now));
+  const statusFresh = !failed && Number.isFinite(observedAt) && observedAt <= now && now-observedAt <= 90000;
+  const ready = statusFresh ? status?.readiness : null;
+  const control = ready?.control === 'available' ? 'available' : ready?.control === 'unavailable' ? 'unavailable' : 'unknown';
+  const vehicleAt = Date.parse(ready?.vehicle_observed_at || '');
+  const vehicleFresh = Number.isFinite(vehicleAt) && vehicleAt <= now && now-vehicleAt <= 180000;
+  const vehicle = vehicleFresh && ready?.vehicle === 'connected' ? 'connected' : vehicleFresh && ready?.vehicle === 'disconnected' ? 'disconnected' : 'unknown';
+  const readiness = `Control ${control} · vehicle ${vehicle} · transaction / authorization unknown · measured charging unknown. Authorization for a new session requires installation-specific verification; no active transaction is not a schedule prohibition.`;
   const proposal = d.plan.proposal;
   const planStale = stale || d.planning?.historical === true || !!(proposal?.periods.length && proposal.periods.every(p=>p.endMs<=now));
   const windows = !planStale && proposal ? proposal.periods.map(p=>({start:p.startMs,end:p.endMs})) : null;
@@ -44,7 +51,7 @@ export function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), f
       settings: {target:d.soc?.target_percent, minimum:d.settings?.minimum_ready_by_soc, cap:d.settings?.soft_price_cap, readyBy:d.settings?.departure_time},
       canSave:false, untilDeadline:U, targetNote:'',
       warning:warning ? {title:'Morek health requires attention',detail:`${health}${status?.outcomes?.uncertain && (status?.operator?.state === 'mismatch' || status?.verification?.reason === 'limits_or_transitions_differ') ? ' · Effective limits mismatch the sent schedule.' : ''}`} : null,
-      evidence:{status:health, context:`Morek status observed ${date(observedAt,zone)}${failed ? ' · unavailable' : ''}; separate from dashboard`,proposal:date(d.planning?.calculated_at,zone),sent:`${date(status?.sent_at,zone)} · ${status?.ack || U}`,readback:date(status?.effective?.fetched_at,zone),measurement:'SOC age and measured power unavailable when stale or unsupported',dispatch:'Automatic dispatch is unarmed.'},
+      evidence:{status:health, context:`Morek status observed ${date(observedAt,zone)}${failed ? ' · unavailable' : ''}; separate from dashboard`,readiness,proposal:date(d.planning?.calculated_at,zone),sent:`${date(status?.sent_at,zone)} · ${status?.ack || U}`,readback:date(status?.effective?.fetched_at,zone),measurement:'SOC age and measured power unavailable when stale or unsupported',dispatch:'Automatic dispatch is unarmed.'},
       labels:{settingsNote:'Read-only preview. Plan controls are unavailable in this slice.',saveLabel:'Save plan · unavailable',powerNote:'No verified general Morek power source',planLabel:'Backend policy:',chartIntro:'Published source price before configured fiscal additions; source-included charges may apply.',chartNote:`Held published intervals only. ${priceFreshness} Unpublished future and history are unavailable. Cap is omitted if its basis differs or is unknown.`,bands:'',dialogNote:'Proposal only; not necessarily sent.',footer:'Dashboard and Morek status are separate observations.'}
     }, actions:{}
   };

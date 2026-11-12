@@ -52527,7 +52527,7 @@ function renderBattery({ soc: soc2, target, capacityKwh, efficiency, stale = fal
 // shared-dashboard/evidence-view.js
 function renderEvidence(data, power, count) {
   const d3 = data || {};
-  return `<div class="evidence-status"><strong>${escapeText(d3.status)}</strong><span>${escapeText(d3.context)}</span></div><div class="evidence-grid"><div><small>Proposal calculated</small><b>${escapeText(d3.proposal)}</b></div><div><small>Last sent / ACK</small><b>${escapeText(d3.sent)}</b></div><div><small>Effective limits read</small><b>${escapeText(d3.readback)}</b></div><div><small>Vehicle / power received</small><b>${escapeText(d3.measurement)}</b></div></div><p class="subtext">Whether the current proposal was sent is unknown. Readback is effective limits, not a profile inventory. An ACK or match does not prove physical charging; power is a separate observation. ${escapeText(d3.dispatch)}</p><wa-details id="details" summary="View evidence & debug controls"><div class="details-body"><p><b>Current proposal:</b> ${count == null ? "Unknown" : count} windows; not necessarily sent.</p><p><b>Last sent and acknowledgement:</b> ${escapeText(d3.sent)} \xB7 response only.</p><p><b>Effective readback:</b> ${escapeText(d3.readback)} \xB7 not an inventory.</p><p><b>Measured power:</b> ${escapeText(power)} \xB7 ${escapeText(d3.measurement)}.</p><p>Missing, stale and superseded evidence must not be treated as current.</p><div id="morek-debug"><div class="actions"><wa-button size="small" disabled>Send \xB7 unavailable</wa-button><wa-button size="small" disabled>Refresh \xB7 unavailable</wa-button></div></div></div></wa-details>`;
+  return `<div class="evidence-status"><strong>${escapeText(d3.status)}</strong><span>${escapeText(d3.context)}</span></div>${d3.readiness ? `<p class="subtext">${escapeText(d3.readiness)}</p>` : ""}<div class="evidence-grid"><div><small>Proposal calculated</small><b>${escapeText(d3.proposal)}</b></div><div><small>Last sent / ACK</small><b>${escapeText(d3.sent)}</b></div><div><small>Effective limits read</small><b>${escapeText(d3.readback)}</b></div><div><small>Vehicle / power received</small><b>${escapeText(d3.measurement)}</b></div></div><p class="subtext">Whether the current proposal was sent is unknown. Readback is effective limits, not a profile inventory. An ACK or match does not prove physical charging; power is a separate observation. ${escapeText(d3.dispatch)}</p><wa-details id="details" summary="View evidence & debug controls"><div class="details-body"><p><b>Current proposal:</b> ${count == null ? "Unknown" : count} windows; not necessarily sent.</p><p><b>Last sent and acknowledgement:</b> ${escapeText(d3.sent)} \xB7 response only.</p><p><b>Effective readback:</b> ${escapeText(d3.readback)} \xB7 not an inventory.</p><p><b>Measured power:</b> ${escapeText(power)} \xB7 ${escapeText(d3.measurement)}.</p><p>Missing, stale and superseded evidence must not be treated as current.</p><div id="morek-debug"><div class="actions"><wa-button size="small" disabled>Send \xB7 unavailable</wa-button><wa-button size="small" disabled>Refresh \xB7 unavailable</wa-button></div></div></div></wa-details>`;
 }
 
 // shared-dashboard/history-view.js
@@ -59780,6 +59780,13 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
   const socStale = stale || !Number.isFinite(socAge) || socAge < 0 || socAge + (now - generated) / 1e3 > 180;
   const status = decodeMorekState(statusRaw);
   const health = translate2("en", healthKey(status, observedAt, failed, false, now));
+  const statusFresh = !failed && Number.isFinite(observedAt) && observedAt <= now && now - observedAt <= 9e4;
+  const ready = statusFresh ? status?.readiness : null;
+  const control = ready?.control === "available" ? "available" : ready?.control === "unavailable" ? "unavailable" : "unknown";
+  const vehicleAt = Date.parse(ready?.vehicle_observed_at || "");
+  const vehicleFresh = Number.isFinite(vehicleAt) && vehicleAt <= now && now - vehicleAt <= 18e4;
+  const vehicle = vehicleFresh && ready?.vehicle === "connected" ? "connected" : vehicleFresh && ready?.vehicle === "disconnected" ? "disconnected" : "unknown";
+  const readiness = `Control ${control} \xB7 vehicle ${vehicle} \xB7 transaction / authorization unknown \xB7 measured charging unknown. Authorization for a new session requires installation-specific verification; no active transaction is not a schedule prohibition.`;
   const proposal = d3.plan.proposal;
   const planStale = stale || d3.planning?.historical === true || !!(proposal?.periods.length && proposal.periods.every((p4) => p4.endMs <= now));
   const windows = !planStale && proposal ? proposal.periods.map((p4) => ({ start: p4.startMs, end: p4.endMs })) : null;
@@ -59805,7 +59812,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
       untilDeadline: U,
       targetNote: "",
       warning: warning ? { title: "Morek health requires attention", detail: `${health}${status?.outcomes?.uncertain && (status?.operator?.state === "mismatch" || status?.verification?.reason === "limits_or_transitions_differ") ? " \xB7 Effective limits mismatch the sent schedule." : ""}` } : null,
-      evidence: { status: health, context: `Morek status observed ${date(observedAt, zone)}${failed ? " \xB7 unavailable" : ""}; separate from dashboard`, proposal: date(d3.planning?.calculated_at, zone), sent: `${date(status?.sent_at, zone)} \xB7 ${status?.ack || U}`, readback: date(status?.effective?.fetched_at, zone), measurement: "SOC age and measured power unavailable when stale or unsupported", dispatch: "Automatic dispatch is unarmed." },
+      evidence: { status: health, context: `Morek status observed ${date(observedAt, zone)}${failed ? " \xB7 unavailable" : ""}; separate from dashboard`, readiness, proposal: date(d3.planning?.calculated_at, zone), sent: `${date(status?.sent_at, zone)} \xB7 ${status?.ack || U}`, readback: date(status?.effective?.fetched_at, zone), measurement: "SOC age and measured power unavailable when stale or unsupported", dispatch: "Automatic dispatch is unarmed." },
       labels: { settingsNote: "Read-only preview. Plan controls are unavailable in this slice.", saveLabel: "Save plan \xB7 unavailable", powerNote: "No verified general Morek power source", planLabel: "Backend policy:", chartIntro: "Published source price before configured fiscal additions; source-included charges may apply.", chartNote: `Held published intervals only. ${priceFreshness} Unpublished future and history are unavailable. Cap is omitted if its basis differs or is unknown.`, bands: "", dialogNote: "Proposal only; not necessarily sent.", footer: "Dashboard and Morek status are separate observations." }
     },
     actions: {}
@@ -59813,7 +59820,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.47";
+var CARD_VERSION = "2.5.48";
 
 // sidebar/panel.js
 var settingsWritesByConnection = /* @__PURE__ */ new WeakMap();
