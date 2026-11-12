@@ -566,7 +566,9 @@ tests are documented there; full HA collection is still blocked on Windows.
     API contracts, and document panel installation/update. Don't reimplement a second UI
     or assume local preview proves actual HA integration.
 - [ ] **5.5 Durable Morek ownership and recovery**
-  - [x] **Unarmed-entry abort (2.5.43; coordinator review pending):** an internal
+  - Umbrella only: assign 5.5a–5.5f individually, not all of 5.5 in one session.
+    The checked groundwork is not active ownership or permission to send a profile.
+  - **Unarmed-entry abort (2.5.43; coordinator review pending):** an internal
     explicit abort removes only a verified unarmed marker when the existing Auto
     pause is durably `until_resumed`, identity is unique, and known profile outcomes
     are not uncertain. It does not clear or claim absence of retained profiles,
@@ -596,7 +598,42 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Test actual modules with mocked HA/OCPP/storage across crashes, races, migration,
     rollback and competing ordinary writers. Keep production dispatch unarmed until the
     full activation path is reviewed and all remaining blockers are resolved.
+- [x] **5.5a Person-Stop and unarmed drain foundation** (2.5.40; mocked review pending)
+  - Process-local drain, generation checks and a distinct reserved person-Stop path;
+    no durable ownership, autonomous dispatch or physical-stop guarantee.
+- [x] **5.5b Durable unarmed entry evidence** (2.5.41; mocked review pending)
+  - Requested/interrupted/drained markers block ordinary and manual profile writes
+    across restart. First-marker and lost-document ambiguity remain explicitly open.
+- [x] **5.5c Abort of an unarmed entry** (2.5.43; mocked review pending)
+  - Explicit, evidence-checked abort returns to the prior legacy binding only with
+    a disk-verified until-resumed Auto pause. No profile, charger or resume action.
+- [ ] **5.5d Persisted ownership handover foundation** (next; unarmed)
+  - Wire and test a durable, connector-bound handover from the existing entry/drain
+    evidence to a Morek-owned **unarmed** record. Prove conflicting legacy and manual
+    profile writers remain excluded through persistence and restart; keep production
+    owned-profile dispatch refused. This internal record does not enable schedule-mode
+    operation or imply an actionable person-Stop policy for retained profiles; preserve
+    the existing Stop path during entry and leave that later policy to 5.6b.
+  - Model and refuse incomplete/uncertain writes and Stop races; no activation,
+    automatic profile sends, clears, or user-facing mode switch. A drained connector
+    alone is not proof that producers or unknown external operations are settled.
+- [ ] **5.5e Missing and uncertain evidence recovery** (unarmed)
+  - Handle interrupted handovers, lost/malformed ownership documents, stale attempts
+    and unknown outcomes using existing durable evidence. First use and lost state
+    must not be silently conflated for activation. Expose bounded, explicit refusal
+    or recovery reasons; do not add generic journaling as an automatic prerequisite.
+  - Mock restart/reconnect, delayed responses, persistence failures and duplicate
+    identity; do not retry uncertain writes or infer profile inventory from readback.
+- [ ] **5.5f Safe ownership exit and handback** (unarmed/mocked)
+  - Implement/test a guarded exit transition and legacy handback without silently
+    removing or releasing an owned profile or its persistent 0 A limit. Keep known
+    sent/unknown evidence and person Stop distinct; expose unresolved decisions rather
+    than making unsafe assumptions. No live profile action or activation.
+  - Include the combined actual-module crash/race and regression tests for 5.5 in
+    this slice; do not add a separate test-only substage unless a real defect requires it.
 - [ ] **5.6 Authorization and safe schedule-only operation**
+  - Umbrella only: assign 5.6a–5.6c individually. Preserve protection and person Stop;
+    Morek's reported native load protection is not a SpotNav load-management task.
   - Resolve how a new charging transaction is authorized, how person Stop and
     competing writers are respected, and how retained 0 A, invalid/no-price plans
     and leaving the mode are handled. Address any existing regulator conflict
@@ -609,7 +646,23 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Implement only an explicitly reviewed, fail-closed policy; identify any user or
     installation-specific decisions and stop for them rather than assuming safety.
     A stored current limit cannot start or authorize charging by itself.
+- [ ] **5.6a Transaction authorization and connection readiness**
+  - Reuse observed charger/transaction facts to report and gate what can actually
+    be known about a new charging session. Do not change authorization settings or
+    infer that a stored schedule authorizes charging. Test unknown/offline/refused
+    cases with mocked boundaries; surface installation-specific decisions for the user.
+- [ ] **5.6b Person Stop and retained-schedule policy**
+  - Define and implement the reviewed fail-closed behavior for person Stop, pause,
+    retained 0 A and a future stored profile under schedule ownership. Keep a Stop,
+    upload suspension, profile removal and mode exit distinct; no automatic blanket
+    clear. Test races and unknown outcomes without claiming physical stopping.
+- [ ] **5.6c Invalid-plan and competing-writer policy**
+  - Handle no/stale/invalid prices or plan and existing conflicting writers without
+    silently releasing a stored limit or disabling protection. Report blockers and
+    test mocked reconnection, person Stop and regulator exceptions. Do not implement
+    household load balancing or dynamically adjust amps for house load.
 - [ ] **5.7 Activation implementation and pre-install automated validation**
+  - Umbrella only: assign 5.7a–5.7b individually; live activation stays in 5.8.
   - After 5.5–5.6, implement and review a deliberate, reversible
     activation path using the existing guarded worker, planner triggers and durable
     evidence. Do not weaken interlocks or automatically retry unknown outcomes; live
@@ -626,7 +679,19 @@ tests are documented there; full HA collection is still blocked on Windows.
     run it on a supported local host if available. If not, report the exact gap
     and evidence to the user before installation; do not claim it passed or halt
     unrelated implementation just to provision the test environment.
+- [ ] **5.7a Deliberate activation path**
+  - Implement the reviewed, reversible and explicitly enabled ownership/worker path
+    after 5.5–5.6; default unarmed and enforce all blockers. Test with mocked charger,
+    HA and persistence boundaries. No live activation or deployment is authorized.
+- [ ] **5.7b End-to-end regression and installation preparation**
+  - Exercise settings/price/SOC → plan → guarded reconciliation, stable-plan
+    deduplication, restart/reconnect, uncertainty and operator status with mocks;
+    include the deferred 5.4c suite if a supported local host is available.
+    Document exact unverified checks and prepare the user-directed 5.8 procedure.
 - [ ] **5.8 Install, activate and validate the working release**
+  - Umbrella: 5.8a and 5.8b are user-directed operations, not authorization or
+    an additional mandatory hardware-testing stage. Each live operation still
+    requires the user's specific approval.
   - After 5.2–5.7 and 5.3a are complete and reviewed, support the user's preferred
     installation/update. Obtain specific approval for each deployment, share modification,
     restart, activation or other live action; this roadmap is not authorization. Do not
@@ -647,6 +712,14 @@ tests are documented there; full HA collection is still blocked on Windows.
     connectivity, actual flow or any safety blocker is unavailable, state precisely
     what remains unverified and leave initial-release acceptance open; do not postpone
     basic daily operation merely for Stage 6–9 history or optional visual enhancements.
+- [ ] **5.8a Approved installation and read-only checks**
+  - After user approval, support the preferred install/update and any separately
+    approved restart; verify loaded version, dashboard and available data read-only.
+    Report unresolved test/environment limitations without exposing private data.
+- [ ] **5.8b Approved activation and observed operation**
+  - Only after specific approval and blocker review, enable the reviewed path and
+    distinguish proposal, sent ACK, effective limits and measured physical flow.
+    If approval or required evidence is unavailable, leave acceptance open.
 
 ### Stage 6 — Real history data (old B1)
 

@@ -6,6 +6,15 @@ Re-check the live system and Git state before acting; observations below may bec
 
 ## Approved next direction (planning, not implemented)
 
+**2026-11-12 task sizing:** the user requested explicit, bounded substages instead
+of repeatedly assigning an oversized block. The roadmap now records completed
+5.5a–5.5c groundwork and splits remaining 5.5d–5.5f, 5.6a–5.6c and 5.7a–5.7b.
+5.8a–5.8b describe user-directed installation/activation, not permission for live
+actions or a new hardware-testing stage. Assign **5.5d only** next. The full 5.5,
+5.6 and 5.7 umbrellas remain open; dispatch remains unarmed and the deferred 5.4c
+HA-plugin suite remains unrun. Follow the numbered checklist rather than historical
+handoff entries; do not repeat completed groundwork or bundle future substages.
+
 **2026-11-12 Charge Now decision:** the user wants this as an optional feature
 after initial installation and user-directed testing in 5.8, not a release
 prerequisite. Roadmap Stage 10 records it; it is not implemented. Default to one
