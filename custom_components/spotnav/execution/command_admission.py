@@ -307,6 +307,7 @@ class CommandAdmission:
         from .controller import ChargingController
         from .morek_outcomes import outcomes_for
         from .execution_ownership import _MISSING, _read_envelope
+        from ..planning.auto_settings import AutoSettings, SUPPORTED_SCHEMAS
         from homeassistant.helpers.storage import Store
 
         try:
@@ -333,7 +334,7 @@ class CommandAdmission:
             return (self._entry_draining.get(connector) == "drained_unarmed" and not stop_requested()
                     and identity_valid())
 
-        async with executor._lock, controller._lock, controller._assign_lock, self._lock_for(connector):
+        async with executor._lock, executor._store._lock, controller._lock, controller._assign_lock, self._lock_for(connector):
             try:
                 if not can_commit():
                     return "handover_interrupted"
@@ -345,6 +346,17 @@ class CommandAdmission:
                         or (executor._store.settings(entry_id).pause.manual
                             and executor._store.settings(entry_id).pause.action == "stop")):
                     return "person_stop_or_settings_unavailable"
+                settings_raw = await self._store._hass.async_add_executor_job(_read_envelope, executor._store._store.path)
+                if (not isinstance(settings_raw, dict) or type(settings_raw.get("version")) is not int
+                        or settings_raw["version"] != 1 or settings_raw.get("minor_version", 1) != 1
+                        or not isinstance(settings_raw.get("data"), dict)
+                        or settings_raw["data"].get("schema") not in SUPPORTED_SCHEMAS
+                        or not isinstance(settings_raw["data"].get("chargers"), dict)):
+                    return "settings_unavailable"
+                settings_entry = settings_raw["data"]["chargers"].get(entry_id)
+                if (not isinstance(settings_entry, dict) or AutoSettings.from_stored(settings_entry.get("settings"))
+                        != executor._store.settings(entry_id)):
+                    return "settings_unavailable"
                 attempt = controller._last_start_attempt
                 if (executor._start_pending or controller._start_in_flight
                         or (attempt is not None and attempt.start_dispatch == "unknown")):

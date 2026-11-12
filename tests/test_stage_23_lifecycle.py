@@ -777,6 +777,208 @@ async def test_stop_during_owner_save_restores_legacy(environment, monkeypatch, 
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["before", "after", "cancel", "rollback"])
+async def test_handover_uncertain_saves_never_retry_or_admit_writes(environment, monkeypatch, failure):
+    hass, _, _, _, _, _ = environment
+    store, gate, identity, executor, adapter, path = await handover_fixture(environment, monkeypatch)
+    original = store._store.async_save
+    entered, release = asyncio.Event(), asyncio.Event()
+    calls = []
+    async def save(data):
+        owner = data["records"]["a"]["owner"]
+        calls.append(owner)
+        if failure == "rollback" and owner == "morek_schedule":
+            await original(data)
+            entered.set()
+            await release.wait()
+            return
+        if failure == "rollback" or (failure in ("before", "after", "cancel") and owner == "morek_schedule"):
+            if failure == "after":
+                await original(data)
+            if failure == "cancel":
+                entered.set()
+                await release.wait()
+            raise OSError("synthetic unknown write")
+        await original(data)
+    store._store.async_save = save
+    task = asyncio.create_task(gate.async_handover_unarmed("a", identity, executor))
+    if failure in ("cancel", "rollback"):
+        await entered.wait()
+        if failure == "cancel":
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        else:
+            with adapter.person_stop_scope():
+                release.set()
+                assert await asyncio.wait_for(task, 2) == "save_uncertain"
+                assert not await adapter.async_legacy_permitted(person_stop=True)
+    else:
+        assert await task == "save_uncertain"
+    assert calls == (["morek_schedule", "legacy"] if failure == "rollback" else ["morek_schedule"])
+    assert (await store.async_status("a", identity()))["record_state"] == "save_failed"
+    assert not await adapter.async_start()
+    state = await execution_ownership.ExecutionOwnershipStore(hass).async_status("a", identity())
+    assert state["recorded_owner"] == ("morek_schedule" if failure in ("after", "rollback") else "legacy")
+    path.async_start.assert_not_awaited()
+    path.async_stop.assert_not_awaited()
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_stop_after_handover_preserves_intent_without_dispatch(environment, monkeypatch):
+    _, _, _, _, _, _ = environment
+    _, gate, identity, executor, adapter, path = await handover_fixture(environment, monkeypatch)
+    assert await gate.async_handover_unarmed("a", identity, executor) == "handed_over_unarmed"
+    adapter.vehicle_connected = lambda: True
+    with pytest.raises(AutoControlRefused):
+        await executor.async_manual_stop()
+    assert executor._store.settings("a").pause.action == "stop"
+    path.async_stop.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("phase", ["before_write", "after_write"])
+async def test_auto_stop_waits_for_handover_compensation_and_records_intent(environment, monkeypatch, phase):
+    from custom_components.spotnav.planning.auto_settings import PauseIntent
+
+    hass, _, _, _, _, _ = environment
+    store, gate, identity, executor, adapter, path = await handover_fixture(environment, monkeypatch)
+    await executor._store.async_update("a", mutate=lambda value: replace(value, pause=PauseIntent()))
+    adapter.vehicle_connected = lambda: True
+    async def stop(**_kwargs):
+        assert await adapter.async_stop(person_stop=True)
+    executor._controller.async_stop = AsyncMock(side_effect=stop)
+    executor._controller.reset_person_hold = MagicMock()
+    executor._runner = MagicMock()
+    executor._runner.begin.return_value = SimpleNamespace(early=True)
+    executor._notify_change = AsyncMock()
+    executor._sync_manual_watch = MagicMock()
+    executor._note_manual_stop_sent = MagicMock()
+    executor._core_stop_scope = lambda _connected, scope, **_kw: scope
+    executor._core_connected = lambda **_kw: True
+    executor._core_stop_outcome = MagicMock()
+    entered, release = asyncio.Event(), asyncio.Event()
+    original = store._store.async_save
+    async def save(data):
+        if data["records"]["a"]["owner"] == "morek_schedule":
+            if phase == "after_write":
+                await original(data)
+            entered.set()
+            await release.wait()
+            if phase == "before_write":
+                await original(data)
+        else:
+            await original(data)
+    store._store.async_save = save
+    handover = asyncio.create_task(gate.async_handover_unarmed("a", identity, executor))
+    await entered.wait()
+    stop_task = asyncio.create_task(executor.async_manual_stop())
+    await asyncio.sleep(0)
+    assert not stop_task.done()
+    release.set()
+    assert await asyncio.wait_for(handover, 2) == "interrupted"
+    await asyncio.wait_for(stop_task, 2)
+    assert executor._store.settings("a").pause.action == "stop"
+    assert (await execution_ownership.ExecutionOwnershipStore(hass).async_status("a", identity()))["recorded_owner"] == "legacy"
+    path.async_stop.assert_awaited_once()
+    path.async_start.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_stop_before_handover_prevents_owner_save(environment, monkeypatch):
+    hass, _, _, _, _, _ = environment
+    store, gate, identity, executor, adapter, path = await handover_fixture(environment, monkeypatch)
+    save = AsyncMock(wraps=store._store.async_save)
+    store._store.async_save = save
+    with adapter.person_stop_scope():
+        assert await gate.async_handover_unarmed("a", identity, executor) == "handover_interrupted"
+        assert await adapter.async_legacy_permitted(person_stop=True)
+    save.assert_not_awaited()
+    assert (await execution_ownership.ExecutionOwnershipStore(hass).async_status("a", identity()))["recorded_owner"] == "legacy"
+    path.async_start.assert_not_awaited()
+    path.async_stop.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["owner", "rollback"])
+async def test_uncertain_owner_save_keeps_auto_stop_intent_without_dispatch(environment, monkeypatch, failure):
+    _, _, _, _, _, _ = environment
+    store, gate, identity, executor, adapter, path = await handover_fixture(environment, monkeypatch)
+    entered, release = asyncio.Event(), asyncio.Event()
+    original = store._store.async_save
+    async def save(data):
+        if data["records"]["a"]["owner"] == "morek_schedule":
+            if failure == "rollback":
+                await original(data)
+            entered.set()
+            await release.wait()
+            if failure == "rollback":
+                return
+        raise OSError("unknown outcome")
+    store._store.async_save = AsyncMock(side_effect=save)
+    handover = asyncio.create_task(gate.async_handover_unarmed("a", identity, executor))
+    await entered.wait()
+    adapter.vehicle_connected = lambda: True
+    stop = asyncio.create_task(executor.async_manual_stop())
+    await asyncio.sleep(0)
+    release.set()
+    assert await asyncio.wait_for(handover, 2) == "save_uncertain"
+    with pytest.raises(AutoControlRefused):
+        await asyncio.wait_for(stop, 2)
+    assert executor._store.settings("a").pause.action == "stop"
+    assert store._store.async_save.await_count == (2 if failure == "rollback" else 1)
+    path.async_stop.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("case", ["duplicate", "ambiguous", "outcome", "unknown_write"])
+async def test_handover_refuses_untrusted_evidence(environment, monkeypatch, case):
+    hass, _, _, _, system, _ = environment
+    store, gate, identity, executor, adapter, path = await handover_fixture(environment, monkeypatch)
+    if case == "duplicate":
+        assert await gate.async_ensure_initialized("b", identity) == "ownership_conflict"
+    elif case == "ambiguous":
+        hass.data["ocpp"]["two"] = system
+    elif case == "outcome":
+        (hass.root / "spotnav.morek_schedule.connector_outcomes").write_text(json.dumps({
+            "version": 1, "data": {"schema": 1, "entry_id": "a", "uncertain": True},
+        }), encoding="utf-8")
+    else:
+        gate._uncertain_operations.add(command_admission.physical_connector(identity()))
+    result = await gate.async_handover_unarmed("a", identity, executor)
+    assert result != "handed_over_unarmed"
+    assert not await adapter.async_start()
+    assert await adapter.async_stop(protection=True)
+    path.async_start.assert_not_awaited()
+    path.async_stop.assert_awaited_once()
+    assert (await execution_ownership.ExecutionOwnershipStore(hass).async_status(
+        "a", morek_schedule._identity_status(hass, executor.controller.ocpp_target)))["recorded_owner"] != "morek_schedule"
+
+
+@pytest.mark.asyncio
+async def test_queued_legacy_work_and_unrelated_connector_during_handover(environment, monkeypatch):
+    hass, _, _, _, _, _ = environment
+    _, gate, identity, executor, adapter, path = await handover_fixture(environment, monkeypatch)
+    connector = command_admission.physical_connector(identity())
+    lock = gate._lock_for(connector)
+    await lock.acquire()
+    queued = asyncio.create_task(adapter.async_start())
+    await asyncio.sleep(0)
+    handover = asyncio.create_task(gate.async_handover_unarmed("a", identity, executor))
+    await asyncio.sleep(0)
+    lock.release()
+    assert not await asyncio.wait_for(queued, 2)
+    assert await asyncio.wait_for(handover, 2) == "handed_over_unarmed"
+    other, other_path, _, _ = adapter_for(hass, SimpleNamespace(devid="other", connector_id=2))
+    assert await other.async_start()
+    assert await adapter.async_stop(protection=True)
+    other_path.async_start.assert_awaited_once()
+    path.async_start.assert_not_awaited()
+    path.async_stop.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_uncertain_transition_save_keeps_stop_possible_and_others_blocked(environment):
     hass, store, gate, target, _, entry = environment
     await integration._async_setup_ownership_metadata(

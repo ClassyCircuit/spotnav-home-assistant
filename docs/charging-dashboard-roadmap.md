@@ -612,21 +612,13 @@ tests are documented there; full HA collection is still blocked on Windows.
 - [x] **5.5c Abort of an unarmed entry** (2.5.43; mocked review pending)
   - Explicit, evidence-checked abort returns to the prior legacy binding only with
     a disk-verified until-resumed Auto pause. No profile, charger or resume action.
-- [ ] **5.5d Persisted ownership handover foundation** (next; unarmed)
-  - **Partial 2.5.44:** legacy manual Send/Clear admission now requires a valid
-    unarmed legacy owner, including after reload. The handover and Stop-wins
-    protocol remain unimplemented; this substage is not complete.
-  - **Handover incomplete:** a Stop reservation can arrive while an
-    ownership save is in flight. If the Morek owner lands first, current person-Stop
-    admission refuses it as non-legacy. The existing entry drain and abort tests do
-    not prove a safe owner-changing save across that boundary. A handover must resolve
-    and test this race without treating an in-flight command as recalled. The 2.5.44
-    manual-owner admission fix above supersedes the earlier admission gap.
-  - The current uncommitted working tree also contains an `async_handover_unarmed`
-    ownership-store draft. It is not wired into connector admission or covered by
-    handover tests; preserve and evaluate it, but do not treat it as completed work.
-    Inspect Git status and current code before continuing; this note is not a claim
-    that the draft has been reviewed or is safe to use as-is.
+- [x] **5.5d Persisted ownership handover foundation** (2.5.45, unarmed; coordinator review pending)
+  - The internal handover now has a mocked success case and Stop-wins save
+    compensation. An uncertain save remains blocked; a later Stop stores intent
+    without bypassing the owner. Coordinator review remains pending.
+  - **Historical 2.5.44 partial:** legacy manual Send/Clear admission was made to
+    require a valid unarmed legacy owner, including after reload. At that point the
+    handover and Stop-wins protocol were not complete; 2.5.45 supersedes that state.
   - Wire and test a durable, connector-bound handover from the existing entry/drain
     evidence to a Morek-owned **unarmed** record. Prove conflicting legacy and manual
     profile writers remain excluded through persistence and restart; keep production

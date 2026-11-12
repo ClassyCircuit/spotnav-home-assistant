@@ -273,6 +273,32 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-12 — 5.5d handover (2.5.45; coordinator review pending)
+
+- The internal handover consumes a process-local completed drain. It obtains Auto,
+  settings, controller and assignment locks before connector admission and storage;
+  validates identity, settings and known uncertainty evidence; then verifies the
+  unarmed Morek owner on disk. It does not prove external operations or profile
+  inventory. A Stop before the synchronous completion boundary interrupts entry;
+  if the owner save landed, it is verified and the prior legacy binding restored
+  with an interrupted marker before the Stop is admitted. Unknown owner saves or
+  restorations fail closed without retry. Blocked Stops record intent using the
+  existing Auto pause store without claiming physical stopping or profile removal.
+- This path sends no profile or charger operation and does not arm dispatch. The
+  process-local drain and uncertain-operation latch do not recover lost documents
+  or prove external settlement across restart. Later recovery, retained profiles,
+  exit, authorization, and retained-schedule Stop policy remain open. The 5.5d
+  focused mocked checks pass; coordinator review remains pending.
+- Validation: `python tools/run_isolated_lifecycle_tests.py` 95 passed;
+  `python tools/run_isolated_lifecycle_tests.py tests/test_command_admission.py
+  tests/test_execution_ownership.py tests/test_morek_schedule.py` 210 passed;
+  `python tools/run_isolated_planning_tests.py` 492 passed, 1 deselected.
+  Targeted Ruff, frontend `npm run build`, `npm run check-dist` and
+  `git diff --check` passed. One initial focused test failed due to assigning a
+  read-only test fixture property and passed after correction. Pytest reports its
+  existing timeout-option and dependency warnings. The deferred 5.4c HA-plugin
+  suite remains unrun; no live HA or charger was contacted.
+
 ### 2026-11-12 — 5.5d partial manual admission fix (later store draft noted above)
 
 - Version 2.5.44 makes the existing manual profile admission require a valid,
