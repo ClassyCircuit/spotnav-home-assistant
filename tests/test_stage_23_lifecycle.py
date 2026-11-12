@@ -18,7 +18,7 @@ from custom_components.spotnav.execution import charger_handback, command_admiss
 from custom_components.spotnav.execution import execution_ownership
 from custom_components.spotnav.execution.chargers.adapter import ChargerAdapter
 from custom_components.spotnav.execution.chargers.base import PhaseSwitchResult
-from custom_components.spotnav.execution.auto_execution import AutoExecutor
+from custom_components.spotnav.execution.auto_execution import AutoControlCommitted, AutoControlRefused, AutoExecutor
 from custom_components.spotnav.execution.controller import ChargingController, ChargingPlan
 from custom_components.spotnav.planning.auto_settings import AutoSettings
 
@@ -358,5 +358,243 @@ async def test_restart_carries_person_stop_to_real_auto_boundary_under_morek_own
     else:
         assert executor.pause_intent.manual and executor.pause_intent.action == "stop"
     assert not await executor.async_start_on_plug_in()
+    path.async_start.assert_not_awaited()
+    path.async_stop.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_quiesce_blocks_person_stop_but_not_regulator_protection(environment, monkeypatch):
+    """Characterize the entry blocker; quiescing must not be wired as an activation path."""
+    hass, _, gate, target, _, entry = environment
+    adapter, path, _, _ = adapter_for(hass, target)
+    monkeypatch.setattr(controller_module, "Store", lambda *_args, **_kwargs: MagicMock())
+    monkeypatch.setattr(controller_module, "build_adapter", lambda *_args, **_kwargs: adapter)
+    monkeypatch.setattr(controller_module, "ocpp_target_of", lambda *_: (target, "stored"))
+    monkeypatch.setattr(controller_module, "energy_register_entity_for", lambda *_: None)
+    monkeypatch.setattr(controller_module, "CoreFailureRepairs", MagicMock())
+    charger = ChargingController(hass, "a", {"charge_control": "switch.charger"})
+    await integration._async_setup_ownership_metadata(hass, entry, charger)
+    connector = command_admission.physical_connector(morek_schedule._identity_status(hass, target))
+    await gate.async_quiesce_for_reload(connector)
+
+    with pytest.raises(controller_module.ChargingExecutionError, match="ownership"):
+        await charger._stop_locked(by_person=True, urgent=True)
+    path.async_stop.assert_not_awaited()
+    # The existing explicitly classified regulator path remains distinct.
+    assert await adapter.async_stop(protection=True)
+    path.async_stop.assert_awaited_once()
+    hass.services.async_call.assert_not_awaited()
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_old_quiesce_refuses_auto_stop_before_intent_is_recorded(environment):
+    """The old unwired latch also blocks Stop at Auto, before the controller guard."""
+    hass, _, gate, target, _, entry = environment
+    await integration._async_setup_ownership_metadata(
+        hass, entry, SimpleNamespace(ocpp_target=target, charge_control="switch.charger"))
+    def identity():
+        return morek_schedule._identity_status(hass, target)
+    connector = command_admission.physical_connector(identity())
+    controller = MagicMock(entry_id="a")
+    controller.async_stop = AsyncMock()
+    settings_store = MagicMock()
+    settings_store.settings.return_value = AutoSettings()
+    settings_store.async_update = AsyncMock()
+    executor = AutoExecutor(hass, controller, settings_store, legacy_admission=lambda: command_admission.async_auto_legacy_allowed(
+        gate, "a", identity))
+    await gate.async_quiesce_for_reload(connector)
+
+    with pytest.raises(AutoControlRefused) as refusal:
+        await executor.async_manual_action("stop")
+    assert refusal.value.code == "legacy_execution_ownership_blocked"
+    settings_store.async_update.assert_not_awaited()
+    controller.async_stop.assert_not_awaited()
+    hass.services.async_call.assert_not_awaited()
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["none", "stop", "save"])
+async def test_coordinated_entry_interrupted_by_auto_stop_while_writer_in_flight(environment, failure):
+    hass, _, gate, target, _, entry = environment
+    adapter, path, _, _ = adapter_for(hass, target)
+    await integration._async_setup_ownership_metadata(
+        hass, entry, SimpleNamespace(ocpp_target=target, charge_control="switch.charger"))
+    def identity():
+        return morek_schedule._identity_status(hass, target)
+    connector = command_admission.physical_connector(identity())
+    entered, release = asyncio.Event(), asyncio.Event()
+    async def in_flight():
+        entered.set()
+        await release.wait()
+    active = asyncio.create_task(gate.async_execute("a", "legacy_actuator", identity, in_flight))
+    await entered.wait()
+    queued = asyncio.create_task(adapter.async_start(16))
+    await asyncio.sleep(0)
+    drain = asyncio.create_task(gate.async_begin_unarmed_entry("a", identity, lambda: False))
+    await asyncio.sleep(0)
+    assert not drain.done()
+
+    controller = MagicMock(entry_id="a", adapter=adapter, known_connected=True)
+    adapter.vehicle_connected = lambda: True
+    path.async_stop.return_value = failure != "stop"
+    async def stop(**_kwargs):
+        assert await adapter.async_stop(person_stop=True)
+    controller.async_stop = AsyncMock(side_effect=stop)
+    settings = [AutoSettings()]
+    settings_store = MagicMock()
+    settings_store.settings.side_effect = lambda _: settings[0]
+    async def update(_entry, *, mutate):
+        if failure == "save":
+            raise OSError("synthetic save failure")
+        settings[0] = mutate(settings[0])
+    settings_store.async_update = AsyncMock(side_effect=update)
+    async def hold(_entry, *, mutate):
+        settings[0] = mutate(settings[0])
+    settings_store.async_hold_unsaved = AsyncMock(side_effect=hold)
+    executor = AutoExecutor(
+        hass, controller, settings_store,
+        legacy_admission=lambda: command_admission.async_auto_legacy_allowed(gate, "a", identity),
+        person_stop_scope=adapter.person_stop_scope,
+        person_stop_admission=lambda: adapter.async_legacy_permitted(person_stop=True),
+    )
+    executor._runner = MagicMock()
+    executor._runner.begin.return_value = SimpleNamespace(early=True)
+    executor._notify_change = AsyncMock()
+    executor._sync_manual_watch = MagicMock()
+    executor._note_manual_stop_sent = MagicMock()
+    executor._arm_save_retry = MagicMock()
+    executor._core_stop_scope = lambda _connected, scope, **_kw: scope
+    stop_task = asyncio.create_task(executor.async_manual_stop())
+    await asyncio.sleep(0)
+    assert not stop_task.done()
+    assert gate._entry_draining[connector] == "interrupted"
+    release.set()
+    assert (await active).allowed  # Already dispatched, not recalled.
+    assert not await queued
+    assert await drain == "interrupted"
+    if failure == "none":
+        await asyncio.wait_for(stop_task, 2)
+    elif failure == "stop":
+        with pytest.raises(AssertionError):
+            await asyncio.wait_for(stop_task, 2)
+        assert executor._last_error == "pause_stop_failed"
+    else:
+        with pytest.raises(AutoControlCommitted):
+            await asyncio.wait_for(stop_task, 2)
+        settings_store.async_hold_unsaved.assert_awaited_once()
+    assert settings[0].pause.manual and settings[0].pause.action == "stop"
+    controller.async_stop.assert_awaited_once()
+    path.async_stop.assert_awaited_once()
+    path.async_start.assert_not_awaited()
+    assert not await adapter.async_start(16)
+    assert (await gate.async_execute("a", "owned_profile", identity, AsyncMock())).reason == "connector_quiescing"
+    hass.services.async_call.assert_not_awaited()
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_entry_reservation_identity_failures_and_cancellation(environment):
+    hass, store, gate, target, _, entry = environment
+    await integration._async_setup_ownership_metadata(
+        hass, entry, SimpleNamespace(ocpp_target=target, charge_control="switch.charger"))
+    def identity():
+        return morek_schedule._identity_status(hass, target)
+    connector = command_admission.physical_connector(identity())
+    with gate.person_stop_reservation("a", identity):
+        assert await gate.async_begin_unarmed_entry("a", identity, lambda: False) == "person_stop_active"
+    assert await gate.async_begin_unarmed_entry("a", identity, lambda: True) == "person_stop_active"
+    assert await gate.async_begin_unarmed_entry("a", lambda: {}, lambda: False) == "identity_unresolved"
+    await gate._lock_for(connector).acquire()
+    task = asyncio.create_task(gate.async_begin_unarmed_entry("a", identity, lambda: False))
+    await asyncio.sleep(0)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    gate._lock_for(connector).release()
+    adapter, path, _, _ = adapter_for(hass, target)
+    assert not await adapter.async_start()
+    assert await adapter.async_stop(protection=True)
+    path.async_start.assert_not_awaited()
+    write = AsyncMock()
+    assert (await gate.async_execute("a", "owned_profile", identity, write)).allowed is False
+    write.assert_not_awaited()
+    assert (await store.async_status("a", identity()))["recorded_owner"] == "legacy"
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_coordinated_stop_reaches_real_controller_and_keeps_other_connector_working(environment, monkeypatch):
+    hass, _, gate, target, _, entry = environment
+    adapter, path, _, _ = adapter_for(hass, target)
+    monkeypatch.setattr(controller_module, "Store", lambda *_args, **_kwargs: MagicMock())
+    monkeypatch.setattr(controller_module, "build_adapter", lambda *_args, **_kwargs: adapter)
+    monkeypatch.setattr(controller_module, "ocpp_target_of", lambda *_: (target, "stored"))
+    monkeypatch.setattr(controller_module, "energy_register_entity_for", lambda *_: None)
+    monkeypatch.setattr(controller_module, "CoreFailureRepairs", MagicMock())
+    charger = ChargingController(hass, "a", {"charge_control": "switch.charger"})
+    await integration._async_setup_ownership_metadata(hass, entry, charger)
+    def identity():
+        return morek_schedule._identity_status(hass, target)
+    assert await gate.async_begin_unarmed_entry("a", identity, lambda: False) == "drained_unarmed"
+    path.async_stop.assert_not_awaited()
+    adapter.enabled_state = lambda: True
+    charger._async_save = AsyncMock()
+    charger._notify = MagicMock()
+    with adapter.person_stop_scope():
+        await charger._stop_locked(by_person=True, urgent=True)
+    path.async_stop.assert_awaited_once()
+    assert gate._entry_draining[command_admission.physical_connector(identity())] == "interrupted"
+    other, other_path, _, _ = adapter_for(hass, SimpleNamespace(devid="unknown", connector_id=2))
+    assert await other.async_start()
+    other_path.async_start.assert_awaited_once()
+    hass.services.async_call.assert_not_awaited()
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("case", ["duplicate", "store_failure"])
+async def test_unarmed_entry_refuses_ambiguous_ownership(environment, case):
+    hass, store, gate, target, _, entry = environment
+    await integration._async_setup_ownership_metadata(
+        hass, entry, SimpleNamespace(ocpp_target=target, charge_control="switch.charger"))
+    def identity():
+        return morek_schedule._identity_status(hass, target)
+    if case == "duplicate":
+        assert await gate.async_ensure_initialized("b", identity) == "ownership_conflict"
+    else:
+        store.async_status = AsyncMock(side_effect=OSError("synthetic failure"))
+    assert await gate.async_begin_unarmed_entry("a", identity, lambda: False) == "ownership_unavailable"
+    adapter, path, _, _ = adapter_for(hass, target)
+    assert not await adapter.async_start()
+    path.async_start.assert_not_awaited()
+    path.async_stop.assert_not_awaited()
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_cancelled_reserved_stop_keeps_entry_interrupted_and_ordinary_writes_closed(environment):
+    hass, _, gate, target, _, entry = environment
+    await integration._async_setup_ownership_metadata(
+        hass, entry, SimpleNamespace(ocpp_target=target, charge_control="switch.charger"))
+    def identity():
+        return morek_schedule._identity_status(hass, target)
+    connector = command_admission.physical_connector(identity())
+    await gate._lock_for(connector).acquire()
+    drain = asyncio.create_task(gate.async_begin_unarmed_entry("a", identity, lambda: False))
+    await asyncio.sleep(0)
+    adapter, path, _, _ = adapter_for(hass, target)
+    async def stop():
+        with adapter.person_stop_scope():
+            await adapter.async_stop(person_stop=True)
+    task = asyncio.create_task(stop())
+    await asyncio.sleep(0)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    gate._lock_for(connector).release()
+    assert await drain == "interrupted"
+    assert not await adapter.async_start()
     path.async_start.assert_not_awaited()
     path.async_stop.assert_not_awaited()

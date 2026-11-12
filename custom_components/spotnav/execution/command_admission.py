@@ -7,6 +7,8 @@ this admission; regulator protection and external writers remain separate.
 from __future__ import annotations
 
 import asyncio
+from contextlib import contextmanager
+from contextvars import ContextVar
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, Generic, Literal, TypeVar
@@ -16,9 +18,10 @@ from homeassistant.core import HomeAssistant
 from ..const import MOREK_CONNECTOR_ID, MOREK_STATION_ID
 from .execution_ownership import ExecutionOwnershipStore, ownership_store
 
-OperationKind = Literal["legacy_actuator", "owned_profile", "read_only"]
+OperationKind = Literal["legacy_actuator", "person_stop", "owned_profile", "read_only"]
 T = TypeVar("T")
 _DATA_KEY = "spotnav_command_admission"
+_STOP_RESERVATION: ContextVar[Any] = ContextVar("spotnav_person_stop", default=None)
 
 
 @dataclass(frozen=True)
@@ -81,6 +84,75 @@ class CommandAdmission:
         self._locks: dict[PhysicalConnector, asyncio.Lock] = {}
         self._generations: dict[PhysicalConnector, int] = {}
         self._quiescing: set[PhysicalConnector] = set()
+        self._entry_draining: dict[PhysicalConnector, str] = {}
+        self._person_stops: dict[PhysicalConnector, int] = {}
+
+    @contextmanager
+    def person_stop_reservation(self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]]):
+        """Reserve before outer locks; interrupt an unarmed entry without reopening writes."""
+        current = _STOP_RESERVATION.get()
+        if current is not None and current[0] is self and current[1] == entry_id and current[3] is asyncio.current_task():
+            yield
+            return
+        try:
+            identity = resolve_identity()
+            connector = physical_connector(identity) if classify_morek_identity(identity) == "supported_morek" else None
+        except Exception:  # noqa: BLE001 - the ordinary identity checks still apply
+            connector = None
+        if connector is not None:
+            self._person_stops[connector] = self._person_stops.get(connector, 0) + 1
+            if connector in self._entry_draining:
+                self._entry_draining[connector] = "interrupted"
+                self._generations[connector] = self._generations.get(connector, 0) + 1
+        token = _STOP_RESERVATION.set((self, entry_id, connector, asyncio.current_task()))
+        try:
+            yield
+        finally:
+            _STOP_RESERVATION.reset(token)
+            if connector is not None:
+                self._person_stops[connector] -= 1
+                if not self._person_stops[connector]:
+                    del self._person_stops[connector]
+
+    async def async_begin_unarmed_entry(
+        self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]], person_stop_active: Callable[[], bool]
+    ) -> str:
+        """Internal drain experiment: never persists an owner, opens admission or sends a command.
+
+        Call without outer locks. The latch stays closed on cancellation or interruption.
+        A successful drain is not ownership and has no production activation path.
+        """
+        try:
+            identity = dict(resolve_identity())
+            connector = physical_connector(identity)
+            if classify_morek_identity(identity) != "supported_morek" or connector is None:
+                return "identity_unresolved"
+            if connector in self._entry_draining or connector in self._quiescing:
+                return "entry_unavailable"
+            if self._person_stops.get(connector) or person_stop_active():
+                return "person_stop_active"
+        except Exception:  # noqa: BLE001 - unavailable facts cannot establish a transition
+            return "entry_unavailable"
+        self._entry_draining[connector] = "draining"
+        self._generations[connector] = self._generations.get(connector, 0) + 1
+        async with self._lock_for(connector):
+            if self._entry_draining[connector] != "draining" or self._person_stops.get(connector):
+                return "interrupted"
+            try:
+                fresh = dict(resolve_identity())
+                status = await self._store.async_status(entry_id, fresh)
+                if (classify_morek_identity(fresh) != "supported_morek" or physical_connector(fresh) != connector
+                        or physical_connector(resolve_identity()) != connector or person_stop_active()
+                        or self._person_stops.get(connector) or self._entry_draining[connector] != "draining"):
+                    return "interrupted"
+                if (status.get("record_state") != "valid" or status.get("recorded_owner") != "legacy"
+                        or status.get("armed") is not False or
+                        (status.get("station_id"), status.get("connector_id")) != (connector.station_id, connector.connector_id)):
+                    return "ownership_unavailable"
+            except Exception:  # noqa: BLE001 - unknown state leaves admission closed
+                return "ownership_unavailable"
+            self._entry_draining[connector] = "drained_unarmed"
+            return "drained_unarmed"
 
     def _lock_for(self, connector: PhysicalConnector) -> asyncio.Lock:
         # Do not discard idle locks: a waiting task may still hold a reference.
@@ -167,7 +239,7 @@ class CommandAdmission:
                 except Exception:  # noqa: BLE001 - a queued read must not use the wrong connector lock
                     return AdmissionResult(False, "identity_changed")
                 return AdmissionResult(True, "allowed_read_only", await operation())
-        if kind not in ("legacy_actuator", "owned_profile"):
+        if kind not in ("legacy_actuator", "person_stop", "owned_profile"):
             return AdmissionResult(False, "invalid_operation")
         try:
             connector = physical_connector(resolve_identity())
@@ -176,10 +248,19 @@ class CommandAdmission:
         if connector is None:
             return AdmissionResult(False, "identity_unresolved")
 
+        if expected_generation is None:
+            expected_generation = self.generation(connector)
+
         async with self._lock_for(connector):
             if connector in self._quiescing:
                 return AdmissionResult(False, "connector_quiescing")
-            if expected_generation is not None and expected_generation != self.generation(connector):
+            reservation = _STOP_RESERVATION.get()
+            person = (kind == "person_stop" and reservation == (self, entry_id, connector, asyncio.current_task()))
+            if kind == "person_stop" and not person:
+                return AdmissionResult(False, "person_stop_not_reserved")
+            if connector in self._entry_draining and not person:
+                return AdmissionResult(False, "connector_quiescing")
+            if not person and expected_generation != self.generation(connector):
                 return AdmissionResult(False, "stale_generation")
             try:
                 identity = dict(resolve_identity())
@@ -212,7 +293,7 @@ class CommandAdmission:
             if status.get("armed") is not False:
                 return AdmissionResult(False, "ownership_inconsistent")
             # Quiescing may have begun while the store read was in progress.
-            if connector in self._quiescing:
+            if connector in self._quiescing or (connector in self._entry_draining and not person):
                 return AdmissionResult(False, "connector_quiescing")
             return AdmissionResult(True, "allowed_legacy", await operation())
 
@@ -232,7 +313,7 @@ class CommandAdmission:
         except Exception:  # noqa: BLE001
             return AdmissionResult(False, "identity_unresolved")
         async with self._lock_for(connector):
-            if connector in self._quiescing:
+            if connector in self._quiescing or connector in self._entry_draining:
                 return AdmissionResult(False, "connector_quiescing")
             try:
                 identity = dict(resolve_identity())
@@ -282,7 +363,7 @@ def legacy_write_guard(
     Only positively unrelated connectors bypass target admission. A configured OCPP
     charger with no resolved target is not treated as a non-OCPP charger.
     """
-    async def guard(operation: Callable[[], Awaitable[T]]) -> AdmissionResult[T]:
+    async def guard(operation: Callable[[], Awaitable[T]], *, person_stop: bool = False) -> AdmissionResult[T]:
         if not ocpp:
             return AdmissionResult(True, "non_ocpp", await operation())
         from ..api.morek_schedule import _identity_status
@@ -298,5 +379,12 @@ def legacy_write_guard(
             return AdmissionResult(True, "non_target", await operation())
         if classification != "supported_morek":
             return AdmissionResult(False, "identity_unresolved")
-        return await command_admission(hass).async_execute(entry_id, "legacy_actuator", identity, operation)
+        return await command_admission(hass).async_execute(
+            entry_id, "person_stop" if person_stop else "legacy_actuator", identity, operation)
+    def stop_scope():
+        from ..api.morek_schedule import _identity_status
+
+        return command_admission(hass).person_stop_reservation(entry_id, lambda: _identity_status(hass, resolve_target()))
+
+    guard.stop_scope = stop_scope
     return guard

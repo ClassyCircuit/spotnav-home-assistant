@@ -221,17 +221,27 @@ class ChargerAdapter:
         self.pre_current_recorded: Callable[[], Awaitable[None]] | None = None
         self.write_guard: Callable[[Callable[[], Awaitable[Any]]], Awaitable[AdmissionResult[Any]]] | None = None
 
-    async def _guarded(self, operation: Callable[[], Awaitable[Any]], *, protection: bool = False) -> AdmissionResult[Any]:
+    async def _guarded(self, operation: Callable[[], Awaitable[Any]], *, protection: bool = False,
+                       person_stop: bool = False) -> AdmissionResult[Any]:
         """Ordinary writes use connector admission; explicit protection remains operational."""
         if protection or self.write_guard is None:
             return AdmissionResult(True, "protection" if protection else "unguarded", await operation())
+        if person_stop:
+            return await self.write_guard(operation, person_stop=True)
         return await self.write_guard(operation)
 
-    async def async_legacy_permitted(self) -> bool:
+    def person_stop_scope(self):
+        """Reserve a person Stop before acquiring Auto or controller locks."""
+        from contextlib import nullcontext
+
+        scope = getattr(self.write_guard, "stop_scope", None)
+        return scope() if scope is not None else nullcontext()
+
+    async def async_legacy_permitted(self, *, person_stop: bool = False) -> bool:
         """Check before controller preparation; dispatch checks again at the adapter."""
         async def check() -> None:
             return None
-        return (await self._guarded(check)).allowed
+        return (await self._guarded(check, person_stop=person_stop)).allowed
 
     # -- what a restart must not forget
 
@@ -297,7 +307,7 @@ class ChargerAdapter:
                 await self._record_pre_current(before)
         return executed
 
-    async def async_stop(self, *, protection: bool = False) -> bool | str:
+    async def async_stop(self, *, protection: bool = False, person_stop: bool = False) -> bool | str:
         """Stop the charge; `False` when the command was not executed (its entity is unavailable), and
         `STOP_HELD_AT_FLOOR` when the charger held the charge at its floor instead of pausing it (a Peblar
         out of pauses): the charge still runs, so what was started stays started.
@@ -307,7 +317,7 @@ class ChargerAdapter:
         result: bool | str = False
         try:
             admitted = await self._guarded(lambda: self._logged(COMMAND_STOP, lambda: self.path.async_stop()),
-                                           protection=protection)
+                                           protection=protection, person_stop=person_stop)
             result = admitted.value if admitted.allowed else False
         except BaseException:
             result = True  # it may have reached the charger

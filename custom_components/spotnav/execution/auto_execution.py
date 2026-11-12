@@ -23,7 +23,7 @@ import hashlib
 import json
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, nullcontext
 from dataclasses import dataclass, replace
 from datetime import datetime, time as dt_time, timedelta, timezone
 from typing import Any, Final, Literal
@@ -564,6 +564,8 @@ class AutoExecutor:
         live_snapshot: Callable[[], Any] | None = None,
         now: Callable[[], datetime] | None = None,
         legacy_admission: Callable[[], Awaitable[bool]] | None = None,
+        person_stop_scope: Callable[[], Any] | None = None,
+        person_stop_admission: Callable[[], Awaitable[bool]] | None = None,
     ) -> None:
         self._hass = hass
         self._controller = controller
@@ -574,6 +576,8 @@ class AutoExecutor:
         self._live_snapshot = live_snapshot
         self._now: Callable[[], datetime] = now if now is not None else dt_util.utcnow
         self._legacy_admission = legacy_admission
+        self._person_stop_scope = person_stop_scope or nullcontext
+        self._person_stop_admission = person_stop_admission
         self._lock = asyncio.Lock()
         self._attempt = 0
         self._shutdown = False
@@ -718,8 +722,10 @@ class AutoExecutor:
         """Check ownership after acquiring the Auto lock, including queued work."""
         return self._legacy_admission is None or await self._legacy_admission()
 
-    async def _require_legacy(self) -> None:
-        if not await self._legacy_allowed():
+    async def _require_legacy(self, *, person_stop: bool = False) -> None:
+        allowed = (await self._person_stop_admission() if person_stop and self._person_stop_admission is not None
+                   else await self._legacy_allowed())
+        if not allowed:
             raise AutoControlRefused(EXECUTION_OWNERSHIP_BLOCKED, "Legacy execution is blocked by connector ownership")
 
     @property
@@ -1742,15 +1748,17 @@ class AutoExecutor:
 
     async def async_manual_stop(self) -> None:
         """A person stopping a charge: it pauses Auto, schedule and strategy, for the plug-in session."""
-        async with self._lock:
-            await self._require_legacy()
-            await self._immediate_stop_locked()
+        with self._person_stop_scope():
+            async with self._lock:
+                await self._require_legacy(person_stop=True)
+                await self._immediate_stop_locked()
 
     async def async_manual_cancel(self) -> None:
         """A person cancelling the schedule: a Stop, which clears the plan and pauses Auto for the plug-in."""
-        async with self._lock:
-            await self._require_legacy()
-            await self._immediate_stop_locked()
+        with self._person_stop_scope():
+            async with self._lock:
+                await self._require_legacy(person_stop=True)
+                await self._immediate_stop_locked()
 
     async def async_manual_follow(self) -> None:
         """A person re-arming the saved plan. A manual pause ends first (the person hands the charger back
@@ -1787,9 +1795,10 @@ class AutoExecutor:
           admission.
         * A failure to store the pause changes nothing and issues no charger command.
         """
-        async with self._lock:
-            await self._require_legacy()
-            await self._pause_locked(choice)
+        with self._person_stop_scope():
+            async with self._lock:
+                await self._require_legacy(person_stop=True)
+                await self._pause_locked(choice)
 
     async def _pause_locked(self, choice: PauseChoice = PAUSE_UNTIL_RESUMED) -> None:
         """The pause itself. Runs with this boundary's lock held, and never translates failures."""
@@ -1919,6 +1928,13 @@ class AutoExecutor:
     async def async_manual_action(
         self, action: str, choice: PauseChoice | None = None
     ) -> ControlDecision:
+        """Reserve a person Stop before waiting for the Auto lock."""
+        with self._person_stop_scope() if action == ACTION_STOP else nullcontext():
+            return await self._async_manual_action(action, choice)
+
+    async def _async_manual_action(
+        self, action: str, choice: PauseChoice | None = None
+    ) -> ControlDecision:
         """Admit and carry out one manual action against the state that exists now.
 
         Admission happens inside the lock with the state re-read there; a dashboard read is not an
@@ -1936,7 +1952,7 @@ class AutoExecutor:
         `pause_stop_failed` in the refreshed facts.
         """
         async with self._lock:
-            await self._require_legacy()
+            await self._require_legacy(person_stop=action == ACTION_STOP)
             # One capture, both axes: the facts are read once and both decisions derive from that
             # object.
             facts = self.control_facts()

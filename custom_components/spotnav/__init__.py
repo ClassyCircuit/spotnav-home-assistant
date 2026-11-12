@@ -415,7 +415,11 @@ async def _async_setup_charger_entry(hass: HomeAssistant, entry: ChargerConfigEn
                 command_admission(hass), entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target)
             )
 
-        executor = data.executor = AutoExecutor(hass, controller, settings_store, legacy_admission=legacy_allowed)
+        executor = data.executor = AutoExecutor(
+            hass, controller, settings_store, legacy_admission=legacy_allowed,
+            person_stop_scope=controller.adapter.person_stop_scope,
+            person_stop_admission=lambda: controller.adapter.async_legacy_permitted(person_stop=True),
+        )
         entry.async_on_unload(executor.async_shutdown)
         await executor.async_start()
         # Solar execution needs only the executor, controller and settings store.

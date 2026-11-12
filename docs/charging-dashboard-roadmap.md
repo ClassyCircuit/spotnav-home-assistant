@@ -563,6 +563,18 @@ tests are documented there; full HA collection is still blocked on Windows.
     API contracts, and document panel installation/update. Don't reimplement a second UI
     or assume local preview proves actual HA integration.
 - [ ] **5.5 Durable Morek ownership and recovery**
+  - **Person-Stop coordination foundation implemented for review (2.5.40):** an
+    internal, process-local unarmed drain is interrupted by a separately classified
+    Stop reservation before the Auto lock. Ordinary admission remains closed; no
+    entry or owner is persisted or activated. Mocked-boundary checks are documented
+    in the handoff; durable transition/restart recovery remains open.
+  - **Historical entry/drain blocker (2026-11-12):** the existing
+    quiesce latch refuses a person's Stop at the ordinary controller guard. The
+    separately classified regulator-protection path bypasses that guard. Making
+    quiesce durable or wiring it into entry would therefore change person-Stop
+    behavior; keep the latch unwired and production dispatch unarmed pending a
+    reviewed compatible design. An actual-module mocked characterization records
+    the conflict; the newer internal coordination above does not use the old latch.
   - Resolve and implement safe ownership entry/exit, producer drain and durable transitions,
     lost-document versus first-use ambiguity, uncertain in-flight outcomes, restart/reconnect
     and retained-profile handling. Do not bypass existing uncertainty or identity guards.

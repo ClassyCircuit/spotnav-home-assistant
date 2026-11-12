@@ -245,6 +245,118 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-12 — unarmed person-Stop coordination foundation (review required)
+
+- Version 2.5.40 adds an internal `async_begin_unarmed_entry` experiment. It closes
+  ordinary admission, invalidates the connector generation and drains the connector
+  lock; it never persists an owner, sends a profile or arms dispatch. The result
+  `drained_unarmed` is not ownership. A person's Stop reserves before the Auto or
+  controller lock and synchronously interrupts/increments the entry generation.
+  The separately classified Stop still checks the resolved physical identity and
+  persisted legacy owner under connector admission; it is not an urgent or regulator
+  bypass. Auto's existing Stop intent and outcome code continues to run.
+- Entry never waits for Auto, controller or assignment locks while holding the
+  connector lock. The Stop waits behind any already-admitted command; that command
+  cannot be recalled. No reopening path exists: cancellation, interruption and
+  failed/ambiguous checks leave this process's entry latch closed to ordinary work.
+  Operations capture a generation before waiting for connector admission. The old
+  process-local quiesce seam remains separate and its two characterization tests
+  remain in place. Regulator protection and unrelated connectors are unchanged.
+- This is **not durable ownership entry**. The latch and reservation do not survive
+  process restart; no transition evidence is written and no unknown external outcome
+  is recovered. Existing Auto Stop persistence and its existing failure behavior are
+  reused, not upgraded to a crash-proof command journal. A future entry caller must
+  supply trustworthy current Stop-intent state and must not arm from this drain.
+  Manual profile operations, lost-document/first-use ambiguity, restart/reconnect,
+  unknown outcomes and safe exit/handback still need a durable reviewed protocol.
+  A current Stop does not withdraw a stored future profile, release retained 0 A, or
+  prove later charging cannot occur; that policy remains unresolved.
+- Mocked actual-module checks cover in-flight drain/Stop, blocked queued work,
+  Stop intent with failed Stop and failed intent save, controller dispatch,
+  cancellation, duplicate/failed ownership checks, unrelated connectors and
+  regulator bypass. They do not prove physical stopping, a full crash matrix, or
+  live HA behavior. The 5.4c full HA-plugin dashboard suite remains unrun. No HA,
+  profile operation, deployment or charger operation occurred. Stop for review.
+- Validation: `python tools/run_isolated_lifecycle_tests.py` 36 passed;
+  `python tools/run_isolated_planning_tests.py` 492 passed, 1 deselected (includes
+  Morek worker tests); targeted Ruff, frontend `npm run build`, `npm run check-dist`
+  and `git diff --check` passed. The lifecycle runner with additional ownership,
+  admission and worker tests had 107 passed and one failure: its harness did not
+  pre-resolve `Europe/Stockholm` for the planner/worker test. The planning runner
+  pre-resolves zones and passed that worker suite. A prior lifecycle run had a
+  mocked HA fixture missing `states`; the test was fixed and rerun successfully.
+  Pytest reports its unknown timeout option and dependency deprecations; Git reports
+  Windows line-ending warnings. These results do not replace full HA-plugin tests.
+
+### 2026-11-12 — person-Stop coordination investigation (incomplete)
+
+- No new transition or Stop coordination was implemented. The existing unwired
+  latch also causes `AutoExecutor.async_manual_action("stop")` to refuse at
+  `_require_legacy`, before it records the person's intent or calls the controller.
+  A new actual-module mocked characterization covers that boundary; the previous
+  controller characterization is retained. This is not a defect in the normal
+  production Stop path, because no production entry uses the latch.
+- A controller-only Stop exception would not reach that Auto path. Conversely,
+  clearing the latch to let Stop through would admit ordinary queued adapter work:
+  `legacy_write_guard` does not capture a generation token. A possible design is
+  a Stop-specific coordination reservation established before the Auto lock, with
+  transition invalidation and identity/owner checks retained at each write boundary;
+  another is to abort and fully drain/invalidate producers before reopening ordinary
+  admission. Neither is implemented or proven here. Either must handle direct Stop,
+  pause and cancellation/save failures without using the regulator bypass or losing
+  an already dispatched operation's unknown outcome. Review lock ordering and
+  durable failure semantics rather than inferring these guarantees from the latch.
+- Whether a person Stop under schedule ownership or a retained future profile should
+  withdraw or alter that profile remains unresolved. Stopping a current session,
+  retaining 0 A, withdrawing a schedule and preventing later charging are distinct;
+  no profile operation or future prevention is implied. The remaining 5.5 entry,
+  exit/handback, lost-document ambiguity, retained-profile and restart/recovery work
+  remains open; production autonomous dispatch is unarmed.
+- `python tools/run_isolated_lifecycle_tests.py`: 28 passed. `python
+  tools/run_isolated_planning_tests.py`: 492 passed, 1 deselected. Targeted Ruff
+  initially found E731 in the new test; it was corrected and rerun as recorded in
+  the session. Pytest reported the existing timeout-option and dependency warnings.
+  The 5.4c HA-plugin suite remains unrun. These are mocked checks, not live HA or
+  hardware tests. No integration or frontend code changed and no HA, deployment or
+  charger operation occurred. Stop for coordinator review.
+
+### 2026-11-12 — Stage 5.5 entry/drain blocked for review
+
+- No entry implementation or ownership transition was added. The process-local
+  `async_quiesce_for_reload` latch refuses ordinary writes, including a person's
+  urgent Stop: `ChargingController._stop_locked(by_person=True)` first calls
+  `adapter.async_legacy_permitted`, and the latch rejects that check. A separately
+  classified regulator-protection stop bypasses the ordinary guard. Persisting or
+  wiring the latch as ownership entry would change the existing person-Stop path,
+  contrary to the required safety boundary. Do not treat `urgent` as a general
+  protection exemption. A reviewed compatible person-Stop/transition policy is
+  needed before implementing entry; protection and manual interlocks remain unchanged.
+- Current final legacy dispatch takes existing outer controller/assignment locks,
+  then connector admission, then ownership-store lock. Startup installs the guard
+  and awaits metadata initialization before Auto start and restore. The Morek
+  manual action currently enters connector admission before its per-entry action
+  lock; do not assume the historical audit's proposed reverse order describes the
+  current implementation. A transition must not hold connector admission while
+  waiting for producer/controller/assignment locks. The existing drain only waits
+  for connector-admitted work; it cannot recall a dispatched command or prove all
+  producer state or unknown external outcomes have drained.
+- Manual profile admission checks the process-local latch but does not consult
+  durable ownership. Any later durable transition must address manual profile writes
+  and restart as well as duplicate physical identity, save/cancellation ambiguity,
+  and stale queued generations; no recovery behavior is implied by this note.
+  Safe exit/handback, retained profiles including persistent 0 A, lost-document
+  versus first-use ambiguity, durable unknown outcomes and restart/reconnect remain
+  open. Do not clear a profile or infer physical charging from a readback.
+- `python tools/run_isolated_lifecycle_tests.py`: 27 passed, including the new
+  real-controller/adapter mocked-boundary characterization. `python
+  tools/run_isolated_planning_tests.py`: 492 passed, 1 deselected. `ruff check
+  tests/test_stage_23_lifecycle.py`: passed. Pytest reported its existing unknown
+  timeout-option and dependency deprecation warnings. These are mocked tests, not
+  live HA/OCPP or hardware validation. The 5.4c HA-plugin dashboard suite remains
+  unrun as documented below. No integration or frontend code changed, so no
+  manifest bump or frontend build was performed. No HA access, deployment or
+  charger operation occurred. Stop for coordinator review.
+
 ### 2026-11-12 — continue implementation before live testing
 
 - The user wants remaining implementation completed before installing and testing

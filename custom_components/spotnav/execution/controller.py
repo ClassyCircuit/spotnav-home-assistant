@@ -3458,11 +3458,15 @@ class ChargingController:
 
     async def async_cancel(self, *, by_person: bool = False) -> None:
         """Stop charging and remove the active schedule. One operation, one lock. `by_person` as for `async_stop`."""
-        async with self._lock:
-            if self._runner.depth:
-                await self._stop_locked(clear_schedule=True, by_person=by_person)
-                return
-            await self._core_direct_stop(self._stop_locked(clear_schedule=True, by_person=by_person), True)
+        from contextlib import nullcontext
+
+        scope = self.adapter.person_stop_scope() if by_person and isinstance(self.adapter, ChargerAdapter) else nullcontext()
+        with scope:
+            async with self._lock:
+                if self._runner.depth:
+                    await self._stop_locked(clear_schedule=True, by_person=by_person)
+                    return
+                await self._core_direct_stop(self._stop_locked(clear_schedule=True, by_person=by_person), True)
 
     async def async_follow_schedule(self) -> None:
         """Immediately restore the charger state required by the saved plan."""
@@ -4478,14 +4482,18 @@ class ChargingController:
         windows are all past: a person's Stop, a pause, solar standing it down. A stop through here goes out
         even while another settles (`urgent`, a person's): an automatic decision passes `urgent=False`.
         """
-        async with self._lock:
-            request = self._stop_request_locked(
-                clear_schedule=clear_schedule, balancing=balancing, urgent=urgent, by_person=by_person
-            )
-            if self._runner.depth:
-                await request
-                return
-            await self._core_direct_stop(request, clear_schedule)
+        from contextlib import nullcontext
+
+        scope = self.adapter.person_stop_scope() if by_person and isinstance(self.adapter, ChargerAdapter) else nullcontext()
+        with scope:
+            async with self._lock:
+                request = self._stop_request_locked(
+                    clear_schedule=clear_schedule, balancing=balancing, urgent=urgent, by_person=by_person
+                )
+                if self._runner.depth:
+                    await request
+                    return
+                await self._core_direct_stop(request, clear_schedule)
 
     async def _stop_request_locked(
         self,
@@ -4541,7 +4549,7 @@ class ChargingController:
         A stop the charger answers by holding the charge at its floor (`STOP_HELD_AT_FLOOR`) did not end the charge:
         like one not executed it forgets nothing and raises, as `EXECUTION_STOP_HELD_AT_FLOOR`.
         """
-        if not protection and isinstance(self.adapter, ChargerAdapter) and not await self.adapter.async_legacy_permitted():
+        if not protection and isinstance(self.adapter, ChargerAdapter) and not await self.adapter.async_legacy_permitted(person_stop=by_person):
             raise ChargingExecutionError("legacy_execution_ownership_blocked", "Legacy charger control is blocked by ownership")
         if by_person:
             self._set_own_stop(False)
@@ -4584,6 +4592,7 @@ class ChargingController:
                 # at most: every regulator write behind it sees `_stop_in_flight` and sends nothing.
                 async with self._assign_lock:
                     executed = (await self.adapter.async_stop(protection=True) if protection
+                                else await self.adapter.async_stop(person_stop=True) if by_person and isinstance(self.adapter, ChargerAdapter)
                                 else await self.adapter.async_stop())
             except Exception as err:  # noqa: BLE001 - a command that failed outright did not execute either
                 failure = err

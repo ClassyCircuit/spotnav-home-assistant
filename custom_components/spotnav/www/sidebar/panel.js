@@ -59813,7 +59813,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.39";
+var CARD_VERSION = "2.5.40";
 
 // sidebar/panel.js
 var settingsWritesByConnection = /* @__PURE__ */ new WeakMap();
