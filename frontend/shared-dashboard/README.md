@@ -15,12 +15,14 @@ dashboard.update({ model: nextModel, format, actions });
 dashboard.dispose();
 ```
 
-`update` still remounts the view, but experimentally restores edited field values,
-dialog visibility, identified focus and chart zoom. This is not yet a production-safe
-incremental update: the dialog is actually closed and reopened, text selection and
-arbitrary nested scroll positions are not preserved, and revision/identity safety is
-the host's responsibility. Set `draftKey` to a stable charger-and-revision identity;
-changing it clears drafts. This has not been integrated with a real settings save.
+`update` reconciles the existing DOM instead of remounting it for the same
+`draftKey`: inputs, dialog, debug subtree and chart containers remain mounted.
+Dirty input values and active input selection are not overwritten, current plan and
+health text are updated, and scroll positions are restored. Changing `draftKey`
+disposes the old view and clears its draft. The host owns revision/identity checks;
+the sidebar marks a changed revision as a conflict requiring explicit reload.
+Mounted chart instances retain their viewport; updating real chart series and
+source-aware navigation remain 5.4c, not provided by this reconciliation.
 `dispose` disconnects observers, removes listeners,
 disposes ECharts and clears the root. Mounting again on the same root disposes
 the previous instance. The host owns subscriptions, async requests, permissions,
@@ -39,7 +41,11 @@ used with live data until 5.4c replaces those assumptions.
 
 - `windows`: array of `{start,end,energy,cost,centsPerKwh,projectedSoc,control}`;
   `null`/missing means unavailable, `[]` means known empty. Times are numeric
-  hours on the same axis as prices; energy is wall kWh, cost EUR, price c/kWh.
+  coordinates on the same axis as prices. `format.minutesPerTimeUnit` converts
+  an axis difference to minutes: `60` for the preview's sample-hour axis and
+  `1/60000` for the sidebar's epoch-millisecond axis. Legacy adapters omitting
+  it retain the original hours interpretation. No boundary rounding is done.
+  Energy is wall kWh, cost EUR, price c/kWh.
   `control: 'minimum-exception'` adds the exception label. The host supplies
   projections and plan values; the UI is not a planner. `assumptions` contains
   `startingSoc`, `capacityKwh`, `efficiency`; invalid values render unknown.
@@ -63,7 +69,7 @@ used with live data until 5.4c replaces those assumptions.
 - `evidence` contains text fields `status`, `context`, `proposal`, `sent`,
   `readback`, `measurement`, `dispatch`. Missing evidence displays Unknown.
   ACK, effective readback and measured flow remain distinct. Diagnostic
-  send/refresh buttons are intentionally disabled in this foundation.
+  send/refresh buttons are disabled unless the host provides guarded diagnostics.
 - `insights`, if available, has `intro`, `blocks` (`title`, `value`, `status`,
   `detail`, `extra`), `caution`, and `method`; otherwise it is unavailable.
   `warning` optionally has `title` and `detail`. `labels` supplies host-specific
@@ -78,17 +84,20 @@ used with live data until 5.4c replaces those assumptions.
   fixed fictional dates, quarter-hour boundaries or 24-hour-day logic for live
   prices**. The host must ensure coherent, ordered intervals and source-aware
   calendar/timezone/DST formatting.
-- `actions.selectScenario(value)` is optional. `actions.save(rawStrings)` only
+- `actions.selectScenario(value)` is optional. `actions.save(rawValues)` only
   runs if both the callback and `model.canSave === true` are supplied. The host
   must authorize, validate, check revisions and handle failures; raw form values
-  are not settings validation. The sample adapter provides no save action.
+  are not settings validation. The sidebar uses canonical settings, existing
+  `replacementFor`, and revision-checked saves; its reload callback discards a
+  draft after confirmation. The sample adapter provides no save action.
 
-The 5.4b1 HA sidebar in `../sidebar/` uses this same entry point and a separate
-read-only real adapter. It isolates the bundled styles in a shadow root; previously
+The HA sidebar in `../sidebar/` uses this same entry point and a separate
+real adapter. It isolates the bundled styles in a shadow root; previously
 registered `wa-*` components take precedence and mixed versions are unverified.
-5.4b2 must connect guarded controls and replace the remount update lifecycle.
+The sidebar owns guarded settings and manual diagnostic actions, not the shared
+view or preview. Automatic Morek dispatch remains unarmed.
 The shared styles currently include global `:root` and `body` rules. 5.4c must
 implement source-boundary navigation, actual price/timezone/DST handling,
 published availability, and real chart data; this sample hour-axis chart is not
-proof of those behaviors. Chart viewport restoration is experimental. Physical touch,
+proof of those behaviors. Physical touch,
 actual HA mobile app and theme behavior remain unverified.

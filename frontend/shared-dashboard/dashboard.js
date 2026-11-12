@@ -16,6 +16,7 @@ import { renderEvidence } from './evidence-view.js';
 import { renderHistory } from './history-view.js';
 import { renderInsights } from './insight-view.js';
 import { escapeText as e } from './text.js';
+import { reconcile } from './reconcile.js';
 
 const card = (title, eyebrow, body, cls, tag) => `<section class="panel ${cls}"><header class="panel-head"><div><div class="eyebrow">${e(eyebrow)}</div><h2>${e(title)}</h2></div>${tag ? `<span class="sample-tag">${e(tag)}</span>` : ''}</header>${body}</section>`;
 const metric = (label, value, note) => `<div class="metric"><div class="muted">${e(label)}</div><strong>${e(value)}</strong><div class="muted">${e(note)}</div></div>`;
@@ -27,13 +28,15 @@ const mounted = new WeakMap();
 export function mountDashboard(root, adapter) {
   if (!root || !adapter || !adapter.model || !adapter.format || typeof adapter.format.time !== 'function' || typeof adapter.format.day !== 'function') throw new TypeError('A root, model and explicit time/day formatters are required');
   mounted.get(root)?.dispose();
-  let disposed = false, chartMount, listeners;
+  let disposed = false, chartMount, listeners, pendingUpdate;
+  const bound = new WeakSet();
   // Only values actually edited by the user are retained across observations.
   // A host must change draftKey when the charger or canonical revision changes.
   const drafts = new Map();
   let current = adapter;
   function cleanup() {
     listeners?.abort();
+    listeners = null;
     chartMount?.dispose();
     chartMount = null;
     const dialog = root.querySelector('#plan-dialog');
@@ -70,32 +73,43 @@ export function mountDashboard(root, adapter) {
     const scenario = m.scenarios;
     const option = (s) => `<option value="${e(s.value)}" ${s.value === scenario.selected ? 'selected' : ''}>${e(s.label)}</option>`;
     const capCurrency = f.currency === undefined ? 'EUR' : f.currency;
-    const fields = [['Target SOC (%)','target','number'],['Minimum SOC (%)','minimum','number'],[`Soft cap (${typeof capCurrency === 'string' && /^[A-Z]{3}$/.test(capCurrency) ? capCurrency : 'currency unknown'}/kWh)`,'cap','number'],['Ready by','readyBy','time']].map(([label,key,type]) => `<wa-input data-setting="${key}" label="${e(label)}" value="${e(value(settings[key]))}" type="${type}"${key === 'cap' ? ' step="0.01"' : ''}${m.canSave === true ? '' : ' disabled'}></wa-input>`).join('');
-    root.innerHTML = `<div class="shell"><header class="masthead"><div><div class="brand">SPOTNAV <span>ENHANCED</span></div><h1>Charging, in focus.</h1><p>A single view of your vehicle, plan and charger.</p></div>${labels.banner ? `<div class="sample-banner">${e(labels.banner)}<br><span>${e(labels.bannerDetail)}</span></div>` : ''}</header>
+    const fields = [['Target SOC (%)','target','number'],['Minimum SOC (%)','minimum','number'],[`Soft cap (${typeof capCurrency === 'string' && /^[A-Z]{3}$/.test(capCurrency) ? capCurrency : 'currency unknown'}/kWh)`,'cap','number'],['Ready by','readyBy','time']].map(([label,key,type]) => `<wa-input data-setting="${key}" label="${e(label)}" value="${e(value(settings[key]))}" type="${type}"${key === 'cap' ? ' step="0.01"' : ''}${m.canSave === true && !(m.settingsEditor && ((key==='target' && !m.targetSupported) || (['minimum','cap'].includes(key) && !m.policySupported))) ? '' : ' disabled'}></wa-input>`).join('');
+    const policyFields = m.settingsEditor ? `<label><input type="checkbox" data-setting="capEnabled" ${settings.capEnabled ? 'checked' : ''} ${m.canSave && m.policySupported ? '' : 'disabled'}> Enable soft cap</label><label>Price basis <select data-setting="capBasis" ${m.canSave && m.policySupported ? '' : 'disabled'}><option value="">Unknown</option><option value="nord_pool" ${settings.capBasis === 'nord_pool' ? 'selected' : ''}>Nord Pool</option><option value="configured_variable_cost" ${settings.capBasis === 'configured_variable_cost' ? 'selected' : ''}>Configured variable cost</option></select></label><label><input type="checkbox" data-setting="deadlineEnabled" ${settings.deadlineEnabled ? 'checked' : ''} ${m.canSave ? '' : 'disabled'}> Enable ready-by</label>` : '';
+    const html = `<div class="shell"><header class="masthead"><div><div class="brand">SPOTNAV <span>ENHANCED</span></div><h1>Charging, in focus.</h1><p>A single view of your vehicle, plan and charger.</p></div>${labels.banner ? `<div class="sample-banner">${e(labels.banner)}<br><span>${e(labels.bannerDetail)}</span></div>` : ''}</header>
       ${scenario ? `<div class="scenario-picker"><label for="sample-state">${e(scenario.label)}</label><select id="sample-state">${(scenario.options || []).map(option).join('')}</select><span>${e(scenario.note)}</span></div>` : ''}
-      ${m.warning ? `<div class="alert" role="status"><div><strong>${e(m.warning.title)}</strong><p>${e(m.warning.detail)}</p></div><a href="#details">View details ↓</a></div>` : ''}<div class="dashboard">
-      ${card('Your vehicle','OVERVIEW',`<div class="status-line"><span class="dot ${!Number.isFinite(state.soc) || state.soc < 0 || state.soc > 100 || state.stale ? 'dot-unknown' : ''}"></span> ${e(state.status)}</div>${renderBattery({soc:state.soc,target:settings.target,minimum:settings.minimum,deadline:settings.readyBy,capacityKwh:assumptions.capacityKwh,efficiency:assumptions.efficiency,stale:!!state.stale,lowSocWarning:state.lowSocWarning,windows,sample})}<p class="waiting">${e(state.detail)}</p><div class="metrics">${metric('Measured now',state.power,labels.powerNote)}<div class="metric next-metric"><div class="muted">${state.stale ? 'Next window · stale proposal' : 'Next proposed window'}</div><button type="button" id="open-plan" aria-haspopup="dialog">${next ? `${e(time(next.start))}–${e(time(next.end))}` : 'Unknown'} <span aria-hidden="true">↗</span></button><div class="muted">${e(next ? day(next.start) : 'Unknown')} · view complete plan</div></div>${metric(state.stale ? 'Last plan cost · stale' : 'Estimated charge cost',money(summary.cost, f.currency),`${number(summary.energy,2,' kWh',n=>n>=0)} wall energy`)}${metric('Until deadline',m.untilDeadline,labels.deadlineNote)}</div><div class="hint"><b>${e(labels.planLabel)}</b> ${e(state.policy)} ${e(m.targetNote)}</div>`, 'overview',tag)}
-      ${card('Plan controls',labels.settingsEyebrow || 'SETTINGS',`<p class="subtext">${e(labels.settingsNote)}</p><div class="fields">${fields}</div><wa-button id="save-plan" variant="brand" ${typeof actions.save !== 'function' || m.canSave !== true ? 'disabled' : ''}>${e(labels.saveLabel || 'Save plan · unavailable')}</wa-button><div class="controls-plan">${plan}<button type="button" id="open-plan-details" aria-haspopup="dialog">View full window details ↗</button></div>`, 'controls',tag)}
+      <div id="critical-live" role="status" aria-live="polite">${m.warning ? `<div class="alert"><div><strong>${e(m.warning.title)}</strong><p>${e(m.warning.detail)}</p></div><a href="#details">View details ↓</a></div>` : ''}</div><div class="dashboard">
+      ${card('Your vehicle','OVERVIEW',`<div class="status-line"><span class="dot ${!Number.isFinite(state.soc) || state.soc < 0 || state.soc > 100 || state.stale ? 'dot-unknown' : ''}"></span> ${e(state.status)}</div>${renderBattery({soc:state.soc,target:settings.target,minimum:settings.minimum,deadline:settings.readyBy,capacityKwh:assumptions.capacityKwh,efficiency:assumptions.efficiency,stale:!!state.stale,lowSocWarning:state.lowSocWarning,windows,sample,minutesPerTimeUnit:f.minutesPerTimeUnit})}<p class="waiting">${e(state.detail)}</p><div class="metrics">${metric('Measured now',state.power,labels.powerNote)}<div class="metric next-metric"><div class="muted">${state.stale ? 'Next window · stale proposal' : 'Next proposed window'}</div><button type="button" id="open-plan" aria-haspopup="dialog">${next ? `${e(time(next.start))}–${e(time(next.end))}` : 'Unknown'} <span aria-hidden="true">↗</span></button><div class="muted">${e(next ? day(next.start) : 'Unknown')} · view complete plan</div></div>${metric(state.stale ? 'Last plan cost · stale' : 'Estimated charge cost',money(summary.cost, f.currency),`${number(summary.energy,2,' kWh',n=>n>=0)} wall energy`)}${metric('Until deadline',m.untilDeadline,labels.deadlineNote)}</div><div class="hint"><b>${e(labels.planLabel)}</b> ${e(state.policy)} ${e(m.targetNote)}</div>`, 'overview',tag)}
+      ${card('Plan controls',labels.settingsEyebrow || 'SETTINGS',`<p class="subtext">${e(labels.settingsNote)}</p><div class="fields">${fields}${policyFields}</div><p id="settings-notice" role="status">${e(m.settingsNotice || '')}</p><wa-button id="save-plan" variant="brand" ${typeof actions.save !== 'function' || m.canSave !== true ? 'disabled' : ''}>${e(labels.saveLabel || 'Save plan · unavailable')}</wa-button>${m.settingsEditor ? '<button type="button" id="reload-settings">Reload settings</button>' : ''}<div class="controls-plan">${plan}<button type="button" id="open-plan-details" aria-haspopup="dialog">View full window details ↗</button></div>`, 'controls',tag)}
       ${card('Price insights',labels.insightEyebrow || 'PRICE DATA',renderInsights(m.insights),'insights',tag)}
       ${modes.map(priceCard).join('')}
       ${card('Plan activity & freshness',labels.evidenceEyebrow || 'EVIDENCE',renderEvidence(m.evidence,state.power,knownPlan ? windows.length : null),'morek',tag)}
       ${card('Recent charging',labels.historyEyebrow || 'HISTORY',renderHistory(m.history,historyReady),'history',tag)}
       </div><dialog id="plan-dialog" aria-labelledby="dialog-title"><div class="dialog-head"><div><div class="eyebrow">${e(labels.dialogEyebrow || 'PROPOSAL')}</div><h2 id="dialog-title">Proposed charging plan</h2></div><button id="close-plan" type="button" aria-label="Close proposed plan">✕</button></div><p class="subtext">${e(labels.dialogNote)}</p><div role="status" aria-live="polite">${m.warning ? `<strong>${e(m.warning.title)}</strong><p>${e(m.warning.detail)}</p>` : ''}${m.evidence?.status ? `<p>${e(m.evidence.status)}</p>` : ''}</div>${plan}</dialog><footer>${e(labels.footer)}</footer></div>`;
-    listeners = new AbortController(); const signal = listeners.signal;
+    const template=document.createElement('template'); template.innerHTML=html;
+    if (!root.firstChild) root.append(template.content);
+    else reconcile(root.firstChild,template.content.firstChild,node=>drafts.has(node.dataset?.setting) || root.getRootNode().activeElement===node);
+    listeners ||= new AbortController(); const signal = listeners.signal;
+    const bind=(node,fn)=>{if(node && !bound.has(node)){bound.add(node);fn();}};
     const dialog = root.querySelector('#plan-dialog'); let trigger;
-    root.querySelectorAll('#open-plan, #open-plan-details').forEach(button => button.addEventListener('click', () => { trigger = button; dialog.showModal(); root.querySelector('#close-plan').focus(); }, {signal}));
-    root.querySelector('#close-plan').addEventListener('click', () => dialog.close(), {signal});
-    dialog.addEventListener('click', event => { if (event.target !== dialog) return; const r = dialog.getBoundingClientRect(); if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) dialog.close(); }, {signal});
-    dialog.addEventListener('close', () => trigger?.focus(), {signal});
-    root.querySelector('a[href="#details"]')?.addEventListener('click', event => { event.preventDefault(); root.querySelector('#details').open = true; }, {signal});
-    root.querySelector('#sample-state')?.addEventListener('change', event => actions.selectScenario?.(event.target.value), {signal});
+    root.querySelectorAll('#open-plan, #open-plan-details').forEach(button => bind(button,()=>button.addEventListener('click', () => { trigger = button; dialog.showModal(); root.querySelector('#close-plan').focus(); }, {signal})));
+    bind(root.querySelector('#close-plan'),()=>root.querySelector('#close-plan').addEventListener('click', () => dialog.close(), {signal}));
+    bind(dialog,()=>{dialog.addEventListener('click', event => { if (event.target !== dialog) return; const r = dialog.getBoundingClientRect(); if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) dialog.close(); }, {signal});
+    dialog.addEventListener('close', () => {
+      trigger?.focus();
+      if (pendingUpdate) { const next = pendingUpdate; pendingUpdate = null; instance.update(next); }
+    }, {signal});});
+    const detailsLink=root.querySelector('a[href="#details"]');bind(detailsLink,()=>detailsLink.addEventListener('click', event => { event.preventDefault(); root.querySelector('#details').open = true; }, {signal}));
+    const scenarioInput=root.querySelector('#sample-state');bind(scenarioInput,()=>scenarioInput.addEventListener('change', event => current.actions?.selectScenario?.(event.target.value), {signal}));
     root.querySelectorAll('[data-setting]').forEach(input => {
-      if (drafts.has(input.dataset.setting)) input.value = drafts.get(input.dataset.setting);
-      input.addEventListener('input', () => drafts.set(input.dataset.setting, input.value), {signal});
-      input.addEventListener('change', () => drafts.set(input.dataset.setting, input.value), {signal});
+      const get = () => input.type === 'checkbox' ? input.checked : input.value;
+      if (drafts.has(input.dataset.setting)) { if (input.type === 'checkbox') {if(input.checked!==drafts.get(input.dataset.setting)) input.checked = drafts.get(input.dataset.setting);} else if(input.value!==drafts.get(input.dataset.setting)) input.value = drafts.get(input.dataset.setting); }
+      bind(input,()=>{input.addEventListener('input', () => {drafts.set(input.dataset.setting, get()); current.actions?.edit?.();}, {signal});
+      input.addEventListener('change', () => {drafts.set(input.dataset.setting, get()); current.actions?.edit?.();}, {signal});});
     });
-    root.querySelector('#save-plan').addEventListener('click', () => { if (m.canSave === true && typeof actions.save === 'function') actions.save(Object.fromEntries([...root.querySelectorAll('[data-setting]')].map(input=>[input.dataset.setting,input.value]))); }, {signal});
-    if (chartReady || historyReady) {
+    const saveButton=root.querySelector('#save-plan');bind(saveButton,()=>saveButton.addEventListener('click', () => { if (current.model.canSave === true && typeof current.actions?.save === 'function') current.actions.save(Object.fromEntries([...root.querySelectorAll('[data-setting]')].map(input=>[input.dataset.setting,input.type === 'checkbox' ? input.checked : input.value]))); }, {signal}));
+    const reloadButton=root.querySelector('#reload-settings');bind(reloadButton,()=>reloadButton.addEventListener('click', () => current.actions?.reloadSettings?.(), {signal}));
+    if (chartMount && !chartReady && !historyReady) {chartMount.dispose();chartMount=null;}
+    if ((chartReady || historyReady) && !chartMount) {
       chartMount = mountCharts(root, {...chart,prices,windows:chartWindows,readings:historyReady ? readings : null,sentHistory:historyReady ? sentHistory : null,historyAxis:m.history?.axis}, f, chartReady ? modes : []);
     }
     return chartMount;
@@ -104,25 +118,17 @@ export function mountDashboard(root, adapter) {
   const instance = { update(next) {
     if (disposed) throw new Error('Dashboard disposed');
     if (!next?.model || !next.format || typeof next.format.time !== 'function' || typeof next.format.day !== 'function') throw new TypeError('Explicit model and formatters required');
-    const sameDraft = current.draftKey === next.draftKey;
-    if (!sameDraft) drafts.clear();
-    const dialogOpen = sameDraft && root.querySelector('#plan-dialog')?.open;
-    const active = root.getRootNode().activeElement;
-    const focusSelector = active && root.contains(active) ? (active.id ? `#${CSS.escape(active.id)}` : active.dataset?.setting ? `[data-setting="${CSS.escape(active.dataset.setting)}"]` : null) : null;
-    const scrolls = [...root.querySelectorAll('*')].filter(el => el.scrollTop || el.scrollLeft).map(el => [el.id, el.scrollTop, el.scrollLeft]).filter(([id]) => id);
-    const windowScroll = [window.scrollX, window.scrollY];
-    const zoom = Object.fromEntries(Object.entries(chartMount?.priceCharts || {}).map(([mode, chart]) => {
-      const z = chart.getOption().dataZoom[0];
-      return [mode, [z.startValue, z.endValue]];
-    }));
-    cleanup(); current = next; const result = render();
-    for (const [mode, range] of Object.entries(zoom)) chartMount?.priceCharts[mode]?.dispatchAction({type:'dataZoom', startValue:range[0], endValue:range[1]});
-    if (dialogOpen) root.querySelector('#plan-dialog')?.showModal();
-    if (focusSelector && sameDraft) root.querySelector(focusSelector)?.focus({preventScroll:true});
-    for (const [id, top, left] of scrolls) { const el = root.querySelector(`#${CSS.escape(id)}`); if (el) { el.scrollTop = top; el.scrollLeft = left; } }
-    window.scrollTo(...windowScroll);
+    const sameDraft=current.draftKey===next.draftKey;
+    const scrolls=sameDraft ? [...root.querySelectorAll('*')].filter(node=>node.scrollTop || node.scrollLeft).map(node=>[node,node.scrollTop,node.scrollLeft]) : [];
+    const viewport=root.ownerDocument.defaultView, x=viewport?.scrollX, y=viewport?.scrollY;
+    if (!sameDraft) {drafts.clear();cleanup();}
+    pendingUpdate=null;current=next;const result=render();
+    if (sameDraft) {
+      for (const [node,top,left] of scrolls) if (node.isConnected) {node.scrollTop=top;node.scrollLeft=left;}
+      if (viewport && (viewport.scrollX!==x || viewport.scrollY!==y)) viewport.scrollTo(x,y);
+    }
     return result;
-  }, get charts() { return chartMount?.priceCharts || {}; }, dispose() { if (!disposed) { disposed = true; drafts.clear(); cleanup(); if (mounted.get(root) === instance) mounted.delete(root); } } };
+  }, resetDrafts() { drafts.clear(); }, get charts() { return chartMount?.priceCharts || {}; }, dispose() { if (!disposed) { disposed = true; drafts.clear(); cleanup(); if (mounted.get(root) === instance) mounted.delete(root); } } };
   mounted.set(root, instance);
   return instance;
 }

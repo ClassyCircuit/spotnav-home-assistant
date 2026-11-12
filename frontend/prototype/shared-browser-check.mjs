@@ -41,14 +41,18 @@ for(const [name,width,height] of [['desktop',1440,1000],['mobile',390,844]]){
   const preserved=await evaluate(`(()=>{
     const input=document.querySelector('[data-setting="target"]'); input.value='77'; input.dispatchEvent(new Event('input',{bubbles:true}));
     window.sampleDashboard.charts.step.dispatchAction({type:'dataZoom',startValue:20,endValue:35});
-    const before=window.sampleDashboard.charts.step.getOption().dataZoom[0];
+    const chart=window.sampleDashboard.charts.step; const before=chart.getOption().dataZoom[0];
     document.querySelector('#open-plan').click();
+    const dialog=document.querySelector('#plan-dialog');
+    const style=document.createElement('style');style.textContent='#plan-dialog{max-height:130px}';document.head.append(style);dialog.scrollTop=10;
+    const selection=window.getSelection(),range=document.createRange();range.selectNodeContents(dialog.querySelector('h2'));selection.removeAllRanges();selection.addRange(range);
+    const selectedNode=selection.anchorNode,selectedOffset=selection.anchorOffset,scroll=dialog.scrollTop,pageScroll=window.scrollY;
     const updated={...window.sampleAdapter,model:{...window.sampleAdapter.model,warning:{title:'Mismatch',detail:'Check limits'}}};
     window.sampleDashboard.update(updated);
     const after=window.sampleDashboard.charts.step.getOption().dataZoom[0];
-    return {draft:document.querySelector('[data-setting="target"]').value,open:document.querySelector('#plan-dialog').open,focus:document.activeElement.id,warning:document.querySelector('#plan-dialog').innerText.includes('Mismatch'),zoom:[before.startValue,before.endValue,after.startValue,after.endValue]};
+    return {chartSame:chart===window.sampleDashboard.charts.step,dialogSame:dialog===document.querySelector('#plan-dialog'),selectionSame:selection.anchorNode===selectedNode&&selection.anchorOffset===selectedOffset,scrollSame:dialog.scrollTop===scroll&&window.scrollY===pageScroll,draft:document.querySelector('[data-setting="target"]').value,open:document.querySelector('#plan-dialog').open,focus:document.activeElement.id,warning:document.querySelector('#plan-dialog').innerText.includes('Mismatch'),zoom:[before.startValue,before.endValue,after.startValue,after.endValue]};
   })()`);
-  assert.equal(preserved.draft,'77');assert.ok(preserved.open);assert.equal(preserved.focus,'close-plan');assert.ok(preserved.warning);assert.deepEqual(preserved.zoom.slice(0,2),preserved.zoom.slice(2));
+  assert.ok(preserved.chartSame && preserved.dialogSame && preserved.selectionSame && preserved.scrollSame);assert.equal(preserved.draft,'77');assert.ok(preserved.open);assert.equal(preserved.focus,'close-plan');assert.ok(preserved.warning);assert.deepEqual(preserved.zoom.slice(0,2),preserved.zoom.slice(2));
   await evaluate(`document.querySelector('#close-plan').click()`);
   for(const [query,expected] of [['?state=charging','6.0 kW'],['?state=unavailable','Vehicle state unavailable'],['?state=infeasible','falls short'],['?state=partial','01:22:30'],['?state=exception','ABOVE-CAP MINIMUM'],['?state=stale','Vehicle data stale'],['?plan=missing','Unknown efficiency'],['?plan=invalid','Target feasibility is unknown'],['?plan=long','03:30'],['?insights=missing','insight inputs masked']]){await navigate(query);assert.ok((await evaluate('document.body.innerText')).includes(expected),query);assert.ok(await evaluate('document.documentElement.scrollWidth<=innerWidth'));}
   await navigate('?state=waiting');await evaluate(`(()=>{let s=document.querySelector('#sample-state');s.value='charging';s.dispatchEvent(new Event('change',{bubbles:true}))})()`);
@@ -65,7 +69,7 @@ const result=await evaluate(`(()=>{
   const unknown=root.innerText.includes('Unknown'), safe=!root.querySelector('img,script,svg[onload]') && !window.pwned, unavailable=root.innerText.includes('Price chart unavailable');
   const noSample=!root.innerText.includes('SAMPLE DATA') && !root.innerText.includes('48%') && !root.innerText.includes('07:00') && !root.innerText.includes('35 c/kWh');
   const oldButton=root.querySelector('#save-plan');const prior=window.sampleAdapter;instance.update(prior);const old=instance.charts.step;instance.update(fake);oldButton.dispatchEvent(new MouseEvent('click',{bubbles:true}));const disposed=old.isDisposed();
-  root.querySelector('#save-plan').dispatchEvent(new MouseEvent('click',{bubbles:true}));const noDuplicate=saves===2 && selections===1;
+   root.querySelector('#save-plan').dispatchEvent(new MouseEvent('click',{bubbles:true}));const noDuplicate=oldButton===root.querySelector('#save-plan') && saves===3 && selections===1;
   instance.dispose();const empty=!root.hasChildNodes();instance=window.mountSharedDashboard(root,prior);const remount=!!instance.charts.step;const last=instance.charts.step;instance.dispose();root.remove();window.ResizeObserver=NativeResizeObserver;
   return {unknown,safe,unavailable,noSample,disposed,noDuplicate,empty,remount,lastDisposed:last.isDisposed(),observersClean:observers>0 && observers===disconnected};
 })()`);

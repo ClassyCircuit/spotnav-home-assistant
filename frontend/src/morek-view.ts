@@ -111,6 +111,7 @@ export function morekPanel(
   error: string | null,
   act: (action: "status" | "send" | "fetch" | "clear") => void,
   activeAction?: "status" | "send" | "fetch" | "clear" | null,
+  confirmActions = true,
 ): HTMLElement {
   const section = doc.createElement("section");
   section.className = C.morekPanel;
@@ -262,6 +263,7 @@ export function morekPanel(
   if (admin) {
     const actions = doc.createElement("div");
     actions.className = C.morekActions;
+    actions.dataset["morekActions"] = "";
     const choices = state.supported
       ? [["Recalculate preview", "status"], ["Send current plan", "send"], ["Refresh from Morek", "fetch"]] as const
       : [["Check connection again", "status"]] as const;
@@ -270,9 +272,10 @@ export function morekPanel(
       button.type = "button";
       button.className = C.button;
       button.textContent = label;
+      button.dataset["morekAction"] = action;
       button.disabled = busy || (action === "send" && (state.outcomes?.uncertain === true || state.preview === undefined || state.preview.reason !== null || !state.preview.profile || !state.preview.preview_id));
       button.addEventListener("click", () => {
-        if (action === "send" && !doc.defaultView?.confirm(
+        if (confirmActions && action === "send" && !doc.defaultView?.confirm(
           "Recalculate and send the CURRENT plan to Morek? Times may differ from this preview. Its final 0 A limit stays installed until explicitly cleared, even if SpotNav Auto resumes."
         )) return;
         act(action);
@@ -285,9 +288,10 @@ export function morekPanel(
       clear.type = "button";
       clear.className = C.button;
       clear.textContent = "Remove SpotNav schedule";
+      clear.dataset["morekAction"] = "clear";
       clear.disabled = busy;
       clear.addEventListener("click", () => {
-        if (!doc.defaultView?.confirm("Remove ONLY SpotNav schedule profile 42001 from Morek? This removes its persistent 0 A limit. Other installed profiles will not be deliberately cleared. Effective limits may increase. Auto will not be resumed.")) return;
+        if (confirmActions && !doc.defaultView?.confirm("Remove ONLY SpotNav schedule profile 42001 from Morek? This removes its persistent 0 A limit. Other installed profiles will not be deliberately cleared. Effective limits may increase. Auto will not be resumed.")) return;
         act("clear");
       });
       actions.append(clear);

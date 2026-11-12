@@ -44,11 +44,11 @@ var init_chunk_R7QX4M6R = __esm({
             validity.invalidKeys.push("customError");
             return validity;
           }
-          for (const key2 in formControl.validity) {
-            if (key2 === "valid") {
+          for (const key3 in formControl.validity) {
+            if (key3 === "valid") {
               continue;
             }
-            const checkedKey = key2;
+            const checkedKey = key3;
             if (formControl.validity[checkedKey]) {
               validity.invalidKeys.push(checkedKey);
             }
@@ -81,12 +81,12 @@ var init_chunk_7VGCIHDG = __esm({
     __typeError = (msg) => {
       throw TypeError(msg);
     };
-    __decorateClass = (decorators, target, key2, kind) => {
-      var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc(target, key2) : target;
+    __decorateClass = (decorators, target, key3, kind) => {
+      var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc(target, key3) : target;
       for (var i7 = decorators.length - 1, decorator; i7 >= 0; i7--)
         if (decorator = decorators[i7])
-          result = (kind ? decorator(target, key2, result) : decorator(result)) || result;
-      if (kind && result) __defProp2(target, key2, result);
+          result = (kind ? decorator(target, key3, result) : decorator(result)) || result;
+      if (kind && result) __defProp2(target, key3, result);
       return result;
     };
     __accessCheck = (obj, member, msg) => member.has(obj) || __typeError("Cannot " + msg);
@@ -1958,10 +1958,10 @@ function watch(propertyName, options) {
     const watchedProperties = Array.isArray(propertyName) ? propertyName : [propertyName];
     proto.update = function(changedProps) {
       watchedProperties.forEach((property) => {
-        const key2 = property;
-        if (changedProps.has(key2)) {
-          const oldValue = changedProps.get(key2);
-          const newValue = this[key2];
+        const key3 = property;
+        if (changedProps.has(key3)) {
+          const oldValue = changedProps.get(key3);
+          const newValue = this[key3];
           if (oldValue !== newValue) {
             if (!resolvedOptions.waitUntilFirstUpdate || this.hasUpdated) {
               this[decoratedFnName](oldValue, newValue);
@@ -2058,27 +2058,27 @@ var init_dist = __esm({
         const secondary = translations.get(language);
         return { locale, language, region, primary, secondary };
       }
-      exists(key2, options) {
+      exists(key3, options) {
         var _a2;
         const { primary, secondary } = this.getTranslationData((_a2 = options.lang) !== null && _a2 !== void 0 ? _a2 : this.lang());
         options = Object.assign({ includeFallback: false }, options);
-        if (primary && primary[key2] || secondary && secondary[key2] || options.includeFallback && fallback && fallback[key2]) {
+        if (primary && primary[key3] || secondary && secondary[key3] || options.includeFallback && fallback && fallback[key3]) {
           return true;
         }
         return false;
       }
-      term(key2, ...args) {
+      term(key3, ...args) {
         const { primary, secondary } = this.getTranslationData(this.lang());
         let term;
-        if (primary && primary[key2]) {
-          term = primary[key2];
-        } else if (secondary && secondary[key2]) {
-          term = secondary[key2];
-        } else if (fallback && fallback[key2]) {
-          term = fallback[key2];
+        if (primary && primary[key3]) {
+          term = primary[key3];
+        } else if (secondary && secondary[key3]) {
+          term = secondary[key3];
+        } else if (fallback && fallback[key3]) {
+          term = fallback[key3];
         } else {
-          console.error(`No translation found for: ${String(key2)}`);
-          return String(key2);
+          console.error(`No translation found for: ${String(key3)}`);
+          return String(key3);
         }
         if (typeof term === "function") {
           return term(...args);
@@ -6323,9 +6323,9 @@ function clone(source) {
     }
   } else if (!BUILTIN_OBJECT[typeStr] && !isPrimitive(source) && !isDom(source)) {
     result = {};
-    for (var key2 in source) {
-      if (source.hasOwnProperty(key2) && key2 !== protoKey) {
-        result[key2] = clone(source[key2]);
+    for (var key3 in source) {
+      if (source.hasOwnProperty(key3) && key3 !== protoKey) {
+        result[key3] = clone(source[key3]);
       }
     }
   }
@@ -6335,14 +6335,14 @@ function merge(target, source, overwrite) {
   if (!isObject(source) || !isObject(target)) {
     return overwrite ? clone(source) : target;
   }
-  for (var key2 in source) {
-    if (source.hasOwnProperty(key2) && key2 !== protoKey) {
-      var targetProp = target[key2];
-      var sourceProp = source[key2];
+  for (var key3 in source) {
+    if (source.hasOwnProperty(key3) && key3 !== protoKey) {
+      var targetProp = target[key3];
+      var sourceProp = source[key3];
       if (isObject(sourceProp) && isObject(targetProp) && !isArray(sourceProp) && !isArray(targetProp) && !isDom(sourceProp) && !isDom(targetProp) && !isBuiltInObject(sourceProp) && !isBuiltInObject(targetProp) && !isPrimitive(sourceProp) && !isPrimitive(targetProp)) {
         merge(targetProp, sourceProp, overwrite);
-      } else if (overwrite || !(key2 in target)) {
-        target[key2] = clone(source[key2]);
+      } else if (overwrite || !(key3 in target)) {
+        target[key3] = clone(source[key3]);
       }
     }
   }
@@ -6359,9 +6359,9 @@ function extend(target, source) {
   if (Object.assign) {
     Object.assign(target, source);
   } else {
-    for (var key2 in source) {
-      if (source.hasOwnProperty(key2) && key2 !== protoKey) {
-        target[key2] = source[key2];
+    for (var key3 in source) {
+      if (source.hasOwnProperty(key3) && key3 !== protoKey) {
+        target[key3] = source[key3];
       }
     }
   }
@@ -6378,9 +6378,9 @@ function assignProps(tar, src, props) {
 function defaults(target, source, overlay) {
   var keysArr = keys(source);
   for (var i7 = 0, len2 = keysArr.length; i7 < len2; i7++) {
-    var key2 = keysArr[i7];
-    if (overlay ? source[key2] != null : target[key2] == null) {
-      target[key2] = source[key2];
+    var key3 = keysArr[i7];
+    if (overlay ? source[key3] != null : target[key3] == null) {
+      target[key3] = source[key3];
     }
   }
   return target;
@@ -6419,10 +6419,10 @@ function mixin(target, source, override) {
   if (Object.getOwnPropertyNames) {
     var keyList = Object.getOwnPropertyNames(source);
     for (var i7 = 0; i7 < keyList.length; i7++) {
-      var key2 = keyList[i7];
-      if (key2 !== "constructor") {
-        if (override ? source[key2] != null : target[key2] == null) {
-          target[key2] = source[key2];
+      var key3 = keyList[i7];
+      if (key3 !== "constructor") {
+        if (override ? source[key3] != null : target[key3] == null) {
+          target[key3] = source[key3];
         }
       }
     }
@@ -6450,9 +6450,9 @@ function each(arr, cb, context) {
       cb.call(context, arr[i7], i7, arr);
     }
   } else {
-    for (var key2 in arr) {
-      if (arr.hasOwnProperty(key2)) {
-        cb.call(context, arr[key2], key2, arr);
+    for (var key3 in arr) {
+      if (arr.hasOwnProperty(key3)) {
+        cb.call(context, arr[key3], key3, arr);
       }
     }
   }
@@ -6520,9 +6520,9 @@ function keys(obj) {
     return Object.keys(obj);
   }
   var keyList = [];
-  for (var key2 in obj) {
-    if (obj.hasOwnProperty(key2)) {
-      keyList.push(key2);
+  for (var key3 in obj) {
+    if (obj.hasOwnProperty(key3)) {
+      keyList.push(key3);
     }
   }
   return keyList;
@@ -6650,21 +6650,21 @@ var MapPolyfill = (function() {
   function MapPolyfill2() {
     this.data = {};
   }
-  MapPolyfill2.prototype["delete"] = function(key2) {
-    var existed = this.has(key2);
+  MapPolyfill2.prototype["delete"] = function(key3) {
+    var existed = this.has(key3);
     if (existed) {
-      delete this.data[key2];
+      delete this.data[key3];
     }
     return existed;
   };
-  MapPolyfill2.prototype.has = function(key2) {
-    return this.data.hasOwnProperty(key2);
+  MapPolyfill2.prototype.has = function(key3) {
+    return this.data.hasOwnProperty(key3);
   };
-  MapPolyfill2.prototype.get = function(key2) {
-    return this.data[key2];
+  MapPolyfill2.prototype.get = function(key3) {
+    return this.data[key3];
   };
-  MapPolyfill2.prototype.set = function(key2, value2) {
-    this.data[key2] = value2;
+  MapPolyfill2.prototype.set = function(key3, value2) {
+    this.data[key3] = value2;
     return this;
   };
   MapPolyfill2.prototype.keys = function() {
@@ -6672,9 +6672,9 @@ var MapPolyfill = (function() {
   };
   MapPolyfill2.prototype.forEach = function(callback) {
     var data = this.data;
-    for (var key2 in data) {
-      if (data.hasOwnProperty(key2)) {
-        callback(data[key2], key2);
+    for (var key3 in data) {
+      if (data.hasOwnProperty(key3)) {
+        callback(data[key3], key3);
       }
     }
   };
@@ -6690,31 +6690,31 @@ var HashMap = (function() {
     this.data = maybeNativeMap();
     var thisMap = this;
     obj instanceof HashMap2 ? obj.each(visit) : obj && each(obj, visit);
-    function visit(value2, key2) {
-      isArr ? thisMap.set(value2, key2) : thisMap.set(key2, value2);
+    function visit(value2, key3) {
+      isArr ? thisMap.set(value2, key3) : thisMap.set(key3, value2);
     }
   }
-  HashMap2.prototype.hasKey = function(key2) {
-    return this.data.has(key2);
+  HashMap2.prototype.hasKey = function(key3) {
+    return this.data.has(key3);
   };
-  HashMap2.prototype.get = function(key2) {
-    return this.data.get(key2);
+  HashMap2.prototype.get = function(key3) {
+    return this.data.get(key3);
   };
-  HashMap2.prototype.set = function(key2, value2) {
-    this.data.set(key2, value2);
+  HashMap2.prototype.set = function(key3, value2) {
+    this.data.set(key3, value2);
     return value2;
   };
   HashMap2.prototype.each = function(cb, context) {
-    this.data.forEach(function(value2, key2) {
-      cb.call(context, value2, key2);
+    this.data.forEach(function(value2, key3) {
+      cb.call(context, value2, key3);
     });
   };
   HashMap2.prototype.keys = function() {
     var keys2 = this.data.keys();
     return isNativeMapSupported ? Array.from(keys2) : keys2;
   };
-  HashMap2.prototype.removeKey = function(key2) {
-    this.data["delete"](key2);
+  HashMap2.prototype.removeKey = function(key3) {
+    this.data["delete"](key3);
   };
   return HashMap2;
 })();
@@ -9557,11 +9557,11 @@ var LRU = (function() {
     this._map = {};
     this._maxSize = maxSize;
   }
-  LRU2.prototype.put = function(key2, value2) {
+  LRU2.prototype.put = function(key3, value2) {
     var list2 = this._list;
     var map3 = this._map;
     var removed = null;
-    if (map3[key2] == null) {
+    if (map3[key3] == null) {
       var len2 = list2.len();
       var entry = this._lastRemovedEntry;
       if (len2 >= this._maxSize && len2 > 0) {
@@ -9576,14 +9576,14 @@ var LRU = (function() {
       } else {
         entry = new Entry(value2);
       }
-      entry.key = key2;
+      entry.key = key3;
       list2.insertEntry(entry);
-      map3[key2] = entry;
+      map3[key3] = entry;
     }
     return removed;
   };
-  LRU2.prototype.get = function(key2) {
-    var entry = this._map[key2];
+  LRU2.prototype.get = function(key3) {
+    var entry = this._map[key3];
     var list2 = this._list;
     if (entry != null) {
       if (entry !== list2.tail) {
@@ -10724,8 +10724,8 @@ var Animator = (function() {
   };
   Animator2.prototype.getTracks = function() {
     var _this = this;
-    return map(this._trackKeys, function(key2) {
-      return _this._tracks[key2];
+    return map(this._trackKeys, function(key3) {
+      return _this._tracks[key3];
     });
   };
   Animator2.prototype.stopTracks = function(propNames, forwardToLast) {
@@ -11682,8 +11682,8 @@ function calculateTextPosition(out2, opts, rect) {
 // node_modules/zrender/lib/Element.js
 var PRESERVED_NORMAL_STATE = "__zr_normal__";
 var PRIMARY_STATES_KEYS = TRANSFORMABLE_PROPS.concat(["ignore"]);
-var DEFAULT_ANIMATABLE_MAP = reduce(TRANSFORMABLE_PROPS, function(obj, key2) {
-  obj[key2] = true;
+var DEFAULT_ANIMATABLE_MAP = reduce(TRANSFORMABLE_PROPS, function(obj, key3) {
+  obj[key3] = true;
   return obj;
 }, { ignore: false });
 var tmpTextPosCalcRes = {};
@@ -11876,18 +11876,18 @@ var Element = (function() {
   };
   Element2.prototype.traverse = function(cb, context) {
   };
-  Element2.prototype.attrKV = function(key2, value2) {
-    if (key2 === "textConfig") {
+  Element2.prototype.attrKV = function(key3, value2) {
+    if (key3 === "textConfig") {
       this.setTextConfig(value2);
-    } else if (key2 === "textContent") {
+    } else if (key3 === "textContent") {
       this.setTextContent(value2);
-    } else if (key2 === "clipPath") {
+    } else if (key3 === "clipPath") {
       this.setClipPath(value2);
-    } else if (key2 === "extra") {
+    } else if (key3 === "extra") {
       this.extra = this.extra || {};
       extend(this.extra, value2);
     } else {
-      this[key2] = value2;
+      this[key3] = value2;
     }
   };
   Element2.prototype.hide = function() {
@@ -11905,8 +11905,8 @@ var Element = (function() {
       var obj = keyOrObj;
       var keysArr = keys(obj);
       for (var i7 = 0; i7 < keysArr.length; i7++) {
-        var key2 = keysArr[i7];
-        this.attrKV(key2, keyOrObj[key2]);
+        var key3 = keysArr[i7];
+        this.attrKV(key3, keyOrObj[key3]);
       }
     }
     this.markRedraw();
@@ -11938,9 +11938,9 @@ var Element = (function() {
   };
   Element2.prototype._savePrimaryToNormal = function(toState, normalState, primaryKeys) {
     for (var i7 = 0; i7 < primaryKeys.length; i7++) {
-      var key2 = primaryKeys[i7];
-      if (toState[key2] != null && !(key2 in normalState)) {
-        normalState[key2] = this[key2];
+      var key3 = primaryKeys[i7];
+      if (toState[key3] != null && !(key3 in normalState)) {
+        normalState[key3] = this[key3];
       }
     }
   };
@@ -12155,22 +12155,22 @@ var Element = (function() {
     var transitionTarget = {};
     var hasTransition = false;
     for (var i7 = 0; i7 < PRIMARY_STATES_KEYS.length; i7++) {
-      var key2 = PRIMARY_STATES_KEYS[i7];
-      var propNeedsTransition = transition && DEFAULT_ANIMATABLE_MAP[key2];
-      if (state && state[key2] != null) {
+      var key3 = PRIMARY_STATES_KEYS[i7];
+      var propNeedsTransition = transition && DEFAULT_ANIMATABLE_MAP[key3];
+      if (state && state[key3] != null) {
         if (propNeedsTransition) {
           hasTransition = true;
-          transitionTarget[key2] = state[key2];
+          transitionTarget[key3] = state[key3];
         } else {
-          this[key2] = state[key2];
+          this[key3] = state[key3];
         }
       } else if (needsRestoreToNormal) {
-        if (normalState[key2] != null) {
+        if (normalState[key3] != null) {
           if (propNeedsTransition) {
             hasTransition = true;
-            transitionTarget[key2] = normalState[key2];
+            transitionTarget[key3] = normalState[key3];
           } else {
-            this[key2] = normalState[key2];
+            this[key3] = normalState[key3];
           }
         }
       }
@@ -12354,24 +12354,24 @@ var Element = (function() {
       this._textGuide.removeSelfFromZr(zr);
     }
   };
-  Element2.prototype.animate = function(key2, loop, allowDiscreteAnimation) {
-    var target = key2 ? this[key2] : this;
+  Element2.prototype.animate = function(key3, loop, allowDiscreteAnimation) {
+    var target = key3 ? this[key3] : this;
     if (true) {
       if (!target) {
-        logError('Property "' + key2 + '" is not existed in element ' + this.id);
+        logError('Property "' + key3 + '" is not existed in element ' + this.id);
         return;
       }
     }
     var animator = new Animator_default(target, loop, allowDiscreteAnimation);
-    key2 && (animator.targetName = key2);
-    this.addAnimator(animator, key2);
+    key3 && (animator.targetName = key3);
+    this.addAnimator(animator, key3);
     return animator;
   };
-  Element2.prototype.addAnimator = function(animator, key2) {
+  Element2.prototype.addAnimator = function(animator, key3) {
     var zr = this.__zr;
     var el = this;
     animator.during(function() {
-      el.updateDuringAnimation(key2);
+      el.updateDuringAnimation(key3);
     }).done(function() {
       var animators = el.animators;
       var idx = indexOf(animators, animator);
@@ -12385,7 +12385,7 @@ var Element = (function() {
     }
     zr && zr.wakeUp();
   };
-  Element2.prototype.updateDuringAnimation = function(key2) {
+  Element2.prototype.updateDuringAnimation = function(key3) {
     this.markRedraw();
   };
   Element2.prototype.stopAnimation = function(scope, forwardToLast) {
@@ -12429,17 +12429,17 @@ var Element = (function() {
     elProto.__inHover = IN_HOVER_LAYER_KIND_NO;
     elProto.__dirty = REDRAW_BIT;
     var logs = {};
-    function logDeprecatedError(key2, xKey, yKey) {
-      if (!logs[key2 + xKey + yKey]) {
-        console.warn("DEPRECATED: '" + key2 + "' has been deprecated. use '" + xKey + "', '" + yKey + "' instead");
-        logs[key2 + xKey + yKey] = true;
+    function logDeprecatedError(key3, xKey, yKey) {
+      if (!logs[key3 + xKey + yKey]) {
+        console.warn("DEPRECATED: '" + key3 + "' has been deprecated. use '" + xKey + "', '" + yKey + "' instead");
+        logs[key3 + xKey + yKey] = true;
       }
     }
-    function createLegacyProperty(key2, privateKey, xKey, yKey) {
-      Object.defineProperty(elProto, key2, {
+    function createLegacyProperty(key3, privateKey, xKey, yKey) {
+      Object.defineProperty(elProto, key3, {
         get: function() {
           if (true) {
-            logDeprecatedError(key2, xKey, yKey);
+            logDeprecatedError(key3, xKey, yKey);
           }
           if (!this[privateKey]) {
             var pos = this[privateKey] = [];
@@ -12449,7 +12449,7 @@ var Element = (function() {
         },
         set: function(pos) {
           if (true) {
-            logDeprecatedError(key2, xKey, yKey);
+            logDeprecatedError(key3, xKey, yKey);
           }
           this[xKey] = pos[0];
           this[yKey] = pos[1];
@@ -12538,20 +12538,20 @@ function copyArrShallow(source, target, len2) {
 function is2DArray(value2) {
   return isArrayLike(value2[0]);
 }
-function copyValue(target, source, key2) {
-  if (isArrayLike(source[key2])) {
-    if (!isArrayLike(target[key2])) {
-      target[key2] = [];
+function copyValue(target, source, key3) {
+  if (isArrayLike(source[key3])) {
+    if (!isArrayLike(target[key3])) {
+      target[key3] = [];
     }
-    if (isTypedArray(source[key2])) {
-      var len2 = source[key2].length;
-      if (target[key2].length !== len2) {
-        target[key2] = new source[key2].constructor(len2);
-        copyArrShallow(target[key2], source[key2], len2);
+    if (isTypedArray(source[key3])) {
+      var len2 = source[key3].length;
+      if (target[key3].length !== len2) {
+        target[key3] = new source[key3].constructor(len2);
+        copyArrShallow(target[key3], source[key3], len2);
       }
     } else {
-      var sourceArr = source[key2];
-      var targetArr = target[key2];
+      var sourceArr = source[key3];
+      var targetArr = target[key3];
       var len0 = sourceArr.length;
       if (is2DArray(sourceArr)) {
         var len1 = sourceArr[0].length;
@@ -12568,7 +12568,7 @@ function copyValue(target, source, key2) {
       targetArr.length = sourceArr.length;
     }
   } else {
-    target[key2] = source[key2];
+    target[key3] = source[key3];
   }
 }
 function isValueSame(val1, val2) {
@@ -12631,8 +12631,8 @@ function animateToShallow(animatable, topKey, animateObj, target, cfg, animation
     }
   }
   if (!cfg.force) {
-    animationKeys = filter(animationKeys, function(key2) {
-      return !isValueSame(target[key2], animateObj[key2]);
+    animationKeys = filter(animationKeys, function(key3) {
+      return !isValueSame(target[key3], animateObj[key3]);
     });
     keyLen = animationKeys.length;
   }
@@ -13519,15 +13519,15 @@ var INTERNAL_COMPONENT_ID_PREFIX = "\0_ec_\0";
 function normalizeToArray(value2) {
   return value2 instanceof Array ? value2 : value2 == null ? [] : [value2];
 }
-function defaultEmphasis(opt, key2, subOpts) {
+function defaultEmphasis(opt, key3, subOpts) {
   if (opt) {
-    opt[key2] = opt[key2] || {};
+    opt[key3] = opt[key3] || {};
     opt.emphasis = opt.emphasis || {};
-    opt.emphasis[key2] = opt.emphasis[key2] || {};
+    opt.emphasis[key3] = opt.emphasis[key3] || {};
     for (var i7 = 0, len2 = subOpts.length; i7 < len2; i7++) {
       var subOptName = subOpts[i7];
-      if (!opt.emphasis[key2].hasOwnProperty(subOptName) && opt[key2].hasOwnProperty(subOptName)) {
-        opt.emphasis[key2][subOptName] = opt[key2][subOptName];
+      if (!opt.emphasis[key3].hasOwnProperty(subOptName) && opt[key3].hasOwnProperty(subOptName)) {
+        opt.emphasis[key3][subOptName] = opt[key3][subOptName];
       }
     }
   }
@@ -13698,8 +13698,8 @@ function makeIdAndName(mapResult) {
 }
 function keyExistAndEqual(attr, obj1, obj2) {
   var key1 = convertOptionIdName(obj1[attr], null);
-  var key2 = convertOptionIdName(obj2[attr], null);
-  return key1 != null && key2 != null && key1 === key2;
+  var key22 = convertOptionIdName(obj2[attr], null);
+  return key1 != null && key22 != null && key1 === key22;
 }
 function makeComparableKey(val) {
   if (true) {
@@ -13799,9 +13799,9 @@ function queryDataIndex(data, payload) {
   }
 }
 function makeInner() {
-  var key2 = "__ec_inner_" + innerUniqueIndex++;
+  var key3 = "__ec_inner_" + innerUniqueIndex++;
   return function(hostObj) {
-    return hostObj[key2] || (hostObj[key2] = {});
+    return hostObj[key3] || (hostObj[key3] = {});
   };
 }
 var innerUniqueIndex = getRandomIdBase();
@@ -13835,12 +13835,12 @@ function preParseFinder(finderInput, opt) {
   var queryOptionMap = createHashMap();
   var others = {};
   var mainTypeSpecified = false;
-  each(finder, function(value2, key2) {
-    if (key2 === "dataIndex" || key2 === "dataIndexInside") {
-      others[key2] = value2;
+  each(finder, function(value2, key3) {
+    if (key3 === "dataIndex" || key3 === "dataIndexInside") {
+      others[key3] = value2;
       return;
     }
-    var parsedKey = key2.match(/^(\w+)(Index|Id|Name)$/) || [];
+    var parsedKey = key3.match(/^(\w+)(Index|Id|Name)$/) || [];
     var mainType = parsedKey[1];
     var queryType = (parsedKey[2] || "").toLowerCase();
     if (!mainType || !queryType || opt && opt.includeMainTypes && indexOf(opt.includeMainTypes, mainType) < 0) {
@@ -13924,11 +13924,11 @@ function makeQueryConditionKindA(payload, mainType, subType) {
   subType && (condition.subType = subType);
   return condition;
 }
-function setAttribute(dom, key2, value2) {
-  dom.setAttribute ? dom.setAttribute(key2, value2) : dom[key2] = value2;
+function setAttribute(dom, key3, value2) {
+  dom.setAttribute ? dom.setAttribute(key3, value2) : dom[key3] = value2;
 }
-function getAttribute(dom, key2) {
-  return dom.getAttribute ? dom.getAttribute(key2) : dom[key2];
+function getAttribute(dom, key3) {
+  return dom.getAttribute ? dom.getAttribute(key3) : dom[key3];
 }
 function getTooltipRenderMode(renderModeOption) {
   if (renderModeOption === "auto") {
@@ -14048,18 +14048,18 @@ function removeDuplicates(arr, getKey2, resolve) {
   var dupMap = createHashMap();
   var writeIdx = 0;
   each(arr, function(item) {
-    var key2 = getKey2(item);
+    var key3 = getKey2(item);
     if (true) {
-      assert(isString(key2));
+      assert(isString(key3));
     }
-    var count = dupMap.get(key2) || 0;
+    var count = dupMap.get(key3) || 0;
     if (resolve) {
       resolve(item, count);
     }
     if (!count && !resolve) {
       arr[writeIdx++] = item;
     }
-    dupMap.set(key2, count + 1);
+    dupMap.set(key3, count + 1);
   });
   if (!resolve) {
     arr.length = writeIdx;
@@ -14894,11 +14894,11 @@ var Displayable = (function(_super) {
   Displayable2.prototype._init = function(props) {
     var keysArr = keys(props);
     for (var i7 = 0; i7 < keysArr.length; i7++) {
-      var key2 = keysArr[i7];
-      if (key2 === "style") {
-        this.useStyle(props[key2]);
+      var key3 = keysArr[i7];
+      if (key3 === "style") {
+        this.useStyle(props[key3]);
       } else {
-        _super.prototype.attrKV.call(this, key2, props[key2]);
+        _super.prototype.attrKV.call(this, key3, props[key3]);
       }
     }
     if (!this.style) {
@@ -14999,9 +14999,9 @@ var Displayable = (function(_super) {
       this.markRedraw();
     }
   };
-  Displayable2.prototype.attrKV = function(key2, value2) {
-    if (key2 !== "style") {
-      _super.prototype.attrKV.call(this, key2, value2);
+  Displayable2.prototype.attrKV = function(key3, value2) {
+    if (key3 !== "style") {
+      _super.prototype.attrKV.call(this, key3, value2);
     } else {
       if (!this.style) {
         this.useStyle(value2);
@@ -15088,17 +15088,17 @@ var Displayable = (function(_super) {
         if (needsRestoreToNormal) {
           var changedKeys = keys(sourceStyle);
           for (var i7 = 0; i7 < changedKeys.length; i7++) {
-            var key2 = changedKeys[i7];
-            if (key2 in targetStyle) {
-              targetStyle[key2] = targetStyle[key2];
-              this.style[key2] = sourceStyle[key2];
+            var key3 = changedKeys[i7];
+            if (key3 in targetStyle) {
+              targetStyle[key3] = targetStyle[key3];
+              this.style[key3] = sourceStyle[key3];
             }
           }
         }
         var targetKeys = keys(targetStyle);
         for (var i7 = 0; i7 < targetKeys.length; i7++) {
-          var key2 = targetKeys[i7];
-          this.style[key2] = this.style[key2];
+          var key3 = targetKeys[i7];
+          this.style[key3] = this.style[key3];
         }
         this._transitionState(stateName, {
           style: targetStyle
@@ -15114,12 +15114,12 @@ var Displayable = (function(_super) {
     if (!inHoverOnlyStyleChange) {
       var statesKeys = this.__inHover ? PRIMARY_STATES_KEYS_IN_HOVER_LAYER : PRIMARY_STATES_KEYS2;
       for (var i7 = 0; i7 < statesKeys.length; i7++) {
-        var key2 = statesKeys[i7];
-        if (state && state[key2] != null) {
-          this[key2] = state[key2];
+        var key3 = statesKeys[i7];
+        if (state && state[key3] != null) {
+          this[key3] = state[key3];
         } else if (needsRestoreToNormal) {
-          if (normalState[key2] != null) {
-            this[key2] = normalState[key2];
+          if (normalState[key3] != null) {
+            this[key3] = normalState[key3];
           }
         }
       }
@@ -16422,9 +16422,9 @@ var Path = (function(_super) {
       }
       decalEl.silent = true;
       var decalElStyle = decalEl.style;
-      for (var key2 in style) {
-        if (decalElStyle[key2] !== style[key2]) {
-          decalElStyle[key2] = style[key2];
+      for (var key3 in style) {
+        if (decalElStyle[key3] !== style[key3]) {
+          decalElStyle[key3] = style[key3];
         }
       }
       decalElStyle.fill = style.fill ? style.decal : null;
@@ -16450,18 +16450,18 @@ var Path = (function(_super) {
       this.useStyle(defaultStyle);
     }
     for (var i7 = 0; i7 < keysArr.length; i7++) {
-      var key2 = keysArr[i7];
-      var value2 = props[key2];
-      if (key2 === "style") {
+      var key3 = keysArr[i7];
+      var value2 = props[key3];
+      if (key3 === "style") {
         if (!this.style) {
           this.useStyle(value2);
         } else {
           extend(this.style, value2);
         }
-      } else if (key2 === "shape") {
+      } else if (key3 === "shape") {
         extend(this.shape, value2);
       } else {
-        _super.prototype.attrKV.call(this, key2, value2);
+        _super.prototype.attrKV.call(this, key3, value2);
       }
     }
     if (!this.style) {
@@ -16621,11 +16621,11 @@ var Path = (function(_super) {
       this.markRedraw();
     }
   };
-  Path2.prototype.attrKV = function(key2, value2) {
-    if (key2 === "shape") {
+  Path2.prototype.attrKV = function(key3, value2) {
+    if (key3 === "shape") {
       this.setShape(value2);
     } else {
-      _super.prototype.attrKV.call(this, key2, value2);
+      _super.prototype.attrKV.call(this, key3, value2);
     }
   };
   Path2.prototype.setShape = function(keyOrObj, value2) {
@@ -16682,11 +16682,11 @@ var Path = (function(_super) {
         var targetShapePrimaryProps = {};
         var shapeKeys = keys(targetShape);
         for (var i7 = 0; i7 < shapeKeys.length; i7++) {
-          var key2 = shapeKeys[i7];
-          if (typeof targetShape[key2] === "object") {
-            this.shape[key2] = targetShape[key2];
+          var key3 = shapeKeys[i7];
+          if (typeof targetShape[key3] === "object") {
+            this.shape[key3] = targetShape[key3];
           } else {
-            targetShapePrimaryProps[key2] = targetShape[key2];
+            targetShapePrimaryProps[key3] = targetShape[key3];
           }
         }
         this._transitionState(stateName, {
@@ -16735,9 +16735,9 @@ var Path = (function(_super) {
       };
       return Sub2;
     })(Path2);
-    for (var key2 in defaultProps) {
-      if (typeof defaultProps[key2] === "function") {
-        Sub.prototype[key2] = defaultProps[key2];
+    for (var key3 in defaultProps) {
+      if (typeof defaultProps[key3] === "function") {
+        Sub.prototype[key3] = defaultProps[key3];
       }
     }
     return Sub;
@@ -20090,10 +20090,10 @@ function setTooltipConfig(opt) {
   formatterParams[mainType + "Index"] = componentIndex;
   var formatterParamsExtra = opt.formatterParamsExtra;
   if (formatterParamsExtra) {
-    each(keys(formatterParamsExtra), function(key2) {
-      if (!hasOwn(formatterParams, key2)) {
-        formatterParams[key2] = formatterParamsExtra[key2];
-        formatterParams.$vars.push(key2);
+    each(keys(formatterParamsExtra), function(key3) {
+      if (!hasOwn(formatterParams, key3)) {
+        formatterParams[key3] = formatterParamsExtra[key3];
+        formatterParams.$vars.push(key3);
       }
     });
   }
@@ -20529,17 +20529,17 @@ function setTokenTextStyle(textStyle, textStyleModel, globalTextStyle, plainText
     }
   }
   for (var i7 = 0; i7 < TEXT_PROPS_WITH_GLOBAL.length; i7++) {
-    var key2 = TEXT_PROPS_WITH_GLOBAL[i7];
-    var val = richInheritPlainLabel !== false && plainTextModel ? retrieve3(textStyleModel.getShallow(key2), plainTextModel.getShallow(key2), globalTextStyle[key2]) : retrieve2(textStyleModel.getShallow(key2), globalTextStyle[key2]);
+    var key3 = TEXT_PROPS_WITH_GLOBAL[i7];
+    var val = richInheritPlainLabel !== false && plainTextModel ? retrieve3(textStyleModel.getShallow(key3), plainTextModel.getShallow(key3), globalTextStyle[key3]) : retrieve2(textStyleModel.getShallow(key3), globalTextStyle[key3]);
     if (val != null) {
-      textStyle[key2] = val;
+      textStyle[key3] = val;
     }
   }
   for (var i7 = 0; i7 < TEXT_PROPS_SELF.length; i7++) {
-    var key2 = TEXT_PROPS_SELF[i7];
-    var val = textStyleModel.getShallow(key2);
+    var key3 = TEXT_PROPS_SELF[i7];
+    var val = textStyleModel.getShallow(key3);
     if (val != null) {
-      textStyle[key2] = val;
+      textStyle[key3] = val;
     }
   }
   if (textStyle.verticalAlign == null) {
@@ -20550,10 +20550,10 @@ function setTokenTextStyle(textStyle, textStyleModel, globalTextStyle, plainText
   }
   if (!isBlock || !opt.disableBox) {
     for (var i7 = 0; i7 < TEXT_PROPS_BOX.length; i7++) {
-      var key2 = TEXT_PROPS_BOX[i7];
-      var val = textStyleModel.getShallow(key2);
+      var key3 = TEXT_PROPS_BOX[i7];
+      var val = textStyleModel.getShallow(key3);
       if (val != null) {
-        textStyle[key2] = val;
+        textStyle[key3] = val;
       }
     }
     var borderType = textStyleModel.getShallow("borderType");
@@ -20717,13 +20717,13 @@ var Model = (
       }
       return this._doGet(this.parsePath(path), !ignoreParent && this.parentModel);
     };
-    Model2.prototype.getShallow = function(key2, ignoreParent) {
+    Model2.prototype.getShallow = function(key3, ignoreParent) {
       var option = this.option;
-      var val = option == null ? option : option[key2];
+      var val = option == null ? option : option[key3];
       if (val == null && !ignoreParent) {
         var parentModel = this.parentModel;
         if (parentModel) {
-          val = parentModel.getShallow(key2);
+          val = parentModel.getShallow(key3);
         }
       }
       return val;
@@ -22298,7 +22298,7 @@ function makeSeriesEncodeForAxisCoordSys(coordDimensions, seriesModel, source) {
   var encodeSeriesName = [];
   var ecModel = seriesModel.ecModel;
   var datasetMap = innerGlobalModel(ecModel).datasetMap;
-  var key2 = datasetModel.uid + "_" + source.seriesLayoutBy;
+  var key3 = datasetModel.uid + "_" + source.seriesLayoutBy;
   var baseCategoryDimIndex;
   var categoryWayValueDimStart;
   coordDimensions = coordDimensions.slice();
@@ -22312,7 +22312,7 @@ function makeSeriesEncodeForAxisCoordSys(coordDimensions, seriesModel, source) {
     }
     encode[coordDimInfo.name] = [];
   });
-  var datasetRecord = datasetMap.get(key2) || datasetMap.set(key2, {
+  var datasetRecord = datasetMap.get(key3) || datasetMap.set(key3, {
     categoryWayDim: categoryWayValueDimStart,
     valueWayDim: 0
   });
@@ -23557,14 +23557,14 @@ function get(opt, path) {
 function set2(opt, path, val, overwrite) {
   var pathArr = path.split(",");
   var obj = opt;
-  var key2;
+  var key3;
   var i7 = 0;
   for (; i7 < pathArr.length - 1; i7++) {
-    key2 = pathArr[i7];
-    if (obj[key2] == null) {
-      obj[key2] = {};
+    key3 = pathArr[i7];
+    if (obj[key3] == null) {
+      obj[key3] = {};
     }
-    obj = obj[key2];
+    obj = obj[key3];
   }
   if (overwrite || obj[pathArr[i7]] == null) {
     obj[pathArr[i7]] = val;
@@ -23913,8 +23913,8 @@ function detectSourceFormat(data) {
       }
     }
   } else if (isObject(data)) {
-    for (var key2 in data) {
-      if (hasOwn(data, key2) && isArrayLike(data[key2])) {
+    for (var key3 in data) {
+      if (hasOwn(data, key3) && isArrayLike(data[key3])) {
         sourceFormat = SOURCE_FORMAT_KEYED_COLUMNS;
         break;
       }
@@ -23961,8 +23961,8 @@ function determineSourceDimensions(data, sourceFormat, seriesLayoutBy, sourceHea
   } else if (sourceFormat === SOURCE_FORMAT_KEYED_COLUMNS) {
     if (!dimensionsDefine) {
       dimensionsDefine = [];
-      each(data, function(colArr, key2) {
-        dimensionsDefine.push(key2);
+      each(data, function(colArr, key3) {
+        dimensionsDefine.push(key3);
       });
     }
   } else if (sourceFormat === SOURCE_FORMAT_ORIGINAL) {
@@ -24158,8 +24158,8 @@ var DefaultDataProvider = (
         pure: true,
         appendData: function(newData) {
           var data = this._data;
-          each(newData, function(newCol, key2) {
-            var oldCol = data[key2] || (data[key2] = []);
+          each(newData, function(newCol, key3) {
+            var oldCol = data[key3] || (data[key3] = []);
             for (var i7 = 0; i7 < (newCol || []).length; i7++) {
               oldCol.push(newCol[i7]);
             }
@@ -27141,8 +27141,8 @@ var dataColorPaletteTask = {
     var paletteScopeGroupByType = createHashMap();
     ecModel.eachSeries(function(seriesModel) {
       if (!seriesModel.isColorBySeries()) {
-        var key2 = seriesModel.type + "-" + seriesModel.getColorBy();
-        inner4(seriesModel).scope = paletteScopeGroupByType.get(key2) || paletteScopeGroupByType.set(key2, {});
+        var key3 = seriesModel.type + "-" + seriesModel.getColorBy();
+        inner4(seriesModel).scope = paletteScopeGroupByType.get(key3) || paletteScopeGroupByType.set(key3, {});
       }
     });
     ecModel.eachSeries(function(seriesModel) {
@@ -27940,13 +27940,13 @@ var ECEventProcessor = (
           dataIndex: 1,
           dataType: 1
         };
-        each(query, function(val, key2) {
+        each(query, function(val, key3) {
           var reserved = false;
           for (var i7 = 0; i7 < suffixes_1.length; i7++) {
             var propSuffix = suffixes_1[i7];
-            var suffixPos = key2.lastIndexOf(propSuffix);
-            if (suffixPos > 0 && suffixPos === key2.length - propSuffix.length) {
-              var mainType = key2.slice(0, suffixPos);
+            var suffixPos = key3.lastIndexOf(propSuffix);
+            if (suffixPos > 0 && suffixPos === key3.length - propSuffix.length) {
+              var mainType = key3.slice(0, suffixPos);
               if (mainType !== "data") {
                 cptQuery.mainType = mainType;
                 cptQuery[propSuffix.toLowerCase()] = val;
@@ -27954,12 +27954,12 @@ var ECEventProcessor = (
               }
             }
           }
-          if (dataKeys_1.hasOwnProperty(key2)) {
-            dataQuery[key2] = val;
+          if (dataKeys_1.hasOwnProperty(key3)) {
+            dataQuery[key3] = val;
             reserved = true;
           }
           if (!reserved) {
-            otherQuery[key2] = val;
+            otherQuery[key3] = val;
           }
         });
       }
@@ -28074,8 +28074,8 @@ var dataSymbolTask = {
 };
 
 // node_modules/echarts/lib/visual/helper.js
-function getItemVisualFromData(data, dataIndex, key2) {
-  switch (key2) {
+function getItemVisualFromData(data, dataIndex, key3) {
+  switch (key3) {
     case "color":
       var style = data.getItemVisual(dataIndex, "style");
       return style[data.getVisual("drawType")];
@@ -28084,15 +28084,15 @@ function getItemVisualFromData(data, dataIndex, key2) {
     case "symbol":
     case "symbolSize":
     case "liftZ":
-      return data.getItemVisual(dataIndex, key2);
+      return data.getItemVisual(dataIndex, key3);
     default:
       if (true) {
-        console.warn("Unknown visual type " + key2);
+        console.warn("Unknown visual type " + key3);
       }
   }
 }
-function getVisualFromData(data, key2) {
-  switch (key2) {
+function getVisualFromData(data, key3) {
+  switch (key3) {
     case "color":
       var style = data.getVisual("style");
       return style[data.getVisual("drawType")];
@@ -28101,15 +28101,15 @@ function getVisualFromData(data, key2) {
     case "symbol":
     case "symbolSize":
     case "liftZ":
-      return data.getVisual(key2);
+      return data.getVisual(key3);
     default:
       if (true) {
-        console.warn("Unknown visual type " + key2);
+        console.warn("Unknown visual type " + key3);
       }
   }
 }
-function setItemVisualFromData(data, dataIndex, key2, value2) {
-  switch (key2) {
+function setItemVisualFromData(data, dataIndex, key3, value2) {
+  switch (key3) {
     case "color":
       var style = data.ensureUniqueItemVisual(dataIndex, "style");
       style[data.getVisual("drawType")] = value2;
@@ -28121,11 +28121,11 @@ function setItemVisualFromData(data, dataIndex, key2, value2) {
     case "symbol":
     case "symbolSize":
     case "liftZ":
-      data.setItemVisual(dataIndex, key2, value2);
+      data.setItemVisual(dataIndex, key3, value2);
       break;
     default:
       if (true) {
-        console.warn("Unknown visual type " + key2);
+        console.warn("Unknown visual type " + key3);
       }
   }
 }
@@ -28244,11 +28244,11 @@ var WeakMap2 = (function() {
   function WeakMap3() {
     this._id = "__ec_inner_" + wmUniqueIndex++;
   }
-  WeakMap3.prototype.get = function(key2) {
-    return this._guard(key2)[this._id];
+  WeakMap3.prototype.get = function(key3) {
+    return this._guard(key3)[this._id];
   };
-  WeakMap3.prototype.set = function(key2, value2) {
-    var target = this._guard(key2);
+  WeakMap3.prototype.set = function(key3, value2) {
+    var target = this._guard(key3);
     if (supportDefineProperty) {
       Object.defineProperty(target, this._id, {
         value: value2,
@@ -28260,21 +28260,21 @@ var WeakMap2 = (function() {
     }
     return this;
   };
-  WeakMap3.prototype["delete"] = function(key2) {
-    if (this.has(key2)) {
-      delete this._guard(key2)[this._id];
+  WeakMap3.prototype["delete"] = function(key3) {
+    if (this.has(key3)) {
+      delete this._guard(key3)[this._id];
       return true;
     }
     return false;
   };
-  WeakMap3.prototype.has = function(key2) {
-    return !!this._guard(key2)[this._id];
+  WeakMap3.prototype.has = function(key3) {
+    return !!this._guard(key3)[this._id];
   };
-  WeakMap3.prototype._guard = function(key2) {
-    if (key2 !== Object(key2)) {
+  WeakMap3.prototype._guard = function(key3) {
+    if (key3 !== Object(key3)) {
       throw TypeError("Value of WeakMap is not a non-null object.");
     }
-    return key2;
+    return key3;
   };
   return WeakMap3;
 })();
@@ -29998,23 +29998,23 @@ var ECharts = (
       var ecModel = this._model;
       var result;
       var findResult = parseFinder(ecModel, finder);
-      each(findResult, function(models, key2) {
-        key2.indexOf("Models") >= 0 && each(models, function(model) {
+      each(findResult, function(models, key3) {
+        key3.indexOf("Models") >= 0 && each(models, function(model) {
           var coordSys = model.coordinateSystem;
           if (coordSys && coordSys.containPoint) {
             result = result || !!coordSys.containPoint(value2);
-          } else if (key2 === "seriesModels") {
+          } else if (key3 === "seriesModels") {
             var view = this._chartsMap[model.__viewId];
             if (view && view.containPoint) {
               result = result || view.containPoint(value2, model);
             } else {
               if (true) {
-                warn(key2 + ": " + (view ? "The found component do not support containPoint." : "No view mapping to the found component."));
+                warn(key3 + ": " + (view ? "The found component do not support containPoint." : "No view mapping to the found component."));
               }
             }
           } else {
             if (true) {
-              warn(key2 + ": containPoint is not supported");
+              warn(key3 + ": containPoint is not supported");
             }
           }
         }, this);
@@ -30753,15 +30753,15 @@ var ECharts = (
           each(zLevels, function(item) {
             var componentModel = ecModel.getComponent(item.type, item.idx);
             var zlevel = item.zlevel;
-            var key2 = item.key;
+            var key3 = item.key;
             if (lastSeriesZLevel_1 != null) {
               zlevel = Math.max(lastSeriesZLevel_1, zlevel);
             }
-            if (key2) {
-              if (zlevel === lastSeriesZLevel_1 && key2 !== lastSeriesKey_1) {
+            if (key3) {
+              if (zlevel === lastSeriesZLevel_1 && key3 !== lastSeriesKey_1) {
                 zlevel++;
               }
-              lastSeriesKey_1 = key2;
+              lastSeriesKey_1 = key3;
             } else if (lastSeriesKey_1) {
               if (zlevel === lastSeriesZLevel_1) {
                 zlevel++;
@@ -31447,22 +31447,22 @@ var DataDiffer = (
     DataDiffer2.prototype._initIndexMap = function(arr, map3, keyArr, keyGetterName) {
       var cbModeMultiple = this._diffModeMultiple;
       for (var i7 = 0; i7 < arr.length; i7++) {
-        var key2 = "_ec_" + this[keyGetterName](arr[i7], i7);
+        var key3 = "_ec_" + this[keyGetterName](arr[i7], i7);
         if (!cbModeMultiple) {
-          keyArr[i7] = key2;
+          keyArr[i7] = key3;
         }
         if (!map3) {
           continue;
         }
-        var idxMapVal = map3[key2];
+        var idxMapVal = map3[key3];
         var idxMapValLen = dataIndexMapValueLength(idxMapVal);
         if (idxMapValLen === 0) {
-          map3[key2] = i7;
+          map3[key3] = i7;
           if (cbModeMultiple) {
-            keyArr.push(key2);
+            keyArr.push(key3);
           }
         } else if (idxMapValLen === 1) {
-          map3[key2] = [idxMapVal, i7];
+          map3[key3] = [idxMapVal, i7];
         } else {
           idxMapVal.push(i7);
         }
@@ -31993,11 +31993,11 @@ var SeriesData = (
       dim = this.getDimension(dim);
       this._approximateExtent[dim] = extent.slice();
     };
-    SeriesData2.prototype.getCalculationInfo = function(key2) {
-      return this._calculationInfo[key2];
+    SeriesData2.prototype.getCalculationInfo = function(key3) {
+      return this._calculationInfo[key3];
     };
-    SeriesData2.prototype.setCalculationInfo = function(key2, value2) {
-      isObject3(key2) ? extend(this._calculationInfo, key2) : this._calculationInfo[key2] = value2;
+    SeriesData2.prototype.setCalculationInfo = function(key3, value2) {
+      isObject3(key3) ? extend(this._calculationInfo, key3) : this._calculationInfo[key3] = value2;
     };
     SeriesData2.prototype.getName = function(idx) {
       var rawIndex = this.getRawIndex(idx);
@@ -32197,9 +32197,9 @@ var SeriesData = (
         return getId(thisList, idx);
       });
     };
-    SeriesData2.prototype.getVisual = function(key2) {
+    SeriesData2.prototype.getVisual = function(key3) {
       var visual = this._visual;
-      return visual && visual[key2];
+      return visual && visual[key3];
     };
     SeriesData2.prototype.setVisual = function(kvObj, val) {
       this._visual = this._visual || {};
@@ -32209,53 +32209,53 @@ var SeriesData = (
         this._visual[kvObj] = val;
       }
     };
-    SeriesData2.prototype.getItemVisual = function(idx, key2) {
+    SeriesData2.prototype.getItemVisual = function(idx, key3) {
       var itemVisual = this._itemVisuals[idx];
-      var val = itemVisual && itemVisual[key2];
+      var val = itemVisual && itemVisual[key3];
       if (val == null) {
-        return this.getVisual(key2);
+        return this.getVisual(key3);
       }
       return val;
     };
     SeriesData2.prototype.hasItemVisual = function() {
       return this._itemVisuals.length > 0;
     };
-    SeriesData2.prototype.ensureUniqueItemVisual = function(idx, key2) {
+    SeriesData2.prototype.ensureUniqueItemVisual = function(idx, key3) {
       var itemVisuals = this._itemVisuals;
       var itemVisual = itemVisuals[idx];
       if (!itemVisual) {
         itemVisual = itemVisuals[idx] = {};
       }
-      var val = itemVisual[key2];
+      var val = itemVisual[key3];
       if (val == null) {
-        val = this.getVisual(key2);
+        val = this.getVisual(key3);
         if (isArray(val)) {
           val = val.slice();
         } else if (isObject3(val)) {
           val = extend({}, val);
         }
-        itemVisual[key2] = val;
+        itemVisual[key3] = val;
       }
       return val;
     };
-    SeriesData2.prototype.setItemVisual = function(idx, key2, value2) {
+    SeriesData2.prototype.setItemVisual = function(idx, key3, value2) {
       var itemVisual = this._itemVisuals[idx] || {};
       this._itemVisuals[idx] = itemVisual;
-      if (isObject3(key2)) {
-        extend(itemVisual, key2);
+      if (isObject3(key3)) {
+        extend(itemVisual, key3);
       } else {
-        itemVisual[key2] = value2;
+        itemVisual[key3] = value2;
       }
     };
     SeriesData2.prototype.clearAllVisual = function() {
       this._visual = {};
       this._itemVisuals = [];
     };
-    SeriesData2.prototype.setLayout = function(key2, val) {
-      isObject3(key2) ? extend(this._layout, key2) : this._layout[key2] = val;
+    SeriesData2.prototype.setLayout = function(key3, val) {
+      isObject3(key3) ? extend(this._layout, key3) : this._layout[key3] = val;
     };
-    SeriesData2.prototype.getLayout = function(key2) {
-      return this._layout[key2];
+    SeriesData2.prototype.getLayout = function(key3) {
+      return this._layout[key3];
     };
     SeriesData2.prototype.getItemLayout = function(idx) {
       return this._itemLayouts[idx];
@@ -35168,16 +35168,16 @@ function initAxisCacheMethod(prop) {
     });
   };
 }
-function axisCacheGet(cache, key2) {
+function axisCacheGet(cache, key3) {
   for (var i7 = 0; i7 < cache.list.length; i7++) {
-    if (cache.list[i7].key === key2) {
+    if (cache.list[i7].key === key3) {
       return cache.list[i7].value;
     }
   }
 }
-function axisCacheSet(cache, key2, value2) {
+function axisCacheSet(cache, key3, value2) {
   cache.list.push({
-    key: key2,
+    key: key3,
     value: value2
   });
   return value2;
@@ -36978,10 +36978,10 @@ function convertToEC4RichItem(out2, richItem) {
 }
 function warnDeprecated(deprecated, insteadApproach) {
   if (true) {
-    var key2 = deprecated + "^_^" + insteadApproach;
-    if (!deprecatedLogs[key2]) {
+    var key3 = deprecated + "^_^" + insteadApproach;
+    if (!deprecatedLogs[key3]) {
       console.warn('[ECharts] DEPRECATED: "' + deprecated + '" has been deprecated. ' + insteadApproach);
-      deprecatedLogs[key2] = true;
+      deprecatedLogs[key3] = true;
     }
   }
 }
@@ -39072,15 +39072,15 @@ function findAxisModels(seriesModel) {
     xAxisModel: null,
     yAxisModel: null
   };
-  each(axisModelMap, function(v2, key2) {
-    var axisType = key2.replace(/Model$/, "");
+  each(axisModelMap, function(v2, key3) {
+    var axisType = key3.replace(/Model$/, "");
     var axisModel = seriesModel.getReferringComponents(axisType, SINGLE_REFERRING).models[0];
     if (true) {
       if (!axisModel) {
         throw new Error(axisType + ' "' + retrieve3(seriesModel.get(axisType + "Index"), seriesModel.get(axisType + "Id"), 0) + '" not found');
       }
     }
-    axisModelMap[key2] = axisModel;
+    axisModelMap[key3] = axisModel;
   });
   return axisModelMap;
 }
@@ -40004,8 +40004,8 @@ var Grid = (
     };
     Grid2.prototype.getCartesian = function(xAxisIndex, yAxisIndex) {
       if (xAxisIndex != null && yAxisIndex != null) {
-        var key2 = "x" + xAxisIndex + "y" + yAxisIndex;
-        return this._coordsMap[key2];
+        var key3 = "x" + xAxisIndex + "y" + yAxisIndex;
+        return this._coordsMap[key3];
       }
       if (isObject(xAxisIndex)) {
         yAxisIndex = xAxisIndex.yAxisIndex;
@@ -40089,11 +40089,11 @@ var Grid = (
       this._axesMap = axesMap;
       each(axesMap.x, function(xAxis, xAxisIndex) {
         each(axesMap.y, function(yAxis, yAxisIndex) {
-          var key2 = "x" + xAxisIndex + "y" + yAxisIndex;
-          var cartesian = new Cartesian2D_default(key2);
+          var key3 = "x" + xAxisIndex + "y" + yAxisIndex;
+          var cartesian = new Cartesian2D_default(key3);
           cartesian.master = _this;
           cartesian.model = gridModel;
-          _this._coordsMap[key2] = cartesian;
+          _this._coordsMap[key3] = cartesian;
           _this._coordsList.push(cartesian);
           cartesian.addAxis(xAxis);
           cartesian.addAxis(yAxis);
@@ -41487,9 +41487,9 @@ var VisualMapping = (
     VisualMapping2.mapVisual = function(visual, callback, context) {
       var isPrimary;
       var newVisual = isArray(visual) ? [] : isObject(visual) ? {} : (isPrimary = true, null);
-      VisualMapping2.eachVisual(visual, function(v2, key2) {
-        var newVal = callback.call(context, v2, key2);
-        isPrimary ? newVisual = newVal : newVisual[key2] = newVal;
+      VisualMapping2.eachVisual(visual, function(v2, key3) {
+        var newVal = callback.call(context, v2, key3);
+        isPrimary ? newVisual = newVal : newVisual[key3] = newVal;
       });
       return newVisual;
     };
@@ -41967,13 +41967,13 @@ var Line2 = (
       updateProps(line, target, seriesModel, idx);
       each(SYMBOL_CATEGORIES, function(symbolCategory) {
         var symbolType = makeSymbolTypeValue(symbolCategory, lineData, idx);
-        var key2 = makeSymbolTypeKey(symbolCategory);
-        if (this[key2] !== symbolType) {
+        var key3 = makeSymbolTypeKey(symbolCategory);
+        if (this[key3] !== symbolType) {
           this.remove(this.childOfName(symbolCategory));
           var symbol = createSymbol2(symbolCategory, lineData, idx);
           this.add(symbol);
         }
-        this[key2] = symbolType;
+        this[key3] = symbolType;
       }, this);
       this._updateCommonStl(lineData, idx, seriesScope);
     };
@@ -42643,8 +42643,8 @@ var LEGACY_TRANSFORM_PROPS_MAP = {
   origin: ["originX", "originY"]
 };
 var LEGACY_TRANSFORM_PROPS = keys(LEGACY_TRANSFORM_PROPS_MAP);
-var TRANSFORM_PROPS_MAP = reduce(TRANSFORMABLE_PROPS, function(obj, key2) {
-  obj[key2] = 1;
+var TRANSFORM_PROPS_MAP = reduce(TRANSFORMABLE_PROPS, function(obj, key3) {
+  obj[key3] = 1;
   return obj;
 }, {});
 var transformPropNamesStr = TRANSFORMABLE_PROPS.join(", ");
@@ -42796,86 +42796,86 @@ function applyMiscProps(el, elOption) {
 var tmpDuringScope = {};
 var transitionDuringAPI = {
   // Usually other props do not need to be changed in animation during.
-  setTransform: function(key2, val) {
+  setTransform: function(key3, val) {
     if (true) {
-      assert(hasOwn(TRANSFORM_PROPS_MAP, key2), "Only " + transformPropNamesStr + " available in `setTransform`.");
+      assert(hasOwn(TRANSFORM_PROPS_MAP, key3), "Only " + transformPropNamesStr + " available in `setTransform`.");
     }
-    tmpDuringScope.el[key2] = val;
+    tmpDuringScope.el[key3] = val;
     return this;
   },
-  getTransform: function(key2) {
+  getTransform: function(key3) {
     if (true) {
-      assert(hasOwn(TRANSFORM_PROPS_MAP, key2), "Only " + transformPropNamesStr + " available in `getTransform`.");
+      assert(hasOwn(TRANSFORM_PROPS_MAP, key3), "Only " + transformPropNamesStr + " available in `getTransform`.");
     }
-    return tmpDuringScope.el[key2];
+    return tmpDuringScope.el[key3];
   },
-  setShape: function(key2, val) {
+  setShape: function(key3, val) {
     if (true) {
-      assertNotReserved(key2);
+      assertNotReserved(key3);
     }
     var el = tmpDuringScope.el;
     var shape = el.shape || (el.shape = {});
-    shape[key2] = val;
+    shape[key3] = val;
     el.dirtyShape && el.dirtyShape();
     return this;
   },
-  getShape: function(key2) {
+  getShape: function(key3) {
     if (true) {
-      assertNotReserved(key2);
+      assertNotReserved(key3);
     }
     var shape = tmpDuringScope.el.shape;
     if (shape) {
-      return shape[key2];
+      return shape[key3];
     }
   },
-  setStyle: function(key2, val) {
+  setStyle: function(key3, val) {
     if (true) {
-      assertNotReserved(key2);
+      assertNotReserved(key3);
     }
     var el = tmpDuringScope.el;
     var style = el.style;
     if (style) {
       if (true) {
         if (eqNaN(val)) {
-          warn("style." + key2 + " must not be assigned with NaN.");
+          warn("style." + key3 + " must not be assigned with NaN.");
         }
       }
-      style[key2] = val;
+      style[key3] = val;
       el.dirtyStyle && el.dirtyStyle();
     }
     return this;
   },
-  getStyle: function(key2) {
+  getStyle: function(key3) {
     if (true) {
-      assertNotReserved(key2);
+      assertNotReserved(key3);
     }
     var style = tmpDuringScope.el.style;
     if (style) {
-      return style[key2];
+      return style[key3];
     }
   },
-  setExtra: function(key2, val) {
+  setExtra: function(key3, val) {
     if (true) {
-      assertNotReserved(key2);
+      assertNotReserved(key3);
     }
     var extra = tmpDuringScope.el.extra || (tmpDuringScope.el.extra = {});
-    extra[key2] = val;
+    extra[key3] = val;
     return this;
   },
-  getExtra: function(key2) {
+  getExtra: function(key3) {
     if (true) {
-      assertNotReserved(key2);
+      assertNotReserved(key3);
     }
     var extra = tmpDuringScope.el.extra;
     if (extra) {
-      return extra[key2];
+      return extra[key3];
     }
   }
 };
-function assertNotReserved(key2) {
+function assertNotReserved(key3) {
   if (true) {
-    if (key2 === "transition" || key2 === "enterFrom" || key2 === "leaveTo") {
-      throw new Error('key must not be "' + key2 + '"');
+    if (key3 === "transition" || key3 === "enterFrom" || key3 === "leaveTo") {
+      throw new Error('key must not be "' + key3 + '"');
     }
   }
 }
@@ -42911,19 +42911,19 @@ function prepareShapeOrExtraTransitionFrom(mainAttr, fromEl, elOption, transFrom
       } else {
         var transitionKeys = normalizeToArray(attrTransition);
         for (var i7 = 0; i7 < transitionKeys.length; i7++) {
-          var key2 = transitionKeys[i7];
-          var elVal = elPropsInAttr[key2];
-          transFromPropsInAttr[key2] = elVal;
+          var key3 = transitionKeys[i7];
+          var elVal = elPropsInAttr[key3];
+          transFromPropsInAttr[key3] = elVal;
         }
       }
     } else if (isTransitionAll(transition) || indexOf(transition, mainAttr) >= 0) {
       !transFromPropsInAttr && (transFromPropsInAttr = transFromProps[mainAttr] = {});
       var elPropsInAttrKeys = keys(elPropsInAttr);
       for (var i7 = 0; i7 < elPropsInAttrKeys.length; i7++) {
-        var key2 = elPropsInAttrKeys[i7];
-        var elVal = elPropsInAttr[key2];
-        if (isNonStyleTransitionEnabled(attrOpt[key2], elVal)) {
-          transFromPropsInAttr[key2] = elVal;
+        var key3 = elPropsInAttrKeys[i7];
+        var elVal = elPropsInAttr[key3];
+        if (isNonStyleTransitionEnabled(attrOpt[key3], elVal)) {
+          transFromPropsInAttr[key3] = elVal;
         }
       }
     }
@@ -42937,23 +42937,23 @@ function prepareShapeOrExtraAllPropsFinal(mainAttr, elOption, allProps) {
   var allPropsInAttr = allProps[mainAttr] = {};
   var keysInAttr = keys(attrOpt);
   for (var i7 = 0; i7 < keysInAttr.length; i7++) {
-    var key2 = keysInAttr[i7];
-    allPropsInAttr[key2] = cloneValue(attrOpt[key2]);
+    var key3 = keysInAttr[i7];
+    allPropsInAttr[key3] = cloneValue(attrOpt[key3]);
   }
 }
 function prepareTransformTransitionFrom(el, elOption, transFromProps) {
   var transition = elOption.transition;
   var transitionKeys = isTransitionAll(transition) ? TRANSFORMABLE_PROPS : normalizeToArray(transition || []);
   for (var i7 = 0; i7 < transitionKeys.length; i7++) {
-    var key2 = transitionKeys[i7];
-    if (key2 === "style" || key2 === "shape" || key2 === "extra") {
+    var key3 = transitionKeys[i7];
+    if (key3 === "style" || key3 === "shape" || key3 === "extra") {
       continue;
     }
-    var elVal = el[key2];
+    var elVal = el[key3];
     if (true) {
-      checkTransformPropRefer(key2, "el.transition");
+      checkTransformPropRefer(key3, "el.transition");
     }
-    transFromProps[key2] = elVal;
+    transFromProps[key3] = elVal;
   }
 }
 function prepareTransformAllPropsFinal(el, elOption, allProps) {
@@ -42967,9 +42967,9 @@ function prepareTransformAllPropsFinal(el, elOption, allProps) {
     }
   }
   for (var i7 = 0; i7 < TRANSFORMABLE_PROPS.length; i7++) {
-    var key2 = TRANSFORMABLE_PROPS[i7];
-    if (elOption[key2] != null) {
-      allProps[key2] = elOption[key2];
+    var key3 = TRANSFORMABLE_PROPS[i7];
+    if (elOption[key3] != null) {
+      allProps[key3] = elOption[key3];
     }
   }
 }
@@ -42986,9 +42986,9 @@ function prepareStyleTransitionFrom(fromEl, elOption, styleOpt, transFromProps) 
       var transitionKeys = normalizeToArray(styleTransition);
       !transFromStyleProps && (transFromStyleProps = transFromProps.style = {});
       for (var i7 = 0; i7 < transitionKeys.length; i7++) {
-        var key2 = transitionKeys[i7];
-        var elVal = fromElStyle[key2];
-        transFromStyleProps[key2] = elVal;
+        var key3 = transitionKeys[i7];
+        var elVal = fromElStyle[key3];
+        transFromStyleProps[key3] = elVal;
       }
     } else if (fromEl.getAnimationStyleProps && (isTransitionAll(elTransition) || isTransitionAll(styleTransition) || indexOf(elTransition, "style") >= 0)) {
       var animationProps = fromEl.getAnimationStyleProps();
@@ -42997,10 +42997,10 @@ function prepareStyleTransitionFrom(fromEl, elOption, styleOpt, transFromProps) 
         !transFromStyleProps && (transFromStyleProps = transFromProps.style = {});
         var styleKeys = keys(styleOpt);
         for (var i7 = 0; i7 < styleKeys.length; i7++) {
-          var key2 = styleKeys[i7];
-          if (animationStyleProps[key2]) {
-            var elVal = fromElStyle[key2];
-            transFromStyleProps[key2] = elVal;
+          var key3 = styleKeys[i7];
+          if (animationStyleProps[key3]) {
+            var elVal = fromElStyle[key3];
+            transFromStyleProps[key3] = elVal;
           }
         }
       }
@@ -43012,9 +43012,9 @@ function isNonStyleTransitionEnabled(optVal, elVal) {
 }
 var checkTransformPropRefer;
 if (true) {
-  checkTransformPropRefer = function(key2, usedIn) {
-    if (!hasOwn(TRANSFORM_PROPS_MAP, key2)) {
-      warn("Prop `" + key2 + "` is not a permitted in `" + usedIn + "`. Only `" + keys(TRANSFORM_PROPS_MAP).join("`, `") + "` are permitted.");
+  checkTransformPropRefer = function(key3, usedIn) {
+    if (!hasOwn(TRANSFORM_PROPS_MAP, key3)) {
+      warn("Prop `" + key3 + "` is not a permitted in `" + usedIn + "`. Only `" + keys(TRANSFORM_PROPS_MAP).join("`, `") + "` are permitted.");
     }
   };
 }
@@ -43068,8 +43068,8 @@ function applyKeyframeAnimation(el, animationOpts, animatableModel) {
       }
       var propKeys = keys(kfValues);
       if (!targetPropName) {
-        propKeys = filter(propKeys, function(key2) {
-          return indexOf(KEYFRAME_EXCLUDE_KEYS, key2) < 0;
+        propKeys = filter(propKeys, function(key3) {
+          return indexOf(KEYFRAME_EXCLUDE_KEYS, key3) < 0;
         });
       }
       if (!propKeys.length) {
@@ -43086,8 +43086,8 @@ function applyKeyframeAnimation(el, animationOpts, animatableModel) {
       }
       targetPropName && (stateToRestore[targetPropName] = stateToRestore[targetPropName] || {});
       var savedTarget = targetPropName ? stateToRestore[targetPropName] : stateToRestore;
-      each(propKeys, function(key2) {
-        savedTarget[key2] = ((targetPropName ? el[targetPropName] : el) || {})[key2];
+      each(propKeys, function(key3) {
+        savedTarget[key3] = ((targetPropName ? el[targetPropName] : el) || {})[key3];
       });
       animator.whenWithKeys(duration * kf.percent, kfValues, propKeys, kf.easing);
     });
@@ -43518,9 +43518,9 @@ function makeRenderItem(customSeries, data, ecModel, api) {
     return itemStyle;
   }
   function applyUserPropsAfter(itemStyle, extra) {
-    for (var key2 in extra) {
-      if (hasOwn(extra, key2)) {
-        itemStyle[key2] = extra[key2];
+    for (var key3 in extra) {
+      if (hasOwn(extra, key3)) {
+        itemStyle[key3] = extra[key3];
       }
     }
   }
@@ -44060,8 +44060,8 @@ function updateProps2(animationModel, moveAnimation, el, props) {
 function propsEqual(lastProps, newProps) {
   if (isObject(lastProps) && isObject(newProps)) {
     var equals_1 = true;
-    each(newProps, function(item, key2) {
-      equals_1 = equals_1 && propsEqual(lastProps[key2], item);
+    each(newProps, function(item, key3) {
+      equals_1 = equals_1 && propsEqual(lastProps[key3], item);
     });
     return !!equals_1;
   } else {
@@ -44398,14 +44398,14 @@ var AxisPointerModel_default = AxisPointerModel;
 // node_modules/echarts/lib/component/axisPointer/globalListener.js
 var inner10 = makeInner();
 var each5 = each;
-function register(key2, api, handler) {
+function register(key3, api, handler) {
   if (env_default.node) {
     return;
   }
   var zr = api.getZr();
   inner10(zr).records || (inner10(zr).records = {});
   initGlobalListeners(zr, api);
-  var record3 = inner10(zr).records[key2] || (inner10(zr).records[key2] = {});
+  var record3 = inner10(zr).records[key3] || (inner10(zr).records[key3] = {});
   record3.handler = handler;
 }
 function initGlobalListeners(zr, api) {
@@ -44466,14 +44466,14 @@ function makeDispatchAction(api) {
     pendings
   };
 }
-function unregister(key2, api) {
+function unregister(key3, api) {
   if (env_default.node) {
     return;
   }
   var zr = api.getZr();
-  var record3 = (inner10(zr).records || {})[key2];
+  var record3 = (inner10(zr).records || {})[key3];
   if (record3) {
-    inner10(zr).records[key2] = null;
+    inner10(zr).records[key3] = null;
   }
 }
 
@@ -44597,7 +44597,7 @@ function axisTrigger(payload, ecModel, api) {
   };
   each(coordSysAxesInfo.coordSysMap, function(coordSys, coordSysKey) {
     var coordSysContainsPoint = isIllegalPoint || coordSys.containPoint(point);
-    each(coordSysAxesInfo.coordSysAxesInfo[coordSysKey], function(axisInfo, key2) {
+    each(coordSysAxesInfo.coordSysAxesInfo[coordSysKey], function(axisInfo, key3) {
       var axis2 = axisInfo.axis;
       var inputAxisInfo = findInputAxisInfo(inputAxesInfo, axisInfo);
       if (!shouldHide && coordSysContainsPoint && (!inputAxesInfo || inputAxisInfo)) {
@@ -44756,9 +44756,9 @@ function showTooltip(dataByCoordSys, axisInfo, payloadInfo, value2) {
 }
 function updateModelActually(showValueMap, axesInfo, outputPayload) {
   var outputAxesInfo = outputPayload.axesInfo = [];
-  each(axesInfo, function(axisInfo, key2) {
+  each(axesInfo, function(axisInfo, key3) {
     var option = axisInfo.axisPointerModel.option;
-    var valItem = showValueMap[key2];
+    var valItem = showValueMap[key3];
     if (valItem) {
       !axisInfo.useHandle && (option.status = "show");
       option.value = valItem.value;
@@ -44799,7 +44799,7 @@ function dispatchHighDownActually(axesInfo, dispatchAction2, api) {
   var highDownKey = "axisPointerLastHighlights";
   var lastHighlights = inner11(zr)[highDownKey] || {};
   var newHighlights = inner11(zr)[highDownKey] = {};
-  each(axesInfo, function(axisInfo, key2) {
+  each(axesInfo, function(axisInfo, key3) {
     var option = axisInfo.axisPointerModel.option;
     option.status === "show" && axisInfo.triggerEmphasis && each(option.seriesDataIndices, function(batchItem) {
       newHighlights[batchItem.seriesIndex + "|" + batchItem.dataIndex] = batchItem;
@@ -44813,11 +44813,11 @@ function dispatchHighDownActually(axesInfo, dispatchAction2, api) {
       dataIndex: batchItem.dataIndex
     };
   }
-  each(lastHighlights, function(batchItem, key2) {
-    !newHighlights[key2] && toDownplay.push(makeHighDownItem(batchItem));
+  each(lastHighlights, function(batchItem, key3) {
+    !newHighlights[key3] && toDownplay.push(makeHighDownItem(batchItem));
   });
-  each(newHighlights, function(batchItem, key2) {
-    !lastHighlights[key2] && toHighlight.push(makeHighDownItem(batchItem));
+  each(newHighlights, function(batchItem, key3) {
+    !lastHighlights[key3] && toHighlight.push(makeHighDownItem(batchItem));
   });
   toDownplay.length && api.dispatchAction({
     type: "downplay",
@@ -46945,16 +46945,16 @@ function createVisualMappings(option, stateList, supplementVisualOption) {
 }
 function replaceVisualOption(thisOption, newOption, keys2) {
   var has3;
-  each(keys2, function(key2) {
-    if (newOption.hasOwnProperty(key2) && hasKeys(newOption[key2])) {
+  each(keys2, function(key3) {
+    if (newOption.hasOwnProperty(key3) && hasKeys(newOption[key3])) {
       has3 = true;
     }
   });
-  has3 && each(keys2, function(key2) {
-    if (newOption.hasOwnProperty(key2) && hasKeys(newOption[key2])) {
-      thisOption[key2] = clone(newOption[key2]);
+  has3 && each(keys2, function(key3) {
+    if (newOption.hasOwnProperty(key3) && hasKeys(newOption[key3])) {
+      thisOption[key3] = clone(newOption[key3]);
     } else {
-      delete thisOption[key2];
+      delete thisOption[key3];
     }
   });
 }
@@ -46970,11 +46970,11 @@ function incrementalApplyVisual(stateList, visualMappings, getValueState, dim) {
       if (dim != null) {
         dimIndex = data.getDimensionIndex(dim);
       }
-      function getVisual(key2) {
-        return getItemVisualFromData(data, dataIndex, key2);
+      function getVisual(key3) {
+        return getItemVisualFromData(data, dataIndex, key3);
       }
-      function setVisual(key2, value3) {
-        setItemVisualFromData(data, dataIndex, key2, value3);
+      function setVisual(key3, value3) {
+        setItemVisualFromData(data, dataIndex, key3, value3);
       }
       var dataIndex;
       var store = data.getStore();
@@ -49363,8 +49363,8 @@ var visualDefault = {
   /**
    * @public
    */
-  get: function(visualType, key2, isCategory2) {
-    var value2 = clone((defaultOption2[visualType] || {})[key2]);
+  get: function(visualType, key3, isCategory2) {
+    var value2 = clone((defaultOption2[visualType] || {})[key3]);
     return isCategory2 ? isArray(value2) ? value2[value2.length - 1] : value2 : value2;
   }
 };
@@ -49933,11 +49933,11 @@ var VisualMapView = (
         var defaultColor = visualMapModel.get("contentColor");
         visualObj.color = defaultColor;
       }
-      function getter(key2) {
-        return visualObj[key2];
+      function getter(key3) {
+        return visualObj[key3];
       }
-      function setter(key2, value2) {
-        visualObj[key2] = value2;
+      function setter(key3, value2) {
+        visualObj[key3] = value2;
       }
       var mappings = visualMapModel.controllerVisuals[forceState || visualMapModel.getValueState(targetValue)];
       var visualTypes = VisualMapping_default.prepareVisualTypes(mappings);
@@ -50649,11 +50649,11 @@ function getColorVisual(seriesModel, visualMapModel, value2, valueState) {
     mapping && mapping.applyVisual(value2, getVisual, setVisual);
   }
   return resultVisual.color;
-  function getVisual(key2) {
-    return resultVisual[key2];
+  function getVisual(key3) {
+    return resultVisual[key3];
   }
-  function setVisual(key2, value3) {
-    resultVisual[key2] = value3;
+  function setVisual(key3, value3) {
+    resultVisual[key3] = value3;
   }
 }
 
@@ -50796,17 +50796,17 @@ var PiecewiseModel = (
       var selected = (isInit ? thisOption : newOption).selected || {};
       thisOption.selected = selected;
       each(pieceList, function(piece, index) {
-        var key2 = this.getSelectedMapKey(piece);
-        if (!selected.hasOwnProperty(key2)) {
-          selected[key2] = true;
+        var key3 = this.getSelectedMapKey(piece);
+        if (!selected.hasOwnProperty(key3)) {
+          selected[key3] = true;
         }
       }, this);
       if (thisOption.selectedMode === "single") {
         var hasSel_1 = false;
         each(pieceList, function(piece, index) {
-          var key2 = this.getSelectedMapKey(piece);
-          if (selected[key2]) {
-            hasSel_1 ? selected[key2] = false : hasSel_1 = true;
+          var key3 = this.getSelectedMapKey(piece);
+          if (selected[key3]) {
+            hasSel_1 ? selected[key3] = false : hasSel_1 = true;
           }
         }, this);
       }
@@ -51197,8 +51197,8 @@ var PiecewiseVisualMapView = (
       var newKey = visualMapModel.getSelectedMapKey(piece);
       if (selectedMode === "single" || selectedMode === true) {
         selected[newKey] = true;
-        each(selected, function(o9, key2) {
-          selected[key2] = key2 === newKey;
+        each(selected, function(o9, key3) {
+          selected[key3] = key3 === newKey;
         });
       } else {
         selected[newKey] = !selected[newKey];
@@ -52102,14 +52102,14 @@ var CanvasPainter = (function() {
     var layerStack = this._i.layerStack;
     var layersMap = this._i.layers;
     for (var i7 = layerStack.length - 1; i7 >= 0; i7--) {
-      var key2 = layerStack[i7];
-      if (key2.zl === zlevel) {
-        var layer = layersMap[zlevel][key2.zl2];
+      var key3 = layerStack[i7];
+      if (key3.zl === zlevel) {
+        var layer = layersMap[zlevel][key3.zl2];
         if (layer.__builtin__) {
           continue;
         }
         layerStack.splice(i7, 1);
-        layersMap[zlevel][key2.zl2] = void 0;
+        layersMap[zlevel][key3.zl2] = void 0;
         if (!layer.virtual) {
           var parentNode = layer.dom.parentNode;
           parentNode && parentNode.removeChild(layer.dom);
@@ -52477,12 +52477,12 @@ function renderPlan(windows, assumptions = {}, stale = false, formatters, totals
 var percent = (n6) => Number.isFinite(n6) && n6 >= 0 && n6 <= 100;
 var positive = (n6) => Number.isFinite(n6) && n6 > 0;
 var showKwh = (n6) => number(n6, 1, " kWh", (x2) => x2 >= 0);
-function batteryEstimates({ soc: soc2, target, capacityKwh, efficiency, stale = false, windows = [] }) {
+function batteryEstimates({ soc: soc2, target, capacityKwh, efficiency, stale = false, windows = [], minutesPerTimeUnit = 60 }) {
   const validSoc = !stale && percent(soc2), validTarget = percent(target), validCapacity = positive(capacityKwh);
   const battery = validSoc && validCapacity ? soc2 / 100 * capacityKwh : null;
   const needed = validSoc && validTarget && validCapacity ? Math.max(0, target - soc2) / 100 * capacityKwh : null;
   const wall = needed != null && positive(efficiency) && efficiency <= 1 ? needed / efficiency : null;
-  const active = !stale && windows.length > 0 && windows.every((w2) => Number.isFinite(w2.start) && Number.isFinite(w2.end) && w2.end > w2.start) ? windows.reduce((n6, w2) => n6 + (w2.end - w2.start) * 60, 0) : null;
+  const active = !stale && positive(minutesPerTimeUnit) && windows.length > 0 && windows.every((w2) => Number.isFinite(w2.start) && Number.isFinite(w2.end) && w2.end > w2.start) ? windows.reduce((n6, w2) => n6 + (w2.end - w2.start) * minutesPerTimeUnit, 0) : null;
   return {
     battery: Number.isFinite(battery) ? battery : null,
     needed: Number.isFinite(needed) ? needed : null,
@@ -52490,10 +52490,10 @@ function batteryEstimates({ soc: soc2, target, capacityKwh, efficiency, stale = 
     active: Number.isFinite(active) ? active : null
   };
 }
-function renderBattery({ soc: soc2, target, capacityKwh, efficiency, stale = false, lowSocWarning, windows, minimum, deadline, sample = false }) {
+function renderBattery({ soc: soc2, target, capacityKwh, efficiency, stale = false, lowSocWarning, windows, minimum, deadline, sample = false, minutesPerTimeUnit = 60 }) {
   const s4 = percent(soc2) ? soc2 : null, t6 = percent(target) ? target : null;
   const low = percent(lowSocWarning) ? lowSocWarning : null;
-  const values = batteryEstimates({ soc: soc2, target, capacityKwh, efficiency, stale, windows });
+  const values = batteryEstimates({ soc: soc2, target, capacityKwh, efficiency, stale, windows, minutesPerTimeUnit });
   const socText = s4 == null ? "Unknown" : `${s4}%`;
   const activeText = values.active == null ? "Unknown" : `${Math.round(values.active)} min`;
   return `<div class="battery-card ${stale ? "battery-stale" : ""}"><div class="battery-title"><div><span class="battery-caption">${stale ? `Last ${sample ? "sample " : ""}SOC \xB7 stale` : `${sample ? "Sample b" : "B"}attery SOC`}</span><strong>${socText}</strong></div><div class="battery-target">Target <b>${t6 == null ? "Unknown" : `${t6}%`}</b><small>Minimum ${number(minimum, 0, "%", percent)} \xB7 by ${escapeText(deadline)}</small></div></div><div class="battery-track" role="img" aria-label="${stale ? "Stale " : ""}SOC ${socText}; target ${t6 == null ? "unknown" : `${t6}%`}${low == null ? "" : `; separate low SOC warning ${low}%`}">${s4 == null ? "" : `<span class="battery-fill" style="width:${s4}%"></span>`}${t6 == null ? "" : `<span class="battery-marker target-marker" style="left:${t6}%"></span>`}${low == null ? "" : `<span class="battery-marker low-marker" style="left:${low}%"></span>`}</div><div class="battery-legend"><span>\u25CF ${stale ? "Stale SOC" : "SOC"}</span><span>\u2502 Target${t6 == null ? " unknown" : ` ${t6}%`}</span>${low == null ? "" : `<span class="battery-low">\u250A Low-SOC warning ${low}%${s4 != null && !stale && s4 <= low ? " \xB7 below warning" : ""}</span>`}</div>${low == null ? "" : '<p class="battery-note">Low-SOC warning is a separate illustrative value, not the ready-by minimum or a protection floor.</p>'}<div class="battery-facts"><div><small>In usable battery \xB7 est.</small><b>${showKwh(values.battery)}</b></div><div><small>To target \xB7 battery est.</small><b>${showKwh(values.needed)}</b></div><div><small>To target \xB7 wall est.</small><b>${showKwh(values.wall)}</b></div><div><small>Plan active time \xB7 est.</small><b>${activeText}</b></div></div><p class="battery-note">Assumptions: ${number(capacityKwh, 0, " kWh", positive)} usable; ${number(Number.isFinite(efficiency) ? efficiency * 100 : null, 0, "%", (n6) => n6 > 0 && n6 <= 100)} charging efficiency. Battery energy = wall energy \xD7 efficiency. Estimates, not measurements or a guaranteed finish.${stale ? " Stale SOC is not used in estimates." : ""}</p></div>`;
@@ -52502,7 +52502,7 @@ function renderBattery({ soc: soc2, target, capacityKwh, efficiency, stale = fal
 // shared-dashboard/evidence-view.js
 function renderEvidence(data, power, count) {
   const d3 = data || {};
-  return `<div class="evidence-status"><strong>${escapeText(d3.status)}</strong><span>${escapeText(d3.context)}</span></div><div class="evidence-grid"><div><small>Proposal calculated</small><b>${escapeText(d3.proposal)}</b></div><div><small>Last sent / ACK</small><b>${escapeText(d3.sent)}</b></div><div><small>Effective limits read</small><b>${escapeText(d3.readback)}</b></div><div><small>Vehicle / power received</small><b>${escapeText(d3.measurement)}</b></div></div><p class="subtext">Whether the current proposal was sent is unknown. Readback is effective limits, not a profile inventory. An ACK or match does not prove physical charging; power is a separate observation. ${escapeText(d3.dispatch)}</p><wa-details id="details" summary="View evidence & debug controls"><div class="details-body"><p><b>Current proposal:</b> ${count == null ? "Unknown" : count} windows; not necessarily sent.</p><p><b>Last sent and acknowledgement:</b> ${escapeText(d3.sent)} \xB7 response only.</p><p><b>Effective readback:</b> ${escapeText(d3.readback)} \xB7 not an inventory.</p><p><b>Measured power:</b> ${escapeText(power)} \xB7 ${escapeText(d3.measurement)}.</p><p>Missing, stale and superseded evidence must not be treated as current.</p><div class="actions"><wa-button size="small" disabled>Send \xB7 unavailable</wa-button><wa-button size="small" disabled>Refresh \xB7 unavailable</wa-button></div></div></wa-details>`;
+  return `<div class="evidence-status"><strong>${escapeText(d3.status)}</strong><span>${escapeText(d3.context)}</span></div><div class="evidence-grid"><div><small>Proposal calculated</small><b>${escapeText(d3.proposal)}</b></div><div><small>Last sent / ACK</small><b>${escapeText(d3.sent)}</b></div><div><small>Effective limits read</small><b>${escapeText(d3.readback)}</b></div><div><small>Vehicle / power received</small><b>${escapeText(d3.measurement)}</b></div></div><p class="subtext">Whether the current proposal was sent is unknown. Readback is effective limits, not a profile inventory. An ACK or match does not prove physical charging; power is a separate observation. ${escapeText(d3.dispatch)}</p><wa-details id="details" summary="View evidence & debug controls"><div class="details-body"><p><b>Current proposal:</b> ${count == null ? "Unknown" : count} windows; not necessarily sent.</p><p><b>Last sent and acknowledgement:</b> ${escapeText(d3.sent)} \xB7 response only.</p><p><b>Effective readback:</b> ${escapeText(d3.readback)} \xB7 not an inventory.</p><p><b>Measured power:</b> ${escapeText(power)} \xB7 ${escapeText(d3.measurement)}.</p><p>Missing, stale and superseded evidence must not be treated as current.</p><div id="morek-debug"><div class="actions"><wa-button size="small" disabled>Send \xB7 unavailable</wa-button><wa-button size="small" disabled>Refresh \xB7 unavailable</wa-button></div></div></div></wa-details>`;
 }
 
 // shared-dashboard/history-view.js
@@ -52516,6 +52516,66 @@ function renderInsights(insights) {
   if (!insights) return "<p>Price insights unavailable.</p>";
   const blocks = Array.isArray(insights.blocks) ? insights.blocks : [];
   return `<div class="insights-intro">${escapeText(insights.intro)}</div><div class="insight-grid">${blocks.map((b3) => `<section class="insight-block"><h3>${escapeText(b3.title)}</h3><div class="insight-value">${escapeText(b3.value)}</div><strong class="insight-status">${escapeText(b3.status ?? "")}</strong><p>${escapeText(b3.detail ?? "")}</p>${b3.extra ? `<div class="month-range">${escapeText(b3.extra)}</div>` : ""}</section>`).join("")}</div><p class="insight-caution">${escapeText(insights.caution)}</p><wa-details summary="How these insights work"><div class="details-body"><p>${escapeText(insights.method)}</p></div></wa-details>`;
+}
+
+// shared-dashboard/reconcile.js
+var key2 = (node) => {
+  if (node.nodeType !== 1) return null;
+  if (node.id) return `id:${node.id}`;
+  if (node.dataset.setting) return `setting:${node.dataset.setting}`;
+  if (node.dataset.morekAction) return `morek-action:${node.dataset.morekAction}`;
+  if (node.hasAttribute("data-morek-actions")) return "morek-actions";
+  if (node.dataset.zoom) return `zoom:${node.dataset.zoom}`;
+  if (node.dataset.reset) return `reset:${node.dataset.reset}`;
+  if (node.tagName === "SECTION" && node.className) return `section:${node.className}`;
+  return null;
+};
+function reconcile(oldNode, newNode, preserveValue = () => false) {
+  if (oldNode.nodeType !== newNode.nodeType || oldNode.nodeName !== newNode.nodeName) {
+    oldNode.replaceWith(newNode);
+    return newNode;
+  }
+  if (oldNode.nodeType === 3) {
+    if (oldNode.nodeValue !== newNode.nodeValue) oldNode.nodeValue = newNode.nodeValue;
+    return oldNode;
+  }
+  if (oldNode.nodeType !== 1) return oldNode;
+  const keepValue = preserveValue(oldNode);
+  for (const attr of [...oldNode.attributes]) {
+    if (["DIALOG", "DETAILS", "WA-DETAILS"].includes(oldNode.tagName) && attr.name === "open" || keepValue && ["value", "checked"].includes(attr.name)) continue;
+    if (!newNode.hasAttribute(attr.name)) oldNode.removeAttribute(attr.name);
+  }
+  for (const attr of [...newNode.attributes]) {
+    if (keepValue && ["value", "checked"].includes(attr.name)) continue;
+    if (oldNode.getAttribute(attr.name) !== attr.value) oldNode.setAttribute(attr.name, attr.value);
+  }
+  if (keepValue && oldNode.tagName === "SELECT" || oldNode.id === "morek-debug" || oldNode.classList.contains("price-chart") || oldNode.id === "power-chart") return oldNode;
+  const desired = [...newNode.childNodes];
+  let cursor = oldNode.firstChild;
+  for (const next of desired) {
+    const wanted = key2(next);
+    let found = cursor;
+    if (wanted) {
+      while (found && key2(found) !== wanted) found = found.nextSibling;
+    } else if (found && (key2(found) || found.nodeName !== next.nodeName || found.nodeType !== next.nodeType)) found = null;
+    if (!found) {
+      oldNode.insertBefore(next, cursor);
+      continue;
+    }
+    while (cursor && cursor !== found) {
+      const obsolete = cursor;
+      cursor = cursor.nextSibling;
+      obsolete.remove();
+    }
+    const result = reconcile(found, next, preserveValue);
+    cursor = result.nextSibling;
+  }
+  while (cursor) {
+    const next = cursor.nextSibling;
+    cursor.remove();
+    cursor = next;
+  }
+  return oldNode;
 }
 
 // shared-dashboard/dashboard.js
@@ -52534,11 +52594,13 @@ var mounted = /* @__PURE__ */ new WeakMap();
 function mountDashboard(root, adapter) {
   if (!root || !adapter || !adapter.model || !adapter.format || typeof adapter.format.time !== "function" || typeof adapter.format.day !== "function") throw new TypeError("A root, model and explicit time/day formatters are required");
   mounted.get(root)?.dispose();
-  let disposed = false, chartMount, listeners;
+  let disposed = false, chartMount, listeners, pendingUpdate;
+  const bound = /* @__PURE__ */ new WeakSet();
   const drafts = /* @__PURE__ */ new Map();
   let current = adapter;
   function cleanup() {
     listeners?.abort();
+    listeners = null;
     chartMount?.dispose();
     chartMount = null;
     const dialog = root.querySelector("#plan-dialog");
@@ -52560,7 +52622,7 @@ function mountDashboard(root, adapter) {
     const tag = sample ? "SAMPLE" : "";
     const modes = chart?.comparison === true ? ["bar", "step"] : ["step"];
     const prices = Array.isArray(chart?.prices) ? chart.prices.filter((p4) => Number.isFinite(p4?.start) && Number.isFinite(p4?.end) && p4.end > p4.start && Number.isFinite(p4.cents)) : [];
-    const chartReady = prices.length > 0 && Array.isArray(chart?.horizon) && chart.horizon.length === 2 && chart.horizon.every(Number.isFinite) && chart.horizon[0] < chart.horizon[1] && Number.isFinite(chart.now) && Array.isArray(chart.bands) && chart.bands.length === 3 && chart.bands.every(Number.isFinite) && chart.bands[0] < chart.bands[1] && chart.bands[1] < chart.bands[2] && ["date", "days", "priceGaps", "stepSegments", "stepPoints", "snapRange", "initialRange", "timeTicks"].every((key2) => typeof f3[key2] === "function");
+    const chartReady = prices.length > 0 && Array.isArray(chart?.horizon) && chart.horizon.length === 2 && chart.horizon.every(Number.isFinite) && chart.horizon[0] < chart.horizon[1] && Number.isFinite(chart.now) && Array.isArray(chart.bands) && chart.bands.length === 3 && chart.bands.every(Number.isFinite) && chart.bands[0] < chart.bands[1] && chart.bands[1] < chart.bands[2] && ["date", "days", "priceGaps", "stepSegments", "stepPoints", "snapRange", "initialRange", "timeTicks"].every((key3) => typeof f3[key3] === "function");
     const readings = Array.isArray(m4.history?.readings) ? m4.history.readings.filter((r7) => Number.isFinite(r7?.time)).map((r7) => ({ time: r7.time, kw: Number.isFinite(r7.kw) && r7.kw >= 0 ? r7.kw : null })) : [];
     const sentHistory = m4.history?.sentHistory;
     const historyReady = readings.length >= 2 && readings.every((r7, i7) => !i7 || r7.time > readings[i7 - 1].time) && Number.isFinite(sentHistory?.start) && Number.isFinite(sentHistory?.end) && sentHistory.end > sentHistory.start;
@@ -52575,47 +52637,89 @@ function mountDashboard(root, adapter) {
     const scenario = m4.scenarios;
     const option = (s4) => `<option value="${escapeText(s4.value)}" ${s4.value === scenario.selected ? "selected" : ""}>${escapeText(s4.label)}</option>`;
     const capCurrency = f3.currency === void 0 ? "EUR" : f3.currency;
-    const fields = [["Target SOC (%)", "target", "number"], ["Minimum SOC (%)", "minimum", "number"], [`Soft cap (${typeof capCurrency === "string" && /^[A-Z]{3}$/.test(capCurrency) ? capCurrency : "currency unknown"}/kWh)`, "cap", "number"], ["Ready by", "readyBy", "time"]].map(([label, key2, type]) => `<wa-input data-setting="${key2}" label="${escapeText(label)}" value="${escapeText(value(settings[key2]))}" type="${type}"${key2 === "cap" ? ' step="0.01"' : ""}${m4.canSave === true ? "" : " disabled"}></wa-input>`).join("");
-    root.innerHTML = `<div class="shell"><header class="masthead"><div><div class="brand">SPOTNAV <span>ENHANCED</span></div><h1>Charging, in focus.</h1><p>A single view of your vehicle, plan and charger.</p></div>${labels.banner ? `<div class="sample-banner">${escapeText(labels.banner)}<br><span>${escapeText(labels.bannerDetail)}</span></div>` : ""}</header>
+    const fields = [["Target SOC (%)", "target", "number"], ["Minimum SOC (%)", "minimum", "number"], [`Soft cap (${typeof capCurrency === "string" && /^[A-Z]{3}$/.test(capCurrency) ? capCurrency : "currency unknown"}/kWh)`, "cap", "number"], ["Ready by", "readyBy", "time"]].map(([label, key3, type]) => `<wa-input data-setting="${key3}" label="${escapeText(label)}" value="${escapeText(value(settings[key3]))}" type="${type}"${key3 === "cap" ? ' step="0.01"' : ""}${m4.canSave === true && !(m4.settingsEditor && (key3 === "target" && !m4.targetSupported || ["minimum", "cap"].includes(key3) && !m4.policySupported)) ? "" : " disabled"}></wa-input>`).join("");
+    const policyFields = m4.settingsEditor ? `<label><input type="checkbox" data-setting="capEnabled" ${settings.capEnabled ? "checked" : ""} ${m4.canSave && m4.policySupported ? "" : "disabled"}> Enable soft cap</label><label>Price basis <select data-setting="capBasis" ${m4.canSave && m4.policySupported ? "" : "disabled"}><option value="">Unknown</option><option value="nord_pool" ${settings.capBasis === "nord_pool" ? "selected" : ""}>Nord Pool</option><option value="configured_variable_cost" ${settings.capBasis === "configured_variable_cost" ? "selected" : ""}>Configured variable cost</option></select></label><label><input type="checkbox" data-setting="deadlineEnabled" ${settings.deadlineEnabled ? "checked" : ""} ${m4.canSave ? "" : "disabled"}> Enable ready-by</label>` : "";
+    const html = `<div class="shell"><header class="masthead"><div><div class="brand">SPOTNAV <span>ENHANCED</span></div><h1>Charging, in focus.</h1><p>A single view of your vehicle, plan and charger.</p></div>${labels.banner ? `<div class="sample-banner">${escapeText(labels.banner)}<br><span>${escapeText(labels.bannerDetail)}</span></div>` : ""}</header>
       ${scenario ? `<div class="scenario-picker"><label for="sample-state">${escapeText(scenario.label)}</label><select id="sample-state">${(scenario.options || []).map(option).join("")}</select><span>${escapeText(scenario.note)}</span></div>` : ""}
-      ${m4.warning ? `<div class="alert" role="status"><div><strong>${escapeText(m4.warning.title)}</strong><p>${escapeText(m4.warning.detail)}</p></div><a href="#details">View details \u2193</a></div>` : ""}<div class="dashboard">
-      ${card("Your vehicle", "OVERVIEW", `<div class="status-line"><span class="dot ${!Number.isFinite(state.soc) || state.soc < 0 || state.soc > 100 || state.stale ? "dot-unknown" : ""}"></span> ${escapeText(state.status)}</div>${renderBattery({ soc: state.soc, target: settings.target, minimum: settings.minimum, deadline: settings.readyBy, capacityKwh: assumptions.capacityKwh, efficiency: assumptions.efficiency, stale: !!state.stale, lowSocWarning: state.lowSocWarning, windows, sample })}<p class="waiting">${escapeText(state.detail)}</p><div class="metrics">${metric("Measured now", state.power, labels.powerNote)}<div class="metric next-metric"><div class="muted">${state.stale ? "Next window \xB7 stale proposal" : "Next proposed window"}</div><button type="button" id="open-plan" aria-haspopup="dialog">${next ? `${escapeText(time(next.start))}\u2013${escapeText(time(next.end))}` : "Unknown"} <span aria-hidden="true">\u2197</span></button><div class="muted">${escapeText(next ? day(next.start) : "Unknown")} \xB7 view complete plan</div></div>${metric(state.stale ? "Last plan cost \xB7 stale" : "Estimated charge cost", money(summary.cost, f3.currency), `${number(summary.energy, 2, " kWh", (n6) => n6 >= 0)} wall energy`)}${metric("Until deadline", m4.untilDeadline, labels.deadlineNote)}</div><div class="hint"><b>${escapeText(labels.planLabel)}</b> ${escapeText(state.policy)} ${escapeText(m4.targetNote)}</div>`, "overview", tag)}
-      ${card("Plan controls", labels.settingsEyebrow || "SETTINGS", `<p class="subtext">${escapeText(labels.settingsNote)}</p><div class="fields">${fields}</div><wa-button id="save-plan" variant="brand" ${typeof actions2.save !== "function" || m4.canSave !== true ? "disabled" : ""}>${escapeText(labels.saveLabel || "Save plan \xB7 unavailable")}</wa-button><div class="controls-plan">${plan}<button type="button" id="open-plan-details" aria-haspopup="dialog">View full window details \u2197</button></div>`, "controls", tag)}
+      <div id="critical-live" role="status" aria-live="polite">${m4.warning ? `<div class="alert"><div><strong>${escapeText(m4.warning.title)}</strong><p>${escapeText(m4.warning.detail)}</p></div><a href="#details">View details \u2193</a></div>` : ""}</div><div class="dashboard">
+      ${card("Your vehicle", "OVERVIEW", `<div class="status-line"><span class="dot ${!Number.isFinite(state.soc) || state.soc < 0 || state.soc > 100 || state.stale ? "dot-unknown" : ""}"></span> ${escapeText(state.status)}</div>${renderBattery({ soc: state.soc, target: settings.target, minimum: settings.minimum, deadline: settings.readyBy, capacityKwh: assumptions.capacityKwh, efficiency: assumptions.efficiency, stale: !!state.stale, lowSocWarning: state.lowSocWarning, windows, sample, minutesPerTimeUnit: f3.minutesPerTimeUnit })}<p class="waiting">${escapeText(state.detail)}</p><div class="metrics">${metric("Measured now", state.power, labels.powerNote)}<div class="metric next-metric"><div class="muted">${state.stale ? "Next window \xB7 stale proposal" : "Next proposed window"}</div><button type="button" id="open-plan" aria-haspopup="dialog">${next ? `${escapeText(time(next.start))}\u2013${escapeText(time(next.end))}` : "Unknown"} <span aria-hidden="true">\u2197</span></button><div class="muted">${escapeText(next ? day(next.start) : "Unknown")} \xB7 view complete plan</div></div>${metric(state.stale ? "Last plan cost \xB7 stale" : "Estimated charge cost", money(summary.cost, f3.currency), `${number(summary.energy, 2, " kWh", (n6) => n6 >= 0)} wall energy`)}${metric("Until deadline", m4.untilDeadline, labels.deadlineNote)}</div><div class="hint"><b>${escapeText(labels.planLabel)}</b> ${escapeText(state.policy)} ${escapeText(m4.targetNote)}</div>`, "overview", tag)}
+      ${card("Plan controls", labels.settingsEyebrow || "SETTINGS", `<p class="subtext">${escapeText(labels.settingsNote)}</p><div class="fields">${fields}${policyFields}</div><p id="settings-notice" role="status">${escapeText(m4.settingsNotice || "")}</p><wa-button id="save-plan" variant="brand" ${typeof actions2.save !== "function" || m4.canSave !== true ? "disabled" : ""}>${escapeText(labels.saveLabel || "Save plan \xB7 unavailable")}</wa-button>${m4.settingsEditor ? '<button type="button" id="reload-settings">Reload settings</button>' : ""}<div class="controls-plan">${plan}<button type="button" id="open-plan-details" aria-haspopup="dialog">View full window details \u2197</button></div>`, "controls", tag)}
       ${card("Price insights", labels.insightEyebrow || "PRICE DATA", renderInsights(m4.insights), "insights", tag)}
       ${modes.map(priceCard).join("")}
       ${card("Plan activity & freshness", labels.evidenceEyebrow || "EVIDENCE", renderEvidence(m4.evidence, state.power, knownPlan ? windows.length : null), "morek", tag)}
       ${card("Recent charging", labels.historyEyebrow || "HISTORY", renderHistory(m4.history, historyReady), "history", tag)}
       </div><dialog id="plan-dialog" aria-labelledby="dialog-title"><div class="dialog-head"><div><div class="eyebrow">${escapeText(labels.dialogEyebrow || "PROPOSAL")}</div><h2 id="dialog-title">Proposed charging plan</h2></div><button id="close-plan" type="button" aria-label="Close proposed plan">\u2715</button></div><p class="subtext">${escapeText(labels.dialogNote)}</p><div role="status" aria-live="polite">${m4.warning ? `<strong>${escapeText(m4.warning.title)}</strong><p>${escapeText(m4.warning.detail)}</p>` : ""}${m4.evidence?.status ? `<p>${escapeText(m4.evidence.status)}</p>` : ""}</div>${plan}</dialog><footer>${escapeText(labels.footer)}</footer></div>`;
-    listeners = new AbortController();
+    const template = document.createElement("template");
+    template.innerHTML = html;
+    if (!root.firstChild) root.append(template.content);
+    else reconcile(root.firstChild, template.content.firstChild, (node) => drafts.has(node.dataset?.setting) || root.getRootNode().activeElement === node);
+    listeners ||= new AbortController();
     const signal = listeners.signal;
+    const bind3 = (node, fn) => {
+      if (node && !bound.has(node)) {
+        bound.add(node);
+        fn();
+      }
+    };
     const dialog = root.querySelector("#plan-dialog");
     let trigger2;
-    root.querySelectorAll("#open-plan, #open-plan-details").forEach((button) => button.addEventListener("click", () => {
+    root.querySelectorAll("#open-plan, #open-plan-details").forEach((button) => bind3(button, () => button.addEventListener("click", () => {
       trigger2 = button;
       dialog.showModal();
       root.querySelector("#close-plan").focus();
-    }, { signal }));
-    root.querySelector("#close-plan").addEventListener("click", () => dialog.close(), { signal });
-    dialog.addEventListener("click", (event) => {
-      if (event.target !== dialog) return;
-      const r7 = dialog.getBoundingClientRect();
-      if (event.clientX < r7.left || event.clientX > r7.right || event.clientY < r7.top || event.clientY > r7.bottom) dialog.close();
-    }, { signal });
-    dialog.addEventListener("close", () => trigger2?.focus(), { signal });
-    root.querySelector('a[href="#details"]')?.addEventListener("click", (event) => {
+    }, { signal })));
+    bind3(root.querySelector("#close-plan"), () => root.querySelector("#close-plan").addEventListener("click", () => dialog.close(), { signal }));
+    bind3(dialog, () => {
+      dialog.addEventListener("click", (event) => {
+        if (event.target !== dialog) return;
+        const r7 = dialog.getBoundingClientRect();
+        if (event.clientX < r7.left || event.clientX > r7.right || event.clientY < r7.top || event.clientY > r7.bottom) dialog.close();
+      }, { signal });
+      dialog.addEventListener("close", () => {
+        trigger2?.focus();
+        if (pendingUpdate) {
+          const next2 = pendingUpdate;
+          pendingUpdate = null;
+          instance.update(next2);
+        }
+      }, { signal });
+    });
+    const detailsLink = root.querySelector('a[href="#details"]');
+    bind3(detailsLink, () => detailsLink.addEventListener("click", (event) => {
       event.preventDefault();
       root.querySelector("#details").open = true;
-    }, { signal });
-    root.querySelector("#sample-state")?.addEventListener("change", (event) => actions2.selectScenario?.(event.target.value), { signal });
+    }, { signal }));
+    const scenarioInput = root.querySelector("#sample-state");
+    bind3(scenarioInput, () => scenarioInput.addEventListener("change", (event) => current.actions?.selectScenario?.(event.target.value), { signal }));
     root.querySelectorAll("[data-setting]").forEach((input) => {
-      if (drafts.has(input.dataset.setting)) input.value = drafts.get(input.dataset.setting);
-      input.addEventListener("input", () => drafts.set(input.dataset.setting, input.value), { signal });
-      input.addEventListener("change", () => drafts.set(input.dataset.setting, input.value), { signal });
+      const get2 = () => input.type === "checkbox" ? input.checked : input.value;
+      if (drafts.has(input.dataset.setting)) {
+        if (input.type === "checkbox") {
+          if (input.checked !== drafts.get(input.dataset.setting)) input.checked = drafts.get(input.dataset.setting);
+        } else if (input.value !== drafts.get(input.dataset.setting)) input.value = drafts.get(input.dataset.setting);
+      }
+      bind3(input, () => {
+        input.addEventListener("input", () => {
+          drafts.set(input.dataset.setting, get2());
+          current.actions?.edit?.();
+        }, { signal });
+        input.addEventListener("change", () => {
+          drafts.set(input.dataset.setting, get2());
+          current.actions?.edit?.();
+        }, { signal });
+      });
     });
-    root.querySelector("#save-plan").addEventListener("click", () => {
-      if (m4.canSave === true && typeof actions2.save === "function") actions2.save(Object.fromEntries([...root.querySelectorAll("[data-setting]")].map((input) => [input.dataset.setting, input.value])));
-    }, { signal });
-    if (chartReady || historyReady) {
+    const saveButton = root.querySelector("#save-plan");
+    bind3(saveButton, () => saveButton.addEventListener("click", () => {
+      if (current.model.canSave === true && typeof current.actions?.save === "function") current.actions.save(Object.fromEntries([...root.querySelectorAll("[data-setting]")].map((input) => [input.dataset.setting, input.type === "checkbox" ? input.checked : input.value])));
+    }, { signal }));
+    const reloadButton = root.querySelector("#reload-settings");
+    bind3(reloadButton, () => reloadButton.addEventListener("click", () => current.actions?.reloadSettings?.(), { signal }));
+    if (chartMount && !chartReady && !historyReady) {
+      chartMount.dispose();
+      chartMount = null;
+    }
+    if ((chartReady || historyReady) && !chartMount) {
       chartMount = mountCharts(root, { ...chart, prices, windows: chartWindows, readings: historyReady ? readings : null, sentHistory: historyReady ? sentHistory : null, historyAxis: m4.history?.axis }, f3, chartReady ? modes : []);
     }
     return chartMount;
@@ -52625,31 +52729,25 @@ function mountDashboard(root, adapter) {
     if (disposed) throw new Error("Dashboard disposed");
     if (!next?.model || !next.format || typeof next.format.time !== "function" || typeof next.format.day !== "function") throw new TypeError("Explicit model and formatters required");
     const sameDraft = current.draftKey === next.draftKey;
-    if (!sameDraft) drafts.clear();
-    const dialogOpen = sameDraft && root.querySelector("#plan-dialog")?.open;
-    const active = root.getRootNode().activeElement;
-    const focusSelector = active && root.contains(active) ? active.id ? `#${CSS.escape(active.id)}` : active.dataset?.setting ? `[data-setting="${CSS.escape(active.dataset.setting)}"]` : null : null;
-    const scrolls = [...root.querySelectorAll("*")].filter((el) => el.scrollTop || el.scrollLeft).map((el) => [el.id, el.scrollTop, el.scrollLeft]).filter(([id]) => id);
-    const windowScroll = [window.scrollX, window.scrollY];
-    const zoom = Object.fromEntries(Object.entries(chartMount?.priceCharts || {}).map(([mode, chart]) => {
-      const z2 = chart.getOption().dataZoom[0];
-      return [mode, [z2.startValue, z2.endValue]];
-    }));
-    cleanup();
+    const scrolls = sameDraft ? [...root.querySelectorAll("*")].filter((node) => node.scrollTop || node.scrollLeft).map((node) => [node, node.scrollTop, node.scrollLeft]) : [];
+    const viewport = root.ownerDocument.defaultView, x2 = viewport?.scrollX, y3 = viewport?.scrollY;
+    if (!sameDraft) {
+      drafts.clear();
+      cleanup();
+    }
+    pendingUpdate = null;
     current = next;
     const result = render2();
-    for (const [mode, range] of Object.entries(zoom)) chartMount?.priceCharts[mode]?.dispatchAction({ type: "dataZoom", startValue: range[0], endValue: range[1] });
-    if (dialogOpen) root.querySelector("#plan-dialog")?.showModal();
-    if (focusSelector && sameDraft) root.querySelector(focusSelector)?.focus({ preventScroll: true });
-    for (const [id, top, left] of scrolls) {
-      const el = root.querySelector(`#${CSS.escape(id)}`);
-      if (el) {
-        el.scrollTop = top;
-        el.scrollLeft = left;
+    if (sameDraft) {
+      for (const [node, top, left] of scrolls) if (node.isConnected) {
+        node.scrollTop = top;
+        node.scrollLeft = left;
       }
+      if (viewport && (viewport.scrollX !== x2 || viewport.scrollY !== y3)) viewport.scrollTo(x2, y3);
     }
-    window.scrollTo(...windowScroll);
     return result;
+  }, resetDrafts() {
+    drafts.clear();
   }, get charts() {
     return chartMount?.priceCharts || {};
   }, dispose() {
@@ -52666,6 +52764,7 @@ function mountDashboard(root, adapter) {
 
 // src/types.ts
 var API_VERSION = 1;
+var ACTION_API_VERSION = 1;
 var ACTION_START = "start";
 var ACTION_STOP = "stop";
 var ACTION_RESUME = "resume";
@@ -52687,6 +52786,8 @@ var CONNECTION_STATES = [
   "error",
   "unknown"
 ];
+var SETTINGS_API_VERSION = 1;
+var SETTINGS_DRIVER_TARGET_SOC = "target_soc";
 var SETTINGS_STRATEGY_CHEAPEST = "cheapest";
 var SETTINGS_STRATEGY_SOLAR = "solar";
 var SETTINGS_STRATEGY_HYBRID = "hybrid";
@@ -55606,7 +55707,7 @@ function zoneClock(timeZone) {
     timeZoneName: "shortOffset",
     hour: "2-digit"
   });
-  const clock = {
+  const clock2 = {
     timeZone: requested,
     msOfDay(instantMs2) {
       const parts = partsOf(instantMs2);
@@ -55621,8 +55722,8 @@ function zoneClock(timeZone) {
       return parts.find((part2) => part2.type === "timeZoneName")?.value ?? "";
     }
   };
-  clocks.set(requested, clock);
-  return clock;
+  clocks.set(requested, clock2);
+  return clock2;
 }
 function localDayKey(instantMs2, timeZone) {
   return zoneClock(timeZone).dayKey(instantMs2);
@@ -56828,8 +56929,8 @@ var en_default2 = {
 
 // src/i18n/index.ts
 var loaded = /* @__PURE__ */ new Map([["en", en_default2]]);
-function translate2(language, key2, params = {}) {
-  const template = loaded.get(language)?.[key2] ?? en_default2[key2];
+function translate2(language, key3, params = {}) {
+  const template = loaded.get(language)?.[key3] ?? en_default2[key3];
   return template.replace(/\{(\w+)\}/g, (match, name) => params[name] ?? match);
 }
 
@@ -56881,6 +56982,160 @@ async function morekSchedule(hass, chargerId, action, previewId) {
     ...action === "clear" ? { confirm_profile_id: 42001 } : {}
   });
 }
+function actionMessage(chargerId, action, choice) {
+  const message = {
+    type: "spotnav/manual_action",
+    api_version: ACTION_API_VERSION,
+    charger_id: chargerId,
+    action
+  };
+  if (action === ACTION_STOP && choice !== null) {
+    message.choice = choice;
+  }
+  return message;
+}
+async function performAction(hass, chargerId, action, choice = null) {
+  const raw = await call(hass, actionMessage(chargerId, action, choice));
+  return decodeActionResult(raw);
+}
+function decodeActionResult(raw) {
+  const source = typeof raw === "object" && raw !== null && !Array.isArray(raw) ? raw : null;
+  if (source === null) {
+    throw new SpotnavApiError(null);
+  }
+  const record3 = source;
+  const keys2 = ["api_version", "ok", "error", "action", "choice"];
+  for (const key3 of keys2) {
+    if (!(key3 in record3)) {
+      throw new SpotnavApiError(null);
+    }
+  }
+  if (Object.keys(record3).length !== keys2.length) {
+    throw new SpotnavApiError(null);
+  }
+  const version = record3.api_version;
+  const ok = record3.ok;
+  const error2 = record3.error;
+  const answered = record3.action;
+  const answeredChoice = record3.choice;
+  if (typeof version !== "number" || typeof ok !== "boolean") {
+    throw new SpotnavApiError(null);
+  }
+  for (const value2 of [error2, answered, answeredChoice]) {
+    if (value2 !== null && typeof value2 !== "string") {
+      throw new SpotnavApiError(null);
+    }
+  }
+  return {
+    api_version: version,
+    ok,
+    error: error2 ?? null,
+    action: answered ?? null,
+    choice: answeredChoice ?? null
+  };
+}
+async function getSettings(hass, chargerId) {
+  return await call(hass, {
+    type: "spotnav/get_settings",
+    api_version: SETTINGS_API_VERSION,
+    charger_id: chargerId
+  });
+}
+async function updateSettings(hass, chargerId, expectedRevision, body) {
+  return await call(hass, {
+    type: "spotnav/update_settings",
+    api_version: SETTINGS_API_VERSION,
+    charger_id: chargerId,
+    expected_revision: expectedRevision,
+    settings: body
+  });
+}
+
+// src/price-provider.ts
+function addIntegrationPath(domain) {
+  return `/config/integrations/dashboard/add?domain=${encodeURIComponent(domain)}`;
+}
+function integrationPath(domain) {
+  return `/config/integrations/integration/${encodeURIComponent(domain)}`;
+}
+var NOTICES = {
+  add_nordpool: {
+    text: "price.notice.addNordpool",
+    action: { label: "price.notice.addNordpool.action", does: { kind: "page", path: addIntegrationPath("nordpool") } },
+    key: "offered"
+  },
+  nordpool_not_loaded: {
+    text: "price.notice.nordpoolNotLoaded",
+    action: { label: "price.notice.nordpoolNotLoaded.action", does: { kind: "page", path: integrationPath("nordpool") } },
+    key: "offered"
+  },
+  // Nord Pool from HACS has the built-in one's domain and no action: nothing to add, the key is the way on.
+  nordpool_custom: { text: "price.notice.nordpoolCustom", key: "shown" },
+  add_entsoe_key: { text: "price.notice.addEntsoeKey", key: "shown" },
+  entsoe_key_rejected: { text: "price.notice.entsoeKeyRejected", key: "shown" },
+  add_pvpc: {
+    text: "price.notice.addPvpc",
+    action: {
+      label: "price.notice.addPvpc.action",
+      does: { kind: "page", path: addIntegrationPath("pvpc_hourly_pricing") }
+    }
+  },
+  pvpc_not_loaded: {
+    text: "price.notice.pvpcNotLoaded",
+    action: {
+      label: "price.notice.pvpcNotLoaded.action",
+      does: { kind: "page", path: integrationPath("pvpc_hourly_pricing") }
+    }
+  },
+  add_octopus: {
+    text: "price.notice.addOctopus",
+    action: { label: "price.notice.addOctopus.action", does: { kind: "octopus" } }
+  },
+  octopus_not_loaded: {
+    text: "price.notice.octopusNotLoaded",
+    action: {
+      label: "price.notice.openOctopus",
+      does: { kind: "page", path: integrationPath("octopus_energy") }
+    }
+  },
+  octopus_no_agile: {
+    text: "price.notice.octopusNoAgile",
+    action: {
+      label: "price.notice.openOctopus",
+      does: { kind: "page", path: integrationPath("octopus_energy") }
+    }
+  },
+  octopus_region_mismatch: {
+    text: "price.notice.octopusRegionMismatch",
+    action: { label: "price.notice.chooseArea", does: { kind: "area" } }
+  },
+  add_zonneplan: {
+    text: "price.notice.addZonneplan",
+    action: { label: "price.notice.addZonneplan.action", does: { kind: "zonneplan" } }
+  },
+  zonneplan_not_loaded: {
+    text: "price.notice.zonneplanNotLoaded",
+    action: {
+      label: "price.notice.openZonneplan",
+      does: { kind: "page", path: integrationPath("zonneplan_one") }
+    }
+  },
+  zonneplan_no_tariff: {
+    text: "price.notice.zonneplanNoTariff",
+    action: {
+      label: "price.notice.openZonneplan",
+      does: { kind: "page", path: integrationPath("zonneplan_one") }
+    }
+  },
+  zonneplan_area: {
+    text: "price.notice.zonneplanArea",
+    action: { label: "price.notice.chooseArea", does: { kind: "area" } }
+  },
+  source_missing: {
+    text: "price.notice.sourceMissing",
+    action: { label: "price.notice.chooseArea", does: { kind: "area" } }
+  }
+};
 
 // src/settings.ts
 var MalformedPayload = class extends Error {
@@ -56898,55 +57153,55 @@ function exactKeys(source, keys2) {
   if (Object.keys(source).length !== keys2.length) {
     return bad();
   }
-  for (const key2 of keys2) {
-    if (!Object.prototype.hasOwnProperty.call(source, key2)) {
+  for (const key3 of keys2) {
+    if (!Object.prototype.hasOwnProperty.call(source, key3)) {
       return bad();
     }
   }
 }
-function text(source, key2) {
-  const value2 = source[key2];
+function text(source, key3) {
+  const value2 = source[key3];
   return typeof value2 === "string" ? value2 : bad();
 }
-function textOrNull(source, key2) {
-  const value2 = source[key2];
+function textOrNull(source, key3) {
+  const value2 = source[key3];
   if (value2 === null) {
     return null;
   }
   return typeof value2 === "string" ? value2 : bad();
 }
-function booleanValue(source, key2) {
-  const value2 = source[key2];
+function booleanValue(source, key3) {
+  const value2 = source[key3];
   return typeof value2 === "boolean" ? value2 : bad();
 }
-function finite(source, key2) {
-  const value2 = source[key2];
+function finite(source, key3) {
+  const value2 = source[key3];
   return typeof value2 === "number" && Number.isFinite(value2) ? value2 : bad();
 }
-function whole(source, key2) {
-  const value2 = source[key2];
+function whole(source, key3) {
+  const value2 = source[key3];
   return typeof value2 === "number" && Number.isInteger(value2) ? value2 : bad();
 }
-function periodsOrNull(source, key2) {
-  const value2 = wholeOrNull(source, key2);
+function periodsOrNull(source, key3) {
+  const value2 = wholeOrNull(source, key3);
   return value2 === null || value2 >= PERIODS_MIN && value2 <= PERIODS_MAX ? value2 : bad();
 }
-function wholeOrNull(source, key2) {
-  const value2 = source[key2];
+function wholeOrNull(source, key3) {
+  const value2 = source[key3];
   if (value2 === null) {
     return null;
   }
   return typeof value2 === "number" && Number.isInteger(value2) ? value2 : bad();
 }
-function oneOf(source, key2, allowed) {
-  const value2 = source[key2];
+function oneOf(source, key3, allowed) {
+  const value2 = source[key3];
   if (typeof value2 !== "string" || !allowed.includes(value2)) {
     return bad();
   }
   return value2;
 }
-function list(source, key2) {
-  const value2 = source[key2];
+function list(source, key3) {
+  const value2 = source[key3];
   return Array.isArray(value2) ? value2 : bad();
 }
 var WALL_TIME = /^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/;
@@ -56958,14 +57213,25 @@ function isIsoDate(value2) {
   const parsed = /* @__PURE__ */ new Date(`${value2}T00:00:00Z`);
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value2;
 }
-function dateOrNull(source, key2) {
-  const value2 = textOrNull(source, key2);
+function dateOrNull(source, key3) {
+  const value2 = textOrNull(source, key3);
   return value2 === null || isIsoDate(value2) ? value2 : bad();
 }
-function wallTime(source, key2) {
-  const value2 = text(source, key2);
+function wallTime(source, key3) {
+  const value2 = text(source, key3);
   return WALL_TIME.test(value2) ? value2 : bad();
 }
+function instantOrNull(source, key3) {
+  const value2 = textOrNull(source, key3);
+  if (value2 === null) {
+    return null;
+  }
+  if (!/(?:Z|[+-]\d{2}:?\d{2})$/.test(value2) || Number.isNaN(Date.parse(value2))) {
+    return bad();
+  }
+  return value2;
+}
+var PAUSE_CHOICES = ["next_period", "until_tomorrow", "until_resumed", "manual"];
 var DRIVERS = ["manual_kwh", "target_soc"];
 var STRATEGIES = [SETTINGS_STRATEGY_CHEAPEST, SETTINGS_STRATEGY_SOLAR, SETTINGS_STRATEGY_HYBRID];
 var FISCAL_KEYS = ["enabled", "value"];
@@ -57001,12 +57267,14 @@ var OPTIONAL_RECORD_KEYS = [
   "if_not_ready"
 ];
 var ALL_WEEKDAYS = [1, 2, 3, 4, 5, 6, 7];
-function weekdays(source, key2) {
-  const days = list(source, key2).map(
+function weekdays(source, key3) {
+  const days = list(source, key3).map(
     (day) => typeof day === "number" && Number.isInteger(day) && day >= 1 && day <= 7 ? day : bad()
   );
   return days.length === 0 || new Set(days).size !== days.length ? bad() : [...days].sort((a4, b3) => a4 - b3);
 }
+var ENVELOPE_KEYS = ["api_version", "ok", "error", "settings", "pause"];
+var PAUSE_KEYS = ["choice", "admitted_at", "expires_at"];
 function decodeFiscal(source) {
   exactKeys(source, FISCAL_KEYS);
   const enabled = booleanValue(source, "enabled");
@@ -57068,8 +57336,8 @@ function decodeTarget(source) {
 function decodeFrame(raw) {
   const source = record(raw);
   exactKeys(source, ["x", "y", "w", "h"]);
-  const [x2, y3, w2, h3] = ["x", "y", "w", "h"].map((key2) => {
-    const value2 = finite(source, key2);
+  const [x2, y3, w2, h3] = ["x", "y", "w", "h"].map((key3) => {
+    const value2 = finite(source, key3);
     return value2 < 0 || value2 > 1 ? bad() : value2;
   });
   return x2 + w2 > 1.000001 || y3 + h3 > 1.000001 ? bad() : { x: x2, y: y3, w: w2, h: h3 };
@@ -57097,7 +57365,7 @@ function vehicleIds(source) {
 }
 function decodeSettingsRecord(raw) {
   const source = record(raw);
-  const present = OPTIONAL_RECORD_KEYS.filter((key2) => Object.prototype.hasOwnProperty.call(source, key2));
+  const present = OPTIONAL_RECORD_KEYS.filter((key3) => Object.prototype.hasOwnProperty.call(source, key3));
   const hasDate = present.includes("departure_date");
   const hasWeekdays = present.includes("departure_weekdays");
   exactKeys(source, [...RECORD_KEYS, ...present]);
@@ -57139,8 +57407,315 @@ function decodeSettingsRecord(raw) {
     ...present.includes("if_not_ready") ? { if_not_ready: oneOf(source, "if_not_ready", IF_NOT_READY) } : {}
   };
 }
+function decodePauseObservation(raw) {
+  const source = record(raw);
+  const manual = source["choice"] === "manual";
+  exactKeys(source, manual ? [...PAUSE_KEYS, "action", "scope"] : PAUSE_KEYS);
+  if (manual && (!["start", "stop"].includes(String(source["action"])) || !["plug_in", "next_plug_in"].includes(String(source["scope"])))) {
+    return bad();
+  }
+  const choice = textOrNull(source, "choice");
+  if (choice !== null && !PAUSE_CHOICES.includes(choice)) {
+    return bad();
+  }
+  const admittedAt = instantOrNull(source, "admitted_at");
+  const expiresAt = instantOrNull(source, "expires_at");
+  if (choice === null) {
+    return admittedAt !== null || expiresAt !== null ? bad() : { choice: null, admitted_at: null, expires_at: null };
+  }
+  if (choice === "until_resumed" || manual ? expiresAt !== null : expiresAt === null) {
+    return bad();
+  }
+  if (admittedAt !== null && expiresAt !== null && Date.parse(expiresAt) <= Date.parse(admittedAt)) {
+    return bad();
+  }
+  return manual ? { choice, admitted_at: admittedAt, expires_at: expiresAt, action: String(source["action"]), scope: String(source["scope"]) } : { choice, admitted_at: admittedAt, expires_at: expiresAt };
+}
+function malformed() {
+  return { ok: false, failure: "malformed" };
+}
+function decodeSettingsAnswer(raw) {
+  try {
+    if (!isRecord(raw)) {
+      return malformed();
+    }
+    const version = raw["api_version"];
+    if (typeof version === "number" && version !== SETTINGS_API_VERSION) {
+      return { ok: false, failure: "unsupported" };
+    }
+    exactKeys(raw, ENVELOPE_KEYS);
+    if (version !== SETTINGS_API_VERSION) {
+      return malformed();
+    }
+    const ok = booleanValue(raw, "ok");
+    const error2 = textOrNull(raw, "error");
+    const rawSettings = raw["settings"];
+    const rawPause = raw["pause"];
+    const settings = rawSettings === null ? null : decodeSettingsRecord(rawSettings);
+    const pause = rawPause === null ? null : decodePauseObservation(rawPause);
+    if (ok) {
+      if (error2 !== null || settings === null || pause === null) {
+        return malformed();
+      }
+      return { ok: true, value: { ok: true, settings, pause } };
+    }
+    if (error2 === null || error2 === "" || settings === null !== (pause === null)) {
+      return malformed();
+    }
+    return { ok: true, value: { ok: false, code: error2, settings, pause } };
+  } catch (error2) {
+    if (error2 instanceof MalformedPayload) {
+      return malformed();
+    }
+    throw error2;
+  }
+}
+function encodeBody(record3) {
+  return {
+    ...record3.soft_price_cap === void 0 ? {} : { soft_price_cap: record3.soft_price_cap },
+    ...record3.minimum_ready_by_soc === void 0 ? {} : { minimum_ready_by_soc: record3.minimum_ready_by_soc },
+    ...record3.cap_price_basis === void 0 ? {} : { cap_price_basis: record3.cap_price_basis },
+    area_id: record3.area_id,
+    overrides: record3.overrides.map((item) => ({
+      area_id: item.area_id,
+      vat: { ...item.vat },
+      tax: { ...item.tax },
+      transfer: { ...item.transfer }
+    })),
+    phases: record3.phases,
+    amps: record3.amps,
+    requested_kwh: record3.requested_kwh,
+    ...record3.fill_to_limit === void 0 ? {} : { fill_to_limit: record3.fill_to_limit },
+    max_periods: record3.max_periods,
+    departure_enabled: record3.departure_enabled,
+    departure_time: record3.departure_time,
+    departure_date: record3.departure_date,
+    departure_weekdays: [...record3.departure_weekdays],
+    strategy: record3.strategy,
+    driver: record3.driver,
+    target: { ...record3.target },
+    ...record3.vehicle_ids === void 0 ? {} : { vehicle_ids: record3.vehicle_ids === null ? null : [...record3.vehicle_ids] },
+    ...record3.identify_mode === void 0 ? {} : { identify_mode: record3.identify_mode },
+    ...record3.identify_camera === void 0 ? {} : { identify_camera: copyCamera(record3.identify_camera) },
+    ...record3.users_change_plan === void 0 ? {} : { users_change_plan: record3.users_change_plan },
+    ...record3.if_not_ready === void 0 ? {} : { if_not_ready: record3.if_not_ready }
+  };
+}
+function copyCamera(camera) {
+  return camera === null ? null : { ...camera, frame: camera.frame === null ? null : { ...camera.frame } };
+}
+function formFromRecord(record3) {
+  return {
+    ...record3.soft_price_cap === void 0 ? {} : { capEnabled: record3.soft_price_cap !== null, capValue: record3.soft_price_cap === null ? "" : String(record3.soft_price_cap), capBasis: record3.cap_price_basis ?? "", minimumReadySoc: record3.minimum_ready_by_soc == null ? "" : String(record3.minimum_ready_by_soc) },
+    energy: String(record3.requested_kwh),
+    fill: record3.fill_to_limit === true,
+    deadlineEnabled: record3.departure_enabled,
+    deadlineTime: record3.departure_time,
+    departureDate: record3.departure_date ?? "",
+    departureWeekdays: record3.departure_weekdays.join(""),
+    current: record3.amps === null ? "" : String(record3.amps),
+    driver: record3.driver,
+    targetPercent: record3.target.target_percent === null ? "" : String(record3.target.target_percent),
+    vehicleId: record3.target.vehicle_id ?? "",
+    ...record3.if_not_ready === void 0 ? {} : { ifNotReady: record3.if_not_ready }
+  };
+}
+function decimal(text3, minimum, maximum) {
+  const trimmed = text3.trim().replace(",", ".");
+  if (trimmed === "") {
+    return { ok: false, errorKey: "settings.error.required" };
+  }
+  const value2 = Number(trimmed);
+  if (!Number.isFinite(value2)) {
+    return { ok: false, errorKey: "settings.error.invalidNumber" };
+  }
+  if (value2 < minimum || value2 > maximum) {
+    return { ok: false, errorKey: "settings.error.outOfRange" };
+  }
+  return { ok: true, value: value2 };
+}
+function integer(text3, minimum, maximum) {
+  const trimmed = text3.trim();
+  if (trimmed === "") {
+    return { ok: false, errorKey: "settings.error.required" };
+  }
+  const value2 = Number(trimmed);
+  if (!Number.isFinite(value2) || !Number.isInteger(value2)) {
+    return { ok: false, errorKey: "settings.error.invalidNumber" };
+  }
+  if (value2 < minimum || value2 > maximum) {
+    return { ok: false, errorKey: "settings.error.outOfRange" };
+  }
+  return { ok: true, value: value2 };
+}
+var TARGET_PERCENT_MIN = 0;
+var TARGET_PERCENT_MAX = 100;
+function checkTargetPercent(text3) {
+  return decimal(text3, TARGET_PERCENT_MIN, TARGET_PERCENT_MAX);
+}
+function checkEnergy(text3) {
+  return decimal(text3, ENERGY_MIN_KWH, ENERGY_MAX_KWH);
+}
+function checkDeadlineTime(text3) {
+  const trimmed = text3.trim();
+  if (trimmed === "") {
+    return { ok: false, errorKey: "settings.error.required" };
+  }
+  return WALL_TIME.test(trimmed) ? { ok: true, value: trimmed } : { ok: false, errorKey: "settings.error.invalidTime" };
+}
+function checkDepartureDate(text3, days, moved) {
+  const trimmed = text3.trim();
+  if (trimmed === "") {
+    return { ok: true, value: null };
+  }
+  if (!isIsoDate(trimmed)) {
+    return { ok: false, errorKey: "settings.error.invalidDate" };
+  }
+  if (moved && days !== null && (trimmed < days.today || trimmed > days.max)) {
+    return { ok: false, errorKey: "settings.error.dateRange" };
+  }
+  return { ok: true, value: trimmed };
+}
+function checkCurrent(text3) {
+  return integer(text3, AMPS_MIN, AMPS_MAX);
+}
+function checkCurrentInRange(text3, range) {
+  const amps = checkCurrent(text3);
+  if (!amps.ok) {
+    return amps;
+  }
+  return amps.value < range.minA || amps.value > range.maxA ? { ok: false, errorKey: "settings.error.outOfRange" } : amps;
+}
+var ENERGY_MIN_KWH = 0.1;
+var ENERGY_MAX_KWH = 1e3;
 var PERIODS_MIN = 1;
 var PERIODS_MAX = 8;
+var AMPS_MIN = 1;
+var AMPS_MAX = 80;
+function replacementFor(kind, record3, values, range = null, opened = null, days = null) {
+  const body = encodeBody(record3);
+  const energy2 = kind === "energy" || kind === "plan" ? checkEnergy(values.energy) : null;
+  if (energy2 !== null && !energy2.ok) {
+    return energy2;
+  }
+  const amps = kind === "current" || kind === "plan" ? currentCheck(values, record3, range) : null;
+  if (amps !== null && !amps.ok) {
+    return amps;
+  }
+  const time = kind === "deadline" || kind === "plan" ? checkDeadlineTime(values.deadlineTime) : null;
+  if (time !== null && !time.ok) {
+    return time;
+  }
+  const dateBase = opened === null ? record3 : opened;
+  const dateMoved = values.departureDate !== (dateBase.departure_date ?? "");
+  const date2 = kind === "deadline" || kind === "plan" ? checkDepartureDate(values.deadlineEnabled ? values.departureDate : "", days, dateMoved) : null;
+  if (date2 !== null && !date2.ok) {
+    return date2;
+  }
+  const dayList = kind === "deadline" || kind === "plan" ? weekdaysFromText(values.departureWeekdays) : null;
+  if (dayList !== null && dayList === "invalid") {
+    return { ok: false, errorKey: "settings.error.weekdays" };
+  }
+  const driverOk = values.driver === "manual_kwh" || values.driver === SETTINGS_DRIVER_TARGET_SOC;
+  if (kind === "plan" && !driverOk) {
+    return { ok: false, errorKey: "settings.error.invalid" };
+  }
+  const soc2 = kind === "plan" && values.driver === SETTINGS_DRIVER_TARGET_SOC;
+  const targetPercent = soc2 ? checkTargetPercent(values.targetPercent) : null;
+  if (targetPercent !== null && !targetPercent.ok) {
+    return targetPercent;
+  }
+  let changed = false;
+  const next = { ...body };
+  if (kind === "plan" && record3.soft_price_cap !== void 0 && values.capEnabled !== void 0) {
+    const base2 = opened ?? record3;
+    const cap = values.capEnabled ? decimal(values.capValue ?? "", -1e9, 1e9) : null;
+    if (cap !== null && !cap.ok) return cap;
+    const minimum = (values.minimumReadySoc ?? "").trim() === "" ? null : decimal(values.minimumReadySoc ?? "", 0, 100);
+    if (minimum !== null && !minimum.ok) return minimum;
+    const capValue = cap === null ? null : cap.value;
+    const minValue = minimum === null ? null : minimum.value;
+    const basis = values.capBasis === "nord_pool" || values.capBasis === "configured_variable_cost" ? values.capBasis : null;
+    if (capValue !== null && basis === null) return { ok: false, errorKey: "settings.error.invalid" };
+    if (opened === null || capValue !== base2.soft_price_cap) {
+      next.soft_price_cap = capValue;
+      changed ||= capValue !== record3.soft_price_cap;
+    }
+    if (opened === null || minValue !== base2.minimum_ready_by_soc) {
+      next.minimum_ready_by_soc = minValue;
+      changed ||= minValue !== record3.minimum_ready_by_soc;
+    }
+    if (opened === null || basis !== base2.cap_price_basis) {
+      next.cap_price_basis = basis;
+      changed ||= basis !== record3.cap_price_basis;
+    }
+  }
+  if (kind === "plan" && driverOk && (opened === null || values.driver !== opened.driver)) {
+    next.driver = values.driver;
+    changed = changed || values.driver !== record3.driver;
+  }
+  const target = { ...record3.target };
+  let targetMoved = false;
+  if (targetPercent !== null && targetPercent.ok && (opened === null || targetPercent.value !== opened.target.target_percent)) {
+    target.target_percent = targetPercent.value;
+    targetMoved = targetMoved || targetPercent.value !== record3.target.target_percent;
+  }
+  const vehicleId = values.vehicleId.trim();
+  if (soc2 && vehicleId !== "" && (opened === null || vehicleId !== (opened.target.vehicle_id ?? ""))) {
+    target.vehicle_id = vehicleId;
+    targetMoved = targetMoved || vehicleId !== record3.target.vehicle_id;
+  }
+  if (targetMoved) {
+    next.target = target;
+    changed = true;
+  }
+  if (energy2 !== null && energy2.ok && (opened === null || energy2.value !== opened.requested_kwh)) {
+    next.requested_kwh = energy2.value;
+    changed = changed || energy2.value !== record3.requested_kwh;
+  }
+  const fillShown = opened === null ? record3.fill_to_limit === true : opened.fill_to_limit === true;
+  if (energy2 !== null && energy2.ok && record3.fill_to_limit !== void 0 && values.fill !== fillShown) {
+    next.fill_to_limit = values.fill;
+    changed = changed || values.fill !== record3.fill_to_limit;
+  }
+  if (amps !== null && amps.ok && (opened === null || amps.value !== opened.amps)) {
+    next.amps = amps.value;
+    changed = changed || amps.value !== record3.amps;
+  }
+  const deadlineMoved = opened === null || time !== null && time.ok && (values.deadlineEnabled !== opened.departure_enabled || time.value !== opened.departure_time || date2 !== null && date2.ok && date2.value !== opened.departure_date);
+  const weekdaysMoved = dayList !== null && (opened === null ? dayList.join("") !== record3.departure_weekdays.join("") : dayList.join("") !== opened.departure_weekdays.join(""));
+  if (weekdaysMoved && dayList !== null) {
+    next.departure_weekdays = dayList;
+    changed = changed || dayList.join("") !== record3.departure_weekdays.join("");
+  }
+  if (time !== null && time.ok && deadlineMoved) {
+    next.departure_enabled = values.deadlineEnabled;
+    next.departure_time = time.value;
+    if (date2 !== null && date2.ok) {
+      next.departure_date = date2.value;
+    }
+    changed = changed || values.deadlineEnabled !== record3.departure_enabled || time.value !== record3.departure_time || date2 !== null && date2.ok && date2.value !== record3.departure_date;
+  }
+  if (kind === "plan" && record3.if_not_ready !== void 0 && IF_NOT_READY.includes(values.ifNotReady ?? "")) {
+    const shown = opened === null ? record3.if_not_ready : opened.if_not_ready;
+    if (values.ifNotReady !== shown) {
+      next.if_not_ready = values.ifNotReady;
+      changed = changed || values.ifNotReady !== record3.if_not_ready;
+    }
+  }
+  return { ok: true, body: next, changed };
+}
+function weekdaysFromText(text3) {
+  const days = [...new Set([...text3].map(Number))].filter((day) => day >= 1 && day <= 7).sort((a4, b3) => a4 - b3);
+  return days.length === 0 ? "invalid" : days;
+}
+function currentCheck(values, record3, range) {
+  const amps = checkCurrent(values.current);
+  if (!amps.ok || range === null || amps.value === record3.amps) {
+    return amps;
+  }
+  return checkCurrentInRange(values.current, range);
+}
 
 // src/validate.ts
 var DIRECTION_HINTS = ["use_power", "magnitude"];
@@ -57158,11 +57733,11 @@ function referencePictures(list2) {
 var CHARGE_BAR_BASES = ["target", "energy", "vehicle_limit", "open"];
 var Malformed = class extends Error {
 };
-function has2(source, key2) {
-  return Object.prototype.hasOwnProperty.call(source, key2);
+function has2(source, key3) {
+  return Object.prototype.hasOwnProperty.call(source, key3);
 }
-function required(source, key2) {
-  return has2(source, key2) ? source[key2] : bad2();
+function required(source, key3) {
+  return has2(source, key3) ? source[key3] : bad2();
 }
 var OFFSET_SUFFIX = /(?:Z|[+-]\d{2}:?\d{2})$/;
 var DURATION_TOLERANCE_MS = 1e3;
@@ -57175,45 +57750,45 @@ function isRecord2(value2) {
 function record2(value2) {
   return isRecord2(value2) ? value2 : bad2();
 }
-function text2(source, key2) {
-  const value2 = source[key2];
+function text2(source, key3) {
+  const value2 = source[key3];
   return typeof value2 === "string" ? value2 : bad2();
 }
-function textOrNull2(source, key2) {
-  const value2 = required(source, key2);
+function textOrNull2(source, key3) {
+  const value2 = required(source, key3);
   if (value2 === null) {
     return null;
   }
   return typeof value2 === "string" ? value2 : bad2();
 }
-function numberValue(source, key2) {
-  const value2 = source[key2];
+function numberValue(source, key3) {
+  const value2 = source[key3];
   return typeof value2 === "number" && Number.isFinite(value2) ? value2 : bad2();
 }
-function numberOrNull(source, key2) {
-  const value2 = required(source, key2);
+function numberOrNull(source, key3) {
+  const value2 = required(source, key3);
   if (value2 === null) {
     return null;
   }
   return typeof value2 === "number" && Number.isFinite(value2) ? value2 : bad2();
 }
-function booleanValue2(source, key2) {
-  const value2 = source[key2];
+function booleanValue2(source, key3) {
+  const value2 = source[key3];
   return typeof value2 === "boolean" ? value2 : bad2();
 }
-function booleanOrNull(source, key2) {
-  const value2 = required(source, key2);
+function booleanOrNull(source, key3) {
+  const value2 = required(source, key3);
   if (value2 === null) {
     return null;
   }
   return typeof value2 === "boolean" ? value2 : bad2();
 }
-function arrayValue(source, key2) {
-  const value2 = source[key2];
+function arrayValue(source, key3) {
+  const value2 = source[key3];
   return Array.isArray(value2) ? value2 : bad2();
 }
-function stringListOrNull(source, key2) {
-  const value2 = required(source, key2);
+function stringListOrNull(source, key3) {
+  const value2 = required(source, key3);
   if (value2 === null) {
     return null;
   }
@@ -57222,12 +57797,12 @@ function stringListOrNull(source, key2) {
   }
   return value2.map((entry) => typeof entry === "string" ? entry : bad2());
 }
-function sectionOrNull(source, key2, decode) {
-  const value2 = required(source, key2);
+function sectionOrNull(source, key3, decode) {
+  const value2 = required(source, key3);
   return value2 === null ? null : decode(record2(value2));
 }
-function numberList(source, key2) {
-  return arrayValue(source, key2).map(
+function numberList(source, key3) {
+  return arrayValue(source, key3).map(
     (entry) => typeof entry === "number" && Number.isFinite(entry) ? entry : bad2()
   );
 }
@@ -57238,8 +57813,8 @@ function instantMs(value2) {
   const parsed = Date.parse(value2);
   return Number.isFinite(parsed) ? parsed : bad2();
 }
-function instant(source, key2) {
-  const value2 = source[key2];
+function instant(source, key3) {
+  const value2 = source[key3];
   const ms = instantMs(value2);
   return { text: value2, ms };
 }
@@ -57253,15 +57828,15 @@ function isValidTimeZone(timeZone) {
 }
 function exactKeys2(source, keys2) {
   presentKeys(source, keys2);
-  for (const key2 of Object.keys(source)) {
-    if (!keys2.includes(key2)) {
+  for (const key3 of Object.keys(source)) {
+    if (!keys2.includes(key3)) {
       bad2();
     }
   }
 }
 function presentKeys(source, keys2) {
-  for (const key2 of keys2) {
-    required(source, key2);
+  for (const key3 of keys2) {
+    required(source, key3);
   }
 }
 function decodeCapabilities(source) {
@@ -57493,7 +58068,7 @@ function priceProviderOrNull(raw) {
   }
   try {
     exactKeys2(raw, ["key", "name", "url", "notice"]);
-    const key2 = textOrNull2(raw, "key");
+    const key3 = textOrNull2(raw, "key");
     const name = textOrNull2(raw, "name");
     const url = textOrNull2(raw, "url");
     const rawNotice = raw["notice"];
@@ -57508,7 +58083,7 @@ function priceProviderOrNull(raw) {
       notice = { code: text2(item, "code"), params };
     }
     const attribution = name !== null && url !== null ? priceSource({ name, url }) : null;
-    return { key: key2, name, url: attribution?.url ?? null, notice };
+    return { key: key3, name, url: attribution?.url ?? null, notice };
   } catch {
     return null;
   }
@@ -57615,8 +58190,8 @@ function decodeLive(source) {
     measured_current_a: numberOrNull(source, "measured_current_a")
   };
 }
-var PAUSE_CHOICES = ["next_period", "until_tomorrow", "until_resumed"];
-var STORED_PAUSE_CHOICES = [...PAUSE_CHOICES, "manual"];
+var PAUSE_CHOICES2 = ["next_period", "until_tomorrow", "until_resumed"];
+var STORED_PAUSE_CHOICES = [...PAUSE_CHOICES2, "manual"];
 var MANUAL_ACTIONS = ["start", "stop"];
 var MANUAL_SCOPES = ["plug_in", "next_plug_in"];
 var STRATEGIES2 = ["cheapest", "solar", "hybrid"];
@@ -57635,8 +58210,8 @@ var AUTOMATIC_REASONS = [
   "pause_clear_failed",
   "action_pending"
 ];
-function instantOrNull(source, key2) {
-  const value2 = required(source, key2);
+function instantOrNull2(source, key3) {
+  const value2 = required(source, key3);
   if (value2 === null) {
     return [null, null];
   }
@@ -57649,8 +58224,8 @@ function instantOrNull(source, key2) {
   }
   return [value2, milliseconds];
 }
-function enumOrNull(source, key2, allowed) {
-  const value2 = required(source, key2);
+function enumOrNull(source, key3, allowed) {
+  const value2 = required(source, key3);
   if (value2 === null) {
     return null;
   }
@@ -57668,8 +58243,8 @@ function decodePause(source) {
   if (manual && (action === null || scope === null)) {
     return bad2();
   }
-  const [admittedAt, admittedAtMs] = instantOrNull(source, "admitted_at");
-  const [expiresAt, expiresAtMs] = instantOrNull(source, "expires_at");
+  const [admittedAt, admittedAtMs] = instantOrNull2(source, "admitted_at");
+  const [expiresAt, expiresAtMs] = instantOrNull2(source, "expires_at");
   if (choice === null) {
     if (admittedAt !== null || expiresAt !== null) {
       return bad2();
@@ -57759,7 +58334,7 @@ function decodeControl(source) {
     return bad2();
   }
   const choices = arrayValue(source, "pause_choices").map((value2) => {
-    if (typeof value2 !== "string" || !PAUSE_CHOICES.includes(value2)) {
+    if (typeof value2 !== "string" || !PAUSE_CHOICES2.includes(value2)) {
       return bad2();
     }
     return value2;
@@ -58054,32 +58629,32 @@ var STATUS_CODE_TABLE = {
     { kwh: "numberOrNull", requested_kwh: "numberOrNull", soc_percent: "numberOrNull", departure: "instantOrNull" }
   ]
 };
-function decodeStatusParam(source, key2, kind) {
+function decodeStatusParam(source, key3, kind) {
   switch (kind) {
     case "text":
-      return text2(source, key2);
+      return text2(source, key3);
     case "textOrNull":
-      return textOrNull2(source, key2);
+      return textOrNull2(source, key3);
     case "instant": {
-      const [iso] = instantOrNull(source, key2);
+      const [iso] = instantOrNull2(source, key3);
       return iso ?? bad2();
     }
     case "instantOrNull":
-      return instantOrNull(source, key2)[0];
+      return instantOrNull2(source, key3)[0];
     case "number":
-      return numberValue(source, key2);
+      return numberValue(source, key3);
     case "numberOrNull":
-      return numberOrNull(source, key2);
+      return numberOrNull(source, key3);
     case "int": {
-      const value2 = numberValue(source, key2);
+      const value2 = numberValue(source, key3);
       return Number.isInteger(value2) ? value2 : bad2();
     }
     case "boolean":
-      return booleanValue2(source, key2);
+      return booleanValue2(source, key3);
     case "choiceOrNull":
-      return enumOrNull(source, key2, STORED_PAUSE_CHOICES);
+      return enumOrNull(source, key3, STORED_PAUSE_CHOICES);
     case "codes":
-      return arrayValue(source, key2).map((entry) => typeof entry === "string" ? entry : bad2());
+      return arrayValue(source, key3).map((entry) => typeof entry === "string" ? entry : bad2());
   }
 }
 function decodeStatus(source) {
@@ -58103,7 +58678,7 @@ function decodeStatus(source) {
     return {
       code,
       params: Object.fromEntries(
-        Object.entries(kinds).map(([key2, kind]) => [key2, decodeStatusParam(params, key2, kind)])
+        Object.entries(kinds).map(([key3, kind]) => [key3, decodeStatusParam(params, key3, kind)])
       )
     };
   });
@@ -58123,7 +58698,7 @@ function decodeDashboard(raw) {
       return { ok: false, failure: "unsupported" };
     }
     exactKeys2(
-      Object.fromEntries(Object.entries(root).filter(([key2]) => !OPTIONAL_DASHBOARD_KEYS.includes(key2))),
+      Object.fromEntries(Object.entries(root).filter(([key3]) => !OPTIONAL_DASHBOARD_KEYS.includes(key3))),
       DASHBOARD_KEYS
     );
     const market = sectionOrNull(root, "market", decodeMarket);
@@ -58300,8 +58875,8 @@ function priceSourceOrNull(root) {
   }
 }
 var GRID_TARIFF_POLICIES = ["off", "manual", "included"];
-function wholeNumber(source, key2, min3, max3) {
-  const value2 = source[key2];
+function wholeNumber(source, key3, min3, max3) {
+  const value2 = source[key3];
   return typeof value2 === "number" && Number.isInteger(value2) && value2 >= min3 && value2 <= max3 ? value2 : bad2();
 }
 function gridTariffFee(raw) {
@@ -58339,8 +58914,8 @@ function decodeHighLoadWindow(raw) {
     to_hour: to
   };
 }
-function nonNegativeOrNull(source, key2) {
-  const value2 = numberOrNull(source, key2);
+function nonNegativeOrNull(source, key3) {
+  const value2 = numberOrNull(source, key3);
   return value2 !== null && value2 < 0 ? bad2() : value2;
 }
 function decodeDemandComponent(raw) {
@@ -58435,7 +59010,7 @@ function cameraIdentificationOrNull(root) {
     return null;
   }
   try {
-    const choices = (key2) => arrayValue(value2, key2).map((entry) => {
+    const choices = (key3) => arrayValue(value2, key3).map((entry) => {
       const item = record2(entry);
       return {
         entity_id: text2(item, "entity_id"),
@@ -58508,9 +59083,9 @@ function chargeBarOrNull(root) {
     if (basis === "open" !== (percent2 === null)) {
       return null;
     }
-    const moment = (key2) => required(value2, key2) === null ? null : instantMs(value2[key2]);
-    const positive2 = (key2) => {
-      const number2 = numberOrNull(value2, key2);
+    const moment = (key3) => required(value2, key3) === null ? null : instantMs(value2[key3]);
+    const positive2 = (key3) => {
+      const number2 = numberOrNull(value2, key3);
       return number2 === null || number2 < 0 ? null : number2;
     };
     return {
@@ -58534,15 +59109,15 @@ function oneOfValues(value2, allowed) {
 function decodeSource(raw) {
   const source = record2(raw);
   presentKeys(source, ["entity_id", "name", "chosen", "candidates"]);
-  for (const key2 of Object.keys(source)) {
-    if (!["entity_id", "name", "chosen", "candidates", "others", "reading"].includes(key2)) {
+  for (const key3 of Object.keys(source)) {
+    if (!["entity_id", "name", "chosen", "candidates", "others", "reading"].includes(key3)) {
       bad2();
     }
   }
   if (typeof source.chosen !== "boolean") {
     return bad2();
   }
-  const choices = (key2) => arrayValue(source, key2).map((entry) => {
+  const choices = (key3) => arrayValue(source, key3).map((entry) => {
     const item = record2(entry);
     for (const name of Object.keys(item)) {
       if (!["entity_id", "name", "state"].includes(name)) {
@@ -58653,8 +59228,8 @@ function currentRangeOrNull(root) {
 }
 var SOC_MISSING = ["soc", "capacity", "vehicle"];
 var SOC_SOURCES = ["charger", "vehicle"];
-function boundedOrNull(source, key2, minimum, maximum, exclusiveMinimum = false) {
-  const value2 = numberOrNull(source, key2);
+function boundedOrNull(source, key3, minimum, maximum, exclusiveMinimum = false) {
+  const value2 = numberOrNull(source, key3);
   if (value2 === null) {
     return null;
   }
@@ -58712,7 +59287,7 @@ var CAPACITY_SOURCES = ["reported", "stored"];
 function decodeVehicle(raw) {
   const source = record2(raw);
   const optional = ["identification", "target_percent", "min_percent", "charge_limit_range", "wake_for_reading"].filter(
-    (key2) => Object.prototype.hasOwnProperty.call(source, key2)
+    (key3) => Object.prototype.hasOwnProperty.call(source, key3)
   );
   exactKeys2(source, [
     ...optional,
@@ -58768,8 +59343,8 @@ function minimumLevel(source) {
 var MIN_PERCENT_LOW = 10;
 var MIN_PERCENT_HIGH = 80;
 var MIN_PERCENT_STEP = 5;
-function phaseCount(source, key2) {
-  const value2 = source[key2];
+function phaseCount(source, key3) {
+  const value2 = source[key3];
   return value2 === 1 || value2 === 3 ? value2 : bad2();
 }
 function suggestedPhase(source) {
@@ -58806,6 +59381,20 @@ function progressOrNull(root) {
   }
 }
 
+// src/model.ts
+function admittedAction(control, action, choice) {
+  if (action === ACTION_START) {
+    return choice === null && control.immediate_action === ACTION_START;
+  }
+  if (action === ACTION_STOP) {
+    if (choice === null) {
+      return control.immediate_action === ACTION_STOP;
+    }
+    return control.automatic_action === ACTION_PAUSE && control.pause_choices.includes(choice);
+  }
+  return choice === null && control.automatic_action === ACTION_RESUME;
+}
+
 // src/morek-view.ts
 function decodeMorekState(raw) {
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return null;
@@ -58823,6 +59412,205 @@ function decodeMorekState(raw) {
   if (state.effective !== null && (typeof state.effective !== "object" || !Array.isArray(state.effective.periods))) return null;
   if (state.preview !== void 0 && (typeof state.preview !== "object" || state.preview === null || typeof state.preview.calculated_at !== "string" || state.preview.reason !== null && typeof state.preview.reason !== "string" || state.preview.profile !== null && (typeof state.preview.profile !== "object" || !Array.isArray(state.preview.profile.chargingSchedule?.chargingSchedulePeriod)))) return null;
   return state;
+}
+function localTime(value2) {
+  if (value2 === null) return "not yet";
+  const date2 = new Date(value2);
+  return Number.isNaN(date2.getTime()) ? "unknown" : date2.toLocaleString();
+}
+function transitions(doc, profile) {
+  const start2 = new Date(profile.chargingSchedule.startSchedule).getTime();
+  const list2 = doc.createElement("ul");
+  for (const period of profile.chargingSchedule.chargingSchedulePeriod) {
+    const line = doc.createElement("li");
+    line.textContent = `${localTime(new Date(start2 + period.startPeriod * 1e3).toISOString())}: ${period.limit} A`;
+    list2.append(line);
+  }
+  return list2;
+}
+var PREVIEW_REFUSALS = {
+  pause_auto_first: "Pause Auto 'Until I resume' before sending.",
+  current_must_be_16: "Set the plan current to 16 A to preview this test.",
+  no_current_plan: "No current, priced plan matches the saved settings.",
+  plan_expired: "The plan has expired; the previously sent limit may still remain.",
+  prices_unavailable: "Prices are missing for the current plan; no schedule will be sent.",
+  prices_stale_or_unavailable: "Price data is stale or unavailable; no schedule will be sent.",
+  target_stop_unsupported: "This HA backend cannot send shortened charging windows yet. Update the integration.",
+  too_many_blocks: "This test supports at most three charging windows.",
+  invalid_plan: "The charging windows must be valid, ordered, and within 48 hours.",
+  morek_offline: "Morek is not connected through HA OCPP.",
+  not_morek_connector: "This connector is not identified as the permitted Morek station.",
+  preview_unavailable: "The plan could not be calculated right now. Try again shortly."
+};
+function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmActions = true) {
+  const section = doc.createElement("section");
+  section.className = VISUAL_CLASSES.morekPanel;
+  const heading = doc.createElement("h3");
+  heading.textContent = "Morek stored schedule";
+  section.append(heading);
+  const health = doc.createElement("p");
+  const labels = {
+    waiting: "Waiting for a usable plan",
+    not_ready: "Not ready",
+    offline: "Offline",
+    sending: "Sending \u2014 outcome not yet known",
+    checking: "Checking readback",
+    mismatch: "Mismatch \u2014 intervention may be needed",
+    verified: "Remaining effective schedule verified at last read",
+    intervention_needed: "Intervention needed \u2014 action outcome uncertain",
+    ready: "Manual preview ready, not sent"
+  };
+  const sending = busy && activeAction === "send" && !state.outcomes?.uncertain;
+  health.textContent = `Operator state: ${sending ? labels.sending : labels[state.operator?.state ?? ""] ?? "Unavailable \u2014 recalculate status"}` + (!sending && state.operator?.reason ? ` (${state.operator.reason})` : "");
+  section.append(health);
+  const availability = doc.createElement("p");
+  availability.textContent = `Automatic Morek mode unavailable and unarmed. Recorded owner: ${state.ownership?.recorded_owner ?? "unknown"}. Durable ownership transitions and lost-state recovery, conflicting control and household protection, transaction authorization, and safe retained-profile exit remain unresolved.`;
+  section.append(availability);
+  const evidence = doc.createElement("p");
+  evidence.textContent = "Proposal is not sent; an upload ACK is not effective readback. A verified remaining effective schedule is not profile inventory, transaction authorization, or measured physical charging. Measured charging is not established here; check separate live measurements.";
+  section.append(evidence);
+  const recovery = doc.createElement("p");
+  recovery.textContent = "A retained final 0 A may persist through restart or downgrade. Preserve any person Stop and household protection; do not blindly resume legacy control. For uncertain actions, keep the outcome unresolved and seek a supervised ownership and electrical recovery decision. Refresh is read-only, not inventory or recovery. Selective removal can increase allowed current and cannot resolve an earlier unknown upload; do not use a blanket profile clear.";
+  section.append(recovery);
+  if (!state.supported) {
+    const warning = doc.createElement("p");
+    warning.textContent = state.reason === "no_ocpp_target" ? "SpotNav has not identified an OCPP connector for this charger. Check its OCPP charger setup." : state.reason === "wrong_connector" ? "SpotNav is configured for a different connector; this test requires connector 1." : state.reason === "ambiguous_station" ? "Multiple OCPP connections match this charger. No request will be sent until its identity is unambiguous." : state.reason === "unsupported_ocpp_version" ? "This test requires an OCPP 1.6 connection." : "HA OCPP has not matched this charger to Morek station 3020002509120029. Check its OCPP configuration and connection.";
+    section.append(warning);
+    const identity2 = doc.createElement("p");
+    identity2.textContent = `SpotNav OCPP ID: ${state.configured_id ?? "not found"} \xB7 connector: ${state.connector_id ?? "not found"} \xB7 HA OCPP station: ${state.resolved_id ?? "not resolved"}`;
+    section.append(identity2);
+  }
+  const note = doc.createElement("p");
+  note.textContent = "SpotNav still uses live start/stop commands. Pause Auto 'Until I resume' before sending. These controls do not authorize a plugged-in car.";
+  section.append(note);
+  const previewTitle = doc.createElement("strong");
+  previewTitle.textContent = "Preview \u2014 calculated, NOT sent";
+  section.append(previewTitle);
+  const preview = doc.createElement("p");
+  preview.textContent = state.preview === void 0 ? "Preview unavailable from this HA version. Update the integration before sending." : `Calculated ${localTime(state.preview.calculated_at)}. Send recalculates from the latest plan and time; these times may shift.`;
+  section.append(preview);
+  if (state.preview?.profile) {
+    section.append(transitions(doc, state.preview.profile));
+    const endNote = doc.createElement("p");
+    endNote.textContent = "These are fixed start/stop times from the displayed plan, including its estimated final stop. Morek will not adjust them based on actual energy delivered. If applied, the final 0 A limit can remain after the last window until explicitly removed.";
+    section.append(endNote);
+  }
+  if (state.preview?.reason) {
+    const refusal = doc.createElement("p");
+    refusal.textContent = `Cannot send: ${PREVIEW_REFUSALS[state.preview.reason] ?? "This plan cannot be sent."}`;
+    section.append(refusal);
+  }
+  const status = doc.createElement("p");
+  const ack = state.ack === null ? "No plan sent from this card" : `Last upload: ${state.ack} at ${localTime(state.sent_at)}`;
+  const verification = state.sent === null ? "" : state.verified && !state.outcomes?.uncertain ? state.verification?.reason === "matched_with_drift" ? " \xB7 Remaining schedule matched within tolerance, NOT exact" : " \xB7 Remaining schedule matched at last read" : state.verification?.pending ? " \xB7 Awaiting follow-up readback \u2014 NOT verified" : " \xB7 NOT verified";
+  status.textContent = ack + verification;
+  section.append(status);
+  if (state.outcomes?.uncertain) {
+    const warning = doc.createElement("p");
+    warning.textContent = "A profile action or its stored outcome is uncertain and may have applied. Further sends are blocked; readback cannot prove which profiles are installed.";
+    section.append(warning);
+  }
+  if (state.verification) {
+    const detail = doc.createElement("p");
+    const reasons = {
+      limits_or_transitions_differ: "Morek's reported limits or transitions differ from the sent schedule.",
+      readback_unavailable: "Morek has not returned a usable current schedule.",
+      coverage_missing: "Morek did not report a duration; coverage cannot be verified.",
+      coverage_too_short: "Morek's reported duration does not cover the final stop plus one hour.",
+      coverage_stale: "The reported schedule coverage has already expired.",
+      coverage_boundary_ambiguous: "Readback starts too close to a transition to establish the initial limit safely.",
+      no_remaining_transitions: "No remaining transitions can be verified from this readback.",
+      verification_superseded: "The readback belongs to an older or unavailable attempt or plan.",
+      verification_interrupted: "Automatic checks were interrupted, for example by an HA restart. Refresh from Morek.",
+      cleanup_requested: "The sent schedule is historical after a removal request.",
+      upload_unconfirmed: "The upload was not confirmed; its effect is unknown.",
+      outcome_uncertain: "An earlier profile action has an unresolved outcome; readback cannot resolve it.",
+      matched: "Remaining effective limits and transitions match at the last read; past intervals and physical charging are not verified.",
+      matched_with_drift: "Remaining limits match within the time tolerance; past intervals and physical charging are not verified."
+    };
+    detail.textContent = reasons[state.verification.reason ?? ""] ?? "";
+    if (state.verification.max_delta_s != null) {
+      detail.textContent += ` Maximum transition drift: ${Math.round(state.verification.max_delta_s)} s; tolerance: ${state.verification.tolerance_s ?? 90} s.`;
+    }
+    if (state.verification.coverage_start) detail.textContent += ` Compared from ${localTime(state.verification.coverage_start)}.`;
+    if (state.verification.coverage_end) detail.textContent += ` Readback covers through ${localTime(state.verification.coverage_end)}.`;
+    if (state.verification.pending) detail.textContent += ` Automatic read-only check ${localTime(state.verification.next_check_at ?? null)}. No profile will be resent or cleared. Do not assume the sent limits are active yet.`;
+    section.append(detail);
+  }
+  if (state.cleanup) {
+    const cleanup = doc.createElement("p");
+    cleanup.textContent = `Cleanup request for profile ${state.cleanup.profile_id}: ${state.cleanup.status} at ${localTime(state.cleanup.requested_at)}. ` + (state.cleanup.status.toLowerCase() === "accepted" ? "Morek acknowledged removal. Readback below shows effective limits, not proof of the stored profile inventory." : state.cleanup.status.toLowerCase() === "unknown" ? "Outcome unknown; the request may have taken effect. Do not assume the profile is removed." : "Morek did not acknowledge removal. Do not assume the profile is removed.");
+    section.append(cleanup);
+  }
+  if (state.sent !== null) {
+    const title = doc.createElement("strong");
+    title.textContent = `Sent (profile ${state.sent.chargingProfileId})`;
+    section.append(title);
+    if (state.sent.stackLevel !== void 0) {
+      const priority = doc.createElement("p");
+      priority.textContent = `OCPP default-profile stack level: ${state.sent.stackLevel}`;
+      section.append(priority);
+    }
+    section.append(transitions(doc, state.sent));
+  }
+  if (state.effective !== null) {
+    const title = doc.createElement("strong");
+    title.textContent = `Morek effective schedule (${state.effective.status}, read ${localTime(state.effective.fetched_at)})`;
+    section.append(title);
+    if (state.effective.duration_s !== void 0) {
+      const coverage = doc.createElement("p");
+      coverage.textContent = `Reported duration: ${state.effective.duration_s ?? "not reported"} seconds \xB7 unit: ${state.effective.rate_unit ?? "not reported"} \xB7 schedule start: ${localTime(state.effective.schedule_start ?? null)}.`;
+      section.append(coverage);
+    }
+    const list2 = doc.createElement("ul");
+    for (const period of state.effective.periods) {
+      const line = doc.createElement("li");
+      line.textContent = `${localTime(period.at)}: ${period.amps} A`;
+      list2.append(line);
+    }
+    section.append(list2);
+  }
+  if (error2 !== null) {
+    const message = doc.createElement("p");
+    message.textContent = `Morek request failed: ${error2}`;
+    section.append(message);
+  }
+  if (admin) {
+    const actions2 = doc.createElement("div");
+    actions2.className = VISUAL_CLASSES.morekActions;
+    actions2.dataset["morekActions"] = "";
+    const choices = state.supported ? [["Recalculate preview", "status"], ["Send current plan", "send"], ["Refresh from Morek", "fetch"]] : [["Check connection again", "status"]];
+    for (const [label, action] of choices) {
+      const button = doc.createElement("button");
+      button.type = "button";
+      button.className = VISUAL_CLASSES.button;
+      button.textContent = label;
+      button.dataset["morekAction"] = action;
+      button.disabled = busy || action === "send" && (state.outcomes?.uncertain === true || state.preview === void 0 || state.preview.reason !== null || !state.preview.profile || !state.preview.preview_id);
+      button.addEventListener("click", () => {
+        if (confirmActions && action === "send" && !doc.defaultView?.confirm(
+          "Recalculate and send the CURRENT plan to Morek? Times may differ from this preview. Its final 0 A limit stays installed until explicitly cleared, even if SpotNav Auto resumes."
+        )) return;
+        act(action);
+      });
+      actions2.append(button);
+    }
+    section.append(actions2);
+    if (state.supported && state.cleanup_supported === true) {
+      const clear2 = doc.createElement("button");
+      clear2.type = "button";
+      clear2.className = VISUAL_CLASSES.button;
+      clear2.textContent = "Remove SpotNav schedule";
+      clear2.dataset["morekAction"] = "clear";
+      clear2.disabled = busy;
+      clear2.addEventListener("click", () => {
+        if (confirmActions && !doc.defaultView?.confirm("Remove ONLY SpotNav schedule profile 42001 from Morek? This removes its persistent 0 A limit. Other installed profiles will not be deliberately cleared. Effective limits may increase. Auto will not be resumed.")) return;
+        act("clear");
+      });
+      actions2.append(clear2);
+    }
+  }
+  return section;
 }
 
 // src/daily-overview.ts
@@ -58889,7 +59677,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
   const warning = status?.outcomes?.uncertain || status?.operator?.state === "mismatch" || status?.verification?.reason === "limits_or_transitions_differ";
   return {
     draftKey: d3.charger.charger_id,
-    format: { currency, time: (ms) => part(ms, zone, { timeStyle: "short" }), day: (ms) => part(ms, zone, { dateStyle: "medium" }) },
+    format: { currency, minutesPerTimeUnit: 1 / 6e4, time: (ms) => part(ms, zone, { timeStyle: "short" }), day: (ms) => part(ms, zone, { dateStyle: "medium" }) },
     model: {
       windows,
       nextWindow,
@@ -58911,48 +59699,74 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.35";
+var CARD_VERSION = "2.5.37";
 
 // sidebar/panel.js
+var settingsWritesByConnection = /* @__PURE__ */ new WeakMap();
 var SpotnavEnhancedPanel = class extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
     this.generation = 0;
+    this.permissionEpoch = 0;
+    this.pendingSettingsWrites = /* @__PURE__ */ new Map();
+    this.unknownSettingsWrites = /* @__PURE__ */ new Set();
     this.connected = false;
   }
   connectedCallback() {
     this.connected = true;
     this.classList.add("wa-dark");
-    this.shadowRoot.innerHTML = `<link rel="stylesheet" href="/spotnav-sidebar/panel.css?v=${CARD_VERSION}"><style>:host{display:block;min-height:100%;padding-bottom:env(safe-area-inset-bottom)}.hostbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top));background:#11151d;color:white}.hostbar label{flex:1 1 180px}.hostbar select{max-width:100%}.hostbar button,.hostbar select{font:inherit;padding:8px}.message{padding:16px;color:white;background:#11151d}</style><div class="hostbar"><button id="menu" aria-label="Open navigation">\u2630</button><strong>SpotNav Enhanced</strong><label>Charger <select id="charger"><option value="">Select charger</option></select></label><button id="refresh">Refresh observations</button></div><div class="message" role="status">Select a charger.</div><main></main>`;
+    this.shadowRoot.innerHTML = `<link rel="stylesheet" href="/spotnav-sidebar/panel.css?v=${CARD_VERSION}"><style>:host{display:block;min-height:100%;padding-bottom:env(safe-area-inset-bottom)}.hostbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top));background:#11151d;color:white}.hostbar label{flex:1 1 180px}.hostbar select{max-width:100%}.hostbar button,.hostbar select{font:inherit;padding:8px}.message{padding:16px;color:white;background:#11151d}</style><div class="hostbar"><button id="menu" aria-label="Open navigation">\u2630</button><strong>SpotNav Enhanced</strong><label>Charger <select id="charger"><option value="">Select charger</option></select></label><button id="refresh">Refresh observations</button><div id="automatic-controls"><span id="pause-state">Auto state unknown.</span> <button id="pause-auto" disabled>Pause Auto until resumed</button> <button id="resume-auto" disabled>Resume Auto</button><span id="pause-notice" role="status"></span></div></div><div class="message" role="status">Select a charger.</div><main></main>`;
     this.shadowRoot.querySelector("#menu").onclick = () => this.dispatchEvent(new CustomEvent("hass-toggle-menu", { bubbles: true, composed: true }));
     this.shadowRoot.querySelector("#charger").onchange = (e9) => {
+      this.stopObservations();
       this.charger = e9.target.value;
       this.refresh();
     };
     this.shadowRoot.querySelector("#refresh").onclick = () => this.refresh();
+    this.shadowRoot.querySelector("#pause-auto").onclick = () => void this.automaticAction("stop", "until_resumed");
+    this.shadowRoot.querySelector("#resume-auto").onclick = () => void this.automaticAction("resume", null);
     if (this._hass) this.loadChargers();
   }
   disconnectedCallback() {
     this.connected = false;
-    this.generation++;
-    clearInterval(this.ageTimer);
-    this.cancelStatus?.();
-    this.view?.dispose();
-    this.view = null;
+    this.stopObservations();
   }
   set hass(value2) {
+    if (!this.settingsWriteContext && value2) {
+      const key3 = value2.connection || value2;
+      if (!settingsWritesByConnection.has(key3)) settingsWritesByConnection.set(key3, { pending: /* @__PURE__ */ new Map(), unknown: /* @__PURE__ */ new Set() });
+      this.settingsWriteContext = settingsWritesByConnection.get(key3);
+      this.pendingSettingsWrites = this.settingsWriteContext.pending;
+      this.unknownSettingsWrites = this.settingsWriteContext.unknown;
+    }
     const was = this._hass?.connected !== false;
+    const wasAdmin = this._hass?.user?.is_admin === true;
     this._hass = value2;
     if (!this.connected) return;
     if (value2?.connected === false) {
-      this.generation++;
-      clearInterval(this.ageTimer);
-      this.cancelStatus?.();
-      this.view?.dispose();
-      this.view = null;
+      this.stopObservations();
       this.message("Home Assistant disconnected.");
     } else if (!this.loaded || !was) this.loadChargers();
+    else if (wasAdmin !== (value2?.user?.is_admin === true)) {
+      this.permissionEpoch++;
+      this.dashboardEpoch++;
+      this.controlPermissionPending = true;
+      if (this.settingsBusy) {
+        this.settingsConflict = true;
+        this.settingsNotice = "Permission changed during save; its outcome must be checked by reloading settings.";
+      }
+      if (this.morekBusy) {
+        if (this.morekActiveAction === "send") this.morekUncertain = true;
+        this.morekError = "Permission changed during the operation; its outcome may be unknown.";
+      }
+      if (this.autoBusy) {
+        this.autoUncertain = true;
+        this.autoNotice = "Permission changed during the operation; its outcome may be unknown.";
+      }
+      this.paint();
+      this.refresh();
+    }
   }
   get hass() {
     return this._hass;
@@ -58961,6 +59775,298 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     const el = this.shadowRoot.querySelector(".message");
     el.textContent = text3;
     el.hidden = !text3;
+  }
+  stopObservations() {
+    if (this.settingsBusy && this.charger) this.unknownSettingsWrites.add(this.charger);
+    this.generation++;
+    clearInterval(this.ageTimer);
+    this.ageTimer = null;
+    for (const cancel of this.cancellations || []) cancel();
+    this.cancellations = /* @__PURE__ */ new Set();
+    this.dashboardRead = null;
+    this.statusRead = null;
+    this.rawDashboard = null;
+    this.rawStatus = null;
+    this.statusAt = null;
+    this.statusFailed = false;
+    this.dashboardFailed = false;
+    this.settingsRecord = null;
+    this.settingsLoading = false;
+    this.settingsBusy = false;
+    this.settingsConflict = false;
+    this.settingsDirty = false;
+    this.settingsNotice = "";
+    this.morekBusy = false;
+    this.morekError = null;
+    this.morekUncertain = false;
+    this.statusEpoch = (this.statusEpoch || 0) + 1;
+    this.dashboardEpoch = (this.dashboardEpoch || 0) + 1;
+    this.autoBusy = false;
+    this.autoUncertain = false;
+    this.autoNotice = "";
+    this.autoExpected = null;
+    this.controlPermissionPending = false;
+    const pause = this.shadowRoot.querySelector("#pause-state");
+    if (pause) pause.textContent = "Auto state unknown.";
+    for (const id of ["pause-auto", "resume-auto"]) {
+      const button = this.shadowRoot.querySelector(`#${id}`);
+      if (button) button.disabled = true;
+    }
+    this.view?.dispose();
+    this.view = null;
+  }
+  paint() {
+    if (!this.rawDashboard) return;
+    const adapter = dashboardAdapter(this.rawDashboard, this.rawStatus, this.statusAt, Date.now(), this.statusFailed);
+    if (!adapter || adapter.draftKey !== this.charger) {
+      this.message("Dashboard unavailable or unsupported.");
+      return;
+    }
+    const decoded = decodeDashboard(this.rawDashboard);
+    const dashboard = decoded.ok ? decoded.value : null;
+    this.paintAutomatic(dashboard);
+    if (this.settingsRecord && dashboard?.settings?.revision > this.settingsRecord.revision) {
+      this.settingsConflict = true;
+      this.settingsNotice = "Settings changed elsewhere. Reload the charger before editing again.";
+    }
+    const allowed = this._hass?.user?.is_admin === true || dashboard?.settings?.users_change_plan === true;
+    if (this.settingsRecord) {
+      const record3 = this.settingsRecord;
+      adapter.model.settings = { target: record3.target.target_percent, minimum: record3.minimum_ready_by_soc, cap: record3.soft_price_cap, readyBy: record3.departure_time, capEnabled: record3.soft_price_cap != null, capBasis: record3.cap_price_basis, deadlineEnabled: record3.departure_enabled };
+      adapter.model.settingsEditor = true;
+      adapter.model.targetSupported = record3.driver === "target_soc";
+      adapter.model.policySupported = record3.soft_price_cap !== void 0;
+      adapter.model.canSave = allowed && !this.settingsBusy && !this.settingsConflict;
+      adapter.model.settingsNotice = this.settingsNotice || (!allowed ? "You do not have permission to change this plan." : "");
+      adapter.model.labels.settingsNote = record3.driver === "target_soc" ? "Edits use revision-checked SpotNav settings." : "Target SOC is unavailable in manual energy mode.";
+      adapter.model.labels.saveLabel = this.settingsBusy ? "Saving\u2026" : "Save plan";
+      adapter.actions.save = (values) => this.savePlan(values);
+      adapter.actions.reloadSettings = () => this.reloadSettings();
+      adapter.actions.edit = () => {
+        this.settingsDirty = true;
+        this.paintMorek();
+      };
+    } else adapter.model.settingsNotice = this.settingsLoading ? "Loading settings\u2026" : this.settingsNotice || "Settings unavailable.";
+    this.message(this.dashboardFailed ? "Dashboard refresh failed; the last observation may be stale." : "");
+    if (this.view) this.view.update(adapter);
+    else this.view = mountDashboard(this.shadowRoot.querySelector("main"), adapter);
+    this.paintMorek();
+  }
+  paintAutomatic(dashboard) {
+    const control = dashboard?.control, active = control?.pause?.choice;
+    const observed = Date.parse(dashboard?.generated_at || ""), fresh = Number.isFinite(observed) && observed <= Date.now() && Date.now() - observed <= 9e4;
+    this.shadowRoot.querySelector("#pause-state").textContent = control && fresh ? active ? `Confirmed pause: ${active}.` : "No pause reported." : "Auto state unavailable or stale.";
+    const can = fresh && !!control?.can_act && !this.controlPermissionPending && !this.autoBusy && !this.autoUncertain && !this.morekBusy && !this.morekUncertain && !this.settingsBusy && this._hass?.connected !== false;
+    this.shadowRoot.querySelector("#pause-auto").disabled = !(can && admittedAction(control, "stop", "until_resumed"));
+    this.shadowRoot.querySelector("#resume-auto").disabled = !(can && admittedAction(control, "resume", null));
+    this.shadowRoot.querySelector("#pause-notice").textContent = this.autoNotice || "";
+  }
+  async automaticAction(action, choice) {
+    const generation = this.generation, permissionEpoch = this.permissionEpoch, charger = this.charger, hass = this._hass, decoded = decodeDashboard(this.rawDashboard);
+    const observed = decoded.ok ? Date.parse(decoded.value.generated_at || "") : NaN;
+    if (!this.connected || !charger || !hass || hass.connected === false || !decoded.ok || !Number.isFinite(observed) || observed > Date.now() || Date.now() - observed > 9e4 || this.controlPermissionPending || this.autoBusy || this.autoUncertain || this.morekBusy || this.morekUncertain || this.settingsBusy || !decoded.value.control.can_act || !admittedAction(decoded.value.control, action, choice)) return;
+    const dispatchedAt = Date.now();
+    this.autoBusy = true;
+    this.autoNotice = "Request in progress; state not yet confirmed.";
+    this.dashboardEpoch++;
+    this.statusEpoch++;
+    this.statusAt = null;
+    this.paint();
+    try {
+      const result = await this.bounded(performAction(hass, charger, action, choice));
+      if (!this.connected || generation !== this.generation || permissionEpoch !== this.permissionEpoch || charger !== this.charger) return;
+      this.autoExpected = result.ok ? { action, choice, dispatchedAt } : null;
+      this.autoNotice = result.ok ? "Accepted; waiting for a fresh confirmed state." : "Request rejected; prior state is not changed here.";
+    } catch {
+      if (this.connected && generation === this.generation && charger === this.charger) {
+        this.autoUncertain = true;
+        this.autoNotice = "Request failed or outcome unknown; no retry is offered in this session.";
+      }
+    } finally {
+      if (this.connected && generation === this.generation && charger === this.charger) {
+        this.autoBusy = false;
+        this.paint();
+        this.refresh();
+      }
+    }
+  }
+  reloadSettings() {
+    if (!this.connected || this.settingsBusy || !this.charger || this.pendingSettingsWrites.has(this.charger)) return;
+    if (!window.confirm("Discard the current draft and reload the latest settings?")) return;
+    this.view?.resetDrafts();
+    this.settingsRecord = null;
+    this.settingsConflict = false;
+    this.settingsDirty = false;
+    this.unknownSettingsWrites.delete(this.charger);
+    this.settingsNotice = "Loading settings\u2026";
+    void this.loadSettings();
+  }
+  paintMorek() {
+    const target = this.shadowRoot.querySelector("#morek-debug");
+    const state = decodeMorekState(this.rawStatus);
+    if (!target) return;
+    if (!state) {
+      target.querySelectorAll("button").forEach((button) => {
+        button.disabled = true;
+      });
+      return;
+    }
+    const fresh = morekPanel(document, state, this._hass?.user?.is_admin === true, this.morekBusy || this.settingsBusy || this.settingsDirty || this.autoBusy, this.morekError, (action) => void this.morekAction(action), this.morekActiveAction, false);
+    if (target.firstChild) reconcile(target.firstChild, fresh);
+    else target.append(fresh);
+    const send = target.querySelector('[data-morek-action="send"]');
+    if (send && (this.morekUncertain || this.autoUncertain)) send.disabled = true;
+  }
+  async morekAction(action) {
+    const hass = this._hass, charger = this.charger, generation = this.generation, permissionEpoch = this.permissionEpoch, statusSnapshot = this.rawStatus, observedAt = this.statusAt, state = decodeMorekState(statusSnapshot);
+    if (!this.connected || hass?.connected === false || hass?.user?.is_admin !== true || !charger || !state || this.morekBusy || this.autoBusy || !["status", "send", "fetch", "clear"].includes(action)) return;
+    if (action !== "status" && !state.supported) return;
+    if (action === "clear" && state.cleanup_supported !== true) return;
+    if (this.settingsBusy || action === "send" && this.settingsDirty) return;
+    if (action === "send" && (this.morekUncertain || this.autoUncertain || state.outcomes?.uncertain || !state.preview?.profile || state.preview.reason !== null || !state.preview.preview_id || !this.statusAt || Date.now() - this.statusAt > 9e4)) return;
+    const previewId = state.preview?.preview_id, configured = state.configured_id, resolved = state.resolved_id, dashboardSnapshot = this.rawDashboard;
+    if (action === "send" && !window.confirm("Confirm sending the current preview. The final 0 A limit may persist.")) return;
+    if (action === "clear" && !window.confirm("Confirm selective removal of SpotNav profile 42001. Effective limits may increase.")) return;
+    const latest = decodeMorekState(this.rawStatus);
+    const dashboard = decodeDashboard(this.rawDashboard);
+    const generated = dashboard.ok ? Date.parse(dashboard.value.generated_at || "") : NaN;
+    if (action === "send" && (this.rawDashboard !== dashboardSnapshot || !dashboard.ok || !Number.isFinite(generated) || generated > Date.now() || Date.now() - generated > 9e4 || dashboard.value.control.pause?.choice !== "until_resumed" || !dashboard.value.control.pause_blocks_execution)) return;
+    if (!this.connected || this.generation !== generation || this.permissionEpoch !== permissionEpoch || this.charger !== charger || this.rawStatus !== statusSnapshot || this.statusAt !== observedAt || this._hass?.user?.is_admin !== true || this._hass?.connected === false || this.morekBusy || this.settingsBusy || this.autoBusy || !latest || latest.configured_id !== configured || latest.resolved_id !== resolved || action !== "status" && !latest.supported || action === "send" && (this.morekUncertain || this.autoUncertain || latest.outcomes?.uncertain || !latest.preview?.preview_id || latest.preview.preview_id !== previewId || latest.preview.reason !== null || !latest.preview.profile || this.settingsDirty || !this.statusAt || Date.now() - this.statusAt > 9e4) || action === "clear" && (!latest.supported || latest.cleanup_supported !== true)) return;
+    this.morekBusy = true;
+    this.morekActiveAction = action;
+    this.morekError = null;
+    this.statusEpoch++;
+    this.paintMorek();
+    try {
+      const result = decodeMorekState(await this.bounded(morekSchedule(hass, charger, action, previewId)));
+      if (!this.connected || generation !== this.generation || permissionEpoch !== this.permissionEpoch || charger !== this.charger) return;
+      if (!result) {
+        if (action === "send") this.morekUncertain = true;
+        this.morekError = "Response unavailable; operation outcome may be unknown.";
+      } else {
+        this.rawStatus = { api_version: 1, schedule: result };
+        this.statusAt = action === "status" ? Date.now() : null;
+        this.statusFailed = action !== "status";
+      }
+    } catch {
+      if (this.connected && generation === this.generation && charger === this.charger) {
+        if (action === "send") this.morekUncertain = true;
+        this.morekError = "Request failed or outcome unknown; do not assume the operation did not apply.";
+      }
+    } finally {
+      if (this.connected && generation === this.generation && charger === this.charger) {
+        this.morekBusy = false;
+        this.morekActiveAction = null;
+        this.paint();
+        this.refresh();
+      }
+    }
+  }
+  async loadSettings() {
+    if (this.settingsLoading || this.settingsRecord || !this.charger) return;
+    const generation = this.generation, charger = this.charger, hass = this._hass;
+    this.settingsLoading = true;
+    try {
+      const decoded = decodeSettingsAnswer(await this.bounded(getSettings(hass, charger)));
+      if (!this.connected || generation !== this.generation || charger !== this.charger) return;
+      if (!decoded.ok || !decoded.value.ok || !decoded.value.settings) {
+        this.settingsNotice = "Settings unavailable.";
+        return;
+      }
+      this.settingsRecord = decoded.value.settings;
+      this.settingsConflict = this.unknownSettingsWrites.has(charger) || this.pendingSettingsWrites.has(charger);
+      this.settingsNotice = this.settingsConflict ? "A previous dispatched save has an unknown outcome. Wait for it to settle, then explicitly reload settings." : "";
+    } catch {
+      if (this.connected && generation === this.generation) this.settingsNotice = "Settings unavailable.";
+    } finally {
+      if (this.connected && generation === this.generation) {
+        this.settingsLoading = false;
+        this.paint();
+      }
+    }
+  }
+  async savePlan(values) {
+    const generation = this.generation, permissionEpoch = this.permissionEpoch, charger = this.charger, hass = this._hass, record3 = this.settingsRecord;
+    const decoded = decodeDashboard(this.rawDashboard);
+    const allowed = hass?.user?.is_admin === true || decoded.ok && decoded.value.settings?.users_change_plan === true;
+    if (!this.connected || hass?.connected === false || !charger || !record3 || this.settingsBusy || this.pendingSettingsWrites.has(charger) || this.morekBusy || this.autoBusy || this.settingsConflict || !allowed) {
+      this.settingsNotice = "Save unavailable or permission denied.";
+      this.paint();
+      return;
+    }
+    if (record3.driver !== "target_soc" && values.target !== String(record3.target.target_percent ?? "")) {
+      this.settingsNotice = "Target SOC cannot be changed in manual energy mode.";
+      this.paint();
+      return;
+    }
+    const form = { ...formFromRecord(record3), targetPercent: values.target, minimumReadySoc: values.minimum, capValue: values.cap, capEnabled: values.capEnabled, capBasis: values.capBasis, deadlineEnabled: values.deadlineEnabled, deadlineTime: values.readyBy };
+    const check = replacementFor("plan", record3, form);
+    if (!check.ok) {
+      this.settingsNotice = translate2("en", check.errorKey);
+      this.paint();
+      return;
+    }
+    if (!check.changed) {
+      this.settingsNotice = "No changes to save.";
+      this.paint();
+      return;
+    }
+    this.settingsBusy = true;
+    this.statusEpoch++;
+    this.statusAt = null;
+    this.settingsNotice = "Saving\u2026";
+    this.paint();
+    try {
+      const request = updateSettings(hass, charger, record3.revision, check.body);
+      this.pendingSettingsWrites.set(charger, request);
+      request.finally(() => {
+        if (this.pendingSettingsWrites.get(charger) === request) this.pendingSettingsWrites.delete(charger);
+      }).catch(() => {
+      });
+      const answer = decodeSettingsAnswer(await this.bounded(request));
+      if (!this.connected || generation !== this.generation || permissionEpoch !== this.permissionEpoch || charger !== this.charger) return;
+      if (!answer.ok) {
+        this.settingsConflict = true;
+        this.settingsNotice = "Save response unavailable; outcome unknown. Reload before retrying.";
+      } else if (answer.value.ok) {
+        this.settingsRecord = answer.value.settings;
+        this.settingsDirty = false;
+        this.settingsNotice = "Saved and confirmed.";
+        this.view?.resetDrafts();
+        this.dashboardEpoch++;
+      } else if (answer.value.code === "revision_conflict") {
+        this.settingsConflict = true;
+        this.settingsNotice = "Settings conflict. Reload the charger and review the new values.";
+      } else if (answer.value.code === "spotnav_settings_reconcile_failed") {
+        this.settingsConflict = true;
+        this.settingsNotice = "Settings may be saved, but replanning failed; reload and inspect confirmed settings.";
+      } else this.settingsNotice = "Settings save rejected.";
+    } catch {
+      this.unknownSettingsWrites.add(charger);
+      if (this.connected && generation === this.generation) {
+        this.settingsConflict = true;
+        this.settingsNotice = "Save outcome unknown; the dispatched request may still complete. Wait for it to settle, then reload before retrying.";
+      }
+    } finally {
+      if (this.connected && generation === this.generation) {
+        this.settingsBusy = false;
+        this.paint();
+        this.refresh();
+      }
+    }
+  }
+  bounded(request) {
+    let timer, cancel;
+    const cancellations = this.cancellations ||= /* @__PURE__ */ new Set();
+    const timeout = new Promise((_2, reject) => {
+      cancel = () => reject(new Error("cancelled"));
+      cancellations.add(cancel);
+      timer = setTimeout(() => reject(new Error("timeout")), 1e4);
+    });
+    return Promise.race([request, timeout]).finally(() => {
+      clearTimeout(timer);
+      cancellations.delete(cancel);
+    });
   }
   async loadChargers() {
     const generation = ++this.generation;
@@ -58986,49 +60092,82 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       }
     }
   }
-  async refresh() {
-    const generation = ++this.generation, charger = this.charger, hass = this._hass;
-    clearInterval(this.ageTimer);
-    this.cancelStatus?.();
-    this.view?.dispose();
-    this.view = null;
+  refresh() {
+    const generation = this.generation, charger = this.charger, hass = this._hass;
     if (!charger || !hass || hass.connected === false) {
       this.message("Select an available charger.");
       return;
     }
-    this.message("Loading separate dashboard and Morek observations\u2026");
+    if (!this.settingsRecord && !this.settingsLoading) void this.loadSettings();
     const valid = () => this.connected && generation === this.generation && this.charger === charger && this._hass?.connected !== false;
-    const dashboardPromise = getDashboard(hass, charger);
-    let timeout, cancel;
-    const statusPromise = Promise.race([morekSchedule(hass, charger, "status"), new Promise((_2, reject) => {
-      cancel = () => {
-        clearTimeout(timeout);
-        reject(new Error("cancelled"));
-      };
-      this.cancelStatus = cancel;
-      timeout = setTimeout(() => reject(new Error("timeout")), 1e4);
-    })]).then((value2) => ({ value: value2, at: Date.now(), failed: false }), () => ({ value: null, at: null, failed: true })).finally(() => {
-      clearTimeout(timeout);
-      if (this.cancelStatus === cancel) this.cancelStatus = null;
-    });
-    try {
-      const raw = await dashboardPromise;
-      if (!valid()) return;
-      const initial = dashboardAdapter(raw, null, null);
-      if (!initial || initial.draftKey !== charger) {
-        this.message("Dashboard unavailable or unsupported.");
-        return;
+    if (!this.ageTimer) this.ageTimer = setInterval(() => {
+      if (valid()) {
+        this.paint();
+        this.refresh();
       }
-      this.message("");
-      this.view = mountDashboard(this.shadowRoot.querySelector("main"), initial);
-      const status = await statusPromise;
-      if (!valid()) return;
-      this.view.update(dashboardAdapter(raw, status.value, status.at, Date.now(), status.failed));
-      this.ageTimer = setInterval(() => {
-        if (valid() && this.view) this.view.update(dashboardAdapter(raw, status.value, status.at, Date.now(), status.failed));
-      }, 3e4);
-    } catch {
-      if (valid()) this.message("Dashboard unavailable.");
+    }, 3e4);
+    if (!this.rawDashboard) this.message("Loading separate dashboard and Morek observations\u2026");
+    if (!this.dashboardRead) {
+      const epoch = this.dashboardEpoch;
+      const pending = getDashboard(hass, charger);
+      this.dashboardRead = pending;
+      pending.finally(() => {
+        if (this.dashboardRead === pending) {
+          this.dashboardRead = null;
+          if (valid() && epoch !== this.dashboardEpoch) this.refresh();
+        }
+      }).catch(() => {
+      });
+      this.bounded(pending).then((raw) => {
+        if (!valid() || epoch !== this.dashboardEpoch) return;
+        const decoded = dashboardAdapter(raw, this.rawStatus, this.statusAt);
+        if (!decoded || decoded.draftKey !== charger) {
+          this.dashboardFailed = true;
+          if (this.view) this.paint();
+          else this.message("Dashboard unavailable or unsupported.");
+          return;
+        }
+        this.dashboardFailed = false;
+        this.rawDashboard = raw;
+        this.controlPermissionPending = false;
+        const control = decodeDashboard(raw).value?.control;
+        const generated = Date.parse(raw.generated_at || "");
+        if (this.autoExpected && control && Number.isFinite(generated) && generated >= this.autoExpected.dispatchedAt && generated <= Date.now() && (this.autoExpected.action === "stop" ? control.pause?.choice === this.autoExpected.choice : control.pause?.choice == null)) {
+          this.autoNotice = "Confirmed by a fresh dashboard observation.";
+          this.autoExpected = null;
+        }
+        this.paint();
+      }).catch(() => {
+        if (valid() && epoch === this.dashboardEpoch) {
+          this.dashboardFailed = true;
+          if (this.view) this.paint();
+          else this.message("Dashboard unavailable.");
+        }
+      });
+    }
+    if (!this.statusRead && !this.morekBusy && !this.settingsBusy) {
+      const epoch = this.statusEpoch;
+      const pending = morekSchedule(hass, charger, "status");
+      this.statusRead = pending;
+      pending.finally(() => {
+        if (this.statusRead === pending) {
+          this.statusRead = null;
+          if (valid() && epoch !== this.statusEpoch) this.refresh();
+        }
+      }).catch(() => {
+      });
+      this.bounded(pending).then((raw) => {
+        if (!valid() || epoch !== this.statusEpoch) return;
+        this.rawStatus = raw;
+        this.statusAt = Date.now();
+        this.statusFailed = false;
+        this.paint();
+      }).catch(() => {
+        if (valid() && epoch === this.statusEpoch) {
+          this.statusFailed = true;
+          this.paint();
+        }
+      });
     }
   }
 };

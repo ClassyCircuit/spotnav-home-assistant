@@ -486,9 +486,9 @@ tests are documented there; full HA collection is still blocked on Windows.
     wording; bundle assets locally with notices. Test fixture rendering, responsive
     behavior, accessible controls, safe untrusted text and component cleanup. Compare
     old prototype and shared preview at equivalent widths; no HA deployment or commands.
-- [ ] **5.4b HA sidebar host and live overview/controls** (umbrella: 5.4b1–5.4b2)
-  - Read-only sidebar foundation is implemented in 5.4b1; controls and a
-    production-safe incremental lifecycle remain 5.4b2 work. Keep this umbrella open.
+- [x] **5.4b HA sidebar host and live overview/controls** (local implementation and mocked verification; coordinator review pending)
+  - 5.4b1–5.4b2 are complete locally. Actual HA integration, physical touch and
+    hardware behavior remain unverified; 5.4c remains separate and unstarted.
   - Register one integration-provided HA custom sidebar panel and mount the shared UI,
     with a practical non-destructive setup/update path. Use HA's supported panel interface;
     handle sidebar/mobile navigation, safe areas, lifecycle, access and CSS isolation.
@@ -514,14 +514,28 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Test actual integration registration/cleanup and panel adapter with mocked HA
     boundaries, out-of-order responses, missing data, local asset packaging, read-only
     safety and desktop/mobile mock-host parity with the shared preview. No live HA access.
-- [ ] **5.4b2 Real controls and stable interactive updates**
+- [x] **5.4b2 Real controls and stable interactive updates** (local implementation and mocked verification; coordinator review pending)
+  - Local continuation adds canonical revision-checked saves, guarded Morek debug and
+    admitted Pause/Resume, single Send/Clear confirmation and in-place shared/debug
+    reconciliation. Bounded closure testing is documented in the handoff and matrix;
+    actual HA, physical touch and charging remain unverified.
+  - Verification continuation bounded stalled settings writes without retry and fixed
+    read-slot overlap after actions; `frontend/sidebar/verification-matrix.md` lists
+    the representative closure cases and their mocked evidence.
   - Build on 5.4b1 to wire existing 5.3 revision-checked settings and permitted manual
     debug controls, preserving all admin/interlock checks. Implement stable updates that
     preserve modal/focus, selection, draft, scroll and zoom while delivering warnings;
     invalidate stale charger/revision actions and handle save/conflict/teardown safely.
+  - Coordinator review found that 5.4b1 passes epoch-millisecond windows into a sample
+    hour-based active-duration calculation: a one-hour plan renders as 216,000,000 min.
+    Define and test explicit time units end to end; correct real and preview durations
+    without changing exact window times. Also replace the age-only timer with bounded,
+    coalesced recurring real dashboard/status reads and reconnect handling: fresh backend
+    changes must appear without manual Refresh or destructive UI remounts. Test slow,
+    failed, stale and out-of-order requests and stop timers on teardown.
   - Test successful/rejected saves, admin/non-admin, lifecycle/races and no charger writes
     except explicitly requested and authorized existing actions. No deployment or live
-    charger operation; finish 5.4b only after both slices pass review.
+    charger operation; coordinator review of both slices remains pending.
 - [ ] **5.4c Real stepped-area price chart and install preparation**
   - Bind the shared ECharts chart to real available prices and proposed windows, with
     correct units/basis, timezone/DST, missing/negative prices and source resolution.

@@ -234,6 +234,123 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### Stage 5.4b2 — complete locally, coordinator review pending
+
+- The bounded 5.4b2 closure cases pass; 5.4b is complete for local implementation
+  and mocked verification. `frontend/sidebar/verification-matrix.md` maps the evidence.
+  A destroyed panel could previously lose an outstanding settings write when a new
+  panel was created. The pending/unknown tracking now survives panel replacement on
+  the same HA connection; a pending write cannot be retried or reloaded, and its
+  unknown result requires explicit reload after settlement. This is in-memory frontend
+  protection, not durable recovery across browser reloads or new connections.
+- Version 2.5.37: focused sidebar 37 and full Vitest 2,420/101 files passed;
+  shared/sample 23, mocked registration 2 and isolated notifier 14 passed.
+  Type-check, build, check-dist and diff check passed. jsdom emitted CSS parsing
+  warnings; notifier pytest reported its existing unknown timeout option and HA
+  deprecation warnings; Git reported Windows line-ending warnings.
+- The built-panel mock browser check passed desktop and emulated mobile, including a
+  desktop switch while a draft and dialog were active and an old response was pending;
+  no unintended write occurred. Screenshots are in temporary `opencode/spotnav-54b1/`.
+  The local check used an existing debugging browser and observed only local/data
+  requests. Actual HA integration, physical touch, charger behavior and physical
+  charging remain unverified. No HA, deployment or hardware action occurred. Morek
+  automatic dispatch remains unarmed. Stop for coordinator review, not 5.4c.
+
+### Historical 5.4b2 partial work (superseded above)
+
+- Verification continuation: `frontend/sidebar/verification-matrix.md` records
+  tested and still missing cases. A stalled settings write now times out visibly,
+  preserves its draft, blocks retries/reload until the underlying request settles,
+  and keeps an unknown-outcome latch across disconnect for explicit reload. A
+  dispatched request is never cancelled or automatically retried. Action and
+  permission changes no longer clear in-flight dashboard/status read slots; once
+  a superseded read settles, a fresh read is requested. Pause confirmation requires
+  a matching observation generated after dispatch. No HA or hardware was contacted.
+- Tests: sidebar suite 25 passed; the final full suite passed 2,408 tests.
+  Shared/sample tests passed 23; mocked registration 2;
+  notifier 14 (existing pytest option/deprecation warnings). Type-check, build and
+  check-dist passed. Built-panel browser check passed at desktop and emulated-mobile
+  widths with simultaneous dirty input, open dialog and mismatch; it made local-only
+  requests. Screenshots: temp `opencode/spotnav-54b1/`. Sample browser checks covered
+  chart identity/zoom, dialog, text selection and scroll. Actual HA and physical
+  touch remain untested. Several specific races remain listed in the matrix; do not
+  mark 5.4b2 complete yet.
+
+- Latest continuation: `frontend/sidebar/panel.js` exposes explicit Pause until
+  resumed and Resume using `admittedAction` and the existing `performAction` API;
+  a fresh dashboard confirms state. Send/Clear now have one confirmation at the
+  sidebar boundary followed by identity, permission, preview and lifecycle checks;
+  the card keeps its existing confirmation. Timeout/permission-change outcomes are
+  conservatively treated as unknown. Automatic Morek dispatch remains unarmed.
+- `frontend/shared-dashboard/reconcile.js` updates stable DOM regions in place,
+  preserving dialog, dirty/focused inputs, Morek action nodes and chart instances;
+  current overview and health continue updating during edits. Browser checks cover
+  dialog/chart identity, sample zoom, text selection and scroll, and mocked sidebar
+  actions and save/conflict on desktop/mobile. Real chart data updates remain 5.4c.
+  Full requested action-race/interaction matrix has not been exhaustively tested;
+  keep 5.4b2 open for review and further focused regression coverage.
+- Validation: `npx vitest run --maxWorkers=2 --silent` passed 2,396 tests;
+  focused sidebar/Morek passed 34; shared/sample Node tests 23; mocked registration
+  2; notifier tests 14 (pytest option/deprecation warnings). Type-check, build and
+  check-dist passed. `sidebar/browser-check.mjs` tested the built panel with mocked
+  settings and Morek operations; `prototype/shared-browser-check.mjs` exercised
+  shared view identity/zoom/selection at 1440×1000 and emulated 390×844. Screenshots
+  are in temp `opencode/spotnav-54b1/` and `spotnav-54a/`. jsdom has CSS parsing
+  warnings; no live HA, physical touch, charger operation or deployment occurred.
+
+- Subsequent continuation: `frontend/sidebar/panel.js` loads canonical settings,
+  uses `formFromRecord`/`replacementFor('plan', …)` and revision-checked
+  `updateSettings`, and presents save/conflict/unknown-outcome notices. The shared
+  form exposes target, minimum, cap enable/value/basis and ready-by controls;
+  unsupported policy/target fields are disabled. Explicit reload discards drafts
+  only after confirmation. Charger/generation guards discard late UI responses;
+  a dispatched request cannot be recalled. No save directly sends a profile.
+- Historical entry: the sidebar embeds the existing `morekPanel` diagnostic view and dispatches
+  explicit status, fetch, send and selective clear through `morekSchedule`, with
+  administrator, support, preview fingerprint, uncertainty and confirmation
+  checks. Backend interlocks remain authoritative. The former duplicate prompts
+  and missing Pause/Resume are superseded by the continuation above.
+  No live actions were performed. These new write paths are not ready to deploy
+  without further review and the remaining tests below.
+- Historical entry: shared updates previously deferred remounts while a field was focused, a draft existed or the
+  plan dialog is open; critical status is updated in a live region. This does not
+  replace the general remount path: selection in other elements, arbitrary scroll,
+  chart identity and all debug-control focus are not guaranteed. Existing Morek
+  debug content was regenerated on updates. The in-place reconciliation above supersedes it.
+- Current checks: full frontend Vitest passed 2,393 tests; 10 focused sidebar tests
+  passed with mocked HA, including one
+  successful save, conflict/invalid/non-admin cases, late save, explicit fetch and
+  mocked send/clear guards; 23 shared/sample tests and 2 mocked registration tests
+  passed. Type-check, build and check-dist passed; isolated notifier tests passed
+  14 with existing pytest/deprecation warnings. The local built-panel mock browser check
+  passed at desktop/mobile sizes with one successful and one conflicting save,
+  draft retention and the one-hour display. It imports the built `www/sidebar/panel.js`
+  in the mock host; it does not establish actual HA,
+  physical touch or production-bundle compatibility; jsdom reports CSS warnings.
+
+- Shared vehicle rendering now uses `format.minutesPerTimeUnit`: the live adapter
+  supplies `1/60000` for epoch milliseconds; the sample supplies `60` for hours.
+  Exact window boundaries are unchanged. Rendered-module tests cover one hour,
+  partial and multiple windows in both representations.
+- The sidebar now refreshes dashboard and Morek status independently every
+  30 seconds, coalesces in-flight requests, bounds the displayed wait at ten
+  seconds, invalidates on charger/disconnect/teardown, and retains a failure notice
+  for a failed dashboard observation. A timed-out HA WebSocket call is not
+  cancellable; its channel remains single-flight until it settles or the session
+  changes, to avoid leaking repeated requests. The other channel keeps refreshing.
+  Only read-only requests are scheduled. With the plan modal open, observation
+  updates are deferred without detaching it, while critical health is updated in
+  its live region; the newest deferred model is applied on close.
+- Historical partial entry: settings and debug actions have since been connected
+  as described above. The full interaction-safe lifecycle and comprehensive tests
+  remain outstanding. No HA or charger access, profile action or deployment occurred.
+- Version 2.5.36, `npm run build`, `npm run check-dist`, type-check, two mocked
+  registration tests, five focused sidebar tests and six shared/sample tests passed.
+  The local Chromium source-bundled mock-host check passed at 1440×1000 and emulated
+  390×844, asserting `60 min`, unavailable chart and local-only requests; captures
+  are in `opencode/spotnav-54b1/`. It does not test the shipped panel bundle in HA,
+  physical touch, saves or manual actions. jsdom emitted CSS parsing warnings.
+
 ### Stage 5.4b1 — read-only sidebar foundation (coordinator review pending)
 
 - `sidebar.py` registers a domain-wide HA `panel_custom` sidebar and local static
@@ -277,7 +394,7 @@ requirements, not features claimed implemented in the manual baseline below.
   them. The mock browser used only local/data resources. No live HA, charger, phone,
   profile operation, deployment or restart occurred. Stop for coordinator review.
 
-### Stage 5.4b — partial shared-view work, not complete
+### Historical 5.4b partial shared-view work (superseded above)
 
 - The shared preview can accept explicit backend-supplied plan totals and a currency;
   absent currency can be marked unknown and non-EUR totals are not labelled EUR.
