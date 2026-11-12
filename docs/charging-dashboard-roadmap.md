@@ -1403,6 +1403,10 @@ action, weaken admission/safety checks, or claim physical behavior is verified.
     old report versus newer HA timestamps, source changes and updates over time.
 
 - [x] **12.7 Resume outcomes and ownership/evidence diagnosis** (2.5.74 local; review pending)
+  - **2.5.78 local follow-up:** the sidebar no longer prints an uninitialized
+    notice, uses fresh schedule-owned pause evidence for Resume rather than only
+    the legacy control axis, and explains unavailable controls without guessing the
+    cause of the reported incident. Mocked tests pass; live behavior is unverified.
   - **Follow-up implemented locally in 2.5.77; review pending:** one-time automatic
     missing-ownership clean start preserves an existing durable active pause, records
     missing history without a fake attempt, and reuses completion on clean restarts.

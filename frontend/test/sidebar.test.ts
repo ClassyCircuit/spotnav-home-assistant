@@ -204,6 +204,32 @@ describe('actual sidebar read-only host', () => {
     expect(failed.totals).toBeNull();
     expect(current().windows).toHaveLength(1);
   });
+  it('offers Resume after clean ownership with a durable manual pause, without an undefined notice', async () => {
+    const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';raw.control.automatic_action='resume';raw.control.pause_choices=[];raw.control.pause_blocks_execution=true;raw.control.pause={choice:'manual',admitted_at:raw.generated_at,expires_at:null,action:'stop',scope:'plug_in'};
+    const owned={api_version:1,schedule:{...status.schedule,supported:true,outcomes:{uncertain:false},ownership:{recorded_owner:'morek_schedule',completion_authorized:true},schedule_pause:{intent:'pause_until_resumed',request:'pending',ack:null,readback:'unverified'}}};const calls=[];
+    const hass={connected:true,user:{is_admin:true},callWS:msg=>{calls.push(msg);if(msg.type==='spotnav/list_chargers')return Promise.resolve({api_version:1,chargers:[{charger_id:'a',charger_name:'A'}]});if(msg.type==='spotnav/get_dashboard')return Promise.resolve(raw);if(msg.type==='spotnav/get_settings')return Promise.resolve(envelope(record()));if(msg.type==='spotnav/manual_action')return Promise.resolve({api_version:1,ok:true,error:null,action:'resume',choice:null});return Promise.resolve(owned);}};
+    const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();const root=panel.shadowRoot;
+    expect(root.querySelector('#pause-notice').textContent).toBe('');expect(root.querySelector('#pause-state').textContent).not.toMatch(/Resume unavailable/);expect(root.querySelector('#resume-auto').disabled).toBe(false);expect(calls.filter(m=>m.type==='spotnav/manual_action')).toHaveLength(0);
+    await panel.automaticAction('resume',null);expect(calls.filter(m=>m.type==='spotnav/manual_action')).toHaveLength(1);panel.remove();
+  });
+  it('explains an unauthorized schedule owner without claiming a physical state', async () => {
+    const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';
+    const owned={api_version:1,schedule:{...status.schedule,supported:true,ownership:{recorded_owner:'morek_schedule',completion_authorized:false,recovery:{automatic_recovery:'restart_dispatch_evidence_unavailable'}},schedule_pause:{intent:'pause_until_resumed',request:'pending',ack:null,readback:'unverified'}}};
+    const hass={connected:true,user:{is_admin:true},callWS:msg=>Promise.resolve(msg.type==='spotnav/list_chargers'?{api_version:1,chargers:[{charger_id:'a',charger_name:'A'}]}:msg.type==='spotnav/get_dashboard'?raw:msg.type==='spotnav/get_settings'?envelope(record()):owned)};
+    const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();expect(panel.shadowRoot.querySelector('#pause-state').textContent).toMatch(/physical charging unknown.*not currently authorized.*restart_dispatch_evidence_unavailable/);expect(panel.shadowRoot.querySelector('#pause-notice').textContent).toBe('');expect(panel.shadowRoot.querySelector('#resume-auto').disabled).toBe(true);panel.remove();
+  });
+  it('offers schedule-owned Resume even when the legacy dashboard says Pause', async () => {
+    const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';
+    const owned={api_version:1,schedule:{...status.schedule,supported:true,outcomes:{uncertain:false},ownership:{recorded_owner:'morek_schedule',completion_authorized:true},schedule_pause:{intent:'pause_until_resumed',request:'pending',ack:null,readback:'unverified'}}};const calls=[];
+    const hass={connected:true,user:{is_admin:true},callWS:msg=>{calls.push(msg);if(msg.type==='spotnav/list_chargers')return Promise.resolve({api_version:1,chargers:[{charger_id:'a',charger_name:'A'}]});if(msg.type==='spotnav/get_dashboard')return Promise.resolve(raw);if(msg.type==='spotnav/get_settings')return Promise.resolve(envelope(record()));if(msg.type==='spotnav/manual_action')return Promise.resolve({api_version:1,ok:true,error:null,action:'resume',choice:null});return Promise.resolve(owned);}};
+    const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();expect(panel.shadowRoot.querySelector('#resume-auto').disabled).toBe(false);expect(calls.filter(m=>m.type==='spotnav/manual_action')).toHaveLength(0);await panel.automaticAction('resume',null);expect(calls.filter(m=>m.type==='spotnav/manual_action')).toHaveLength(1);panel.remove();
+  });
+  it.each(['unknown','uncertain','stop_pending','unauthorized','stale','dashboard_failed'])('does not bypass %s when offering schedule-owned Resume', async reason => {
+    const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';const calls=[];
+    const owned={api_version:1,schedule:{...status.schedule,supported:true,outcomes:{uncertain:reason==='uncertain'},ownership:{recorded_owner:'morek_schedule',completion_authorized:reason!=='unauthorized'},schedule_pause:{intent:'pause_until_resumed',request:reason==='stop_pending'?'stop_pending':'pending',ack:null,readback:'unverified'}}};if(reason==='unknown')delete owned.schedule.outcomes;
+    const hass={connected:true,user:{is_admin:true},callWS:msg=>{calls.push(msg);return Promise.resolve(msg.type==='spotnav/list_chargers'?{api_version:1,chargers:[{charger_id:'a',charger_name:'A'}]}:msg.type==='spotnav/get_dashboard'?raw:msg.type==='spotnav/get_settings'?envelope(record()):owned);}};
+    const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();if(reason==='stale')panel.statusAt=Date.now()-90001;if(reason==='dashboard_failed')panel.dashboardFailed=true;panel.paint();expect(panel.shadowRoot.querySelector('#resume-auto').disabled).toBe(true);await panel.automaticAction('resume',null);expect(calls.filter(m=>m.type==='spotnav/manual_action')).toHaveLength(0);panel.remove();
+  });
   it('keeps last vehicle SOC visible while tracking report age, source and estimates separately', () => {
     const now=Date.now(), raw=fixture();raw.generated_at=new Date(now).toISOString();
     raw.soc={...raw.soc,value:62,age_s:30,source:'vehicle',estimated:false,capacity_kwh:70,efficiency:0.9};

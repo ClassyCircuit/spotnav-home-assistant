@@ -355,6 +355,25 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-13 — schedule-owned Resume UI (2.5.78; local, review pending)
+
+- A reported 2.5.77 sidebar showed a pending schedule pause, unavailable Resume
+  and `undefined`. The notice was uninitialized and concatenated into text. The
+  sidebar also relied on the legacy dashboard's Pause/Resume axis even when the
+  schedule owner had its own durable pause. It now offers explicit Resume for a
+  fresh, authorized schedule-owned pause with known non-uncertain outcomes, including
+  a pending request that requires confirmation after restart. It does not bypass a
+  pending Stop, unknown outcome, stale status, permission or ownership check.
+- The exact reason for the reported unavailable control was not supplied; the
+  sidebar now distinguishes stale observations, in-flight/unknown actions,
+  permission, missing owner authority and pause evidence rather than attributing
+  it to one presumed cause. Failed dashboard refreshes also block cached controls.
+  No action is issued on opening the panel and there is no automatic retry.
+- Focused mocked sidebar/Morek tests and actual-module clean-start/Stop routing
+  tests passed; frontend build and check-dist passed. Browser, full HA-plugin and
+  live hardware validation remain unrun. No HA contact, deployment, Resume retry
+  or charger operation was performed; a retained final 0 A may remain.
+
 ### 2026-11-13 — automatic paused clean start (2.5.77; local, review pending)
 
 - The user accepted that missing ownership and outcome history could conceal an
