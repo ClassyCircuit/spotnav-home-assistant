@@ -52561,7 +52561,7 @@ function renderBattery({ soc: soc2, target, capacityKwh, efficiency, stale = fal
 // shared-dashboard/evidence-view.js
 function renderEvidence(data, power, count) {
   const d3 = data || {};
-  return `<div class="evidence-status"><strong>${escapeText(d3.status)}</strong><span>${escapeText(d3.context)}</span></div>${d3.readiness ? `<p class="subtext">${escapeText(d3.readiness)}</p>` : ""}<div class="evidence-grid"><div><small>Proposal calculated</small><b>${escapeText(d3.proposal)}</b></div><div><small>Last sent / ACK</small><b>${escapeText(d3.sent)}</b></div><div><small>Effective limits read</small><b>${escapeText(d3.readback)}</b></div><div><small>Vehicle / power received</small><b>${escapeText(d3.measurement)}</b></div></div><p class="subtext">Whether the current proposal was sent is unknown. Readback is effective limits, not a profile inventory. An ACK or match does not prove physical charging; power is a separate observation. ${escapeText(d3.dispatch)}</p><wa-details id="details" summary="View evidence & debug controls"><div class="details-body"><p><b>Current proposal:</b> ${count == null ? "Unknown" : count} windows; not necessarily sent.</p><p><b>Last sent and acknowledgement:</b> ${escapeText(d3.sent)} \xB7 response only.</p><p><b>Effective readback:</b> ${escapeText(d3.readback)} \xB7 not an inventory.</p><p><b>Measured power:</b> ${escapeText(power)} \xB7 ${escapeText(d3.measurement)}.</p><p>Missing, stale and superseded evidence must not be treated as current.</p><div id="morek-debug"><div class="actions"><wa-button size="small" disabled>Send \xB7 unavailable</wa-button><wa-button size="small" disabled>Refresh \xB7 unavailable</wa-button></div></div></div></wa-details>`;
+  return `<div class="evidence-status"><strong>${escapeText(d3.status)}</strong><span>${escapeText(d3.context)}</span></div><div class="evidence-grid"><div><small>Proposal calculated</small><b>${escapeText(d3.proposal)}</b></div><div><small>Last sent / ACK</small><b>${escapeText(d3.sent)}</b></div><div><small>Effective limits read</small><b>${escapeText(d3.readback)}</b></div><div><small>Measured charging</small><b>${escapeText(d3.measurement)}</b></div></div><p class="subtext">${escapeText(d3.dispatch)}</p><wa-details id="details" summary="View evidence & debug controls"><div class="details-body">${d3.readiness ? `<p class="subtext">${escapeText(d3.readiness)}</p>` : ""}<div id="morek-debug"><div class="actions"><wa-button size="small" disabled>Send \xB7 unavailable</wa-button><wa-button size="small" disabled>Refresh \xB7 unavailable</wa-button></div></div></div></wa-details>`;
 }
 
 // shared-dashboard/history-view.js
@@ -59498,6 +59498,39 @@ function localTime(value2) {
   const date2 = new Date(value2);
   return Number.isNaN(date2.getTime()) ? "unknown" : date2.toLocaleString();
 }
+function morekEvidence(state, observedAt, failed, now = Date.now()) {
+  const time = (value2) => value2 ? localTime(value2) : "Unavailable";
+  const fresh = (value2) => Number.isFinite(value2) && value2 <= now && now - value2 <= 9e4;
+  const statusFresh = !failed && observedAt != null && fresh(observedAt);
+  const readAt = Date.parse(state?.effective?.fetched_at ?? "");
+  const readFresh = statusFresh && fresh(readAt);
+  const start2 = Date.parse(state?.effective?.schedule_start ?? "");
+  const duration = state?.effective?.duration_s;
+  const end2 = Number.isFinite(start2) && typeof duration === "number" && Number.isFinite(duration) && duration > 0 ? start2 + duration * 1e3 : NaN;
+  const coverage = Number.isFinite(end2) ? `${time(state?.effective?.schedule_start)} \u2013 ${localTime(new Date(end2).toISOString())}` : "coverage unavailable";
+  const validCoverage = Number.isFinite(start2) && Number.isFinite(end2) && start2 <= now && now < end2;
+  const outcomeUnknown = state?.outcomes?.uncertain === true;
+  const reason = state?.verification?.reason;
+  let summary = "Current plan is not confirmed on the charger; the reason is unknown.";
+  if (!statusFresh) summary = "Current plan is not confirmed on the charger; Morek status is unavailable or stale.";
+  else if (state?.outcomes?.state === "storage_unavailable") summary = "Current plan is not confirmed; outcome evidence is unavailable.";
+  else if (outcomeUnknown) summary = "Current plan is not confirmed; a profile action may have applied and its outcome is unknown.";
+  else if (state && !state.supported) summary = "Current plan is not confirmed; Morek identity unsupported or unresolved.";
+  else if (state?.operator?.state === "offline") summary = "Current plan is not confirmed; Morek is offline.";
+  else if (!state?.preview?.profile) summary = "Current plan is not confirmed; a current proposal is unavailable.";
+  else if (state.verification_target === "held_pause" && state.verified) summary = "Current plan is not confirmed; the readback comparison concerns a held pause, not the plan.";
+  else if (reason === "verification_superseded") summary = "Current plan is not confirmed; the readback belongs to an older or unavailable attempt or plan.";
+  else if (reason === "limits_or_transitions_differ") summary = "Current plan is not confirmed; limits at the last read differed from the last sent schedule.";
+  else if (!state.sent) summary = "Current plan is not confirmed; no sent schedule is recorded.";
+  else if (!state.effective) summary = "Current plan is not confirmed; effective readback is unavailable.";
+  else if (!readFresh || !validCoverage) summary = "Current plan is not confirmed; the readback is stale or its current coverage is unavailable.";
+  else if (state.verified && state.verification_target === "current_plan") summary = "The remaining plan matched effective limits at the last read, within reported coverage.";
+  else summary = "Current plan is not confirmed; the last readback has not verified this plan.";
+  const proposal = state?.preview?.profile ? `Calculated ${time(state.preview.calculated_at)}${statusFresh ? "" : " \xB7 status stale"}` : "Unavailable";
+  const sent = state?.sent ? `${time(state.sent_at)} \xB7 ACK ${state.ack ?? "unknown"} (response time unavailable)` : "No sent schedule recorded";
+  const readback = state?.effective ? `${state.effective.status} \xB7 read ${time(state.effective.fetched_at)} \xB7 ${readFresh && validCoverage ? "recent observation" : "stale or coverage unknown"} \xB7 ${coverage}` : "Unavailable";
+  return { summary, proposal, sent, readback, measurement: "Measured power unavailable; physical charging unknown." };
+}
 function transitions(doc, profile) {
   const start2 = new Date(profile.chargingSchedule.startSchedule).getTime();
   const list2 = doc.createElement("ul");
@@ -59541,8 +59574,11 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
     ready: "Manual preview ready, not sent"
   };
   const sending = busy && activeAction === "send" && !state.outcomes?.uncertain;
-  health.textContent = `Operator state: ${state.outcomes?.state === "storage_unavailable" ? "Profile evidence unavailable" : sending ? labels.sending : labels[state.operator?.state ?? ""] ?? "Unavailable \u2014 recalculate status"}` + (!sending && state.operator?.reason ? ` (${state.operator.reason})` : "");
+  health.textContent = sending ? "Sending \u2014 outcome not yet known" : morekEvidence(state, Date.now(), false).summary;
   section.append(health);
+  const operator = doc.createElement("p");
+  operator.textContent = `Reported operator state: ${labels[state.operator?.state ?? ""] ?? "unknown"}${state.operator?.reason ? ` (${state.operator.reason})` : ""}.`;
+  section.append(operator);
   const reconciliation = state.reconciliation?.reason;
   const reconciliationMessages = {
     plan_inputs_changed: "Plan inputs changed; waiting for a fresh calculation. The retained limit may remain.",
@@ -59577,7 +59613,16 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
     outcome_storage_unavailable: "Profile evidence storage is unavailable; schedule sending remains blocked."
   };
   const blocker = state.ownership?.blockers?.find((value2) => blockers[value2]);
-  availability.textContent = state.ownership?.completion_authorized ? "Schedule ownership is confirmed for this process. External OCPP writers and native protection cannot be verified here." : `${blocker ? blockers[blocker] : "Schedule sending is blocked; review ownership and recovery status."} Recorded owner: ${state.ownership?.recorded_owner ?? "unknown"}.`;
+  const recoveryStates = {
+    ownership_missing: "Ownership record is missing; do not assume a profile is absent.",
+    ownership_malformed: "Ownership record is malformed; schedule sending remains blocked.",
+    person_stop_active: "A person Stop is pending; preserve it.",
+    identity_unresolved: "Charger identity is unresolved.",
+    identity_changed: "Charger identity changed during the check.",
+    profile_outcome_uncertain: "A profile outcome is uncertain and may have applied."
+  };
+  const recoveryReason = recoveryStates[state.ownership?.recovery?.state ?? ""];
+  availability.textContent = state.ownership?.completion_authorized ? "Schedule ownership is confirmed for this process. External OCPP writers and native protection cannot be verified here." : `${blocker ? blockers[blocker] : recoveryReason ?? "Schedule sending is blocked; review ownership and recovery status."} Recorded owner: ${state.ownership?.recorded_owner ?? "unknown"}.`;
   section.append(availability);
   if (state.ownership?.local_regulator === "linked_may_write") {
     const conflict = doc.createElement("p");
@@ -59694,9 +59739,9 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
     section.append(message);
   }
   if (admin) {
-    const actions2 = doc.createElement("div");
-    actions2.className = VISUAL_CLASSES.morekActions;
-    actions2.dataset["morekActions"] = "";
+    const actions3 = doc.createElement("div");
+    actions3.className = VISUAL_CLASSES.morekActions;
+    actions3.dataset["morekActions"] = "";
     const choices = state.supported ? [["Recalculate preview", "status"], ["Send current plan", "send"], ["Refresh from Morek", "fetch"]] : [["Check connection again", "status"]];
     for (const [label, action] of choices) {
       const button = doc.createElement("button");
@@ -59711,9 +59756,9 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
         )) return;
         act(action);
       });
-      actions2.append(button);
+      actions3.append(button);
     }
-    section.append(actions2);
+    section.append(actions3);
     if (state.supported && state.cleanup_supported === true) {
       const clear2 = doc.createElement("button");
       clear2.type = "button";
@@ -59725,9 +59770,21 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
         if (confirmActions && !doc.defaultView?.confirm("Remove ONLY SpotNav schedule profile 42001 from Morek? This removes its persistent 0 A limit. Other installed profiles will not be deliberately cleared. Effective limits may increase. Auto will not be resumed.")) return;
         act("clear");
       });
-      actions2.append(clear2);
+      actions3.append(clear2);
     }
   }
+  const details = doc.createElement("details");
+  const summary = doc.createElement("summary");
+  summary.textContent = "Technical evidence and diagnostics";
+  details.append(summary);
+  const actions2 = section.querySelector("[data-morek-actions]");
+  for (const child of Array.from(section.children)) {
+    if (child !== heading && child !== health && child !== actions2) details.append(child);
+  }
+  const safety = doc.createElement("p");
+  safety.textContent = "A final 0 A limit may remain. Readback is not profile inventory; ACK and readback do not prove physical charging. Preserve person Stop and household protection.";
+  section.insertBefore(safety, actions2);
+  section.insertBefore(details, actions2);
   return section;
 }
 
@@ -59894,6 +59951,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
   const status = decodeMorekState(statusRaw);
   const health = translate2("en", healthKey(status, observedAt, failed, false, now));
   const statusFresh = !failed && Number.isFinite(observedAt) && observedAt <= now && now - observedAt <= 9e4;
+  const evidence = morekEvidence(status, observedAt, failed, now);
   const ready = statusFresh ? status?.readiness : null;
   const control = ready?.control === "available" ? "available" : ready?.control === "unavailable" ? "unavailable" : "unknown";
   const vehicleAt = Date.parse(ready?.vehicle_observed_at || "");
@@ -59961,7 +60019,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
       untilDeadline,
       targetNote: d3.settings?.driver === "target_soc" && d3.soc?.value != null ? `Plan energy, projected SOC and cost are estimates based on the last-known SOC${d3.soc.estimated ? " and an energy-derived SOC estimate" : ""}; an old reading may not reflect driving since then.` : "",
       warning: warning ? { title: "Morek health requires attention", detail: `${health}${status?.outcomes?.uncertain && (status?.operator?.state === "mismatch" || status?.verification?.reason === "limits_or_transitions_differ") ? " \xB7 Effective limits mismatch the sent schedule." : ""}` } : null,
-      evidence: { status: health, context: `Morek status observed ${date(observedAt, zone)}${failed ? " \xB7 unavailable" : ""}; separate from dashboard`, readiness, proposal: date(d3.planning?.calculated_at, zone), sent: `${date(status?.sent_at, zone)} \xB7 ${status?.ack || U}`, readback: date(status?.effective?.fetched_at, zone), measurement: "SOC age and measured power unavailable when stale or unsupported", dispatch: `${status?.ownership?.completion_authorized ? "Schedule ownership confirmed for this process." : "Schedule dispatch blocked; recovery needs valid durable ownership and outcome evidence. Older completed ownership may need one admin reconfirmation."} External OCPP writers and native protection are not verified; the historical mismatch does not establish current state. A held exit or uncertain outcome remains blocked. Disabling the integration may leave a schedule or 0 A limit; no physical stop or profile removal is implied.` },
+      evidence: { status: evidence.summary, context: `Morek status observed ${date(observedAt, zone)}${statusFresh ? "" : " \xB7 stale or unavailable"}`, readiness, proposal: evidence.proposal, sent: evidence.sent, readback: evidence.readback, measurement: evidence.measurement, dispatch: `${status?.outcomes?.uncertain && status?.outcomes?.state !== "storage_unavailable" ? "A recorded uncertain action may have applied; do not retry blindly. " : ""}A final 0 A limit may remain. Readback is not profile inventory; ACK or readback does not prove physical charging. Preserve person Stop and household protection.` },
       labels: { settingsNote: "Read-only preview. Plan controls are unavailable in this slice.", saveLabel: "Save plan \xB7 unavailable", powerNote: "No verified general Morek power source", deadlineNote: d3.settings?.departure_enabled === false ? "Ready-by is off" : deadlineCurrent && Number.isFinite(deadline) ? `Ready by ${date(deadline, zone)}; not a predicted finish` : "Ready-by time or current plan unavailable", planLabel: "Backend policy:", chartIntro: "Published source price before configured fiscal additions; source-included charges may apply.", chartNote: `Held published intervals only. ${priceFreshness} Unpublished future and history are unavailable. Cap is omitted if its basis differs or is unknown.`, bands: "", dialogNote: "Proposal only; not necessarily sent.", footer: "Dashboard and Morek status are separate observations." }
     },
     actions: {}
@@ -59969,7 +60027,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.74";
+var CARD_VERSION = "2.5.75";
 
 // sidebar/panel.js
 var settingsWritesByConnection = /* @__PURE__ */ new WeakMap();

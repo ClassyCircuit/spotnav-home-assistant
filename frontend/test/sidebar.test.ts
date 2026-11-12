@@ -162,10 +162,9 @@ describe('actual sidebar read-only host', () => {
     expect(text(current)).toMatch(/vehicle unknown/);
     expect(text(current)).toMatch(/authorization unknown · measured charging unknown/);
     const dispatch=dashboardAdapter(raw,current,now).model.evidence.dispatch;
-    expect(dispatch).toMatch(/Schedule dispatch blocked/);
-    expect(dispatch).toMatch(/uncertain outcome remains blocked/);
-    expect(dispatch).toMatch(/Disabling the integration.*may leave a schedule or 0 A limit/);
-    expect(dispatch).toMatch(/External OCPP writers and native protection are not verified/);
+    expect(dispatch).toMatch(/0 A limit may remain/);
+    expect(dispatch).toMatch(/not profile inventory/);
+    expect(dispatch).toMatch(/person Stop and household protection/);
   });
   it('decodes backend fixture without sample data and fails closed on stale or unsupported data', () => {
     const raw=fixture(); raw.generated_at=new Date().toISOString();

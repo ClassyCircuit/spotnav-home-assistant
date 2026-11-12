@@ -1,6 +1,6 @@
 // Live adapter: no prototype modules, no calculations of financial or charger state.
 import { decodeDashboard } from '../src/validate.ts';
-import { decodeMorekState } from '../src/morek-view.ts';
+import { decodeMorekState, morekEvidence } from '../src/morek-view.ts';
 import { healthKey } from '../src/daily-overview.ts';
 import { translate } from '../src/i18n/index.ts';
 import { publishedChart } from './price-chart.js';
@@ -67,6 +67,7 @@ export function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), f
   const status = decodeMorekState(statusRaw);
   const health = translate('en', healthKey(status, observedAt, failed, false, now));
   const statusFresh = !failed && Number.isFinite(observedAt) && observedAt <= now && now-observedAt <= 90000;
+  const evidence = morekEvidence(status, observedAt, failed, now);
   const ready = statusFresh ? status?.readiness : null;
   const control = ready?.control === 'available' ? 'available' : ready?.control === 'unavailable' ? 'unavailable' : 'unknown';
   const vehicleAt = Date.parse(ready?.vehicle_observed_at || '');
@@ -120,7 +121,7 @@ export function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), f
       settings: {target:d.soc?.target_percent, minimum:d.settings?.minimum_ready_by_soc, cap:d.settings?.soft_price_cap, readyBy:d.settings?.departure_time},
       canSave:false, untilDeadline, targetNote:d.settings?.driver==='target_soc' && d.soc?.value!=null ? `Plan energy, projected SOC and cost are estimates based on the last-known SOC${d.soc.estimated ? ' and an energy-derived SOC estimate' : ''}; an old reading may not reflect driving since then.` : '',
       warning:warning ? {title:'Morek health requires attention',detail:`${health}${status?.outcomes?.uncertain && (status?.operator?.state === 'mismatch' || status?.verification?.reason === 'limits_or_transitions_differ') ? ' · Effective limits mismatch the sent schedule.' : ''}`} : null,
-      evidence:{status:health, context:`Morek status observed ${date(observedAt,zone)}${failed ? ' · unavailable' : ''}; separate from dashboard`,readiness,proposal:date(d.planning?.calculated_at,zone),sent:`${date(status?.sent_at,zone)} · ${status?.ack || U}`,readback:date(status?.effective?.fetched_at,zone),measurement:'SOC age and measured power unavailable when stale or unsupported',dispatch:`${status?.ownership?.completion_authorized ? 'Schedule ownership confirmed for this process.' : 'Schedule dispatch blocked; recovery needs valid durable ownership and outcome evidence. Older completed ownership may need one admin reconfirmation.'} External OCPP writers and native protection are not verified; the historical mismatch does not establish current state. A held exit or uncertain outcome remains blocked. Disabling the integration may leave a schedule or 0 A limit; no physical stop or profile removal is implied.`},
+      evidence:{status:evidence.summary, context:`Morek status observed ${date(observedAt,zone)}${statusFresh ? '' : ' · stale or unavailable'}`,readiness,proposal:evidence.proposal,sent:evidence.sent,readback:evidence.readback,measurement:evidence.measurement,dispatch:`${status?.outcomes?.uncertain && status?.outcomes?.state!=='storage_unavailable' ? 'A recorded uncertain action may have applied; do not retry blindly. ' : ''}A final 0 A limit may remain. Readback is not profile inventory; ACK or readback does not prove physical charging. Preserve person Stop and household protection.`},
       labels:{settingsNote:'Read-only preview. Plan controls are unavailable in this slice.',saveLabel:'Save plan · unavailable',powerNote:'No verified general Morek power source',deadlineNote:d.settings?.departure_enabled===false ? 'Ready-by is off' : deadlineCurrent && Number.isFinite(deadline) ? `Ready by ${date(deadline,zone)}; not a predicted finish` : 'Ready-by time or current plan unavailable',planLabel:'Backend policy:',chartIntro:'Published source price before configured fiscal additions; source-included charges may apply.',chartNote:`Held published intervals only. ${priceFreshness} Unpublished future and history are unavailable. Cap is omitted if its basis differs or is unknown.`,bands:'',dialogNote:'Proposal only; not necessarily sent.',footer:'Dashboard and Morek status are separate observations.'}
     }, actions:{}
   };

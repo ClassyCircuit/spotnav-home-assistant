@@ -355,6 +355,27 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-12 — Stage 12.4 Morek evidence (2.5.75; review pending)
+
+- The shared sidebar presents a short plan-confirmation summary and separate
+  proposal, sent/ACK, effective readback and measured-charging observations.
+  Readback age, reported coverage, supersession, mismatch, offline and unknown
+  outcomes are kept distinct. Power remains unavailable because this path does
+  not have a verified Morek measurement binding. Detailed transitions, drift,
+  ownership and technical controls are expandable; opening them does not write.
+- Status previously could retain `verified` after the comparison coverage expired.
+  It now withdraws the current verification outside that bounded interval and
+  distinguishes comparisons against a held pause from comparisons against the
+  current plan. The sidebar additionally treats a readback older than 90 seconds
+  as historical; this is presentation freshness, not a new admission rule. An ACK
+  response timestamp is not stored, so it is explicitly unavailable. No previous
+  uncaptured Resume error is diagnosed by these changes.
+- Focused actual-module status and mocked sidebar tests, frontend type-check,
+  build and check-dist were run. Browser, mobile rendering, full HA-plugin suite,
+  live HA and hardware remain unverified. No HA contact, vehicle refresh,
+  deployment or charger operation occurred. A final 0 A may remain; readback is
+  not profile inventory and neither it nor an ACK proves physical charging.
+
 ### 2026-11-12 — Stage 12.7 Resume and evidence (2.5.74; review pending)
 
 - The manual-action endpoint preserves domain refusals and reports unexpected

@@ -10,7 +10,7 @@ export interface MorekState {
   reconciliation?: { reason: string };
   schedule_pause?: { intent?: string; request?: string; ack?: string | null; readback?: string; measured?: string; coverage_start?: string | null; coverage_end?: string | null };
   readiness?: { control?: string; vehicle?: string; transaction?: string; measurement?: string; vehicle_observed_at?: string | null };
-  ownership?: { recorded_owner?: string | null; blockers?: string[]; schedule_mode_available?: boolean; completion_authorized?: boolean; reconfirmation_required?: boolean; local_regulator?: string };
+  ownership?: { recorded_owner?: string | null; blockers?: string[]; schedule_mode_available?: boolean; completion_authorized?: boolean; reconfirmation_required?: boolean; local_regulator?: string; recovery?: { state?: string } };
   reason?: string | null;
   configured_id?: string | null;
   resolved_id?: string | null;
@@ -19,6 +19,7 @@ export interface MorekState {
   sent_at: string | null;
   ack: string | null;
   verified: boolean;
+  verification_target?: "current_plan" | "held_pause" | null;
   verification?: {
     pending?: boolean; reason?: string; exact?: boolean; tolerance_s?: number;
     max_delta_s?: number | null; coverage_start?: string | null; coverage_end?: string | null; next_check_at?: string | null;
@@ -80,6 +81,41 @@ function localTime(value: string | null): string {
   return Number.isNaN(date.getTime()) ? "unknown" : date.toLocaleString();
 }
 
+/** Status/readback ages are presentation limits, not permission to operate the charger. */
+export function morekEvidence(state: MorekState | null, observedAt: number | null, failed: boolean, now = Date.now()) {
+  const time = (value: string | null | undefined) => value ? localTime(value) : "Unavailable";
+  const fresh = (value: number) => Number.isFinite(value) && value <= now && now - value <= 90000;
+  const statusFresh = !failed && observedAt != null && fresh(observedAt);
+  const readAt = Date.parse(state?.effective?.fetched_at ?? "");
+  const readFresh = statusFresh && fresh(readAt);
+  const start = Date.parse(state?.effective?.schedule_start ?? "");
+  const duration = state?.effective?.duration_s;
+  const end = Number.isFinite(start) && typeof duration === "number" && Number.isFinite(duration) && duration > 0 ? start + duration * 1000 : NaN;
+  const coverage = Number.isFinite(end) ? `${time(state?.effective?.schedule_start)} – ${localTime(new Date(end).toISOString())}` : "coverage unavailable";
+  const validCoverage = Number.isFinite(start) && Number.isFinite(end) && start <= now && now < end;
+  const outcomeUnknown = state?.outcomes?.uncertain === true;
+  const reason = state?.verification?.reason;
+  let summary = "Current plan is not confirmed on the charger; the reason is unknown.";
+  if (!statusFresh) summary = "Current plan is not confirmed on the charger; Morek status is unavailable or stale.";
+  else if (state?.outcomes?.state === "storage_unavailable") summary = "Current plan is not confirmed; outcome evidence is unavailable.";
+  else if (outcomeUnknown) summary = "Current plan is not confirmed; a profile action may have applied and its outcome is unknown.";
+  else if (state && !state.supported) summary = "Current plan is not confirmed; Morek identity unsupported or unresolved.";
+  else if (state?.operator?.state === "offline") summary = "Current plan is not confirmed; Morek is offline.";
+  else if (!state?.preview?.profile) summary = "Current plan is not confirmed; a current proposal is unavailable.";
+  else if (state.verification_target === "held_pause" && state.verified) summary = "Current plan is not confirmed; the readback comparison concerns a held pause, not the plan.";
+  else if (reason === "verification_superseded") summary = "Current plan is not confirmed; the readback belongs to an older or unavailable attempt or plan.";
+  else if (reason === "limits_or_transitions_differ") summary = "Current plan is not confirmed; limits at the last read differed from the last sent schedule.";
+  else if (!state.sent) summary = "Current plan is not confirmed; no sent schedule is recorded.";
+  else if (!state.effective) summary = "Current plan is not confirmed; effective readback is unavailable.";
+  else if (!readFresh || !validCoverage) summary = "Current plan is not confirmed; the readback is stale or its current coverage is unavailable.";
+  else if (state.verified && state.verification_target === "current_plan") summary = "The remaining plan matched effective limits at the last read, within reported coverage.";
+  else summary = "Current plan is not confirmed; the last readback has not verified this plan.";
+  const proposal = state?.preview?.profile ? `Calculated ${time(state.preview.calculated_at)}${statusFresh ? "" : " · status stale"}` : "Unavailable";
+  const sent = state?.sent ? `${time(state.sent_at)} · ACK ${state.ack ?? "unknown"} (response time unavailable)` : "No sent schedule recorded";
+  const readback = state?.effective ? `${state.effective.status} · read ${time(state.effective.fetched_at)} · ${readFresh && validCoverage ? "recent observation" : "stale or coverage unknown"} · ${coverage}` : "Unavailable";
+  return { summary, proposal, sent, readback, measurement: "Measured power unavailable; physical charging unknown." };
+}
+
 function transitions(doc: Document, profile: MorekProfile): HTMLUListElement {
   const start = new Date(profile.chargingSchedule.startSchedule).getTime();
   const list = doc.createElement("ul");
@@ -129,9 +165,11 @@ export function morekPanel(
     intervention_needed: "Intervention needed — action outcome uncertain", ready: "Manual preview ready, not sent",
   };
   const sending = busy && activeAction === "send" && !state.outcomes?.uncertain;
-  health.textContent = `Operator state: ${state.outcomes?.state === "storage_unavailable" ? "Profile evidence unavailable" : sending ? labels.sending : labels[state.operator?.state ?? ""] ?? "Unavailable — recalculate status"}` +
-    (!sending && state.operator?.reason ? ` (${state.operator.reason})` : "");
+  health.textContent = sending ? "Sending — outcome not yet known" : morekEvidence(state, Date.now(), false).summary;
   section.append(health);
+  const operator = doc.createElement("p");
+  operator.textContent = `Reported operator state: ${labels[state.operator?.state ?? ""] ?? "unknown"}${state.operator?.reason ? ` (${state.operator.reason})` : ""}.`;
+  section.append(operator);
   const reconciliation = state.reconciliation?.reason;
   const reconciliationMessages: Record<string, string> = {
     plan_inputs_changed: "Plan inputs changed; waiting for a fresh calculation. The retained limit may remain.",
@@ -166,9 +204,18 @@ export function morekPanel(
     outcome_storage_unavailable: "Profile evidence storage is unavailable; schedule sending remains blocked.",
   };
   const blocker = state.ownership?.blockers?.find((value) => blockers[value]);
+  const recoveryStates: Record<string, string> = {
+    ownership_missing: "Ownership record is missing; do not assume a profile is absent.",
+    ownership_malformed: "Ownership record is malformed; schedule sending remains blocked.",
+    person_stop_active: "A person Stop is pending; preserve it.",
+    identity_unresolved: "Charger identity is unresolved.",
+    identity_changed: "Charger identity changed during the check.",
+    profile_outcome_uncertain: "A profile outcome is uncertain and may have applied.",
+  };
+  const recoveryReason = recoveryStates[state.ownership?.recovery?.state ?? ""];
   availability.textContent = state.ownership?.completion_authorized
     ? "Schedule ownership is confirmed for this process. External OCPP writers and native protection cannot be verified here."
-    : `${blocker ? blockers[blocker] : "Schedule sending is blocked; review ownership and recovery status."} Recorded owner: ${state.ownership?.recorded_owner ?? "unknown"}.`;
+    : `${blocker ? blockers[blocker] : recoveryReason ?? "Schedule sending is blocked; review ownership and recovery status."} Recorded owner: ${state.ownership?.recorded_owner ?? "unknown"}.`;
   section.append(availability);
   if (state.ownership?.local_regulator === "linked_may_write") {
     const conflict = doc.createElement("p");
@@ -341,5 +388,17 @@ export function morekPanel(
       actions.append(clear);
     }
   }
+  const details = doc.createElement("details");
+  const summary = doc.createElement("summary");
+  summary.textContent = "Technical evidence and diagnostics";
+  details.append(summary);
+  const actions = section.querySelector<HTMLElement>("[data-morek-actions]");
+  for (const child of Array.from(section.children)) {
+    if (child !== heading && child !== health && child !== actions) details.append(child);
+  }
+  const safety = doc.createElement("p");
+  safety.textContent = "A final 0 A limit may remain. Readback is not profile inventory; ACK and readback do not prove physical charging. Preserve person Stop and household protection.";
+  section.insertBefore(safety, actions);
+  section.insertBefore(details, actions);
   return section;
 }

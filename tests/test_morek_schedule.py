@@ -226,6 +226,48 @@ async def test_initializer_refuses_real_unsupported_and_ambiguous_identities():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(("end_offset", "associated", "pause_type", "expected", "reason", "target"), [
+    (3600, True, None, True, "matched", "current_plan"),
+    (3600, True, "pause_until_resumed", True, "matched", "held_pause"),
+    (3600, True, "resume_requested", True, "matched", "current_plan"),
+    (-1, True, None, False, "coverage_stale", None),
+    (3600, False, None, False, "verification_superseded", None),
+])
+async def test_status_expires_or_supersedes_verification(monkeypatch, end_offset, associated, pause_type, expected, reason, target):
+    now = datetime.now(timezone.utc)
+    entry = SimpleNamespace(entry_id="charger")
+    record = {"schema": 1, "entry_id": "charger", "uncertain": False,
+              "attempt": {"state": "accepted"}, "acknowledged": {"fingerprint": "f"},
+              "verified": {"attempt_id": "id" if associated else "old", "attempt_at": "t", "fingerprint": "f"}}
+    if pause_type:
+        record["attempt"]["pause_id"] = "pause"
+        record["schedule_pause"] = {"version": 1, "type": pause_type, "id": "pause",
+                                    "station_id": morek_schedule.MOREK_STATION_ID, "connector_id": 1}
+    ledger = SimpleNamespace(read=AsyncMock(return_value=record), write=AsyncMock())
+    data = {"verified": True, "attempt_id": "id", "sent_at": "t", "verification": {
+        "reason": "matched", "coverage_start": (now - timedelta(hours=1)).isoformat(),
+        "coverage_end": (now + timedelta(seconds=end_offset)).isoformat()}}
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=None))
+    monkeypatch.setattr(morek_schedule, "ownership_store", lambda *_: SimpleNamespace(async_status=AsyncMock(return_value={})))
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda *_: SimpleNamespace(
+        _recovery_status={}, _person_stops={}, owned_ticket_current=lambda *_: False,
+        async_recovery_status=AsyncMock(return_value={})))
+    monkeypatch.setattr(morek_schedule, "_state", AsyncMock(return_value=(data, None)))
+    monkeypatch.setattr(morek_schedule, "_verification_current", lambda *_: True)
+    monkeypatch.setattr(morek_schedule, "_preview", lambda *_: {})
+    monkeypatch.setattr(morek_schedule, "outcomes_for", lambda *_: ledger)
+    connection = SimpleNamespace(send_result=Mock(), send_error=Mock())
+    await morek_schedule.websocket_morek_schedule.__wrapped__(SimpleNamespace(data={}), connection,
+        {"id": 1, "api_version": 1, "charger_id": "charger", "action": "status"})
+    result = connection.send_result.call_args.args[1]["schedule"]
+    assert result["verified"] is expected
+    assert result["verification"]["reason"] == reason
+    assert result["verification_target"] == target
+    ledger.write.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(("attempt", "uncertain", "expected"), [
     (None, False, "profile_history_unavailable"),
     ({"state": "pending"}, False, "profile_outcome_unsettled"),

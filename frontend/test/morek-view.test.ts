@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { decodeMorekState, morekPanel } from "../src/morek-view";
+import { decodeMorekState, morekEvidence, morekPanel } from "../src/morek-view";
 import { dashboard, FakeHass, mountCard } from "./helpers";
 
 const state = {
@@ -22,6 +22,31 @@ const state = {
   ] },
 };
 
+describe("daily Morek evidence", () => {
+  const now = Date.parse("2026-11-06T20:02:00Z");
+  const current = { ...state, verified: true, verification_target: "current_plan" as const,
+    effective: { ...state.effective, schedule_start: "2026-11-06T20:01:00Z", duration_s: 3600 } };
+  it.each([
+    [current, now, false, /remaining plan matched/i],
+    [current, now-100000, false, /status.*stale/i],
+    [{...current, verification:{reason:"verification_superseded"}}, now, false, /older or unavailable/i],
+    [{...current, verified:false, verification:{reason:"limits_or_transitions_differ"}}, now, false, /limits at the last read differed/i],
+    [{...current, effective:null}, now, false, /readback is unavailable/i],
+    [{...current, operator:{state:"offline"}}, now, false, /offline/i],
+    [{...current, outcomes:{uncertain:true}}, now, false, /may have applied/i],
+    [{...current, verification_target:"held_pause" as const}, now, false, /held pause/i],
+    [current, now, true, /stale/i],
+  ])("reports only supported evidence", (sample, observed, failed, expected) => {
+    expect(morekEvidence(sample, observed, failed, now).summary).toMatch(expected);
+  });
+  it("keeps technical details collapsed and opens without writes", () => {
+    const act=vi.fn();const panel=morekPanel(document,current,true,false,null,act);
+    const details=panel.querySelector("details")!;
+    expect(details.open).toBe(false);expect(details.textContent).toContain("Sent (profile 42001)");
+    details.open=true;expect(details.open).toBe(true);expect(act).not.toHaveBeenCalled();
+  });
+});
+
 describe("Morek manual test panel", () => {
   it("shows an automatic reconciliation blocker without issuing any action", () => {
     const act = vi.fn();
@@ -38,7 +63,7 @@ describe("Morek manual test panel", () => {
   ])("shows operator state %s and activation blockers", (status, label) => {
     const panel = morekPanel(document, { ...state, operator: { state: status }, ownership: { recorded_owner: "legacy" } }, true, false, null, vi.fn());
     expect(panel.textContent).toContain(label);
-    expect(panel.textContent).toContain("Schedule sending is blocked pending migration or reconfirmation");
+    expect(panel.textContent).toContain("Schedule sending is blocked; review ownership and recovery status");
     expect(panel.textContent).toContain("household protection");
     expect(panel.textContent).toContain("transaction authorization");
     expect(panel.textContent).toContain("not profile inventory");

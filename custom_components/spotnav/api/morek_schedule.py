@@ -363,6 +363,16 @@ def _verification_state(hass: HomeAssistant, entry_id: str, data: dict[str, Any]
     return verification
 
 
+def _verification_coverage_current(verification: dict[str, Any], now: datetime) -> bool:
+    """A historical comparison cannot verify limits after its bounded coverage ends."""
+    try:
+        start = _utc(datetime.fromisoformat(verification["coverage_start"].replace("Z", "+00:00")))
+        end = _utc(datetime.fromisoformat(verification["coverage_end"].replace("Z", "+00:00")))
+        return start <= now < end
+    except (KeyError, TypeError, ValueError, AttributeError, OverflowError, ScheduleRefused):
+        return False
+
+
 def _owned_pause_status(outcomes: dict[str, Any], verification: dict[str, Any], verified: bool,
                         worker: Any, *, stop_pending: bool = False) -> dict[str, Any]:
     """Separate durable intent from request and bounded observation, not physical flow."""
@@ -1268,13 +1278,16 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
                 ownership["blockers"] = [evidence_blocker]
             verified_evidence = outcomes.get("verified") or {}
             worker = getattr(getattr(entry, "runtime_data", None), "morek_worker", None)
-            verified = bool(data.get("verified") and verified_evidence.get("attempt_id") == data.get("attempt_id")
+            verification = _verification_state(hass, entry.entry_id, data)
+            associated = bool(data.get("verified") and verified_evidence.get("attempt_id") == data.get("attempt_id")
                             and verified_evidence.get("attempt_at") == data.get("sent_at")
                             and verified_evidence.get("fingerprint") == (outcomes.get("acknowledged") or {}).get("fingerprint")
                             and (worker is None or verified_evidence.get("planner_serial") == worker._serial)
                             and _verification_current(hass, entry.entry_id, entry, data, outcomes, data.get("sent_at")))
-            verification = _verification_state(hass, entry.entry_id, data)
-            if data.get("verified") and not verified:
+            verified = associated and _verification_coverage_current(verification, datetime.now(timezone.utc))
+            if associated and not verified:
+                verification.update({"matched": False, "exact": False, "reason": "coverage_stale"})
+            elif data.get("verified") and not verified:
                 verification.update({"matched": False, "exact": False, "reason": "verification_superseded"})
             compared = verification.get("reason") in (
                 "limits_or_transitions_differ", "coverage_missing", "coverage_too_short", "coverage_stale",
@@ -1311,6 +1324,9 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
                       "operator": operator,
                       "sent_at": None if aborted_display else data.get("sent_at"),
                       "ack": None if aborted_display else data.get("ack"), "verified": verified,
+                      "verification_target": ("held_pause" if (attempt or {}).get("pause_id")
+                                              and (outcomes.get("schedule_pause") or {}).get("type") == "pause_until_resumed"
+                                              else "current_plan") if verified else None,
                       "sent": None if aborted_display else data.get("profile"), "effective": data.get("effective"),
                       "preview": preview,
                       "cleanup": data.get("cleanup"), "cleanup_supported": True,

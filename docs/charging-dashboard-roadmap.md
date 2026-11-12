@@ -1330,7 +1330,13 @@ action, weaken admission/safety checks, or claim physical behavior is verified.
     sources or sufficient coverage do not exist. Reuse 5.7b and later Stages 6–8;
     do not infer measured charging from planned windows or duplicate those stages.
 
-- [ ] **12.4 Clear Morek status and evidence**
+- [x] **12.4 Clear Morek status and evidence** (2.5.75 local; review pending)
+  - The daily view separates proposal, sent/ACK, effective readback and measured
+    charging, with freshness and reported coverage; diagnostics and transitions
+    remain expandable. Missing or historical evidence is not confirmation.
+    Backend verification now expires outside its bounded coverage and identifies
+    held-pause versus plan comparisons. Focused mocks pass; mobile rendering,
+    live HA and physical behavior remain unverified.
   - Replace the confusing wall of repeated warnings with a concise, actionable daily
     status and expandable technical details. Clearly separate the current proposal,
     last upload and ACK, effective readback with coverage/freshness, and genuinely
