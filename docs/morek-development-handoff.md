@@ -234,6 +234,75 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### Stage 5.4b1 — read-only sidebar foundation (coordinator review pending)
+
+- `sidebar.py` registers a domain-wide HA `panel_custom` sidebar and local static
+  route. Entry reload/unload does not re-register it; HA stop removes the panel.
+  `frontend/sidebar/panel.js` mounts the actual shared dashboard in shadow DOM,
+  with local versioned CSS, a charger selector and explicit read-only refresh.
+  The old card and user dashboards are untouched. Registration and the new assets
+  are part of integration setup; install/update requires shipping the built `www`
+  assets and an approved HA restart. No installation is authorized by this note.
+- `frontend/sidebar/adapter.js` uses the existing dashboard and Morek decoders and
+  health logic. It makes independent dashboard and Morek status observations and
+  invalidates late results on selection, disconnect or teardown. It never invokes
+  Morek fetch/send/clear, settings, or charging actions. Missing general power,
+  historical data, per-window cost and real prices are unavailable. Backend plan
+  totals retain their own currency; no frontend cost rule or sample fallback is used.
+  Historical, expired or stale proposals are suppressed. SOC freshness uses the
+  existing 180-second backend threshold; dashboard observations age after 90 seconds.
+- The host is read-only, including for admins. 5.4b2 must implement guarded settings
+  and debug actions and truly stable incremental updates. The current shared `update`
+  still closes/reopens the dialog and cannot guarantee focus, selection or scroll.
+  5.4c must bind the real chart with proper timezone/DST behavior. This is not a final
+  installable release. Actual HA, mobile app, physical touch and mixed Web Awesome
+  versions remain unverified. Existing `wa-*` registrations win; compatibility with
+  an independently installed version is not guaranteed.
+- `tools/test_sidebar_registration.py`: 2 mocked-boundary tests passed (duplicate
+  setup, cleanup/reload, missing bundle). `frontend/test/sidebar.test.ts` exercises
+  the actual host and decoder against a backend fixture, stale/missing status,
+  non-admin reads, switching and out-of-order dashboard/status responses, disconnect
+  and read-only requests. jsdom reports CSS parsing warnings; it is not a browser.
+  Full Vitest run passed 2,385 tests before the last additional focused race test;
+  the three focused sidebar tests passed afterward. Type-check, build, check-dist,
+  four shared-plan tests and diff check passed; line-ending warnings are present.
+- Local Chromium mock-host/preview captures using the same backend fixture at
+  1440×1000 and emulated 390×844 are in the temp directory
+  `opencode/spotnav-54b1/{desktop,mobile}-{preview,panel}.png`. The panel adds a
+  navigation/charger bar and has a slightly narrower content area; shared card
+  layout/styles are the same. The check observed 28 local/data requests and no
+  runtime exceptions. It does not prove HA compatibility or pixel identity.
+- Build bundles Web Awesome and ECharts into `www/sidebar/panel.js`, isolates the
+  shared styles in `panel.css`, and copies MIT/Apache/BSD and icon notices beside
+  them. The mock browser used only local/data resources. No live HA, charger, phone,
+  profile operation, deployment or restart occurred. Stop for coordinator review.
+
+### Stage 5.4b — partial shared-view work, not complete
+
+- The shared preview can accept explicit backend-supplied plan totals and a currency;
+  absent currency can be marked unknown and non-EUR totals are not labelled EUR.
+  The sample price chart still assumes cents and is not suitable for real prices.
+- An experimental update restores dirty input values, zoom and dialog visibility
+  after a remount, and puts warning/status text in the dialog. This is not a true
+  incremental update: focus/selection and all scroll positions are not guaranteed,
+  and the dialog is actually closed and reopened. Hosts must change `draftKey` on
+  charger/revision changes. This is not yet wired to settings or safe for production.
+- `node --test shared-dashboard/plan-view.test.mjs shared-dashboard/boundaries.test.mjs`
+  passed four tests. The local preview browser check passed at 1440×1000 and emulated
+  390×844, including a basic draft/dialog/zoom/warning restoration check; its captures
+  are in `opencode/spotnav-54a/shared-{desktop,mobile}-full.png` in the temp directory.
+  These are preview captures, not panel parity screenshots. Physical touch and HA
+  were not tested. An initial run attached to a browser with extensions and failed
+  the local-only network assertion; a clean browser passed.
+- Version bumped to 2.5.35; frontend type-check, build and check-dist passed.
+  The first full frontend test run failed 29 tests on five-second timeouts when
+  npm consumed the intended worker option; a direct `npx vitest run --maxWorkers=2`
+  rerun passed all 2,383 tests. Isolated notifier tests passed 14 (with existing
+  pytest configuration/deprecation warnings). These do not test a panel host.
+- Historical entry: the absence of sidebar registration and a real adapter described
+  here was superseded by 5.4b1 above. 5.4b remains open for guarded controls and
+  stable updates; 5.4c remains future work.
+
 ### Stage 5.4a — shared dashboard foundation (coordinator review pending)
 
 - `frontend/shared-dashboard/dashboard.js` exports `mountDashboard(root, adapter)`

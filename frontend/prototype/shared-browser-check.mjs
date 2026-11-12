@@ -38,6 +38,18 @@ for(const [name,width,height] of [['desktop',1440,1000],['mobile',390,844]]){
   await evaluate(`window.sampleDashboard.charts.step.dispatchAction({type:'showTip',seriesIndex:0,dataIndex:192})`);
   assert.match(await evaluate(`document.querySelector('#price-step').innerText`),/Tue 10 Nov 2026/);
   await evaluate(`window.sampleDashboard.charts.step.dispatchAction({type:'hideTip'})`);
+  const preserved=await evaluate(`(()=>{
+    const input=document.querySelector('[data-setting="target"]'); input.value='77'; input.dispatchEvent(new Event('input',{bubbles:true}));
+    window.sampleDashboard.charts.step.dispatchAction({type:'dataZoom',startValue:20,endValue:35});
+    const before=window.sampleDashboard.charts.step.getOption().dataZoom[0];
+    document.querySelector('#open-plan').click();
+    const updated={...window.sampleAdapter,model:{...window.sampleAdapter.model,warning:{title:'Mismatch',detail:'Check limits'}}};
+    window.sampleDashboard.update(updated);
+    const after=window.sampleDashboard.charts.step.getOption().dataZoom[0];
+    return {draft:document.querySelector('[data-setting="target"]').value,open:document.querySelector('#plan-dialog').open,focus:document.activeElement.id,warning:document.querySelector('#plan-dialog').innerText.includes('Mismatch'),zoom:[before.startValue,before.endValue,after.startValue,after.endValue]};
+  })()`);
+  assert.equal(preserved.draft,'77');assert.ok(preserved.open);assert.equal(preserved.focus,'close-plan');assert.ok(preserved.warning);assert.deepEqual(preserved.zoom.slice(0,2),preserved.zoom.slice(2));
+  await evaluate(`document.querySelector('#close-plan').click()`);
   for(const [query,expected] of [['?state=charging','6.0 kW'],['?state=unavailable','Vehicle state unavailable'],['?state=infeasible','falls short'],['?state=partial','01:22:30'],['?state=exception','ABOVE-CAP MINIMUM'],['?state=stale','Vehicle data stale'],['?plan=missing','Unknown efficiency'],['?plan=invalid','Target feasibility is unknown'],['?plan=long','03:30'],['?insights=missing','insight inputs masked']]){await navigate(query);assert.ok((await evaluate('document.body.innerText')).includes(expected),query);assert.ok(await evaluate('document.documentElement.scrollWidth<=innerWidth'));}
   await navigate('?state=waiting');await evaluate(`(()=>{let s=document.querySelector('#sample-state');s.value='charging';s.dispatchEvent(new Event('change',{bubbles:true}))})()`);
   await evaluate(`new Promise(r=>setTimeout(r,500))`);assert.match(await evaluate('location.search'),/state=charging/);

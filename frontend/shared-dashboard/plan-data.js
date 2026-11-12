@@ -22,4 +22,10 @@ export const total = rows => {
   return { energy: validEnergy, cost: validCost, centsPerKwh: Number.isFinite(average) ? average : null };
 };
 
-export const money = value => !Number.isFinite(value) ? 'Unknown' : `${value < 0 ? '−' : ''}€${Math.abs(value).toFixed(2)}`;
+// `undefined` retains the preview's EUR fixture; a live host must explicitly
+// provide its authoritative ISO currency or null. Never label an unknown currency EUR.
+export const money = (value, currency = 'EUR') => {
+  if (!Number.isFinite(value) || typeof currency !== 'string' || !/^[A-Z]{3}$/.test(currency)) return 'Unknown';
+  if (currency === 'EUR') return `${value < 0 ? '−' : ''}€${Math.abs(value).toFixed(2)}`;
+  return `${value.toFixed(2)} ${currency}`;
+};

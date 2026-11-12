@@ -6,6 +6,7 @@ import { join } from "node:path";
 
 import { ASSET, bundle, cardVersion } from "./bundle.mjs";
 import { LANGUAGE_DIR, languageFiles } from "./languages.mjs";
+import { sidebarFiles } from "./sidebar-bundle.mjs";
 
 const files = languageFiles();
 mkdirSync(LANGUAGE_DIR, { recursive: true });
@@ -23,3 +24,7 @@ await bundle(ASSET);
 const { size } = statSync(ASSET);
 console.log(`built ${ASSET} (${size} bytes, integration version ${cardVersion()})`);
 console.log(`wrote ${files.length} language files to ${LANGUAGE_DIR}`);
+const sidebar = join(ASSET, '..', 'sidebar');
+mkdirSync(sidebar, {recursive:true});
+for (const [name, bytes] of await sidebarFiles()) writeFileSync(join(sidebar,name),bytes);
+console.log(`built sidebar assets in ${sidebar}`);

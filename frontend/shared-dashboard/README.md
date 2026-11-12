@@ -15,8 +15,13 @@ dashboard.update({ model: nextModel, format, actions });
 dashboard.dispose();
 ```
 
-`update` replaces the entire model and remounts the view; it closes any open
-dialog and resets chart zoom. `dispose` disconnects observers, removes listeners,
+`update` still remounts the view, but experimentally restores edited field values,
+dialog visibility, identified focus and chart zoom. This is not yet a production-safe
+incremental update: the dialog is actually closed and reopened, text selection and
+arbitrary nested scroll positions are not preserved, and revision/identity safety is
+the host's responsibility. Set `draftKey` to a stable charger-and-revision identity;
+changing it clears drafts. This has not been integrated with a real settings save.
+`dispose` disconnects observers, removes listeners,
 disposes ECharts and clears the root. Mounting again on the same root disposes
 the previous instance. The host owns subscriptions, async requests, permissions,
 revision checks, errors, and their cleanup. Updates are not atomic backend reads.
@@ -26,7 +31,11 @@ revision checks, errors, and their cleanup. Updates are not atomic backend reads
 See `../prototype/sample-adapter.js` for a complete *fictional* example. Supply
 validated values; omitted data is unknown/unavailable, never a sample default.
 Host-supplied display strings and formatter results are treated as text. No
-field accepts HTML. The current presentation is English and EUR/cents per kWh.
+field accepts HTML. The current presentation is English. The fixture uses EUR/cents;
+live hosts must set `format.currency` to an authoritative ISO currency or `null`.
+An optional `model.totals` supplies backend totals instead of summing windows.
+The sample chart and its price units are still EUR/cents-specific and must not be
+used with live data until 5.4c replaces those assumptions.
 
 - `windows`: array of `{start,end,energy,cost,centsPerKwh,projectedSoc,control}`;
   `null`/missing means unavailable, `[]` means known empty. Times are numeric
@@ -74,11 +83,12 @@ field accepts HTML. The current presentation is English and EUR/cents per kWh.
   must authorize, validate, check revisions and handle failures; raw form values
   are not settings validation. The sample adapter provides no save action.
 
-This extraction does not implement an HA sidebar or real adapter. 5.4b must
-connect the existing 5.2/5.3 APIs and guards and solve HA lifecycle, shadow
-DOM/CSS isolation, theme, safe areas and Web Awesome registration collisions.
+The 5.4b1 HA sidebar in `../sidebar/` uses this same entry point and a separate
+read-only real adapter. It isolates the bundled styles in a shadow root; previously
+registered `wa-*` components take precedence and mixed versions are unverified.
+5.4b2 must connect guarded controls and replace the remount update lifecycle.
 The shared styles currently include global `:root` and `body` rules. 5.4c must
 implement source-boundary navigation, actual price/timezone/DST handling,
 published availability, and real chart data; this sample hour-axis chart is not
-proof of those behaviors. Chart viewport is reset on update. Physical touch,
+proof of those behaviors. Chart viewport restoration is experimental. Physical touch,
 actual HA mobile app and theme behavior remain unverified.

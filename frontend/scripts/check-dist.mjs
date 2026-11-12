@@ -10,6 +10,7 @@ import { join } from "node:path";
 
 import { ASSET, bundle } from "./bundle.mjs";
 import { LANGUAGE_DIR, languageFiles } from "./languages.mjs";
+import { sidebarFiles } from "./sidebar-bundle.mjs";
 
 const directory = mkdtempSync(join(tmpdir(), "spotnav-card-"));
 const fresh = join(directory, "spotnav-card.js");
@@ -50,6 +51,10 @@ try {
     }
   }
   console.log(`language files are current: ${expected.join(", ")}`);
+  for (const [name, bytes] of await sidebarFiles()) {
+    const path = join(ASSET, '..', 'sidebar', name);
+    if (digest(readFileSync(path)) !== digest(bytes)) throw new Error(`${path} is stale; run npm run build`);
+  }
   console.log(
     `dist is current: ${ASSET} (${committed.length} bytes, sha256 ${digest(committed)})`,
   );

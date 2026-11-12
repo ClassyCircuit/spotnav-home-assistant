@@ -47,6 +47,7 @@ from .api.price_source import async_setup_price_source_api
 from .api.site_settings import async_setup_site_settings_api
 from .api.webhook import async_register_charger_webhook
 from .card_asset import async_setup_card_asset
+from .sidebar import async_setup_sidebar, async_remove_sidebar
 from .const import (
     CONF_CHARGER_ENTRY_IDS,
     CONF_CORE_OWNERSHIP,
@@ -203,6 +204,12 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     async_setup_blueprints_api(hass)
     # Static route for the bundled card asset, versioned by the manifest.
     await async_setup_card_asset(hass)
+    await async_setup_sidebar(hass)
+    @callback
+    def remove_sidebar_on_stop(_event: Event) -> None:
+        async_remove_sidebar(hass)
+
+    hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, remove_sidebar_on_stop)
     async_register_pairing(hass)
     # SpotNav's automation blueprints, copied to blueprints/automation/spotnav/ when they differ and were not edited
     # (`blueprint_install.py`).

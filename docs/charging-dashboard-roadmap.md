@@ -474,7 +474,9 @@ tests are documented there; full HA collection is still blocked on Windows.
     sample adapter; shared styles, dialog, stepped chart and views have lifecycle
     cleanup. Local browser checks and baseline comparisons are recorded in the handoff.
     The bar chart is an optional comparison only. No sidebar or real data is connected.
-    Updates currently reset chart zoom and close the dialog; real-data timestamp/DST,
+    Updates currently remount, resetting chart zoom, closing dialogs and losing drafts;
+    sample-oriented EUR/cents and global CSS assumptions also need live-host adaptation.
+    Real-data timestamp/DST,
     HA CSS isolation, registration and integration are 5.4b/5.4c work.
   - Refactor the existing prototype layout, styles, Web Awesome controls, modal and
     selected stepped-area chart into one production-ready shared UI code path. Local
@@ -484,7 +486,9 @@ tests are documented there; full HA collection is still blocked on Windows.
     wording; bundle assets locally with notices. Test fixture rendering, responsive
     behavior, accessible controls, safe untrusted text and component cleanup. Compare
     old prototype and shared preview at equivalent widths; no HA deployment or commands.
-- [ ] **5.4b HA sidebar host and live overview/controls**
+- [ ] **5.4b HA sidebar host and live overview/controls** (umbrella: 5.4b1–5.4b2)
+  - Read-only sidebar foundation is implemented in 5.4b1; controls and a
+    production-safe incremental lifecycle remain 5.4b2 work. Keep this umbrella open.
   - Register one integration-provided HA custom sidebar panel and mount the shared UI,
     with a practical non-destructive setup/update path. Use HA's supported panel interface;
     handle sidebar/mobile navigation, safe areas, lifecycle, access and CSS isolation.
@@ -492,9 +496,32 @@ tests are documented there; full HA collection is still blocked on Windows.
     adapter. Reuse revision checks, permissions, race guards and manual interlocks; never
     render mock values or cause a charger write when opening the panel. Missing measured
     power, historical data and unsupported fields remain visibly unavailable.
+  - Fix the shared UI's full-remount update behavior before wiring frequent HA updates:
+    preserve open dialog/focus, unsaved settings drafts, scroll and chart zoom across
+    routine updates, while delivering critical health changes immediately. Handle
+    lifecycle/config changes and explicit save/conflict safely without stale writes.
+    Replace hardcoded sample currency/basis assumptions with authoritative values or
+    Unknown; do not recalculate unavailable per-window costs in the UI.
   - Test actual-module contracts, mock HA panel lifecycle, action safety and visual parity
     with preview under identical fixture/viewport, desktop and mobile. HA-host behavior
     is not proven until installation; don't overwrite user views or remove the old card.
+- [x] **5.4b1 Sidebar host and real read-only data** (local mocked-boundary implementation; coordinator review pending, not an installable final release)
+  - Register an integration-provided sidebar panel and locally bundle/mount the existing
+    shared UI. Connect real, decoded 5.2 dashboard and read-only Morek status data via a
+    lifecycle-safe adapter with explicit selected charger and no sample fallback. Missing
+    real fields and the 5.4c price chart remain unavailable; all settings/charger actions
+    remain disabled in this slice. Preserve the old card and protect HA styles/assets.
+  - Test actual integration registration/cleanup and panel adapter with mocked HA
+    boundaries, out-of-order responses, missing data, local asset packaging, read-only
+    safety and desktop/mobile mock-host parity with the shared preview. No live HA access.
+- [ ] **5.4b2 Real controls and stable interactive updates**
+  - Build on 5.4b1 to wire existing 5.3 revision-checked settings and permitted manual
+    debug controls, preserving all admin/interlock checks. Implement stable updates that
+    preserve modal/focus, selection, draft, scroll and zoom while delivering warnings;
+    invalidate stale charger/revision actions and handle save/conflict/teardown safely.
+  - Test successful/rejected saves, admin/non-admin, lifecycle/races and no charger writes
+    except explicitly requested and authorized existing actions. No deployment or live
+    charger operation; finish 5.4b only after both slices pass review.
 - [ ] **5.4c Real stepped-area price chart and install preparation**
   - Bind the shared ECharts chart to real available prices and proposed windows, with
     correct units/basis, timezone/DST, missing/negative prices and source resolution.
