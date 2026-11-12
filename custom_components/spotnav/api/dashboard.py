@@ -415,6 +415,14 @@ class CapturedSoc:
     #: The efficiency the card works a target out with: the car's learned one once trusted
     #: (`learned_energy.efficiency_for`), else `CHARGE_EFFICIENCY`.
     efficiency: float = CHARGE_EFFICIENCY
+    time_basis: str | None = None
+    restored: bool = False
+    integration: str | None = None
+    raw_value: float | None = None
+    raw_age_s: float | None = None
+    raw_time_basis: str | None = None
+    raw_source: str | None = None
+    raw_retained: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -757,9 +765,20 @@ def capture_soc(
         return None
     max_percent = reader.vehicle_max_percent(vehicle_id)
     reading = reader.read(vehicle_id)
+    raw_reading = getattr(reader, "last_reported_reading", None)
+    if raw_reading is None:
+        raw_reading = getattr(reader, "last_raw_reading", None)
+    if raw_reading is None and reading is not None and not reading.estimated:
+        raw_reading = reading
+    integration = None
+    if raw_reading is not None and raw_reading.entity_id:
+        entity = er.async_get(hass).async_get(raw_reading.entity_id)
+        integration = None if entity is None else _text(entity.platform)
     capacity = reader.capacity_kwh(vehicle_id)
     target = settings.target.target_percent
-    value = None if reading is None else reading.soc_percent
+    value = None if reading is None else finite_number(reading.soc_percent)
+    if value is not None and not 0 <= value <= 100:
+        value = None
     # The planner's own learned figure for this car (`learned_energy.target_need`): the need here is the plan's.
     preview = preview_for(hass, entry_id)
     learned = NOTHING_LEARNED if preview is None else preview.learned_energy(vehicle_id, capacity)
@@ -786,6 +805,14 @@ def capture_soc(
         vehicle_max_percent=max_percent,
         room_kwh=battery_room_kwh(soc_percent=value, capacity_kwh=capacity, vehicle_max_percent=max_percent),
         efficiency=efficiency_for(learned, capacity),
+        time_basis=None if reading is None else reading.time_basis,
+        restored=bool(reading is not None and reading.restored),
+        integration=integration,
+        raw_value=None if raw_reading is None else raw_reading.soc_percent,
+        raw_age_s=None if raw_reading is None else raw_reading.age_s,
+        raw_time_basis=None if raw_reading is None else raw_reading.time_basis,
+        raw_source=None if raw_reading is None else raw_reading.source,
+        raw_retained=bool(raw_reading is not None and raw_reading.restored),
     )
 
 
@@ -2112,6 +2139,7 @@ def serialize_dashboard(
         ),
         "current_range": dict(capture.current_range),
         "soc": serialize_soc(capture.soc),
+        "soc_observation": serialize_soc_observation(capture.soc),
         "vehicles": [serialize_vehicle(vehicle) for vehicle in capture.vehicles],
         "target_vehicle_id": _text(capture.target_vehicle_id),
         "charging_phases": serialize_charging_phases(capture.charging_phases),
@@ -2416,6 +2444,24 @@ def serialize_site(
     }
 
 
+def serialize_soc_observation(soc: CapturedSoc | None) -> dict[str, Any] | None:
+    """Display provenance, separate from the stable planner-oriented SOC contract."""
+    if soc is None:
+        return None
+    value = finite_number(soc.raw_value)
+    age = finite_number(soc.raw_age_s)
+    return {
+        "time_basis": soc.time_basis,
+        "restored": soc.restored,
+        "integration": _text(soc.integration),
+        "raw_value": value if value is not None and 0 <= value <= 100 else None,
+        "raw_age_s": age if age is not None and age >= 0 else None,
+        "raw_time_basis": soc.raw_time_basis,
+        "raw_source": soc.raw_source,
+        "raw_retained": soc.raw_retained,
+    }
+
+
 def serialize_soc(soc: CapturedSoc | None) -> dict[str, Any] | None:
     """The `soc` block: the state of charge a target is planned against, and how sure it is.
 
@@ -2438,9 +2484,11 @@ def serialize_soc(soc: CapturedSoc | None) -> dict[str, Any] | None:
         return None
     value = finite_number(soc.value)
     age = finite_number(soc.age_s)
+    if value is not None and not 0 <= value <= 100:
+        value = None
     return {
         "value": None if value is None else round(value, 1),
-        "age_s": None if age is None else int(age),
+        "age_s": None if age is None or age < 0 else int(age),
         "source": soc.source,
         "estimated": soc.estimated,
         "target_percent": finite_number(soc.target_percent),

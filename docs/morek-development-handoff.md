@@ -355,6 +355,29 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-12 — Stage 12.6 SOC provenance (2.5.71; review pending)
+
+- The existing selected-vehicle reader prefers a live charger SOC when available,
+  otherwise the selected vehicle. It already uses an unambiguous vehicle report-time
+  sensor where available; otherwise HA `last_updated` is a state-write time, not
+  proof the vehicle reported. The dashboard now exposes a separate optional SOC
+  observation: timestamp basis, integration, raw/retained reading and restored
+  state, alongside the existing effective reading and energy-derived estimate.
+  A retained anchor is shown only for the same selected vehicle. Neither an HA
+  rewrite nor a dashboard refresh is described as a new vehicle report.
+- The shared sidebar keeps valid old SOC visible with its source and advancing age
+  when known, labels unknown report time and estimates, and shows available battery
+  capacity/efficiency. Stale, estimated or unknown-time SOC is not promoted into
+  fresh sidebar projections. The existing planner/execution freshness and safety
+  thresholds, selection and vehicle refresh behavior are unchanged. Other SOC
+  consumers of the existing contract have not been redesigned.
+- Focused mocked checks: sidebar tests 51 passed; isolated actual-module SOC and
+  dashboard provenance tests 4 passed; shared-plan tests 3 passed; Ruff, frontend
+  type-check, build and check-dist passed. Python's isolated harness reports existing
+  pytest configuration and dependency warnings. Browser, full HA-plugin suite,
+  actual HA/BavarianData timestamp availability and physical behavior were not
+  validated. No vehicle refresh, live HA access, deployment or charger action.
+
 ### 2026-11-12 — merge dashboard work into main (2.5.70)
 
 - Combined the 2.5.68 Web Awesome registration/refresh work from main with the

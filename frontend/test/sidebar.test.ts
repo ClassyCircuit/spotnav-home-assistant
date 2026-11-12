@@ -167,10 +167,37 @@ describe('actual sidebar read-only host', () => {
     expect(current().windows).toHaveLength(1);
     const failed=dashboardAdapter(raw,status,now,now,false,true).model;
     expect(failed.vehicle.status).toMatch(/unavailable.*stale/i);
-    expect(failed.vehicle.soc).toBeNull();
+    expect(failed.vehicle.soc).toBe(raw.soc.value);
+    expect(failed.vehicle.stale).toBe(true);
     expect(failed.windows).toBeNull();
     expect(failed.totals).toBeNull();
     expect(current().windows).toHaveLength(1);
+  });
+  it('keeps last vehicle SOC visible while tracking report age, source and estimates separately', () => {
+    const now=Date.now(), raw=fixture();raw.generated_at=new Date(now).toISOString();
+    raw.soc={...raw.soc,value:62,age_s:30,source:'vehicle',estimated:false,capacity_kwh:70,efficiency:0.9};
+    raw.soc_observation={time_basis:'vehicle_timestamp',restored:false,integration:'bavariandata',raw_value:62,raw_age_s:30,raw_time_basis:'vehicle_timestamp',raw_source:'vehicle'};
+    let m=dashboardAdapter(raw,status,now,now).model;
+    expect(m.vehicle.soc).toBe(62);expect(m.vehicle.stale).toBe(false);expect(m.vehicle.socDetail).toMatch(/bavariandata.*Vehicle report 30 s ago/);expect(m.assumptions.capacityKwh).toBe(70);
+    m=dashboardAdapter(raw,status,now,now+300000).model;expect(m.vehicle.soc).toBe(62);expect(m.vehicle.stale).toBe(true);expect(m.vehicle.socDetail).toMatch(/5 min ago/);expect(m.assumptions.startingSoc).toBeNull();
+    expect(renderBattery({soc:62,stale:true,planStale:false,windows:[{start:0,end:3600000}],minutesPerTimeUnit:1/60000})).toContain('60 min');
+    raw.generated_at=new Date(now+300000).toISOString();raw.soc.age_s=330;raw.soc_observation.raw_age_s=330;
+    m=dashboardAdapter(raw,status,now,now+300000).model;expect(m.vehicle.socDetail).toMatch(/5 min ago/);
+    raw.soc={...raw.soc,value:68,estimated:true};m=dashboardAdapter(raw,status,now,now+300000).model;
+    expect(m.vehicle.soc).toBe(62);expect(m.vehicle.socDetail).toMatch(/SpotNav estimate: 68%.*not a vehicle measurement/);expect(m.assumptions.startingSoc).toBeNull();
+    raw.soc_observation={...raw.soc_observation,raw_value:null,integration:null};m=dashboardAdapter(raw,status,now,now+300000).model;
+    expect(m.vehicle.soc).toBe(68);expect(m.vehicle.socEstimated).toBe(true);
+    expect(renderBattery({soc:m.vehicle.soc,stale:m.vehicle.stale,socEstimated:true,socDetail:m.vehicle.socDetail})).toContain('Estimated SOC - not a measurement');
+    raw.soc.estimated=false;raw.soc.value=null;m=dashboardAdapter(raw,status,now,now+300000).model;expect(m.vehicle.soc).toBeNull();expect(m.vehicle.socDetail).toMatch(/no valid reading/);
+  });
+  it('does not present HA state writes or restored readings as vehicle report time', () => {
+    const now=Date.now(), raw=fixture();raw.generated_at=new Date(now).toISOString();raw.soc={...raw.soc,value:44,age_s:10,source:'vehicle',estimated:false};
+    raw.soc_observation={time_basis:'last_updated',restored:false,integration:'other',raw_value:44,raw_age_s:10,raw_time_basis:'last_updated',raw_source:'vehicle'};
+    let m=dashboardAdapter(raw,status,now,now).model;expect(m.vehicle.stale).toBe(true);expect(m.vehicle.socDetail).toMatch(/Vehicle report time unavailable; HA state updated 10 s ago/);
+    raw.soc_observation={...raw.soc_observation,time_basis:'anchor',restored:true};raw.soc.age_s=3600;
+    m=dashboardAdapter(raw,status,now,now).model;expect(m.vehicle.soc).toBe(44);expect(m.vehicle.socDetail).toMatch(/Restored reading; not a new vehicle report/);expect(m.vehicle.socDetail).not.toMatch(/HA state updated/);
+    raw.soc.source='charger';raw.soc_observation={...raw.soc_observation,time_basis:'last_updated',restored:false,integration:'ocpp'};raw.soc.age_s=10;
+    m=dashboardAdapter(raw,status,now,now).model;expect(m.vehicle.socDetail).toMatch(/Charger.*ocpp/);expect(m.vehicle.stale).toBe(false);
   });
   it('mounts shared UI, ignores old responses on switch and never sends writes', async () => {
     const a=fixture(), b=fixture(); a.generated_at=b.generated_at=new Date().toISOString();

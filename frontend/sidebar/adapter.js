@@ -43,9 +43,26 @@ export function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), f
   const d = decoded.value, zone = d.market?.timezone || null;
   const generated = Date.parse(d.generated_at || '');
   const stale = dashboardFailed || !Number.isFinite(generated) || generated > now || now - generated > 90000;
-  const socAge = d.soc?.age_s;
-  // Match the backend's target_stop.SOC_FRESH_MAX_AGE_S, not a warning threshold.
-  const socStale = stale || !Number.isFinite(socAge) || socAge < 0 || socAge + (now-generated)/1000 > 180;
+  const meta=raw?.soc_observation && typeof raw.soc_observation==='object' ? raw.soc_observation : null;
+  const validPercent=v=>Number.isFinite(v) && v>=0 && v<=100;
+  const useRaw=(d.soc?.estimated===true || d.soc?.value==null) && validPercent(meta?.raw_value);
+  const soc=useRaw ? meta.raw_value : d.soc?.value;
+  const basis=useRaw ? meta?.raw_time_basis : meta?.time_basis;
+  const restored=meta?.restored===true || (useRaw && meta?.raw_retained===true);
+  const rawAge=useRaw && !(restored && basis==='last_updated') ? meta?.raw_age_s : d.soc?.age_s;
+  const age=Number.isFinite(rawAge) && rawAge>=0 && Number.isFinite(generated) && generated<=now ? rawAge+(now-generated)/1000 : null;
+  const vehicleSource=useRaw ? meta?.raw_source : d.soc?.source;
+  const knownReport=basis==='vehicle_timestamp' && vehicleSource==='vehicle';
+  // Unknown vehicle report time is not evidence of freshness, even if HA just wrote the state.
+  const knownTime=knownReport || (vehicleSource==='charger' && basis==='last_updated');
+  const socStale=stale || !knownTime || age==null || age>180 || (!useRaw && d.soc?.estimated===true) || restored;
+  const elapsed=age==null ? 'age unknown' : age<60 ? `${Math.floor(age)} s ago` : age<3600 ? `${Math.floor(age/60)} min ago` : `${Math.floor(age/3600)} h ago`;
+  const source=vehicleSource==='vehicle' ? 'Vehicle' : vehicleSource==='charger' ? 'Charger' : 'Source unknown';
+  const integration=typeof meta?.integration==='string' && meta.integration && (useRaw || !d.soc?.estimated) ? ` · ${meta.integration}` : '';
+  const estimateAge=Number.isFinite(d.soc?.age_s) && d.soc.age_s>=0 && Number.isFinite(generated) && generated<=now ? Math.floor((d.soc.age_s+(now-generated)/1000)/60) : null;
+  const estimate=d.soc?.estimated && validPercent(d.soc.value) ? `SpotNav estimate: ${d.soc.value}% (derived, not a vehicle measurement; anchor ${estimateAge==null ? 'age unknown' : `${estimateAge} min old`}).` : '';
+  const report=knownReport ? `Vehicle report ${elapsed}.` : vehicleSource==='vehicle' ? `Vehicle report time unavailable${basis==='last_updated' && !restored ? `; HA state updated ${elapsed}` : ''}.` : `Reading age: ${elapsed}.`;
+  const socDetail=validPercent(soc) ? `${source}${integration} · ${report}${restored ? ' Restored reading; not a new vehicle report.' : ''} ${estimate}` : `SOC unavailable: no valid reading. ${estimate}`;
   const status = decodeMorekState(statusRaw);
   const health = translate('en', healthKey(status, observedAt, failed, false, now));
   const statusFresh = !failed && Number.isFinite(observedAt) && observedAt <= now && now-observedAt <= 90000;
@@ -68,7 +85,8 @@ export function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), f
     format: {currency, minutesPerTimeUnit:1/60000, time: ms=>part(ms,zone,{timeStyle:'short'}), day: ms=>part(ms,zone,{dateStyle:'medium'}), ...published?.format},
     model: {
       windows, nextWindow, chart:published?.chart, totals: !planStale && proposal ? {energy:proposal.planned_kwh,cost:proposal.unpriced ? null : proposal.cost?.value} : null,
-      vehicle: {status: stale ? 'Connection unavailable · stale dashboard' : d.charger.available ? (d.connection?.state || U) : 'Charger unavailable', detail:`Dashboard observed ${date(d.generated_at,zone)}${stale ? ' · stale' : ''}`, power:'Unavailable', soc: socStale ? null : d.soc?.value, stale:socStale, policy: (d.plan.price_policy?.explanations || []).map(code=>{const keys={minimum_exception:'exception',minimum_shortfall:'minimumShortfall',target_shortfall:'targetShortfall',recalculating:'recalculating',unavailable:'unavailable',minimum_covered:'covered',within_cap:'within',target_met:'targetMet',error:'error'};return keys[code] ? translate('en',`daily.policy.${keys[code]}`) : U;}).join(' ') || U},
+      vehicle: {status: stale ? 'Connection unavailable · stale dashboard' : d.charger.available ? (d.connection?.state || U) : 'Charger unavailable', detail:`Dashboard observed ${date(d.generated_at,zone)}${stale ? ' · stale' : ''}`, power:'Unavailable', soc:validPercent(soc) ? soc : null, stale:socStale, planStale, socDetail, socEstimated:!useRaw && d.soc?.estimated===true, policy: (d.plan.price_policy?.explanations || []).map(code=>{const keys={minimum_exception:'exception',minimum_shortfall:'minimumShortfall',target_shortfall:'targetShortfall',recalculating:'recalculating',unavailable:'unavailable',minimum_covered:'covered',within_cap:'within',target_met:'targetMet',error:'error'};return keys[code] ? translate('en',`daily.policy.${keys[code]}`) : U;}).join(' ') || U},
+      assumptions:{startingSoc:!socStale && !d.soc?.estimated ? soc : null,capacityKwh:d.soc?.capacity_kwh,efficiency:d.soc?.efficiency},
       settings: {target:d.soc?.target_percent, minimum:d.settings?.minimum_ready_by_soc, cap:d.settings?.soft_price_cap, readyBy:d.settings?.departure_time},
       canSave:false, untilDeadline:U, targetNote:'',
       warning:warning ? {title:'Morek health requires attention',detail:`${health}${status?.outcomes?.uncertain && (status?.operator?.state === 'mismatch' || status?.verification?.reason === 'limits_or_transitions_differ') ? ' · Effective limits mismatch the sent schedule.' : ''}`} : null,

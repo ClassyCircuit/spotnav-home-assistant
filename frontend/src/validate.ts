@@ -1950,6 +1950,7 @@ const DASHBOARD_KEYS = [
  * is read tolerantly for the settings overview; the card edits it in the entity configuration.
  */
 const OPTIONAL_DASHBOARD_KEYS = [
+  "soc_observation",
   "sessions_summary",
   "connection",
   "starting_up",

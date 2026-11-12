@@ -634,7 +634,7 @@ def resolve_soc(
     if restored:
         assert reading is not None
         # The anchor's own reading, set again by the start: as old as the anchor.
-        reading = replace(reading, age_s=max(0.0, (now - anchor.read_at).total_seconds()), time_basis="anchor")
+        reading = replace(reading, age_s=max(0.0, (now - anchor.read_at).total_seconds()), time_basis="anchor", restored=True)
     estimate = estimate_soc_percent(
         anchor, register_kwh=register_kwh, capacity_kwh=capacity_kwh, ceiling_percent=ceiling_percent
     )
@@ -651,6 +651,7 @@ def resolve_soc(
             vehicle_id=vehicle_id,
             age_s=max(0.0, (now - anchor.read_at).total_seconds()),
             estimated=True,
+            restored=restored,
             time_basis="anchor",
         ),
         anchor,
@@ -914,6 +915,7 @@ class SocReader:
         self._peak_saved_at: datetime | None = None
         # What the last resolution was made of, for the diagnostics.
         self._last_reading: SocReading | None = None
+        self._last_vehicle_id: str | None = None
         self._last_since_restart = False
         self._store: Store[dict[str, Any]] = Store(hass, _STORE_VERSION, f"{_STORE_KEY_PREFIX}.{entry_id}")
         self._anchor: SocAnchor | None = None
@@ -1138,6 +1140,30 @@ class SocReader:
         anchor = self._anchor if self._anchor is not None and self._anchor.vehicle_id == vehicle_id else None
         return self._resolve(vehicle_id, anchor).reading
 
+    @property
+    def last_raw_reading(self) -> SocReading | None:
+        """The raw reading captured by the latest read; no additional vehicle request."""
+        return self._last_reading
+
+    @property
+    def last_reported_reading(self) -> SocReading | None:
+        """Last raw value, or its retained anchor when the live sensor is unavailable."""
+        raw = self._last_reading
+        if raw is not None and raw.soc_percent is not None:
+            return raw
+        anchor = self._anchor
+        if anchor is None or anchor.vehicle_id != self._last_vehicle_id:
+            return raw
+        return SocReading(
+            soc_percent=anchor.soc_percent,
+            source=anchor.source,
+            entity_id=raw.entity_id if raw is not None and raw.source == anchor.source else None,
+            vehicle_id=anchor.vehicle_id,
+            age_s=max(0.0, (self._now() - anchor.read_at).total_seconds()),
+            time_basis=anchor.time_basis,
+            restored=True,
+        )
+
     def _note_report_check(self, previous: SocAnchor | None, anchor: SocAnchor | None) -> None:
         """Remember a car whose report time failed the check on a new reading, until one passes."""
         if anchor is None or not anchor.vehicle_id or anchor.baseline_check not in ("passed", "failed"):
@@ -1158,6 +1184,7 @@ class SocReader:
             _LOGGER.debug("The car's report time agrees with the energy charged again: used for the estimate")
 
     def _resolve(self, vehicle_id: str | None, anchor: SocAnchor | None) -> SocResolution:
+        self._last_vehicle_id = vehicle_id
         register_entity_id = self._register_entity_id()
         self._watch_register(register_entity_id)
         reading, throughout = self._with_comeback(self._raw_reader(vehicle_id))

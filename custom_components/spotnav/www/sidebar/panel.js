@@ -52532,12 +52532,12 @@ function renderPlan(windows, assumptions = {}, stale = false, formatters, totals
 var percent = (n6) => Number.isFinite(n6) && n6 >= 0 && n6 <= 100;
 var positive = (n6) => Number.isFinite(n6) && n6 > 0;
 var showKwh = (n6) => number(n6, 1, " kWh", (x2) => x2 >= 0);
-function batteryEstimates({ soc: soc2, target, capacityKwh, efficiency, stale = false, windows = [], minutesPerTimeUnit = 60 }) {
+function batteryEstimates({ soc: soc2, target, capacityKwh, efficiency, stale = false, planStale = stale, windows = [], minutesPerTimeUnit = 60 }) {
   const validSoc = !stale && percent(soc2), validTarget = percent(target), validCapacity = positive(capacityKwh);
   const battery = validSoc && validCapacity ? soc2 / 100 * capacityKwh : null;
   const needed = validSoc && validTarget && validCapacity ? Math.max(0, target - soc2) / 100 * capacityKwh : null;
   const wall = needed != null && positive(efficiency) && efficiency <= 1 ? needed / efficiency : null;
-  const active = !stale && positive(minutesPerTimeUnit) && windows.length > 0 && windows.every((w2) => Number.isFinite(w2.start) && Number.isFinite(w2.end) && w2.end > w2.start) ? windows.reduce((n6, w2) => n6 + (w2.end - w2.start) * minutesPerTimeUnit, 0) : null;
+  const active = !planStale && positive(minutesPerTimeUnit) && windows.length > 0 && windows.every((w2) => Number.isFinite(w2.start) && Number.isFinite(w2.end) && w2.end > w2.start) ? windows.reduce((n6, w2) => n6 + (w2.end - w2.start) * minutesPerTimeUnit, 0) : null;
   return {
     battery: Number.isFinite(battery) ? battery : null,
     needed: Number.isFinite(needed) ? needed : null,
@@ -52545,13 +52545,14 @@ function batteryEstimates({ soc: soc2, target, capacityKwh, efficiency, stale = 
     active: Number.isFinite(active) ? active : null
   };
 }
-function renderBattery({ soc: soc2, target, capacityKwh, efficiency, stale = false, lowSocWarning, windows, minimum, deadline, sample = false, minutesPerTimeUnit = 60 }) {
+function renderBattery({ soc: soc2, target, capacityKwh, efficiency, stale = false, planStale = stale, lowSocWarning, windows, minimum, deadline, sample = false, minutesPerTimeUnit = 60, socDetail = "", socEstimated = false }) {
   const s4 = percent(soc2) ? soc2 : null, t6 = percent(target) ? target : null;
   const low = percent(lowSocWarning) ? lowSocWarning : null;
-  const values = batteryEstimates({ soc: soc2, target, capacityKwh, efficiency, stale, windows, minutesPerTimeUnit });
+  const values = batteryEstimates({ soc: soc2, target, capacityKwh, efficiency, stale, planStale, windows, minutesPerTimeUnit });
   const socText = s4 == null ? "Unknown" : `${s4}%`;
+  const caption = s4 == null ? "SOC unavailable" : socEstimated ? "Estimated SOC - not a measurement" : stale ? `Last ${sample ? "sample " : ""}SOC - stale or freshness unknown` : `${sample ? "Sample b" : "B"}attery SOC`;
   const activeText = values.active == null ? "Unknown" : `${Math.round(values.active)} min`;
-  return `<div class="battery-card ${stale ? "battery-stale" : ""}"><div class="battery-title"><div><span class="battery-caption">${stale ? `Last ${sample ? "sample " : ""}SOC \xB7 stale` : `${sample ? "Sample b" : "B"}attery SOC`}</span><strong>${socText}</strong></div><div class="battery-target">Target <b>${t6 == null ? "Unknown" : `${t6}%`}</b><small>Minimum ${number(minimum, 0, "%", percent)} \xB7 by ${escapeText(deadline)}</small></div></div><div class="battery-track" role="img" aria-label="${stale ? "Stale " : ""}SOC ${socText}; target ${t6 == null ? "unknown" : `${t6}%`}${low == null ? "" : `; separate low SOC warning ${low}%`}">${s4 == null ? "" : `<span class="battery-fill" style="width:${s4}%"></span>`}${t6 == null ? "" : `<span class="battery-marker target-marker" style="left:${t6}%"></span>`}${low == null ? "" : `<span class="battery-marker low-marker" style="left:${low}%"></span>`}</div><div class="battery-legend"><span>\u25CF ${stale ? "Stale SOC" : "SOC"}</span><span>\u2502 Target${t6 == null ? " unknown" : ` ${t6}%`}</span>${low == null ? "" : `<span class="battery-low">\u250A Low-SOC warning ${low}%${s4 != null && !stale && s4 <= low ? " \xB7 below warning" : ""}</span>`}</div>${low == null ? "" : '<p class="battery-note">Low-SOC warning is a separate illustrative value, not the ready-by minimum or a protection floor.</p>'}<div class="battery-facts"><div><small>In usable battery \xB7 est.</small><b>${showKwh(values.battery)}</b></div><div><small>To target \xB7 battery est.</small><b>${showKwh(values.needed)}</b></div><div><small>To target \xB7 wall est.</small><b>${showKwh(values.wall)}</b></div><div><small>Plan active time \xB7 est.</small><b>${activeText}</b></div></div><p class="battery-note">Assumptions: ${number(capacityKwh, 0, " kWh", positive)} usable; ${number(Number.isFinite(efficiency) ? efficiency * 100 : null, 0, "%", (n6) => n6 > 0 && n6 <= 100)} charging efficiency. Battery energy = wall energy \xD7 efficiency. Estimates, not measurements or a guaranteed finish.${stale ? " Stale SOC is not used in estimates." : ""}</p></div>`;
+  return `<div class="battery-card ${stale ? "battery-stale" : ""}"><div class="battery-title"><div><span class="battery-caption">${escapeText(caption)}</span><strong>${socText}</strong></div><div class="battery-target">Target <b>${t6 == null ? "Unknown" : `${t6}%`}</b><small>Minimum ${number(minimum, 0, "%", percent)} \xB7 by ${escapeText(deadline)}</small></div></div>${socDetail ? `<p class="battery-note">${escapeText(socDetail)}</p>` : ""}<div class="battery-track" role="img" aria-label="${stale ? "Stale " : ""}SOC ${socText}; target ${t6 == null ? "unknown" : `${t6}%`}${low == null ? "" : `; separate low SOC warning ${low}%`}">${s4 == null ? "" : `<span class="battery-fill" style="width:${s4}%"></span>`}${t6 == null ? "" : `<span class="battery-marker target-marker" style="left:${t6}%"></span>`}${low == null ? "" : `<span class="battery-marker low-marker" style="left:${low}%"></span>`}</div><div class="battery-legend"><span>\u25CF ${stale ? "Stale SOC" : "SOC"}</span><span>\u2502 Target${t6 == null ? " unknown" : ` ${t6}%`}</span>${low == null ? "" : `<span class="battery-low">\u250A Low-SOC warning ${low}%${s4 != null && !stale && s4 <= low ? " \xB7 below warning" : ""}</span>`}</div>${low == null ? "" : '<p class="battery-note">Low-SOC warning is a separate illustrative value, not the ready-by minimum or a protection floor.</p>'}<div class="battery-facts"><div><small>In usable battery \xB7 est.</small><b>${showKwh(values.battery)}</b></div><div><small>To target \xB7 battery est.</small><b>${showKwh(values.needed)}</b></div><div><small>To target \xB7 wall est.</small><b>${showKwh(values.wall)}</b></div><div><small>Plan active time \xB7 est.</small><b>${activeText}</b></div></div><p class="battery-note">Assumptions: ${number(capacityKwh, 0, " kWh", positive)} usable; ${number(Number.isFinite(efficiency) ? efficiency * 100 : null, 0, "%", (n6) => n6 > 0 && n6 <= 100)} charging efficiency. Battery energy = wall energy \xD7 efficiency. Estimates, not measurements or a guaranteed finish.${stale ? " Stale or uncertain SOC is not used in estimates." : ""}${!positive(capacityKwh) ? " Configure usable battery capacity in vehicle settings." : ""}${!positive(efficiency) || efficiency > 1 ? " Charging efficiency is unavailable." : ""}</p></div>`;
 }
 
 // shared-dashboard/evidence-view.js
@@ -52669,7 +52670,7 @@ function mountDashboard(root, adapter) {
     const windows = knownPlan ? m4.windows.map((w2) => w2 && typeof w2 === "object" ? w2 : {}) : [];
     const chartWindows = windows.filter((w2) => Number.isFinite(w2.start) && Number.isFinite(w2.end) && w2.end > w2.start);
     const assumptions = m4.assumptions || {};
-    const plan = knownPlan ? renderPlan(windows, assumptions, !!state.stale, f3, m4.totals) : '<p class="projection-note">Proposed plan unavailable.</p>';
+    const plan = knownPlan ? renderPlan(windows, assumptions, !!(state.planStale ?? state.stale), f3, m4.totals) : '<p class="projection-note">Proposed plan unavailable.</p>';
     const summary = m4.totals === void 0 ? total(windows) : m4.totals || {}, next = m4.nextWindow === void 0 ? windows[0] : m4.nextWindow;
     const time = (x2) => Number.isFinite(x2) ? f3.time(x2) : "Unknown";
     const day = (x2) => Number.isFinite(x2) ? f3.day(x2) : "Unknown";
@@ -52702,7 +52703,7 @@ function mountDashboard(root, adapter) {
     const html = `<div class="shell"><header class="masthead"><div><div class="brand">SPOTNAV <span>ENHANCED</span></div><h1>Charging, in focus.</h1><p>A single view of your vehicle, plan and charger.</p></div>${labels.banner ? `<div class="sample-banner">${escapeText(labels.banner)}<br><span>${escapeText(labels.bannerDetail)}</span></div>` : ""}</header>
       ${scenario ? `<div class="scenario-picker"><label for="sample-state">${escapeText(scenario.label)}</label><select id="sample-state">${(scenario.options || []).map(option).join("")}</select><span>${escapeText(scenario.note)}</span></div>` : ""}
       <div id="critical-live" role="status" aria-live="polite">${m4.warning ? `<div class="alert"><div><strong>${escapeText(m4.warning.title)}</strong><p>${escapeText(m4.warning.detail)}</p></div><a href="#details">View details \u2193</a></div>` : ""}</div><div class="dashboard">
-      ${card("Your vehicle", "OVERVIEW", `<div class="status-line"><span class="dot ${!Number.isFinite(state.soc) || state.soc < 0 || state.soc > 100 || state.stale ? "dot-unknown" : ""}"></span> ${escapeText(state.status)}</div>${renderBattery({ soc: state.soc, target: settings.target, minimum: settings.minimum, deadline: settings.readyBy, capacityKwh: assumptions.capacityKwh, efficiency: assumptions.efficiency, stale: !!state.stale, lowSocWarning: state.lowSocWarning, windows, sample, minutesPerTimeUnit: f3.minutesPerTimeUnit })}<p class="waiting">${escapeText(state.detail)}</p><div class="metrics">${metric("Measured now", state.power, labels.powerNote)}<div class="metric next-metric"><div class="muted">${state.stale ? "Next window \xB7 stale proposal" : "Next proposed window"}</div><button type="button" id="open-plan" aria-haspopup="dialog">${next ? `${escapeText(time(next.start))}\u2013${escapeText(time(next.end))}` : "Unknown"} <span aria-hidden="true">\u2197</span></button><div class="muted">${escapeText(next ? day(next.start) : "Unknown")} \xB7 view complete plan</div></div>${metric(state.stale ? "Last plan cost \xB7 stale" : "Estimated charge cost", money(summary.cost, f3.currency), `${number(summary.energy, 2, " kWh", (n6) => n6 >= 0)} wall energy`)}${metric("Until deadline", m4.untilDeadline, labels.deadlineNote)}</div><div class="hint"><b>${escapeText(labels.planLabel)}</b> ${escapeText(state.policy)} ${escapeText(m4.targetNote)}</div>`, "overview", tag)}
+      ${card("Your vehicle", "OVERVIEW", `<div class="status-line"><span class="dot ${!Number.isFinite(state.soc) || state.soc < 0 || state.soc > 100 || state.stale ? "dot-unknown" : ""}"></span> ${escapeText(state.status)}</div>${renderBattery({ soc: state.soc, target: settings.target, minimum: settings.minimum, deadline: settings.readyBy, capacityKwh: assumptions.capacityKwh, efficiency: assumptions.efficiency, stale: !!state.stale, planStale: !!(state.planStale ?? state.stale), lowSocWarning: state.lowSocWarning, windows, sample, minutesPerTimeUnit: f3.minutesPerTimeUnit, socDetail: state.socDetail, socEstimated: state.socEstimated })}<p class="waiting">${escapeText(state.detail)}</p><div class="metrics">${metric("Measured now", state.power, labels.powerNote)}<div class="metric next-metric"><div class="muted">${state.planStale ?? state.stale ? "Next window \xB7 stale proposal" : "Next proposed window"}</div><button type="button" id="open-plan" aria-haspopup="dialog">${next ? `${escapeText(time(next.start))}\u2013${escapeText(time(next.end))}` : "Unknown"} <span aria-hidden="true">\u2197</span></button><div class="muted">${escapeText(next ? day(next.start) : "Unknown")} \xB7 view complete plan</div></div>${metric(state.planStale ?? state.stale ? "Last plan cost \xB7 stale" : "Estimated charge cost", money(summary.cost, f3.currency), `${number(summary.energy, 2, " kWh", (n6) => n6 >= 0)} wall energy`)}${metric("Until deadline", m4.untilDeadline, labels.deadlineNote)}</div><div class="hint"><b>${escapeText(labels.planLabel)}</b> ${escapeText(state.policy)} ${escapeText(m4.targetNote)}</div>`, "overview", tag)}
       ${card("Plan controls", labels.settingsEyebrow || "SETTINGS", `<p class="subtext">${escapeText(labels.settingsNote)}</p><div class="fields">${fields}${policyFields}</div>${policyHelp}<p id="settings-notice" role="status">${escapeText(m4.settingsNotice || "")}</p><wa-button id="save-plan" variant="brand" ${typeof actions2.save !== "function" || m4.canSave !== true ? "disabled" : ""}>${escapeText(labels.saveLabel || "Save plan \xB7 unavailable")}</wa-button>${m4.settingsEditor ? '<button type="button" id="reload-settings">Reload settings</button>' : ""}<div class="controls-plan">${plan}<button type="button" id="open-plan-details" aria-haspopup="dialog">View full window details \u2197</button></div>`, "controls", tag)}
       ${card("Price insights", labels.insightEyebrow || "PRICE DATA", renderInsights(m4.insights), "insights", tag)}
       ${modes.map(priceCard).join("")}
@@ -58860,6 +58861,7 @@ var DASHBOARD_KEYS = [
   "summary"
 ];
 var OPTIONAL_DASHBOARD_KEYS = [
+  "soc_observation",
   "sessions_summary",
   "connection",
   "starting_up",
@@ -59860,8 +59862,25 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
   const d3 = decoded.value, zone = d3.market?.timezone || null;
   const generated = Date.parse(d3.generated_at || "");
   const stale = dashboardFailed || !Number.isFinite(generated) || generated > now || now - generated > 9e4;
-  const socAge = d3.soc?.age_s;
-  const socStale = stale || !Number.isFinite(socAge) || socAge < 0 || socAge + (now - generated) / 1e3 > 180;
+  const meta = raw?.soc_observation && typeof raw.soc_observation === "object" ? raw.soc_observation : null;
+  const validPercent = (v2) => Number.isFinite(v2) && v2 >= 0 && v2 <= 100;
+  const useRaw = (d3.soc?.estimated === true || d3.soc?.value == null) && validPercent(meta?.raw_value);
+  const soc2 = useRaw ? meta.raw_value : d3.soc?.value;
+  const basis = useRaw ? meta?.raw_time_basis : meta?.time_basis;
+  const restored = meta?.restored === true || useRaw && meta?.raw_retained === true;
+  const rawAge = useRaw && !(restored && basis === "last_updated") ? meta?.raw_age_s : d3.soc?.age_s;
+  const age = Number.isFinite(rawAge) && rawAge >= 0 && Number.isFinite(generated) && generated <= now ? rawAge + (now - generated) / 1e3 : null;
+  const vehicleSource = useRaw ? meta?.raw_source : d3.soc?.source;
+  const knownReport = basis === "vehicle_timestamp" && vehicleSource === "vehicle";
+  const knownTime = knownReport || vehicleSource === "charger" && basis === "last_updated";
+  const socStale = stale || !knownTime || age == null || age > 180 || !useRaw && d3.soc?.estimated === true || restored;
+  const elapsed = age == null ? "age unknown" : age < 60 ? `${Math.floor(age)} s ago` : age < 3600 ? `${Math.floor(age / 60)} min ago` : `${Math.floor(age / 3600)} h ago`;
+  const source = vehicleSource === "vehicle" ? "Vehicle" : vehicleSource === "charger" ? "Charger" : "Source unknown";
+  const integration = typeof meta?.integration === "string" && meta.integration && (useRaw || !d3.soc?.estimated) ? ` \xB7 ${meta.integration}` : "";
+  const estimateAge = Number.isFinite(d3.soc?.age_s) && d3.soc.age_s >= 0 && Number.isFinite(generated) && generated <= now ? Math.floor((d3.soc.age_s + (now - generated) / 1e3) / 60) : null;
+  const estimate = d3.soc?.estimated && validPercent(d3.soc.value) ? `SpotNav estimate: ${d3.soc.value}% (derived, not a vehicle measurement; anchor ${estimateAge == null ? "age unknown" : `${estimateAge} min old`}).` : "";
+  const report = knownReport ? `Vehicle report ${elapsed}.` : vehicleSource === "vehicle" ? `Vehicle report time unavailable${basis === "last_updated" && !restored ? `; HA state updated ${elapsed}` : ""}.` : `Reading age: ${elapsed}.`;
+  const socDetail = validPercent(soc2) ? `${source}${integration} \xB7 ${report}${restored ? " Restored reading; not a new vehicle report." : ""} ${estimate}` : `SOC unavailable: no valid reading. ${estimate}`;
   const status = decodeMorekState(statusRaw);
   const health = translate2("en", healthKey(status, observedAt, failed, false, now));
   const statusFresh = !failed && Number.isFinite(observedAt) && observedAt <= now && now - observedAt <= 9e4;
@@ -59887,10 +59906,11 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
       nextWindow,
       chart: published?.chart,
       totals: !planStale && proposal ? { energy: proposal.planned_kwh, cost: proposal.unpriced ? null : proposal.cost?.value } : null,
-      vehicle: { status: stale ? "Connection unavailable \xB7 stale dashboard" : d3.charger.available ? d3.connection?.state || U : "Charger unavailable", detail: `Dashboard observed ${date(d3.generated_at, zone)}${stale ? " \xB7 stale" : ""}`, power: "Unavailable", soc: socStale ? null : d3.soc?.value, stale: socStale, policy: (d3.plan.price_policy?.explanations || []).map((code) => {
+      vehicle: { status: stale ? "Connection unavailable \xB7 stale dashboard" : d3.charger.available ? d3.connection?.state || U : "Charger unavailable", detail: `Dashboard observed ${date(d3.generated_at, zone)}${stale ? " \xB7 stale" : ""}`, power: "Unavailable", soc: validPercent(soc2) ? soc2 : null, stale: socStale, planStale, socDetail, socEstimated: !useRaw && d3.soc?.estimated === true, policy: (d3.plan.price_policy?.explanations || []).map((code) => {
         const keys2 = { minimum_exception: "exception", minimum_shortfall: "minimumShortfall", target_shortfall: "targetShortfall", recalculating: "recalculating", unavailable: "unavailable", minimum_covered: "covered", within_cap: "within", target_met: "targetMet", error: "error" };
         return keys2[code] ? translate2("en", `daily.policy.${keys2[code]}`) : U;
       }).join(" ") || U },
+      assumptions: { startingSoc: !socStale && !d3.soc?.estimated ? soc2 : null, capacityKwh: d3.soc?.capacity_kwh, efficiency: d3.soc?.efficiency },
       settings: { target: d3.soc?.target_percent, minimum: d3.settings?.minimum_ready_by_soc, cap: d3.settings?.soft_price_cap, readyBy: d3.settings?.departure_time },
       canSave: false,
       untilDeadline: U,
@@ -59904,7 +59924,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.70";
+var CARD_VERSION = "2.5.71";
 
 // sidebar/panel.js
 var settingsWritesByConnection = /* @__PURE__ */ new WeakMap();

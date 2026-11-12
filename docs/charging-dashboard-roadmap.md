@@ -1356,7 +1356,13 @@ action, weaken admission/safety checks, or claim physical behavior is verified.
     concurrent saves, unchanged drafts and settings-to-planner flow. Opening or
     editing without saving must not write. Keep existing execution interlocks.
 
-- [ ] **12.6 BavarianData SOC provenance and freshness**
+- [x] **12.6 BavarianData SOC provenance and freshness** (local implementation; review pending)
+  - 2.5.71 retains last-known SOC and exposes the reading's time basis, source
+    integration, retained/restored status and separate energy-derived estimate.
+    The sidebar distinguishes a vehicle report from an HA state write and keeps
+    stale/unknown-age values out of its energy estimates. Planner and execution
+    thresholds are unchanged. Fast mocked checks pass; actual HA/vehicle and
+    browser rendering remain unverified.
   - A read-only HA observation established that the selected vehicle came from the
     loaded `bavariandata` integration and the dashboard API contained an SOC reading
     roughly 23 minutes old; the sidebar hid it under its 180-second freshness rule.
