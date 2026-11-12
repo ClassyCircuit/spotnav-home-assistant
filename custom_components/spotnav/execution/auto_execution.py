@@ -726,6 +726,16 @@ class AutoExecutor:
         allowed = (await self._person_stop_admission() if person_stop and self._person_stop_admission is not None
                    else await self._legacy_allowed())
         if not allowed:
+            if person_stop and self._person_stop_admission is not None:
+                connected = self._controller.adapter.vehicle_connected()
+                if connected is None:
+                    connected = self._controller.known_connected
+                scope = MANUAL_SCOPE_NEXT_PLUG_IN if connected is False else MANUAL_SCOPE_PLUG_IN
+                try:
+                    await self._store_manual_pause(self._manual_intent(MANUAL_STOP, scope))
+                except Exception:  # noqa: BLE001 - intent remains held if storage failed
+                    _LOGGER.warning("Could not persist a blocked person's Stop intent")
+                self._last_error = EXECUTION_PAUSE_STOP_FAILED
             raise AutoControlRefused(EXECUTION_OWNERSHIP_BLOCKED, "Legacy execution is blocked by connector ownership")
 
     @property

@@ -81,6 +81,59 @@ class ExecutionOwnershipStore:
         self._contenders: dict[tuple[str, int], set[str]] = {}
         self._cancelled_write = False
         self._transition_save_uncertain = False
+        self._owner_save_uncertain = False
+
+    async def async_handover_unarmed(
+        self, entry_id: str, identity: Mapping[str, Any], can_commit: Callable[[], bool],
+        stop_requested: Callable[[], bool], identity_valid: Callable[[], bool],
+    ) -> str:
+        """Commit or compensate a drained entry; caller holds connector admission."""
+        async with self._lock:
+            await self._load()
+            physical = (identity.get("resolved_id"), identity.get("connector_id"))
+            record = self._records.get(entry_id)
+            if (self._state != "valid" or self._transition_save_uncertain or self._cancelled_write
+                    or not record or record.get("owner") != "legacy"
+                    or record.get("transition") != {"version": 1, "state": "drained_unarmed"}
+                    or (record["station_id"], record["connector_id"]) != physical
+                    or len(self._contenders.get(physical, set())) > 1
+                    or any(other != entry_id and (item["station_id"], item["connector_id"]) == physical
+                           for other, item in self._records.items())):
+                return "ownership_unavailable"
+            try:
+                state, disk = _decode(await self._hass.async_add_executor_job(_read_envelope, self._store.path))
+                if state != "valid" or disk != self._records or not can_commit():
+                    return "handover_interrupted"
+                owned = {**record, "owner": "morek_schedule"}
+                del owned["transition"]
+                records = {**self._records, entry_id: owned}
+                await self._store.async_save({"schema_version": SCHEMA_VERSION, "records": records})
+                state, disk = _decode(await self._hass.async_add_executor_job(_read_envelope, self._store.path))
+                if state != "valid" or disk != records:
+                    raise OSError("ownership verification failed")
+                self._records = records
+                if stop_requested():
+                    if not identity_valid():
+                        return "identity_changed"
+                    restored = {**record, "transition": {"version": 1, "state": "interrupted"}}
+                    records = {**records, entry_id: restored}
+                    await self._store.async_save({"schema_version": SCHEMA_VERSION, "records": records})
+                    state, disk = _decode(await self._hass.async_add_executor_job(_read_envelope, self._store.path))
+                    if state != "valid" or disk != records:
+                        raise OSError("restoration verification failed")
+                    self._records = records
+                    return "interrupted"
+                if not can_commit():
+                    return "handover_changed"
+                return "handed_over_unarmed"
+            except asyncio.CancelledError:
+                self._state = "save_failed"
+                self._transition_save_uncertain = self._owner_save_uncertain = self._cancelled_write = True
+                raise
+            except Exception:  # noqa: BLE001 - no retry after an uncertain write
+                self._state = "save_failed"
+                self._transition_save_uncertain = self._owner_save_uncertain = True
+                return "save_uncertain"
 
     async def async_set_entry_transition(
         self, entry_id: str, identity: dict[str, Any], resolve_identity: Callable[[], Mapping[str, Any]],
@@ -281,7 +334,8 @@ class ExecutionOwnershipStore:
                       (identity.get("resolved_id"), identity.get("connector_id")) !=
                       (record["station_id"], record["connector_id"])):
                     state = "identity_mismatch"
-            person_stop_safe = self._transition_save_uncertain and state == "valid" and record is not None and record["owner"] == "legacy"
+            person_stop_safe = (self._transition_save_uncertain and not self._owner_save_uncertain
+                                and state == "valid" and record is not None and record["owner"] == "legacy")
             if self._transition_save_uncertain:
                 state = "save_failed"
             return {

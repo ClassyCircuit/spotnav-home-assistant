@@ -613,6 +613,27 @@ async def test_cancelled_reserved_stop_keeps_entry_interrupted_and_ordinary_writ
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("action,args", [
+    ("send", {"preview_id": "preview"}),
+    ("clear", {"confirm_profile_id": 42001}),
+])
+async def test_restarted_morek_owner_refuses_manual_profile_actions(environment, monkeypatch, action, args):
+    hass, _, _, target, _, entry = environment
+    persist(hass, {"a": record("morek_schedule")})
+    await integration._async_setup_ownership_metadata(
+        hass, entry, SimpleNamespace(ocpp_target=target, charge_control="switch.charger"))
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=target))
+    operation = AsyncMock()
+    monkeypatch.setattr(morek_schedule, "_async_schedule_action_locked", operation)
+    with pytest.raises(morek_schedule.ScheduleRefused, match="legacy_not_owner"):
+        await morek_schedule.async_schedule_action(hass, "a", action, **args)
+    operation.assert_not_awaited()
+    hass.station.call.assert_not_awaited()
+    hass.services.async_call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("transition", ["requested", "interrupted", "drained_unarmed"])
 async def test_durable_transition_blocks_startup_and_manual_profile_actions(environment, monkeypatch, transition):
     hass, _, _, target, _, entry = environment
@@ -677,6 +698,82 @@ async def test_completed_unarmed_drain_persists_without_active_owner(environment
     assert not status["armed"] and not status["ready"]
     hass.services.async_call.assert_not_awaited()
     hass.station.call.assert_not_awaited()
+
+
+async def handover_fixture(environment, monkeypatch):
+    from homeassistant.helpers import storage
+    from custom_components.spotnav.execution import morek_outcomes
+
+    hass, store, gate, target, _, entry = environment
+    monkeypatch.setattr(storage, "Store", FakeStore)
+    monkeypatch.setattr(morek_outcomes, "Store", FakeStore)
+    adapter, path, _, _ = adapter_for(hass, target)
+    monkeypatch.setattr(controller_module, "Store", lambda *_args, **_kwargs: MagicMock())
+    monkeypatch.setattr(controller_module, "build_adapter", lambda *_args, **_kwargs: adapter)
+    monkeypatch.setattr(controller_module, "ocpp_target_of", lambda *_: (target, "stored"))
+    monkeypatch.setattr(controller_module, "energy_register_entity_for", lambda *_: None)
+    monkeypatch.setattr(controller_module, "CoreFailureRepairs", MagicMock())
+    charger = ChargingController(hass, "a", {"charge_control": "switch.charger"})
+    settings = await paused_settings_for_recovery(hass, monkeypatch)
+    executor = AutoExecutor(hass, charger, settings,
+                            legacy_admission=lambda: command_admission.async_auto_legacy_allowed(gate, "a", identity),
+                            person_stop_scope=adapter.person_stop_scope,
+                            person_stop_admission=lambda: adapter.async_legacy_permitted(person_stop=True))
+    def identity():
+        return morek_schedule._identity_status(hass, target)
+    await integration._async_setup_ownership_metadata(hass, entry, charger)
+    assert await gate.async_begin_unarmed_entry("a", identity, lambda: False) == "drained_unarmed"
+    return store, gate, identity, executor, adapter, path
+
+
+@pytest.mark.asyncio
+async def test_unarmed_handover_persists_and_excludes_writers(environment, monkeypatch):
+    hass, _, _, _, _, _ = environment
+    store, gate, identity, executor, adapter, path = await handover_fixture(environment, monkeypatch)
+    assert await gate.async_handover_unarmed("a", identity, executor) == "handed_over_unarmed"
+    restarted = execution_ownership.ExecutionOwnershipStore(hass)
+    status = await restarted.async_status("a", identity())
+    assert status["recorded_owner"] == "morek_schedule" and not status["armed"]
+    new_gate = command_admission.CommandAdmission(restarted)
+    operation = AsyncMock()
+    assert not (await new_gate.async_execute("a", "legacy_actuator", identity, operation)).allowed
+    assert not (await new_gate.async_manual_profile("a", identity, operation)).allowed
+    assert (await new_gate.async_execute("a", "owned_profile", identity, operation)).reason == "schedule_mode_unarmed"
+    operation.assert_not_awaited()
+    path.async_start.assert_not_awaited()
+    path.async_stop.assert_not_awaited()
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("phase", ["before_write", "after_write"])
+async def test_stop_during_owner_save_restores_legacy(environment, monkeypatch, phase):
+    hass, _, _, _, _, _ = environment
+    store, gate, identity, executor, adapter, path = await handover_fixture(environment, monkeypatch)
+    entered, release = asyncio.Event(), asyncio.Event()
+    save = store._store.async_save
+    async def save_with_barrier(data):
+        if data["records"]["a"]["owner"] == "morek_schedule":
+            if phase == "after_write":
+                await save(data)
+            entered.set()
+            await release.wait()
+            if phase == "before_write":
+                await save(data)
+        else:
+            await save(data)
+    store._store.async_save = save_with_barrier
+    task = asyncio.create_task(gate.async_handover_unarmed("a", identity, executor))
+    await entered.wait()
+    with adapter.person_stop_scope():
+        release.set()
+        assert await asyncio.wait_for(task, 2) == "interrupted"
+        assert await adapter.async_legacy_permitted(person_stop=True)
+    status = await execution_ownership.ExecutionOwnershipStore(hass).async_status("a", identity())
+    assert status["recorded_owner"] == "legacy" and status["transition_state"] == "interrupted"
+    assert not await adapter.async_start()
+    path.async_start.assert_not_awaited()
+    path.async_stop.assert_not_awaited()
 
 
 @pytest.mark.asyncio

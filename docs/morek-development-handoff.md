@@ -6,6 +6,15 @@ Re-check the live system and Git state before acting; observations below may bec
 
 ## Approved next direction (planning, not implemented)
 
+**2026-11-12 roadmap consistency review:** the next assigned work remains 5.5d,
+not completed. The current uncommitted tree includes the 2.5.44 manual-owner
+admission fix and an additional `async_handover_unarmed` store-method draft;
+the latter is not called by the admission path or covered by handover tests. Preserve
+and evaluate it rather than assuming either safety or completion. The roadmap now
+distinguishes 5.4c's implemented real-data chart from later chart extensions, carries
+the offline HA-plugin suite gap forward, and records the default-branch/update issue.
+No HA access or code change was performed in this documentation review.
+
 **2026-11-12 task sizing:** the user requested explicit, bounded substages instead
 of repeatedly assigning an oversized block. The roadmap now records completed
 5.5a–5.5c groundwork and splits remaining 5.5d–5.5f, 5.6a–5.6c and 5.7a–5.7b.
@@ -263,6 +272,49 @@ requirements, not features claimed implemented in the manual baseline below.
   Do not assume `GetCompositeSchedule` lists stored profiles.
 
 ## Tests, build, and next steps
+
+### 2026-11-12 — 5.5d partial manual admission fix (later store draft noted above)
+
+- Version 2.5.44 makes the existing manual profile admission require a valid,
+  matching, unarmed legacy owner. Actual manual Send and selective Clear entry
+  points are tested against a reloaded Morek-owned record; neither operation is
+  invoked. Existing admin, pause, identity and profile checks remain in place.
+- This is **not** a completed handover: the later store-method draft is unwired
+  and untested, and 5.5d remains open. The user has specified Stop wins;
+  the prior investigation below is historical, not a request for a new policy
+  decision. The post-completion Stop intent path and uncertain save/rollback
+  behavior also need implementation and actual-module race tests.
+- `python tools/run_isolated_lifecycle_tests.py`: 77 passed;
+  `python tools/run_isolated_lifecycle_tests.py tests/test_command_admission.py
+  tests/test_execution_ownership.py tests/test_morek_schedule.py`: 192 passed;
+  `python tools/run_isolated_planning_tests.py`: 492 passed, 1 deselected.
+  Targeted Ruff, `npm run build` and `npm run check-dist` passed. Pytest reports
+  its existing timeout-option and dependency warnings. No live HA or charger was
+  contacted. The 5.4c full HA-plugin suite remains unrun.
+
+### 2026-11-12 — 5.5d investigation, incomplete
+
+- No ownership handover or integration change was implemented. In
+  `execution/command_admission.py`, a person Stop reserves before the Auto lock, but
+  final Stop admission still requires a legacy owner. An asynchronous ownership
+  save can land after a Stop reserves and before that Stop obtains the connector
+  lock; simply committing `morek_schedule` would then refuse the Stop. The existing
+  abort save race returns to legacy and therefore does not establish safety for
+  this opposite transition. A compatible protocol and tests are still needed; this
+  observation does not establish that such a protocol is impossible.
+- At that historical point `async_manual_profile` did not check `recorded_owner`;
+  the 2.5.44 partial fix above supersedes that finding. The entry drain also does not shut down every producer
+  or prove external operations settled. Do not equate the drain with such evidence,
+  require an impossible profile inventory, or interpret an empty unwired start ledger
+  as proof of settled operations. 5.5d remains open and production stays unarmed.
+- Baseline checks: `python tools/run_isolated_lifecycle_tests.py` passed 75;
+  `python tools/run_isolated_planning_tests.py` passed 492 with 1 deselected;
+  `ruff check custom_components/spotnav/execution/command_admission.py
+  custom_components/spotnav/execution/execution_ownership.py
+  tests/test_stage_23_lifecycle.py tests/test_command_admission.py
+  tests/test_execution_ownership.py` passed. Pytest reported its existing unknown
+  timeout-option and dependency-deprecation warnings. These are existing baseline
+  tests, not 5.5d acceptance tests. No live HA or hardware was contacted.
 
 ### 2026-11-12 — unarmed entry abort (coordinator review pending)
 

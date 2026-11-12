@@ -127,7 +127,8 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Keep protection unchanged; expose an activation blocker if live site regulation
     conflicts with schedule-only control. Do not redesign the regulator here.
   - Shared adapter admission covers ordinary dispatch, not regulator protection or
-    external integrations. Durable ownership transitions remain unimplemented.
+    external integrations. Durable unarmed transition evidence was later added;
+    active ownership transitions remain unimplemented.
 - [x] **2.3 Mode lifecycle and end-to-end regression** (unarmed scope; review required)
   - Establish and consult ownership before ordinary startup/restore writes. A process-local
     drain is a future handover seam, not a completed handover or producer shutdown.
@@ -149,7 +150,7 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Planner publications trigger coalesced reconciliation without a browser;
     connector admission serializes and rejects stale work, with process-local
     deduplication and an uncertainty latch. Production owned-profile admission
-    still refuses all sends; no transition or activation is implemented.
+    still refuses all sends; later unarmed transition groundwork is not activation.
 - [x] **3.3 Shared manual actions and persisted outcomes** (unarmed; review required)
   - Manual actions and the worker serialize on the physical connector and share
     persisted intent/attempt/ACK/readback evidence; Refresh sends only a read.
@@ -171,7 +172,8 @@ tests are documented there; full HA collection is still blocked on Windows.
 - [x] **4.3 Operator state and unresolved actions** (unarmed scope; review required)
   - The existing status API and panel report current evidence and waiting, manual-preview
     ready, sending, checking, mismatch, offline and intervention states. Uncertain
-    outcomes remain latched; no general recovery, ownership transition or reset exists.
+    outcomes remain latched; no general recovery or uncertainty reset exists.
+    Later unarmed transition/abort groundwork is not active ownership recovery.
   - Explain activation blockers, person Stop, protection, retained 0 A and supervised
     recovery/downgrade; neither readback nor selective removal resolves an unknown upload.
 
@@ -385,9 +387,9 @@ tests are documented there; full HA collection is still blocked on Windows.
 - [x] **5.1d Daily dashboard polish and visual review** (sample-only; coordinator and user visual review pending)
   - Local daily hierarchy, explicitly simulated scenarios and independent illustrative
     sent-versus-measured history are available; see handoff for checks and limitations.
-    Both chart alternatives remain for user choice; overall 5.1 is not approved.
-  - Refine the full dark dashboard while retaining both chart alternatives until the user
-    selects a direction: strengthen
+    This historical comparison preceded the user's selection of the stepped-area
+    chart; overall 5.1 visual approval remains pending.
+  - Refine the full dark dashboard around the selected stepped-area direction: strengthen
     hierarchy, legibility and card balance; remove duplicated cost/status content;
     keep important warnings visible and technical evidence accessible. Distinguish a
     schedule mismatch from measured charging state in clear, actionable wording. Use
@@ -434,7 +436,7 @@ tests are documented there; full HA collection is still blocked on Windows.
     handoff for freshness, source and testing limitations. Planning remains backend-owned.
   - Focused lifecycle/race and action-safety tests and local desktop/mobile browser checks
     use mocked HA/OCPP boundaries. No live HA or physical charging was checked. Overall
-    overall 5.1 visual approval remains pending; the user selected the stepped-area chart.
+    5.1 visual approval remains pending; the user selected the stepped-area chart.
 - [x] **5.3 Plan controls and actions** (implemented locally; coordinator review pending)
   - The user chose English-only card presentation regardless of HA language; do not
     translate the 5.3 strings. The 2.5.33 work implements this and improves open-modal
@@ -482,6 +484,9 @@ tests are documented there; full HA collection is still blocked on Windows.
   - One maintained dashboard UI, hosted by an HA custom sidebar panel and by the local
     sample preview. The stepped-area chart is selected; no second daily dashboard is
     required. Preserve existing 5.2/5.3 backend contracts, interlocks and compatibility.
+  - 5.4a–5.4c are locally implemented; this umbrella stays open for coordinator
+    review and the documented 5.4c full backend-suite gap. That offline suite may
+    be deferred to 5.7b and does not block 5.5–5.7 implementation.
 - [x] **5.4a Extract the tested UI into shared components** (local visual foundation; coordinator review pending)
   - The preview mounts `frontend/shared-dashboard/dashboard.js` through an explicit
     sample adapter; shared styles, dialog, stepped chart and views have lifecycle
@@ -608,6 +613,20 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Explicit, evidence-checked abort returns to the prior legacy binding only with
     a disk-verified until-resumed Auto pause. No profile, charger or resume action.
 - [ ] **5.5d Persisted ownership handover foundation** (next; unarmed)
+  - **Partial 2.5.44:** legacy manual Send/Clear admission now requires a valid
+    unarmed legacy owner, including after reload. The handover and Stop-wins
+    protocol remain unimplemented; this substage is not complete.
+  - **Handover incomplete:** a Stop reservation can arrive while an
+    ownership save is in flight. If the Morek owner lands first, current person-Stop
+    admission refuses it as non-legacy. The existing entry drain and abort tests do
+    not prove a safe owner-changing save across that boundary. A handover must resolve
+    and test this race without treating an in-flight command as recalled. The 2.5.44
+    manual-owner admission fix above supersedes the earlier admission gap.
+  - The current uncommitted working tree also contains an `async_handover_unarmed`
+    ownership-store draft. It is not wired into connector admission or covered by
+    handover tests; preserve and evaluate it, but do not treat it as completed work.
+    Inspect Git status and current code before continuing; this note is not a claim
+    that the draft has been reviewed or is safe to use as-is.
   - Wire and test a durable, connector-bound handover from the existing entry/drain
     evidence to a Morek-owned **unarmed** record. Prove conflicting legacy and manual
     profile writers remain excluded through persistence and restart; keep production
@@ -716,6 +735,10 @@ tests are documented there; full HA collection is still blocked on Windows.
   - After user approval, support the preferred install/update and any separately
     approved restart; verify loaded version, dashboard and available data read-only.
     Report unresolved test/environment limitations without exposing private data.
+  - Confirm the repository/branch selected by the installed updater and publish only
+    a reviewed release with separate approval: the default `main` and development
+    branch may differ. Do not assume a feature-branch push reaches an install tracking
+    `main`, change the default branch, push, merge or deploy without authorization.
 - [ ] **5.8b Approved activation and observed operation**
   - Only after specific approval and blocker review, enable the reviewed path and
     distinguish proposal, sent ACK, effective limits and measured physical flow.
@@ -737,13 +760,14 @@ tests are documented there; full HA collection is still blocked on Windows.
 
 - [ ] **7.1 Price chart**
   - Extend the real-data chart already delivered in 5.4c; do not rebuild or rebind it.
-    Add remaining advanced display features and test negative/missing prices and DST.
+    Add only remaining advanced display features and regression coverage for
+    negative/missing prices and DST; 5.4c already supplies local mocked groundwork.
 - [ ] **7.2 Interaction**
-  - Reuse prototype interactions; add Yesterday/Today/available future/All,
-    touch/mouse zoom, overview/reset and exact tooltips for real data.
-  - Preserve zoom on updates; snap navigation to real source interval boundaries without
-    rounding underlying data or plan times. Test resize and keyboard/touch behavior in
-    a browser, including timezone/DST and source-resolution changes.
+  - Extend the existing real-data wheel/tooltip/zoom/reset and zoom-preserving update
+    groundwork; do not reimplement it. Add any missing Yesterday/Today/available
+    future/All navigation only where source coverage supports it. Retain snapping
+    to source boundaries without rounding data or plan times. Test remaining resize,
+    keyboard and physical-touch behavior, timezone/DST and resolution changes.
 - [ ] **7.3 Aligned tracks**
   - Distinguish proposal/sent/effective/measured tracks and minimum-SOC exceptions.
   - Show mismatches and missing observations honestly; reuse Stage 6 provenance.
@@ -775,8 +799,12 @@ tests are documented there; full HA collection is still blocked on Windows.
 - [ ] **9.2 Responsive integration:** browser-test the whole dashboard, empty/error
   states and repeated updates; remove duplicate daily controls within the new UI.
 - [ ] **9.3 Installation and documentation polish:** improve the initial 5.4–5.8
-  dashboard template, migration and diagnostics guidance; never overwrite user views
+  sidebar installation, migration and diagnostics guidance; never overwrite user views
   or claim unperformed hardware tests.
+- [ ] **9.4 Additional execution-health notifications:** consider bounded Morek
+  mismatch/uncertainty phone events beyond the existing 5.3a plug-in and plan notices.
+  Reuse the existing notifier, opt-in and deduplication; never equate ACK/readback
+  with measured charging. This is later polish, not a prerequisite for 5.8.
 
 ### Stage 10 — Optional Charge Now (after initial installation)
 
@@ -890,9 +918,9 @@ evcc or another controller alongside SpotNav.
 
 ## 2. Historical manual baseline, not the finished product
 
-The baseline below describes **2.5.7**, not the current implementation. Source manifest
-is **2.5.30** at this update; see the checklist and recent development handoff for later
-unarmed groundwork. Source, installed HA version and charger state are separate facts.
+The baseline below describes **2.5.7**, not the current implementation. The local
+manifest was 2.5.44 during this roadmap review; check Git and the handoff for ongoing
+uncommitted work. Source, installed HA version and charger state are separate facts.
 
 - The manual Morek API can preview, send, fetch and selectively clear profile
   `42001`, station `3020002509120029`, connector `1`, through HA OCPP.

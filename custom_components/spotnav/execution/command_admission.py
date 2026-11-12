@@ -86,6 +86,7 @@ class CommandAdmission:
         self._quiescing: set[PhysicalConnector] = set()
         self._entry_draining: dict[PhysicalConnector, str] = {}
         self._person_stops: dict[PhysicalConnector, int] = {}
+        self._uncertain_operations: set[PhysicalConnector] = set()
 
     @contextmanager
     def person_stop_reservation(self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]]):
@@ -294,6 +295,93 @@ class CommandAdmission:
                 if self._entry_draining.get(connector) == "recovering":
                     del self._entry_draining[connector]
 
+    async def async_handover_unarmed(
+        self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]], executor: Any,
+    ) -> str:
+        """Complete an in-process drain without arming or invoking a charger.
+
+        Producer locks precede connector admission. The synchronous return from
+        the verified save and removal of the entry latch is the completion boundary.
+        """
+        from .auto_execution import AutoExecutor
+        from .controller import ChargingController
+        from .morek_outcomes import outcomes_for
+        from .execution_ownership import _MISSING, _read_envelope
+        from homeassistant.helpers.storage import Store
+
+        try:
+            identity = dict(resolve_identity())
+            connector = physical_connector(identity)
+            if classify_morek_identity(identity) != "supported_morek" or connector is None:
+                return "identity_unresolved"
+            if not isinstance(executor, AutoExecutor) or not isinstance(executor.controller, ChargingController):
+                return "producer_unavailable"
+            controller = executor.controller
+            if controller.entry_id != entry_id:
+                return "producer_unavailable"
+        except Exception:  # noqa: BLE001
+            return "producer_unavailable"
+
+        def identity_valid() -> bool:
+            current = dict(resolve_identity())
+            return classify_morek_identity(current) == "supported_morek" and physical_connector(current) == connector
+
+        def stop_requested() -> bool:
+            return bool(self._person_stops.get(connector)) or self._entry_draining.get(connector) == "interrupted"
+
+        def can_commit() -> bool:
+            return (self._entry_draining.get(connector) == "drained_unarmed" and not stop_requested()
+                    and identity_valid())
+
+        async with executor._lock, controller._lock, controller._assign_lock, self._lock_for(connector):
+            try:
+                if not can_commit():
+                    return "handover_interrupted"
+                if executor._shutdown or controller._shut_down:
+                    return "producer_unavailable"
+                if connector in self._uncertain_operations:
+                    return "legacy_operation_uncertain"
+                if (not executor._store.loaded or executor._store.unsaved
+                        or (executor._store.settings(entry_id).pause.manual
+                            and executor._store.settings(entry_id).pause.action == "stop")):
+                    return "person_stop_or_settings_unavailable"
+                attempt = controller._last_start_attempt
+                if (executor._start_pending or controller._start_in_flight
+                        or (attempt is not None and attempt.start_dispatch == "unknown")):
+                    return "legacy_operation_uncertain"
+                outcome = await outcomes_for(self._store._hass).read()
+                if outcome is not None and (outcome.get("entry_id") != entry_id or outcome.get("uncertain") is not False
+                        or (outcome.get("attempt") is not None and outcome["attempt"].get("state") not in
+                            ("accepted", "rejected", "aborted_before_dispatch"))
+                        or (outcome.get("removal") is not None and outcome["removal"].get("state") not in
+                            ("accepted", "rejected", "notsupported"))):
+                    return "profile_outcome_uncertain"
+                old = Store(self._store._hass, 1, f"spotnav.morek_schedule.{entry_id}")
+                raw = await self._store._hass.async_add_executor_job(_read_envelope, old.path)
+                if raw is not _MISSING:
+                    if (not isinstance(raw, dict) or raw.get("version") != 1 or raw.get("minor_version", 1) != 1
+                            or not isinstance(raw.get("data"), dict)):
+                        return "legacy_profile_history_invalid"
+                    data = raw["data"]
+                    cleanup, profile = data.get("cleanup"), data.get("profile")
+                    if ((cleanup is not None and not isinstance(cleanup, dict))
+                            or (profile is not None and not isinstance(profile, dict))):
+                        return "legacy_profile_history_invalid"
+                    if ((profile and str(data.get("ack", "unknown")).lower() not in ("accepted", "rejected", "notsupported"))
+                            or (cleanup and str(cleanup.get("status", "unknown")).lower() not in
+                                ("accepted", "rejected", "notsupported"))):
+                        return "profile_outcome_uncertain"
+                if not can_commit():
+                    return "handover_interrupted"
+                result = await self._store.async_handover_unarmed(
+                    entry_id, identity, can_commit, stop_requested, identity_valid)
+                if result == "handed_over_unarmed":
+                    # No await between the last Stop check and this boundary.
+                    del self._entry_draining[connector]
+                return result
+            except Exception:  # noqa: BLE001 - unavailable evidence cannot authorize handover
+                return "handover_evidence_unavailable"
+
     def _lock_for(self, connector: PhysicalConnector) -> asyncio.Lock:
         # Do not discard idle locks: a waiting task may still hold a reference.
         return self._locks.setdefault(connector, asyncio.Lock())
@@ -438,7 +526,12 @@ class CommandAdmission:
             # Quiescing may have begun while the store read was in progress.
             if connector in self._quiescing or (connector in self._entry_draining and not person):
                 return AdmissionResult(False, "connector_quiescing")
-            return AdmissionResult(True, "allowed_legacy", await operation())
+            try:
+                return AdmissionResult(True, "allowed_legacy", await operation())
+            except BaseException:
+                if not person:
+                    self._uncertain_operations.add(connector)
+                raise
 
     async def async_manual_profile(
         self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]], operation: Callable[[], Awaitable[T]]
@@ -474,6 +567,8 @@ class CommandAdmission:
                     return AdmissionResult(False, "identity_changed")
                 if status.get("record_state") != "valid" or status.get("transition_state") is not None:
                     return AdmissionResult(False, "ownership_unavailable")
+                if status.get("recorded_owner") != "legacy" or status.get("armed") is not False:
+                    return AdmissionResult(False, "legacy_not_owner")
                 if (status.get("station_id"), status.get("connector_id")) != (connector.station_id, connector.connector_id):
                     return AdmissionResult(False, "ownership_identity_mismatch")
                 if connector in self._quiescing or connector in self._entry_draining:
