@@ -1,8 +1,8 @@
-"""Unarmed, event-driven Morek intent reconciliation.
+"""Event-driven Morek intent reconciliation.
 
 Admission is the final physical-connector lock. No controller or assignment
 lock is taken inside it. The shared outcome ledger is not an ownership
-transition; production owned-profile admission always refuses.
+transition; production admission requires completed ownership and a current ticket.
 """
 
 from __future__ import annotations
@@ -138,6 +138,8 @@ class MorekScheduleWorker:
                     raise morek_schedule.ScheduleRefused("stale_work")
                 if generation != admission.generation(connector) or admission._person_stops.get(connector):
                     raise morek_schedule.ScheduleRefused("stale_generation")
+                if not admission.owned_ticket_current(self._entry_id, connector):
+                    raise morek_schedule.ScheduleRefused("migration_confirmation_required")
                 if self._suspended or not self._available():
                     raise morek_schedule.ScheduleRefused("charger_unavailable")
                 identity_now = self._identity()
@@ -159,7 +161,8 @@ class MorekScheduleWorker:
                 _, fingerprint = self._intent(pause)
                 outcome = await morek_schedule._send_profile_shared(
                     self._hass, self._entry_id, data, store, fingerprint, validate, automatic=True,
-                    pause_id=None if pause is None else pause["id"])
+                    pause_id=None if pause is None else pause["id"],
+                    validate_durable=lambda: admission.async_owned_boundary_current(self._entry_id, connector))
                 return outcome, data.get("sent_at"), data.get("attempt_id")
 
         result = await admission.async_execute(

@@ -647,6 +647,8 @@ async def async_record_owned_pause(hass: HomeAssistant, entry_id: str, *, resume
                 await outcomes_for(hass).write(record)
             if resume and (generation != admission.generation(connector) or admission._person_stops.get(connector)):
                 raise ScheduleRefused("resume_interrupted")
+            if not resume and physical_connector(identity()) == connector:
+                admission.renew_ticket_for_durable_pause(entry_id, connector, generation)
     worker = getattr(getattr(entry, "runtime_data", None), "morek_worker", None)
     if worker is not None:
         if resume:
@@ -745,7 +747,8 @@ def _verification_current(hass: HomeAssistant, entry_id: str, entry: Any, data: 
 
 
 async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[str, Any], store: Any,
-                               fingerprint: str, validate: Any, *, automatic: bool, pause_id: str | None = None) -> str:
+                               fingerprint: str, validate: Any, *, automatic: bool, pause_id: str | None = None,
+                               validate_durable: Any = None) -> str:
     """Connector lock held. Record first, revalidate after every pre-dispatch await."""
     ledger = outcomes_for(hass)
     record = await _outcome_record(hass, entry_id, data)
@@ -788,8 +791,20 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
                  "verification": {"pending": False, "reason": "upload_unconfirmed",
                                   "next_check_at": None, "attempts": 0}})
     await store.async_save(data)
+    durable_ok = True
+    if validate_durable is not None:
+        # Do not repair or overwrite changed/unknown evidence. The already
+        # persisted uncertain attempt blocks retries if the last check fails.
+        try:
+            durable_ok = await validate_durable()
+            if await ledger.read() != record:
+                return "upload_uncertain"
+        except Exception:  # noqa: BLE001 - leave the attempted outcome uncertain
+            return "upload_uncertain"
     try:
         profile, point, target = validate()
+        if not durable_ok:
+            return "upload_uncertain"
     except Exception:
         record["attempt"]["state"] = "aborted_before_dispatch"
         record["uncertain"] = False
@@ -1158,7 +1173,7 @@ async def _async_schedule_action_locked(hass: HomeAssistant, entry_id: str, acti
 
 
 @websocket_api.websocket_command({vol.Required("type"): "spotnav/morek_schedule", vol.Required("api_version"): int,
-                                   vol.Required("charger_id"): str, vol.Required("action"): vol.In(("status", "send", "fetch", "clear", "request_enable", "disable_uploads")),
+                                   vol.Required("charger_id"): str, vol.Required("action"): vol.In(("status", "send", "fetch", "clear", "request_enable", "disable_uploads", "reconfirm_migration")),
                                    vol.Optional("preview_id"): str, vol.Optional("confirm_profile_id"): int})
 @websocket_api.async_response
 async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
@@ -1184,6 +1199,17 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
             identity = _identity_status(hass, target)
             ownership = await ownership_store(hass).async_status(entry.entry_id, identity)
             admission = command_admission(hass)
+            from ..execution.command_admission import physical_connector
+            connector = physical_connector(identity)
+            current_ticket = (connector is not None and ownership.get("record_state") == "valid"
+                              and admission.owned_ticket_current(entry.entry_id, connector))
+            ownership["completion_authorized"] = bool(current_ticket)
+            ownership["reconfirmation_required"] = (ownership.get("handover_evidence") == "completed" and not current_ticket)
+            ownership["limitations"] = ["external_writers_not_inventoried", "native_protection_not_verified",
+                                        "historical_mismatch_current_state_unknown", "physical_charging_unknown"]
+            ownership["local_regulator"] = ("linked_may_write" if callable(getattr(controller, "_start_cap", None))
+                                              else "not_observed")
+            ownership["blockers"] = [] if current_ticket else ["migration_or_reconfirmation_required"]
             previous_recovery = admission._recovery_status.get(entry.entry_id, {})
             ownership["recovery"] = await admission.async_recovery_status(
                 entry.entry_id, lambda: _identity_status(hass, getattr(controller_for(hass, entry.entry_id), "ocpp_target", None))
@@ -1198,6 +1224,18 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
                 outcomes = await _outcome_record(hass, entry.entry_id, data)
             except (OutcomeUnavailable, ScheduleRefused):
                 outcomes = {"state": "storage_unavailable", "uncertain": True}
+            attempt = outcomes.get("attempt")
+            removal = outcomes.get("removal")
+            settled = (outcomes.get("uncertain") is False and isinstance(attempt, dict)
+                       and attempt.get("state") in ("accepted", "rejected", "aborted_before_dispatch")
+                       and (removal is None or (isinstance(removal, dict) and removal.get("state") in
+                                                ("accepted", "rejected", "notsupported"))))
+            if not settled:
+                # Reconfirmation cannot repair an uncertain profile outcome.
+                current_ticket = False
+                ownership["completion_authorized"] = False
+                ownership["reconfirmation_required"] = False
+                ownership["blockers"] = ["profile_outcome_uncertain"]
             verified_evidence = outcomes.get("verified") or {}
             worker = getattr(getattr(entry, "runtime_data", None), "morek_worker", None)
             verified = bool(data.get("verified") and verified_evidence.get("attempt_id") == data.get("attempt_id")
@@ -1224,14 +1262,17 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
                 online = False
             operator = _operator_state(identity, online, outcomes, verification, verified, preview,
                                        hass.data.get("spotnav_morek_sending", {}).get(entry.entry_id))
-            from ..execution.command_admission import physical_connector
             connector = physical_connector(identity)
             stop_pending = connector is not None and bool(admission._person_stops.get(connector))
             aborted_attempt = outcomes.get("attempt") or {}
             aborted_display = (aborted_attempt.get("state") == "aborted_before_dispatch"
                                and aborted_attempt.get("id") == data.get("attempt_id"))
+            readiness = _session_readiness(hass, controller, identity, online, datetime.now(timezone.utc))
+            readiness["activation_blockers"] = [] if current_ticket else ["migration_or_reconfirmation_required"]
+            if not settled:
+                readiness["activation_blockers"].append("profile_outcome_uncertain")
             result = {**identity,
-                      "readiness": _session_readiness(hass, controller, identity, online, datetime.now(timezone.utc)),
+                      "readiness": readiness,
                       "schedule_pause": _owned_pause_status(outcomes, verification, verified, worker, stop_pending=stop_pending),
                       "reconciliation": {"reason": worker.reason if worker is not None and
                                          getattr(worker, "reason_serial", -1) == worker._serial else "pending"},
@@ -1244,6 +1285,18 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
                       "preview": preview,
                       "cleanup": data.get("cleanup"), "cleanup_supported": True,
                       "verification": verification}
+        elif msg["action"] == "reconfirm_migration":
+            entry, failure = lookup_charger(hass, msg["charger_id"])
+            if failure or entry is None:
+                raise ScheduleRefused(failure or "unknown_charger")
+            admission = command_admission(hass)
+            code = await admission.async_reconfirm_completed(
+                entry.entry_id,
+                lambda: _identity_status(hass, getattr(controller_for(hass, entry.entry_id), "ocpp_target", None)),
+            )
+            if code != "reconfirmed":
+                raise ScheduleRefused(code)
+            result = {"reconfirmation": code, "physical_state": "unknown"}
         elif msg["action"] in ("request_enable", "disable_uploads"):
             entry, failure = lookup_charger(hass, msg["charger_id"])
             if failure or entry is None:

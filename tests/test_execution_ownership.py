@@ -145,9 +145,26 @@ def test_future_mode_in_stored_metadata_is_never_armed(setup_store):
                     encoding="utf-8")
     status = run(ownership.ExecutionOwnershipStore(setup_store).async_status("c", IDENTITY))
     assert status["recorded_owner"] == "morek_schedule"
+    assert status["handover_evidence"] == "unverified"
     assert not status["armed"] and not status["ready"] and not status["schedule_mode_available"]
     assert set(status["blockers"]) == {"command_isolation_not_implemented", "safety_unverified", "site_regulation_conflict_unresolved",
                                        "transaction_authorization_unverified"}
+
+
+@pytest.mark.parametrize("evidence", [
+    {"version": 1, "state": "unknown", "id": "a" * 32},
+    {"version": 1, "state": "owner_written_unconfirmed", "id": "bad"},
+    {"version": 2, "state": "owner_written_unconfirmed", "id": "a" * 32},
+])
+def test_unsupported_handover_evidence_is_not_interpreted_as_authority(setup_store, evidence):
+    record = {"station_id": MOREK_STATION_ID, "connector_id": 1, "owner": "morek_schedule", "handover": evidence}
+    path = setup_store.root / ownership.STORAGE_KEY
+    path.write_text(json.dumps({"version": 1, "data": {"schema_version": 1, "records": {"c": record}}}), encoding="utf-8")
+    store = ownership.ExecutionOwnershipStore(setup_store)
+    assert run(store.async_status("c", IDENTITY))["record_state"] == "malformed"
+    write = AsyncMock()
+    assert not run(CommandAdmission(store).async_execute("c", "owned_profile", lambda: IDENTITY, write)).allowed
+    write.assert_not_awaited()
 
 
 def test_failed_save_and_concurrent_first_use(setup_store):

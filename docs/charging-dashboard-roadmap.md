@@ -809,6 +809,36 @@ tests are documented there; full HA collection is still blocked on Windows.
     and evidence to the user before installation; do not claim it passed or halt
     unrelated implementation just to provision the test environment.
 - [ ] **5.7a Replace Morek execution with the schedule owner**
+  - **2.5.63 wired, full matrix/review outstanding:** connector-bound completion,
+    a generation/lifecycle-bound process ticket, explicit admin reconfirmation after
+    restart/reconnect, production owned admission and final worker persistence checks
+    now have local mocked coverage. Real setup → restart/reconfirmation → real
+    admission → worker → mocked OCPP succeeds. Reconfirmation itself sends nothing.
+    The complete requested actual-admission safety/provenance race matrix is not yet
+    established; do not mark this substage complete on the strength of that one path.
+    A Stop not durably recorded before a crash cannot be recovered. Native protection,
+    external writers and the present physical charger state are not established.
+  - **2.5.62 safety correction, not completion:** startup/reconnect no longer
+    releases its barrier for an old or unconfirmed owner. No completed evidence is
+    produced yet, and production admission remains unarmed. The completion-save,
+    crash/Stop recovery, actual dispatch and full mocked race matrix remain open;
+    see the current handoff. External-writer absence and native protection are
+    limitations to report, not universal machine-proof prerequisites.
+  - **2.5.61 partial:** new unarmed entry transitions carry a versioned migration
+    ID; the owner save carries the same ID as `owner_written_unconfirmed`. This
+    survives a possibly-landed owner save but is deliberately not completion evidence.
+    Old records remain readable and unverified. Production dispatch remains
+    unconditionally unarmed. A crash/Stop-safe completion protocol and real admission
+    remain to be implemented and tested; see handoff. External-writer absence need
+    not be machine-proven, per the user's decision, but uncertainty is not proof of
+    retained-profile safety or permission to clear a charger.
+  - **2.5.60 partial:** startup now reserves the same lifecycle barrier before
+    ownership initialization, and a handover is interrupted by any newer lifecycle
+    revision even if an identity changes away and back. Wired reconnect tests cover
+    additional Stop, duplicate callback, identity, cancellation and save-failure
+    boundaries. Production dispatch stays unconditionally unarmed: an owner record
+    alone does not prove handover completed after an interrupted save, and external
+    writer/protection evidence is not established. Full invariants remain open.
   - **2.5.59 partial:** reconnect may release its generation-bound barrier only
     after unique schedule ownership is compared against the durable document and
     the settled outcome ledger, with lifecycle, connector and Stop rechecked under

@@ -22,6 +22,17 @@ const envelope = (settings,ok=true,error=null) => ({api_version:1,ok,error,setti
 const tick = async () => { for(let i=0;i<20;i++) await Promise.resolve(); };
 
 describe('actual sidebar read-only host', () => {
+  it('offers admin reconfirmation without sending on render', async () => {
+    const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';
+    const owned={api_version:1,schedule:{...status.schedule,supported:true,ownership:{recorded_owner:'morek_schedule',reconfirmation_required:true,completion_authorized:false}}};
+    const calls=[];
+    const hass={connected:true,user:{is_admin:true},callWS:vi.fn(msg=>{calls.push(msg);if(msg.type==='spotnav/list_chargers')return Promise.resolve({api_version:1,chargers:[{charger_id:'a',charger_name:'A'}]});if(msg.type==='spotnav/get_dashboard')return Promise.resolve(raw);return Promise.resolve(owned);})};
+    const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();
+    const select=panel.shadowRoot.querySelector('#charger');select.value='a';select.dispatchEvent(new Event('change'));await tick();
+    expect([...panel.shadowRoot.querySelectorAll('button')].some(button=>button.textContent==='Reconfirm schedule ownership')).toBe(true);
+    expect(calls.some(m=>m.type==='spotnav/morek_schedule'&&m.action!=='status')).toBe(false);
+    panel.remove();
+  });
   it('keeps schedule-owned controls unarmed and reports intent separately from flow', async () => {
     const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';
     const owned={api_version:1,schedule:{...status.schedule,supported:true,ownership:{recorded_owner:'morek_schedule'},schedule_pause:{intent:'pause_until_resumed',request:'uncertain',ack:null,readback:'unverified',measured:'unknown'}}};
@@ -30,12 +41,11 @@ describe('actual sidebar read-only host', () => {
     const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();
     const select=panel.shadowRoot.querySelector('#charger');select.value='a';select.dispatchEvent(new Event('change'));await tick();
     const root=panel.shadowRoot;
-    expect(root.querySelector('#pause-state').textContent).toMatch(/Pause requested.*uncertain.*physical charging unknown.*unarmed/);
-    expect(root.querySelector('#pause-auto').disabled).toBe(true);
+    expect(root.querySelector('#pause-state').textContent).toMatch(/Pause requested.*uncertain.*physical charging unknown.*Controls unavailable/);
+    expect(root.querySelector('#pause-auto').disabled).toBe(false);
     expect(root.querySelector('#resume-auto').disabled).toBe(true);
     panel.rawStatus={...owned,schedule:{...owned.schedule,schedule_pause:{intent:'resume_requested',request:'accepted',ack:'Accepted',readback:'bounded_match',measured:'unknown'}}};panel.paint();
     expect(root.querySelector('#pause-state').textContent).toMatch(/Resume requested; retained limit may remain.*Accepted.*bounded effective readback match.*physical charging unknown/);
-    await panel.automaticAction('stop','until_resumed');
     expect(calls.some(m=>m.type==='spotnav/manual_action'||(m.type==='spotnav/morek_schedule'&&m.action!=='status'))).toBe(false);
     panel.remove();
   });
@@ -50,10 +60,10 @@ describe('actual sidebar read-only host', () => {
     expect(text(current)).toMatch(/vehicle unknown/);
     expect(text(current)).toMatch(/authorization unknown · measured charging unknown/);
     const dispatch=dashboardAdapter(raw,current,now).model.evidence.dispatch;
-    expect(dispatch).toMatch(/schedule dispatch is unarmed/);
-    expect(dispatch).toMatch(/lost state and retained profiles are unresolved/);
-    expect(dispatch).toMatch(/Disabling the integration.*may leave the last schedule or a 0 A limit/);
-    expect(dispatch).toMatch(/External writers, installation protection and transaction authorization/);
+    expect(dispatch).toMatch(/Schedule dispatch blocked/);
+    expect(dispatch).toMatch(/uncertain outcome remains blocked/);
+    expect(dispatch).toMatch(/Disabling the integration.*may leave a schedule or 0 A limit/);
+    expect(dispatch).toMatch(/External OCPP writers and native protection are not verified/);
   });
   it('decodes backend fixture without sample data and fails closed on stale or unsupported data', () => {
     const raw=fixture(); raw.generated_at=new Date().toISOString();

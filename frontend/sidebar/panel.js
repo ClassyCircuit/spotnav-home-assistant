@@ -122,9 +122,11 @@ export class SpotnavEnhancedPanel extends HTMLElement {
       const from=Date.parse(pause?.coverage_start || ''), to=Date.parse(pause?.coverage_end || '');
       const coverage=Number.isFinite(from) && Number.isFinite(to) && to>from ? ` (${new Date(from).toLocaleString()} – ${new Date(to).toLocaleString()})` : ' (coverage unavailable)';
       const readback=pause?.readback==='bounded_match' ? `bounded effective readback match${coverage}` : 'readback unconfirmed';
-      this.shadowRoot.querySelector('#pause-state').textContent=`${intent}; request ${request}; ACK ${ack}; ${readback}; physical charging unknown. Schedule-owned controls disabled: automatic dispatch unarmed.`;
-      this.shadowRoot.querySelector('#pause-auto').disabled=true;
-      this.shadowRoot.querySelector('#resume-auto').disabled=true;
+      const canPause=fresh && statusFresh && !!control?.can_act && !this.controlPermissionPending && !this.autoBusy && !this.autoUncertain && !this.morekBusy && !this.morekUncertain && !this.settingsBusy && this._hass?.connected!==false;
+      const can=canPause && status?.ownership?.completion_authorized===true;
+      this.shadowRoot.querySelector('#pause-state').textContent=`${intent}; request ${request}; ACK ${ack}; ${readback}; physical charging unknown.${can ? '' : ' Controls unavailable until schedule ownership is confirmed.'}`;
+      this.shadowRoot.querySelector('#pause-auto').disabled=!(canPause && admittedAction(control,'stop','until_resumed'));
+      this.shadowRoot.querySelector('#resume-auto').disabled=!(can && admittedAction(control,'resume',null));
       this.shadowRoot.querySelector('#pause-notice').textContent=this.autoNotice || '';
       return;
     }
@@ -136,7 +138,8 @@ export class SpotnavEnhancedPanel extends HTMLElement {
   }
   async automaticAction(action,choice) {
     const generation=this.generation, permissionEpoch=this.permissionEpoch, charger=this.charger, hass=this._hass, decoded=decodeDashboard(this.rawDashboard);
-    if (decodeMorekState(this.rawStatus)?.ownership?.recorded_owner==='morek_schedule') return;
+    const owner=decodeMorekState(this.rawStatus)?.ownership;
+    if (owner?.recorded_owner==='morek_schedule' && action!=='stop' && owner.completion_authorized!==true) return;
     const observed=decoded.ok ? Date.parse(decoded.value.generated_at || '') : NaN;
     if (!this.connected || !charger || !hass || hass.connected===false || !decoded.ok || !Number.isFinite(observed) || observed>Date.now() || Date.now()-observed>90000 || this.controlPermissionPending || this.autoBusy || this.autoUncertain || this.morekBusy || this.morekUncertain || this.settingsBusy || !decoded.value.control.can_act || !admittedAction(decoded.value.control,action,choice)) return;
     const dispatchedAt=Date.now();this.autoBusy=true;this.autoNotice='Request in progress; state not yet confirmed.';this.dashboardEpoch++;this.statusEpoch++;this.statusAt=null;this.paint();
@@ -162,11 +165,19 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     const fresh=morekPanel(document,state,this._hass?.user?.is_admin===true,this.morekBusy || this.settingsBusy || this.settingsDirty || this.autoBusy,this.morekError,action=>void this.morekAction(action),this.morekActiveAction,false);
     if (target.firstChild) reconcile(target.firstChild,fresh);
     else target.append(fresh);
+    if (state.ownership?.reconfirmation_required && state.supported && this._hass?.user?.is_admin===true) {
+      const button=document.createElement('button');
+      button.type='button';button.textContent='Reconfirm schedule ownership';
+      button.disabled=this.morekBusy || this.settingsBusy || this.autoBusy;
+      button.addEventListener('click',()=>void this.morekAction('reconfirm_migration'));
+      target.firstChild.append(button);
+    }
     const send=target.querySelector('[data-morek-action="send"]');if(send && (this.morekUncertain || this.autoUncertain))send.disabled=true;
   }
   async morekAction(action) {
     const hass=this._hass, charger=this.charger, generation=this.generation, permissionEpoch=this.permissionEpoch, statusSnapshot=this.rawStatus, observedAt=this.statusAt, state=decodeMorekState(statusSnapshot);
-    if (!this.connected || hass?.connected===false || hass?.user?.is_admin!==true || !charger || !state || this.morekBusy || this.autoBusy || !['status','send','fetch','clear'].includes(action)) return;
+    if (!this.connected || hass?.connected===false || hass?.user?.is_admin!==true || !charger || !state || this.morekBusy || this.autoBusy || !['status','send','fetch','clear','reconfirm_migration'].includes(action)) return;
+    if (action==='reconfirm_migration' && state.ownership?.reconfirmation_required!==true) return;
     if (action!=='status' && !state.supported) return;
     if (action==='clear' && state.cleanup_supported!==true) return;
     if (this.settingsBusy || (action==='send' && this.settingsDirty)) return;
@@ -176,6 +187,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     // confirmation and disabled state. A request already sent cannot be recalled.
     if (action==='send' && !window.confirm('Confirm sending the current preview. The final 0 A limit may persist.')) return;
     if (action==='clear' && !window.confirm('Confirm selective removal of SpotNav profile 42001. Effective limits may increase.')) return;
+    if (action==='reconfirm_migration' && !window.confirm('Reconfirm schedule ownership for this connection? This does not verify charger protection, profile inventory or physical charging. A previous schedule or 0 A limit may remain.')) return;
     const latest=decodeMorekState(this.rawStatus);
     const dashboard=decodeDashboard(this.rawDashboard);
     const generated=dashboard.ok ? Date.parse(dashboard.value.generated_at || '') : NaN;
@@ -184,7 +196,9 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     this.morekBusy=true;this.morekActiveAction=action;this.morekError=null;this.statusEpoch++;
     this.paintMorek();
     try {
-      const result=decodeMorekState(await this.bounded(morekSchedule(hass,charger,action,previewId)));
+      const raw=await this.bounded(morekSchedule(hass,charger,action,previewId));
+      if (action==='reconfirm_migration') {this.morekError=null;return;}
+      const result=decodeMorekState(raw);
       if (!this.connected || generation!==this.generation || permissionEpoch!==this.permissionEpoch || charger!==this.charger) return;
       if (!result) {if(action==='send')this.morekUncertain=true;this.morekError='Response unavailable; operation outcome may be unknown.';}
       else {this.rawStatus={api_version:1,schedule:result};this.statusAt=action==='status' ? Date.now() : null;this.statusFailed=action!=='status';}

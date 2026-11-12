@@ -340,6 +340,136 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-12 — wired completion and guarded worker (2.5.63; review required)
+
+- A versioned `completed` handover carries the original connector-bound migration
+  ID. The real producer-locked handover saves and reads it back, rechecks generation,
+  lifecycle and identity, and only then issues an in-process ticket. Barrier release
+  and production owned-profile admission require both. The worker rereads durable
+  ownership and the attempt ledger before its final synchronous checks and wire call.
+- On restart the ticket is absent even if completion landed. A narrowly scoped
+  admin-only **Reconfirm schedule ownership** action rereads the owner and settled
+  ledger and releases only the current barrier. It sends no profile; a later worker
+  trigger is needed to reconcile. Ordinary restart and reconnect require this fresh
+  confirmation. Unconfirmed owners, missing documents, held exits and uncertain
+  outcomes remain blocked. A Stop that never reached durable storage before a crash
+  cannot be reconstructed. The reconfirmation does not verify physical charger state.
+- Mocked tests use real setup, ownership, admission, ledger and worker to reach a
+  mocked OCPP call after restart/reconfirmation; migration and reconfirmation do not
+  themselves send. Tests also cover Stop during final worker persistence, completion
+  save/readback cancellation and Stop/lifecycle races, and blocked recovery cases.
+  Existing planner provenance and worker regressions include simulated admission;
+  the complete requested real-admission race/provenance matrix has not been established.
+  Therefore 5.7a remains open for coordinator review, and this is not a deployment
+  recommendation. 5.7b remains open for end-to-end regression and monitoring.
+- External OCPP writers and native protection are not proven by local mocks. The past
+  mismatch is a historical unknown, not a current observation; a genuinely uncertain
+  persisted outcome blocks dispatch. ACK/readback do not establish physical charging
+  or profile inventory. Disabling SpotNav may leave a schedule or 0 A in place. No
+  live HA, hardware or deployment was accessed.
+- Local checks: `python tools/run_isolated_planning_tests.py -x` and the same
+  runner with `tests/test_morek_worker.py -x` each reported 553 passed, 1 deselected;
+  `python tools/run_isolated_lifecycle_tests.py -x` reported 179 passed; the expanded
+  lifecycle run with `tests/test_execution_ownership.py tests/test_command_admission.py
+  tests/test_morek_schedule.py tests/test_morek_outcomes.py tests/test_morek_readiness.py
+  -x` reported 328 passed. Targeted Ruff, frontend type-check/build/check-dist and
+  `npm run test -- test/sidebar.test.ts test/morek-view.test.ts` (62 passed), and
+  `git diff --check` passed. Initial tests exposed stale unarmed-status assertions;
+  those expectations were updated and reruns passed. Pytest timeout-option and
+  dependency deprecations, jsdom CSS parsing and Git line-ending warnings remain.
+  The full 5.4c HA-plugin suite was not run.
+
+### 2026-11-12 — lifecycle barrier correction (2.5.62; incomplete)
+
+- The real startup/reconnect barrier now refuses to release for an old owner or
+  `owner_written_unconfirmed`. The store does not yet produce or recognize
+  `completed`, so this intentionally retains the barrier for all current records.
+  Production schedule admission remains unconditionally unarmed; this is not the
+  requested completed implementation and is not ready for installation.
+- The missing code boundary is the completion save and restart recovery connecting
+  `ExecutionOwnershipStore.async_handover_unarmed` to
+  `CommandAdmission.async_release_lifecycle_barrier` and `async_execute`. A save
+  can land before failing or being cancelled, and an unrecorded Stop cannot be
+  reconstructed after a crash. A durable completion alone therefore cannot establish
+  ordering in every such race; implement conservative restart recovery or fresh
+  explicit user action, plus actual production admission and the requested race matrix.
+  No further installation-specific decision or live proof is required to implement it.
+- External writers and native protection remain unverified limitations, not universal
+  machine-proof prerequisites. The past mismatch is historical, not a current charger
+  observation; persisted uncertain outcomes must still block. Disabling the integration
+  can leave a schedule or 0 A limit in place. No profile was sent or cleared.
+- Local checks: isolated planning 551 passed, 1 deselected; lifecycle 162 passed;
+  expanded lifecycle/ownership/admission/schedule/outcome/readiness 309 passed;
+  isolated planning with worker argument 551 passed, 1 deselected. Targeted Ruff,
+  frontend type-check, build, check-dist and sidebar/Morek tests (61 passed) passed.
+  Initial lifecycle and expanded runs failed one setup expectation after the barrier
+  change; the expectation was corrected and both reruns passed. Existing pytest
+  timeout-option/deprecation and jsdom CSS warnings remain. The full HA-plugin
+  dashboard suite and the requested new completion/production-send matrix were not run.
+
+### 2026-11-12 — connector-bound unconfirmed handover witness (2.5.61; partial)
+
+- Fresh unarmed entry transitions now use version 2 with a random migration ID,
+  retained across requested/drained/interrupted states. The existing owner save
+  copies that ID into a connector-bound `owner_written_unconfirmed` witness; legacy
+  version-1 transitions and old owner records remain readable. An old owner without
+  a witness reports unverified. The held-exit transition removes only the owner-side
+  metadata as it creates its existing legacy held marker; no charger state is changed.
+- This witness records that the owner save was attempted, **not** that handover
+  completed. A Stop or cancellation can occur while the owner save is awaiting, and
+  a save may land before that interruption is known. A restart must not treat the
+  witness as completion. Production admission remains unconditionally unarmed;
+  no user control or automatic dispatch was added. The product decision does not
+  require impossible proof of absence of external writers; the concrete remaining
+  blocker is a crash/Stop-safe durable completion protocol and its final-dispatch
+  enforcement, plus the requested production-path and race matrix. Physical retained
+  state and the historical mismatch remain installation-specific unknowns, not proof
+  of an empty inventory or permission to clear. 5.7a and 5.7b remain open.
+- Mocked coverage checks matching migration IDs after an actual unarmed handover,
+  old records, malformed/unsupported evidence and after-write uncertainty. It does
+  not prove the full requested completion-save matrix or real production admission.
+  No HA, charger, profile, deployment or physical behavior was accessed or tested.
+- Checks: `python tools/run_isolated_planning_tests.py -x` 551 passed, 1 deselected;
+  `python tools/run_isolated_lifecycle_tests.py -x` 162 passed;
+  `python tools/run_isolated_lifecycle_tests.py tests/test_execution_ownership.py
+  tests/test_command_admission.py tests/test_morek_schedule.py tests/test_morek_outcomes.py
+  tests/test_morek_readiness.py -x` 309 passed. Targeted Ruff, frontend type-check,
+  build, check-dist and focused sidebar/Morek tests (61 passed), and diff check passed.
+  Existing pytest timeout-option and dependency-deprecation warnings, jsdom CSS and
+  Git line-ending warnings remain. Full 5.4c HA-plugin suite remains unrun.
+
+### 2026-11-12 — startup and handover race hardening (2.5.60; partial)
+
+- Startup reserves the existing lifecycle barrier before its first ownership await;
+  it may release only through the same current, durable-owner and outcome checks
+  after unarmed handover. A callback now retains an entry barrier even if the current
+  identity appears unrelated, without blocking positively unrelated connectors.
+  Handover captures the entry lifecycle revision and treats any change as interruption,
+  including an identity changing away and back while an owner save is awaiting.
+- The real reconnect callback now has mocked handover tests for Stop, duplicate
+  callbacks, temporary identity change, cancellation and failure at requested,
+  drained and owner-save waits. Before the first marker lands a crash can still leave
+  the prior legacy document on disk; startup's new process-local barrier is not durable
+  proof of completed handover or of first use. This does not close every crash/restart
+  or duplicate-entry test gap, nor prove external OCPP writers settled.
+- Production owned-profile admission remains unconditionally unarmed. The current
+  owner record has no durable completion witness distinguishable from an interrupted
+  owner save, and no enforceable installation evidence establishes external-writer
+  or protection safety. Profile inventory and the historical mismatch remain unknown;
+  ACK/readback do not prove physical charging. A complete evidence and final-dispatch
+  protocol, including a safe way to resolve those installation facts, is still needed.
+  No live HA, hardware, deployment, profile clear or charging action was performed.
+  5.7a and 5.7b remain open for coordinator review.
+- Checks: `python tools/run_isolated_planning_tests.py -x` 548 passed, 1 deselected;
+  `python tools/run_isolated_lifecycle_tests.py -x` 162 passed;
+  `python tools/run_isolated_lifecycle_tests.py tests/test_morek_schedule.py
+  tests/test_morek_readiness.py tests/test_command_admission.py
+  tests/test_execution_ownership.py tests/test_morek_outcomes.py -x` 306 passed.
+  Targeted Ruff, frontend type-check, build, check-dist and focused sidebar/Morek
+  tests (61 passed), and diff check passed. Existing pytest timeout-option and
+  dependency deprecation, jsdom CSS, and Git line-ending warnings remain. Full
+  5.4c HA-plugin suite was not run.
+
 ### 2026-11-12 — verified reconnect barrier release (2.5.59; partial)
 
 - A reconnect callback captures a per-entry barrier revision. After initialization,

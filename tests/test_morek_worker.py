@@ -29,6 +29,12 @@ class SimulatedAdmission(CommandAdmission):
         self.entered = None
         self.release = None
 
+    def owned_ticket_current(self, entry_id, connector):
+        return True  # Other worker tests deliberately simulate admission.
+
+    async def async_owned_boundary_current(self, entry_id, connector):
+        return True
+
     async def async_execute(self, entry_id, kind, resolve_identity, operation, *, expected_generation=None):
         if kind == "read_only":
             return await super().async_execute(entry_id, kind, resolve_identity, operation)

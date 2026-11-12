@@ -59533,8 +59533,13 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
     section.append(detail);
   }
   const availability = doc.createElement("p");
-  availability.textContent = `Automatic Morek mode unavailable and unarmed. Recorded owner: ${state.ownership?.recorded_owner ?? "unknown"}. Durable ownership transitions and lost-state recovery, conflicting control and household protection, transaction authorization, and safe retained-profile exit remain unresolved.`;
+  availability.textContent = state.ownership?.completion_authorized ? "Schedule ownership is confirmed for this process. External OCPP writers and native protection cannot be verified here." : `Schedule sending is blocked pending migration or reconfirmation. Recorded owner: ${state.ownership?.recorded_owner ?? "unknown"}.`;
   section.append(availability);
+  if (state.ownership?.local_regulator === "linked_may_write") {
+    const conflict = doc.createElement("p");
+    conflict.textContent = "A local site regulator is linked and may independently write to this charger. Its protection remains in place; effective limits may conflict with the schedule.";
+    section.append(conflict);
+  }
   const evidence = doc.createElement("p");
   evidence.textContent = "Proposal is not sent; an upload ACK is not effective readback. A verified remaining effective schedule is not profile inventory, transaction authorization, or measured physical charging. Measured charging is not established here; check separate live measurements.";
   section.append(evidence);
@@ -59550,7 +59555,7 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
     section.append(identity2);
   }
   const note = doc.createElement("p");
-  note.textContent = "SpotNav still uses live start/stop commands. Pause Auto 'Until I resume' before sending. These controls do not authorize a plugged-in car.";
+  note.textContent = state.ownership?.recorded_owner === "morek_schedule" ? "Morek uses schedule ownership; manual profile writes are blocked. These controls do not establish physical charging." : "Pause Auto 'Until I resume' before sending. These controls do not authorize a plugged-in car.";
   section.append(note);
   const previewTitle = doc.createElement("strong");
   previewTitle.textContent = "Preview \u2014 calculated, NOT sent";
@@ -59838,7 +59843,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
       untilDeadline: U,
       targetNote: "",
       warning: warning ? { title: "Morek health requires attention", detail: `${health}${status?.outcomes?.uncertain && (status?.operator?.state === "mismatch" || status?.verification?.reason === "limits_or_transitions_differ") ? " \xB7 Effective limits mismatch the sent schedule." : ""}` } : null,
-      evidence: { status: health, context: `Morek status observed ${date(observedAt, zone)}${failed ? " \xB7 unavailable" : ""}; separate from dashboard`, readiness, proposal: date(d3.planning?.calculated_at, zone), sent: `${date(status?.sent_at, zone)} \xB7 ${status?.ack || U}`, readback: date(status?.effective?.fetched_at, zone), measurement: "SOC age and measured power unavailable when stale or unsupported", dispatch: "Automatic schedule dispatch is unarmed. Migration, first-use versus lost state and retained profiles are unresolved; a held exit stays blocked. External writers, installation protection and transaction authorization require verification. Disabling the integration stops SpotNav activity but may leave the last schedule or a 0 A limit on the charger; it does not prove charging stopped or remove a profile." },
+      evidence: { status: health, context: `Morek status observed ${date(observedAt, zone)}${failed ? " \xB7 unavailable" : ""}; separate from dashboard`, readiness, proposal: date(d3.planning?.calculated_at, zone), sent: `${date(status?.sent_at, zone)} \xB7 ${status?.ack || U}`, readback: date(status?.effective?.fetched_at, zone), measurement: "SOC age and measured power unavailable when stale or unsupported", dispatch: `${status?.ownership?.completion_authorized ? "Schedule ownership confirmed for this process." : "Schedule dispatch blocked; completed migration may require admin reconfirmation after restart or reconnect."} External OCPP writers and native protection are not verified; the historical mismatch does not establish current state. A held exit or uncertain outcome remains blocked. Disabling the integration may leave a schedule or 0 A limit; no physical stop or profile removal is implied.` },
       labels: { settingsNote: "Read-only preview. Plan controls are unavailable in this slice.", saveLabel: "Save plan \xB7 unavailable", powerNote: "No verified general Morek power source", planLabel: "Backend policy:", chartIntro: "Published source price before configured fiscal additions; source-included charges may apply.", chartNote: `Held published intervals only. ${priceFreshness} Unpublished future and history are unavailable. Cap is omitted if its basis differs or is unknown.`, bands: "", dialogNote: "Proposal only; not necessarily sent.", footer: "Dashboard and Morek status are separate observations." }
     },
     actions: {}
@@ -59846,7 +59851,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.59";
+var CARD_VERSION = "2.5.63";
 
 // sidebar/panel.js
 var settingsWritesByConnection = /* @__PURE__ */ new WeakMap();
@@ -60018,9 +60023,11 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       const from = Date.parse(pause?.coverage_start || ""), to = Date.parse(pause?.coverage_end || "");
       const coverage = Number.isFinite(from) && Number.isFinite(to) && to > from ? ` (${new Date(from).toLocaleString()} \u2013 ${new Date(to).toLocaleString()})` : " (coverage unavailable)";
       const readback = pause?.readback === "bounded_match" ? `bounded effective readback match${coverage}` : "readback unconfirmed";
-      this.shadowRoot.querySelector("#pause-state").textContent = `${intent}; request ${request}; ACK ${ack}; ${readback}; physical charging unknown. Schedule-owned controls disabled: automatic dispatch unarmed.`;
-      this.shadowRoot.querySelector("#pause-auto").disabled = true;
-      this.shadowRoot.querySelector("#resume-auto").disabled = true;
+      const canPause = fresh && statusFresh && !!control?.can_act && !this.controlPermissionPending && !this.autoBusy && !this.autoUncertain && !this.morekBusy && !this.morekUncertain && !this.settingsBusy && this._hass?.connected !== false;
+      const can2 = canPause && status?.ownership?.completion_authorized === true;
+      this.shadowRoot.querySelector("#pause-state").textContent = `${intent}; request ${request}; ACK ${ack}; ${readback}; physical charging unknown.${can2 ? "" : " Controls unavailable until schedule ownership is confirmed."}`;
+      this.shadowRoot.querySelector("#pause-auto").disabled = !(canPause && admittedAction(control, "stop", "until_resumed"));
+      this.shadowRoot.querySelector("#resume-auto").disabled = !(can2 && admittedAction(control, "resume", null));
       this.shadowRoot.querySelector("#pause-notice").textContent = this.autoNotice || "";
       return;
     }
@@ -60032,7 +60039,8 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
   }
   async automaticAction(action, choice) {
     const generation = this.generation, permissionEpoch = this.permissionEpoch, charger = this.charger, hass = this._hass, decoded = decodeDashboard(this.rawDashboard);
-    if (decodeMorekState(this.rawStatus)?.ownership?.recorded_owner === "morek_schedule") return;
+    const owner = decodeMorekState(this.rawStatus)?.ownership;
+    if (owner?.recorded_owner === "morek_schedule" && action !== "stop" && owner.completion_authorized !== true) return;
     const observed = decoded.ok ? Date.parse(decoded.value.generated_at || "") : NaN;
     if (!this.connected || !charger || !hass || hass.connected === false || !decoded.ok || !Number.isFinite(observed) || observed > Date.now() || Date.now() - observed > 9e4 || this.controlPermissionPending || this.autoBusy || this.autoUncertain || this.morekBusy || this.morekUncertain || this.settingsBusy || !decoded.value.control.can_act || !admittedAction(decoded.value.control, action, choice)) return;
     const dispatchedAt = Date.now();
@@ -60084,12 +60092,21 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     const fresh = morekPanel(document, state, this._hass?.user?.is_admin === true, this.morekBusy || this.settingsBusy || this.settingsDirty || this.autoBusy, this.morekError, (action) => void this.morekAction(action), this.morekActiveAction, false);
     if (target.firstChild) reconcile(target.firstChild, fresh);
     else target.append(fresh);
+    if (state.ownership?.reconfirmation_required && state.supported && this._hass?.user?.is_admin === true) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = "Reconfirm schedule ownership";
+      button.disabled = this.morekBusy || this.settingsBusy || this.autoBusy;
+      button.addEventListener("click", () => void this.morekAction("reconfirm_migration"));
+      target.firstChild.append(button);
+    }
     const send = target.querySelector('[data-morek-action="send"]');
     if (send && (this.morekUncertain || this.autoUncertain)) send.disabled = true;
   }
   async morekAction(action) {
     const hass = this._hass, charger = this.charger, generation = this.generation, permissionEpoch = this.permissionEpoch, statusSnapshot = this.rawStatus, observedAt = this.statusAt, state = decodeMorekState(statusSnapshot);
-    if (!this.connected || hass?.connected === false || hass?.user?.is_admin !== true || !charger || !state || this.morekBusy || this.autoBusy || !["status", "send", "fetch", "clear"].includes(action)) return;
+    if (!this.connected || hass?.connected === false || hass?.user?.is_admin !== true || !charger || !state || this.morekBusy || this.autoBusy || !["status", "send", "fetch", "clear", "reconfirm_migration"].includes(action)) return;
+    if (action === "reconfirm_migration" && state.ownership?.reconfirmation_required !== true) return;
     if (action !== "status" && !state.supported) return;
     if (action === "clear" && state.cleanup_supported !== true) return;
     if (this.settingsBusy || action === "send" && this.settingsDirty) return;
@@ -60097,6 +60114,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     const previewId = state.preview?.preview_id, configured = state.configured_id, resolved = state.resolved_id, dashboardSnapshot = this.rawDashboard;
     if (action === "send" && !window.confirm("Confirm sending the current preview. The final 0 A limit may persist.")) return;
     if (action === "clear" && !window.confirm("Confirm selective removal of SpotNav profile 42001. Effective limits may increase.")) return;
+    if (action === "reconfirm_migration" && !window.confirm("Reconfirm schedule ownership for this connection? This does not verify charger protection, profile inventory or physical charging. A previous schedule or 0 A limit may remain.")) return;
     const latest = decodeMorekState(this.rawStatus);
     const dashboard = decodeDashboard(this.rawDashboard);
     const generated = dashboard.ok ? Date.parse(dashboard.value.generated_at || "") : NaN;
@@ -60108,7 +60126,12 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this.statusEpoch++;
     this.paintMorek();
     try {
-      const result = decodeMorekState(await this.bounded(morekSchedule(hass, charger, action, previewId)));
+      const raw = await this.bounded(morekSchedule(hass, charger, action, previewId));
+      if (action === "reconfirm_migration") {
+        this.morekError = null;
+        return;
+      }
+      const result = decodeMorekState(raw);
       if (!this.connected || generation !== this.generation || permissionEpoch !== this.permissionEpoch || charger !== this.charger) return;
       if (!result) {
         if (action === "send") this.morekUncertain = true;

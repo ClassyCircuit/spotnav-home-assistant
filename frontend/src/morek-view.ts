@@ -10,7 +10,7 @@ export interface MorekState {
   reconciliation?: { reason: string };
   schedule_pause?: { intent?: string; request?: string; ack?: string | null; readback?: string; measured?: string; coverage_start?: string | null; coverage_end?: string | null };
   readiness?: { control?: string; vehicle?: string; transaction?: string; measurement?: string; vehicle_observed_at?: string | null };
-  ownership?: { recorded_owner?: string | null; blockers?: string[]; schedule_mode_available?: boolean };
+  ownership?: { recorded_owner?: string | null; blockers?: string[]; schedule_mode_available?: boolean; completion_authorized?: boolean; reconfirmation_required?: boolean; local_regulator?: string };
   reason?: string | null;
   configured_id?: string | null;
   resolved_id?: string | null;
@@ -159,9 +159,15 @@ export function morekPanel(
     section.append(detail);
   }
   const availability = doc.createElement("p");
-  availability.textContent = `Automatic Morek mode unavailable and unarmed. Recorded owner: ${state.ownership?.recorded_owner ?? "unknown"}. ` +
-    "Durable ownership transitions and lost-state recovery, conflicting control and household protection, transaction authorization, and safe retained-profile exit remain unresolved.";
+  availability.textContent = state.ownership?.completion_authorized
+    ? "Schedule ownership is confirmed for this process. External OCPP writers and native protection cannot be verified here."
+    : `Schedule sending is blocked pending migration or reconfirmation. Recorded owner: ${state.ownership?.recorded_owner ?? "unknown"}.`;
   section.append(availability);
+  if (state.ownership?.local_regulator === "linked_may_write") {
+    const conflict = doc.createElement("p");
+    conflict.textContent = "A local site regulator is linked and may independently write to this charger. Its protection remains in place; effective limits may conflict with the schedule.";
+    section.append(conflict);
+  }
   const evidence = doc.createElement("p");
   evidence.textContent = "Proposal is not sent; an upload ACK is not effective readback. A verified remaining effective schedule is not profile inventory, transaction authorization, or measured physical charging. Measured charging is not established here; check separate live measurements.";
   section.append(evidence);
@@ -185,7 +191,9 @@ export function morekPanel(
     section.append(identity);
   }
   const note = doc.createElement("p");
-  note.textContent = "SpotNav still uses live start/stop commands. Pause Auto 'Until I resume' before sending. These controls do not authorize a plugged-in car.";
+  note.textContent = state.ownership?.recorded_owner === "morek_schedule"
+    ? "Morek uses schedule ownership; manual profile writes are blocked. These controls do not establish physical charging."
+    : "Pause Auto 'Until I resume' before sending. These controls do not authorize a plugged-in car.";
   section.append(note);
   const previewTitle = doc.createElement("strong");
   previewTitle.textContent = "Preview — calculated, NOT sent";

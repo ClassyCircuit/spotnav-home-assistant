@@ -220,7 +220,8 @@ async def test_status_exposes_read_only_unarmed_ownership(monkeypatch):
     monkeypatch.setattr(morek_schedule, "ownership_store", lambda h: store)
     recovery = {"state": "legacy_unarmed", "activation_allowed": False, "activation_provenance": "unverified"}
     monkeypatch.setattr(morek_schedule, "command_admission", lambda _: SimpleNamespace(
-        _recovery_status={}, _person_stops={}, async_recovery_status=AsyncMock(return_value=recovery)))
+        _recovery_status={}, _person_stops={}, owned_ticket_current=lambda *_: False,
+        async_recovery_status=AsyncMock(return_value=recovery)))
     monkeypatch.setattr(morek_schedule, "_state", AsyncMock(return_value=({}, None)))
     monkeypatch.setattr(morek_schedule, "_preview", lambda h, e, t: {})
     monkeypatch.setattr(morek_schedule, "outcomes_for", lambda h: MemoryOutcomes())
@@ -252,6 +253,28 @@ async def test_draft_mode_actions_cannot_be_invoked(monkeypatch, action, admin):
         "spotnav_morek_action_unavailable" if admin else "spotnav_not_admin")
     connection.send_result.assert_not_called()
     admission.async_schedule_request.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("admin", [False, True])
+async def test_reconfirmation_is_admin_only_and_does_not_send(monkeypatch, admin):
+    admission = SimpleNamespace(async_reconfirm_completed=AsyncMock(return_value="reconfirmed"))
+    entry = SimpleNamespace(entry_id="charger", runtime_data=SimpleNamespace(morek_worker=None))
+    monkeypatch.setattr(morek_schedule, "is_admin", lambda _: admin)
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda _: admission)
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "async_schedule_action", AsyncMock())
+    connection = SimpleNamespace(send_result=Mock(), send_error=Mock())
+    await morek_schedule.websocket_morek_schedule.__wrapped__(
+        SimpleNamespace(data={}), connection,
+        {"id": 1, "api_version": 1, "charger_id": "charger", "action": "reconfirm_migration"})
+    if admin:
+        assert connection.send_result.call_args.args[1]["schedule"]["physical_state"] == "unknown"
+        admission.async_reconfirm_completed.assert_awaited_once()
+    else:
+        assert connection.send_error.call_args.args[1] == "spotnav_not_admin"
+        admission.async_reconfirm_completed.assert_not_awaited()
+    morek_schedule.async_schedule_action.assert_not_awaited()
 
 
 @pytest.mark.parametrize(("online", "outcomes", "verification", "verified", "preview", "sending", "expected"), [

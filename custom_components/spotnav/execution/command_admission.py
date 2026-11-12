@@ -1,4 +1,4 @@
-"""Connector-scoped command admission; it does not activate an owner.
+"""Connector-scoped command admission and process-local migration authorization.
 
 Only internal callers may classify an operation. Ordinary physical writes use
 this admission; regulator protection and external writers remain separate.
@@ -94,16 +94,17 @@ class CommandAdmission:
         self._person_stops: dict[PhysicalConnector, int] = {}
         self._uncertain_operations: set[PhysicalConnector] = set()
         self._recovery_status: dict[str, dict[str, Any]] = {}
+        self._completion_tickets: dict[str, tuple[PhysicalConnector, str, int, Generation]] = {}
+        self._stop_prior_tickets: dict[asyncio.Task, tuple[PhysicalConnector, str, int, Generation]] = {}
 
     def reserve_lifecycle_barrier(self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]]) -> int:
         """Synchronously invalidate ordinary target writes before scheduling recovery."""
         revision = self._lifecycle_revisions.get(entry_id, 0) + 1
         self._lifecycle_revisions[entry_id] = revision
+        self._completion_tickets.pop(entry_id, None)
         try:
             identity = dict(resolve_identity())
             classification = classify_morek_identity(identity)
-            if classification == "non_target":
-                return revision
             connector = physical_connector(identity) if classification == "supported_morek" else None
         except Exception:  # noqa: BLE001 - unknown identity is not permission
             connector = None
@@ -150,6 +151,8 @@ class CommandAdmission:
                 status = await self._store.async_status(entry_id, identity)
                 if (status.get("record_state") != "valid" or status.get("recorded_owner") != "morek_schedule"
                         or status.get("transition_state") is not None or status.get("armed") is not False
+                        or status.get("handover_evidence") != "completed"
+                        or not self.ticket_current(entry_id, connector, status.get("handover_id"))
                         or (status.get("station_id"), status.get("connector_id")) !=
                            (connector.station_id, connector.connector_id)):
                     return False
@@ -177,6 +180,99 @@ class CommandAdmission:
             return False
         return entry_id in self._lifecycle_barriers or connector in self._lifecycle_barriers.values()
 
+    def ticket_current(self, entry_id: str, connector: PhysicalConnector, migration_id: str | None) -> bool:
+        """Check process evidence synchronously at every wire boundary."""
+        ticket = self._completion_tickets.get(entry_id)
+        record = self._store._records.get(entry_id, {})
+        return bool(ticket and self._store._state == "valid" and not self._store._transition_save_uncertain
+                    and not self._store._cancelled_write and record.get("owner") == "morek_schedule"
+                    and record.get("handover") == {"version": 1, "state": "completed", "id": migration_id}
+                    and (record.get("station_id"), record.get("connector_id")) == (connector.station_id, connector.connector_id)
+                    and ticket == (connector, migration_id, self._lifecycle_revisions.get(entry_id, 0),
+                                          self.generation(connector))
+                    and not self._person_stops.get(connector)
+                    and connector not in self._entry_draining and connector not in self._quiescing
+                    and connector not in self._uncertain_operations)
+
+    def owned_ticket_current(self, entry_id: str, connector: PhysicalConnector) -> bool:
+        ticket = self._completion_tickets.get(entry_id)
+        return bool(ticket and self.ticket_current(entry_id, connector, ticket[1])
+                    and not self.lifecycle_blocked(entry_id, connector))
+
+    async def async_owned_boundary_current(self, entry_id: str, connector: PhysicalConnector) -> bool:
+        """Re-read ownership at the last awaited worker boundary under connector admission."""
+        from .execution_ownership import _decode, _read_envelope
+        if not self.owned_ticket_current(entry_id, connector):
+            return False
+        try:
+            async with self._store._lock:
+                raw = await self._store._hass.async_add_executor_job(_read_envelope, self._store._store.path)
+                state, records = _decode(raw)
+                return (state == "valid" and records == self._store._records
+                        and self.owned_ticket_current(entry_id, connector))
+        except Exception:  # noqa: BLE001 - failed read is not permission
+            return False
+
+    async def async_reconfirm_completed(
+        self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]],
+    ) -> str:
+        """Explicitly reconfirm a completed owner; never operate the charger."""
+        from .execution_ownership import _decode, _read_envelope
+        from .morek_outcomes import outcomes_for
+
+        try:
+            identity = dict(resolve_identity())
+            connector = physical_connector(identity)
+            if classify_morek_identity(identity) != "supported_morek" or connector is None:
+                return "identity_unresolved"
+            revision = self._lifecycle_revisions.get(entry_id, 0)
+            generation = self.generation(connector)
+
+            def current() -> bool:
+                fresh = dict(resolve_identity())
+                return (self._lifecycle_revisions.get(entry_id, 0) == revision
+                        and self.generation(connector) == generation and not self._person_stops.get(connector)
+                        and connector not in self._entry_draining and connector not in self._quiescing
+                        and connector not in self._uncertain_operations
+                        and classify_morek_identity(fresh) == "supported_morek"
+                        and physical_connector(fresh) == connector)
+
+            async with self._lock_for(connector):
+                if not current():
+                    return "reconfirmation_interrupted"
+                status = await self._store.async_status(entry_id, identity)
+                if (status.get("record_state") != "valid" or status.get("recorded_owner") != "morek_schedule"
+                        or status.get("handover_evidence") != "completed" or not status.get("handover_id")
+                        or status.get("transition_state") is not None):
+                    return "completion_unavailable"
+                async with self._store._lock:
+                    raw = await self._store._hass.async_add_executor_job(_read_envelope, self._store._store.path)
+                    state, disk = _decode(raw)
+                    if (state != "valid" or disk != self._store._records or self._store._state != "valid"
+                            or self._store._cancelled_write or self._store._transition_save_uncertain):
+                        return "ownership_unavailable"
+                outcome = await outcomes_for(self._store._hass).read()
+                if (outcome is None or outcome.get("entry_id") != entry_id or outcome.get("uncertain") is not False
+                        or not isinstance(outcome.get("attempt"), dict)
+                        or outcome["attempt"].get("state") not in ("accepted", "rejected", "aborted_before_dispatch")
+                        or (outcome.get("removal") is not None and outcome["removal"].get("state") not in
+                            ("accepted", "rejected", "notsupported"))):
+                    return "profile_outcome_unavailable"
+                if not current():
+                    return "reconfirmation_interrupted"
+                ticket = (connector, status["handover_id"], revision, generation)
+                self._completion_tickets[entry_id] = ticket
+            if entry_id in self._lifecycle_barriers:
+                released = await self.async_release_lifecycle_barrier(
+                    entry_id, resolve_identity, revision, lambda: self._lifecycle_revisions.get(entry_id, 0) == revision)
+                if not released:
+                    if self._completion_tickets.get(entry_id) == ticket:
+                        self._completion_tickets.pop(entry_id, None)
+                    return "reconfirmation_interrupted"
+            return "reconfirmed"
+        except Exception:  # noqa: BLE001 - missing or malformed evidence is not authority
+            return "reconfirmation_unavailable"
+
     @contextmanager
     def person_stop_reservation(self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]]):
         """Reserve before outer locks; interrupt an unarmed entry without reopening writes."""
@@ -195,6 +291,9 @@ class CommandAdmission:
         except Exception:  # noqa: BLE001 - the ordinary identity checks still apply
             connector = None
         if connector is not None:
+            prior = self._completion_tickets.pop(entry_id, None)
+            if prior is not None and asyncio.current_task() is not None:
+                self._stop_prior_tickets[asyncio.current_task()] = prior
             self._person_stops[connector] = self._person_stops.get(connector, 0) + 1
             self._generations[connector] = self._generations.get(connector, 0) + 1
             if connector in self._entry_draining:
@@ -203,11 +302,21 @@ class CommandAdmission:
         try:
             yield
         finally:
+            self._stop_prior_tickets.pop(asyncio.current_task(), None)
             _STOP_RESERVATION.reset(token)
             if connector is not None:
                 self._person_stops[connector] -= 1
                 if not self._person_stops[connector]:
                     del self._person_stops[connector]
+
+    def renew_ticket_for_durable_pause(self, entry_id: str, connector: PhysicalConnector, generation: Generation) -> None:
+        """A successfully recorded Stop may carry forward only its own prior authority."""
+        prior = self._stop_prior_tickets.get(asyncio.current_task())
+        if (prior is not None and prior[0] == connector and prior[3].revision + 1 == generation.revision
+                and prior[2] == self._lifecycle_revisions.get(entry_id, 0)
+                and self.generation(connector) == generation and self._person_stops.get(connector) == 1
+                and not self.lifecycle_blocked(entry_id, connector) and connector not in self._entry_draining):
+            self._completion_tickets[entry_id] = (connector, prior[1], prior[2], generation)
 
     async def async_begin_unarmed_entry(
         self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]], person_stop_active: Callable[[], bool]
@@ -229,6 +338,7 @@ class CommandAdmission:
         except Exception:  # noqa: BLE001 - unavailable facts cannot establish a transition
             return "entry_unavailable"
         self._entry_draining[connector] = "draining"
+        self._completion_tickets.pop(entry_id, None)
         self._generations[connector] = self._generations.get(connector, 0) + 1
         try:
             saved = await self._store.async_set_entry_transition(entry_id, identity, resolve_identity, "requested")
@@ -451,7 +561,9 @@ class CommandAdmission:
                                 result["state"] = "legacy_unarmed"
                             elif status.get("recorded_owner") == "morek_schedule":
                                 result["state"] = "morek_owned_unarmed"
-                                result["handover_completion"] = "not_proven_by_owner_record"
+                                result["handover_completion"] = ("owner_written_unconfirmed"
+                                    if status.get("handover_evidence") == "owner_written_unconfirmed"
+                                    else "not_proven_by_owner_record")
                             else:
                                 result["state"] = "ownership_unavailable"
                             result["profile_history"] = "missing_not_inventory" if outcome is None else "recorded"
@@ -589,12 +701,16 @@ class CommandAdmission:
             current = dict(resolve_identity())
             return classify_morek_identity(current) == "supported_morek" and physical_connector(current) == connector
 
+        lifecycle_revision = self._lifecycle_revisions.get(entry_id, 0)
+        generation = self.generation(connector)
+
         def stop_requested() -> bool:
-            return bool(self._person_stops.get(connector)) or self._entry_draining.get(connector) == "interrupted"
+            return (bool(self._person_stops.get(connector)) or self._entry_draining.get(connector) == "interrupted"
+                    or self._lifecycle_revisions.get(entry_id, 0) != lifecycle_revision)
 
         def can_commit() -> bool:
             return (self._entry_draining.get(connector) == "drained_unarmed" and not stop_requested()
-                    and identity_valid())
+                    and self.generation(connector) == generation and identity_valid())
 
         async with executor._lock, executor._store._lock, controller._lock, controller._assign_lock, self._lock_for(connector):
             try:
@@ -651,6 +767,23 @@ class CommandAdmission:
                     return "handover_interrupted"
                 result = await self._store.async_handover_unarmed(
                     entry_id, identity, can_commit, stop_requested, identity_valid)
+                if result == "handed_over_unarmed" and require_outcome:
+                    # The ledger can change while the owner save is awaiting.
+                    outcome = await outcomes_for(self._store._hass).read()
+                    if (not can_commit() or outcome is None or outcome.get("entry_id") != entry_id
+                            or outcome.get("uncertain") is not False or not isinstance(outcome.get("attempt"), dict)
+                            or outcome["attempt"].get("state") not in ("accepted", "rejected", "aborted_before_dispatch")
+                            or (outcome.get("removal") is not None and outcome["removal"].get("state") not in
+                                ("accepted", "rejected", "notsupported"))):
+                        return "handover_interrupted"
+                    result = await self._store.async_complete_handover(entry_id, identity, can_commit)
+                    if result != "completed" or not can_commit():
+                        return result if result != "completed" else "completion_interrupted"
+                    migration_id = self._store._records[entry_id]["handover"]["id"]
+                    # No await between final checks and the ticket/latch update.
+                    del self._entry_draining[connector]
+                    self._completion_tickets[entry_id] = (connector, migration_id, lifecycle_revision, generation)
+                    return "handed_over_unarmed"
                 if result == "handed_over_unarmed":
                     # No await between the last Stop check and this boundary.
                     del self._entry_draining[connector]
@@ -832,7 +965,37 @@ class CommandAdmission:
             if owner not in ("legacy", "morek_schedule"):
                 return AdmissionResult(False, "ownership_unavailable")
             if kind == "owned_profile":
-                return AdmissionResult(False, "schedule_mode_unarmed")
+                # This path is reachable only with a verified completed migration
+                # and a process-local ticket; neither an owner nor a disk marker alone
+                # is enough after restart or a lifecycle interruption.
+                if (owner != "morek_schedule" or status.get("handover_evidence") != "completed"
+                        or not self.ticket_current(entry_id, connector, status.get("handover_id"))):
+                    return AdmissionResult(False, "schedule_mode_unarmed")
+                from .execution_ownership import _decode, _read_envelope
+                from .morek_outcomes import outcomes_for
+                try:
+                    async with self._store._lock:
+                        raw = await self._store._hass.async_add_executor_job(_read_envelope, self._store._store.path)
+                        disk_state, disk = _decode(raw)
+                        if (disk_state != "valid" or disk != self._store._records or self._store._state != "valid"
+                                or self._store._transition_save_uncertain or self._store._cancelled_write):
+                            return AdmissionResult(False, "ownership_unavailable")
+                    outcome = await outcomes_for(self._store._hass).read()
+                    if (outcome is None or outcome.get("entry_id") != entry_id or outcome.get("uncertain") is not False
+                            or not isinstance(outcome.get("attempt"), dict)
+                            or outcome["attempt"].get("state") not in ("accepted", "rejected", "aborted_before_dispatch")
+                            or (outcome.get("removal") is not None and outcome["removal"].get("state") not in
+                                ("accepted", "rejected", "notsupported"))):
+                        return AdmissionResult(False, "profile_outcome_unavailable")
+                    fresh = dict(resolve_identity())
+                    if (classify_morek_identity(fresh) != "supported_morek" or physical_connector(fresh) != connector
+                            or self.lifecycle_blocked(entry_id, connector)
+                            or expected_generation != self.generation(connector)
+                            or not self.ticket_current(entry_id, connector, status.get("handover_id"))):
+                        return AdmissionResult(False, "stale_generation")
+                except Exception:  # noqa: BLE001 - unavailable evidence never authorizes a write
+                    return AdmissionResult(False, "ownership_unavailable")
+                return AdmissionResult(True, "allowed_owned_profile", await operation())
             if owner != "legacy":
                 return AdmissionResult(False, "legacy_not_owner")
             if status.get("armed") is not False:

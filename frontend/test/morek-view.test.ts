@@ -38,7 +38,7 @@ describe("Morek manual test panel", () => {
   ])("shows operator state %s and activation blockers", (status, label) => {
     const panel = morekPanel(document, { ...state, operator: { state: status }, ownership: { recorded_owner: "legacy" } }, true, false, null, vi.fn());
     expect(panel.textContent).toContain(label);
-    expect(panel.textContent).toContain("Automatic Morek mode unavailable and unarmed");
+    expect(panel.textContent).toContain("Schedule sending is blocked pending migration or reconfirmation");
     expect(panel.textContent).toContain("household protection");
     expect(panel.textContent).toContain("transaction authorization");
     expect(panel.textContent).toContain("not profile inventory");

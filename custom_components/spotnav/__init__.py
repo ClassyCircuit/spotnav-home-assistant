@@ -308,11 +308,13 @@ def _drop_core_ownership_choice(hass: HomeAssistant, entry: ConfigEntry) -> None
 
 async def _async_setup_ownership_metadata(
     hass: HomeAssistant, entry: ChargerConfigEntry, controller: ChargingController, *, migrate: bool = False,
-) -> None:
+) -> Any:
     """Initialize metadata now and on the control entity's next availability transition."""
     if controller.ocpp_target is None:
         return
     lifecycle_epoch = 0
+    initial_revision = (command_admission(hass).reserve_lifecycle_barrier(
+        entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target)) if migrate else None)
 
     async def ensure(expected_epoch: int) -> None:
         admission = command_admission(hass)
@@ -388,6 +390,14 @@ async def _async_setup_ownership_metadata(
 
     entry.async_on_unload(close_ownership_listener if migrate else remove_listener)
     await ensure(lifecycle_epoch)
+
+    async def release_initial_barrier() -> None:
+        if initial_revision is not None:
+            await command_admission(hass).async_release_lifecycle_barrier(
+                entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target),
+                initial_revision, lambda: lifecycle_epoch == 0)
+
+    return release_initial_barrier
 
 
 async def _async_finish_morek_migration(hass, entry, controller, executor) -> None:
@@ -466,7 +476,7 @@ async def _async_setup_charger_entry(hass: HomeAssistant, entry: ChargerConfigEn
     data = entry.runtime_data = ChargerData(controller=controller, soc_reader=soc_reader)
     entry.async_on_unload(controller.async_shutdown)
     # Establish ownership before Auto startup, initial planning or controller restore can write.
-    await _async_setup_ownership_metadata(hass, entry, controller, migrate=True)
+    release_initial_barrier = await _async_setup_ownership_metadata(hass, entry, controller, migrate=True)
     await _async_start_debug_day(hass, entry, data, controller)
 
     settings_store = domain_data(hass).auto_store
@@ -497,6 +507,8 @@ async def _async_setup_charger_entry(hass: HomeAssistant, entry: ChargerConfigEn
         )
         entry.async_on_unload(executor.async_shutdown)
         await _async_finish_morek_migration(hass, entry, controller, executor)
+        if release_initial_barrier is not None:
+            await release_initial_barrier()
         await executor.async_start()
         # Solar execution needs only the executor, controller and settings store.
         solar = data.solar = async_setup_solar_execution(
