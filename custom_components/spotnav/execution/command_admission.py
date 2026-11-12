@@ -85,6 +85,7 @@ class CommandAdmission:
         self._generations: dict[PhysicalConnector, int] = {}
         self._quiescing: set[PhysicalConnector] = set()
         self._entry_draining: dict[PhysicalConnector, str] = {}
+        self._migration_controllers: dict[PhysicalConnector, Any] = {}
         self._person_stops: dict[PhysicalConnector, int] = {}
         self._uncertain_operations: set[PhysicalConnector] = set()
         self._recovery_status: dict[str, dict[str, Any]] = {}
@@ -469,7 +470,8 @@ class CommandAdmission:
                     del self._entry_draining[connector]
 
     async def async_handover_unarmed(
-        self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]], executor: Any,
+        self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]], executor: Any, *,
+        require_outcome: bool = False,
     ) -> str:
         """Complete an in-process drain without arming or invoking a charger.
 
@@ -535,6 +537,8 @@ class CommandAdmission:
                         or (attempt is not None and attempt.start_dispatch == "unknown")):
                     return "legacy_operation_uncertain"
                 outcome = await outcomes_for(self._store._hass).read()
+                if require_outcome and (outcome is None or not isinstance(outcome.get("attempt"), dict)):
+                    return "profile_history_unavailable"
                 if outcome is not None and (outcome.get("entry_id") != entry_id or outcome.get("uncertain") is not False
                         or (outcome.get("attempt") is not None and outcome["attempt"].get("state") not in
                             ("accepted", "rejected", "aborted_before_dispatch"))
@@ -574,6 +578,40 @@ class CommandAdmission:
     def generation(self, connector: PhysicalConnector) -> Generation:
         """Capture a process-local token before queuing work; not a durable transition."""
         return Generation(connector, self._generations.get(connector, 0))
+
+    async def async_schedule_request(
+        self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]], *, requested: bool,
+    ) -> str:
+        """Persist an unarmed request or disable future work; never touch the charger.
+
+        Invalidate before waiting for admission, so a queued or persistence-bound
+        worker cannot overtake disable. A dispatched write cannot be recalled.
+        """
+        try:
+            identity = dict(resolve_identity())
+            connector = physical_connector(identity)
+            if classify_morek_identity(identity) != "supported_morek" or connector is None:
+                return "identity_unresolved"
+        except Exception:  # noqa: BLE001
+            return "identity_unresolved"
+        if self._person_stops.get(connector):
+            return "person_stop_active"
+        self._generations[connector] = self._generations.get(connector, 0) + 1
+        generation = self.generation(connector)
+
+        def current() -> bool:
+            fresh = dict(resolve_identity())
+            return (not self._person_stops.get(connector) and generation == self.generation(connector)
+                    and connector not in self._entry_draining and connector not in self._quiescing
+                    and classify_morek_identity(fresh) == "supported_morek" and physical_connector(fresh) == connector)
+
+        async with self._lock_for(connector):
+            try:
+                if not current():
+                    return "request_interrupted"
+                return await self._store.async_set_schedule_request(entry_id, identity, requested, current)
+            except Exception:  # noqa: BLE001 - unavailable evidence is not permission
+                return "request_unavailable"
 
     async def async_invalidate(self, connector: PhysicalConnector) -> Generation:
         """Invalidate previously captured work after preceding connector operations finish."""

@@ -466,9 +466,10 @@ def _session_readiness(hass: HomeAssistant, controller: Any, identity: dict[str,
     result: dict[str, Any] = {
         "control": "unknown", "vehicle": "unknown", "transaction": "unknown",
         "measurement": "unknown", "vehicle_observed_at": None,
-        "activation_blockers": ["production_dispatch_unarmed", "transaction_authorization_unverified",
-                                "held_exit_has_no_release", "external_writers_unverified",
-                                "installation_protection_conflict_unresolved"],
+        "activation_blockers": ["production_dispatch_unarmed", "activation_path_incomplete",
+                                "first_use_or_lost_state_unverified", "retained_profile_unresolved",
+                                "transaction_authorization_unverified", "held_exit_has_no_release",
+                                "external_writers_unverified", "installation_protection_conflict_unresolved"],
     }
     if not identity.get("supported") or identity.get("match_count") != 1:
         if identity.get("supported") and identity.get("match_count") == 0:
@@ -1157,7 +1158,7 @@ async def _async_schedule_action_locked(hass: HomeAssistant, entry_id: str, acti
 
 
 @websocket_api.websocket_command({vol.Required("type"): "spotnav/morek_schedule", vol.Required("api_version"): int,
-                                   vol.Required("charger_id"): str, vol.Required("action"): vol.In(("status", "send", "fetch", "clear")),
+                                   vol.Required("charger_id"): str, vol.Required("action"): vol.In(("status", "send", "fetch", "clear", "request_enable", "disable_uploads")),
                                    vol.Optional("preview_id"): str, vol.Optional("confirm_profile_id"): int})
 @websocket_api.async_response
 async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
@@ -1166,6 +1167,11 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
         return
     if msg["action"] != "status" and not is_admin(connection):
         connection.send_error(msg["id"], "spotnav_not_admin", "Administrator required")
+        return
+    if msg["action"] in ("request_enable", "disable_uploads"):
+        # In-progress intent groundwork is not a supported mode switch. Keep
+        # its records readable, but do not expose new runtime mode controls.
+        connection.send_error(msg["id"], "spotnav_morek_action_unavailable", "Schedule mode controls are unavailable")
         return
     try:
         if msg["action"] == "status":
@@ -1185,6 +1191,9 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
             if "recovery_result" in previous_recovery:
                 ownership["recovery"]["last_recovery_result"] = previous_recovery["recovery_result"]
                 admission._recovery_status[entry.entry_id]["recovery_result"] = previous_recovery["recovery_result"]
+            if "migration_result" in previous_recovery:
+                ownership["recovery"]["migration_result"] = previous_recovery["migration_result"]
+                admission._recovery_status[entry.entry_id]["migration_result"] = previous_recovery["migration_result"]
             try:
                 outcomes = await _outcome_record(hass, entry.entry_id, data)
             except (OutcomeUnavailable, ScheduleRefused):
@@ -1235,6 +1244,18 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
                       "preview": preview,
                       "cleanup": data.get("cleanup"), "cleanup_supported": True,
                       "verification": verification}
+        elif msg["action"] in ("request_enable", "disable_uploads"):
+            entry, failure = lookup_charger(hass, msg["charger_id"])
+            if failure or entry is None:
+                raise ScheduleRefused(failure or "unknown_charger")
+            admission = command_admission(hass)
+            result_code = await admission.async_schedule_request(
+                entry.entry_id,
+                lambda: _identity_status(hass, getattr(controller_for(hass, entry.entry_id), "ocpp_target", None)),
+                requested=msg["action"] == "request_enable",
+            )
+            result = {"request_result": result_code, "dispatch_allowed": False,
+                      "reason": "schedule_mode_unarmed"}
         else:
             result = await async_schedule_action(hass, msg["charger_id"], msg["action"], msg.get("preview_id"),
                                                  msg.get("confirm_profile_id"))

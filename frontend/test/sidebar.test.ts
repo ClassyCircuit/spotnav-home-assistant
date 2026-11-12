@@ -49,6 +49,11 @@ describe('actual sidebar read-only host', () => {
     current.schedule.readiness.vehicle_observed_at=new Date(now-180001).toISOString();
     expect(text(current)).toMatch(/vehicle unknown/);
     expect(text(current)).toMatch(/authorization unknown · measured charging unknown/);
+    const dispatch=dashboardAdapter(raw,current,now).model.evidence.dispatch;
+    expect(dispatch).toMatch(/schedule dispatch is unarmed/);
+    expect(dispatch).toMatch(/lost state and retained profiles are unresolved/);
+    expect(dispatch).toMatch(/Disabling the integration.*may leave the last schedule or a 0 A limit/);
+    expect(dispatch).toMatch(/External writers, installation protection and transaction authorization/);
   });
   it('decodes backend fixture without sample data and fails closed on stale or unsupported data', () => {
     const raw=fixture(); raw.generated_at=new Date().toISOString();

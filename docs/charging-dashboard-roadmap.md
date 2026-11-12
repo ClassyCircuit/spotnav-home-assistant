@@ -13,7 +13,7 @@ This document is not permission to deploy, restart HA, or issue hardware command
 
 The user wants a usable installed dashboard and automatic charging, not a permanent
 unarmed demo. Complete Stage 5 with the core daily frontend and backend connected to
-real data, reactive planning and a deliberately enabled, safe Morek schedule executor.
+real data, reactive planning and a safely migrated Morek schedule executor.
 Historical charging comparisons, monthly analytics, savings and other later features
 may remain explicitly unavailable; they are not prerequisites for this initial release.
 The optional **Charge Now** override in Stage 10 is also post-installation work,
@@ -785,10 +785,11 @@ tests are documented there; full HA collection is still blocked on Windows.
 - [ ] **5.7 Activation implementation and pre-install automated validation**
   - Umbrella only: assign 5.7a–5.7b individually; deployed activation and testing
     are the user's own 5.8 milestone, not LLM implementation tasks.
-  - After 5.5–5.6, implement and review a deliberate, reversible
-    activation path using the existing guarded worker, planner triggers and durable
-    evidence. Do not weaken interlocks or automatically retry unknown outcomes; the
-    user chooses whether and when to enable it after installation.
+  - Replace legacy execution for the supported Morek connector with the existing
+    guarded schedule worker and planner triggers, using a safe migration and durable
+    evidence. Do not build a runtime switch back to the old controller. Preserve
+    protections, do not retry unknown outcomes, and do not silently arm an unsafe
+    migration on update. The user installs and decides when to operate it.
   - Test changed and unchanged settings/prices/SOC → backend replan → guarded schedule
     reconciliation, startup/reconnect and conflict/uncertainty cases. Show proposal,
     sent ACK, effective readback and real measured flow separately on the live dashboard.
@@ -807,19 +808,47 @@ tests are documented there; full HA collection is still blocked on Windows.
     run it on a supported local host if available. If not, report the exact gap
     and evidence to the user before installation; do not claim it passed or halt
     unrelated implementation just to provision the test environment.
-- [ ] **5.7a Deliberate activation path**
-  - Implement the reviewed, reversible and explicitly enabled ownership/worker path
-    after 5.5–5.6; default unarmed and enforce all blockers. Test with mocked charger,
-    HA and persistence boundaries. No live activation or deployment is authorized.
+- [ ] **5.7a Replace Morek execution with the schedule owner**
+  - **2.5.57 partial:** charger setup now starts the existing unarmed connector
+    drain before Auto startup and invokes the existing producer-locked handover.
+    A unique durable legacy binding and settled connector-ledger attempt are required;
+    missing ownership is not initialized on this path. Missing or uncertain ledger
+    evidence leaves the entry interlocked. This is not active schedule dispatch.
+    Full setup/reconnect race and failure coverage, restart provenance, and the
+    remaining production admission invariants still need review; see handoff.
+  - **2.5.56 partial, not complete:** startup/reconnect no longer automatically
+    aborts interrupted unarmed entry markers back to legacy. It preserves the marker
+    and existing held-exit interlock; owned dispatch remains unconditionally refused.
+    Legacy-owned records and missing-document compatibility still need a reviewed
+    safe migration, including person Stop and uncertain prior writes. The interrupted
+    5.7a enable/disable draft remains in the working tree for review but its WebSocket
+    actions are refused and it grants no dispatch authority; no mode switch is offered.
+    The full single-owner migration and its admission/race matrix remain open.
+  - **2.5.55 partial, not complete:** read-only readiness and sidebar evidence now
+    explicitly report first-use/lost-state ambiguity, unresolved retained profiles,
+    held handback, external writers, protection and authorization. No enable or
+    disable operation was added; production admission remains unconditionally unarmed.
+    An enablement intent or acknowledgement cannot establish physical facts. The
+    safe migration, final-dispatch checks and their race/persistence test matrix remain.
+    This historical partial predates the decision below; a dynamic legacy handback or
+    separate runtime enable/disable mode is no longer a product requirement.
+  - Make schedule ownership the single execution path for the supported Morek
+    connector, reusing existing guarded worker and planner code. Preserve shared legacy
+    behavior for other chargers and independent protection. Assess existing ownership
+    and held-exit records before changing them; safely migrate known states and refuse
+    ambiguous or uncertain states rather than deleting or bypassing their safeguards.
+    Do not automatically restore the competing legacy controller for Morek.
   - Replace the unconditional owned-profile refusal only if the complete applicable
-    admission, durable ownership, enable/disable, restart and safety invariants are
+    admission, durable ownership, migration, restart and safety invariants are
     implemented and tested; otherwise retain it and report the exact blocker. Target-SOC
     cheapest-price plans are the only currently provenance-checked scope; do not silently
     enable manual-kWh or solar/hybrid modes. Surface supported scope and refusal reasons.
-  - The held-exit interlock has no release path. Retained-profile resolution and any
-    required user decision are activation blockers; do not silently release a limit
-    or bypass the interlock. Existing protection and external-writer conflicts also
-    require a reviewed installation-specific resolution before activation.
+  - Disabling the HA integration is the user's chosen way to stop SpotNav; it may
+    leave a schedule or 0 A limit on the charger. Explain this honestly; no automatic
+    clear or runtime legacy handback is required. Resolve or retain blockers for
+    unknown profile outcomes, retained-profile consequences, first-use/lost-state
+    ambiguity, external writers and installation protection; do not treat the removal
+    of a mode switch as evidence that the charger is in a safe state.
 - [ ] **5.7b End-to-end local regression and release handoff**
   - Exercise settings/price/SOC → plan → guarded reconciliation, stable-plan
     deduplication, restart/reconnect, uncertainty and operator status with mocks;
@@ -1274,9 +1303,9 @@ Inspect the planner, `execution/session_runner.py`, OCPP adapter/actions, Auto
 pause/resume, direct current/number writes, startup/reconnect and site-control
 paths. Inspect—not assume—current charger transaction authorization behavior.
 
-Deliver a short implementation map listing every writer and where Morek-mode
-gates belong. Specify how to enter/leave schedule-only mode, what existing
-profile remains installed, and what must be approved before hardware testing.
+Deliver a short implementation map listing every writer and where Morek ownership
+guards belong. Specify migration to the single schedule owner, what may remain
+stored on the charger, and what must be approved before hardware testing.
 
 **Done when:** there is an explicit ownership/transition design, an authorization
 plan, and a test matrix showing how conflicting writes will be detected.
@@ -1284,23 +1313,20 @@ No live commands, mode changes or file deployment are needed for this audit.
 
 ### A2 — Enforce exclusive schedule-only mode
 
-Add a persisted per-connector execution mode with safe migration from the current
-manual experiment. Do not silently arm autonomous control on an integration update.
-After deliberate setup, Morek mode is the user's normal path; legacy live
-execution cannot also own that connector. Replace the temporary “pause old Auto
-forever” requirement with this ownership interlock, not with a deleted safeguard.
+Use a single schedule execution path for the supported Morek connector with safe
+migration from the current manual experiment. Do not silently arm unsafe control
+on an integration update. Legacy live execution cannot also own that connector;
+retain shared legacy support for other chargers and the ownership safeguards.
 
-Define separate semantics for **suspend automatic uploads**, **pause charging**,
-**remove stored schedule**, and **leave schedule mode**. They are not equivalent:
-stopping uploads leaves a profile installed, and removing a 0 A limit may allow
-charging. If pause/charge-now controls are included, express them through the same
-owned profile/executor, never a hidden return to legacy RemoteStart/RemoteStop.
-Do not ship an ambiguous “Auto” button whose meaning depends on a hidden mode.
+Keep **disable the integration**, **pause charging**, and **remove stored schedule**
+distinct: disabling SpotNav may leave a profile installed, and removing a 0 A limit
+may allow charging. Pause and Charge Now use the same schedule owner, never a hidden
+return to legacy RemoteStart/RemoteStop. No runtime switch back is required.
 
 **Done when:** automated tests prove that all applicable legacy writers emit no
 conflicting commands in Morek mode, including at scheduled boundaries and reload.
-Read-only diagnostics and independent protections still work. Entry/exit policy
-and the remaining stored limits are explicit to the operator.
+Read-only diagnostics and independent protections still work. Migration and any
+known or uncertain retained limits are explicit to the operator.
 
 ### A2P — Soft price cap, minimum ready-by SOC and reactive planning
 
@@ -1592,7 +1618,7 @@ sections in this order. No essential Morek section is collapsed by default.
 - History retention: proposed 90 days detailed traces plus longer-term aggregates;
   confirm storage impact and preference before treating that as agreed policy.
 - New-transaction authorization, active-window update policy, invalid/no-price
-  policy, charging pause/boost behavior and safe mode exit must be resolved in
+  policy, charging pause/boost behavior and safe retained-profile migration must be resolved in
   A1–A4/A2P. The soft-cap/minimum-SOC requirement is agreed; only precise cost
   basis/defaults, missing-data and infeasible-case behavior remain to specify.
   Do not improvise these while drawing widgets.

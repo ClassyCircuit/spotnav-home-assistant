@@ -307,7 +307,7 @@ def _drop_core_ownership_choice(hass: HomeAssistant, entry: ConfigEntry) -> None
 
 
 async def _async_setup_ownership_metadata(
-    hass: HomeAssistant, entry: ChargerConfigEntry, controller: ChargingController
+    hass: HomeAssistant, entry: ChargerConfigEntry, controller: ChargingController, *, migrate: bool = False,
 ) -> None:
     """Initialize metadata now and on the control entity's next availability transition."""
     if controller.ocpp_target is None:
@@ -317,15 +317,29 @@ async def _async_setup_ownership_metadata(
         admission = command_admission(hass)
         def identity():
             return _identity_status(hass, controller.ocpp_target)
-        await admission.async_ensure_initialized(entry.entry_id, identity)
+        if migrate:
+            # Never recreate a missing document and then mistake it for a known
+            # legacy binding. Existing malformed/conflicting records fail closed.
+            existing = await admission._store.async_status(entry.entry_id, dict(identity()))
+            if existing.get("record_state") == "valid":
+                await admission.async_ensure_initialized(entry.entry_id, identity)
+        else:
+            await admission.async_ensure_initialized(entry.entry_id, identity)
+        # An interrupted migration is not a request to restore the old Morek
+        # executor. Preserve its durable interlock on startup and reconnect.
         evidence = await admission.async_recovery_status(entry.entry_id, identity)
-        if evidence["state"] in ("entry_requested", "entry_interrupted", "entry_drained_unarmed"):
-            # This only clears an unarmed legacy marker when the existing abort
-            # proves an indefinite durable Auto pause and known outcomes.
-            recovered = await admission.async_recover_unarmed(entry.entry_id, identity)
-            evidence = await admission.async_recovery_status(entry.entry_id, identity)
-            evidence["recovery_result"] = recovered
-            admission._recovery_status[entry.entry_id] = evidence
+        if (migrate and existing.get("record_state") == "valid"
+                and existing.get("recorded_owner") == "legacy" and existing.get("transition_state") is None):
+            result = await admission.async_begin_unarmed_entry(entry.entry_id, identity, lambda: False)
+            admission._recovery_status[entry.entry_id] = {**evidence, "migration_result": result}
+            if result == "drained_unarmed":
+                from .execution.command_admission import physical_connector
+                connector = physical_connector(identity())
+                if connector is not None:
+                    admission._migration_controllers[connector] = controller
+            executor = getattr(getattr(entry, "runtime_data", None), "executor", None)
+            if result == "drained_unarmed" and executor is not None:
+                await _async_finish_morek_migration(hass, entry, controller, executor)
 
     @callback
     def control_available(event: Event) -> None:
@@ -348,6 +362,24 @@ async def _async_setup_ownership_metadata(
 
     entry.async_on_unload(async_track_state_change_event(hass, [controller.charge_control], control_available))
     await ensure()
+
+
+async def _async_finish_morek_migration(hass, entry, controller, executor) -> None:
+    """Complete only this process's drained entry before producers start."""
+    admission = command_admission(hass)
+    def identity():
+        return _identity_status(hass, controller.ocpp_target)
+
+    from .execution.command_admission import physical_connector
+    connector = physical_connector(identity())
+    if (connector is None or admission._entry_draining.get(connector) != "drained_unarmed"
+            or admission._migration_controllers.get(connector) is not controller):
+        return
+    result = await admission.async_handover_unarmed(entry.entry_id, identity, executor, require_outcome=True)
+    if result == "handed_over_unarmed":
+        admission._migration_controllers.pop(connector, None)
+    evidence = await admission.async_recovery_status(entry.entry_id, identity)
+    admission._recovery_status[entry.entry_id] = {**evidence, "migration_result": result}
 
 
 async def _async_setup_charger_entry(hass: HomeAssistant, entry: ChargerConfigEntry) -> bool:
@@ -408,7 +440,7 @@ async def _async_setup_charger_entry(hass: HomeAssistant, entry: ChargerConfigEn
     data = entry.runtime_data = ChargerData(controller=controller, soc_reader=soc_reader)
     entry.async_on_unload(controller.async_shutdown)
     # Establish ownership before Auto startup, initial planning or controller restore can write.
-    await _async_setup_ownership_metadata(hass, entry, controller)
+    await _async_setup_ownership_metadata(hass, entry, controller, migrate=True)
     await _async_start_debug_day(hass, entry, data, controller)
 
     settings_store = domain_data(hass).auto_store
@@ -438,6 +470,7 @@ async def _async_setup_charger_entry(hass: HomeAssistant, entry: ChargerConfigEn
             owned_manual_action=owned_manual_action,
         )
         entry.async_on_unload(executor.async_shutdown)
+        await _async_finish_morek_migration(hass, entry, controller, executor)
         await executor.async_start()
         # Solar execution needs only the executor, controller and settings store.
         solar = data.solar = async_setup_solar_execution(

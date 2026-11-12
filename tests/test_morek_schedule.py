@@ -237,6 +237,23 @@ async def test_status_exposes_read_only_unarmed_ownership(monkeypatch):
     connection.send_error.assert_not_called()
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action", ["request_enable", "disable_uploads"])
+@pytest.mark.parametrize("admin", [False, True])
+async def test_draft_mode_actions_cannot_be_invoked(monkeypatch, action, admin):
+    admission = SimpleNamespace(async_schedule_request=AsyncMock())
+    monkeypatch.setattr(morek_schedule, "is_admin", lambda _: admin)
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda _: admission)
+    connection = SimpleNamespace(send_result=Mock(), send_error=Mock())
+    await morek_schedule.websocket_morek_schedule.__wrapped__(
+        SimpleNamespace(data={}), connection,
+        {"id": 1, "api_version": 1, "charger_id": "charger", "action": action})
+    assert connection.send_error.call_args.args[1] == (
+        "spotnav_morek_action_unavailable" if admin else "spotnav_not_admin")
+    connection.send_result.assert_not_called()
+    admission.async_schedule_request.assert_not_awaited()
+
+
 @pytest.mark.parametrize(("online", "outcomes", "verification", "verified", "preview", "sending", "expected"), [
     (True, {"uncertain": False}, {}, False, {"reason": "prices_unavailable"}, None, "waiting"),
     (False, {"uncertain": False}, {}, False, {}, None, "offline"),

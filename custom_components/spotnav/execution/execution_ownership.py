@@ -53,7 +53,8 @@ def _decode(raw: Any) -> tuple[str, dict[str, dict[str, Any]]]:
     for entry_id, record in records.items():
         if (not isinstance(entry_id, str) or not entry_id or not isinstance(record, dict)
                 or set(record) not in ({"station_id", "connector_id", "owner"},
-                                       {"station_id", "connector_id", "owner", "transition"})
+                                       {"station_id", "connector_id", "owner", "transition"},
+                                       {"station_id", "connector_id", "owner", "schedule_request"})
                 or not isinstance(record["station_id"], str) or not record["station_id"]
                 or type(record["connector_id"]) is not int or record["connector_id"] < 1
                 or record["owner"] not in ("legacy", "morek_schedule")):
@@ -64,6 +65,12 @@ def _decode(raw: Any) -> tuple[str, dict[str, dict[str, Any]]]:
                     or set(transition) != {"version", "state"} or type(transition["version"]) is not int
                     or transition["version"] != 1 or transition["state"] not in
                     ("requested", "interrupted", "drained_unarmed", "exit_held_unarmed")):
+                return "malformed", {}
+        if "schedule_request" in record:
+            request = record["schedule_request"]
+            if (record["owner"] != "morek_schedule" or not isinstance(request, dict)
+                    or set(request) != {"version", "state"} or type(request["version"]) is not int
+                    or request["version"] != 1 or request["state"] not in ("requested", "disabled")):
                 return "malformed", {}
     return "valid", records
 
@@ -82,6 +89,60 @@ class ExecutionOwnershipStore:
         self._cancelled_write = False
         self._transition_save_uncertain = False
         self._owner_save_uncertain = False
+
+    async def async_set_schedule_request(
+        self, entry_id: str, identity: Mapping[str, Any], requested: bool, can_commit: Callable[[], bool],
+    ) -> str:
+        """Persist intent only; neither value grants dispatch or changes ownership.
+
+        The connector lock is held by admission. A possibly landed interrupted
+        request is never authority, including after restart.
+        """
+        async with self._lock:
+            await self._load()
+            physical = (identity.get("resolved_id"), identity.get("connector_id"))
+            record = self._records.get(entry_id)
+            if (self._state != "valid" or self._transition_save_uncertain or self._cancelled_write
+                    or not record or record.get("owner") != "morek_schedule"
+                    or (record["station_id"], record["connector_id"]) != physical
+                    or len(self._contenders.get(physical, set())) > 1
+                    or any(other != entry_id and (item["station_id"], item["connector_id"]) == physical
+                           for other, item in self._records.items())):
+                return "ownership_unavailable"
+            try:
+                state, disk = _decode(await self._hass.async_add_executor_job(_read_envelope, self._store.path))
+                if state != "valid" or disk != self._records or not can_commit():
+                    return "request_interrupted"
+                value = {"version": 1, "state": "requested" if requested else "disabled"}
+                if record.get("schedule_request") == value:
+                    return "already_requested" if requested else "already_disabled"
+                records = {**self._records, entry_id: {**record, "schedule_request": value}}
+                await self._store.async_save({"schema_version": SCHEMA_VERSION, "records": records})
+                state, disk = _decode(await self._hass.async_add_executor_job(_read_envelope, self._store.path))
+                if state != "valid" or disk != records:
+                    raise OSError("request verification failed")
+                self._records = records
+                if not can_commit():
+                    # A request cannot authorize dispatch, but don't leave a
+                    # superseded enable displayed as a current request.
+                    if requested:
+                        records = {**records, entry_id: {**records[entry_id], "schedule_request":
+                                                        {"version": 1, "state": "disabled"}}}
+                        await self._store.async_save({"schema_version": SCHEMA_VERSION, "records": records})
+                        state, disk = _decode(await self._hass.async_add_executor_job(_read_envelope, self._store.path))
+                        if state != "valid" or disk != records:
+                            raise OSError("request compensation verification failed")
+                        self._records = records
+                    return "request_interrupted"
+                return "requested_unarmed" if requested else "disabled"
+            except asyncio.CancelledError:
+                self._state = "save_failed"
+                self._transition_save_uncertain = self._cancelled_write = True
+                raise
+            except Exception:  # noqa: BLE001 - a write may have landed; do not retry
+                self._state = "save_failed"
+                self._transition_save_uncertain = True
+                return "save_uncertain"
 
     async def async_handover_unarmed(
         self, entry_id: str, identity: Mapping[str, Any], can_commit: Callable[[], bool],
@@ -244,7 +305,8 @@ class ExecutionOwnershipStore:
                 state, disk = _decode(await self._hass.async_add_executor_job(_read_envelope, self._store.path))
                 if state != "valid" or disk != self._records or not can_commit():
                     return "exit_interrupted"
-                held = {**record, "owner": "legacy", "transition": {"version": 1, "state": "exit_held_unarmed"}}
+                held = {key: value for key, value in record.items() if key != "schedule_request"}
+                held.update({"owner": "legacy", "transition": {"version": 1, "state": "exit_held_unarmed"}})
                 records = {**self._records, entry_id: held}
                 await self._store.async_save({"schema_version": SCHEMA_VERSION, "records": records})
                 state, disk = _decode(await self._hass.async_add_executor_job(_read_envelope, self._store.path))
@@ -384,6 +446,7 @@ class ExecutionOwnershipStore:
                 "station_id": record["station_id"] if record else None,
                 "connector_id": record["connector_id"] if record else None,
                 "transition_state": record.get("transition", {}).get("state") if record and state == "valid" else None,
+                "schedule_request": record.get("schedule_request", {}).get("state", "disabled") if record and state == "valid" else "unavailable",
                 "person_stop_safe_during_transition_failure": person_stop_safe,
                 "schedule_mode_available": False,
                 "armed": False,

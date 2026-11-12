@@ -6,6 +6,15 @@ Re-check the live system and Git state before acting; observations below may bec
 
 ## Approved next direction (planning, not implemented)
 
+**Single Morek execution path:** the user no longer wants a runtime switch back to
+the legacy controller or a separate dynamic handback protocol. Replace Morek's old
+execution behavior with the schedule owner; retain shared legacy behavior for other
+chargers. The user can disable the integration in HA, which may leave a schedule or
+0 A limit on the charger. Preserve and assess existing ownership/held-exit records,
+uncertain outcomes and protection guards; do not delete them blindly, auto-clear a
+profile, or silently arm an unsafe migration. Historical handback requirements below
+are superseded as product requirements, not as permission to bypass safety evidence.
+
 **BMW limit and current monitoring:** the user relies on the BMW's own configured
 charge limit to stop charging at its target, not a second SpotNav live SOC-stop
 controller. The car's setting and SpotNav's planning target are separate; their
@@ -330,6 +339,108 @@ requirements, not features claimed implemented in the manual baseline below.
   Do not assume `GetCompositeSchedule` lists stored profiles.
 
 ## Tests, build, and next steps
+
+### 2026-11-12 — 5.7a wired unarmed migration (2.5.57; partial)
+
+- Charger setup now uses existing entry/drain and producer-locked handover before
+  starting Auto. It accepts only a uniquely bound durable legacy record and, at
+  handover, a connector outcome ledger containing a settled attempt; missing or
+  uncertain outcomes leave the durable entry marker and ordinary writers blocked.
+  A missing ownership document is not recreated on this setup path. Existing held
+  exits and interrupted entry markers remain untouched. Owned-profile admission is
+  still unconditionally unarmed; this is not automatic charging or physical evidence.
+- Actual setup invokes the migration helpers, and mocked tests exercise the helpers
+  with actual admission, store, executor and controller, as well as setup ordering
+  with mocked producers. A fully wired positive setup test and the requested complete
+  restart, reconnect, cancellation, duplicate contender and Stop boundary matrix
+  remain outstanding. In particular, the availability callback schedules its
+  initialization asynchronously; whether a legacy writer can enter before a late
+  reconnect migration establishes its latch needs further investigation. Do not
+  consider single-owner migration complete or deploy this as a verified release.
+- Ledger evidence is not profile inventory and does not establish absence of
+  external writers or resolve protection, authorization or the historical mismatch.
+  No charger command, clear or live operation was performed. The preserved
+  enable/disable draft stays inaccessible through WebSocket. 5.7a and 5.7b remain open.
+- Checks: `python tools/run_isolated_planning_tests.py -x` 548 passed, 1 deselected;
+  `python tools/run_isolated_lifecycle_tests.py -x` 138 passed; expanded lifecycle
+  with `tests/test_morek_schedule.py tests/test_morek_readiness.py
+  tests/test_command_admission.py tests/test_execution_ownership.py
+  tests/test_morek_outcomes.py -x` 282 passed. Targeted Ruff, frontend type-check,
+  build, check-dist and focused sidebar/Morek tests (61 passed) passed. An initial
+  lifecycle run failed an old expectation that startup admits two legacy writes;
+  the test was changed to expect the new interlock, and the rerun passed. Existing
+  pytest timeout/deprecation, jsdom CSS and Git line-ending warnings remain. Full
+  5.4c HA-plugin suite was not run.
+
+### 2026-11-12 — 5.7a single-owner direction (2.5.56; partial)
+
+- The user's revised direction is one Morek schedule owner, not a runtime switch
+  back to legacy. Startup and reconnect now preserve requested, interrupted and
+  drained unarmed migration markers rather than automatically aborting them to
+  legacy; held exits stay blocked. The old internal explicit guarded abort still
+  exists and is not a new user control. This change does not migrate a legacy
+  record to the schedule owner or prevent all legacy Morek execution today.
+- An interrupted previous 5.7a draft added `schedule_request` ownership fields,
+  internal request methods and WebSocket action branches. They are preserved for
+  coordinator review, but the two draft WebSocket actions now unconditionally
+  refuse before reaching those branches; no user-facing switch is offered. The
+  draft is not an admission invariant and has not been fully race-tested. Production
+  owned-profile dispatch remains unconditionally `schedule_mode_unarmed`.
+- Missing ownership is still initialized as legacy for compatibility; that is not
+  first-use evidence. A safe transition that preserves Stop while draining all
+  producers and resolves interrupted/unknown writes remains necessary before
+  claiming a sole schedule path. Held exits and retained profiles are unresolved;
+  external writers, actual protection configuration, transaction authorization,
+  the historical mismatch and trustworthy measured flow require installation-specific
+  investigation. Neither ACK nor composite readback establishes profile inventory
+  or physical charging. Do not infer authorization from the revised product direction.
+  Target-SOC cheapest-price planning remains the only provenance-checked automatic scope.
+- Disabling the integration can stop SpotNav activity without clearing a profile;
+  a stored schedule or 0 A limit may remain. No physical stop is promised. There
+  was no live HA, deployment, profile action or physical validation. 5.7a and 5.7b
+  remain open; stop for coordinator review.
+- Mocked checks: `python tools/run_isolated_planning_tests.py -x` 548 passed,
+  1 deselected; `python tools/run_isolated_lifecycle_tests.py -x` 134 passed;
+  `python tools/run_isolated_lifecycle_tests.py tests/test_morek_schedule.py
+  tests/test_morek_readiness.py tests/test_command_admission.py
+  tests/test_execution_ownership.py tests/test_morek_outcomes.py -x` 278 passed.
+  The first expanded lifecycle run stopped at one test expecting the previous
+  automatic abort; that regression now explicitly exercises failed guarded recovery
+  and passes. Targeted Ruff, frontend type-check, build, check-dist and sidebar/Morek
+  tests (61 passed), and `git diff --check` passed. Existing pytest timeout-option
+  and dependency deprecation, jsdom CSS parsing, and Git line-ending warnings remain.
+  The full 5.4c HA-plugin suite was not run.
+
+### 2026-11-12 — 5.7a partial blocker reporting (2.5.55; review required)
+
+- Read-only readiness adds explicit incomplete activation, first-use/lost-state and
+  retained-profile blockers. Sidebar evidence explains these and the unresolved held
+  exit, external writers, protection and authorization, and distinguishes disabling
+  uploads, Pause and profile removal. It introduces no activation intent or action.
+  Production owned-profile admission remains unconditionally `schedule_mode_unarmed`;
+  schedule-owned controls remain disabled and `exit_held_unarmed` has no release.
+- 5.7a is **not complete**: a durable, deliberate enable/disable protocol, proof of
+  safe entry and handback, final dispatch revalidation and the requested new full
+  mocked transition/race matrix remain. Missing ownership/outcome history cannot
+  prove first use or absence of retained profiles; neither ACK nor composite readback
+  is an inventory or physical-flow evidence. External writers and installation
+  protection require an installation-specific resolution, and authorization and
+  trustworthy flow measurements remain unverified. User attestation alone does not
+  establish these unknowns. Only target-SOC cheapest-price provenance is supported.
+  No new load controller, BMW control, profile clear or retained-limit release exists.
+- Local checks: `python tools/run_isolated_planning_tests.py -x` 544 passed,
+  1 deselected; `python tools/run_isolated_lifecycle_tests.py -x` 130 passed;
+  `python tools/run_isolated_lifecycle_tests.py tests/test_morek_schedule.py
+  tests/test_morek_readiness.py tests/test_command_admission.py
+  tests/test_execution_ownership.py tests/test_morek_outcomes.py -x` 270 passed.
+  `python tools/run_isolated_planning_tests.py tests/test_morek_worker.py -x`
+  also reported 544 passed, 1 deselected. Targeted Ruff and frontend type-check,
+  `npm run build`, `npm run check-dist` and focused sidebar/Morek tests passed
+  (61 tests); `git diff --check` passed with line-ending warnings.
+  Pytest reported existing timeout-option and dependency deprecation warnings;
+  jsdom reported CSS parse warnings. The full 5.4c HA-plugin suite remains unrun.
+  No live HA, deployment or physical charging was tested. Stop for coordinator review;
+  5.7a and 5.7b remain open.
 
 ### 2026-11-12 — 5.6c invalid plans and writers (2.5.54; mocked, quick review)
 
