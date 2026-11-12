@@ -92,6 +92,7 @@ class CommandAdmission:
         self._lifecycle_barriers: dict[str, PhysicalConnector | None] = {}
         self._lifecycle_revisions: dict[str, int] = {}
         self._person_stops: dict[PhysicalConnector, int] = {}
+        self._stop_revisions: dict[str, int] = {}
         self._uncertain_operations: set[PhysicalConnector] = set()
         self._recovery_status: dict[str, dict[str, Any]] = {}
         self._completion_tickets: dict[str, tuple[PhysicalConnector, str, int, Generation]] = {}
@@ -227,6 +228,8 @@ class CommandAdmission:
 
     async def async_reconfirm_completed(
         self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]], *, expected_migration: str | None = None,
+        expected_revision: int | None = None, require_dispatch_evidence: bool = False,
+        expected_stop_revision: int | None = None,
     ) -> str:
         """Explicitly reconfirm a completed owner; never operate the charger."""
         from .execution_ownership import _decode, _read_envelope
@@ -238,11 +241,15 @@ class CommandAdmission:
             if classify_morek_identity(identity) != "supported_morek" or connector is None:
                 return "identity_unresolved"
             revision = self._lifecycle_revisions.get(entry_id, 0)
+            if expected_revision is not None and revision != expected_revision:
+                return "reconfirmation_interrupted"
             generation = self.generation(connector)
 
             def current() -> bool:
                 fresh = dict(resolve_identity())
                 return (self._lifecycle_revisions.get(entry_id, 0) == revision
+                        and (expected_stop_revision is None or
+                             self._stop_revisions.get(entry_id, 0) == expected_stop_revision)
                         and self.generation(connector) == generation and not self._person_stops.get(connector)
                         and connector not in self._entry_draining and connector not in self._quiescing
                         and connector not in self._uncertain_operations
@@ -271,6 +278,18 @@ class CommandAdmission:
                         or (outcome.get("removal") is not None and outcome["removal"].get("state") not in
                             ("accepted", "rejected", "notsupported"))):
                     return "profile_outcome_unavailable"
+                if require_dispatch_evidence:
+                    proof = outcome.get("migration_dispatch_evidence")
+                    if (not isinstance(proof, dict) or set(proof) != {
+                            "version", "migration_id", "station_id", "connector_id", "attempt_id", "ack"}
+                            or type(proof.get("version")) is not int or proof["version"] != 1
+                            or proof.get("migration_id") != status["handover_id"]
+                            or proof.get("station_id") != connector.station_id
+                            or type(proof.get("connector_id")) is not int or proof["connector_id"] != connector.connector_id
+                            or not isinstance(proof.get("attempt_id"), str) or len(proof["attempt_id"]) != 32
+                            or any(c not in "0123456789abcdef" for c in proof["attempt_id"])
+                            or proof.get("ack") not in ("accepted", "rejected", "notsupported")):
+                        return "restart_dispatch_evidence_unavailable"
                 if not current():
                     return "reconfirmation_interrupted"
                 ticket = (connector, status["handover_id"], revision, generation)
@@ -285,6 +304,21 @@ class CommandAdmission:
             return "reconfirmed"
         except Exception:  # noqa: BLE001 - missing or malformed evidence is not authority
             return "reconfirmation_unavailable"
+
+    async def async_recover_after_restart(
+        self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]], revision: int, stop_revision: int,
+    ) -> str:
+        """Recover only from evidence of an actual ticket-admitted settled worker call.
+
+        A completed marker alone may have landed during an interrupted handover.
+        A later worker response could only be recorded after the in-process ticket
+        passed final checks and the request was dispatched. A Stop not durably
+        recorded after that dispatch cannot be recovered after a process crash.
+        """
+        result = await self.async_reconfirm_completed(
+            entry_id, resolve_identity, expected_revision=revision, require_dispatch_evidence=True,
+            expected_stop_revision=stop_revision)
+        return "automatic_recovery_ready" if result == "reconfirmed" else result
 
     async def async_restore_reconnect(self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]],
                                       revision: int) -> bool:
@@ -305,6 +339,7 @@ class CommandAdmission:
         if current is not None and current[0] is self and current[1] == entry_id and current[2] is not None and current[3] is asyncio.current_task():
             yield
             return
+        self._stop_revisions[entry_id] = self._stop_revisions.get(entry_id, 0) + 1
         try:
             identity = resolve_identity()
             offline_intent = (identity.get("reason") == "offline_owned_intent"
@@ -320,6 +355,10 @@ class CommandAdmission:
             # A Stop while offline must invalidate the in-process reconnect
             # candidate even when the resolver cannot currently identify Morek.
             connector = candidate[0]
+        if connector is None and (prior_ticket := self._completion_tickets.get(entry_id)) is not None:
+            # A temporarily unresolved identity must not allow a newer Stop to
+            # leave a just-issued restart ticket live.
+            connector = prior_ticket[0]
         if connector is not None:
             prior = self._completion_tickets.pop(entry_id, None)
             if prior is not None and asyncio.current_task() is not None:

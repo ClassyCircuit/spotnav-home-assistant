@@ -59843,7 +59843,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
       untilDeadline: U,
       targetNote: "",
       warning: warning ? { title: "Morek health requires attention", detail: `${health}${status?.outcomes?.uncertain && (status?.operator?.state === "mismatch" || status?.verification?.reason === "limits_or_transitions_differ") ? " \xB7 Effective limits mismatch the sent schedule." : ""}` } : null,
-      evidence: { status: health, context: `Morek status observed ${date(observedAt, zone)}${failed ? " \xB7 unavailable" : ""}; separate from dashboard`, readiness, proposal: date(d3.planning?.calculated_at, zone), sent: `${date(status?.sent_at, zone)} \xB7 ${status?.ack || U}`, readback: date(status?.effective?.fetched_at, zone), measurement: "SOC age and measured power unavailable when stale or unsupported", dispatch: `${status?.ownership?.completion_authorized ? "Schedule ownership confirmed for this process." : "Schedule dispatch blocked; admin reconfirmation is required after restart and may be required after an interrupted reconnect."} External OCPP writers and native protection are not verified; the historical mismatch does not establish current state. A held exit or uncertain outcome remains blocked. Disabling the integration may leave a schedule or 0 A limit; no physical stop or profile removal is implied.` },
+      evidence: { status: health, context: `Morek status observed ${date(observedAt, zone)}${failed ? " \xB7 unavailable" : ""}; separate from dashboard`, readiness, proposal: date(d3.planning?.calculated_at, zone), sent: `${date(status?.sent_at, zone)} \xB7 ${status?.ack || U}`, readback: date(status?.effective?.fetched_at, zone), measurement: "SOC age and measured power unavailable when stale or unsupported", dispatch: `${status?.ownership?.completion_authorized ? "Schedule ownership confirmed for this process." : "Schedule dispatch blocked; automatic recovery needs a prior settled worker response, otherwise admin reconfirmation may be required."} External OCPP writers and native protection are not verified; the historical mismatch does not establish current state. A held exit or uncertain outcome remains blocked. Disabling the integration may leave a schedule or 0 A limit; no physical stop or profile removal is implied.` },
       labels: { settingsNote: "Read-only preview. Plan controls are unavailable in this slice.", saveLabel: "Save plan \xB7 unavailable", powerNote: "No verified general Morek power source", planLabel: "Backend policy:", chartIntro: "Published source price before configured fiscal additions; source-included charges may apply.", chartNote: `Held published intervals only. ${priceFreshness} Unpublished future and history are unavailable. Cap is omitted if its basis differs or is unknown.`, bands: "", dialogNote: "Proposal only; not necessarily sent.", footer: "Dashboard and Morek status are separate observations." }
     },
     actions: {}
@@ -59851,7 +59851,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.64";
+var CARD_VERSION = "2.5.65";
 
 // sidebar/panel.js
 var settingsWritesByConnection = /* @__PURE__ */ new WeakMap();

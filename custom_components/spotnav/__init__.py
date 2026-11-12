@@ -313,10 +313,13 @@ async def _async_setup_ownership_metadata(
     if controller.ocpp_target is None:
         return
     lifecycle_epoch = 0
+    restart_pending = migrate
+    startup_stop_revision = command_admission(hass)._stop_revisions.get(entry.entry_id, 0) if migrate else 0
     initial_revision = (command_admission(hass).reserve_lifecycle_barrier(
         entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target)) if migrate else None)
 
     async def ensure(expected_epoch: int) -> None:
+        nonlocal restart_pending
         admission = command_admission(hass)
         def identity():
             return _identity_status(hass, controller.ocpp_target)
@@ -335,6 +338,7 @@ async def _async_setup_ownership_metadata(
             return
         if (migrate and existing.get("record_state") == "valid"
                 and existing.get("recorded_owner") == "legacy" and existing.get("transition_state") is None):
+            restart_pending = False
             result = await admission.async_begin_unarmed_entry(
                 entry.entry_id, identity, lambda: expected_epoch != lifecycle_epoch)
             admission._recovery_status[entry.entry_id] = {**evidence, "migration_result": result}
@@ -368,11 +372,20 @@ async def _async_setup_ownership_metadata(
         generation = worker.suspend_for_availability_change() if worker is not None else None
         if is_available:
             async def initialize_and_reconcile() -> None:
+                nonlocal restart_pending
                 await ensure(epoch)  # Never acquire admission recursively in the worker.
                 if migrate and barrier_revision is not None:
-                    await command_admission(hass).async_restore_reconnect(
+                    admission = command_admission(hass)
+                    restored = await admission.async_restore_reconnect(
                         entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target), barrier_revision)
-                    await command_admission(hass).async_release_lifecycle_barrier(
+                    if not restored and restart_pending and epoch == lifecycle_epoch:
+                        result = await admission.async_recover_after_restart(
+                            entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target), barrier_revision,
+                            startup_stop_revision)
+                        admission._recovery_status.setdefault(entry.entry_id, {})["automatic_recovery"] = result
+                        if result == "automatic_recovery_ready":
+                            restart_pending = False
+                    await admission.async_release_lifecycle_barrier(
                         entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target),
                         barrier_revision, lambda: epoch == lifecycle_epoch)
                 current = getattr(getattr(entry, "runtime_data", None), "morek_worker", None)
@@ -394,8 +407,21 @@ async def _async_setup_ownership_metadata(
     await ensure(lifecycle_epoch)
 
     async def release_initial_barrier() -> None:
+        nonlocal restart_pending
         if initial_revision is not None:
-            await command_admission(hass).async_release_lifecycle_barrier(
+            admission = command_admission(hass)
+            from .execution.command_admission import physical_connector
+            connector = physical_connector(_identity_status(hass, controller.ocpp_target))
+            if (restart_pending and lifecycle_epoch == 0 and (connector is None or
+                    not admission.ticket_current(entry.entry_id, connector,
+                        (ticket := admission._completion_tickets.get(entry.entry_id)) and ticket[1]))):
+                result = await admission.async_recover_after_restart(
+                    entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target), initial_revision,
+                    startup_stop_revision)
+                admission._recovery_status.setdefault(entry.entry_id, {})["automatic_recovery"] = result
+                if result == "automatic_recovery_ready":
+                    restart_pending = False
+            await admission.async_release_lifecycle_barrier(
                 entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target),
                 initial_revision, lambda: lifecycle_epoch == 0)
 

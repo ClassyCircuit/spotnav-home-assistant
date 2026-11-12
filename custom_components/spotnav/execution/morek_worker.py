@@ -159,10 +159,12 @@ class MorekScheduleWorker:
                 if pause is not None and pause["type"] == "resume_requested" and self.resume_ticket != (pause["id"], generation):
                     return "resume_requires_confirmation", None, None
                 _, fingerprint = self._intent(pause)
+                ticket = admission._completion_tickets.get(self._entry_id)
                 outcome = await morek_schedule._send_profile_shared(
                     self._hass, self._entry_id, data, store, fingerprint, validate, automatic=True,
                     pause_id=None if pause is None else pause["id"],
-                    validate_durable=lambda: admission.async_owned_boundary_current(self._entry_id, connector))
+                    validate_durable=lambda: admission.async_owned_boundary_current(self._entry_id, connector),
+                    migration_id=None if ticket is None else ticket[1])
                 return outcome, data.get("sent_at"), data.get("attempt_id")
 
         result = await admission.async_execute(

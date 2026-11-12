@@ -162,6 +162,20 @@ async def test_actual_setup_to_real_worker_profile_send(environment, monkeypatch
     assert worker.reason == "upload_accepted_unverified"
     assert point.call.await_count == 1
     assert point.call.await_args.args[0].payload["cs_charging_profiles"]["chargingSchedule"]["chargingSchedulePeriod"][0]["limit"] == 0
+    # Restart again with the new settled dispatch evidence. This time the real
+    # setup path recovers automatically and preserves the durable Pause.
+    restarted = command_admission.CommandAdmission(execution_ownership.ExecutionOwnershipStore(hass))
+    hass.data["spotnav_command_admission"] = restarted
+    hass.data["spotnav_execution_ownership_store"] = restarted._store
+    hass.data.pop("spotnav_morek_outcomes", None)
+    release = await integration._async_setup_ownership_metadata(hass, entry, charger, migrate=True)
+    await release()
+    assert restarted.owned_ticket_current("a", command_admission.physical_connector(identity()))
+    assert point.call.await_count == 1  # recovery is read-only
+    worker = morek_worker.MorekScheduleWorker(hass, "a", None)
+    await worker._reconcile(0)
+    assert worker.reason == "unchanged" and point.call.await_count == 1
+    assert (await morek_outcomes.outcomes_for(hass).read())["schedule_pause"] == intent
     # An actual durable person Stop invalidates the old generation and carries
     # forward only the authority associated with the newly recorded pause.
     monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
@@ -1475,6 +1489,67 @@ async def test_completed_restart_requires_explicit_reconfirmation(environment, m
     await ledger.write({"schema": 1, "entry_id": "a", "uncertain": True, "attempt": {"state": "uncertain"}})
     assert await restarted.async_reconfirm_completed("a", identity) == "profile_outcome_unavailable"
     assert target.connector_id == 1 and store._records["a"]["handover"]["state"] == "completed"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("case", ["missing", "wrong_migration", "wrong_connector", "bad_ack", "uncertain", "valid"])
+async def test_automatic_restart_requires_bound_post_dispatch_evidence(environment, monkeypatch, case):
+    from custom_components.spotnav.execution import morek_outcomes
+    hass, _, gate, target, _, _ = environment
+    monkeypatch.setattr(morek_outcomes, "Store", FakeStore)
+    persist(hass, {"a": {**record("morek_schedule"), "handover": {
+        "version": 1, "state": "completed", "id": "a" * 32}}})
+    proof = {"version": 1, "migration_id": "a" * 32, "station_id": MOREK_STATION_ID,
+             "connector_id": 1, "attempt_id": "b" * 32, "ack": "accepted"}
+    if case == "wrong_migration":
+        proof["migration_id"] = "c" * 32
+    elif case == "wrong_connector":
+        proof["connector_id"] = 2
+    elif case == "bad_ack":
+        proof["ack"] = "unknown"
+    outcome = {"schema": 1, "entry_id": "a", "uncertain": case == "uncertain",
+               "attempt": {"state": "uncertain" if case == "uncertain" else "accepted"}}
+    if case != "missing":
+        outcome["migration_dispatch_evidence"] = proof
+    (hass.root / "spotnav.morek_schedule.connector_outcomes").write_text(json.dumps({
+        "version": 1, "data": outcome}), encoding="utf-8")
+    identity = lambda: morek_schedule._identity_status(hass, target)  # noqa: E731
+    revision = gate.reserve_lifecycle_barrier("a", identity)
+    result = await gate.async_recover_after_restart("a", identity, revision, 0)
+    assert (result == "automatic_recovery_ready") == (case == "valid")
+    operation = AsyncMock()
+    assert (await gate.async_execute("a", "owned_profile", identity, operation)).allowed == (case == "valid")
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_restart_recovery_refuses_stop_while_ledger_read_waits(environment, monkeypatch):
+    from custom_components.spotnav.execution import morek_outcomes
+    hass, _, gate, target, _, _ = environment
+    monkeypatch.setattr(morek_outcomes, "Store", FakeStore)
+    persist(hass, {"a": {**record("morek_schedule"), "handover": {
+        "version": 1, "state": "completed", "id": "a" * 32}}})
+    outcome = {"schema": 1, "entry_id": "a", "uncertain": False, "attempt": {"state": "accepted"},
+               "migration_dispatch_evidence": {"version": 1, "migration_id": "a" * 32,
+                   "station_id": MOREK_STATION_ID, "connector_id": 1, "attempt_id": "b" * 32, "ack": "accepted"}}
+    (hass.root / "spotnav.morek_schedule.connector_outcomes").write_text(json.dumps({
+        "version": 1, "data": outcome}), encoding="utf-8")
+    identity = lambda: morek_schedule._identity_status(hass, target)  # noqa: E731
+    revision = gate.reserve_lifecycle_barrier("a", identity)
+    ledger = morek_outcomes.outcomes_for(hass)
+    original = ledger.read
+    reached, proceed = asyncio.Event(), asyncio.Event()
+    async def delayed():
+        reached.set()
+        await proceed.wait()
+        return await original()
+    monkeypatch.setattr(ledger, "read", delayed)
+    task = asyncio.create_task(gate.async_recover_after_restart("a", identity, revision, 0))
+    await asyncio.wait_for(reached.wait(), 2)
+    with gate.person_stop_reservation("a", lambda: {"supported": False}):
+        proceed.set()
+        assert await task == "reconfirmation_interrupted"
+    assert "a" not in gate._completion_tickets
 
 
 @pytest.mark.asyncio

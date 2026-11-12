@@ -808,7 +808,23 @@ tests are documented there; full HA collection is still blocked on Windows.
     run it on a supported local host if available. If not, report the exact gap
     and evidence to the user before installation; do not claim it passed or halt
     unrelated implementation just to provision the test environment.
-- [x] **5.7a Replace Morek execution with the schedule owner** (local mocked implementation; coordinator review pending)
+- [ ] **5.7a Replace Morek execution with the schedule owner** (local mocked implementation; automatic restart recovery open)
+  - **2.5.65 partial restart recovery:** a settled response from a worker request
+    admitted with the completed migration's current process ticket is now stored
+    as connector/migration-bound dispatch evidence. A later startup can recover
+    automatically after rechecking that evidence, owner, ledger, lifecycle and
+    Stop generation. This evidence records a software ordering, not profile
+    inventory or physical charging. Old records and a migration that has not yet
+    produced such a response remain ambiguous and require explicit recovery;
+    unchanged old acknowledgements cannot safely be converted into the new proof.
+    Thus automatic recovery is not universal and 5.7a remains open. See handoff.
+  - **User correction:** routine HA restarts must not require a reconfirm button.
+    Automatic recovery is the desired daily behavior. The current 2.5.64 process
+    ticket requires reconfirmation after restart, so this is an outstanding gap,
+    not accepted final behavior. Implement automatic recovery for safely evidenced
+    states with actual-module restart/Stop-race tests; keep interrupted or uncertain
+    states blocked and explain them. Do not simply invoke the manual confirmation
+    on startup or claim an unrecorded Stop can be reconstructed after a crash.
   - **2.5.64 local verification:** a clean reconnect can revalidate
     a ticket known in the same process; Stop, identity changes, uncertain outcomes and
     stale lifecycle events fail closed. Process restart still requires an administrator

@@ -995,7 +995,9 @@ async def test_real_admission_rechecks_planner_inputs_after_persistence(monkeypa
     proceed.set()
     await drain(w.worker)
     assert w.worker.reason in ("price_inputs_changed", "plan_inputs_changed", "vehicle_input_stale", "no_current_plan")
-    assert (await w.ledger.read())["attempt"]["state"] == "aborted_before_dispatch"
+    outcome = await w.ledger.read()
+    assert outcome["attempt"]["state"] == "aborted_before_dispatch"
+    assert "migration_dispatch_evidence" not in outcome
     w.point.call.assert_not_awaited()
     w.worker.close()
 
@@ -1060,7 +1062,8 @@ async def test_real_admission_does_not_retry_unknown_profile_result(monkeypatch,
     w.worker.start()
     await drain(w.worker)
     assert w.worker.reason == "upload_uncertain"
-    assert (await w.ledger.read())["uncertain"] is True
+    outcome = await w.ledger.read()
+    assert outcome["uncertain"] is True and "migration_dispatch_evidence" not in outcome
     w.worker.trigger()
     await drain(w.worker)
     assert w.point.call.await_count == 1
@@ -1164,6 +1167,50 @@ async def test_real_admission_pending_resume_after_restart_requires_confirmation
     assert w.worker.reason == "resume_requires_confirmation"
     w.point.call.assert_not_awaited()
     w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_actual_restart_recovers_bound_settled_dispatch_and_sends_fresh_plan(monkeypatch, tmp_path):
+    import custom_components.spotnav as integration
+    from .test_execution_ownership import FakeHass, FakeStore
+    from custom_components.spotnav.execution import command_admission, execution_ownership
+    from custom_components.spotnav import time_zones
+
+    if not hasattr(integration, "_async_setup_ownership_metadata"):
+        pytest.skip("requires the real integration bootstrap (run with isolated lifecycle runner)")
+    await asyncio.to_thread(time_zones.zone, "Europe/Stockholm")
+
+    w, world, _ = await real_admission_planner_worker(monkeypatch, tmp_path)
+    w.worker.start()
+    await drain(w.worker)
+    assert w.point.call.await_count == 1
+    proof = (await w.ledger.read())["migration_dispatch_evidence"]
+    assert proof["migration_id"] == "a" * 32
+    w.worker.close()
+
+    # Fresh process objects, same durable documents; no admin action.
+    hass = FakeHass(tmp_path)
+    hass.async_create_task = asyncio.create_task
+    entry = SimpleNamespace(entry_id="test", runtime_data=SimpleNamespace(executor=None, morek_worker=None),
+                            async_on_unload=lambda _: None)
+    charger = SimpleNamespace(ocpp_target=w.target, charge_control="switch.charger")
+    monkeypatch.setattr(integration, "_identity_status", lambda *_: w.identity)
+    monkeypatch.setattr(integration, "async_track_state_change_event", lambda *_: lambda: None)
+    release = await integration._async_setup_ownership_metadata(hass, entry, charger, migrate=True)
+    await release()
+    gate = command_admission.command_admission(hass)
+    assert isinstance(gate._store, execution_ownership.ExecutionOwnershipStore)
+    assert gate.owned_ticket_current("test", physical_connector(w.identity))
+    assert w.point.call.await_count == 1  # recovery itself did not send
+    hass.data[morek_schedule._DATA_KEY] = {"test": ({}, FakeStore(hass, 1, "entry-restart"), asyncio.Lock())}
+    world.facts[0] = replace(world.facts[0], soc_percent=30)
+    await world.controller.async_recalculate()
+    worker = morek_worker.MorekScheduleWorker(hass, "test", world.controller)
+    worker.start()
+    await drain(worker)
+    assert worker.reason == "upload_accepted_unverified"
+    assert w.point.call.await_count == 2
+    worker.close()
 
 
 @pytest.mark.asyncio

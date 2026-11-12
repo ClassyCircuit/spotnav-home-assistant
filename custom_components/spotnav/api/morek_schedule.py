@@ -756,7 +756,7 @@ def _verification_current(hass: HomeAssistant, entry_id: str, entry: Any, data: 
 
 async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[str, Any], store: Any,
                                fingerprint: str, validate: Any, *, automatic: bool, pause_id: str | None = None,
-                               validate_durable: Any = None) -> str:
+                               validate_durable: Any = None, migration_id: str | None = None) -> str:
     """Connector lock held. Record first, revalidate after every pre-dispatch await."""
     ledger = outcomes_for(hass)
     record = await _outcome_record(hass, entry_id, data)
@@ -844,6 +844,13 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
     elif state in ("rejected", "notsupported"):
         record["attempt"]["state"] = "rejected"
         record["uncertain"] = False
+    if automatic and migration_id and state in ("accepted", "rejected", "notsupported"):
+        # Written only after a real ticket-checked wire call returned a response.
+        # This proves the handover was live before dispatch, not charger behavior.
+        record["migration_dispatch_evidence"] = {
+            "version": 1, "migration_id": migration_id, "station_id": MOREK_STATION_ID,
+            "connector_id": MOREK_CONNECTOR_ID, "attempt_id": attempt_id, "ack": state,
+        }
     # Unknown, cancellation, or interrupted ACK persistence stays uncertain on disk.
     record["attempt"]["ack"] = ack
     await ledger.write(record)
@@ -1228,6 +1235,9 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
             if "migration_result" in previous_recovery:
                 ownership["recovery"]["migration_result"] = previous_recovery["migration_result"]
                 admission._recovery_status[entry.entry_id]["migration_result"] = previous_recovery["migration_result"]
+            if "automatic_recovery" in previous_recovery:
+                ownership["recovery"]["automatic_recovery"] = previous_recovery["automatic_recovery"]
+                admission._recovery_status[entry.entry_id]["automatic_recovery"] = previous_recovery["automatic_recovery"]
             try:
                 outcomes = await _outcome_record(hass, entry.entry_id, data)
             except (OutcomeUnavailable, ScheduleRefused):

@@ -6,6 +6,13 @@ Re-check the live system and Git state before acting; observations below may bec
 
 ## Approved next direction (planning, not implemented)
 
+**Automatic restart recovery requested:** the user does not want to press a
+reconfirmation button after ordinary HA restarts. The current process-ticket design
+still requires it, so normal automatic restart recovery remains open. Implement and
+test safe automatic recovery rather than calling the admin action automatically or
+assuming an unrecorded Stop can be reconstructed. Unknown/interrupted outcomes must
+remain blocked and visible; no live action is authorized by this request.
+
 **Single Morek execution path:** the user no longer wants a runtime switch back to
 the legacy controller or a separate dynamic handback protocol. Replace Morek's old
 execution behavior with the schedule owner; retain shared legacy behavior for other
@@ -339,6 +346,51 @@ requirements, not features claimed implemented in the manual baseline below.
   Do not assume `GetCompositeSchedule` lists stored profiles.
 
 ## Tests, build, and next steps
+
+### 2026-11-12 — bounded automatic restart recovery (2.5.65; partial)
+
+- A settled OCPP response to an actual ticket-admitted worker call stores a
+  connector- and migration-ID-bound dispatch witness in the outcome ledger. That
+  establishes that this process issued the completion ticket and passed the final
+  checks before the call; it does **not** establish profile inventory, effective
+  limits or physical charging. After a process restart, startup can automatically
+  revalidate that witness, durable owner, settled ledger, unique identity and
+  lifecycle/Stop generation, then release the barrier. A previously durable Pause
+  remains in force; a pending Resume still needs its own fresh confirmation. No
+  profile is sent by migration or recovery itself.
+- A process that crashes immediately after the completion marker lands but before
+  issuing its ticket can leave precisely the same `completed` owner and previously
+  settled ledger as one that completed normally but has not yet made a worker call.
+  The marker alone is not safe automatic authority. Consequently old 2.5.64 records
+  and a newly migrated owner without a settled post-handover worker response still
+  need explicit admin reconfirmation. An unchanged old ACK cannot be bound to a
+  migration after the fact. In particular, if no new worker call occurs after that
+  reconfirmation, another restart still requires it. This does not yet satisfy the
+  requested universal ordinary-restart behavior; 5.7a remains open. Resolving that
+  remaining ambiguity needs either a separately reviewed non-profile ordering proof
+  or a product decision allowing one-time handling of the ambiguous old state; it
+  cannot be solved by treating the existing `completed` marker as sufficient.
+- A Stop requested but not durably recorded before a crash cannot be reconstructed.
+  In-process Stop reservations invalidate pending recovery even if identity is
+  temporarily unresolved; durable Stop/Pause and uncertain profile outcomes still
+  block stale Resume or retry. A real setup/worker/restart test covers automatic
+  recovery with a retained Pause; a separate real-planner/production-admission test
+  covers automatic restart followed by a fresh mocked profile call. Mocks do not
+  prove charger protection, absence of external writers or physical charging.
+- Checks: `python tools/run_isolated_planning_tests.py -x` 584 passed, 1 skipped,
+  1 deselected; the skipped actual-bootstrap restart test separately passed via
+  `python tools/run_isolated_lifecycle_tests.py tests/test_morek_worker.py -k
+  actual_restart_recovers_bound -x` (1 passed). `python tools/run_isolated_lifecycle_tests.py
+  -x` 193 passed; the expanded lifecycle run with `tests/test_execution_ownership.py
+  tests/test_command_admission.py tests/test_morek_schedule.py tests/test_morek_outcomes.py
+  tests/test_morek_readiness.py -x` 342 passed. Targeted Ruff and frontend
+  type-check/build/check-dist plus sidebar/Morek tests (62 passed), and diff check
+  passed. Two initial attempts to run the actual-bootstrap restart test failed:
+  the planning runner deliberately stubs the integration bootstrap, and the
+  lifecycle runner initially lacked a prewarmed timezone; the test now skips only
+  in the former and prewarms the zone in the latter. Existing pytest timeout-option,
+  dependency deprecation, jsdom CSS and Git line-ending warnings remain. The full
+  5.4c HA-plugin suite was not run.
 
 ### 2026-11-12 — real-admission provenance and reconnect (2.5.64; coordinator review pending)
 
