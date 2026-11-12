@@ -860,6 +860,9 @@ export function actionErrorKey(code: string | null): TranslationKey {
   if (code === "spotnav_action_unavailable") {
     return "action.error.unavailable";
   }
+  if (code === "legacy_execution_ownership_blocked") {
+    return "action.error.ownershipBlocked";
+  }
   if (code === "spotnav_action_failed") {
     return "action.error.failed";
   }

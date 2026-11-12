@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from .log_buffer import SpotNavLogBuffer
     from .planning.auto_controller import AutoPlannerController
     from .execution.auto_execution import AutoExecutor
+    from .execution.morek_worker import MorekScheduleWorker
     from .planning.auto_settings import AutoSettingsStore
     from .execution.controller import ChargingController
     from .vehicles.discovery_decisions import DiscoveryDecisionStore
@@ -66,6 +67,7 @@ class ChargerData:
     soc_reader: SocReader
     executor: AutoExecutor | None = None
     preview: AutoPlannerController | None = None
+    morek_worker: MorekScheduleWorker | None = None
     observation: MarketObservation | None = None
     solar: SolarExecutionCoordinator | None = None
     hybrid_state: HybridChargerState | None = None

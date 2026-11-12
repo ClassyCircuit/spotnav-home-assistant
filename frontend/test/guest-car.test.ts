@@ -124,8 +124,8 @@ describe("the question", () => {
       document.body.innerHTML = "";
       const { element } = await mounted(dashboard({ asking: true, oneCar: true }), language);
       const words = Array.from(banner(element)!.querySelectorAll("button")).map((button) => button.textContent);
-      expect(words, language).toEqual(["EV6", translate(language, "identify.guest")]);
-      expect(banner(element)!.textContent, language).toContain(translate(language, "identify.keepsSingle", { name: "EV6" }));
+      expect(words, language).toEqual(["EV6", translate("en", "identify.guest")]);
+      expect(banner(element)!.textContent, language).toContain(translate("en", "identify.keepsSingle", { name: "EV6" }));
     }
   });
 
@@ -154,7 +154,7 @@ describe("Byt bil", () => {
     const dialog = openDialog(element)!;
     const radios = Array.from(dialog.querySelectorAll<HTMLInputElement>("input[data-identify-choice]"));
     expect(radios.map((radio) => radio.value)).toEqual([EV6, "guest"]);
-    expect(radios[1]!.parentElement?.textContent).toBe("Gästbil");
+    expect(radios[1]!.parentElement?.textContent).toBe("Guest car");
     radios[1]!.click();
     dialog.querySelector<HTMLFormElement>("form")!.requestSubmit();
     await settle();

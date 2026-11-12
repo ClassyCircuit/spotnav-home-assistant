@@ -55,7 +55,7 @@ async function openSettings(body: Record<string, any>, language = "en") {
   hass.resolveNext(body);
   await settle();
   shadow(element)
-    .querySelector<HTMLButtonElement>(`[aria-label='${translate(language as "en", "header.settings")}']`)!
+    .querySelector<HTMLButtonElement>(`[aria-label='${translate("en", "header.settings")}']`)!
     .click();
   await settle();
   return { hass, element };
@@ -79,8 +79,8 @@ describe("the car's minimum charge level", () => {
   it("is a row on the car's settings, Off or the level", async () => {
     const off = await openSettings(payload(null), "sv");
     const row = dialog(off.element).querySelector<HTMLElement>("[data-vehicle='vehicle_ev6'] [data-row='min_percent']")!;
-    expect(row.textContent).toContain("Lägsta laddnivå");
-    expect(row.querySelector("button")!.textContent).toBe("Av");
+    expect(row.textContent).toContain("Minimum charge level");
+    expect(row.querySelector("button")!.textContent).toBe("Off");
     const on = await openSettings(payload(30));
     const value = dialog(on.element).querySelector<HTMLElement>("[data-vehicle='vehicle_ev6'] [data-row='min_percent'] button")!;
     expect(value.textContent).toBe("30 %");

@@ -72,6 +72,88 @@ _BOTH = (TODAY, TOMORROW)
 # ------------------------------------------------- defaults and the plain proposal
 
 
+async def test_manual_capped_settings_produce_priced_plan(harness: Harness, no_execution: dict[str, Any]) -> None:
+    serve(harness.transport)
+    controller = await harness.auto(soft_price_cap=10000, cap_price_basis="nord_pool")
+    snapshot = controller.snapshot()
+    assert snapshot.state == "proposal_ready"
+    assert snapshot.proposal is not None and snapshot.proposal.exact_periods
+    assert snapshot.proposal.exception_kwh == 0 and not snapshot.proposal.unpriced
+    assert_nothing_executed(no_execution)
+
+
+async def test_manual_cap_with_no_eligible_energy_is_normal(harness: Harness, no_execution: dict[str, Any]) -> None:
+    serve(harness.transport)
+    controller = await harness.auto(soft_price_cap=-10000, cap_price_basis="nord_pool")
+    snapshot = controller.snapshot()
+    assert snapshot.state == "nothing_to_charge" and snapshot.reason == "no_eligible_energy"
+    assert snapshot.proposal is not None and not snapshot.proposal.periods
+    assert_nothing_executed(no_execution)
+
+
+async def test_capped_target_uses_fresh_actual_soc(harness: Harness, no_execution: dict[str, Any]) -> None:
+    serve(harness.transport)
+    harness.vehicle_reader = lambda vehicle_id: LiveVehicleFacts(
+        vehicle_id=vehicle_id, soc_percent=25, soc_age_s=5, reported_capacity_kwh=60, min_percent=35,
+    )
+    controller = await harness.auto(
+        driver=DRIVER_TARGET_SOC, target=TargetSocIntent(vehicle_id="veh-1", target_percent=80),
+        soft_price_cap=-10000, cap_price_basis="nord_pool", minimum_ready_by_soc=40,
+    )
+    proposal = controller.snapshot().proposal
+    assert proposal is not None
+    assert proposal.requested_kwh == pytest.approx(33 / .9)
+    assert proposal.delivered_kwh == pytest.approx(9 / .9)
+    assert proposal.exception_kwh == pytest.approx(9 / .9)
+    assert proposal.periods == proposal.shown_periods
+    assert_nothing_executed(no_execution)
+
+
+async def test_capped_target_rejects_stale_soc(harness: Harness, no_execution: dict[str, Any]) -> None:
+    serve(harness.transport)
+    harness.vehicle_reader = lambda vehicle_id: LiveVehicleFacts(
+        vehicle_id=vehicle_id, soc_percent=25, soc_age_s=181, reported_capacity_kwh=60,
+    )
+    controller = await harness.auto(
+        driver=DRIVER_TARGET_SOC, target=TargetSocIntent(vehicle_id="veh-1", target_percent=80),
+        soft_price_cap=.1, cap_price_basis="nord_pool", minimum_ready_by_soc=40,
+    )
+    assert controller.snapshot().reason == "target_soc_stale"
+    assert_nothing_executed(no_execution)
+
+
+async def test_capped_minimum_above_vehicle_ceiling_is_refused(
+    harness: Harness, no_execution: dict[str, Any]
+) -> None:
+    serve(harness.transport)
+    harness.vehicle_reader = lambda vehicle_id: LiveVehicleFacts(
+        vehicle_id=vehicle_id, soc_percent=25, soc_age_s=1, reported_capacity_kwh=60, max_percent=35,
+    )
+    controller = await harness.auto(
+        driver=DRIVER_TARGET_SOC, target=TargetSocIntent(vehicle_id="veh-1", target_percent=80),
+        soft_price_cap=.1, cap_price_basis="nord_pool", minimum_ready_by_soc=40,
+    )
+    assert controller.snapshot().reason == "minimum_above_target"
+    assert_nothing_executed(no_execution)
+
+
+@pytest.mark.parametrize("minimum", [None, 40])
+async def test_capped_minimum_met_or_unset_refuses_all_expensive(
+    harness: Harness, no_execution: dict[str, Any], minimum: float | None
+) -> None:
+    serve(harness.transport)
+    harness.vehicle_reader = lambda vehicle_id: LiveVehicleFacts(
+        vehicle_id=vehicle_id, soc_percent=45, soc_age_s=1, reported_capacity_kwh=60,
+    )
+    controller = await harness.auto(
+        driver=DRIVER_TARGET_SOC, target=TargetSocIntent(vehicle_id="veh-1", target_percent=80),
+        soft_price_cap=-10000, cap_price_basis="nord_pool", minimum_ready_by_soc=minimum,
+    )
+    snapshot = controller.snapshot()
+    assert snapshot.reason == "no_eligible_energy" and snapshot.proposal.exception_kwh == 0
+    assert_nothing_executed(no_execution)
+
+
 async def test_absent_settings_are_incomplete_and_subscribe_to_nothing(
     harness: Harness, no_execution: dict[str, Any]
 ) -> None:

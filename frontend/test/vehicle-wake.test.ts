@@ -54,7 +54,7 @@ async function openSettings(body: Record<string, any>, language = "en") {
   hass.resolveNext(body);
   await settle();
   shadow(element)
-    .querySelector<HTMLButtonElement>(`[aria-label='${translate(language as "en", "header.settings")}']`)!
+    .querySelector<HTMLButtonElement>(`[aria-label='${translate("en", "header.settings")}']`)!
     .click();
   await settle();
   return { hass, element };
@@ -78,8 +78,8 @@ describe("waking the car for a reading", () => {
   it("is a row on the car's settings, On or Off", async () => {
     const off = await openSettings(payload(false), "sv");
     const row = dialog(off.element).querySelector<HTMLElement>("[data-vehicle='vehicle_ev6'] [data-row='wake_for_reading']")!;
-    expect(row.textContent).toContain("Väck bilen för en avläsning");
-    expect(row.querySelector("button")!.textContent).toBe("Av");
+    expect(row.textContent).toContain("Wake the car for a reading");
+    expect(row.querySelector("button")!.textContent).toBe("Off");
     const on = await openSettings(payload(true));
     const value = dialog(on.element).querySelector<HTMLElement>(
       "[data-vehicle='vehicle_ev6'] [data-row='wake_for_reading'] button",

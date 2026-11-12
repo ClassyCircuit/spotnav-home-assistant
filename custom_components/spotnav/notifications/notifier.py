@@ -16,10 +16,10 @@ alike (the event entity still fires for every plan):
 
 * it settles first: plans installed within `SETTLE_S` of one another are one burst, and only the plan standing
   when the burst is over is judged (`SETTLE_MAX_S` bounds a burst that never ends);
-* not while the car is known to be away: a charger that says no car is connected keeps planning, but nothing
-  is told. An unknown reading keeps the last known one; a charger that cannot say at all tells as before. After
-  a plug-in the first plan installed is told; if none comes, the standing plan is told after `PLUG_IN_WAIT_S`
-  or when its first window opens, whichever is sooner;
+* not while the car is known to be away. Where a planner is available, a recognized plug-in instead waits for
+  a calculation begun after that connection's debounce and sends the current proposal, never the standing plan.
+  A bounded waiting notice is replaced when a usable proposal arrives. The legacy standing-plan fallback is
+  retained only where there is no planner;
 * not when it is the plan last told about (`plan_fingerprint`, kept across restarts), nor what is left of it
   (`plan_is_remainder`: a window ended, or the plan was calculated again partway through);
 * not when it follows a person's own settings write (`QUIET_AFTER_WRITE_S`): they see it, and it counts as
@@ -86,6 +86,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from collections import deque
 from datetime import datetime, timedelta
 from typing import Any, Callable, Final
@@ -309,6 +310,12 @@ class ChargerNotifier:
         self._tracker = ChargerEventTracker()
         self._stops = UnexpectedStopDetector()
         self._snapshot: AutoSnapshot | None = None
+        self._shutdown = False
+        self._preview: Any = None
+        self._proposal_since: datetime | None = None
+        self._proposal_due: datetime | None = None
+        self._proposal_timer: CALLBACK_TYPE | None = None
+        self._proposal_waiting_told = False
         self._completion_at: str | None = None
         self._ignores_stop = False
         self._baselined = False
@@ -374,6 +381,8 @@ class ChargerNotifier:
         day = raw.get("plan_day") if isinstance(raw, dict) else None
         self._plan_day = day if isinstance(day, str) else None
         if isinstance(raw, dict):
+            self._proposal_since = _instant(raw.get("proposal_since"))
+            self._proposal_waiting_told = raw.get("proposal_waiting_told") is True
             self._load_pending(raw)
 
     def _load_pending(self, raw: dict[str, Any]) -> None:
@@ -423,6 +432,9 @@ class ChargerNotifier:
             record["plug_in_told"] = True
         if self._plan_day is not None:
             record["plan_day"] = self._plan_day
+        if self._proposal_since is not None:
+            record["proposal_since"] = self._proposal_since.isoformat()
+            record["proposal_waiting_told"] = self._proposal_waiting_told
         pending: dict[str, Any] = {}
         if self._burst_due is not None:
             pending["burst_due"] = self._burst_due.isoformat()
@@ -440,27 +452,40 @@ class ChargerNotifier:
     @callback
     def async_start(self, preview: Any = None) -> None:
         """Take the baseline and start watching."""
+        self._shutdown = False
+        self._preview = preview
         self._observe()
         self._unsubscribe.append(self._controller.add_listener(self._observe))
         self._unsubscribe.append(self._controller.add_charge_state_listener(self._observe))
         self._unsubscribe.append(self._hass.bus.async_listen(NOTIFICATION_ACTION_EVENT, self._on_action))
         if preview is not None:
-            self._unsubscribe.append(preview.add_listener(self._on_snapshot))
+            self._unsubscribe.append(preview.add_publication_listener(self._on_snapshot))
         # A plan judgement under way at a restart.
         self._arm_plan_timer(self._plan_due())
+        if self._proposal_since is not None and self._connected is True:
+            self._arm_proposal_timer(dt_util.utcnow() + timedelta(seconds=SETTLE_S))
 
     @callback
     def async_shutdown(self) -> None:
+        self._shutdown = True
         for remove in self._unsubscribe:
             remove()
         self._unsubscribe.clear()
         self._cancel_recheck()
         self._arm_plan_timer(None)
+        self._arm_proposal_timer(None)
+        self._preview = None
 
     @callback
     def _on_snapshot(self, snapshot: AutoSnapshot) -> None:
+        if self._shutdown or (self._preview is not None and not self._preview.snapshot_is_current(snapshot)):
+            return
         self._snapshot = snapshot
         self._observe()
+        if self._proposal_current(snapshot):
+            now = dt_util.utcnow()
+            latest = self._proposal_since + timedelta(seconds=SETTLE_MAX_S)
+            self._arm_proposal_timer(max(now, min(now + timedelta(seconds=SETTLE_S), latest)))
 
     @callback
     def _observe(self, *_: Any) -> None:
@@ -523,7 +548,10 @@ class ChargerNotifier:
             ):
                 self._mark_at_risk_told(owed, now)
                 events.append((EVENT_PLAN_AT_RISK, owed))
+        was_held = self._held_before
         self._held_before = held
+        if was_held and not held and self._proposal_current(self._snapshot) and self._proposal_due is None:
+            self._arm_proposal_timer(now + timedelta(seconds=SETTLE_S))
         reason = self._stops.observe(self._expectation(now))
         stop_state = self._stops.window_state
         if stop_state != self._stop_state or self._at_risk_told != at_risk_told:
@@ -565,17 +593,29 @@ class ChargerNotifier:
             # a person's Stop is over with it.
             self._end_plug_in()
             self._at_risk_under_stop = None
+            if self._proposal_since is not None:
+                self._proposal_since = None
+                self._proposal_waiting_told = False
+                self._arm_proposal_timer(None)
+                self._save_plan()
         if reading is None or reading == self._connected:
             return
         before, self._connected = self._connected, reading
         if not self._baselined or before is None:
             return
         if reading:
-            plan = self._controller.plan
-            until = now + timedelta(seconds=PLUG_IN_WAIT_S)
-            if plan is not None:
-                until = max(min(until, plan.start_time), now + timedelta(seconds=SETTLE_S))
-            self._owed_until = until
+            if self._preview is not None:
+                self._proposal_since = now
+                self._proposal_waiting_told = False
+                self._arm_proposal_timer(now + timedelta(seconds=60))
+                self._burst_since = self._burst_due = self._owed_until = None
+                self._burst_quiet = False
+            else:
+                plan = self._controller.plan
+                until = now + timedelta(seconds=PLUG_IN_WAIT_S)
+                if plan is not None:
+                    until = max(min(until, plan.start_time), now + timedelta(seconds=SETTLE_S))
+                self._owed_until = until
         else:
             self._burst_since = self._burst_due = self._owed_until = None
             self._burst_quiet = False
@@ -702,6 +742,11 @@ class ChargerNotifier:
         if due is None or now < due:
             self._arm_plan_timer(due)
             return
+        if self._proposal_since is not None:
+            self._burst_since = self._burst_due = self._owed_until = None
+            self._burst_quiet = False
+            self._save_plan()
+            return
         quiet = self._burst_due is not None and self._burst_quiet
         self._burst_since = self._burst_due = self._owed_until = None
         self._burst_quiet = False
@@ -775,10 +820,94 @@ class ChargerNotifier:
     # ------------------------------------------------------------------ sending
 
     def _maybe_send(self, event: str, attributes: dict[str, Any], now: datetime) -> None:
+        if event == EVENT_PLUGGED_IN and self._proposal_since is not None:
+            if self._push is not None:
+                self._push.async_event(event, now)
+            return
         if event == EVENT_PLAN_INSTALLED:
+            if self._proposal_since is not None:
+                return
             self._plan_installed(now)
             return
         self._send(event, attributes, now, None)
+
+    def _proposal_current(self, snapshot: AutoSnapshot | None) -> bool:
+        """A calculation begun after this connection and still current at use."""
+        return bool(
+            self._proposal_since is not None and self._connected is True
+            and self._controller.adapter.vehicle_connected() is True
+            and self._preview is not None and snapshot is not None and snapshot.in_process
+            and snapshot.calculation_started_at is not None
+            and snapshot.calculation_started_at > self._proposal_since
+            and self._preview.snapshot_matches_connection(snapshot)
+        )
+
+    def _arm_proposal_timer(self, due: datetime | None) -> None:
+        if self._proposal_timer is not None:
+            self._proposal_timer()
+            self._proposal_timer = None
+        self._proposal_due = due
+        if due is None:
+            return
+
+        @callback
+        def fire(_now: datetime) -> None:
+            self._proposal_timer = None
+            self._proposal_due = None
+            self._judge_proposal(dt_util.utcnow())
+
+        self._proposal_timer = async_track_point_in_utc_time(self._hass, fire, due)
+
+    def _judge_proposal(self, now: datetime) -> None:
+        if self._proposal_since is None or self._connected is not True:
+            return
+        settings = self._store.settings(self._entry_id)
+        notifications = settings.notifications
+        event = EVENT_PLUGGED_IN if notifications.wants(EVENT_PLUGGED_IN) else EVENT_PLAN_INSTALLED
+        snapshot = self._snapshot
+        current = self._proposal_current(snapshot)
+        proposal = snapshot.proposal if current and snapshot is not None else None
+        periods = () if proposal is None or not proposal.has_plan else proposal.shown_periods
+        window = next(((start, end) for start, end in periods if end > now and end > start), None)
+        if self._person_stop_holds() or window is None:
+            if not self._proposal_waiting_told:
+                self._send(event, {"proposal_notice": True, "waiting": True}, now, None)
+                self._proposal_waiting_told = True
+                self._save_plan()
+            return
+        start, end = window
+        facts: dict[str, Any] = {
+            "proposal_notice": True,
+            "start": dt_util.as_local(start).strftime("%Y-%m-%d %H:%M"),
+            "end": dt_util.as_local(end).strftime("%Y-%m-%d %H:%M"),
+        }
+        if snapshot.departure_at is not None:
+            facts["ready_by"] = dt_util.as_local(snapshot.departure_at).strftime("%Y-%m-%d %H:%M")
+        target = settings.target.target_percent if settings.driver == "target_soc" else None
+        if (
+            isinstance(target, (int, float)) and not isinstance(target, bool)
+            and math.isfinite(target) and 0 <= target <= 100
+        ):
+            facts["target"] = target
+        soc = snapshot.expected_soc_percent
+        if (
+            snapshot.departure_at is not None and isinstance(soc, (int, float)) and not isinstance(soc, bool)
+            and math.isfinite(soc) and 0 <= soc <= 100
+        ):
+            facts["estimated_soc"] = soc
+        if not proposal.unpriced and proposal.currency and math.isfinite(proposal.estimated_cost):
+            facts["cost"] = Money(round(proposal.estimated_cost * 100), proposal.currency)
+        facts["shortfall"] = bool(
+            proposal.short_of_deadline or (proposal.minimum_shortfall_kwh or 0) > 0
+            or (proposal.policy_shortfall_kwh or 0) > 0
+        )
+        self._tell_owed_at_risk(now)
+        self._send(event, facts, now, None)
+        self._plug_in_told = True
+        self._plan_day = dt_util.as_local(periods[-1][1]).date().isoformat()
+        self._proposal_since = None
+        self._proposal_waiting_told = False
+        self._save_plan()
 
     def _person_stop_holds(self) -> bool:
         """Whether a person's Stop holds: no notice about the plan is told then."""
@@ -792,7 +921,7 @@ class ChargerNotifier:
         ):
             _LOGGER.debug("SpotNav charger %s: %s not told under a person's Stop", self._entry_id, event)
             return
-        if self._push is not None:
+        if self._push is not None and not attributes.get("proposal_notice"):
             # The paired app's wake-up, with its own events and limits, whatever phones are chosen here.
             if self._push.async_event(event, now):
                 self._remember_plan(fingerprint)
@@ -806,8 +935,13 @@ class ChargerNotifier:
             if event == EVENT_PLAN_STOPPED and attributes.get("reason") == REASON_CHARGER_IGNORES_STOP
             else event
         )
+        if attributes.get("proposal_notice"):
+            repeat_key = f"{event}_proposal_{'waiting' if attributes.get('waiting') else 'ready'}"
         last = self._last_sent.get(repeat_key)
-        if last is not None and (now - last).total_seconds() < REPEAT_S:
+        replacing_wait = (
+            attributes.get("proposal_notice") and not attributes.get("waiting") and self._proposal_waiting_told
+        )
+        if last is not None and (now - last).total_seconds() < REPEAT_S and not replacing_wait:
             _LOGGER.debug("SpotNav charger %s: %s not notified again so soon", self._entry_id, event)
             return
         while self._sent_times and (now - self._sent_times[0]).total_seconds() >= 3600:
@@ -1050,6 +1184,8 @@ class ChargerNotifier:
         """What the message says beside the event: times in the installation's zone, kWh, money."""
         controller = self._controller
         plan = controller.plan
+        if attributes.get("proposal_notice"):
+            return attributes
         if event == EVENT_PLAN_STOPPED:
             return {"reason": attributes.get("reason")}
         if event == EVENT_PLAN_AT_RISK:

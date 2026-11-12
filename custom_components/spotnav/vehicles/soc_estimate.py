@@ -922,6 +922,8 @@ class SocReader:
         self._watched: tuple[str, ...] = ()
         self._watch_vehicle: str | None = None
         self._on_reading: Callable[[], None] | None = None
+        self._on_source_unavailable: Callable[[], None] | None = None
+        self._notify_every_reading: Callable[[], bool] | None = None
         self._last_notified: float | None = None
         self._notify_next = False
         # While a calculation lacks a level: the stored vehicle it was for, and the listener for the sensors that
@@ -1032,6 +1034,14 @@ class SocReader:
     def set_on_reading(self, callback_: Callable[[], None] | None) -> None:
         """Ask to be told when a reading moved enough to make a new plan worth calculating."""
         self._on_reading = callback_
+
+    def set_on_source_unavailable(self, callback_: Callable[[], None] | None) -> None:
+        """Notify a policy consumer when a watched SOC source disappears."""
+        self._on_source_unavailable = callback_
+
+    def set_notify_every_reading(self, predicate: Callable[[], bool] | None) -> None:
+        """Allow a policy to require even small or repeated actual readings."""
+        self._notify_every_reading = predicate
 
     def notify_next_reading(self) -> None:
         """Tell `set_on_reading`'s callback of the next reading that arrives, however little it moved: the
@@ -1332,6 +1342,13 @@ class SocReader:
     @callback
     def _on_source_changed(self, event: Event[EventStateChangedData]) -> None:
         self._note_source_state(event)
+        new = event.data["new_state"]
+        old = event.data["old_state"]
+        if (new is None or new.state in (STATE_UNAVAILABLE, STATE_UNKNOWN)) and (
+            old is not None and old.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN)
+        ):
+            if self._on_source_unavailable is not None:
+                self._on_source_unavailable()
         reading = self.read(self._watch_vehicle)
         if reading is None or reading.soc_percent is None or reading.estimated:
             return
@@ -1343,6 +1360,7 @@ class SocReader:
         last = self._last_notified
         if (
             not self._notify_next
+            and not (self._notify_every_reading is not None and self._notify_every_reading())
             and last is not None
             and abs(reading.soc_percent - last) < RECALCULATE_DELTA_PERCENT
         ):

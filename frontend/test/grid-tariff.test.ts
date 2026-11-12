@@ -192,7 +192,7 @@ async function open(
 
 function openSettings(element: Element, language = "en"): void {
   shadow(element)
-    .querySelector<HTMLButtonElement>(`[aria-label="${translate(language as "en", "header.settings")}"]`)
+    .querySelector<HTMLButtonElement>(`[aria-label="${translate("en", "header.settings")}"]`)
     ?.click();
 }
 
@@ -243,8 +243,8 @@ describe("the Electricity price section", () => {
     const at = keys.indexOf("transfer");
     expect(keys.slice(at, at + 4)).toEqual(["transfer", "transfer_percent", "transfer_high", "high_load_window"]);
     const text = (key: string) => priceSection(element).querySelector(`[data-row='${key}']`)!.textContent;
-    expect(text("transfer_percent")).toBe("Nätavgift, % av spotpriset5 %");
-    expect(text("high_load_window")).toBe("HöglasttidVardagar 07–19, nov–mar");
+    expect(text("transfer_percent")).toBe("Grid fee, % of spot5 %");
+    expect(text("high_load_window")).toBe("High-load hoursWeekdays 07–19, Nov–Mar");
   });
 
   it("hides the hours while the fee is off and none are stored, and shows nothing without the block", async () => {
@@ -314,10 +314,10 @@ describe("writing the tariff", () => {
       const dialog = openDialog(element);
       expect(dialog.querySelector("[data-value-editor='highLoad']")).not.toBeNull();
       expect(dialog.querySelector("h2, [role='heading'], .spotnav-dialog-title")?.textContent ?? dialog.textContent).toContain(
-        "Nätavgift under höglasttid",
+        "Grid fee in high-load hours",
       );
       expect(dialog.querySelector<HTMLInputElement>("[data-high-load='fee']")!.value).toBe("12");
-      expect(dialog.textContent).toContain("Avgift (öre/kWh)");
+      expect(dialog.textContent).toContain("Fee (öre/kWh)");
       // Stored hours: no suggestion line.
       expect(dialog.querySelector("[data-window-help='suggestion']")).toBeNull();
       expect(dialog.querySelector<HTMLSelectElement>("[data-window='days']")!.value).toBe("weekdays");
@@ -325,7 +325,7 @@ describe("writing the tariff", () => {
       expect(dialog.querySelector<HTMLSelectElement>("[data-window='toMonth']")!.value).toBe("3");
       expect(dialog.querySelector<HTMLSelectElement>("[data-window='from']")!.value).toBe("7");
       expect(dialog.querySelector<HTMLSelectElement>("[data-window='to']")!.value).toBe("19");
-      expect(dialog.querySelector("[data-high-load='remove']")!.textContent).toBe("Ta bort höglastavgift");
+      expect(dialog.querySelector("[data-high-load='remove']")!.textContent).toBe("Remove the high-load fee");
       // Saved unchanged: nothing is written.
       await save(element);
       expect(sent(hass, "spotnav/update_grid_tariff")).toEqual([]);
@@ -359,7 +359,7 @@ describe("writing the tariff", () => {
     await tap(element, "transfer_high");
     const dialog = openDialog(element);
     expect(dialog.querySelector("[data-value-editor='highLoad']")).not.toBeNull();
-    expect(dialog.textContent).toContain(translate("sv", "gridFee.window.suggestion"));
+    expect(dialog.textContent).toContain(translate("en", "gridFee.window.suggestion"));
     expect(dialog.querySelector<HTMLInputElement>("[data-high-load='fee']")!.value).toBe("");
     expect(dialog.querySelector<HTMLSelectElement>("[data-window='days']")!.value).toBe("weekdays");
     expect(dialog.querySelector<HTMLSelectElement>("[data-window='fromMonth']")!.value).toBe("11");
@@ -370,7 +370,7 @@ describe("writing the tariff", () => {
     expect(dialog.querySelector<HTMLSelectElement>("[data-window='fromMonth']")!.selectedOptions[0]!.textContent).toBe("November");
     // Nothing to remove yet, and no second dialog: Save is the only step.
     expect(dialog.querySelector("[data-high-load='remove']")).toBeNull();
-    expect(dialog.querySelector(".spotnav-settings-save")!.textContent).toBe(translate("sv", "settings.save"));
+    expect(dialog.querySelector(".spotnav-settings-save")!.textContent).toBe(translate("en", "settings.save"));
     dialog.querySelector<HTMLSelectElement>("[data-window='days']")!.value = "mon_sat";
     dialog.querySelector<HTMLSelectElement>("[data-window='to']")!.value = "22";
     dialog.querySelector<HTMLInputElement>("[data-high-load='fee']")!.value = "12,5";
@@ -389,7 +389,7 @@ describe("writing the tariff", () => {
     await tap(element, "transfer_high");
     let dialog = openDialog(element);
     await save(element);
-    expect(openDialog(element).textContent).toContain("Ange avgiften under höglasttid.");
+    expect(openDialog(element).textContent).toContain("Enter the fee for the high-load hours.");
     dialog = openDialog(element);
     dialog.querySelector<HTMLInputElement>("[data-high-load='fee']")!.value = "-1";
     await save(element);
@@ -398,7 +398,7 @@ describe("writing the tariff", () => {
     dialog.querySelector<HTMLSelectElement>("[data-window='from']")!.value = "7";
     dialog.querySelector<HTMLSelectElement>("[data-window='to']")!.value = "7";
     await save(element);
-    expect(openDialog(element).textContent).toContain(translate("sv", "gridFee.window.sameHours"));
+    expect(openDialog(element).textContent).toContain(translate("en", "gridFee.window.sameHours"));
     expect(sent(hass, "spotnav/update_grid_tariff")).toEqual([]);
     // Cancel writes nothing either.
     openDialog(element).querySelector<HTMLButtonElement>(".spotnav-settings-actions button:not(.spotnav-settings-save):not([data-high-load])")!.click();

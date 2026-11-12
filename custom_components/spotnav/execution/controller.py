@@ -394,6 +394,8 @@ class ChargingPlan:
     auto_identity: str | None = None
     auto_settings_revision: int | None = None
     auto_price_identity: str | None = None
+    # A capped Auto plan must not extend its selected windows, including after restore.
+    strict_windows: bool = False
 
     @property
     def auto_owned(self) -> bool:
@@ -449,6 +451,8 @@ def stored_plan(raw: Any) -> ChargingPlan | None:
         plan = ChargingPlan(**raw)
     except TypeError:
         # Unknown keys: a shape this release did not write.
+        return None
+    if not isinstance(plan.strict_windows, bool):
         return None
     try:
         windows = plan.windows
@@ -695,6 +699,22 @@ class CurrentRestore:
     to_a: int | None
 
 
+@dataclass(slots=True)
+class StartAttemptEvidence:
+    """Conservative, in-memory evidence; it does not decide the session outcome.
+
+    Preparation calls can return without writing, so their flags mean *may*
+    have written. A start interrupted after dispatch has an unknown outcome.
+    """
+
+    phase_preparation_attempted: bool = False
+    current_preparation_attempted: bool = False
+    reservation_requested: bool = False
+    reservation_release_requested: bool = False
+    retry_already_armed: bool = False
+    start_dispatch: Literal["not_attempted", "unknown", "not_executed", "executed"] = "not_attempted"
+
+
 #: The core's owners as today's two owner fields (`charge_origin`, `plan_charge`): nobody's, and the charger's own
 #: charge, are neither.
 _CORE_OWNER_ORIGIN: Final = {
@@ -860,6 +880,7 @@ class ChargingController:
         # returns): an observation of the command, not ownership. The hold counts such a charge SpotNav's
         # (`_spotnav_owned`) before the start's result gives the session its owner.
         self._start_in_flight = False
+        self._last_start_attempt: StartAttemptEvidence | None = None
         # Shut down (`async_shutdown`): a regulator step that still holds this controller (the entry unloaded
         # while the step waited) sends the charger nothing more.
         self._shut_down = False
@@ -1253,7 +1274,11 @@ class ChargingController:
             # disk say otherwise than the record (an earlier build saved its record after them): written again, derived
             # from it, so a rollback reads the same.
             await self._async_save_quietly()
-        await self._reschedule_locked()
+        # Restore runs under the controller lock, not the Auto boundary. Check
+        # admission before its immediate re-arm decision; future timer callbacks
+        # still take their usual Auto and final-dispatch guards. Keep the saved
+        # plan and observations even when ownership is unresolved.
+        await self._reschedule_locked(execute_rearm=await self.adapter.async_legacy_permitted())
         # Armed for the controller's whole life, not only while a plan is: a manual Start has no
         # plan, and a scheduled one is observed from acceptance.
         self._async_arm_progress_listener()
@@ -2267,6 +2292,10 @@ class ChargingController:
         self._legacy_person_stopped = False
         return legacy
 
+    def retain_legacy_person_stop(self) -> None:
+        """Keep the old Stop if migrating it into the Auto store failed."""
+        self._legacy_person_stopped = True
+
     async def async_rearm(self) -> None:
         """Arm the plan in force again, as a restore does: a window open now starts through its veto and the
         execution boundary's gate, and a charge outside every window is decided as any re-arm decides it.
@@ -2439,6 +2468,8 @@ class ChargingController:
         async with self._lock:
             if self.plan is None:
                 return False
+            if self.plan.strict_windows:
+                return await self._need_met_locked()
             if self.charges_to_vehicle_limit():
                 # The car ends this charge itself when it is full: no count or estimate of ours ends it. Said
                 # once per plan: every calculation while the need reads met asks again.
@@ -2649,13 +2680,16 @@ class ChargingController:
     async def _async_person_hold_stop(self) -> None:
         """The stop under a person's Stop a report or a timer decided, decided again under the boundary's lock
         (`_recheck`): a person's Start may have replaced their Stop meanwhile."""
+        allowed = False
         try:
-            async with self._automatic(AUTOMATIC_STOP):
+            async with self._automatic(AUTOMATIC_STOP) as allowed:
+                if not allowed:
+                    return
                 await self._recheck(core_events.RECHECK_PERSON_HOLD, self._person_hold_stop_locked)
         finally:
             self._person_hold_task_running = False
             self._person_hold_task_ended_at = dt_util.utcnow()
-            if self._c7.stop_pending and not self._shut_down and self._person_hold_retry_cancel is None:
+            if allowed and self._c7.stop_pending and not self._shut_down and self._person_hold_retry_cancel is None:
                 # The core still awaits this stop (its re-check could not be fed): looked at again once it is
                 # overdue, so the stops under the person's Stop go on even if the charger reports nothing new.
                 self._person_hold_retry_cancel = async_call_later(
@@ -2697,7 +2731,7 @@ class ChargingController:
         async with gate.automatic_turn(kind) as allowed:
             async with self._lock:
                 if not allowed:
-                    _LOGGER.debug("SpotNav charger %s: an automatic %s is held back by a pause", self.entry_id, kind)
+                    _LOGGER.debug("SpotNav charger %s: an automatic %s is held back by the execution gate", self.entry_id, kind)
                 yield allowed
 
     def _hold_blocked(self) -> bool:
@@ -2772,14 +2806,18 @@ class ChargingController:
         """The one stop of a charge that started by itself outside a window: the ordinary stop,
         decided again under the lock, since a window may have opened meanwhile.
         """
-        async with self._automatic(AUTOMATIC_STOP):
+        async with self._automatic(AUTOMATIC_STOP) as allowed:
+            if not allowed:
+                return
             await self._recheck(core_events.RECHECK_HOLD, lambda: self._automatic_stop_locked("the hold's stop"))
 
     async def _async_stray_stop(self) -> None:
         """The ordinary stop of a plan charge that runs outside every window, decided again under the
         lock: a plan may have been installed, or the charge ended, meanwhile.
         """
-        async with self._automatic(AUTOMATIC_STOP):
+        async with self._automatic(AUTOMATIC_STOP) as allowed:
+            if not allowed:
+                return
             await self._recheck(core_events.RECHECK_STRAY, lambda: self._automatic_stop_locked("the stray charge's stop"))
 
     async def _async_save_quietly(self) -> None:
@@ -3420,11 +3458,15 @@ class ChargingController:
 
     async def async_cancel(self, *, by_person: bool = False) -> None:
         """Stop charging and remove the active schedule. One operation, one lock. `by_person` as for `async_stop`."""
-        async with self._lock:
-            if self._runner.depth:
-                await self._stop_locked(clear_schedule=True, by_person=by_person)
-                return
-            await self._core_direct_stop(self._stop_locked(clear_schedule=True, by_person=by_person), True)
+        from contextlib import nullcontext
+
+        scope = self.adapter.person_stop_scope() if by_person and isinstance(self.adapter, ChargerAdapter) else nullcontext()
+        with scope:
+            async with self._lock:
+                if self._runner.depth:
+                    await self._stop_locked(clear_schedule=True, by_person=by_person)
+                    return
+                await self._core_direct_stop(self._stop_locked(clear_schedule=True, by_person=by_person), True)
 
     async def async_follow_schedule(self) -> None:
         """Immediately restore the charger state required by the saved plan."""
@@ -3693,7 +3735,9 @@ class ChargingController:
         request on record is kept: the plan's current stays what the car is climbing to. Takes the
         operation lock, after the execution boundary's gate (`_automatic`). `False` when nothing was started.
         """
-        async with self._automatic(AUTOMATIC_BALANCING_RESUME):
+        async with self._automatic(AUTOMATIC_BALANCING_RESUME) as allowed:
+            if not allowed:
+                return False
             token = self._runner.begin()
             charging = self._core_facts(
                 lambda: {"charging": self.charging}, core_events.BalancingResume.kind, token=token
@@ -3790,21 +3834,21 @@ class ChargingController:
           phase switching was turned off: the next start of any kind leaves the one phase we set behind. A charge that
           runs when the setting is turned off is left as it is (no extra interruption).
         """
+        if isinstance(self.adapter, ChargerAdapter) and not await self.adapter.async_legacy_permitted():
+            return False
+        attempt = self._last_start_attempt = StartAttemptEvidence(retry_already_armed=self._start_retry_since is not None)
         self._start_held_back = False
         if manual or cause != "solar" or not self.phase_switching_option:
+            # This call can write a current and/or phases, or do nothing. Mark it
+            # before awaiting: cancellation cannot prove that it sent nothing.
+            attempt.phase_preparation_attempted = True
             await self._restore_three_phases_locked()
         # Whatever balancing paused before is over (this start is a charge of its own), and a person's start overrules
         # what the car ended before: the core decided both where the start began.
         if manual and self._target_stop is not None:
             self._target_stop = None
             await self._async_save()
-        explicit_amps = amps if amps is not None else self._setting_amps()
-        if explicit_amps is None and self.plan is not None:
-            explicit_amps = self.plan.amps
-        if explicit_amps is None and manual:
-            # A person's Start with no current named and no plan (a paused Auto keeps none): the last current
-            # asked for, so the start is still capped by load balancing as every start is.
-            explicit_amps = self._requested_current_a
+        explicit_amps = self._start_requested_amps(amps, manual=manual)
         reserved = False
         if self.is_switch_only:
             # A charger whose current cannot be set draws its whole switched current from the moment it starts: with
@@ -3823,11 +3867,13 @@ class ChargingController:
                     elif allowance is not None:
                         self._reserve_start(math.ceil(needed - 1e-9))
                         reserved = True
+                        attempt.reservation_requested = True
                 if switch_too_low is None and explicit_amps is not None:
                     await self._async_save()
             except BaseException:
                 if reserved:
                     self._reserve_start(None)
+                    attempt.reservation_release_requested = True
                 raise
             if switch_too_low is not None:
                 await self._hold_start_for_room(manual, cause, switch_too_low, needed)
@@ -3853,11 +3899,14 @@ class ChargingController:
                             # same site reads the allowance less this.
                             self._reserve_start(explicit_amps)
                             reserved = True
+                            attempt.reservation_requested = True
                         if self.current_control == CURRENT_CONTROL_CHANGE_CONFIGURATION:
+                            attempt.current_preparation_attempted = True
                             await self._assign_current_locked(
                                 explicit_amps, verify=False, reason=WRITE_SESSION_START
                             )
                         elif self._writes_current_at_start and not self.adapter.policy.ignored_while_paused:
+                            attempt.current_preparation_attempted = True
                             outcome = await self._assign_current_locked(
                                 explicit_amps, verify=False, reason=WRITE_SESSION_START
                             )
@@ -3868,9 +3917,10 @@ class ChargingController:
                 if too_low is None:
                     await self._async_save()
             except BaseException:
-                # Nothing went out: the site's margin is not on its way to this charger.
+                # Existing reservation cleanup; a preceding current write may already have gone out.
                 if reserved:
                     self._reserve_start(None)
+                    attempt.reservation_release_requested = True
                 raise
             if too_low is not None:
                 await self._hold_start_for_room(manual, cause, too_low, DEFAULT_MIN_CURRENT_A)
@@ -3895,15 +3945,18 @@ class ChargingController:
             was_cause = self._start_cause
             self._start_cause = (("manual" if manual else cause or "other"), sent_at)
             try:
+                attempt.start_dispatch = "unknown"
                 executed = await self.adapter.async_start(explicit_amps)
+                attempt.start_dispatch = "executed" if executed else "not_executed"
                 if executed:
                     # A start went out after any stop before it: a stop from now on is a new decision.
                     self._stop_settle_since = None
                     self._set_own_stop(False)
             except BaseException:
-                # The command failed outright: whatever it was to begin is not ours, nor anybody's.
+                # Preserve existing cleanup; an exception does not prove the command did not reach the charger.
                 if reserved:
                     self._reserve_start(None)
+                    attempt.reservation_release_requested = True
                 self._start_cause = was_cause
                 self._start_sent_at = None
                 self._start_write_pending = False
@@ -3913,6 +3966,7 @@ class ChargingController:
                 # The command never went out: nothing is awaiting an answer, and nothing may say so.
                 if reserved:
                     self._reserve_start(None)
+                    attempt.reservation_release_requested = True
                 self._start_cause = was_cause
                 self._start_sent_at = None
                 self._start_write_pending = False
@@ -3924,6 +3978,7 @@ class ChargingController:
             ):
                 # A charger that only stores a value while paused takes it once it is running; the site may
                 # have less room than when the start was decided.
+                attempt.current_preparation_attempted = True
                 await self._async_assign_current_outcome(
                     explicit_amps, reason=WRITE_SESSION_START, capped=capped
                 )
@@ -3939,6 +3994,19 @@ class ChargingController:
             await self._async_save_quietly()
         self._notify()
         return executed
+
+    def _start_requested_amps(self, amps: int | None, *, manual: bool) -> int | None:
+        """Choose the request without commanding the charger or changing controller state.
+
+        Called at the original decision point, after phase preparation and the
+        manual target-stop save, so this extraction does not change their order.
+        """
+        requested = amps if amps is not None else self._setting_amps()
+        if requested is None and self.plan is not None:
+            requested = self.plan.amps
+        if requested is None and manual:
+            requested = self._requested_current_a
+        return requested
 
     def _setting_amps(self) -> int | None:
         """The charging current the person set for this charger ("Laddström", the settings' `amps`), or `None` when
@@ -4224,7 +4292,7 @@ class ChargingController:
                 try:
                     # A balancing stop: a top-off running past the last window goes on, paused like any charge.
                     # A safety stop is never taken for a pause on its way (`_stop_settling`): the fuse needs it now.
-                    await self._stop_request_locked(balancing=True, urgent=code != "pause")
+                    await self._stop_request_locked(balancing=True, urgent=code != "pause", protection=True)
                     outcome = self._core_stop_outcome(True)
                 finally:
                     self._runner.end(token, pause, outcome=outcome)
@@ -4414,14 +4482,18 @@ class ChargingController:
         windows are all past: a person's Stop, a pause, solar standing it down. A stop through here goes out
         even while another settles (`urgent`, a person's): an automatic decision passes `urgent=False`.
         """
-        async with self._lock:
-            request = self._stop_request_locked(
-                clear_schedule=clear_schedule, balancing=balancing, urgent=urgent, by_person=by_person
-            )
-            if self._runner.depth:
-                await request
-                return
-            await self._core_direct_stop(request, clear_schedule)
+        from contextlib import nullcontext
+
+        scope = self.adapter.person_stop_scope() if by_person and isinstance(self.adapter, ChargerAdapter) else nullcontext()
+        with scope:
+            async with self._lock:
+                request = self._stop_request_locked(
+                    clear_schedule=clear_schedule, balancing=balancing, urgent=urgent, by_person=by_person
+                )
+                if self._runner.depth:
+                    await request
+                    return
+                await self._core_direct_stop(request, clear_schedule)
 
     async def _stop_request_locked(
         self,
@@ -4431,6 +4503,7 @@ class ChargingController:
         urgent: bool = False,
         defer_unready: bool = False,
         by_person: bool = False,
+        protection: bool = False,
     ) -> None:
         """`async_stop` itself, with the operation lock held."""
         if self._top_off_until is not None and not balancing:
@@ -4443,6 +4516,7 @@ class ChargingController:
             defer_unready=defer_unready,
             balancing=balancing,
             by_person=by_person,
+            protection=protection,
         )
 
     async def _stop_locked(
@@ -4453,6 +4527,7 @@ class ChargingController:
         defer_unready: bool = False,
         balancing: bool = False,
         by_person: bool = False,
+        protection: bool = False,
     ) -> None:
         """The stop itself, with the operation lock held: stop charging, optionally removing the saved
         schedule.
@@ -4474,6 +4549,8 @@ class ChargingController:
         A stop the charger answers by holding the charge at its floor (`STOP_HELD_AT_FLOOR`) did not end the charge:
         like one not executed it forgets nothing and raises, as `EXECUTION_STOP_HELD_AT_FLOOR`.
         """
+        if not protection and isinstance(self.adapter, ChargerAdapter) and not await self.adapter.async_legacy_permitted(person_stop=by_person):
+            raise ChargingExecutionError("legacy_execution_ownership_blocked", "Legacy charger control is blocked by ownership")
         if by_person:
             self._set_own_stop(False)
         if defer_unready and not self._stop_needed and self._control_observation is None:
@@ -4504,6 +4581,7 @@ class ChargingController:
             self._command_unfed = SENT_STOP
         elif needed:
             was_sent_at = self._stop_sent_at
+            was_switch_command = self._last_switch_command
             self._stop_sent_at = dt_util.utcnow()
             self._last_switch_command = ("off", self._stop_sent_at)
             self._stop_in_flight = True
@@ -4513,7 +4591,9 @@ class ChargingController:
                 # cannot lift the stop after it (Easee pauses by its limit). The stop waits for that one write
                 # at most: every regulator write behind it sees `_stop_in_flight` and sends nothing.
                 async with self._assign_lock:
-                    executed = await self.adapter.async_stop()
+                    executed = (await self.adapter.async_stop(protection=True) if protection
+                                else await self.adapter.async_stop(person_stop=True) if by_person and isinstance(self.adapter, ChargerAdapter)
+                                else await self.adapter.async_stop())
             except Exception as err:  # noqa: BLE001 - a command that failed outright did not execute either
                 failure = err
                 executed = False
@@ -4525,6 +4605,7 @@ class ChargingController:
                 # forgotten, neither who owns it nor the plan, so the retries that apply to a running
                 # charge (a pause's retry, the stray-charge stop) still find it.
                 self._stop_sent_at = was_sent_at
+                self._last_switch_command = was_switch_command
                 self._notify()
                 if floored:
                     _LOGGER.warning(
@@ -4900,7 +4981,12 @@ class ChargingController:
         the last one a stray plan charge), whichever holds now; a session's current is written as the request
         stands now, capped by what the site allows now, and only while a charge of ours runs."""
         try:
-            async with self._automatic(AUTOMATIC_STOP):
+            async with self._automatic(AUTOMATIC_STOP) as allowed:
+                if not allowed:
+                    # Discard stale automatic work rather than retry it on every ready tick.
+                    self._owed_command = False
+                    self._owed_current = False
+                    return
                 if self._shut_down:
                     return
                 if command and self.plan is not None:
@@ -5264,6 +5350,10 @@ class ChargingController:
             },
             "solar_car_ended": self._solar_car_ended,
         }
+        if self._legacy_person_stopped:
+            # Keep the original evidence across any intervening save until the
+            # Auto settings store has durably taken over the person's Stop.
+            record["person_stopped"] = True
         phases = self._phases.to_store()
         if phases is not None:
             # Only while there is something to keep: a charger that never switched keeps exactly its old record.
@@ -5427,7 +5517,7 @@ class ChargingController:
         self._session_dirty_since = None
         return waiting
 
-    async def _reschedule_locked(self) -> None:
+    async def _reschedule_locked(self, *, execute_rearm: bool = True) -> None:
         """Arm the plan's timers, or clear a plan that is over. The lock is held.
 
         Private because every caller already holds the operation lock (`async_install`,
@@ -5442,7 +5532,9 @@ class ChargingController:
         self._async_arm_target_listener()
         now = dt_util.utcnow()
         windows = self.plan.windows
-        if now >= windows[-1][1]:
+        # Do not feed legacy re-arm decisions or create retries on restore
+        # while another owner (or uncertain metadata) blocks execution.
+        if execute_rearm and now >= windows[-1][1]:
             token = self._runner.begin()
             facts = self._core_facts(
                 lambda: {
@@ -5485,7 +5577,9 @@ class ChargingController:
                     outcome=outcome,
                 )
         active = any(start <= now < end for start, end in windows)
-        if active and self._car_ended_holds_window():
+        if not execute_rearm:
+            pass
+        elif active and self._car_ended_holds_window():
             # The car ended a person's charge in this plug-in: the window open then is not started again,
             # nor any later one while the car is known full and its need has not grown.
             pass
@@ -6085,7 +6179,7 @@ class ChargingController:
         takes the charge over at this boundary (`_successor_continues`).
         """
         self._cancel_start_retry()
-        if self._end_window_guard is not None and self._end_window_guard():
+        if (self.plan is None or not self.plan.strict_windows) and self._end_window_guard is not None and self._end_window_guard():
             _LOGGER.debug(
                 "%s charger %s: window ended with sun available, handing off to solar control",
                 HYBRID_LOG_TOKEN,
@@ -6154,7 +6248,7 @@ class ChargingController:
         (`_successor_continues`).
         """
         self._cancel_start_retry()
-        if self._end_window_guard is not None and self._end_window_guard():
+        if (self.plan is None or not self.plan.strict_windows) and self._end_window_guard is not None and self._end_window_guard():
             _LOGGER.debug(
                 "%s charger %s: final window ended with sun available, handing off to solar control",
                 HYBRID_LOG_TOKEN,
@@ -6180,15 +6274,16 @@ class ChargingController:
             # under the lock, and ends the plan as this would have when it may not run.
             self._async_spawn(self._async_begin_top_off(), "the last window's end")
             return
-        if self.plan is not None and self._control_on and self._car_ended.wait is None:
-            # A charge still running at the last window's end: the plan is done. Not when the car ended it short of
-            # the target: that end was told when the car ended it.
-            self._record_completion("plan_done", target_soc_percent=self.plan.target_soc_percent)
-        self._async_spawn(self._async_window_end_stop(clear_schedule=True), "the last window end's stop")
+        self._async_spawn(self._async_window_end_stop(clear_schedule=True, record_completion=True),
+                          "the last window end's stop")
 
-    async def _async_window_end_stop(self, *, clear_schedule: bool) -> None:
+    async def _async_window_end_stop(self, *, clear_schedule: bool, record_completion: bool = False) -> None:
         """A window's end stops the plan's charge, as an automatic decision (`_automatic`)."""
         async with self._automatic(AUTOMATIC_STOP) as allowed:
+            if not allowed:
+                return
+            if record_completion and self.plan is not None and self._control_on and self._car_ended.wait is None:
+                self._record_completion("plan_done", target_soc_percent=self.plan.target_soc_percent)
             event = core_events.FinalWindowEnd() if clear_schedule else core_events.WindowEnd()
             token = self._runner.begin()
             outcome: CommandOutcome | None = None
@@ -6275,7 +6370,7 @@ class ChargingController:
         evidence). Never past the departure: a deadline already reached is none.
         """
         plan = self.plan
-        if plan is None or not self.charges_to_vehicle_limit():
+        if plan is None or plan.strict_windows or not self.charges_to_vehicle_limit():
             return None
         try:
             window_end = plan.windows[-1][1]
@@ -6299,7 +6394,6 @@ class ChargingController:
         async with self._automatic(AUTOMATIC_STOP) as allowed:
             plan = self.plan
             if not allowed:
-                self._runner.feed(core_events.FinalWindowEnd())
                 return
             if plan is None or self._top_off_until is not None:
                 return
@@ -6354,6 +6448,9 @@ class ChargingController:
         charge that strays past the last window is. Whether one goes on."""
         until = self._top_off_until
         if until is None:
+            return False
+        if self.plan is not None and self.plan.strict_windows:
+            self._clear_top_off()
             return False
         if self.plan is None or now >= until or self._hold_blocked():
             self._clear_top_off()
@@ -6438,7 +6535,9 @@ class ChargingController:
         ordinary end (`plan_done` while the charge is on); the car gone or the charge already off records
         nothing.
         """
-        async with self._automatic(AUTOMATIC_STOP):
+        async with self._automatic(AUTOMATIC_STOP) as allowed:
+            if not allowed:
+                return
             until = self._top_off_until
             plan = self.plan
             if until is None or plan is None:
@@ -6510,7 +6609,7 @@ class ChargingController:
         return sent_at is not None and (dt_util.utcnow() - sent_at).total_seconds() < STOP_ACK_S
 
     def _core_handed_off(self) -> bool:
-        return self._end_window_guard is not None and bool(self._end_window_guard())
+        return (self.plan is None or not self.plan.strict_windows) and self._end_window_guard is not None and bool(self._end_window_guard())
 
     def _core_hold_facts(self) -> dict[str, bool]:
         """What else may own the charger, split as the core decides it: the sun's phase, and whether the plan is

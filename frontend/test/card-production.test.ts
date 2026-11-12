@@ -369,7 +369,7 @@ describe("7-8. disconnect and reconnect", () => {
 });
 
 describe("9. a language change stays local", () => {
-  it("rerenders the held snapshot with translated labels and zero new calls", async () => {
+  it("keeps the English snapshot on an HA language change without new calls", async () => {
     const hass = new FakeHass();
     const english = hass.snapshot("en", "en");
     const element = mountCard(configFor("entry_a"), english);
@@ -390,12 +390,12 @@ describe("9. a language change stays local", () => {
     // not restarted (the interval still ends when it always would have).
     expect(hass.messages).toHaveLength(before);
     expect(hass.outstanding).toBe(0);
-    expect(text(element)).toContain("Planerat från");
+    expect(text(element)).toContain("Planned from");
     // The area line lives in the Settings popover's market section.
     shadow(element)
-      .querySelector<HTMLButtonElement>(`[aria-label="${translate("sv", "header.settings")}"]`)
+      .querySelector<HTMLButtonElement>(`[aria-label="${translate("en", "header.settings")}"]`)
       ?.click();
-    expect(text(element)).toContain(translate("sv", "context.area"));
+    expect(text(element)).toContain(translate("en", "context.area"));
     expect(text(element)).toContain("SE4");
     vi.advanceTimersByTime(REFRESH_INTERVAL_MS - 1_000);
     await settle();
@@ -456,7 +456,7 @@ describe("10-11. two cards, and one destroyed view per replacement", () => {
     expect(text(second)).toContain("Carport");
   });
 
-  it("destroys the previous view on a language rerender and on a state replacement", async () => {
+  it("retains the view on a language change and destroys it on state replacement", async () => {
     const adds = vi.spyOn(document, "addEventListener");
     const removes = vi.spyOn(document, "removeEventListener");
     const hass = new FakeHass();
@@ -470,10 +470,10 @@ describe("10-11. two cards, and one destroyed view per replacement", () => {
     const oldDialogs = Array.from(shadow(element).querySelectorAll("[role='dialog']"));
     element.hass = hass.snapshot("sv", "sv");
     await settle();
-    expect(shadow(element).querySelector(".spotnav-card")).not.toBe(oldCard);
-    expect(oldCard?.isConnected).toBe(false);
+    expect(shadow(element).querySelector(".spotnav-card")).toBe(oldCard);
+    expect(oldCard?.isConnected).toBe(true);
     for (const dialog of oldDialogs) {
-      expect(dialog.isConnected).toBe(false);
+      expect(dialog.isConnected).toBe(true);
     }
     expect(dialogs(element)).toBe(oldDialogs.length);
     expect(shadow(element).querySelectorAll(".spotnav-chart-viewport svg").length).toBe(1);
@@ -485,7 +485,7 @@ describe("10-11. two cards, and one destroyed view per replacement", () => {
     await settle();
     expect(shadow(element).querySelector(".spotnav-card")).toBeNull();
     expect(dialogs(element)).toBe(0);
-    expect(text(element)).toContain(translate("sv", "state.loading"));
+    expect(text(element)).toContain(translate("en", "state.loading"));
     const afterRemoves = removes.mock.calls.filter((call) => call[0] === "pointerdown").length;
     expect(afterRemoves).toBeGreaterThan(beforeRemoves);
     expect(beforeAdds).toBeGreaterThanOrEqual(afterRemoves);

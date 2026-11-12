@@ -109,7 +109,7 @@ describe("the Plan popover's title", () => {
     const { element } = await openPlan(fixture(), aRecord());
     expect(title(element)).toBe("Charging plan for EV6");
     const sv = await openPlan(fixture(), aRecord(), "sv");
-    expect(title(sv.element)).toBe("Laddplan för EV6");
+    expect(title(sv.element)).toBe("Charging plan for EV6");
     expect(translate("de", "settings.plan.titleFor", { name: "EV6" })).toBe("Ladeplan für EV6");
   });
 
@@ -171,9 +171,9 @@ describe("the Charge by row", () => {
     const { element } = await openPlan(fixture(), aRecord({ driver: "manual_kwh" }), "sv");
     const row = chargeByRow(element)!;
     expect(row.classList.contains("spotnav-setting-row")).toBe(true);
-    expect(row.querySelector(".spotnav-setting-row-label")?.textContent).toBe("Ladda efter");
+    expect(row.querySelector(".spotnav-setting-row-label")?.textContent).toBe("Charge by");
     const button = chargeByButton(element)!;
-    expect(button.textContent).toBe("Energi · kWh");
+    expect(button.textContent).toBe("Energy · kWh");
     expect(button.classList.contains("spotnav-setting-row-editable")).toBe(true);
     expect(dlg(element).querySelector("input[type='radio'][name$='-mode']")).toBeNull();
   });

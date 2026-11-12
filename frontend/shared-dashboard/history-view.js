@@ -1,0 +1,5 @@
+import { escapeText as e } from './text.js';
+export function renderHistory(h, chartAvailable = false) {
+  if (!h) return '<p>Charging history unavailable. A proposed window is not measured history.</p>';
+  return `<div class="history-head"><div><strong>${e(h.title)}</strong><p class="subtext">${e(h.subtitle)}</p></div><label class="history-select">Session <select disabled aria-label="Session selector unavailable"><option>${e(h.session)}</option></select></label></div><div class="history-comparison"><span><b>Last sent:</b> ${e(h.sent)}</span><span><b>Observed outside sent window:</b> ${e(h.outside)}</span><span><b>Coverage in sent window:</b> ${e(h.coverage)}</span></div>${chartAvailable ? '<div id="power-chart" class="chart power" role="img" aria-label="Measured power and shaded last sent plan"></div>' : '<p>Measured power history unavailable.</p>'}<p class="subtext">${e(h.note)}</p><div class="missing"><strong>Missing session example</strong><span>Previous session: energy unknown, not 0 kWh. A proposed window is not measured history.</span></div>`;
+}

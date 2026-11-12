@@ -17,6 +17,16 @@ function patch(section: string, patchValue: Record<string, unknown>): Record<str
 }
 
 describe("the outer envelope", () => {
+  it("preserves planner calculation provenance without confusing invalid values with current evidence", () => {
+    const current = decode(rawDashboard());
+    expect(current.ok && current.value.planning?.calculated_at).toBe("2026-09-22T05:59:00+00:00");
+    expect(current.ok && current.value.planning?.historical).toBe(false);
+    const old = decode(patch("planning", { calculated_at: "2026-09-21T05:59:00Z", historical: true }));
+    expect(old.ok && old.value.planning?.historical).toBe(true);
+    const invalid = decode(patch("planning", { calculated_at: "not a date", historical: "false" }));
+    expect(invalid.ok && invalid.value.planning?.calculated_at).toBeNull();
+    expect(invalid.ok && invalid.value.planning?.historical).toBeNull();
+  });
   it("accepts the documented answer and types it as v1", () => {
     const result = decode(rawDashboard());
     expect(result.ok).toBe(true);

@@ -23,6 +23,41 @@ const state = {
 };
 
 describe("Morek manual test panel", () => {
+  it("shows an automatic reconciliation blocker without issuing any action", () => {
+    const act = vi.fn();
+    const panel = morekPanel(document, { ...state, reconciliation: { reason: "price_coverage_unavailable" } }, true, false, null, act);
+    expect(panel.textContent).toContain("Published prices do not cover the proposed windows");
+    expect(panel.textContent).toContain("retained limit may remain");
+    expect(act).not.toHaveBeenCalled();
+  });
+  it.each([
+    ["waiting", "Waiting for a usable plan"], ["offline", "Offline"],
+    ["sending", "Sending — outcome not yet known"], ["checking", "Checking readback"],
+    ["mismatch", "Mismatch"], ["verified", "Remaining effective schedule verified at last read"],
+    ["intervention_needed", "Intervention needed"], ["not_ready", "Not ready"],
+  ])("shows operator state %s and activation blockers", (status, label) => {
+    const panel = morekPanel(document, { ...state, operator: { state: status }, ownership: { recorded_owner: "legacy" } }, true, false, null, vi.fn());
+    expect(panel.textContent).toContain(label);
+    expect(panel.textContent).toContain("Schedule sending is blocked pending migration or reconfirmation");
+    expect(panel.textContent).toContain("household protection");
+    expect(panel.textContent).toContain("transaction authorization");
+    expect(panel.textContent).toContain("not profile inventory");
+    expect(panel.textContent).toContain("do not blindly resume legacy control");
+    expect(panel.textContent).toContain("person Stop");
+  });
+  it("does not display an old verified flag as a match when outcome is uncertain", () => {
+    const panel = morekPanel(document, { ...state, verified: true, outcomes: { uncertain: true } }, true, false, null, vi.fn());
+    expect(panel.textContent).not.toContain("Remaining schedule matched at last read");
+    expect(panel.textContent).toContain("NOT verified");
+  });
+  it("exposes uncertain stored outcomes and blocks send without blocking readback", () => {
+    const panel = morekPanel(document, { ...state, outcomes: { uncertain: true } }, true, false, null, vi.fn());
+    expect(panel.textContent).toContain("may have applied");
+    expect(panel.textContent).toContain("readback cannot prove which profiles are installed");
+    const buttons = Array.from(panel.querySelectorAll("button"));
+    expect(buttons.find((button) => button.textContent === "Send current plan")?.disabled).toBe(true);
+    expect(buttons.find((button) => button.textContent === "Refresh from Morek")?.disabled).toBe(false);
+  });
   it("explains that shortened plan windows are sent as fixed times, not live energy control", () => {
     const panel = morekPanel(document, state, true, false, null, vi.fn());
     expect(panel.textContent).toContain("fixed start/stop times from the displayed plan");
@@ -45,10 +80,10 @@ describe("Morek manual test panel", () => {
       pending: false, reason: "matched_with_drift", max_delta_s: 57, tolerance_s: 90,
       coverage_end: "2026-11-07T08:00:00Z",
     } }, true, false, null, vi.fn());
-    expect(panel.textContent).toContain("Matched within tolerance, NOT exact");
+    expect(panel.textContent).toContain("Remaining schedule matched within tolerance, NOT exact");
+    expect(panel.textContent).toContain("past intervals and physical charging are not verified");
     expect(panel.textContent).toContain("Maximum transition drift: 57 s; tolerance: 90 s");
     expect(panel.textContent).toContain("Readback covers through");
-    expect(panel.textContent).toContain("physical charging is not verified");
   });
 
   it("reports interrupted and missing-coverage checks without claiming verification", () => {
@@ -99,7 +134,7 @@ describe("Morek manual test panel", () => {
     expect(panel.textContent).toContain("NOT verified");
     expect(panel.textContent).toContain("Sent (profile 42001)");
     expect(panel.textContent).toContain("Preview — calculated, NOT sent");
-    expect(panel.textContent).toContain("final 0 A limit remains installed");
+    expect(panel.textContent).toContain("final 0 A limit can remain");
     expect(panel.textContent).toContain("Morek effective schedule");
     const buttons = panel.querySelectorAll("button");
     expect(buttons).toHaveLength(3);
@@ -123,6 +158,7 @@ describe("Morek manual test panel", () => {
   it("keeps the styled opener and a useful diagnosis when the station does not match", async () => {
     vi.useFakeTimers();
     const transport = new FakeHass();
+    transport.trackMorek = true;
     const hass = transport.snapshot("admin", "en");
     hass.user = { is_admin: true };
     const card = mountCard({ type: "custom:spotnav-card", charger: "entry_a" }, hass);

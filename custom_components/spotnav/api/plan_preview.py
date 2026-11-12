@@ -51,6 +51,7 @@ from .common import (
     send_unsupported_version,
 )
 from .dashboard import planning_facts
+from .price_policy import encode_price_policy
 from .settings import (
     body_mutator,
     decode_settings,
@@ -216,13 +217,16 @@ def encode_preview(snapshot: AutoSnapshot, settings: AutoSettings) -> dict[str, 
     """`{state, reason, plan, status, strip}`: the snapshot's planning state and reason; the plan (`null` when
     none: then `status` says why, in the dashboard's status codes); the status lines the plan comes with (a
     departure it does not make, prices it waits for, ...); and the strip the card draws under it."""
-    return {
+    result = {
         "state": snapshot.state,
         "reason": snapshot.reason,
         "plan": _plan(snapshot),
         "status": _status(snapshot, settings),
         "strip": _strip(snapshot),
     }
+    if settings.soft_price_cap is not None:
+        result["price_policy"] = encode_price_policy(settings, snapshot)
+    return result
 
 
 def preview_answer(error: str | None, preview: dict[str, Any] | None = None) -> dict[str, Any]:

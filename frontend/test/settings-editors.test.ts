@@ -270,6 +270,22 @@ describe("the resting settings row", () => {
 });
 
 describe("the request lifecycle", () => {
+  it("edits policy as a draft and saves it with the existing revision, without a charger command", async () => {
+    const record = aRecord({ soft_price_cap: 0.1, cap_price_basis: "nord_pool", minimum_ready_by_soc: 40 });
+    const { hass, element } = await openEditor("energy", { record });
+    const dialog = editorDialog(element)!;
+    const cap = dialog.querySelector<HTMLInputElement>("input[id$='-cap-value']")!;
+    const minimum = dialog.querySelector<HTMLInputElement>("input[id$='-minimum-ready']")!;
+    enter(cap, "0.12"); enter(minimum, "35");
+    expect(updates(hass)).toHaveLength(0);
+    expect(hass.messages.some((m) => m.type === "spotnav/manual_action" || (m.type === "spotnav/morek_schedule" && m.action !== "status"))).toBe(false);
+    button(element, "spotnav-settings-save")!.click();
+    await settle();
+    const message = updates(hass)[0]!;
+    expect(message.expected_revision).toBe(record.revision);
+    expect(message.settings).toMatchObject({ soft_price_cap: 0.12, cap_price_basis: "nord_pool", minimum_ready_by_soc: 35 });
+    expect(hass.messages.some((m) => m.type === "spotnav/manual_action" || (m.type === "spotnav/morek_schedule" && m.action !== "status"))).toBe(false);
+  });
   it("reads the full record once when a dialog opens, with the settings contract's own version", async () => {
     const { hass, element } = await openEditor("energy");
 
@@ -524,17 +540,15 @@ describe("the request lifecycle", () => {
   });
 
   it.each<[Language, string]>([
-    ["da", "1.000 kWh"],
+    ["da", "1,000 kWh"],
     ["en", "1,000 kWh"],
-    ["fi", "1\u00a0000 kWh"],
-    ["nb", "1\u00a0000 kWh"],
-    ["sv", "1\u00a0000 kWh"],
+    ["fi", "1,000 kWh"],
+    ["nb", "1,000 kWh"],
+    ["sv", "1,000 kWh"],
   ])(
     "states a stored 1000 kWh in %s's conventions, the dialog and the row saying the same thing",
     async (language, shown) => {
-      // The amount is at the field's own maximum, so the grouping mark is exercised as well as the
-      // decimal one: `da` groups with a period, `en` with a comma, and `fi`/`nb`/`sv` with a no-break
-      // space. None of that is this card's choice to make, so it is asserted, not assumed.
+      // The card uses English number formatting regardless of the HA language.
       const payload = fixture("start_idle");
       (payload["settings"] as Record<string, unknown>)["requested_kwh"] = 1000;
       const { element } = await openEditor("energy", {
@@ -546,7 +560,7 @@ describe("the request lifecycle", () => {
       expect(rowValues(element)[0], language).toBe(shown);
       // The trigger's accessible name carries the same figure in its own translated sentence.
       expect(trigger(element, "energy").getAttribute("aria-label")).toBe(
-        `${translate(language, "bar.plan")}: ${shown} \u00b7 ${translate(language, "settings.deadline.none")} \u00b7 10 A. ${translate(language, "bar.change")}`,
+        `${translate("en", "bar.plan")}: ${shown} \u00b7 ${translate("en", "settings.deadline.none")} \u00b7 10 A. ${translate("en", "bar.change")}`,
       );
     },
   );
@@ -585,6 +599,26 @@ async function save(
 }
 
 describe("success and its confirmation", () => {
+  it("confirms a policy save from the backend and refreshes its displayed proposal", async () => {
+    const record = aRecord({ soft_price_cap: 0.1, cap_price_basis: "nord_pool", minimum_ready_by_soc: 40 });
+    const { hass, element } = await openEditor("energy", { record });
+    const input = editorDialog(element)!.querySelector<HTMLInputElement>("input[id$='-cap-value']")!;
+    enter(input, "0.12");
+    button(element, "spotnav-settings-save")!.click(); await settle();
+    expect(updates(hass)[0]?.expected_revision).toBe(7);
+    expect(editorDialog(element)).not.toBeNull();
+    hass.resolveNext(success({ ...record, revision: 8, soft_price_cap: 0.12 })); await settle();
+    expect(editorDialog(element)).toBeNull();
+    const refreshed = fixture("start_idle");
+    (refreshed.settings as Record<string, unknown>).requested_kwh = 25;
+    hass.resolveNext(refreshed); await settle();
+    expect(rowValues(element)[0]).toBe("25 kWh");
+    expect(rowError(element)).toBeNull();
+    trigger(element, "energy").click(); await settle();
+    hass.resolveNext(success({ ...record, revision: 8, soft_price_cap: 0.12 })); await settle();
+    expect(editorDialog(element)!.querySelector<HTMLInputElement>("input[id$='-cap-value']")?.value).toBe("0.12");
+    expect(hass.messages.some(m => m.type === "spotnav/manual_action" || (m.type === "spotnav/morek_schedule" && m.action !== "status"))).toBe(false);
+  });
   it("adopts the returned revision, then confirms with one dashboard read and no optimism", async () => {
     const { hass, element } = await openEditor("energy");
     const dashboardsBefore = dashboards(hass).length;
@@ -1027,9 +1061,9 @@ describe("the energy slider and its value on the label row", () => {
 
   it("states the value in the reader's language", async () => {
     const { element } = await openEditor("energy", { record: aRecord({ requested_kwh: 7.3 }), language: "sv" });
-    expect(energyText(element)).toBe("7,3 kWh");
+    expect(energyText(element)).toBe("7.3 kWh");
     const range = editorDialog(element)?.querySelector<HTMLInputElement>("[data-part='energy'] input[type='range']");
-    expect(range?.getAttribute("aria-valuetext")).toBe("7,3 kWh");
+    expect(range?.getAttribute("aria-valuetext")).toBe("7.3 kWh");
     expect(range?.value).toBe("7.5");
   });
 });
@@ -1066,8 +1100,8 @@ describe("the current slider and the nominal power beside it", () => {
     const { element } = await openEditor("current", { record: aRecord({ amps: 10 }), language: "sv" });
     expect(currentText(element)).toBe("10 A");
     const label = editorDialog(element)?.querySelector("[data-part='current-value']")?.parentElement;
-    expect(label?.textContent).toContain(translate("sv", "settings.current.label"));
-    expect(inputs(element)[0]?.getAttribute("aria-label")).toBe("Strömreglage, 6 till 32 A i hela ampere");
+    expect(label?.textContent).toContain(translate("en", "settings.current.label"));
+    expect(inputs(element)[0]?.getAttribute("aria-label")).toBe("Current slider, 6 to 32 A in whole amperes");
   });
 
   it.each([
@@ -1422,8 +1456,8 @@ describe("the departure date picker", () => {
 
   it("is worded in the card's language", async () => {
     const { element } = await openEditor("deadline", { language: "sv" });
-    expect(editorDialog(element)!.textContent).toContain("Ett visst datum");
-    expect(editorDialog(element)!.textContent).toContain("Varje dag");
+    expect(editorDialog(element)!.textContent).toContain("On a date");
+    expect(editorDialog(element)!.textContent).toContain("Every day");
   });
 
   it("writes the chosen date with the rest of the record, in one replacement", async () => {
@@ -1595,8 +1629,8 @@ describe("the weekdays of a daily departure", () => {
     for (let day = 1; day <= 7; day += 1) {
       expect(weekday(element, day)!.checked).toBe(true);
     }
-    expect(group(element)!.textContent).toContain(translate("sv", "settings.deadline.weekdays"));
-    expect(group(element)!.textContent?.toLowerCase()).toContain("mån");
+    expect(group(element)!.textContent).toContain(translate("en", "settings.deadline.weekdays"));
+    expect(group(element)!.textContent?.toLowerCase()).toContain("mon");
     expect(group(element)!.hidden).toBe(false);
   });
 

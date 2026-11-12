@@ -63,6 +63,7 @@ import {
   updateVehicle,
 } from "./api";
 import { decodeMorekState, morekPanel, type MorekState } from "./morek-view";
+import { dailyOverview } from "./daily-overview";
 import {
   brandMark,
   createCardView,
@@ -339,10 +340,15 @@ export class SpotnavCard extends HTMLElement {
   private wantedLanguage: Language | null = null;
   private view: CardView | null = null;
   private morekState: MorekState | null = null;
+  private morekActiveAction: "status" | "send" | "fetch" | "clear" | null = null;
   private morekEnabled = false;
   private morekOperation = 0;
   private morekBusy = false;
   private morekError: string | null = null;
+  private morekObservedAt: number | null = null;
+  private morekRead: Promise<void> | null = null;
+  private morekReadFailed = false;
+  private morekTimeout: number | null = null;
   private actionInFlight: { generation: number; attempt: number; action: ActionId } | null = null;
   private editor: SettingsEditorState | null = null;
   /** The Plan dialog's live preview, bound to the editor it was asked for (`plan-preview.ts`). */
@@ -443,8 +449,12 @@ export class SpotnavCard extends HTMLElement {
     this.morekState = null;
     this.morekEnabled = false;
     this.morekBusy = false;
+    this.morekActiveAction = null;
     this.morekError = null;
     this.morekOperation += 1;
+    this.morekObservedAt = null;
+    this.cancelMorekRead();
+    this.morekReadFailed = false;
     this.deferredRefresh = false;
     this.marketEditor = null;
     this.entityConfig = null;
@@ -461,8 +471,10 @@ export class SpotnavCard extends HTMLElement {
   }
 
   set hass(hass: HomeAssistantLike) {
-    const nextLanguage = resolveLanguage(hass.locale?.language ?? hass.language);
+    // The shipped dashboard deliberately uses English regardless of the HA locale.
+    const nextLanguage: Language = "en";
     const previous = this.language;
+    const wasAdmin = this.isAdmin;
     this.hassObject = hass;
     this.view?.setEntityHass(hass);
     this.followLanguage(nextLanguage);
@@ -476,15 +488,12 @@ export class SpotnavCard extends HTMLElement {
       this.startWork();
       return;
     }
-    if (changed) {
+    if (changed || wasAdmin !== this.isAdmin) {
       this.renderLocal();
     }
   }
 
-  /**
-   * Show `next` now if its words are here (or cannot be had), else keep what is shown and load it: the
-   * card renders again when it is in. One request per language and page, however often `hass` changes.
-   */
+  /** Select the card language. The shipped card passes English, which is bundled and needs no fetch. */
   private followLanguage(next: Language): void {
     if (this.wantedLanguage === next) {
       return;
@@ -518,6 +527,7 @@ export class SpotnavCard extends HTMLElement {
     globalThis.addEventListener?.(CHART_AXIS_EVENT, this.onDisplayChanged);
     globalThis.addEventListener?.(PRICE_UNIT_EVENT, this.onDisplayChanged);
     globalThis.addEventListener?.("storage", this.onDisplayChanged);
+    if (this.cardState.kind === "loading") this.render();
     this.startWork();
   }
 
@@ -532,6 +542,16 @@ export class SpotnavCard extends HTMLElement {
     this.attempt += 1;
     this.inFlight = null;
     this.actionInFlight = null;
+    // A panel request may settle after disconnect or a later reconnection. Its
+    // result must not become the evidence for the new lifecycle.
+    this.morekOperation += 1;
+    this.morekState = null;
+    this.morekBusy = false;
+    this.morekActiveAction = null;
+    this.morekError = null;
+    this.morekObservedAt = null;
+    this.cancelMorekRead();
+    this.morekReadFailed = false;
     this.sentAction = null;
     this.shownAutomatic = null;
     this.deferredRefresh = false;
@@ -545,6 +565,13 @@ export class SpotnavCard extends HTMLElement {
     this.entitySaving = false;
     this.editorOperation += 1;
     this.releaseView();
+    // The Morek panel is a sibling of the view, so destroying the view alone
+    // would leave old evidence visible when this element is reattached.
+    this.root.replaceChildren();
+    if (this.config !== null && this.config.charger !== "") {
+      this.cardState = { kind: "loading" };
+      this.render();
+    }
   }
 
   getCardSize(): number {
@@ -611,7 +638,11 @@ export class SpotnavCard extends HTMLElement {
     if (this.timer !== null) {
       return;
     }
-    this.timer = window.setInterval(() => void this.refresh(), REFRESH_INTERVAL_MS);
+    this.timer = window.setInterval(() => {
+      // Age already displayed evidence even when the next dashboard read stalls.
+      this.paintDailyOverview();
+      void this.refresh();
+    }, REFRESH_INTERVAL_MS);
   }
 
   private stopTimer(): void {
@@ -874,6 +905,7 @@ export class SpotnavCard extends HTMLElement {
       this.editor = { kind, record, conflict: null, operation, generation, saving: false };
       this.view?.showSettingsEditorForm({
         kind,
+        currency: this.cardState.kind === "ready" ? this.cardState.dashboard.market?.currency : null,
         readOnly: !this.mayPlan,
         values: formFromRecord(record),
         energyReadOnly: manualEnergyReadOnly(record),
@@ -1423,6 +1455,7 @@ export class SpotnavCard extends HTMLElement {
       editor.conflict = null;
       this.view?.showSettingsEditorForm({
         kind,
+        currency: this.cardState.kind === "ready" ? this.cardState.dashboard.market?.currency : null,
         readOnly: !this.mayPlan,
         values: formFromRecord(record),
         energyReadOnly: manualEnergyReadOnly(record),
@@ -2608,14 +2641,33 @@ export class SpotnavCard extends HTMLElement {
     if (!this.connected || !this.isAdmin || hass === null || !charger || this.morekBusy) return;
     const generation = this.generation;
     const operation = ++this.morekOperation;
+    this.cancelMorekRead();
+    this.morekObservedAt = null;
+    this.morekReadFailed = true;
     this.morekBusy = true;
+    this.morekActiveAction = action;
     this.morekError = null;
     this.render();
     try {
       const result = decodeMorekState(await morekSchedule(hass, charger, action, this.morekState?.preview?.preview_id ?? undefined));
-      if (operation === this.morekOperation) this.morekState = result;
+      if (!this.morekCurrent(generation, charger, operation)) return;
+      this.morekState = result;
+      if (action === "status" && result !== null) {
+        this.morekObservedAt = Date.now();
+        this.morekReadFailed = false;
+      }
+      if (action !== "status" && this.morekCurrent(generation, charger, operation)) {
+        try {
+          const status = decodeMorekState(await morekSchedule(hass, charger, "status"));
+          if (this.morekCurrent(generation, charger, operation) && status !== null) {
+            this.morekState = status;
+            this.morekObservedAt = Date.now();
+            this.morekReadFailed = false;
+          }
+        } catch { /* Keep the action result; its operator summary may be unavailable. */ }
+      }
     } catch (error) {
-      if (operation !== this.morekOperation) return;
+      if (!this.morekCurrent(generation, charger, operation)) return;
       const code = error instanceof SpotnavApiError ? error.code : null;
       this.morekError = code === "spotnav_morek_pause_auto_first"
         ? "Pause Auto until resumed before sending."
@@ -2632,14 +2684,88 @@ export class SpotnavCard extends HTMLElement {
             : code ?? "Could not reach the charger.";
       try {
         const result = decodeMorekState(await morekSchedule(hass, charger, "status"));
-        if (operation === this.morekOperation) this.morekState = result;
+        if (this.morekCurrent(generation, charger, operation)) {
+          this.morekState = result;
+          this.morekObservedAt = result === null ? null : Date.now();
+          this.morekReadFailed = result === null;
+        }
       } catch { /* Keep the last known result; do not claim the upload worked. */ }
     } finally {
-      if (operation === this.morekOperation) this.morekBusy = false;
+      if (operation === this.morekOperation) {
+        this.morekBusy = false;
+        this.morekActiveAction = null;
+      }
       if (this.connected && operation === this.morekOperation && generation === this.generation && charger === this.config?.charger) {
         this.render();
       }
     }
+  }
+
+  private morekCurrent(generation: number, charger: string, operation: number): boolean {
+    return this.connected && generation === this.generation && charger === this.config?.charger && operation === this.morekOperation;
+  }
+
+  private cancelMorekRead(): void {
+    if (this.morekTimeout !== null) window.clearTimeout(this.morekTimeout);
+    this.morekTimeout = null;
+    this.morekRead = null;
+  }
+
+  private paintDailyOverview(): void {
+    if (this.view === null || this.cardState.kind !== "ready") return;
+    const previous = Array.from(this.view.element.children).find((child) => child.classList.contains("spotnav-daily"));
+    if (previous === undefined) return;
+    const fresh = dailyOverview(this.ownerDocument, this.cardState.dashboard, this.languageOrFallback,
+      this.morekState, this.morekObservedAt, this.morekReadFailed, this.morekBusy, Date.now(), () => { void this.openSettings("plan"); }, () => this.dailyPlanClosed());
+    const open = previous.querySelector("dialog[open]");
+    if (open) {
+      const health = fresh.querySelector(".spotnav-daily-health");
+      if (health) {
+        for (const target of [previous.querySelector(":scope > .spotnav-daily-health"), open.querySelector(".spotnav-daily-health")]) {
+          target?.replaceChildren(...Array.from(health.childNodes, (node) => node.cloneNode(true)));
+        }
+      }
+      return;
+    }
+    previous.replaceWith(fresh);
+    this.view.refit();
+  }
+
+  /** Read-only evidence, independent of dashboard latency and bounded even if HA never replies. */
+  private readMorekStatus(hass: HomeAssistantLike, charger: string, generation: number): void {
+    if (this.morekRead !== null || this.morekBusy || !this.connected) return;
+    const operation = ++this.morekOperation;
+    this.morekReadFailed = false;
+    let timeout: number | undefined;
+    const request = Promise.race([
+      morekSchedule(hass, charger, "status"),
+      new Promise<never>((_resolve, reject) => {
+        timeout = window.setTimeout(() => reject(new Error("timeout")), 10_000);
+        this.morekTimeout = timeout;
+      }),
+    ]);
+    let pending!: Promise<void>;
+    pending = (async () => {
+      try {
+        const result = decodeMorekState(await request);
+        if (!this.morekCurrent(generation, charger, operation)) return;
+        this.morekState = result;
+        this.morekObservedAt = result === null ? null : Date.now();
+        this.morekReadFailed = result === null;
+      } catch {
+        if (!this.morekCurrent(generation, charger, operation)) return;
+        this.morekReadFailed = true;
+      } finally {
+        if (timeout !== undefined) window.clearTimeout(timeout);
+        if (this.morekTimeout === timeout) this.morekTimeout = null;
+        if (this.morekRead === pending) this.morekRead = null;
+        if (this.morekCurrent(generation, charger, operation)) {
+          this.paintDailyOverview();
+          if (this.morekEnabled) this.render();
+        }
+      }
+    })();
+    this.morekRead = pending;
   }
 
   private async load(
@@ -2656,14 +2782,6 @@ export class SpotnavCard extends HTMLElement {
       const answer: unknown = await this.readDashboard(hass, charger);
       const decoded = decodeDashboard(answer);
       next = decoded.ok ? { kind: "ready", dashboard: decoded.value } : { kind: decoded.failure };
-      if (next.kind === "ready" && this.morekEnabled) {
-        try {
-          const morek = decodeMorekState(await morekSchedule(hass, charger, "status"));
-          if (this.accepts(charger, generation, attempt)) this.morekState = morek;
-        } catch {
-          if (this.accepts(charger, generation, attempt)) this.morekState = null;
-        }
-      }
     } catch (error) {
       code = error instanceof SpotnavApiError ? error.code : null;
       next = this.stateFromError(error);
@@ -2702,6 +2820,7 @@ export class SpotnavCard extends HTMLElement {
     }
     this.cardState = next;
     this.render();
+    if (next.kind === "ready") this.readMorekStatus(hass, charger, generation);
     this.followOutcome();
   }
 
@@ -2860,6 +2979,10 @@ export class SpotnavCard extends HTMLElement {
 
   private renderPending = false;
 
+  private dailyPlanClosed(): void {
+    if (this.connected && this.renderPending) this.render();
+  }
+
   /**
    * One render: destroy the previous view, then mount the accepted view or show a quiet state. Everything
    * is built as nodes with `textContent`; no backend, config or exception value is put into markup.
@@ -2881,7 +3004,7 @@ export class SpotnavCard extends HTMLElement {
   }
 
   private render(options: { force?: boolean } = {}): void {
-    if (options.force !== true && this.view !== null && this.view.anyDialogOpen()) {
+    if (options.force !== true && this.view !== null && (this.view.anyDialogOpen() || this.view.element.querySelector(".spotnav-daily dialog[open]"))) {
       this.renderPending = true;
       return;
     }
@@ -3061,6 +3184,11 @@ export class SpotnavCard extends HTMLElement {
           }
         },
       });
+      this.view.element.insertBefore(
+        dailyOverview(doc, this.cardState.dashboard, language, this.morekState, this.morekObservedAt,
+          this.morekReadFailed, this.morekBusy, Date.now(), () => { void this.openSettings("plan"); }, () => this.dailyPlanClosed()),
+        this.view.element.children[1] ?? null,
+      );
       if (this.updateNotice) {
         this.view.setUpdateNotice(updateNoticeElement(doc, this.noticeLanguage));
       }
@@ -3076,7 +3204,7 @@ export class SpotnavCard extends HTMLElement {
         open.setAttribute("aria-expanded", String(this.morekEnabled));
         open.addEventListener("click", () => {
           this.morekEnabled = !this.morekEnabled;
-          if (this.morekEnabled && this.morekState === null && !this.morekBusy) {
+          if (this.morekEnabled && this.morekState === null && !this.morekBusy && this.morekRead === null) {
             void this.morekAction("status");
           } else {
             this.render();
@@ -3086,7 +3214,7 @@ export class SpotnavCard extends HTMLElement {
       }
       if (this.morekEnabled && this.morekState !== null) {
         const panel = morekPanel(doc, this.morekState, this.isAdmin, this.morekBusy, this.morekError,
-          (action) => { void this.morekAction(action); });
+          (action) => { void this.morekAction(action); }, this.morekActiveAction);
         host.append(panel);
       } else if (this.morekEnabled) {
         const loading = doc.createElement("p");

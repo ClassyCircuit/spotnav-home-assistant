@@ -12,7 +12,9 @@ proposal is delegated to the injected `AutoExecutor`; without one this only calc
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import math
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Callable, Final, Literal
@@ -65,7 +67,7 @@ from ..vehicles.guest import is_guest
 from ..vehicles.vehicle_discovery import resolve_target_vehicle
 from ..vehicles.vehicle_properties import resolved_vehicle_id, stored_properties
 from ..execution.min_soc_floor import effective_floor, known_soc
-from ..execution.target_stop import car_ended_full_percent
+from ..execution.target_stop import car_ended_full_percent, SOC_FRESH_MAX_AGE_S
 from .auto_settings import (
     AutoSettings,
     AutoSettingsError,
@@ -103,6 +105,7 @@ from .phases import effective_phases
 from .planner import (
     calculate_plan,
     ending_at_need,
+    effective_target_soc_percent,
     FiscalChoice,
     local_instant,
     MAX_DEPARTURE_DAYS_AHEAD,
@@ -370,6 +373,8 @@ AutoReason = Literal[
     "target_capacity_unknown",
     #: A target needs the car's state of charge and no source provides or can estimate one.
     "target_soc_unknown",
+    "target_soc_stale",
+    "minimum_above_target",
     "no_prices_yet",
     "price_data_stale",
     "ready",
@@ -406,6 +411,9 @@ AutoReason = Literal[
     #: Strategy is `solar` and the site can run it; the price planner stands down and a
     #: `SolarExecutionCoordinator` reports the state (`solar_execution.solar_execution_state`).
     "solar_running",
+    #: A configured cap is not yet supported by the planner; no uncapped fallback is safe.
+    "price_policy_unavailable",
+    "no_eligible_energy",
 ]
 
 
@@ -495,6 +503,67 @@ class _EnergyResolution:
     #: A target only: the car's learned wall kWh per percent the need was worked out with (`learned_energy.py`),
     #: `None` while nothing trusted is learned (the battery size and `CHARGE_EFFICIENCY` then).
     kwh_per_percent: float | None = None
+    #: Resolved minimum wall-energy deficit for capped target planning; None forbids exceptions.
+    minimum_energy_kwh: float | None = None
+
+
+def capped_vehicle_energy(
+    facts: LiveVehicleFacts | None,
+    *,
+    target_percent: float | None,
+    minimum_percent: float | None,
+    learned: LearnedEnergy,
+) -> tuple[str, float | None, float | None]:
+    """Resolve capped target and minimum wall energy from a fresh actual reading.
+
+    This does not assume that the independent immediate SOC floor has charged
+    the vehicle. Both deficits use the same existing learned-energy conversion.
+    """
+    if facts is None or facts.soc_percent is None:
+        return ("target_soc_unknown", None, None)
+    soc, age, capacity = facts.soc_percent, facts.soc_age_s, facts.reported_capacity_kwh
+    if (
+        facts.soc_estimated or isinstance(soc, bool) or not isinstance(soc, (int, float))
+        or not math.isfinite(soc) or not 0 <= soc <= 100
+        or isinstance(age, bool) or not isinstance(age, (int, float))
+        or not math.isfinite(age) or not 0 <= age <= SOC_FRESH_MAX_AGE_S
+    ):
+        return ("target_soc_stale", None, None)
+    if (
+        isinstance(capacity, bool) or not isinstance(capacity, (int, float))
+        or not math.isfinite(capacity) or capacity <= 0
+    ):
+        return ("target_capacity_unknown", None, None)
+    try:
+        if (target_percent is None or isinstance(target_percent, bool)
+                or not isinstance(target_percent, (int, float)) or not math.isfinite(target_percent)
+                or not 0 <= target_percent <= 100):
+            return ("price_policy_unavailable", None, None)
+        # Match target_need_kwh, which resolves stored target percentages to a whole value.
+        target = effective_target_soc_percent(round(target_percent), facts.max_percent, apply_default_target=False)
+    except PlannerInputError:
+        return ("price_policy_unavailable", None, None)
+    if minimum_percent is not None:
+        if (
+            isinstance(minimum_percent, bool) or not isinstance(minimum_percent, (int, float))
+            or not math.isfinite(minimum_percent) or not 0 <= minimum_percent <= 100
+        ):
+            return ("price_policy_unavailable", None, None)
+        if minimum_percent > target:
+            return ("minimum_above_target", None, None)
+    _, target_kwh = target_need(
+        learned, soc_percent=soc, capacity_kwh=capacity, target_percent=target,
+        vehicle_max_percent=facts.max_percent,
+    )
+    if target_kwh is None:
+        return ("target_capacity_unknown", None, None)
+    minimum_kwh = None
+    if minimum_percent is not None:
+        # target_need rounds targets to whole percentages; scale its resolved
+        # wall energy instead so a fractional minimum is not rounded away.
+        delta = max(0.0, target - soc)
+        minimum_kwh = 0.0 if delta == 0 else target_kwh * max(0.0, minimum_percent - soc) / delta
+    return ("ok", target_kwh, minimum_kwh)
 
 
 @dataclass(frozen=True, slots=True)
@@ -568,10 +637,20 @@ class AutoSnapshot:
     #: is expected to reach by then, from the live reading, the planned energy and the charging
     #: efficiency; `None` for a manual need or a plan that is not short.
     expected_soc_percent: float | None = None
+    #: When this process began the calculation, before waiting for the calculation
+    #: lock. Unlike calculated_at this cannot make an already-running calculation
+    #: appear to have begun after a connection event.
+    calculation_started_at: datetime | None = None
+    connection_generation: int | None = None
+    notification_vehicle_id: str | None = None
+    notification_vehicle_checked: bool = False
     #: The price entry's revision this calculation priced with (`price_source.PriceSource.plan_revision`), or
     #: `None` when the charger's own settings are its price source. A change of it is news, and it enters the
     #: application's identity, so a fee change on the price entry replans and reinstalls.
     price_revision: str | None = None
+    # Process-local evidence for automatic Morek dispatch, never restored from storage.
+    morek_price_evidence: Any = None
+    morek_input_evidence: Any = None
 
     def meaningful_key(self) -> tuple[Any, ...]:
         """What a listener hears about, and is not told twice.
@@ -609,6 +688,7 @@ class AutoSnapshot:
             None if self.room_kwh is None else round(self.room_kwh, 1),
             self.room_limited,
             self.fill,
+            self.departure_at,
             None if self.proposal is None else self._proposal_key(self.proposal),
         )
 
@@ -621,7 +701,14 @@ class AutoSnapshot:
         return (
             proposal.reason,
             proposal.slots_needed,
+            proposal.requested_kwh,
+            proposal.delivered_kwh,
+            proposal.power_kw,
             proposal.estimated_cost,
+            proposal.policy_shortfall_kwh,
+            proposal.minimum_shortfall_kwh,
+            proposal.exception_kwh,
+            proposal.exception_periods,
             tuple((start.isoformat(), end.isoformat()) for start, end in proposal.periods),
             tuple(
                 (slot.start.isoformat(), slot.end.isoformat(), slot.unpriced, slot.source)
@@ -700,6 +787,8 @@ class AutoPlannerController:
         self._departure_cancel: Callable[[], None] | None = None
         self._connection_cancel: Callable[[], None] | None = None
         self._plug_in_pending = False
+        self._connection_generation = 0
+        self._connection_ready_generation: int | None = None
         self._energy_cancel: Callable[[], None] | None = None
         self._energy_watched: str | None = None
         # The count the register watcher keeps between calculations (`_baseline`), and the epoch whose
@@ -723,6 +812,7 @@ class AutoPlannerController:
         self._last_failure: tuple[str, str, PlanRequest] | None = None
 
         self._listeners: list[Callable[[AutoSnapshot], None]] = []
+        self._publication_listeners: list[Callable[[AutoSnapshot], None]] = []
         self._unsubscribe: Callable[[], None] | None = None
         self._subscribed_area: str | None = None
         # The price source (`pricing/price_source.py`) the subscription and observation were last matched to, as
@@ -742,6 +832,10 @@ class AutoPlannerController:
         self._executor: AutoExecutor | None = executor
         # Attempt id of the calculation behind `self._snapshot`; a newer attempt makes older ones inert.
         self._attempt = 0
+        # Attempts are claimed before this lock: a newer event invalidates an in-flight
+        # calculation immediately, while their timers and proposal writes remain ordered.
+        self._calculation_lock = asyncio.Lock()
+        self._reconcile_lock = asyncio.Lock()
         # The power the car really draws, learned from the plan's own clean minutes (`planning/learned_power.py`),
         # and the once-a-minute look at an open window that feeds it and plans again when the charge falls behind
         # (`planning/plan_watch.py`), with its one appointment and when that is due.
@@ -821,6 +915,7 @@ class AutoPlannerController:
         # Forced: shutdown takes a new attempt, so the gate would otherwise drop the stopped state.
         self._publish(await self._state_only("planning_unavailable", "shutdown"), force=True)
         self._listeners.clear()
+        self._publication_listeners.clear()
 
     def add_listener(self, listener: Callable[[AutoSnapshot], None]) -> Callable[[], None]:
         """A listener for meaningful snapshot changes; the returned handle is idempotent."""
@@ -831,6 +926,22 @@ class AutoPlannerController:
         def remove() -> None:
             if listener in self._listeners:
                 self._listeners.remove(listener)
+
+        return remove
+
+    def add_publication_listener(self, listener: Callable[[AutoSnapshot], None]) -> Callable[[], None]:
+        """Hear each completed calculation, even one equal to the previous snapshot.
+
+        A queued consumer may have rejected the preceding snapshot while this
+        calculation was pending; meaningful-change-only delivery would strand it.
+        """
+        self._publication_listeners.append(listener)
+        if self._snapshot is not None:
+            self._deliver(listener, self._snapshot)
+
+        def remove() -> None:
+            if listener in self._publication_listeners:
+                self._publication_listeners.remove(listener)
 
         return remove
 
@@ -845,6 +956,120 @@ class AutoPlannerController:
                 missing=settings.missing_for_auto(),
             )
         return self._snapshot
+
+    def snapshot_is_current(self, snapshot: AutoSnapshot) -> bool:
+        """Whether a snapshot is still the latest calculation for current settings."""
+        return (
+            not self._shutdown and snapshot is self._snapshot
+            and self._attempt_current(snapshot.attempt)
+            and snapshot.settings_revision == self._store.settings(self._entry_id).revision
+        )
+
+    @staticmethod
+    def _morek_price_evidence(area: Any) -> tuple[Any, ...]:
+        """Capture immutable source content and authority, not just a fetch timestamp."""
+        return (area.area_id, area.state, area.today, area.tomorrow, area.generation,
+                area.catalogue, area.today_state, area.tomorrow_state,
+                area.today_authority, area.tomorrow_authority,
+                area.today_snapshot.document, area.tomorrow_snapshot.document,
+                area.today_snapshot.attempt_error, area.tomorrow_snapshot.attempt_error)
+
+    def _morek_input_evidence(self, settings: AutoSettings) -> tuple[Any, ...]:
+        source = self._source()
+        effective = with_source(settings, source)
+        facts = None if self._vehicle_reader is None else self._vehicle_reader(effective.target.vehicle_id or "")
+        # Age changes continuously; retain value/source identity and validate age separately.
+        vehicle = None if facts is None else (facts.vehicle_id, facts.soc_percent,
+            facts.reported_capacity_kwh, facts.max_percent, facts.min_percent,
+            facts.soc_source, facts.soc_estimated)
+        controller = None if self._executor is None else self._executor.controller
+        return (settings.revision, self._key_of(source), effective.area_id, vehicle,
+                self._notification_vehicle(), self._connection_generation, self._connection_ready_generation,
+                effective_phases(self._hass, self._entry_id), voltage_between_phases_v(self._hass, self._entry_id),
+                self._plan_power_cap_kw(effective), self._learned_energy_for(facts), self._consumption_for(effective),
+                None if controller is None else controller.plugged_in_for_count,
+                None if controller is None else controller.target_stop_record)
+
+    def morek_plan_blocker(self, snapshot: AutoSnapshot, now: datetime) -> str | None:
+        """Recheck automatic dispatch evidence synchronously, without changing the plan."""
+        try:
+            settings = self._effective(self._store.settings(self._entry_id))
+            if settings.driver != DRIVER_TARGET_SOC or settings.strategy in (STRATEGY_SOLAR, STRATEGY_HYBRID):
+                return "plan_input_provenance_unavailable"
+            if snapshot.morek_input_evidence is None or snapshot.morek_input_evidence != self._morek_input_evidence(self._store.settings(self._entry_id)):
+                return "plan_inputs_changed"
+            facts = None if self._vehicle_reader is None else self._vehicle_reader(settings.target.vehicle_id or "")
+            if facts is None or facts.soc_percent is None:
+                return "vehicle_input_unavailable"
+            if (isinstance(facts.soc_percent, bool) or not isinstance(facts.soc_percent, (int, float))
+                    or not math.isfinite(facts.soc_percent) or not 0 <= facts.soc_percent <= 100):
+                return "vehicle_input_unavailable"
+            checked, vehicle_id = self._notification_vehicle()
+            if not checked or not vehicle_id or facts.vehicle_id != vehicle_id:
+                return "vehicle_identity_unavailable"
+            if settings.soft_price_cap is not None:
+                age = facts.soc_age_s
+                if (facts.soc_estimated or isinstance(age, bool) or not isinstance(age, (int, float))
+                        or not math.isfinite(age) or not 0 <= age <= SOC_FRESH_MAX_AGE_S):
+                    return "vehicle_input_stale"
+            else:
+                controller = None if self._executor is None else self._executor.controller
+                age = facts.soc_age_s
+                if (not facts.soc_estimated and (isinstance(age, bool) or not isinstance(age, (int, float))
+                        or not math.isfinite(age) or age < 0)):
+                    return "vehicle_input_stale"
+                if known_soc(soc_percent=facts.soc_percent, estimated=facts.soc_estimated, age_s=age,
+                             plugged_in_at=None if controller is None else controller.plugged_in_for_count,
+                             now=now) is None:
+                    return "vehicle_input_stale"
+            area = self._manager.area_snapshot(settings.area_id)
+            if area is None or snapshot.morek_price_evidence is None:
+                return "price_evidence_unavailable"
+            if self._morek_price_evidence(area) != snapshot.morek_price_evidence:
+                return "price_inputs_changed"
+            if area.state not in ("ready", "waiting_for_tomorrow"):
+                return "prices_stale_or_unavailable"
+            intervals = []
+            for state, authority, day in ((area.today_state, area.today_authority, area.today_snapshot),
+                                          (area.tomorrow_state, area.tomorrow_authority, area.tomorrow_snapshot)):
+                if state == "ready" and authority == "listed" and day.document is not None:
+                    intervals.extend(day.document.intervals)
+            intervals.sort(key=lambda item: item.utc_start)
+            for start, end in snapshot.proposal.shown_periods:
+                cursor = max(start.astimezone(timezone.utc), now.astimezone(timezone.utc))
+                end = end.astimezone(timezone.utc)
+                for interval in intervals:
+                    if interval.utc_end <= cursor:
+                        continue
+                    if interval.utc_start > cursor or not math.isfinite(interval.eur_per_kwh):
+                        break
+                    cursor = max(cursor, interval.utc_end)
+                    if cursor >= end:
+                        break
+                if cursor < end:
+                    return "price_coverage_unavailable"
+            return None
+        except Exception:  # noqa: BLE001 - unknown evidence cannot authorize a write
+            return "plan_input_provenance_unavailable"
+
+    def snapshot_matches_connection(self, snapshot: AutoSnapshot) -> bool:
+        """The calculation began after the current connection debounce settled."""
+        checked, vehicle_id = self._notification_vehicle()
+        return (
+            self.snapshot_is_current(snapshot)
+            and checked and snapshot.notification_vehicle_checked
+            and snapshot.notification_vehicle_id == vehicle_id
+            and snapshot.connection_generation is not None
+            and snapshot.connection_generation == self._connection_generation
+            and snapshot.connection_generation == self._connection_ready_generation
+        )
+
+    def _notification_vehicle(self) -> tuple[bool, str | None]:
+        try:
+            return True, resolved_vehicle_id(self._hass, self._entry_id)
+        except Exception:  # noqa: BLE001 - notification evidence must never break planning
+            # Without a readable identity do not claim the proposal is for this car.
+            return False, None
 
     @property
     def entry_id(self) -> str:
@@ -874,6 +1099,9 @@ class AutoPlannerController:
             # A refused edit is not a new state: keep the previous snapshot and add the refusal and
             # the current execution facts.
             current = self._store.settings(self._entry_id)
+            if self.snapshot().settings_revision != current.revision:
+                # A newer committed edit is reconciling; never relabel its predecessor.
+                raise
             execution, applied_identity, pending_identity, latest = self._execution_facts()
             snapshot = replace(
                 self.snapshot(),
@@ -1017,7 +1245,7 @@ class AutoPlannerController:
         if self._executor is not None:
             await self._executor.async_pause(choice)
         snapshot = await self._calculate(self._store.settings(self._entry_id))
-        self._publish(snapshot, force=True)
+        self._publish(snapshot)
         return self.snapshot()
 
     async def async_resume(self) -> AutoSnapshot:
@@ -1045,7 +1273,7 @@ class AutoPlannerController:
         try:
             if action == ACTION_STOP:
                 snapshot = await self._calculate(self._store.settings(self._entry_id))
-                self._publish(snapshot, force=True)
+                self._publish(snapshot)
             elif action == ACTION_RESUME:
                 await self.async_recalculate()
         except AutoControlError:
@@ -1086,6 +1314,10 @@ class AutoPlannerController:
         if current is None:
             return self.snapshot()
         execution, applied_identity, pending_identity, latest = self._execution_facts()
+        if current.attempt != latest or current.settings_revision != self._store.settings(self._entry_id).revision:
+            # A new calculation owns the next snapshot; do not promote an older
+            # proposal to its attempt just to report an execution-only change.
+            return current
         if (execution, applied_identity, pending_identity) == (
             current.execution,
             current.applied_identity,
@@ -1094,7 +1326,6 @@ class AutoPlannerController:
             return current
         updated = replace(
             current,
-            attempt=latest,
             execution=execution,
             applied_identity=applied_identity,
             pending_identity=pending_identity,
@@ -1104,14 +1335,20 @@ class AutoPlannerController:
 
     async def _reconcile(self, settings: AutoSettings) -> None:
         """Match the subscription to the settings and their price source, then recalculate."""
-        settings = self._matched_source(settings)
-        self._generation += 1
-        if settings.area_id:
-            await self._subscribe_for(settings)
-        else:
-            self._drop_subscription()
-        await self._reconcile_observation(settings)
-        self._publish(await self._calculate(settings))
+        async with self._reconcile_lock:
+            if self._shutdown:
+                return
+            # A later write can finish while an earlier reconciliation is waiting.
+            settings = self._matched_source(self._store.settings(self._entry_id))
+            self._generation += 1
+            if settings.area_id:
+                await self._subscribe_for(settings)
+            else:
+                self._drop_subscription()
+            await self._reconcile_observation(settings)
+            if self._shutdown or self._store.settings(self._entry_id).revision != settings.revision:
+                return
+            self._publish(await self._calculate(settings))
 
     async def _reconcile_observation(self, settings: AutoSettings) -> None:
         """Move the entry's display subscription to the area these settings name.
@@ -1168,8 +1405,15 @@ class AutoPlannerController:
         """
         if self._shutdown or generation != self._generation:
             return
+        # Invalidate an older calculation before waiting for the executor's
+        # pause lock. After that wait, calculate from the then-current inputs.
+        self._attempt = (
+            self._executor.begin_attempt() if self._executor is not None else self._attempt + 1
+        )
         if self._executor is not None:
             await self._executor.async_settle_pause()
+        if self._shutdown or generation != self._generation:
+            return
         self._publish(await self._calculate(self._store.settings(self._entry_id)))
 
     async def _calculate(self, settings: AutoSettings) -> AutoSnapshot:
@@ -1182,19 +1426,48 @@ class AutoPlannerController:
         if self._shutdown:
             # Shutdown is terminal: no calculation, and therefore nothing that could apply.
             return await self._state_only("planning_unavailable", "shutdown")
+        started_at = self._now()
+        connection_generation = self._connection_ready_generation
+        vehicle_checked, vehicle_id = self._notification_vehicle()
         self._attempt = (
             self._executor.begin_attempt() if self._executor is not None else self._attempt + 1
         )
         attempt = self._attempt
-        # The price source's area and fees, read once per calculation: everything below plans with them.
-        source = self._source()
-        settings = with_source(settings, source)
-        self._price_revision = None if source is None else source.plan_revision
-        self._lapse_target_stop(settings)
-        snapshot = await self._compute(settings, attempt)
-        await self._apply(settings, snapshot, attempt)
-        self._arm_watch()
-        return self._republish_execution(snapshot)
+        async with self._calculation_lock:
+            if not self._attempt_current(attempt) or self._shutdown:
+                return replace(self.snapshot(), attempt=attempt)
+            # A settings write may have committed while this task waited for the lock.
+            if self._store.settings(self._entry_id).revision != settings.revision:
+                return replace(self.snapshot(), attempt=attempt)
+            source = self._source()
+            settings = with_source(settings, source)
+            self._price_revision = None if source is None else source.plan_revision
+            self._lapse_target_stop(settings)
+            try:
+                morek_inputs = self._morek_input_evidence(self._store.settings(self._entry_id))
+            except Exception:  # noqa: BLE001 - planner remains usable; Morek refuses unknown evidence
+                morek_inputs = None
+            snapshot = replace(
+                await self._compute(settings, attempt), attempt=attempt, calculation_started_at=started_at,
+                connection_generation=connection_generation,
+                notification_vehicle_id=vehicle_id, notification_vehicle_checked=vehicle_checked,
+            )
+            try:
+                if morek_inputs != self._morek_input_evidence(self._store.settings(self._entry_id)):
+                    morek_inputs = None
+            except Exception:  # noqa: BLE001
+                morek_inputs = None
+            snapshot = replace(snapshot, morek_input_evidence=morek_inputs)
+            if not self._attempt_current(attempt) or self._shutdown:
+                return snapshot
+            await self._apply(settings, snapshot, attempt)
+            if not self._attempt_current(attempt) or self._shutdown:
+                return snapshot
+            self._arm_watch()
+            return self._republish_execution(snapshot)
+
+    def _attempt_current(self, attempt: int) -> bool:
+        return self._executor.current(attempt) if self._executor is not None else self._attempt == attempt
 
     def _lapse_target_stop(self, settings: AutoSettings) -> None:
         """Let the controller end a target stop's record that no longer describes the car the charger plans for:
@@ -1220,8 +1493,9 @@ class AutoPlannerController:
         # entry reloaded) is in the count this calculation uses.
         self._arm_energy_watch(settings)
         snapshot = await self._compute_plan(settings, attempt, energy)
-        self._arm_departure(settings)
-        self._arm_charge_watch()
+        if self._attempt_current(attempt) and not self._shutdown:
+            self._arm_departure(settings)
+            self._arm_charge_watch()
         return replace(snapshot, **energy) if energy else snapshot
 
     async def _compute_plan(
@@ -1240,6 +1514,12 @@ class AutoPlannerController:
         # Any earlier appointment is void: this calculation re-arms one only if it needs it.
         if not preview:
             self._cancel_wake()
+        if settings.soft_price_cap is not None and settings.strategy in (STRATEGY_HYBRID, STRATEGY_SOLAR):
+            # Solar and hybrid have separate charging owners; the price policy
+            # cannot yet authorize their unpriced energy or forecast credits.
+            return self._fresh_snapshot(
+                settings, "planning_unavailable", "price_policy_unavailable", calculated_at
+            )
         if settings.strategy != STRATEGY_HYBRID and not preview:
             # Cleared for every non-hybrid strategy on every path below, so a charger not on `hybrid`
             # reads as "nothing observed" (`hybrid_execution.clear_hybrid_state`).
@@ -1323,8 +1603,13 @@ class AutoPlannerController:
 
         documents = tuple(
             snapshot.document
-            for snapshot in (area_snapshot.today_snapshot, area_snapshot.tomorrow_snapshot)
-            if snapshot.document is not None
+            for snapshot, state in (
+                (area_snapshot.today_snapshot, area_snapshot.today_state),
+                (area_snapshot.tomorrow_snapshot, area_snapshot.tomorrow_state),
+            )
+            if snapshot.document is not None and (
+                settings.soft_price_cap is None or state not in ("stale", "invalid", "unavailable")
+            )
         )
         if not documents:  # pragma: no cover - the gate covers every documented day state
             return self._fresh_snapshot(
@@ -1382,6 +1667,9 @@ class AutoPlannerController:
             departure_date=self._effective_departure_date(settings, entry, calculated_at),
             voltage_between_phases_v=voltage_between_phases_v(self._hass, self._entry_id),
             power_cap_kw=self._plan_power_cap_kw(settings),
+            soft_price_cap=settings.soft_price_cap,
+            cap_price_basis=settings.cap_price_basis,
+            minimum_energy_kwh=resolved.minimum_energy_kwh,
             # A guest car with no departure is charged within `GUEST_WITHIN`, not the whole horizon.
             window_end=(
                 calculated_at + GUEST_WITHIN if is_guest(settings) and not settings.departure_enabled else None
@@ -1390,7 +1678,7 @@ class AutoPlannerController:
         wait_facts: dict[str, Any] = {}
         try:
             result = calculate_plan(plan_request)
-            if result.reason == "insufficient_price_horizon":
+            if result.reason == "insufficient_price_horizon" and plan_request.soft_price_cap is None:
                 waited = None
                 if plan_request.departure is not None:
                     waited = await self._plan_departure_by_history(
@@ -1426,6 +1714,11 @@ class AutoPlannerController:
         if not preview:
             self._last_failure = None
 
+        if result.reason == "no_eligible_energy" and settings.soft_price_cap is not None:
+            return self._fresh_snapshot(
+                settings, "nothing_to_charge", "no_eligible_energy", calculated_at,
+                entry=entry, price_snapshot=area_snapshot, proposal=result, attempt=attempt,
+            )
         if not result.has_plan:
             return self._fresh_snapshot(
                 settings, "planning_unavailable", self._map_planner_code(result.reason or ""), calculated_at,
@@ -1448,11 +1741,10 @@ class AutoPlannerController:
             # Best effort: the departure leaves too little time for the need, so every slot up to it is
             # planned and charged. A warning, not a refusal; the status says what the car will reach.
             snapshot = replace(snapshot, expected_soc_percent=expected_soc_percent(resolved, result.delivered_kwh))
-        if not preview and not await self._persist_proposal(settings, snapshot):
+        if not preview and self._attempt_current(attempt) and not await self._persist_proposal(settings, snapshot):
             # A proposal whose summary could not be saved is shown with a stable code and installed by
             # nobody. The code is the fact; the exception text is not.
             failed = replace(snapshot, last_error_code="proposal_not_saved")
-            self._publish(failed, force=True)
             return failed
         return snapshot
 
@@ -2049,7 +2341,7 @@ class AutoPlannerController:
                 entry=entry, price_snapshot=area_snapshot, error_code="invalid_contract",
             )
         if today_state in ("stale", "unavailable"):
-            preserved = self._preserved_snapshot(settings)
+            preserved = None if settings.soft_price_cap is not None else self._preserved_snapshot(settings)
             if preserved is not None:
                 return preserved
             if today_state == "unavailable" and area_snapshot.today_authority == "not_listed":
@@ -2214,6 +2506,22 @@ class AutoPlannerController:
         capacity = None
         if facts is not None and facts.reported_capacity_kwh is not None:
             capacity = facts.reported_capacity_kwh
+        if settings.soft_price_cap is not None:
+            learned = self._learned_energy_for(facts, drop=True)
+            policy_reason, target_kwh, minimum_kwh = capped_vehicle_energy(
+                facts, target_percent=settings.target.target_percent,
+                minimum_percent=settings.minimum_ready_by_soc, learned=learned,
+            )
+            if policy_reason != "ok" or target_kwh is None:
+                return self._fresh_snapshot(
+                    settings, "planning_unavailable", policy_reason, calculated_at,
+                    entry=entry, price_snapshot=price_snapshot,
+                )
+            return _EnergyResolution(
+                kwh=target_kwh, delivered_energy_trustworthy=True, soc_percent=live_soc,
+                capacity_kwh=capacity, kwh_per_percent=learned.use_kwh_per_percent,
+                minimum_energy_kwh=minimum_kwh,
+            )
         planned_from = self._planned_from_floor(settings, facts, live_soc, calculated_at)
         # Energy the wall must deliver: battery need divided by charging efficiency
         # (`soc_estimate.CHARGE_EFFICIENCY`), or, once trusted, the car's learned wall kWh per percent
@@ -2547,6 +2855,8 @@ class AutoPlannerController:
         """
         if self._shutdown:
             return False
+        self._connection_generation += 1
+        self._connection_ready_generation = None
         self._cancel_connection()
         if event == CONNECTION_PLUGGED_IN:
             self._plug_in_pending = True
@@ -2558,6 +2868,7 @@ class AutoPlannerController:
                 return
             plug_in = self._plug_in_pending
             self._plug_in_pending = False
+            self._connection_ready_generation = self._connection_generation
             self._hass.async_create_task(self._async_replan_for_connection(plug_in))
 
         self._connection_cancel = self._manager.schedule_at(
@@ -3100,6 +3411,10 @@ class AutoPlannerController:
         if area_snapshot is not None:
             stamp = None if fetched_at is None else fetched_at.isoformat()
             identity = f"{today}/{tomorrow}|{stamp or '-'}"
+        try:
+            morek_prices = None if area_snapshot is None else self._morek_price_evidence(area_snapshot)
+        except Exception:  # noqa: BLE001 - incomplete evidence must not break ordinary planning
+            morek_prices = None
         return AutoSnapshot(
             state=state,
             reason=reason,
@@ -3133,6 +3448,7 @@ class AutoPlannerController:
             history=history,
             wait_rule=wait_rule,
             price_revision=self._price_revision,
+            morek_price_evidence=morek_prices,
         )
 
     async def _state_only(self, state: AutoState, reason: AutoReason) -> AutoSnapshot:
@@ -3155,9 +3471,16 @@ class AutoPlannerController:
         A snapshot from an older attempt than the boundary's latest is dropped. `force` is for states
         not about a calculation (a refusal, a shutdown).
         """
-        if not force and self._executor is not None and not self._executor.current(snapshot.attempt):
-            return
+        if not force:
+            if self._executor is not None and not self._executor.current(snapshot.attempt):
+                return
+            if self._executor is None and snapshot.attempt != self._attempt:
+                return
+            if snapshot.settings_revision != self._store.settings(self._entry_id).revision:
+                return
         self._snapshot = snapshot
+        for listener in list(self._publication_listeners):
+            self._deliver(listener, snapshot)
         key = snapshot.meaningful_key()
         if not force and key == self._last_key:
             return
@@ -3216,7 +3539,13 @@ class AutoPlannerController:
             unpriced=proposal.unpriced,
         )
         try:
-            await self._store.async_update(self._entry_id, proposal=stored)
+            await self._store.async_update(self._entry_id, proposal=stored, expected_revision=settings.revision)
+        except AutoSettingsError as err:
+            if err.code == "revision_conflict":
+                # A newer settings write owns the next summary, not this calculation.
+                return True
+            _LOGGER.warning("Storing an Auto proposal summary failed: %s", err.code)
+            return False
         except Exception as err:  # noqa: BLE001 - becomes a stable, redacted code
             _LOGGER.warning("Storing an Auto proposal summary failed: %s", type(err).__name__)
             return False

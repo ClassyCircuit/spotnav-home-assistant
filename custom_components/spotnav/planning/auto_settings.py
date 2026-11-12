@@ -43,6 +43,7 @@ STORAGE_KEY: Final = f"{DOMAIN}_auto_settings"
 #: Schemas this release reads and writes.
 SUPPORTED_SCHEMAS: Final = (1,)
 EnergyDriver = Literal["manual_kwh", "target_soc"]
+PRICE_BASES: Final = ("nord_pool", "configured_variable_cost")
 
 #: What a person may mean by "stop for now"; resolved to an instant (or none) at admission.
 PauseChoice = Literal["next_period", "until_tomorrow", "until_resumed", "manual"]
@@ -124,6 +125,7 @@ SettingsCode = Literal[
     "invalid_vehicles",
     "invalid_camera",
     "invalid_permission",
+    "invalid_price_policy",
 ]
 
 
@@ -698,6 +700,10 @@ class AutoSettings:
     pause: PauseIntent = field(default_factory=PauseIntent)
     driver: EnergyDriver = DRIVER_MANUAL_KWH
     target: TargetSocIntent = field(default_factory=TargetSocIntent)
+    #: Price policy for planned Auto charging; separate manual/floor actions are not capped.
+    soft_price_cap: float | None = None
+    cap_price_basis: str | None = None
+    minimum_ready_by_soc: float | None = None
     #: What the system optimizes for (`STORED_STRATEGIES`).
     strategy: str = STRATEGY_CHEAPEST
     #: Which phones hear about which events (`notifications/settings.py`). Not a planning input: a
@@ -757,7 +763,7 @@ class AutoSettings:
                 missing.append("target_percent")
         return tuple(missing)
 
-    def validated(self) -> AutoSettings:
+    def validated(self, *, policy_relations: bool = True) -> AutoSettings:
         """The same settings, or a refusal naming the first thing that cannot be stored.
 
         No clamping: a caller asking for 9 periods gets an error, not a different stored setting.
@@ -836,12 +842,29 @@ class AutoSettings:
             except (CameraSettingsError, AttributeError) as err:
                 _refuse("invalid_camera", str(err))
         target = self.target.validated()
+        cap = None if self.soft_price_cap is None else _finite(self.soft_price_cap, "invalid_price_policy", "soft_price_cap")
+        minimum = None if self.minimum_ready_by_soc is None else _finite(
+            self.minimum_ready_by_soc, "invalid_price_policy", "minimum_ready_by_soc"
+        )
+        if minimum is not None and not 0 <= minimum <= 100:
+            _refuse("invalid_price_policy", "minimum_ready_by_soc must be between 0 and 100")
+        if self.cap_price_basis is not None and (
+            not isinstance(self.cap_price_basis, str) or self.cap_price_basis not in PRICE_BASES
+        ):
+            _refuse("invalid_price_policy", "cap_price_basis is not a supported price basis")
+        if policy_relations:
+            if cap is not None and self.cap_price_basis is None:
+                _refuse("invalid_price_policy", "a soft price cap requires an explicit price basis")
+            if minimum is not None and target.target_percent is not None and minimum > target.target_percent:
+                _refuse("invalid_price_policy", "minimum_ready_by_soc cannot exceed target_percent")
         return replace(
             self,
             requested_kwh=float(self.requested_kwh),
             overrides=tuple(sorted(self.overrides, key=lambda item: item.area_id)),
             departure_weekdays=tuple(sorted(self.departure_weekdays)),
             target=target,
+            soft_price_cap=cap,
+            minimum_ready_by_soc=minimum,
             pause=self.pause.validated(),
             notifications=notifications,
             vehicle_ids=vehicle_ids,
@@ -901,6 +924,9 @@ class AutoSettings:
         if self.if_not_ready != IF_NOT_READY_ASK:
             # Additive: written only once chosen.
             stored["if_not_ready"] = self.if_not_ready
+        for name in ("soft_price_cap", "cap_price_basis", "minimum_ready_by_soc"):
+            if (value := getattr(self, name)) is not None:
+                stored[name] = value
         return stored
 
     @classmethod
@@ -919,6 +945,7 @@ class AutoSettings:
                 {
                     "departure_date", "departure_weekdays", "notifications", "fill_to_limit", "vehicle_ids",
                     "identify_mode", "identify_camera", "periods", "max_periods", "users_change_plan", "if_not_ready",
+                    "soft_price_cap", "cap_price_basis", "minimum_ready_by_soc",
                 }
             ),
         )
@@ -982,6 +1009,9 @@ class AutoSettings:
             pause=PauseIntent.from_stored(stored["pause"]),
             driver=stored["driver"],
             target=TargetSocIntent.from_stored(stored["target"]),
+            soft_price_cap=stored.get("soft_price_cap"),
+            cap_price_basis=stored.get("cap_price_basis"),
+            minimum_ready_by_soc=stored.get("minimum_ready_by_soc"),
             strategy=stored["strategy"],
             notifications=notifications,
             vehicle_ids=None if vehicle_ids is None else tuple(vehicle_ids),

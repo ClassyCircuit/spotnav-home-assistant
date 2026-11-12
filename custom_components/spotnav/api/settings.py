@@ -25,6 +25,8 @@ public face, so nothing here serializes `as_dict()` or accepts `from_stored()` p
   and plan): left out, the stored value is kept. Only an administrator changes it.
 * And `if_not_ready` (`ask`, `release` or `hold`: what the site's import target does when the plan cannot be ready by
   its departure under it): left out, the stored value is kept. A plan field, as the departure is.
+* `soft_price_cap`, `cap_price_basis`, and `minimum_ready_by_soc` are additive: omitted fields retain their
+  stored values, and null clears them. They are stored inputs only; the planner does not enforce them yet.
 * One read-only fact, `fiscal_included`: the fiscal components (`vat`, `tax`, `transfer`) the selected area's
   published price already contains (contract v2's `included`). They are locked as "included in the price" and
   nothing is added for them, whatever the overrides say. A body may echo it; it is never stored.
@@ -118,6 +120,9 @@ SETTINGS_KEYS: Final = frozenset(
         "departure_weekdays",
         "driver",
         "target",
+        "soft_price_cap",
+        "cap_price_basis",
+        "minimum_ready_by_soc",
         "notifications",
         "vehicle_ids",
         "identify_mode",
@@ -133,6 +138,7 @@ OPTIONAL_SETTINGS_KEYS: Final = frozenset(
     {
         "departure_date", "departure_weekdays", "phases", "notifications", "fill_to_limit", "vehicle_ids",
         "identify_mode", "identify_camera", "users_change_plan", "if_not_ready",
+        "soft_price_cap", "cap_price_basis", "minimum_ready_by_soc",
     }
 )
 
@@ -408,6 +414,9 @@ def encode_settings(
         "departure_weekdays": list(settings.departure_weekdays),
         "driver": settings.driver,
         "target": encoded_target(settings.target),
+        "soft_price_cap": settings.soft_price_cap,
+        "cap_price_basis": settings.cap_price_basis,
+        "minimum_ready_by_soc": settings.minimum_ready_by_soc,
         "fiscal_included": list(included),
         "notifications": encode_notifications(settings.notifications, available),
         "vehicle_ids": None if settings.vehicle_ids is None else list(settings.vehicle_ids),
@@ -445,8 +454,9 @@ def _enum(value: Any, allowed: tuple[str, ...], code: SettingsCode) -> Any:
 def decode_settings(raw: Any) -> AutoSettings:
     """A full replacement, decoded to a validated `AutoSettings`, or a refusal by stable code.
 
-    Every key is required and every type exact; the result passes the same `AutoSettings.validated()`
-    the store uses. The pause is never part of a body (see `replacement_mutator`).
+    Every required key and every type is checked. Cross-field policy validation is deferred until omitted
+    fields and any remembered vehicle target are resolved by the mutation, then checked by the store.
+    The pause is never part of a body (see `replacement_mutator`).
     """
     stored = _object(raw, REQUIRED_SETTINGS_KEYS, "settings", OPTIONAL_SETTINGS_KEYS | READ_ONLY_SETTINGS_KEYS)
     if "fiscal_included" in stored and not isinstance(stored["fiscal_included"], list):
@@ -487,6 +497,9 @@ def decode_settings(raw: Any) -> AutoSettings:
         ),
         driver=_enum(stored["driver"], ("manual_kwh", "target_soc"), "invalid_driver"),
         target=_target(stored["target"]),
+        soft_price_cap=stored.get("soft_price_cap"),
+        cap_price_basis=stored.get("cap_price_basis"),
+        minimum_ready_by_soc=stored.get("minimum_ready_by_soc"),
         notifications=(
             decode_notifications(stored["notifications"]) if "notifications" in stored else NotificationSettings()
         ),
@@ -507,7 +520,7 @@ def decode_settings(raw: Any) -> AutoSettings:
             if "if_not_ready" in stored
             else IF_NOT_READY_ASK
         ),
-    ).validated()
+    ).validated(policy_relations=False)
 
 
 def replacement_mutator(
@@ -525,6 +538,9 @@ def replacement_mutator(
     keep_auto_periods: bool = False,
     keep_users_change_plan: bool = False,
     keep_if_not_ready: bool = False,
+    keep_soft_price_cap: bool = False,
+    keep_cap_price_basis: bool = False,
+    keep_minimum_ready_by_soc: bool = False,
     vehicle_target: Callable[[str | None], float | None] | None = None,
 ) -> Callable[[AutoSettings], AutoSettings]:
     """A full replacement expressed as the store's own mutation hook.
@@ -574,6 +590,12 @@ def replacement_mutator(
             kept["users_change_plan"] = current.users_change_plan
         if keep_if_not_ready:
             kept["if_not_ready"] = current.if_not_ready
+        if keep_soft_price_cap:
+            kept["soft_price_cap"] = current.soft_price_cap
+        if keep_cap_price_basis:
+            kept["cap_price_basis"] = current.cap_price_basis
+        if keep_minimum_ready_by_soc:
+            kept["minimum_ready_by_soc"] = current.minimum_ready_by_soc
         if keep_auto_periods and current.max_periods is None and replacement.max_periods == MAX_PERIODS:
             kept["max_periods"] = None
         updated = replace(replacement, pause=current.pause, **kept)
@@ -899,6 +921,9 @@ def body_mutator(
         keep_auto_periods=not reads_auto_periods,
         keep_users_change_plan=left_out("users_change_plan"),
         keep_if_not_ready=left_out("if_not_ready"),
+        keep_soft_price_cap=left_out("soft_price_cap"),
+        keep_cap_price_basis=left_out("cap_price_basis"),
+        keep_minimum_ready_by_soc=left_out("minimum_ready_by_soc"),
         vehicle_target=lambda vehicle_id: vehicle_properties.stored_properties(hass, vehicle_id).target_percent,
     )
 

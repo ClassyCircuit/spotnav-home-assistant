@@ -13,15 +13,15 @@ from functools import partial
 from typing import Any, Callable
 
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
-from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, EVENT_HOMEASSISTANT_STOP
+from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, EVENT_HOMEASSISTANT_STOP, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import CoreState, Event, HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers.event import async_call_later
+from homeassistant.helpers.event import async_call_later, async_track_state_change_event
 from homeassistant.helpers.start import async_at_started
 from homeassistant.util import dt as dt_util
 
 from .api.dashboard import async_setup_dashboard_api
-from .api.morek_schedule import async_setup_morek_schedule_api
+from .api.morek_schedule import async_setup_morek_schedule_api, _identity_status, async_maybe_owned_action, ScheduleRefused
 from .api.blueprints import async_setup_blueprints_api
 from .api.debug import async_setup_debug_api
 from .blueprint_install import async_install_blueprints
@@ -47,6 +47,7 @@ from .api.price_source import async_setup_price_source_api
 from .api.site_settings import async_setup_site_settings_api
 from .api.webhook import async_register_charger_webhook
 from .card_asset import async_setup_card_asset
+from .sidebar import async_setup_sidebar, async_remove_sidebar
 from .const import (
     CONF_CHARGER_ENTRY_IDS,
     CONF_CORE_OWNERSHIP,
@@ -65,6 +66,7 @@ from .entity_renames import async_setup_entity_renames
 from .debug_day import ChargerDay
 from .log_buffer import attach_log_buffer
 from .execution.charger_handback import async_hand_back_charger
+from .execution.command_admission import async_auto_legacy_allowed, command_admission, legacy_write_guard
 from .execution.auto_execution import AutoExecutor, pause_blocks_execution
 from .execution.controller import ChargingController
 from .execution.min_soc_floor import FloorInputs, MinSocFloor
@@ -202,6 +204,12 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     async_setup_blueprints_api(hass)
     # Static route for the bundled card asset, versioned by the manifest.
     await async_setup_card_asset(hass)
+    await async_setup_sidebar(hass)
+    @callback
+    def remove_sidebar_on_stop(_event: Event) -> None:
+        async_remove_sidebar(hass)
+
+    hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, remove_sidebar_on_stop)
     async_register_pairing(hass)
     # SpotNav's automation blueprints, copied to blueprints/automation/spotnav/ when they differ and were not edited
     # (`blueprint_install.py`).
@@ -298,6 +306,146 @@ def _drop_core_ownership_choice(hass: HomeAssistant, entry: ConfigEntry) -> None
         )
 
 
+async def _async_setup_ownership_metadata(
+    hass: HomeAssistant, entry: ChargerConfigEntry, controller: ChargingController, *, migrate: bool = False,
+) -> Any:
+    """Initialize metadata now and on the control entity's next availability transition."""
+    if controller.ocpp_target is None:
+        return
+    lifecycle_epoch = 0
+    restart_pending = migrate
+    startup_stop_revision = command_admission(hass)._stop_revisions.get(entry.entry_id, 0) if migrate else 0
+    initial_revision = (command_admission(hass).reserve_lifecycle_barrier(
+        entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target)) if migrate else None)
+
+    async def ensure(expected_epoch: int) -> None:
+        nonlocal restart_pending
+        admission = command_admission(hass)
+        def identity():
+            return _identity_status(hass, controller.ocpp_target)
+        if migrate:
+            # Never recreate a missing document and then mistake it for a known
+            # legacy binding. Existing malformed/conflicting records fail closed.
+            existing = await admission._store.async_status(entry.entry_id, dict(identity()))
+            if existing.get("record_state") == "valid":
+                await admission.async_ensure_initialized(entry.entry_id, identity)
+        else:
+            await admission.async_ensure_initialized(entry.entry_id, identity)
+        # An interrupted migration is not a request to restore the old Morek
+        # executor. Preserve its durable interlock on startup and reconnect.
+        evidence = await admission.async_recovery_status(entry.entry_id, identity)
+        if expected_epoch != lifecycle_epoch:
+            return
+        if (migrate and existing.get("record_state") == "valid"
+                and existing.get("recorded_owner") == "legacy" and existing.get("transition_state") is None):
+            restart_pending = False
+            result = await admission.async_begin_unarmed_entry(
+                entry.entry_id, identity, lambda: expected_epoch != lifecycle_epoch)
+            admission._recovery_status[entry.entry_id] = {**evidence, "migration_result": result}
+            if result == "drained_unarmed":
+                from .execution.command_admission import physical_connector
+                connector = physical_connector(identity())
+                if connector is not None:
+                    admission._migration_controllers[connector] = controller
+            executor = getattr(getattr(entry, "runtime_data", None), "executor", None)
+            if result == "drained_unarmed" and executor is not None and expected_epoch == lifecycle_epoch:
+                await _async_finish_morek_migration(hass, entry, controller, executor)
+
+    @callback
+    def control_available(event: Event) -> None:
+        nonlocal lifecycle_epoch
+        old, new = event.data.get("old_state"), event.data.get("new_state")
+        was_available = old is not None and old.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN)
+        is_available = new is not None and new.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN)
+        if was_available == is_available:
+            return
+        lifecycle_epoch += 1
+        epoch = lifecycle_epoch
+        barrier_revision = None
+        if migrate:
+            # Do this synchronously, before creating a task. A writer already
+            # holding admission is drained by the existing entry protocol.
+            barrier_revision = command_admission(hass).reserve_lifecycle_barrier(
+                entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target), reconnect=True)
+        # Invalidate queued worker work synchronously, including on disconnect.
+        worker = getattr(getattr(entry, "runtime_data", None), "morek_worker", None)
+        generation = worker.suspend_for_availability_change() if worker is not None else None
+        if is_available:
+            async def initialize_and_reconcile() -> None:
+                nonlocal restart_pending
+                await ensure(epoch)  # Never acquire admission recursively in the worker.
+                if migrate and barrier_revision is not None:
+                    admission = command_admission(hass)
+                    restored = await admission.async_restore_reconnect(
+                        entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target), barrier_revision)
+                    if not restored and restart_pending and epoch == lifecycle_epoch:
+                        result = await admission.async_recover_after_restart(
+                            entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target), barrier_revision,
+                            startup_stop_revision)
+                        admission._recovery_status.setdefault(entry.entry_id, {})["automatic_recovery"] = result
+                        if result == "automatic_recovery_ready":
+                            restart_pending = False
+                    await admission.async_release_lifecycle_barrier(
+                        entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target),
+                        barrier_revision, lambda: epoch == lifecycle_epoch)
+                current = getattr(getattr(entry, "runtime_data", None), "morek_worker", None)
+                if current is worker and current is not None:
+                    current.resume_after_availability_change(generation)
+
+            entry.async_create_background_task(hass, initialize_and_reconcile(), "spotnav ownership initialization")
+
+    remove_listener = async_track_state_change_event(hass, [controller.charge_control], control_available)
+    def close_ownership_listener() -> None:
+        nonlocal lifecycle_epoch
+        lifecycle_epoch += 1
+        if migrate:
+            command_admission(hass).reserve_lifecycle_barrier(
+                entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target))
+        remove_listener()
+
+    entry.async_on_unload(close_ownership_listener if migrate else remove_listener)
+    await ensure(lifecycle_epoch)
+
+    async def release_initial_barrier() -> None:
+        nonlocal restart_pending
+        if initial_revision is not None:
+            admission = command_admission(hass)
+            from .execution.command_admission import physical_connector
+            connector = physical_connector(_identity_status(hass, controller.ocpp_target))
+            if (restart_pending and lifecycle_epoch == 0 and (connector is None or
+                    not admission.ticket_current(entry.entry_id, connector,
+                        (ticket := admission._completion_tickets.get(entry.entry_id)) and ticket[1]))):
+                result = await admission.async_recover_after_restart(
+                    entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target), initial_revision,
+                    startup_stop_revision)
+                admission._recovery_status.setdefault(entry.entry_id, {})["automatic_recovery"] = result
+                if result == "automatic_recovery_ready":
+                    restart_pending = False
+            await admission.async_release_lifecycle_barrier(
+                entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target),
+                initial_revision, lambda: lifecycle_epoch == 0)
+
+    return release_initial_barrier
+
+
+async def _async_finish_morek_migration(hass, entry, controller, executor) -> None:
+    """Complete only this process's drained entry before producers start."""
+    admission = command_admission(hass)
+    def identity():
+        return _identity_status(hass, controller.ocpp_target)
+
+    from .execution.command_admission import physical_connector
+    connector = physical_connector(identity())
+    if (connector is None or admission._entry_draining.get(connector) != "drained_unarmed"
+            or admission._migration_controllers.get(connector) is not controller):
+        return
+    result = await admission.async_handover_unarmed(entry.entry_id, identity, executor, require_outcome=True)
+    if result == "handed_over_unarmed":
+        admission._migration_controllers.pop(connector, None)
+    evidence = await admission.async_recovery_status(entry.entry_id, identity)
+    admission._recovery_status[entry.entry_id] = {**evidence, "migration_result": result}
+
+
 async def _async_setup_charger_entry(hass: HomeAssistant, entry: ChargerConfigEntry) -> bool:
     """One charger: its controller, its authority boundary, solar, Auto, its webhook, its entities."""
     _drop_core_ownership_choice(hass, entry)
@@ -350,8 +498,13 @@ async def _async_setup_charger_entry(hass: HomeAssistant, entry: ChargerConfigEn
         vehicle_limit_reader=soc_reader.vehicle_max_percent,
         charger_power_entity_id=charger_power,
     )
+    controller.adapter.write_guard = legacy_write_guard(
+        hass, entry.entry_id, lambda: controller.ocpp_target, ocpp=bool(controller.ocpp_target_source)
+    )
     data = entry.runtime_data = ChargerData(controller=controller, soc_reader=soc_reader)
     entry.async_on_unload(controller.async_shutdown)
+    # Establish ownership before Auto startup, initial planning or controller restore can write.
+    release_initial_barrier = await _async_setup_ownership_metadata(hass, entry, controller, migrate=True)
     await _async_start_debug_day(hass, entry, data, controller)
 
     settings_store = domain_data(hass).auto_store
@@ -360,8 +513,30 @@ async def _async_setup_charger_entry(hass: HomeAssistant, entry: ChargerConfigEn
         # An older release's settings `phases` moves to the vehicle or the charger before anything plans.
         await async_migrate_settings_phases(hass, entry.entry_id)
         # The boundary comes first so the preview can apply on the first calculation of a reload.
-        executor = data.executor = AutoExecutor(hass, controller, settings_store)
+        async def legacy_allowed() -> bool:
+            if not controller.ocpp_target_source:
+                return True
+            return await async_auto_legacy_allowed(
+                command_admission(hass), entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target)
+            )
+
+        async def owned_manual_action(action: str) -> bool:
+            from .execution.auto_execution import AutoControlRefused
+            try:
+                return await async_maybe_owned_action(hass, entry.entry_id, action)
+            except ScheduleRefused as error:
+                raise AutoControlRefused(error.code) from None
+
+        executor = data.executor = AutoExecutor(
+            hass, controller, settings_store, legacy_admission=legacy_allowed,
+            person_stop_scope=controller.adapter.person_stop_scope,
+            person_stop_admission=lambda: controller.adapter.async_legacy_permitted(person_stop=True),
+            owned_manual_action=owned_manual_action,
+        )
         entry.async_on_unload(executor.async_shutdown)
+        await _async_finish_morek_migration(hass, entry, controller, executor)
+        if release_initial_barrier is not None:
+            await release_initial_barrier()
         await executor.async_start()
         # Solar execution needs only the executor, controller and settings store.
         solar = data.solar = async_setup_solar_execution(
@@ -677,6 +852,17 @@ async def _async_setup_auto_preview(
     )
     entry.async_on_unload(preview.async_shutdown)
     await preview.async_start()
+    # Planner publications include price, settings, SOC and deadline recalculations.
+    # This worker is wired but owned-profile admission remains unconditionally unarmed.
+    from .execution.morek_worker import MorekScheduleWorker
+
+    def charger_available() -> bool:
+        state = hass.states.get(data.controller.charge_control)
+        return state is not None and state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN)
+
+    worker = data.morek_worker = MorekScheduleWorker(hass, entry_id, preview, charger_available)
+    worker.start()
+    entry.async_on_unload(worker.close)
 
     def _soc_moved() -> None:
         # New session or real progress: plan again from the current state of charge.
@@ -684,6 +870,20 @@ async def _async_setup_auto_preview(
             entry.async_create_task(hass, preview.async_recalculate(), f"{entry_id} recalculate")
 
     data.soc_reader.set_on_reading(_soc_moved)
+    entry.async_on_unload(lambda: data.soc_reader.set_on_reading(None))
+
+    def _soc_unavailable() -> None:
+        settings = settings_store.settings(entry_id)
+        if settings.driver == DRIVER_TARGET_SOC and settings.soft_price_cap is not None:
+            entry.async_create_task(hass, preview.async_recalculate(), f"{entry_id} recalculate")
+
+    data.soc_reader.set_on_source_unavailable(_soc_unavailable)
+    entry.async_on_unload(lambda: data.soc_reader.set_on_source_unavailable(None))
+    data.soc_reader.set_notify_every_reading(
+        lambda: settings_store.settings(entry_id).driver == DRIVER_TARGET_SOC
+        and settings_store.settings(entry_id).soft_price_cap is not None
+    )
+    entry.async_on_unload(lambda: data.soc_reader.set_notify_every_reading(None))
 
     def _car_ended(vehicle_id: str | None, _full: bool) -> None:
         # The car stopped taking the plan's charge by itself: hear of its next reading, ask its integration once to

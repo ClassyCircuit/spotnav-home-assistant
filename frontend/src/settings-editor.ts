@@ -28,6 +28,7 @@ import type { Soc, Vehicle } from "./validate";
 
 export interface SettingsEditorForm {
   kind: SettingsEditorKind;
+  currency?: string | null;
   readOnly: boolean;
   values: SettingsFormValues;
   energyReadOnly: boolean;
@@ -289,6 +290,24 @@ export function settingsEditorBody(
   }
 
   const values: SettingsFormValues = { ...form.values };
+  const capEnabled = doc.createElement("input");
+  capEnabled.type = "checkbox";
+  capEnabled.checked = values.capEnabled === true;
+  capEnabled.disabled = form.readOnly;
+  const capValue = doc.createElement("input");
+  capValue.type = "number"; capValue.step = "any"; capValue.value = values.capValue ?? "";
+  capValue.className = C.settingsInput;
+  capValue.disabled = form.readOnly || !capEnabled.checked;
+  capEnabled.addEventListener("change", () => { capValue.disabled = form.readOnly || !capEnabled.checked; });
+  const minimum = doc.createElement("input");
+  minimum.type = "number"; minimum.min = "0"; minimum.max = "100"; minimum.step = "any";
+  minimum.value = values.minimumReadySoc ?? ""; minimum.disabled = form.readOnly; minimum.className = C.settingsInput;
+  const basis = doc.createElement("select");
+  basis.className = C.settingsInput; basis.disabled = form.readOnly;
+  for (const [value, key] of [["", "settings.policy.basisChoose"], ["nord_pool", "settings.policy.nordPool"], ["configured_variable_cost", "settings.policy.variable"]] as const) {
+    const option = doc.createElement("option"); option.value = value; option.textContent = translate(language, key); basis.append(option);
+  }
+  basis.value = values.capBasis ?? "";
   // The requested energy exactly as stored, until the slider moves: the energy editor has no number field,
   // so an amount off the slider's step (`7.3` from the app) is kept as it is by a Save that does not move it.
   let energyValue = form.values.energy;
@@ -1031,6 +1050,13 @@ export function settingsEditorBody(
 
   if (form.kind === "plan") {
     appendMode();
+    if (values.capEnabled !== undefined) {
+      body.append(element(doc, "p", C.settingsNote, translate(language, "settings.policy.note")));
+      body.append(field(doc, `${idPrefix}-minimum-ready`, translate(language, "settings.policy.minimum"), minimum));
+      body.append(checkboxField(doc, `${idPrefix}-cap-enabled`, translate(language, "settings.policy.enable"), capEnabled));
+      body.append(field(doc, `${idPrefix}-cap-value`, `${translate(language, "settings.policy.cap")}${form.currency ? ` · ${form.currency}/kWh` : ""}`, capValue));
+      body.append(field(doc, `${idPrefix}-cap-basis`, translate(language, "settings.policy.basis"), basis));
+    }
     appendDeadline();
     appendIfNotReady();
     appendCurrent();
@@ -1059,6 +1085,10 @@ export function settingsEditorBody(
       values.ifNotReady = chosenIfNotReady.value;
     }
     if (form.kind === "plan") {
+      if (values.capEnabled !== undefined) {
+        values.capEnabled = capEnabled.checked; values.capValue = capValue.value;
+        values.capBasis = basis.value; values.minimumReadySoc = minimum.value;
+      }
       values.driver = socMode ? "target_soc" : "manual_kwh";
       values.targetPercent = targetValue;
       // The picked vehicle, else the record's, else the resolved one: what a target-mode Save writes as

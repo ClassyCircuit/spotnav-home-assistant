@@ -68,9 +68,9 @@ describe("the onboard charger suggestion on the card", () => {
       document.body.innerHTML = "";
       const { element } = await mounted(suggested(), language);
       const text = box(element)?.textContent ?? "";
-      expect(text, language).toContain(translate(language, "suggestion.onboardOne.text"));
-      expect(text, language).toContain(translate(language, "suggestion.onboardOne.accept"));
-      expect(text, language).toContain(translate(language, "suggestion.onboardOne.dismiss"));
+      expect(text, language).toContain(translate("en", "suggestion.onboardOne.text"));
+      expect(text, language).toContain(translate("en", "suggestion.onboardOne.accept"));
+      expect(text, language).toContain(translate("en", "suggestion.onboardOne.dismiss"));
     }
     expect(translate("sv", "suggestion.onboardOne.text")).not.toBe(translate("en", "suggestion.onboardOne.text"));
   });

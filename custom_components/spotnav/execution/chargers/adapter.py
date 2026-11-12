@@ -76,10 +76,12 @@ from .base import (
     StartStopPath,
     STOP_HELD_AT_FLOOR,
     WriteRateLimiter,
+    WRITE_REGULATOR,
 )
 from .generic import NoCurrent
 from .ocpp import OcppAssignedCurrent
 from .registry import build_current, build_phase_switch, build_start_stop, ChargerContext
+from ..command_admission import AdmissionResult
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -217,6 +219,29 @@ class ChargerAdapter:
         self.pre_current: PreSpotnavCurrent | None = None
         #: Awaited once the reading is recorded, to save it (the controller's store).
         self.pre_current_recorded: Callable[[], Awaitable[None]] | None = None
+        self.write_guard: Callable[[Callable[[], Awaitable[Any]]], Awaitable[AdmissionResult[Any]]] | None = None
+
+    async def _guarded(self, operation: Callable[[], Awaitable[Any]], *, protection: bool = False,
+                       person_stop: bool = False) -> AdmissionResult[Any]:
+        """Ordinary writes use connector admission; explicit protection remains operational."""
+        if protection or self.write_guard is None:
+            return AdmissionResult(True, "protection" if protection else "unguarded", await operation())
+        if person_stop:
+            return await self.write_guard(operation, person_stop=True)
+        return await self.write_guard(operation)
+
+    def person_stop_scope(self):
+        """Reserve a person Stop before acquiring Auto or controller locks."""
+        from contextlib import nullcontext
+
+        scope = getattr(self.write_guard, "stop_scope", None)
+        return scope() if scope is not None else nullcontext()
+
+    async def async_legacy_permitted(self, *, person_stop: bool = False) -> bool:
+        """Check before controller preparation; dispatch checks again at the adapter."""
+        async def check() -> None:
+            return None
+        return (await self._guarded(check, person_stop=person_stop)).allowed
 
     # -- what a restart must not forget
 
@@ -270,7 +295,8 @@ class ChargerAdapter:
         self._started_at = self._now()
         executed: bool = False
         try:
-            executed = await self._logged(COMMAND_START, lambda: self.path.async_start(amps))
+            result = await self._guarded(lambda: self._logged(COMMAND_START, lambda: self.path.async_start(amps)))
+            executed = bool(result.value) if result.allowed else False
         except BaseException:
             executed = True  # it may have reached the charger
             raise
@@ -281,7 +307,7 @@ class ChargerAdapter:
                 await self._record_pre_current(before)
         return executed
 
-    async def async_stop(self) -> bool | str:
+    async def async_stop(self, *, protection: bool = False, person_stop: bool = False) -> bool | str:
         """Stop the charge; `False` when the command was not executed (its entity is unavailable), and
         `STOP_HELD_AT_FLOOR` when the charger held the charge at its floor instead of pausing it (a Peblar
         out of pauses): the charge still runs, so what was started stays started.
@@ -290,7 +316,9 @@ class ChargerAdapter:
         started_at, self._started_at = self._started_at, None
         result: bool | str = False
         try:
-            result = await self._logged(COMMAND_STOP, lambda: self.path.async_stop())
+            admitted = await self._guarded(lambda: self._logged(COMMAND_STOP, lambda: self.path.async_stop()),
+                                           protection=protection, person_stop=person_stop)
+            result = admitted.value if admitted.allowed else False
         except BaseException:
             result = True  # it may have reached the charger
             raise
@@ -311,7 +339,14 @@ class ChargerAdapter:
             return outcome
 
         try:
-            return await self._logged(COMMAND_CURRENT, run, only_when_sent=True)
+            admitted = await self._guarded(
+                lambda: self._logged(COMMAND_CURRENT, run, only_when_sent=True),
+                protection=reason == WRITE_REGULATOR,
+            )
+            if not admitted.allowed:
+                outcome = "ownership_blocked"
+                return outcome
+            return admitted.value
         finally:
             self._last_current = {
                 "at": self._now().isoformat(),
@@ -342,7 +377,9 @@ class ChargerAdapter:
             return True if result.sent else (result.reason or False)
 
         try:
-            await self._logged(COMMAND_PHASES, run)
+            admitted = await self._guarded(lambda: self._logged(COMMAND_PHASES, run))
+            if not admitted.allowed:
+                return PhaseSwitchResult(False, "ownership_blocked")
         except Exception as err:  # noqa: BLE001 - any failed call is a switch not sent, never a crash of the caller
             _LOGGER.warning("The charger's phase switch to %s phase(s) failed: %s", phases, err)
             return PhaseSwitchResult(False, PHASES_WRITE_FAILED)

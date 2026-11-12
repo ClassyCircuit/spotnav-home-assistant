@@ -126,7 +126,7 @@ describe("the attention line", () => {
 
   it("is in the reader's language and plural", async () => {
     const { element } = await open(dashboard([ALL[1]!]), { language: "sv" });
-    expect(line(element)?.textContent).toBe("Kom igång: 1 sak kvar");
+    expect(line(element)?.textContent).toBe("Get started: 1 thing left");
     expect(setupLineText("sv", 3)).toBe("Kom igång: 3 saker kvar");
     expect(setupLineText("en", 1)).toBe("Get started: 1 thing left");
   });
@@ -159,7 +159,7 @@ describe("the dialog's Get started section", () => {
     const { element } = await open(dashboard(ALL), { language: "sv" });
     line(element)!.click();
     await settle();
-    expect(title(element)).toBe("Kom igång");
+    expect(title(element)).toBe("Get started");
   });
 
   it("puts each row in its own box, the sentence first and its buttons below", async () => {
@@ -348,7 +348,7 @@ describe("the grid sign rows", () => {
     const { element } = await open(withRows([{ ...POWER, value: true }]), { language: "sv" });
     line(element)!.click();
     await settle();
-    expect(button(row(element, "grid_power_sign"), "write")?.textContent).toBe("Slå på ”Sensorn visar export som positiv”");
+    expect(button(row(element, "grid_power_sign"), "write")?.textContent).toBe("Turn on “The sensor shows export as positive”");
   });
 
   it("turn Grid current is signed off for the phase currents", async () => {

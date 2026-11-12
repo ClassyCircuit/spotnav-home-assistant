@@ -60,6 +60,9 @@ export interface Fiscal {
 export interface Planning {
   state: string | null;
   reason: string | null;
+  /** Time and process provenance of the planner snapshot, not the Morek preview time. */
+  calculated_at: string | null;
+  historical: boolean | null;
   settings_revision: number | null;
   price_state: string | null;
   execution_state: string | null;
@@ -166,6 +169,7 @@ export interface Relation {
 }
 
 export interface Plan {
+  price_policy?: { explanations: string[] };
   proposal: Proposal | null;
   installed: Installed | null;
   relation: Relation;
@@ -903,6 +907,9 @@ function decodePlanning(source: Record<string, unknown>): Planning {
   return {
     state: textOrNull(source, "state"),
     reason: textOrNull(source, "reason"),
+    calculated_at: typeof source.calculated_at === "string" && Number.isFinite(Date.parse(source.calculated_at))
+      ? source.calculated_at : null,
+    historical: typeof source.historical === "boolean" ? source.historical : null,
     settings_revision: numberOrNull(source, "settings_revision"),
     price_state: textOrNull(source, "price_state"),
     execution_state: textOrNull(source, "execution_state"),
@@ -1190,7 +1197,15 @@ function decodePlan(source: Record<string, unknown>): Plan {
   presentKeys(source, PLAN_KEYS);
   const proposal = required(source, "proposal");
   const installed = required(source, "installed");
+  const policy = source["price_policy"];
+  const explanations = typeof policy === "object" && policy !== null && !Array.isArray(policy)
+    ? (policy as Record<string, unknown>)["explanations"] : null;
   return {
+    ...(Array.isArray(explanations) ? { price_policy: { explanations: explanations.flatMap((item: unknown) => {
+      if (typeof item !== "object" || item === null || Array.isArray(item)) return [];
+      const code = (item as Record<string, unknown>)["code"];
+      return typeof code === "string" ? [code] : [];
+    }) } } : {}),
     proposal: proposal === null ? null : decodeProposal(record(proposal)),
     installed: installed === null ? null : decodeInstalled(record(installed)),
     relation: decodeRelation(record(required(source, "relation"))),

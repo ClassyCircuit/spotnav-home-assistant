@@ -69,6 +69,28 @@ function aRecord(overrides: Partial<SettingsRecord> = {}): SettingsRecord {
   };
 }
 
+describe("price policy settings", () => {
+  it("decodes and preserves the real policy fields in revision-checked replacement bodies", () => {
+    const record = aRecord({ soft_price_cap: 0.1, cap_price_basis: "nord_pool", minimum_ready_by_soc: 40 });
+    const result = decodeSettingsAnswer(success(record));
+    expect(result.ok && result.value.settings?.soft_price_cap).toBe(0.1);
+    expect(encodeBody(record)).toMatchObject({ soft_price_cap: 0.1, cap_price_basis: "nord_pool", minimum_ready_by_soc: 40 });
+    const unchanged = replacementFor("plan", record, formFromRecord(record));
+    expect(unchanged.ok && unchanged.changed).toBe(false);
+    const changed = replacementFor("plan", record, { ...formFromRecord(record), capValue: "-0.02", minimumReadySoc: "35" });
+    expect(changed.ok && changed.body).toMatchObject({ soft_price_cap: -0.02, minimum_ready_by_soc: 35 });
+    const disabled = replacementFor("plan", record, { ...formFromRecord(record), capEnabled: false });
+    expect(disabled.ok && disabled.body.soft_price_cap).toBeNull();
+    const missingBasis = replacementFor("plan", record, { ...formFromRecord(record), capBasis: "" });
+    expect(missingBasis.ok).toBe(false);
+    const invalidMinimum = replacementFor("plan", record, { ...formFromRecord(record), minimumReadySoc: "101" });
+    expect(invalidMinimum.ok).toBe(false);
+    const concurrent = aRecord({ soft_price_cap: 0.2, cap_price_basis: "nord_pool", minimum_ready_by_soc: 40 });
+    const reapplied = replacementFor("plan", concurrent, { ...formFromRecord(record), minimumReadySoc: "30" }, null, record);
+    expect(reapplied.ok && reapplied.body).toMatchObject({ soft_price_cap: 0.2, minimum_ready_by_soc: 30 });
+  });
+});
+
 const aPause = { choice: null, admitted_at: null, expires_at: null };
 
 function success(record: SettingsRecord = aRecord()): Json {

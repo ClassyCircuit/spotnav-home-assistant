@@ -40,7 +40,7 @@ async function openSettings(language = "en", admin = true, body: Record<string, 
   hass.resolveNext(body);
   await settle();
   shadow(element)
-    .querySelector<HTMLButtonElement>(`[aria-label='${translate(language as "en", "header.settings")}']`)!
+    .querySelector<HTMLButtonElement>(`[aria-label='${translate("en", "header.settings")}']`)!
     .click();
   await settle();
   return { hass, element };
@@ -104,7 +104,7 @@ describe("the charger section", () => {
     const { hass, element } = await openSettings("sv");
     const section = dialog(element).querySelector<HTMLElement>("[data-section='entities']")!;
     const row = section.querySelector<HTMLElement>("[data-row='charge_periods']")!;
-    expect(row.textContent).toBe("LaddperioderAutomatiskt");
+    expect(row.textContent).toBe("Charge periodsAutomatic");
     row.querySelector<HTMLButtonElement>("[data-edit='charge_periods']")!.click();
     await settle();
     const form = dialog(element).querySelector<HTMLFormElement>("form[data-value-editor='single']")!;

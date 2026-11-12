@@ -11,7 +11,13 @@ does not start another OCPP server. Only an administrator can send, fetch, or re
    controller is sending start/stop or current-limit commands. Do not disable
    household load protection for this test.
 2. Set SpotNav's plan current to **16 A** and charge periods to **3** or fewer. Choose a plan whose first
-   charging window is still in the future, within the next 48 hours. From 2.5.7,
+   remaining charging windows are within the next 48 hours. From 2.5.25, an
+   active window can be continued from the request time rounded up to a whole
+   second, until its original end;
+    elapsed windows are omitted, not replaced with extra charging time. From 2.5.29,
+    verification may compare the remaining effective schedule of an active window;
+    it does not verify intervals before the readback.
+   From 2.5.7,
    the sent schedule uses the **displayed windows**, including an estimated
    shorter final block. Morek follows those fixed times; it does not adjust the
    stop based on actual energy delivered. OCPP uses whole seconds: any fractional
@@ -34,6 +40,36 @@ does not start another OCPP server. Only an administrator can send, fetch, or re
    means they differ or the read failed. Watch actual charger measurements at
    the transitions as a separate check.
 
+From 2.5.27, an interrupted or unconfirmed profile action is retained as an
+uncertain outcome, including after a restart. Further Sends are refused rather
+than automatically retried; the request may still have applied. Refresh is a
+read-only composite query, not a profile inventory and not a way to resolve this
+uncertainty. Explicit selective removal remains available, but its acknowledgement
+does not prove an earlier uncertain request cannot still take effect. There is no
+automatic recovery or reset of the uncertainty latch in this release.
+
+### Intervention, retained limits and downgrade (2.5.30+)
+
+The operator state is a snapshot of known evidence, not an installed-profile list.
+When an upload or removal is uncertain, it may already have applied or may still
+take effect. Keep the existing person Stop intent and household load protection;
+do not blindly resume the legacy controller or delete the outcome/ownership records
+to bypass the latch. Refresh can inspect current effective limits when connected,
+but cannot determine which profiles are installed or resolve an unknown command.
+Seek a supervised, explicitly approved physical and ownership recovery decision;
+there is no safe general-purpose reset in this release. Selective removal is a
+separate deliberate action, can increase current, and cannot resolve a preceding
+uncertain upload. Never use a connector-wide or blanket profile clear for cleanup.
+
+A previously applied final 0 A may persist while HA is offline, after restart, or
+after a downgrade. Before downgrade or handback, account for that possible retained
+limit, unknown in-flight commands, protection, person Stop and other controllers;
+do not assume an older version can preserve or enforce this release's uncertainty
+interlock. Safe exit and ownership handover are not implemented. Automatic mode
+remains unarmed: durable transitions and lost-state recovery, electrical protection,
+transaction authorization and retained-profile exit remain unresolved. An Accepted
+ACK or verified remaining effective schedule does not prove physical charging.
+
 ### Readback verification (2.5.6+)
 
 Send keeps the real schedule at **stack level 1** and checks it immediately.
@@ -54,6 +90,11 @@ Verification requires that reported coverage reaches one hour past the final
 stop; a missing duration is **not** assumed to equal the requested duration.
 Matching transitions may differ by up to **90 seconds**: the maximum observed
 drift and tolerance are displayed, and a drifting match is labelled **NOT exact**.
+The comparison starts no earlier than the response coverage, receipt time and sent
+profile. It requires a remaining transition and refuses starts within 90 seconds
+of a planned transition, where the initial limit is ambiguous. Stale, missing or
+short coverage is unverified. A new intent, connection or entry lifecycle can
+supersede a prior readback; an older match does not verify the new proposal.
 This tolerance is not a correction of Morek's clock or a guarantee of precise
 switching. Neither Accepted nor a matching readback proves physical charging.
 

@@ -1,10 +1,132 @@
 # SpotNav Enhanced / Morek development handoff
 
-Last checked: 2026-11-08. This file is a **public-repository handoff**, not a place for
+Last updated: 2026-11-10. This file is a **public-repository handoff**, not a place for
 passwords, access tokens, HA configuration exports, logs, or private household information.
 Re-check the live system and Git state before acting; observations below may become stale.
 
 ## Approved next direction (planning, not implemented)
+
+**Automatic restart recovery requested:** the user does not want to press a
+reconfirmation button after ordinary HA restarts. The current process-ticket design
+still requires it, so normal automatic restart recovery remains open. Implement and
+test safe automatic recovery rather than calling the admin action automatically or
+assuming an unrecorded Stop can be reconstructed. Unknown/interrupted outcomes must
+remain blocked and visible; no live action is authorized by this request.
+
+**Single Morek execution path:** the user no longer wants a runtime switch back to
+the legacy controller or a separate dynamic handback protocol. Replace Morek's old
+execution behavior with the schedule owner; retain shared legacy behavior for other
+chargers. The user can disable the integration in HA, which may leave a schedule or
+0 A limit on the charger. Preserve and assess existing ownership/held-exit records,
+uncertain outcomes and protection guards; do not delete them blindly, auto-clear a
+profile, or silently arm an unsafe migration. Historical handback requirements below
+are superseded as product requirements, not as permission to bypass safety evidence.
+
+**BMW limit and current monitoring:** the user relies on the BMW's own configured
+charge limit to stop charging at its target, not a second SpotNav live SOC-stop
+controller. The car's setting and SpotNav's planning target are separate; their
+agreement and actual behavior are not verified here. The app must still show useful
+current charging and execution health: use genuine available status and measured
+power/energy, label freshness and source, distinguish reported state from measured
+flow, and show unknown/offline/mismatch/errors honestly. Basic monitoring belongs in
+5.7, not only later history or Stage 11; no source or physical behavior is assumed.
+
+**Stage 11 — adaptive Morek estimates:** the user wants future charging-time and
+target-SOC estimates to improve from actual charging and a shortfall to trigger safe
+replanning. Existing learned-power, learned-energy and plan-watch code is groundwork,
+but its Morek-owned wiring and usable measurement sources are not established. Reuse
+and verify it rather than build a second learner; do not infer measurements from a
+schedule. This is post-installation work, not a new 5.8 prerequisite.
+
+**Stage 5 deployment clarification:** once development is complete and reviewed,
+the user intends to merge the current branch to `main`, install it in HA and test
+the deployed system personally. 5.8 is a user-owned milestone, not an LLM task or
+authorization to merge, deploy, restart, activate or operate hardware. LLMs still
+perform local automated/mocked tests in 5.6–5.7 and can help interpret logs when
+asked; HA access and live actions require specific approval. Keep deployed behavior
+unverified until observed, and preserve all safety and uncertainty interlocks.
+
+**Stages 8–9 scope:** retain the desired measured-versus-sent history, costs,
+savings and monthly insights, extending existing session/savings APIs and Stage 6
+evidence rather than duplicating them. Existing costs are not proof of preserved
+historical tariffs. The user does not need separate themes or extra accessibility
+polish; keep practical desktop/mobile usability and readable warnings. Stage 9 is
+targeted fixes only, not another installation prerequisite; 5.8 remains the initial
+installation and user-directed testing path.
+
+**Stage 6 wording review:** genuine charging history remains later work. Existing
+session store/recorder/API, energy-register discovery and power integration are
+groundwork to inspect and reuse, not proof of a complete Morek measurement history.
+The limited `debug_day.py` data is diagnostic, not an established production history
+feed. 5.6a did not establish a trustworthy Morek power/active-transaction source.
+Stage 6 remains open and is not a 5.8 installation prerequisite; installed-source
+inspection or hardware access requires the user's specific approval.
+
+**Stage 7 scope clarification:** the 5.4c real-data price chart, proposal overlay
+and its locally tested interaction groundwork already exist. Stage 7 now lists only
+remaining available-day navigation, practical interaction fixes, aligned evidence tracks and
+real-data price insights. Do not rebuild the chart or repeat 5.4c. Its full offline
+HA-plugin suite is still unrun; actual HA and physical touch remain unverified.
+
+**2026-11-12 agreed daily controls:** use two simple sidebar controls in the final
+design: **Pause / Resume Auto** and **Charge Now / Return to Auto**. Pause requests
+that charging remain held until explicit Resume; Return to Auto cancels only the
+temporary Charge Now override, so charging may continue when Auto selects now.
+Pause/Resume under schedule ownership remains 5.6b; Charge Now remains optional
+Stage 10 after 5.8. Whether Charge Now can override an existing explicit pause
+still requires the user's decision. Neither a request nor ACK proves physical stop.
+
+**Current task status:** 5.5a–5.5f and 5.6a are completed as unarmed local
+mocked groundwork, pending coordinator review, not active operation. The 5.6b–5.8
+tasks remain open; no live access or activation is authorized by this note.
+
+**Historical 2026-11-12 roadmap consistency review (superseded by 5.5d–5.5f):** the next assigned work remained 5.5d,
+not completed. The current uncommitted tree includes the 2.5.44 manual-owner
+admission fix and an additional `async_handover_unarmed` store-method draft;
+the latter is not called by the admission path or covered by handover tests. Preserve
+and evaluate it rather than assuming either safety or completion. The roadmap now
+distinguishes 5.4c's implemented real-data chart from later chart extensions, carries
+the offline HA-plugin suite gap forward, and records the default-branch/update issue.
+No HA access or code change was performed in this documentation review.
+
+**Historical 2026-11-12 task sizing:** the user requested explicit, bounded substages instead
+of repeatedly assigning an oversized block. The roadmap now records completed
+5.5a–5.5c groundwork and splits remaining 5.5d–5.5f, 5.6a–5.6c and 5.7a–5.7b.
+5.8a–5.8b describe user-directed installation/activation, not permission for live
+actions or a new hardware-testing stage. Assign **5.5d only** next. The full 5.5,
+5.6 and 5.7 umbrellas remain open; dispatch remains unarmed and the deferred 5.4c
+HA-plugin suite remains unrun. Follow the numbered checklist rather than historical
+handoff entries; do not repeat completed groundwork or bundle future substages.
+
+**2026-11-12 Charge Now decision:** the user wants this as an optional feature
+after initial installation and user-directed testing in 5.8, not a release
+prerequisite. Roadmap Stage 10 records it; it is not implemented. Default to one
+hour with other durations. On expiry or **Cancel Charge Now**, return to the
+latest valid automatic plan and reconcile the Morek schedule. If Auto selects
+the current time, charging may continue or restart immediately; cancellation
+is not a persistent Stop/pause and must not suppress that automatic window.
+Use the same schedule owner; report offline/unknown results honestly. Later
+implementation, deployment and physical tests require separate authorization.
+
+**2026-11-12 user clarification:** Morek is reported to handle household load
+protection natively. The requested SpotNav Morek mode only schedules charging
+on/off windows; do not implement household load balancing or change amps dynamically
+in response to house load. Scheduled 0 A/allowed-current limits are window controls,
+not a load regulator. This is the user's report, not an independent verification of
+the actual installation. Existing protection, regulator configuration, activation
+blockers and electrical limits must not be changed or bypassed without explicit
+authorization. Resolve any existing regulator conflict before activation; do not
+turn it into a new SpotNav load-management project or a separate hardware-test stage.
+Historical notes below describe previous understanding, not a competing requirement.
+
+**2026-11-09 coordination update:** the roadmap now begins with a concise numbered
+task checklist. Completed audit/ownership/admission/identity/start-evidence work
+through 2.5.13 is Stage 0, not work to repeat. **Stage 1 price-policy settings,
+planning and reactive explanations are implemented through 2.5.21, pending
+coordinator review.** Actual isolation is Stage 2 and remains
+incomplete/unarmed. The proposed additional unwired durable
+pre-dispatch helper was never assigned and is not the next task. Detailed historical
+versions/deployment facts below must not override current Git or the new checklist.
 
 Read [charging-dashboard-roadmap.md](charging-dashboard-roadmap.md) for the user's
 latest requirements and prioritized, bounded LLM tasks. The user wants **one HA
@@ -224,6 +346,2468 @@ requirements, not features claimed implemented in the manual baseline below.
   Do not assume `GetCompositeSchedule` lists stored profiles.
 
 ## Tests, build, and next steps
+
+### 2026-11-12 — non-profile automatic recovery (2.5.66; coordinator review pending)
+
+- The existing connector outcome store now carries a minimal versioned recovery
+  proof bound to the completed owner migration ID and physical connector. Migration
+  writes it after producer drain, verified completion and current lifecycle/Stop
+  checks; admin reconfirmation of an eligible old completed owner writes the same
+  proof. Neither operation sends or clears a profile. Recovery validates ownership,
+  unique connector, settled outcome and durable Pause/Resume intent, and the worker
+  still requires current planner provenance. Old records without a proof or the
+  existing post-dispatch evidence require one admin reconfirmation.
+- **Landed-write policy:** a valid proof on disk is accepted on restart even if the
+  prior save raised or was cancelled. A Stop requested but not durably saved before
+  a crash may be lost; no process can reconstruct it. A newer durable Pause remains
+  authoritative and a pending Resume still requires fresh confirmation after restart.
+  Unknown OCPP outcomes remain blocked, never automatically retried. The proof does
+  not establish physical charging, profile inventory or installation protection.
+- Actual-module mocked tests cover migration without a profile send, automatic
+  restart, eligible old-owner reconfirmation, landed proof with failure/cancellation
+  and Stop races, retained durable Pause, and real admission/worker execution. The
+  user-reported native protection, external writers and charger behavior remain
+  unverified. 5.7a is marked locally complete for coordinator review; 5.7b remains
+  open for broader end-to-end regression and practical charging/health monitoring.
+- Checks: `python tools/run_isolated_planning_tests.py -x` 584 passed, 1 skipped,
+  1 deselected; `python tools/run_isolated_lifecycle_tests.py -x` 198 passed;
+  `python tools/run_isolated_lifecycle_tests.py tests/test_execution_ownership.py
+  tests/test_command_admission.py tests/test_morek_schedule.py tests/test_morek_outcomes.py
+  tests/test_morek_readiness.py -x` 347 passed. The actual-bootstrap focused run
+  `python tools/run_isolated_lifecycle_tests.py tests/test_morek_worker.py -k
+  "actual_restart_recovers_bound or landed_nonprofile_proof or actual_setup_to_real_worker_profile_send or completed_restart_requires" -x`
+  passed 7. Targeted Ruff, frontend type-check/build/check-dist and sidebar/Morek
+  tests (62 passed), and diff check passed. The planning runner skips the actual
+  bootstrap test, which was run by the focused lifecycle command. Existing pytest
+  timeout/deprecation, jsdom CSS and Git line-ending warnings remain. The full
+  5.4c HA-plugin suite was not run; no live access or deployment occurred.
+
+### 2026-11-12 — non-profile restart proof boundary (2.5.65; incomplete)
+
+- Added an actual handover/storage/admission regression in
+  `tests/test_stage_23_lifecycle.py`: the completion write lands, a Stop is
+  reserved, and the save raises. Ownership and outcome bytes remain present,
+  while a restarted gate refuses automatic recovery. A successful completion can
+  leave the same bytes; its process-local ticket and the failed caller's exception
+  or non-durable Stop do not survive restart. This test does not implement a
+  non-profile proof or complete 5.7a.
+- The requested distinction between an ordinary successful proof write and a
+  proof write that landed before failure/cancellation is not represented by HA
+  Store's atomic file contents. A further proof/commit marker has the same final
+  write boundary. A durable Stop, if recorded, remains actionable; a Stop never
+  recorded before a crash cannot be reconstructed. The smallest unresolved choice
+  is whether to accept a landed, correctly ordered proof as sufficient even when
+  its caller did not observe successful return, or require an external transactional
+  mechanism that durably orders proof and Stop. Neither is assumed here. Existing
+  automatic recovery after a settled migration-bound worker response is retained;
+  older or never-sent completed records still need reconfirmation on restart.
+- Mocked checks: `python tools/run_isolated_planning_tests.py -x` 584 passed,
+  1 skipped and 1 deselected; `python tools/run_isolated_lifecycle_tests.py -x`
+  194 passed; the expanded lifecycle run with `tests/test_execution_ownership.py
+  tests/test_command_admission.py tests/test_morek_schedule.py tests/test_morek_outcomes.py
+  tests/test_morek_readiness.py -x` 343 passed. Focused lifecycle runner with
+  `tests/test_morek_worker.py -k "actual_restart_recovers_bound or
+  clean_handover_and_possibly_landed_completion" -x` passed 2. Ruff on the changed
+  test, frontend type-check/build/check-dist and focused frontend tests (62 passed),
+  and diff check passed. Existing pytest timeout/deprecation, jsdom CSS and Git
+  line-ending warnings remain. The full HA-plugin dashboard suite was not run.
+
+### 2026-11-12 — bounded automatic restart recovery (2.5.65; partial)
+
+- A settled OCPP response to an actual ticket-admitted worker call stores a
+  connector- and migration-ID-bound dispatch witness in the outcome ledger. That
+  establishes that this process issued the completion ticket and passed the final
+  checks before the call; it does **not** establish profile inventory, effective
+  limits or physical charging. After a process restart, startup can automatically
+  revalidate that witness, durable owner, settled ledger, unique identity and
+  lifecycle/Stop generation, then release the barrier. A previously durable Pause
+  remains in force; a pending Resume still needs its own fresh confirmation. No
+  profile is sent by migration or recovery itself.
+- A process that crashes immediately after the completion marker lands but before
+  issuing its ticket can leave precisely the same `completed` owner and previously
+  settled ledger as one that completed normally but has not yet made a worker call.
+  The marker alone is not safe automatic authority. Consequently old 2.5.64 records
+  and a newly migrated owner without a settled post-handover worker response still
+  need explicit admin reconfirmation. An unchanged old ACK cannot be bound to a
+  migration after the fact. In particular, if no new worker call occurs after that
+  reconfirmation, another restart still requires it. This does not yet satisfy the
+  requested universal ordinary-restart behavior; 5.7a remains open. Resolving that
+  remaining ambiguity needs either a separately reviewed non-profile ordering proof
+  or a product decision allowing one-time handling of the ambiguous old state; it
+  cannot be solved by treating the existing `completed` marker as sufficient.
+- A Stop requested but not durably recorded before a crash cannot be reconstructed.
+  In-process Stop reservations invalidate pending recovery even if identity is
+  temporarily unresolved; durable Stop/Pause and uncertain profile outcomes still
+  block stale Resume or retry. A real setup/worker/restart test covers automatic
+  recovery with a retained Pause; a separate real-planner/production-admission test
+  covers automatic restart followed by a fresh mocked profile call. Mocks do not
+  prove charger protection, absence of external writers or physical charging.
+- Checks: `python tools/run_isolated_planning_tests.py -x` 584 passed, 1 skipped,
+  1 deselected; the skipped actual-bootstrap restart test separately passed via
+  `python tools/run_isolated_lifecycle_tests.py tests/test_morek_worker.py -k
+  actual_restart_recovers_bound -x` (1 passed). `python tools/run_isolated_lifecycle_tests.py
+  -x` 193 passed; the expanded lifecycle run with `tests/test_execution_ownership.py
+  tests/test_command_admission.py tests/test_morek_schedule.py tests/test_morek_outcomes.py
+  tests/test_morek_readiness.py -x` 342 passed. Targeted Ruff and frontend
+  type-check/build/check-dist plus sidebar/Morek tests (62 passed), and diff check
+  passed. Two initial attempts to run the actual-bootstrap restart test failed:
+  the planning runner deliberately stubs the integration bootstrap, and the
+  lifecycle runner initially lacked a prewarmed timezone; the test now skips only
+  in the former and prewarms the zone in the latter. Existing pytest timeout-option,
+  dependency deprecation, jsdom CSS and Git line-ending warnings remain. The full
+  5.4c HA-plugin suite was not run.
+
+### 2026-11-12 — real-admission provenance and reconnect (2.5.64; coordinator review pending)
+
+- The existing process ticket is invalidated on disconnect, but a separately held
+  in-process reconnect candidate can be revalidated against durable completed owner,
+  settled ledger, unique identity, lifecycle and Stop generation. Only a clean
+  reconnect originating from a current ticket can restore it. A Stop, changed identity,
+  uncertain outcome, unload or superseding lifecycle event prevents that recovery.
+  On an HA process restart there is no candidate: an admin must use **Reconfirm
+  schedule ownership**. A completion write that landed before interruption and a
+  Stop never recorded before a crash cannot be ordered from the disk marker alone.
+- Actual planner plus production admission and disk-backed ledger tests cover changed
+  price state, authority, document, coverage, source and revision; SOC value and age,
+  vehicle identity, settings and connection changes during each pre-dispatch store
+  boundary. They also cover fresh replanning, unchanged-value ageing, deduplication,
+  no retry after an unknown write, and late ACK and composite readback after Stop.
+  Verification now rejects a worker's superseded ticket or pending Stop even when a
+  late ACK is recorded as historical. None of this establishes physical charging.
+- Additional actual-admission tests cover concurrent Resume/Stop during pause-intent
+  persistence, cancelled reconnect revalidation and a newer barrier while its ledger
+  read is pending, as well as unsupported plan modes and pending Resume after restart.
+  5.7a is marked locally complete for coordinator review. 5.7b remains open for
+  broader end-to-end and charging/health monitoring; mocks are not deployed evidence.
+- External writers and native protection remain unverified; effective readback is not
+  profile inventory or measured physical flow. Disabling SpotNav can leave a schedule
+  or 0 A limit. No live HA, deployment or charger operation was performed.
+- Checks: `python tools/run_isolated_planning_tests.py -x` 584 passed, 1 deselected;
+  `python tools/run_isolated_lifecycle_tests.py -x` 186 passed; the lifecycle runner
+  with `tests/test_execution_ownership.py tests/test_command_admission.py
+  tests/test_morek_schedule.py tests/test_morek_outcomes.py tests/test_morek_readiness.py
+  -x` 335 passed. Focused real-admission worker tests reported 31 passed; focused
+  reconnect tests reported 7 passed. Targeted Ruff, frontend type-check, build,
+  check-dist and sidebar/Morek tests (62 passed) and `git diff --check` passed.
+  Existing pytest timeout-option/deprecation, jsdom CSS and Git line-ending warnings
+  remain. The full 5.4c HA-plugin suite was not run.
+
+### 2026-11-12 — wired completion and guarded worker (2.5.63; review required)
+
+- A versioned `completed` handover carries the original connector-bound migration
+  ID. The real producer-locked handover saves and reads it back, rechecks generation,
+  lifecycle and identity, and only then issues an in-process ticket. Barrier release
+  and production owned-profile admission require both. The worker rereads durable
+  ownership and the attempt ledger before its final synchronous checks and wire call.
+- On restart the ticket is absent even if completion landed. A narrowly scoped
+  admin-only **Reconfirm schedule ownership** action rereads the owner and settled
+  ledger and releases only the current barrier. It sends no profile; a later worker
+  trigger is needed to reconcile. Ordinary restart and reconnect require this fresh
+  confirmation. Unconfirmed owners, missing documents, held exits and uncertain
+  outcomes remain blocked. A Stop that never reached durable storage before a crash
+  cannot be reconstructed. The reconfirmation does not verify physical charger state.
+- Mocked tests use real setup, ownership, admission, ledger and worker to reach a
+  mocked OCPP call after restart/reconfirmation; migration and reconfirmation do not
+  themselves send. Tests also cover Stop during final worker persistence, completion
+  save/readback cancellation and Stop/lifecycle races, and blocked recovery cases.
+  Existing planner provenance and worker regressions include simulated admission;
+  the complete requested real-admission race/provenance matrix has not been established.
+  Therefore 5.7a remains open for coordinator review, and this is not a deployment
+  recommendation. 5.7b remains open for end-to-end regression and monitoring.
+- External OCPP writers and native protection are not proven by local mocks. The past
+  mismatch is a historical unknown, not a current observation; a genuinely uncertain
+  persisted outcome blocks dispatch. ACK/readback do not establish physical charging
+  or profile inventory. Disabling SpotNav may leave a schedule or 0 A in place. No
+  live HA, hardware or deployment was accessed.
+- Local checks: `python tools/run_isolated_planning_tests.py -x` and the same
+  runner with `tests/test_morek_worker.py -x` each reported 553 passed, 1 deselected;
+  `python tools/run_isolated_lifecycle_tests.py -x` reported 179 passed; the expanded
+  lifecycle run with `tests/test_execution_ownership.py tests/test_command_admission.py
+  tests/test_morek_schedule.py tests/test_morek_outcomes.py tests/test_morek_readiness.py
+  -x` reported 328 passed. Targeted Ruff, frontend type-check/build/check-dist and
+  `npm run test -- test/sidebar.test.ts test/morek-view.test.ts` (62 passed), and
+  `git diff --check` passed. Initial tests exposed stale unarmed-status assertions;
+  those expectations were updated and reruns passed. Pytest timeout-option and
+  dependency deprecations, jsdom CSS parsing and Git line-ending warnings remain.
+  The full 5.4c HA-plugin suite was not run.
+
+### 2026-11-12 — lifecycle barrier correction (2.5.62; incomplete)
+
+- The real startup/reconnect barrier now refuses to release for an old owner or
+  `owner_written_unconfirmed`. The store does not yet produce or recognize
+  `completed`, so this intentionally retains the barrier for all current records.
+  Production schedule admission remains unconditionally unarmed; this is not the
+  requested completed implementation and is not ready for installation.
+- The missing code boundary is the completion save and restart recovery connecting
+  `ExecutionOwnershipStore.async_handover_unarmed` to
+  `CommandAdmission.async_release_lifecycle_barrier` and `async_execute`. A save
+  can land before failing or being cancelled, and an unrecorded Stop cannot be
+  reconstructed after a crash. A durable completion alone therefore cannot establish
+  ordering in every such race; implement conservative restart recovery or fresh
+  explicit user action, plus actual production admission and the requested race matrix.
+  No further installation-specific decision or live proof is required to implement it.
+- External writers and native protection remain unverified limitations, not universal
+  machine-proof prerequisites. The past mismatch is historical, not a current charger
+  observation; persisted uncertain outcomes must still block. Disabling the integration
+  can leave a schedule or 0 A limit in place. No profile was sent or cleared.
+- Local checks: isolated planning 551 passed, 1 deselected; lifecycle 162 passed;
+  expanded lifecycle/ownership/admission/schedule/outcome/readiness 309 passed;
+  isolated planning with worker argument 551 passed, 1 deselected. Targeted Ruff,
+  frontend type-check, build, check-dist and sidebar/Morek tests (61 passed) passed.
+  Initial lifecycle and expanded runs failed one setup expectation after the barrier
+  change; the expectation was corrected and both reruns passed. Existing pytest
+  timeout-option/deprecation and jsdom CSS warnings remain. The full HA-plugin
+  dashboard suite and the requested new completion/production-send matrix were not run.
+
+### 2026-11-12 — connector-bound unconfirmed handover witness (2.5.61; partial)
+
+- Fresh unarmed entry transitions now use version 2 with a random migration ID,
+  retained across requested/drained/interrupted states. The existing owner save
+  copies that ID into a connector-bound `owner_written_unconfirmed` witness; legacy
+  version-1 transitions and old owner records remain readable. An old owner without
+  a witness reports unverified. The held-exit transition removes only the owner-side
+  metadata as it creates its existing legacy held marker; no charger state is changed.
+- This witness records that the owner save was attempted, **not** that handover
+  completed. A Stop or cancellation can occur while the owner save is awaiting, and
+  a save may land before that interruption is known. A restart must not treat the
+  witness as completion. Production admission remains unconditionally unarmed;
+  no user control or automatic dispatch was added. The product decision does not
+  require impossible proof of absence of external writers; the concrete remaining
+  blocker is a crash/Stop-safe durable completion protocol and its final-dispatch
+  enforcement, plus the requested production-path and race matrix. Physical retained
+  state and the historical mismatch remain installation-specific unknowns, not proof
+  of an empty inventory or permission to clear. 5.7a and 5.7b remain open.
+- Mocked coverage checks matching migration IDs after an actual unarmed handover,
+  old records, malformed/unsupported evidence and after-write uncertainty. It does
+  not prove the full requested completion-save matrix or real production admission.
+  No HA, charger, profile, deployment or physical behavior was accessed or tested.
+- Checks: `python tools/run_isolated_planning_tests.py -x` 551 passed, 1 deselected;
+  `python tools/run_isolated_lifecycle_tests.py -x` 162 passed;
+  `python tools/run_isolated_lifecycle_tests.py tests/test_execution_ownership.py
+  tests/test_command_admission.py tests/test_morek_schedule.py tests/test_morek_outcomes.py
+  tests/test_morek_readiness.py -x` 309 passed. Targeted Ruff, frontend type-check,
+  build, check-dist and focused sidebar/Morek tests (61 passed), and diff check passed.
+  Existing pytest timeout-option and dependency-deprecation warnings, jsdom CSS and
+  Git line-ending warnings remain. Full 5.4c HA-plugin suite remains unrun.
+
+### 2026-11-12 — startup and handover race hardening (2.5.60; partial)
+
+- Startup reserves the existing lifecycle barrier before its first ownership await;
+  it may release only through the same current, durable-owner and outcome checks
+  after unarmed handover. A callback now retains an entry barrier even if the current
+  identity appears unrelated, without blocking positively unrelated connectors.
+  Handover captures the entry lifecycle revision and treats any change as interruption,
+  including an identity changing away and back while an owner save is awaiting.
+- The real reconnect callback now has mocked handover tests for Stop, duplicate
+  callbacks, temporary identity change, cancellation and failure at requested,
+  drained and owner-save waits. Before the first marker lands a crash can still leave
+  the prior legacy document on disk; startup's new process-local barrier is not durable
+  proof of completed handover or of first use. This does not close every crash/restart
+  or duplicate-entry test gap, nor prove external OCPP writers settled.
+- Production owned-profile admission remains unconditionally unarmed. The current
+  owner record has no durable completion witness distinguishable from an interrupted
+  owner save, and no enforceable installation evidence establishes external-writer
+  or protection safety. Profile inventory and the historical mismatch remain unknown;
+  ACK/readback do not prove physical charging. A complete evidence and final-dispatch
+  protocol, including a safe way to resolve those installation facts, is still needed.
+  No live HA, hardware, deployment, profile clear or charging action was performed.
+  5.7a and 5.7b remain open for coordinator review.
+- Checks: `python tools/run_isolated_planning_tests.py -x` 548 passed, 1 deselected;
+  `python tools/run_isolated_lifecycle_tests.py -x` 162 passed;
+  `python tools/run_isolated_lifecycle_tests.py tests/test_morek_schedule.py
+  tests/test_morek_readiness.py tests/test_command_admission.py
+  tests/test_execution_ownership.py tests/test_morek_outcomes.py -x` 306 passed.
+  Targeted Ruff, frontend type-check, build, check-dist and focused sidebar/Morek
+  tests (61 passed), and diff check passed. Existing pytest timeout-option and
+  dependency deprecation, jsdom CSS, and Git line-ending warnings remain. Full
+  5.4c HA-plugin suite was not run.
+
+### 2026-11-12 — verified reconnect barrier release (2.5.59; partial)
+
+- A reconnect callback captures a per-entry barrier revision. After initialization,
+  release takes connector admission, verifies the unique current schedule owner,
+  rereads and compares the durable ownership document, and checks the settled outcome
+  ledger. It then rechecks revision, lifecycle epoch, identity, connector generation,
+  person Stop and in-process uncertainty before removing only that entry's barrier.
+  Another entry's barrier is not removed. The owner admission path continues to refuse
+  legacy/manual writers, and production owned-profile admission still unconditionally
+  returns `schedule_mode_unarmed`; release is not a profile-write authorization.
+- Wired mocked callback tests cover a successful release and refusal after a newer
+  disconnect, uncertain ledger, ambiguous identity, Stop reservation or cancellation.
+  They verify the actual production gate and legacy/manual exclusion. No simulated
+  production activation or charger operation is claimed. Full requested callback-bound
+  duplicate-contender and each persistence/Stop-boundary matrix remains unproven;
+  existing lower-level handover regressions remain in place. The 2.5.58 process-lifetime
+  barrier description below is historical and superseded by this bounded release.
+- First-use/lost-state provenance, historical profile mismatch, unknown retained
+  consequences, external writers, protection, authorization and measured flow remain
+  unresolved. No live HA, profile action or deployment occurred. 5.7a and 5.7b remain open.
+- Local checks: `python tools/run_isolated_planning_tests.py -x` 548 passed,
+  1 deselected; `python tools/run_isolated_lifecycle_tests.py -x` 153 passed;
+  `python tools/run_isolated_lifecycle_tests.py tests/test_morek_schedule.py
+  tests/test_morek_readiness.py tests/test_command_admission.py
+  tests/test_execution_ownership.py tests/test_morek_outcomes.py -x` 297 passed.
+  Targeted Ruff, frontend type-check, build, check-dist and focused sidebar/Morek
+  tests (61 passed), and diff check passed. Existing pytest timeout-option and
+  dependency-deprecation, jsdom CSS and Git line-ending warnings remain. The full
+  5.4c HA-plugin suite was not run.
+
+### 2026-11-12 — reconnect writer barrier (2.5.58; partial)
+
+- Availability callbacks now synchronously reserve a process-local entry/connector
+  barrier before scheduling initialization, invalidate queued generation tokens and
+  interrupt an active drain. The legacy and manual profile admissions recheck the
+  barrier; already admitted work is drained through the existing connector lock.
+  Positively unrelated connectors bypass it, and the separately reserved person Stop
+  and regulator-protection paths are not reclassified. Unresolved identity retains
+  an entry barrier rather than being treated as an unrelated connector.
+- The barrier is deliberately not released in this unarmed implementation, even
+  after a successful migration; no task completion or unload can reopen it. Lifecycle
+  epochs suppress stale initialization after a newer availability transition or unload.
+  The existing durable ownership/transition record remains necessary across restart.
+  Production owned-profile dispatch stays unconditionally unarmed. Future activation
+  must explicitly review barrier lifecycle and final dispatch validation.
+- Mocked actual-module tests now exercise the real charger setup through ownership
+  handover before the real Auto executor start boundary; a reconnect callback with
+  its background coroutine held; a Stop reservation; stale reconnect completion;
+  and a writer already in admission before reconnect. The full requested matrix of
+  duplicate contenders, identity changes, interruption and persistence boundaries
+  through the newly wired callback has not been established. Existing lower-level
+  transition regressions remain; do not infer full 5.7a completion from them.
+  External writers, profile inventory, native protection and physical flow remain
+  unverified. No live HA, profile operation or deployment was performed.
+- Validation: `python tools/run_isolated_planning_tests.py -x` 548 passed,
+  1 deselected; `python tools/run_isolated_lifecycle_tests.py -x` 141 passed;
+  `python tools/run_isolated_lifecycle_tests.py tests/test_morek_schedule.py
+  tests/test_morek_readiness.py tests/test_command_admission.py
+  tests/test_execution_ownership.py tests/test_morek_outcomes.py -x` 285 passed.
+  Targeted Ruff, frontend type-check/build/check-dist and focused sidebar/Morek
+  tests (61 passed), and diff check passed. Two early lifecycle runs timed out
+  because the new test waited at the wrong barrier; the test was corrected. One
+  subsequent run failed an existing unsubscribe identity expectation; the non-migration
+  path now keeps the original callback and the rerun passed. Existing pytest timeout
+  configuration and dependency deprecations, jsdom CSS and Git line-ending warnings
+  remain. The full 5.4c HA-plugin suite was not run. 5.7a and 5.7b remain open.
+
+### 2026-11-12 — 5.7a wired unarmed migration (2.5.57; partial)
+
+- Charger setup now uses existing entry/drain and producer-locked handover before
+  starting Auto. It accepts only a uniquely bound durable legacy record and, at
+  handover, a connector outcome ledger containing a settled attempt; missing or
+  uncertain outcomes leave the durable entry marker and ordinary writers blocked.
+  A missing ownership document is not recreated on this setup path. Existing held
+  exits and interrupted entry markers remain untouched. Owned-profile admission is
+  still unconditionally unarmed; this is not automatic charging or physical evidence.
+- Actual setup invokes the migration helpers, and mocked tests exercise the helpers
+  with actual admission, store, executor and controller, as well as setup ordering
+  with mocked producers. A fully wired positive setup test and the requested complete
+  restart, reconnect, cancellation, duplicate contender and Stop boundary matrix
+  remain outstanding. In particular, the availability callback schedules its
+  initialization asynchronously; whether a legacy writer can enter before a late
+  reconnect migration establishes its latch needs further investigation. Do not
+  consider single-owner migration complete or deploy this as a verified release.
+- Ledger evidence is not profile inventory and does not establish absence of
+  external writers or resolve protection, authorization or the historical mismatch.
+  No charger command, clear or live operation was performed. The preserved
+  enable/disable draft stays inaccessible through WebSocket. 5.7a and 5.7b remain open.
+- Checks: `python tools/run_isolated_planning_tests.py -x` 548 passed, 1 deselected;
+  `python tools/run_isolated_lifecycle_tests.py -x` 138 passed; expanded lifecycle
+  with `tests/test_morek_schedule.py tests/test_morek_readiness.py
+  tests/test_command_admission.py tests/test_execution_ownership.py
+  tests/test_morek_outcomes.py -x` 282 passed. Targeted Ruff, frontend type-check,
+  build, check-dist and focused sidebar/Morek tests (61 passed) passed. An initial
+  lifecycle run failed an old expectation that startup admits two legacy writes;
+  the test was changed to expect the new interlock, and the rerun passed. Existing
+  pytest timeout/deprecation, jsdom CSS and Git line-ending warnings remain. Full
+  5.4c HA-plugin suite was not run.
+
+### 2026-11-12 — 5.7a single-owner direction (2.5.56; partial)
+
+- The user's revised direction is one Morek schedule owner, not a runtime switch
+  back to legacy. Startup and reconnect now preserve requested, interrupted and
+  drained unarmed migration markers rather than automatically aborting them to
+  legacy; held exits stay blocked. The old internal explicit guarded abort still
+  exists and is not a new user control. This change does not migrate a legacy
+  record to the schedule owner or prevent all legacy Morek execution today.
+- An interrupted previous 5.7a draft added `schedule_request` ownership fields,
+  internal request methods and WebSocket action branches. They are preserved for
+  coordinator review, but the two draft WebSocket actions now unconditionally
+  refuse before reaching those branches; no user-facing switch is offered. The
+  draft is not an admission invariant and has not been fully race-tested. Production
+  owned-profile dispatch remains unconditionally `schedule_mode_unarmed`.
+- Missing ownership is still initialized as legacy for compatibility; that is not
+  first-use evidence. A safe transition that preserves Stop while draining all
+  producers and resolves interrupted/unknown writes remains necessary before
+  claiming a sole schedule path. Held exits and retained profiles are unresolved;
+  external writers, actual protection configuration, transaction authorization,
+  the historical mismatch and trustworthy measured flow require installation-specific
+  investigation. Neither ACK nor composite readback establishes profile inventory
+  or physical charging. Do not infer authorization from the revised product direction.
+  Target-SOC cheapest-price planning remains the only provenance-checked automatic scope.
+- Disabling the integration can stop SpotNav activity without clearing a profile;
+  a stored schedule or 0 A limit may remain. No physical stop is promised. There
+  was no live HA, deployment, profile action or physical validation. 5.7a and 5.7b
+  remain open; stop for coordinator review.
+- Mocked checks: `python tools/run_isolated_planning_tests.py -x` 548 passed,
+  1 deselected; `python tools/run_isolated_lifecycle_tests.py -x` 134 passed;
+  `python tools/run_isolated_lifecycle_tests.py tests/test_morek_schedule.py
+  tests/test_morek_readiness.py tests/test_command_admission.py
+  tests/test_execution_ownership.py tests/test_morek_outcomes.py -x` 278 passed.
+  The first expanded lifecycle run stopped at one test expecting the previous
+  automatic abort; that regression now explicitly exercises failed guarded recovery
+  and passes. Targeted Ruff, frontend type-check, build, check-dist and sidebar/Morek
+  tests (61 passed), and `git diff --check` passed. Existing pytest timeout-option
+  and dependency deprecation, jsdom CSS parsing, and Git line-ending warnings remain.
+  The full 5.4c HA-plugin suite was not run.
+
+### 2026-11-12 — 5.7a partial blocker reporting (2.5.55; review required)
+
+- Read-only readiness adds explicit incomplete activation, first-use/lost-state and
+  retained-profile blockers. Sidebar evidence explains these and the unresolved held
+  exit, external writers, protection and authorization, and distinguishes disabling
+  uploads, Pause and profile removal. It introduces no activation intent or action.
+  Production owned-profile admission remains unconditionally `schedule_mode_unarmed`;
+  schedule-owned controls remain disabled and `exit_held_unarmed` has no release.
+- 5.7a is **not complete**: a durable, deliberate enable/disable protocol, proof of
+  safe entry and handback, final dispatch revalidation and the requested new full
+  mocked transition/race matrix remain. Missing ownership/outcome history cannot
+  prove first use or absence of retained profiles; neither ACK nor composite readback
+  is an inventory or physical-flow evidence. External writers and installation
+  protection require an installation-specific resolution, and authorization and
+  trustworthy flow measurements remain unverified. User attestation alone does not
+  establish these unknowns. Only target-SOC cheapest-price provenance is supported.
+  No new load controller, BMW control, profile clear or retained-limit release exists.
+- Local checks: `python tools/run_isolated_planning_tests.py -x` 544 passed,
+  1 deselected; `python tools/run_isolated_lifecycle_tests.py -x` 130 passed;
+  `python tools/run_isolated_lifecycle_tests.py tests/test_morek_schedule.py
+  tests/test_morek_readiness.py tests/test_command_admission.py
+  tests/test_execution_ownership.py tests/test_morek_outcomes.py -x` 270 passed.
+  `python tools/run_isolated_planning_tests.py tests/test_morek_worker.py -x`
+  also reported 544 passed, 1 deselected. Targeted Ruff and frontend type-check,
+  `npm run build`, `npm run check-dist` and focused sidebar/Morek tests passed
+  (61 tests); `git diff --check` passed with line-ending warnings.
+  Pytest reported existing timeout-option and dependency deprecation warnings;
+  jsdom reported CSS parse warnings. The full 5.4c HA-plugin suite remains unrun.
+  No live HA, deployment or physical charging was tested. Stop for coordinator review;
+  5.7a and 5.7b remain open.
+
+### 2026-11-12 — 5.6c invalid plans and writers (2.5.54; mocked, quick review)
+
+- Quick coordinator review found no blocker to proceeding to 5.7a. Independently
+  reran the isolated planning suite (544 passed, 1 deselected) and listed lifecycle
+  suite (270 passed); existing pytest configuration/deprecation warnings remain.
+  Not a comprehensive safety audit or deployed verification. Keep unsupported plan
+  types refused and the production gate closed until the complete activation path and
+  its blockers are actually resolved and tested.
+
+- Automatic Morek intent now compares the calculation's process-local source,
+  vehicle and connection evidence with current inputs, synchronously at each existing
+  shared-send validation. It checks current per-day state/authority and actual UTC
+  price intervals covering the remaining windows, including day boundaries and DST.
+  It refuses stale/changed/missing evidence without clearing a retained limit; unchanged
+  SOC age alone is not a change, while existing SOC freshness rules still apply.
+  Pause's held-off intent does not require a plan or prices. Manual preview/send keeps
+  its existing plan-validation contract. Production owned-profile admission is still
+  unconditionally unarmed; schedule-owned sidebar controls stay disabled.
+- This is deliberately conservative: only target-SOC cheapest-price plan provenance
+  is currently supported; manual-kWh and solar/hybrid plans fail closed as
+  `plan_input_provenance_unavailable`. Manual energy's mutable register/session
+  accounting and hybrid forecasts do not have a demonstrated synchronous provenance
+  boundary here. This restriction must be reviewed and resolved if those modes are
+  needed for activation; it does not prohibit the existing manual experiment.
+- Stop reservations now also invalidate manual Send/Clear across their ledger and
+  entry-store awaits. A known pre-dispatch abort is recorded and prior sent evidence
+  is restored; an interrupted restoration is not described as a sent attempt in
+  status. Existing unknown-outcome latch, restart Resume reconfirmation, identity and
+  ownership checks, and regulator-protection exception remain. The status API and
+  Morek details show worker blockers without conflating ACK/readback and measurement.
+- External/OCPP writers and the installation's native protection cannot be proved or
+  controlled by these mocks; composite schedules are not profile inventory. Held exit
+  still has no release and is an explicit 5.7 activation blocker. First-use/lost-state
+  provenance, authorization and protection conflict resolution remain open. No live
+  HA, charger, deployment or physical behavior was tested.
+- `python tools/run_isolated_planning_tests.py -x`: 544 passed, 1 deselected.
+  `python tools/run_isolated_lifecycle_tests.py tests/test_morek_schedule.py
+  tests/test_morek_readiness.py tests/test_command_admission.py
+  tests/test_execution_ownership.py tests/test_morek_outcomes.py -x`: 270 passed.
+  Targeted Ruff passed; in `frontend/`, `npm run build`, `npm run check-dist`,
+  `npm run type-check`, and `npm run test -- test/sidebar.test.ts
+  test/morek-view.test.ts` passed (61 tests). A first run of a new DST test failed
+  because `shown_periods` is computed, not an initializer field; its fixture was fixed.
+  Pytest reported the existing timeout-option and dependency deprecation warnings;
+  jsdom reported CSS parse warnings. Full 5.4c HA-plugin suite remains unrun.
+  Stop for coordinator review; 5.7 remains open.
+
+### 2026-11-12 — 5.6c partial investigation (2.5.53; not complete)
+
+- Manual profile admission now checks connector generation again after its awaited
+  ownership lookup. A mocked person Stop reservation at that boundary refuses the
+  older operation before its callback. This does not recall an already admitted or
+  external operation, or establish a complete competing-writer policy.
+- Existing worker paths refuse reported unavailable/stale/unpriced/invalid plans,
+  retain pending Resume confirmation across restart and latch uncertain outcomes.
+  However, `snapshot_is_current` establishes latest calculation/settings identity,
+  not by itself time-based price or other input freshness at dispatch. Whether all
+  relevant changes reliably publish before dispatch requires further actual-module
+  investigation, implementation where needed, and delayed/restart/recovery tests.
+  The full requested 5.6c status and competing-writer matrix remains outstanding.
+- Ordinary SpotNav writers use ownership guards; the explicitly classified regulator
+  protection path is separate. External/OCPP or installation-specific writers are
+  not controlled or inventoried here. Protection must not be disabled. Held exit has
+  no release path and is an explicit 5.7 activation blocker; no profile removal or
+  release mechanism was added. Owned dispatch remains unconditionally unarmed and
+  schedule-owned sidebar controls remain disabled. No live behavior is claimed.
+- Checks: `python tools/run_isolated_planning_tests.py -x` 523 passed, 1 deselected;
+  `python tools/run_isolated_lifecycle_tests.py tests/test_morek_schedule.py
+  tests/test_morek_readiness.py tests/test_command_admission.py
+  tests/test_execution_ownership.py tests/test_morek_outcomes.py -x` 269 passed;
+  `ruff check custom_components/spotnav/execution/command_admission.py
+  tests/test_command_admission.py` passed. In `frontend/`, `npm run build`,
+  `npm run check-dist`, `npm run type-check`, and `npm run test --
+  test/sidebar.test.ts test/morek-view.test.ts` passed (60 frontend tests).
+  Pytest reported existing timeout-option and dependency deprecation warnings;
+  jsdom reported CSS parse warnings. Full 5.4c HA-plugin suite remains unrun.
+  No live HA, hardware or deployment actions. Stop for coordinator review.
+
+### 2026-11-12 — 5.6b Pause and Resume (2.5.52; local mocked, quick review)
+
+- Quick coordinator review found no blocker to 5.6c. Independently reran the
+  isolated planning suite (522 passed, 1 deselected) and listed lifecycle suite
+  (256 passed); existing pytest configuration/deprecation warnings remain. This
+  review was not a comprehensive safety audit or deployed verification. Preserve
+  the restart reconfirmation limitation and unresolved held-exit interlock.
+- The existing Auto person Stop, Pause and Resume entry points now route a uniquely
+  identified Morek schedule owner through the connector-bound outcome ledger rather
+  than issuing legacy actuator commands. Legacy owner behavior remains separate.
+  A versioned `resume_requested` intent is not a confirmed replacement: the worker
+  uses a fresh valid plan and binds the attempt to the intent ID; a later Stop replaces
+  it with a new pause ID. Unknown outcomes remain latched, never blindly retried.
+- Stop reserves the connector before the Auto lock. Worker generation checks invalidate
+  old work at each pre-dispatch persistence boundary. Already-dispatched work cannot
+  be recalled; status suppresses an old ACK/readback while Stop is reserved. An offline
+  intent is admitted only when the configured physical ID or a single retained alias
+  mapping and durable owner unambiguously agree. Unknown identity is refused.
+- The Resume authorization ticket is process-local: after restart the durable request
+  remains visible as `resume_requested`, but a fresh explicit Resume is required before
+  it can dispatch. This deliberately fails closed if a Stop raced an interrupted save;
+  a retained 0 A limit is not silently released. The schedule-owned sidebar controls
+  remain disabled because production owned-profile admission is unconditionally
+  unarmed. ACK and bounded effective readback are not physical charging evidence.
+- Mock checks: `python tools/run_isolated_planning_tests.py -x` 522 passed, 1 deselected;
+  `python tools/run_isolated_lifecycle_tests.py tests/test_morek_schedule.py
+  tests/test_command_admission.py tests/test_execution_ownership.py
+  tests/test_morek_outcomes.py -x` 256 passed; targeted Ruff, `npm run type-check`,
+  `npm run build`, `npm run check-dist`, `npm run test -- test/sidebar.test.ts
+  test/morek-view.test.ts` (60 passed), `git diff --check`, and the local desktop/
+  emulated-mobile `node sidebar/browser-check.mjs` passed. Early runs exposed an
+  admission-import boundary test and a fixture lacking `_person_stops`; those were
+  corrected. Pytest emitted existing timeout-option and dependency warnings, jsdom
+  emitted CSS parse warnings and Git emitted line-ending warnings. The full 5.4c
+  HA-plugin suite remains unrun; no HA, charger or physical touch was tested.
+- 5.6c and 5.7–5.8 remain open; held exit still has no release path. The reported
+  native protection is not independently verified. Stop for coordinator review.
+
+### 2026-11-12 — 5.6b sidebar safeguard, incomplete (2.5.51)
+
+- The sidebar now explicitly disables Pause/Resume for a reported Morek schedule
+  owner while production dispatch is unarmed. It separates the last observed
+  owned pause intent, request, ACK and bounded readback from unknown physical flow;
+  the legacy pause label no longer implies a confirmed physical stop. The action
+  method also refuses programmatic invocation for a reported schedule owner.
+- The person-facing owned Pause API, durable Resume, offline identity handling and
+  the complete required race/recovery test matrix remain unimplemented. Do not
+  describe 5.6b as finished or use these disabled controls to operate a charger.
+  The 5.4c full HA-plugin suite remains unrun; no live HA was contacted.
+- Mock checks: `python tools/run_isolated_planning_tests.py` 505 passed, 1
+  deselected; `python tools/run_isolated_lifecycle_tests.py tests/test_morek_schedule.py
+  tests/test_command_admission.py tests/test_execution_ownership.py
+  tests/test_morek_outcomes.py` 256 passed; targeted Ruff passed; `npm run test --
+  test/sidebar.test.ts test/morek-view.test.ts` 60 passed; `npm run type-check`,
+  `npm run build`, `npm run check-dist`, and `git diff --check` passed. Mock browser:
+  `npm run prototype:build`, `npx esbuild sidebar/browser-fixture.js --bundle
+  --format=esm --outfile=prototype/dist/sidebar-browser.js`, then `node
+  sidebar/browser-check.mjs` passed desktop and emulated mobile. Pytest emitted
+  existing timeout-option and dependency warnings; jsdom emitted CSS parse warnings;
+  Git emitted line-ending warnings. Physical touch remains untested.
+
+### 2026-11-12 — 5.6b explicit intent, partial (2.5.50; not complete)
+
+- An internal `async_record_owned_pause` persists a versioned connector-bound
+  `schedule_pause` in the existing outcome ledger after connector and unarmed owner
+  checks. This is separate from legacy `until_resumed`. Under simulated authority,
+  the worker reads that record inside connector admission, selects a one-period 0 A
+  profile and binds the attempt fingerprint and readback to its intent ID. A recorded
+  intent survives the mocked restart; unknown outcomes still block profile sends.
+  The status API includes intent/request/ACK/bounded-readback/measurement fields.
+- **This is not a completed Pause/Resume control:** the internal method is not wired
+  to the person's existing API or sidebar; Resume and its durable pending/replacement
+  semantics are absent. Offline identity resolution cannot yet record a pause. The
+  tests do not establish the complete Stop/Resume/handover race matrix or physical
+  stop. Production owned-profile admission remains unconditionally unarmed. Keep
+  5.6b, 5.6c and 5.7–5.8 open. Do not expose the internal method as operational.
+- Checks: `python tools/run_isolated_planning_tests.py -x` 505 passed, 1 deselected;
+  `python tools/run_isolated_lifecycle_tests.py tests/test_morek_schedule.py
+  tests/test_command_admission.py tests/test_execution_ownership.py
+  tests/test_morek_outcomes.py` 256 passed; targeted Ruff, frontend `npm run build`,
+  `npm run type-check` and `npm run check-dist` passed. Pytest reported existing
+  timeout-option and dependency deprecation warnings. The full 5.4c HA-plugin suite
+  remains unrun. No live HA or charger was contacted.
+
+### 2026-11-12 — 5.6b partial continuation (2.5.49; not complete)
+
+- A person Stop reservation now advances the connector generation before waiting.
+  The worker captures it before its first persistence await and rechecks it and
+  the reservation after the shared send path's awaited persistence boundaries.
+  Already dispatched commands cannot be recalled. Simulated-authority tests cover
+  a queued worker and the ledger and entry-store awaits. Production owned-profile
+  admission remains unconditionally unarmed.
+- A one-period 0 A profile builder and a flat-readback comparator are present but
+  the builder is not wired to a pause operation. A match is bounded to one observed
+  hour; it does not prove infinite persistence, profile inventory or physical stop.
+  Missing, short, nonzero, delayed and ambiguous observations do not match.
+- **5.6b remains incomplete:** no schedule-owned durable Pause/Resume path or
+  status was wired. An initial draft treated every `until_resumed` pause as an owned
+  hold; mocked existing manual-workflow tests exposed that this would conflate the
+  legacy pause used for manual testing with schedule ownership, so that draft was
+  removed. Correct wiring still needs ownership-bound intent and serialized Resume,
+  restart, uncertainty, held-exit, and full race coverage. No activation is allowed.
+- Checks: `python tools/run_isolated_planning_tests.py` 502 passed, 1 deselected;
+  `python tools/run_isolated_lifecycle_tests.py` 130 passed; `python
+  tools/run_isolated_lifecycle_tests.py tests/test_morek_schedule.py
+  tests/test_command_admission.py` 232 passed; targeted Ruff, frontend `npm run
+  type-check`, `npm run build` and `npm run check-dist` passed. An earlier planning
+  run timed out after draft failures; `-x` identified the manual-workflow conflict.
+  Pytest reported existing timeout-option and dependency deprecation warnings.
+  The full 5.4c HA-plugin suite remains unrun. No live HA or charger was contacted.
+
+### 2026-11-12 — 5.6b investigation, not implemented
+
+- Under test-only simulated owned-profile authority, an existing Stop reservation
+  does not increment the connector generation unless an entry drain is in progress.
+  A worker already waiting at admission can consequently dispatch the old plan
+  while Stop is reserved but before the pause is durable. Production owned-profile
+  admission still unconditionally refuses dispatch. A safe implementation needs
+  Stop-wins serialization and revalidation through every pre-dispatch await without
+  breaking the existing handover, held-exit, unrelated-charger and protection paths.
+- A single-period persistent 0 A intent also cannot use the existing readback
+  comparator unchanged: it requires at least two expected transitions and a future
+  transition. Its coverage and mismatch semantics must be defined without claiming
+  physical stop or profile inventory. Resume must not release retained 0 A on an
+  unavailable plan or uncertain outcome. No implementation or activation is claimed.
+- Characterization checks: `python tools/run_isolated_planning_tests.py
+  tests/test_morek_worker.py` 493 passed, 1 deselected; `python
+  tools/run_isolated_lifecycle_tests.py tests/test_morek_schedule.py` 207 passed;
+  `ruff check tests/test_morek_worker.py tests/test_morek_schedule.py` passed.
+  Pytest reported the existing timeout-option and dependency-deprecation warnings.
+  The 5.4c full HA-plugin suite remains unrun. No live HA or charger was contacted.
+
+### 2026-11-12 — 5.6a readiness (2.5.48; local mocked, review pending)
+
+- Morek status now includes read-only `readiness`: uniquely matched OCPP availability
+  and control entity, connector-scoped vehicle state with a 180-second observation
+  age, and separate unknown transaction authorization and measured flow. The sidebar
+  ages out the status response and connector observation separately. A stable HA
+  entity without recent reports can therefore become unknown despite still being
+  correct; neither HA state timestamps nor a status read are a physical heartbeat.
+- The existing connector resolver exposes a transaction-ID sensor key, but no current
+  consumer establishes that sensor's lifecycle, sentinel values or freshness as proof
+  of an authorized active transaction. Do not infer authorization from its mere
+  presence, connector Charging, plug-in, a current limit, ACK or composite readback.
+  A trustworthy Morek power measurement is likewise not established here. Determine
+  new-session authorization configuration and trustworthy transaction/flow evidence
+  with the user in 5.8; this is not a request to change RFID or credentials.
+- No active transaction is required merely to hold a future schedule. This status
+  adds no dispatch or action, and owned-profile admission remains unconditionally
+  unarmed; identity, ownership, Stop, uncertainty and protection guards are unchanged.
+  5.6b, 5.6c and 5.7–5.8 remain open. The 5.5f held exit still has no release path;
+  retained profiles and possible 0 A remain unresolved. Native protection is a user
+  report, not independently verified. The full 5.4c HA-plugin suite remains unrun.
+- Mock checks: `python tools/run_isolated_lifecycle_tests.py` 130 passed;
+  `python tools/run_isolated_lifecycle_tests.py tests/test_morek_readiness.py
+  tests/test_command_admission.py tests/test_execution_ownership.py
+  tests/test_morek_schedule.py tests/test_morek_outcomes.py` 260 passed;
+  `python tools/run_isolated_planning_tests.py` 492 passed, 1 deselected;
+  `ruff check custom_components/spotnav/api/morek_schedule.py tests/test_morek_readiness.py`
+  passed; `npm run test -- test/sidebar.test.ts test/morek-view.test.ts` 59 passed;
+  `npm run type-check`, `npm run build`, `npm run check-dist` passed.
+  Browser checks: `npm run prototype:build`, `npx esbuild sidebar/browser-fixture.js
+  --bundle --format=esm --outfile=prototype/dist/sidebar-browser.js`, and
+  `node sidebar/browser-check.mjs` passed desktop and emulated mobile with local
+  fixtures; the test used an existing local Edge debugger because a new instance
+  could not bind port 9248. No physical touch, live HA or charging was tested.
+  Pytest emitted existing timeout-option and deprecation warnings; jsdom emitted CSS
+  parsing warnings. Stop for coordinator review.
+
+### 2026-11-12 — 5.5f held unarmed exit (2.5.47; coordinator review pending)
+
+- The internal connector-serialized exit changes a unique, verified unarmed Morek
+  record to legacy bookkeeping with a durable `exit_held_unarmed` transition. The
+  transition blocks ordinary legacy writes, manual profile Send/Clear, automatic
+  or explicit Resume, and deletion handback. It is not accepted by the existing
+  entry-abort recovery. The read-only recovery status reports the held exit and
+  unresolved retained profile. Older readers reject the new marker as malformed,
+  not as permission to run legacy control. No release path is implemented here.
+- Exit checks identity, contenders, connector generation and known in-process and
+  durable profile uncertainty under connector admission; it checks legacy profile
+  history without assuming missing history means an empty inventory. It waits for
+  already admitted work, but cannot recall a dispatched or external command.
+  Known accepted profile evidence, including possible persistent 0 A, is preserved.
+  Failed or cancelled saves poison the current process; after restart either the
+  Morek owner or the held legacy marker continues to block ordinary writes.
+- A reserved person Stop interrupts the transition or, if it races the save, leaves
+  the held record in place. Existing Auto handling records the Stop intent while
+  refusing the unresolved retained-schedule Stop; no physical Stop is claimed.
+  Regulator protection and unrelated chargers are unchanged. No Start, Stop, send,
+  clear or automatic resume is issued by exit. Owned-profile dispatch remains unarmed.
+- Combined mocked entry → handover → exit/recovery, durable retained evidence,
+  Stop/save races, uncertain persistence, duplicate/ambiguous identity, stale work,
+  unrelated chargers, protection and deletion-handback checks pass. This completes
+  **5.5 unarmed local groundwork only**, not activation, actual profile resolution,
+  proof of first use, transaction authorization or live hardware validation. The
+  user-directed 5.6–5.8 work and deferred full 5.4c HA-plugin suite remain open.
+- Checks: `python tools/run_isolated_lifecycle_tests.py`: 130 passed;
+  `python tools/run_isolated_lifecycle_tests.py tests/test_command_admission.py
+  tests/test_execution_ownership.py tests/test_morek_schedule.py
+  tests/test_morek_outcomes.py`: 248 passed; `python tools/run_isolated_planning_tests.py`:
+  492 passed, 1 deselected. Targeted Ruff, frontend `npm run build`, and
+  `npm run check-dist` passed. Existing pytest timeout-option/deprecation warnings
+  were reported. No HA or hardware was contacted. Stop for coordinator review.
+
+### 2026-11-12 — 5.5e missing/uncertain evidence recovery (2.5.46; review pending)
+
+- Startup and the existing control-availability callback now inspect connector,
+  ownership, transition and durable Morek outcome evidence. The read-only Morek
+  status includes `ownership.recovery` with a bounded state and unconditionally
+  false activation permission. A missing ownership document is still migrated
+  to legacy for compatibility, but neither that migration nor any existing record
+  proves first-use rather than lost-state provenance; activation provenance is
+  always reported unverified. The control-availability event remains only the
+  existing availability proxy, not proof of every OCPP reconnect.
+- For a legacy entry marker, startup/availability recovery calls the existing
+  guarded abort: it requires unique identity, verified durable until-resumed Auto
+  pause and no known uncertain profile outcomes, checks old manual evidence, and
+  verifies the resulting ownership document. It removes only the marker and
+  leaves Auto paused. Missing profile history is not evidence of absence. Unknown
+  outcomes, corrupt/missing ownership, identity conflicts, active Stop and uncertain
+  saves remain blocked; no uncertain ownership write is automatically retried.
+  Existing process-local uncertain legacy operation evidence also blocks abort.
+- No charger, profile, clear or resume operation is caused by recovery. A prior
+  external command cannot be recalled. Retained profiles, missing-document
+  provenance resolution for activation, safe handback, authorization and the
+  retained-schedule Stop policy remain 5.5f–5.6; owned-profile dispatch stays
+  unarmed. These are mocked tests, not proof of physical charging.
+- Verification: `python tools/run_isolated_lifecycle_tests.py`: 113 passed;
+  `python tools/run_isolated_lifecycle_tests.py tests/test_command_admission.py
+  tests/test_execution_ownership.py tests/test_morek_schedule.py
+  tests/test_morek_outcomes.py`: 231 passed; `python tools/run_isolated_planning_tests.py`:
+  492 passed, 1 deselected. Targeted Ruff, frontend `npm run build`,
+  `npm run check-dist` and `git diff --check` passed. The first planning run had
+  one status test failure from an unmocked new admission dependency; the fixture
+  was updated and the rerun passed. Pytest reports existing timeout-option and
+  dependency deprecation warnings. The full 5.4c HA-plugin dashboard suite
+  remains unrun. No live HA was accessed.
+
+### 2026-11-12 — 5.5d handover (2.5.45; coordinator review pending)
+
+- The internal handover consumes a process-local completed drain. It obtains Auto,
+  settings, controller and assignment locks before connector admission and storage;
+  validates identity, settings and known uncertainty evidence; then verifies the
+  unarmed Morek owner on disk. It does not prove external operations or profile
+  inventory. A Stop before the synchronous completion boundary interrupts entry;
+  if the owner save landed, it is verified and the prior legacy binding restored
+  with an interrupted marker before the Stop is admitted. Unknown owner saves or
+  restorations fail closed without retry. Blocked Stops record intent using the
+  existing Auto pause store without claiming physical stopping or profile removal.
+- This path sends no profile or charger operation and does not arm dispatch. The
+  process-local drain and uncertain-operation latch do not recover lost documents
+  or prove external settlement across restart. Later recovery, retained profiles,
+  exit, authorization, and retained-schedule Stop policy remain open. The 5.5d
+  focused mocked checks pass; coordinator review remains pending.
+- Validation: `python tools/run_isolated_lifecycle_tests.py` 95 passed;
+  `python tools/run_isolated_lifecycle_tests.py tests/test_command_admission.py
+  tests/test_execution_ownership.py tests/test_morek_schedule.py` 210 passed;
+  `python tools/run_isolated_planning_tests.py` 492 passed, 1 deselected.
+  Targeted Ruff, frontend `npm run build`, `npm run check-dist` and
+  `git diff --check` passed. One initial focused test failed due to assigning a
+  read-only test fixture property and passed after correction. Pytest reports its
+  existing timeout-option and dependency warnings. The deferred 5.4c HA-plugin
+  suite remains unrun; no live HA or charger was contacted.
+
+### 2026-11-12 — 5.5d partial manual admission fix (later store draft noted above)
+
+- Version 2.5.44 makes the existing manual profile admission require a valid,
+  matching, unarmed legacy owner. Actual manual Send and selective Clear entry
+  points are tested against a reloaded Morek-owned record; neither operation is
+  invoked. Existing admin, pause, identity and profile checks remain in place.
+- This is **not** a completed handover: the later store-method draft is unwired
+  and untested, and 5.5d remains open. The user has specified Stop wins;
+  the prior investigation below is historical, not a request for a new policy
+  decision. The post-completion Stop intent path and uncertain save/rollback
+  behavior also need implementation and actual-module race tests.
+- `python tools/run_isolated_lifecycle_tests.py`: 77 passed;
+  `python tools/run_isolated_lifecycle_tests.py tests/test_command_admission.py
+  tests/test_execution_ownership.py tests/test_morek_schedule.py`: 192 passed;
+  `python tools/run_isolated_planning_tests.py`: 492 passed, 1 deselected.
+  Targeted Ruff, `npm run build` and `npm run check-dist` passed. Pytest reports
+  its existing timeout-option and dependency warnings. No live HA or charger was
+  contacted. The 5.4c full HA-plugin suite remains unrun.
+
+### 2026-11-12 — 5.5d investigation, incomplete
+
+- No ownership handover or integration change was implemented. In
+  `execution/command_admission.py`, a person Stop reserves before the Auto lock, but
+  final Stop admission still requires a legacy owner. An asynchronous ownership
+  save can land after a Stop reserves and before that Stop obtains the connector
+  lock; simply committing `morek_schedule` would then refuse the Stop. The existing
+  abort save race returns to legacy and therefore does not establish safety for
+  this opposite transition. A compatible protocol and tests are still needed; this
+  observation does not establish that such a protocol is impossible.
+- At that historical point `async_manual_profile` did not check `recorded_owner`;
+  the 2.5.44 partial fix above supersedes that finding. The entry drain also does not shut down every producer
+  or prove external operations settled. Do not equate the drain with such evidence,
+  require an impossible profile inventory, or interpret an empty unwired start ledger
+  as proof of settled operations. 5.5d remains open and production stays unarmed.
+- Baseline checks: `python tools/run_isolated_lifecycle_tests.py` passed 75;
+  `python tools/run_isolated_planning_tests.py` passed 492 with 1 deselected;
+  `ruff check custom_components/spotnav/execution/command_admission.py
+  custom_components/spotnav/execution/execution_ownership.py
+  tests/test_stage_23_lifecycle.py tests/test_command_admission.py
+  tests/test_execution_ownership.py` passed. Pytest reported its existing unknown
+  timeout-option and dependency-deprecation warnings. These are existing baseline
+  tests, not 5.5d acceptance tests. No live HA or hardware was contacted.
+
+### 2026-11-12 — unarmed entry abort (coordinator review pending)
+
+- Version 2.5.43 implements `async_abort_unarmed_entry` for existing schema-1
+  `requested`, `interrupted` and `drained_unarmed` markers on a unique matching
+  **legacy** binding. This is an explicit internal operation, not an activation
+  or user-facing button. It removes only the marker, verifies the entire ownership
+  document on disk before and after the write, and leaves ownership legacy. The
+  prior entry path itself never dispatches a profile or charger command or changes
+  ownership. An absent first marker after a crash remains indistinguishable from no
+  attempt; no detection or retry is claimed.
+- Recovery requires the actual loaded Auto settings store to have no unsaved changes
+  and the disk-verified settings to match memory with `until_resumed` pause. The
+  settings lock is taken before the connector lock; ownership store is taken last.
+  Auto remains paused until a later explicit Resume; the existing pause is the
+  operator-visible state. No pause or person's Stop record is rewritten. A manual
+  Stop or other pause that cannot meet this indefinite-pause check is refused, not
+  silently changed. The operation sends no start/stop, profile, clear or resume.
+- Existing connector-outcome uncertainty, invalid evidence, ambiguous identity,
+  duplicate binding, missing/corrupt ownership and uncertain saves block recovery.
+  Known accepted or retained-profile evidence is left untouched, not claimed absent.
+  Missing profile history is not treated as a profile inventory. The older manual
+  record is checked for known unknown send/clear outcomes and never rewritten.
+  A reserved person Stop interrupts the generation; if a cancellation or Stop races
+  a marker-removal write, the process remains interlocked on uncertainty and the
+  previously verified indefinite pause remains durable if the write landed. On
+  restart the actual stored marker governs admission; no uncertain write is retried.
+  Generation checks reject already queued legacy/manual work after the abort.
+- Mocked lifecycle tests cover all three successful markers, retained evidence,
+  Stop race, stale work, ambiguous/duplicate identity, known unknown outcomes,
+  cancellation and saves failing before/after disk write. The start of a direct
+  pre-existing operation cannot be recalled, and none of these tests proves physical
+  charger behavior. Full 5.5 remains open for actual Morek ownership, safe exit,
+  retained 0 A/future profiles, unknown external outcomes, missing ownership document
+  ambiguity and restart/reconnect. No generic legacy start journal was wired.
+- Validation: `python tools/run_isolated_lifecycle_tests.py`: 75 passed;
+  `python tools/run_isolated_planning_tests.py`: 492 passed, 1 deselected. Targeted
+  Ruff and frontend `npm run build` passed. A first lifecycle run found an existing
+  duplicate-contender detection gap; it was fixed and the rerun passed. Check-dist
+  and `git diff --check` passed. Pytest reports its existing unknown
+  timeout option and dependency deprecations. The 5.4c full HA-plugin suite remains
+  unrun. All boundaries were mocked; no live HA or hardware was contacted.
+
+### 2026-11-12 — unarmed recovery check, safe abort incomplete
+
+- Version 2.5.42 adds an internal connector-serialized abort check. It validates
+  the physical binding and persisted transition, checks the actual Morek outcome
+  and unresolved-start stores, and refuses missing, uncertain, conflicting or
+  potentially retained profile evidence. It also refuses an apparently empty valid
+  unresolved-start document as `legacy_start_evidence_not_wired`: that module's own
+  contract says no controller produces or consumes these records. It therefore cannot
+  establish that an earlier ordinary start had a known outcome. No safe marker-clearing
+  operation is implemented; do not represent the check as recovery to legacy.
+- A reserved person Stop interrupts the check and invalidates its generation. The
+  check neither clears nor rewrites any evidence and never calls a charger or profile
+  operation. A missing outcome document is not proof of no retained profile; even a
+  clean new outcome ledger does not prove an older manual record or an external
+  controller installed nothing. Composite readback cannot resolve that inventory.
+- First-write boundary: before the requested marker is confirmed the entry path only
+  changes its process-local latch/generation and attempts to write ownership metadata;
+  it does not authorize an owner change, charger or profile action. In the mocked
+  definitely-not-written case the prior valid legacy document remains; a later process
+  cannot distinguish it from a normal legacy document. An uncertain write is not
+  retried; after restart its actual durable contents govern admission. This does not
+  prove that a pre-existing external action or retained profile is absent.
+- `python tools/run_isolated_lifecycle_tests.py`: 61 passed. `python
+  tools/run_isolated_planning_tests.py`: 492 passed, 1 deselected. Targeted Ruff
+  and frontend `npm run build` passed; check-dist and diff check were also run for
+  this slice. Pytest reported the existing timeout-option and dependency warnings.
+  Mocked tests are not live HA or physical validation; the full 5.4c HA-plugin
+  suite remains unrun. The safe-abort slice and broader 5.5 remain open for review.
+
+### 2026-11-12 — durable unarmed entry evidence (review required)
+
+- Version 2.5.41 extends an existing schema-1 legacy record with optional
+  `transition: {version: 1, state: requested|interrupted|drained_unarmed}`.
+  Old records remain valid without rewriting. Older code rejects the additional
+  field as malformed rather than interpreting it as legacy permission. Invalid
+  markers and markers on a schedule owner are malformed; no owner is activated.
+  The internal entry path closes its process-local gate, saves and rereads the
+  requested marker, then drains the physical connector and writes interrupted or
+  drained evidence. It does not hold the store lock while waiting for the connector
+  or the connector while waiting for producer/controller/assignment locks.
+- Startup initialization and ordinary physical admission consult the durable
+  marker. Manual Send/Clear now also require a valid matching ownership record with
+  no transition; missing/corrupt/conflicting ownership is refused, not treated as
+  permission. This is intentionally stricter than the earlier manual experiment.
+  A specifically reserved person Stop still checks identity and legacy ownership;
+  a failed transition save retains a separately checked in-process legacy snapshot
+  for that Stop only. Regulator protection is unchanged. No transition save is
+  automatically retried after an uncertain result or cancellation.
+- `requested` after a crash is ambiguous and remains blocked, as do interrupted
+  and drained markers. A Stop during a completed drain may leave `drained_unarmed`
+  as the last durable marker; it is still blocked and is not proof the Stop did not
+  occur. Existing Auto persistence owns Stop intent; transition writes never erase it.
+  A completed local connector drain does not prove all producers or external commands
+  settled. If the **first marker never reaches disk**, a subsequent process sees the
+  old legacy record and cannot infer the attempt; the in-process latch cannot survive
+  that crash. No ownership activation is possible here. Solving that ambiguity and
+  lost documents, durable unknown command outcomes, retained 0 A, safe exit/handback,
+  restart/reconnect and person Stop with an existing future profile remains open.
+- `python tools/run_isolated_lifecycle_tests.py`: 47 passed; `python
+  tools/run_isolated_planning_tests.py`: 492 passed, 1 deselected. Targeted Ruff,
+  frontend `npm run build`, and `npm run check-dist` passed. The first planning run
+  timed out after failures because old mocked Morek fixtures lacked the newly required
+  ownership store; a subsequent `-x` run identified that fixture gap. After updating
+  the mock stores the full isolated planning run passed. Pytest emitted the existing
+  unknown timeout option and dependency deprecation warnings. The full 5.4c HA-plugin
+  suite remains unrun. All I/O was mocked; no live HA or physical behavior was tested.
+  Stop for coordinator review.
+
+### 2026-11-12 — unarmed person-Stop coordination foundation (review required)
+
+- Version 2.5.40 adds an internal `async_begin_unarmed_entry` experiment. It closes
+  ordinary admission, invalidates the connector generation and drains the connector
+  lock; it never persists an owner, sends a profile or arms dispatch. The result
+  `drained_unarmed` is not ownership. A person's Stop reserves before the Auto or
+  controller lock and synchronously interrupts/increments the entry generation.
+  The separately classified Stop still checks the resolved physical identity and
+  persisted legacy owner under connector admission; it is not an urgent or regulator
+  bypass. Auto's existing Stop intent and outcome code continues to run.
+- Entry never waits for Auto, controller or assignment locks while holding the
+  connector lock. The Stop waits behind any already-admitted command; that command
+  cannot be recalled. No reopening path exists: cancellation, interruption and
+  failed/ambiguous checks leave this process's entry latch closed to ordinary work.
+  Operations capture a generation before waiting for connector admission. The old
+  process-local quiesce seam remains separate and its two characterization tests
+  remain in place. Regulator protection and unrelated connectors are unchanged.
+- This is **not durable ownership entry**. The latch and reservation do not survive
+  process restart; no transition evidence is written and no unknown external outcome
+  is recovered. Existing Auto Stop persistence and its existing failure behavior are
+  reused, not upgraded to a crash-proof command journal. A future entry caller must
+  supply trustworthy current Stop-intent state and must not arm from this drain.
+  Manual profile operations, lost-document/first-use ambiguity, restart/reconnect,
+  unknown outcomes and safe exit/handback still need a durable reviewed protocol.
+  A current Stop does not withdraw a stored future profile, release retained 0 A, or
+  prove later charging cannot occur; that policy remains unresolved.
+- Mocked actual-module checks cover in-flight drain/Stop, blocked queued work,
+  Stop intent with failed Stop and failed intent save, controller dispatch,
+  cancellation, duplicate/failed ownership checks, unrelated connectors and
+  regulator bypass. They do not prove physical stopping, a full crash matrix, or
+  live HA behavior. The 5.4c full HA-plugin dashboard suite remains unrun. No HA,
+  profile operation, deployment or charger operation occurred. Stop for review.
+- Validation: `python tools/run_isolated_lifecycle_tests.py` 36 passed;
+  `python tools/run_isolated_planning_tests.py` 492 passed, 1 deselected (includes
+  Morek worker tests); targeted Ruff, frontend `npm run build`, `npm run check-dist`
+  and `git diff --check` passed. The lifecycle runner with additional ownership,
+  admission and worker tests had 107 passed and one failure: its harness did not
+  pre-resolve `Europe/Stockholm` for the planner/worker test. The planning runner
+  pre-resolves zones and passed that worker suite. A prior lifecycle run had a
+  mocked HA fixture missing `states`; the test was fixed and rerun successfully.
+  Pytest reports its unknown timeout option and dependency deprecations; Git reports
+  Windows line-ending warnings. These results do not replace full HA-plugin tests.
+
+### 2026-11-12 — person-Stop coordination investigation (incomplete)
+
+- No new transition or Stop coordination was implemented. The existing unwired
+  latch also causes `AutoExecutor.async_manual_action("stop")` to refuse at
+  `_require_legacy`, before it records the person's intent or calls the controller.
+  A new actual-module mocked characterization covers that boundary; the previous
+  controller characterization is retained. This is not a defect in the normal
+  production Stop path, because no production entry uses the latch.
+- A controller-only Stop exception would not reach that Auto path. Conversely,
+  clearing the latch to let Stop through would admit ordinary queued adapter work:
+  `legacy_write_guard` does not capture a generation token. A possible design is
+  a Stop-specific coordination reservation established before the Auto lock, with
+  transition invalidation and identity/owner checks retained at each write boundary;
+  another is to abort and fully drain/invalidate producers before reopening ordinary
+  admission. Neither is implemented or proven here. Either must handle direct Stop,
+  pause and cancellation/save failures without using the regulator bypass or losing
+  an already dispatched operation's unknown outcome. Review lock ordering and
+  durable failure semantics rather than inferring these guarantees from the latch.
+- Whether a person Stop under schedule ownership or a retained future profile should
+  withdraw or alter that profile remains unresolved. Stopping a current session,
+  retaining 0 A, withdrawing a schedule and preventing later charging are distinct;
+  no profile operation or future prevention is implied. The remaining 5.5 entry,
+  exit/handback, lost-document ambiguity, retained-profile and restart/recovery work
+  remains open; production autonomous dispatch is unarmed.
+- `python tools/run_isolated_lifecycle_tests.py`: 28 passed. `python
+  tools/run_isolated_planning_tests.py`: 492 passed, 1 deselected. Targeted Ruff
+  initially found E731 in the new test; it was corrected and rerun as recorded in
+  the session. Pytest reported the existing timeout-option and dependency warnings.
+  The 5.4c HA-plugin suite remains unrun. These are mocked checks, not live HA or
+  hardware tests. No integration or frontend code changed and no HA, deployment or
+  charger operation occurred. Stop for coordinator review.
+
+### 2026-11-12 — Stage 5.5 entry/drain blocked for review
+
+- No entry implementation or ownership transition was added. The process-local
+  `async_quiesce_for_reload` latch refuses ordinary writes, including a person's
+  urgent Stop: `ChargingController._stop_locked(by_person=True)` first calls
+  `adapter.async_legacy_permitted`, and the latch rejects that check. A separately
+  classified regulator-protection stop bypasses the ordinary guard. Persisting or
+  wiring the latch as ownership entry would change the existing person-Stop path,
+  contrary to the required safety boundary. Do not treat `urgent` as a general
+  protection exemption. A reviewed compatible person-Stop/transition policy is
+  needed before implementing entry; protection and manual interlocks remain unchanged.
+- Current final legacy dispatch takes existing outer controller/assignment locks,
+  then connector admission, then ownership-store lock. Startup installs the guard
+  and awaits metadata initialization before Auto start and restore. The Morek
+  manual action currently enters connector admission before its per-entry action
+  lock; do not assume the historical audit's proposed reverse order describes the
+  current implementation. A transition must not hold connector admission while
+  waiting for producer/controller/assignment locks. The existing drain only waits
+  for connector-admitted work; it cannot recall a dispatched command or prove all
+  producer state or unknown external outcomes have drained.
+- Manual profile admission checks the process-local latch but does not consult
+  durable ownership. Any later durable transition must address manual profile writes
+  and restart as well as duplicate physical identity, save/cancellation ambiguity,
+  and stale queued generations; no recovery behavior is implied by this note.
+  Safe exit/handback, retained profiles including persistent 0 A, lost-document
+  versus first-use ambiguity, durable unknown outcomes and restart/reconnect remain
+  open. Do not clear a profile or infer physical charging from a readback.
+- `python tools/run_isolated_lifecycle_tests.py`: 27 passed, including the new
+  real-controller/adapter mocked-boundary characterization. `python
+  tools/run_isolated_planning_tests.py`: 492 passed, 1 deselected. `ruff check
+  tests/test_stage_23_lifecycle.py`: passed. Pytest reported its existing unknown
+  timeout-option and dependency deprecation warnings. These are mocked tests, not
+  live HA/OCPP or hardware validation. The 5.4c HA-plugin dashboard suite remains
+  unrun as documented below. No integration or frontend code changed, so no
+  manifest bump or frontend build was performed. No HA access, deployment or
+  charger operation occurred. Stop for coordinator review.
+
+### 2026-11-12 — continue implementation before live testing
+
+- The user wants remaining implementation completed before installing and testing
+  in HA. Continue with the roadmap after coordinator review, one bounded substage
+  at a time; do not contact HA, deploy or operate charging until specifically
+  approved. Live installation and user-directed testing remain in 5.8.
+- 5.4c is complete for local implementation and its recorded mocked checks; its
+  full HA-plugin dashboard API/contract/golden suite is **not run**. That suite is
+  offline automated validation, not live HA testing. Carry it to 5.7 and run it
+  on a supported local environment if available; otherwise tell the user exactly
+  what remains unverified before installation. Do not block 5.5–5.7 implementation
+  on provisioning that environment, and do not report the suite as passed.
+- This sequencing does not arm dispatch, waive authorization, resolve ownership,
+  alter existing protection or grant permission to deploy. 5.5–5.7 safety and
+  mocked regression requirements remain; 5.8 live actions require specific approval.
+
+### Stage 5.4c — Linux test environment attempt
+
+- Historical environment limitation: the full HA-plugin dashboard API/contract/golden suite has
+  **not run** in Linux. WSL Ubuntu reports Python 3.12.3. The pinned
+  `pytest-homeassistant-custom-component==0.13.365` declares Python >=3.14.
+  No Python 3.14 executable was found in the WSL command path.
+- The isolated setup attempt
+  `wsl -d Ubuntu -- python3 -m venv /mnt/c/Users/simso/AppData/Local/Temp/opencode/spotnav-ha-54c-venv`
+  failed: `ensurepip` is unavailable (Ubuntu reports `python3.12-venv` is needed).
+  No dependencies were installed, no system Python was changed, and no suite
+  tests ran in this attempt. On a supported local Linux Python >=3.14 environment
+  with `requirements_test.txt` installed, run
+  `python -m pytest tests/test_dashboard_api.py -q` from the repository root.
+- The earlier Windows failure and local mocked verification are recorded below;
+  neither is a passing Linux HA-plugin suite. Actual HA integration, physical
+  touchscreen, charger behavior and charging remain unverified. No live HA or
+  charger was contacted; automatic Morek dispatch remains unarmed. The sequencing
+  clarification above supersedes the earlier instruction to stop before 5.5.
+
+### Stage 5.4c — verification continuation, backend suite outstanding
+
+- Version 2.5.39 fixes wheel zoom on coarse source intervals: the former small
+  wheel step snapped back to the same range. The built-panel mock check now sends
+  Chromium pointer and ordinary wheel events on desktop and emulated mobile,
+  asserts the visible tooltip's exact interval dates/times, UTC offset, price and
+  unit, verifies range change and full-horizon reset, and checks local-only traffic
+  and no charger writes. Previously covered update, zoom retention and degraded
+  transitions also pass. Physical touchscreen and real HA remain unverified.
+- Screenshots inspected: `C:\Users\simso\AppData\Local\Temp\opencode\spotnav-54c\desktop.png`
+  and `mobile.png` (mock fixture, not household data). The mobile image is an
+  emulated viewport, not evidence of physical touch behavior.
+- Final frontend Vitest: 2,423 passed across 102 files; focused chart/sidebar/
+  bundle: 81 passed; shared/sample Node tests: 23 passed. Build, type-check,
+  check-dist, mocked sidebar registration (2) and diff check passed. jsdom emits
+  CSS parsing warnings, and Git emits Windows line-ending warnings.
+- `python -m pytest tests/test_dashboard_api.py -q` failed before collection on
+  Windows: `ModuleNotFoundError: No module named 'fcntl'` from HA's pytest plugin.
+  Ubuntu WSL exists, but its Python 3.12 environment has no `pytest`; no packages
+  were installed. Run that same command on a supported host with the repository's
+  HA test dependencies, without connecting to live HA. This full suite remains
+  unverified under the sequencing clarification above. The isolated serializer and planning suite
+  passed locally (492 passed, 1 deselected); they are not the full plugin suite.
+  The isolated run reports an unknown pytest timeout option and HA deprecation
+  warning; the serializer run reports a voluptuous import-order warning.
+- User reports Morek handles household protection natively; this has not been
+  independently verified. No load-balancing or dynamic amp control was added.
+  No HA, deployment, hardware, commit or push operation occurred; automatic
+  Morek dispatch remains unarmed. Stop for coordinator review; do not start 5.5.
+
+### Historical 5.4c implementation (superseded by verification above)
+
+- Version 2.5.38 adds `prices.published_intervals`, separate from the unchanged
+  merged rows. It exposes captured published boundaries and source prices in
+  major currency/kWh (the source calculation uses 100 subdivisions regardless
+  of ISO minor-unit convention). Market currency/timezone and existing per-day
+  fetched timestamps are reused. Invalid or overlapping rows fail closed. Only
+  held today/tomorrow documents are available; no historical coverage is promised.
+- The sidebar uses the shared chart with neutral colors, explicit source-price
+  basis, exact gaps and timezone offset in chart tooltips. A cap is drawn only for
+  matching-revision settings with the planner's published-price basis; the
+  configured-variable-cost cap is omitted from this raw-price plot. Proposal
+  shading is not sent or measured charging. Chart data and overlays update in
+  place while retaining valid zoom; missing/stale data shows unavailable.
+- Local validation: actual serializer test 1 passed (mocked capture); registration
+  tests 2 passed; focused sidebar/bundle tests 61 passed; shared/sample tests 23
+  passed; full Vitest 2,423 passed before final small formatting/control changes.
+  Build, type-check, check-dist and diff check passed. The initial full test run
+  had 1 stale-bundle version failure before the build; the subsequent run passed.
+  jsdom reported CSS parsing warnings; Python reported an HA voluptuous warning;
+  Git reported CRLF warnings. The full HA-plugin dashboard/golden suite was not
+  run on Windows. Its old golden comparison now checks the additive field
+  separately, but that change needs execution on a supported HA test host.
+- Built-panel mock browser checks passed desktop and emulated mobile for prices,
+  proposal changes, formatter output, zoom/reset actions, retained zoom, shrinking
+  and unavailable/restored data, no horizontal overflow, local requests and no
+  implicit writes. Captures: temporary `opencode/spotnav-54c/{desktop,mobile}.png`.
+  Pointer-triggered tooltips and real wheel gestures have not been verified for
+  this live binding; neither have actual HA, physical touch or charger behavior.
+  Do not mark 5.4c complete until those checks and the backend contract suite pass.
+  No deployment or live operation occurred; autonomous dispatch remains unarmed.
+
+### Historical 5.4c source inspection (superseded above)
+
+- **Incomplete; coordinator review required.** No chart or backend code was changed.
+  `get_dashboard.prices.intervals` is a merged presentation: the serializer may
+  substitute proposal horizon rows and split published rows into quarters. It is
+  therefore not always an authoritative record of source resolution. Captured
+  `ChartInterval` rows originate in held published documents and retain their start,
+  end and raw/effective minor-unit-per-kWh values; held documents are today and
+  tomorrow only. The existing market supplies currency and timezone when available.
+  An additive read-only representation of the captured source intervals is a likely
+  path; validate basis, freshness, overlap and missing metadata before binding.
+- The shared chart assumes sample cents and fixed bands, and chart handlers close
+  over their initial data. Live binding must address units/basis, DST, source-aware
+  navigation and in-place updates together; passing merged rows straight through
+  would not satisfy the acceptance criteria. No browser or contract tests for the
+  requested live binding were performed in this inspection.
+- `docs/sidebar-installation-preparation.md` documents the future non-destructive
+  update path and existing locally bundled assets and notices. It is not approval
+  to install. No HA, share, charger or deployment access occurred; automatic
+  Morek dispatch remains unarmed. Do not proceed to 5.5.
+
+### Stage 5.4b2 — complete locally, coordinator review pending
+
+- The bounded 5.4b2 closure cases pass; 5.4b is complete for local implementation
+  and mocked verification. `frontend/sidebar/verification-matrix.md` maps the evidence.
+  A destroyed panel could previously lose an outstanding settings write when a new
+  panel was created. The pending/unknown tracking now survives panel replacement on
+  the same HA connection; a pending write cannot be retried or reloaded, and its
+  unknown result requires explicit reload after settlement. This is in-memory frontend
+  protection, not durable recovery across browser reloads or new connections.
+- Version 2.5.37: focused sidebar 37 and full Vitest 2,420/101 files passed;
+  shared/sample 23, mocked registration 2 and isolated notifier 14 passed.
+  Type-check, build, check-dist and diff check passed. jsdom emitted CSS parsing
+  warnings; notifier pytest reported its existing unknown timeout option and HA
+  deprecation warnings; Git reported Windows line-ending warnings.
+- The built-panel mock browser check passed desktop and emulated mobile, including a
+  desktop switch while a draft and dialog were active and an old response was pending;
+  no unintended write occurred. Screenshots are in temporary `opencode/spotnav-54b1/`.
+  The local check used an existing debugging browser and observed only local/data
+  requests. Actual HA integration, physical touch, charger behavior and physical
+  charging remain unverified. No HA, deployment or hardware action occurred. Morek
+  automatic dispatch remains unarmed. Stop for coordinator review, not 5.4c.
+
+### Historical 5.4b2 partial work (superseded above)
+
+- Verification continuation: `frontend/sidebar/verification-matrix.md` records
+  tested and still missing cases. A stalled settings write now times out visibly,
+  preserves its draft, blocks retries/reload until the underlying request settles,
+  and keeps an unknown-outcome latch across disconnect for explicit reload. A
+  dispatched request is never cancelled or automatically retried. Action and
+  permission changes no longer clear in-flight dashboard/status read slots; once
+  a superseded read settles, a fresh read is requested. Pause confirmation requires
+  a matching observation generated after dispatch. No HA or hardware was contacted.
+- Tests: sidebar suite 25 passed; the final full suite passed 2,408 tests.
+  Shared/sample tests passed 23; mocked registration 2;
+  notifier 14 (existing pytest option/deprecation warnings). Type-check, build and
+  check-dist passed. Built-panel browser check passed at desktop and emulated-mobile
+  widths with simultaneous dirty input, open dialog and mismatch; it made local-only
+  requests. Screenshots: temp `opencode/spotnav-54b1/`. Sample browser checks covered
+  chart identity/zoom, dialog, text selection and scroll. Actual HA and physical
+  touch remain untested. Several specific races remain listed in the matrix; do not
+  mark 5.4b2 complete yet.
+
+- Latest continuation: `frontend/sidebar/panel.js` exposes explicit Pause until
+  resumed and Resume using `admittedAction` and the existing `performAction` API;
+  a fresh dashboard confirms state. Send/Clear now have one confirmation at the
+  sidebar boundary followed by identity, permission, preview and lifecycle checks;
+  the card keeps its existing confirmation. Timeout/permission-change outcomes are
+  conservatively treated as unknown. Automatic Morek dispatch remains unarmed.
+- `frontend/shared-dashboard/reconcile.js` updates stable DOM regions in place,
+  preserving dialog, dirty/focused inputs, Morek action nodes and chart instances;
+  current overview and health continue updating during edits. Browser checks cover
+  dialog/chart identity, sample zoom, text selection and scroll, and mocked sidebar
+  actions and save/conflict on desktop/mobile. Real chart data updates remain 5.4c.
+  Full requested action-race/interaction matrix has not been exhaustively tested;
+  keep 5.4b2 open for review and further focused regression coverage.
+- Validation: `npx vitest run --maxWorkers=2 --silent` passed 2,396 tests;
+  focused sidebar/Morek passed 34; shared/sample Node tests 23; mocked registration
+  2; notifier tests 14 (pytest option/deprecation warnings). Type-check, build and
+  check-dist passed. `sidebar/browser-check.mjs` tested the built panel with mocked
+  settings and Morek operations; `prototype/shared-browser-check.mjs` exercised
+  shared view identity/zoom/selection at 1440×1000 and emulated 390×844. Screenshots
+  are in temp `opencode/spotnav-54b1/` and `spotnav-54a/`. jsdom has CSS parsing
+  warnings; no live HA, physical touch, charger operation or deployment occurred.
+
+- Subsequent continuation: `frontend/sidebar/panel.js` loads canonical settings,
+  uses `formFromRecord`/`replacementFor('plan', …)` and revision-checked
+  `updateSettings`, and presents save/conflict/unknown-outcome notices. The shared
+  form exposes target, minimum, cap enable/value/basis and ready-by controls;
+  unsupported policy/target fields are disabled. Explicit reload discards drafts
+  only after confirmation. Charger/generation guards discard late UI responses;
+  a dispatched request cannot be recalled. No save directly sends a profile.
+- Historical entry: the sidebar embeds the existing `morekPanel` diagnostic view and dispatches
+  explicit status, fetch, send and selective clear through `morekSchedule`, with
+  administrator, support, preview fingerprint, uncertainty and confirmation
+  checks. Backend interlocks remain authoritative. The former duplicate prompts
+  and missing Pause/Resume are superseded by the continuation above.
+  No live actions were performed. These new write paths are not ready to deploy
+  without further review and the remaining tests below.
+- Historical entry: shared updates previously deferred remounts while a field was focused, a draft existed or the
+  plan dialog is open; critical status is updated in a live region. This does not
+  replace the general remount path: selection in other elements, arbitrary scroll,
+  chart identity and all debug-control focus are not guaranteed. Existing Morek
+  debug content was regenerated on updates. The in-place reconciliation above supersedes it.
+- Current checks: full frontend Vitest passed 2,393 tests; 10 focused sidebar tests
+  passed with mocked HA, including one
+  successful save, conflict/invalid/non-admin cases, late save, explicit fetch and
+  mocked send/clear guards; 23 shared/sample tests and 2 mocked registration tests
+  passed. Type-check, build and check-dist passed; isolated notifier tests passed
+  14 with existing pytest/deprecation warnings. The local built-panel mock browser check
+  passed at desktop/mobile sizes with one successful and one conflicting save,
+  draft retention and the one-hour display. It imports the built `www/sidebar/panel.js`
+  in the mock host; it does not establish actual HA,
+  physical touch or production-bundle compatibility; jsdom reports CSS warnings.
+
+- Shared vehicle rendering now uses `format.minutesPerTimeUnit`: the live adapter
+  supplies `1/60000` for epoch milliseconds; the sample supplies `60` for hours.
+  Exact window boundaries are unchanged. Rendered-module tests cover one hour,
+  partial and multiple windows in both representations.
+- The sidebar now refreshes dashboard and Morek status independently every
+  30 seconds, coalesces in-flight requests, bounds the displayed wait at ten
+  seconds, invalidates on charger/disconnect/teardown, and retains a failure notice
+  for a failed dashboard observation. A timed-out HA WebSocket call is not
+  cancellable; its channel remains single-flight until it settles or the session
+  changes, to avoid leaking repeated requests. The other channel keeps refreshing.
+  Only read-only requests are scheduled. With the plan modal open, observation
+  updates are deferred without detaching it, while critical health is updated in
+  its live region; the newest deferred model is applied on close.
+- Historical partial entry: settings and debug actions have since been connected
+  as described above. The full interaction-safe lifecycle and comprehensive tests
+  remain outstanding. No HA or charger access, profile action or deployment occurred.
+- Version 2.5.36, `npm run build`, `npm run check-dist`, type-check, two mocked
+  registration tests, five focused sidebar tests and six shared/sample tests passed.
+  The local Chromium source-bundled mock-host check passed at 1440×1000 and emulated
+  390×844, asserting `60 min`, unavailable chart and local-only requests; captures
+  are in `opencode/spotnav-54b1/`. It does not test the shipped panel bundle in HA,
+  physical touch, saves or manual actions. jsdom emitted CSS parsing warnings.
+
+### Stage 5.4b1 — read-only sidebar foundation (coordinator review pending)
+
+- `sidebar.py` registers a domain-wide HA `panel_custom` sidebar and local static
+  route. Entry reload/unload does not re-register it; HA stop removes the panel.
+  `frontend/sidebar/panel.js` mounts the actual shared dashboard in shadow DOM,
+  with local versioned CSS, a charger selector and explicit read-only refresh.
+  The old card and user dashboards are untouched. Registration and the new assets
+  are part of integration setup; install/update requires shipping the built `www`
+  assets and an approved HA restart. No installation is authorized by this note.
+- `frontend/sidebar/adapter.js` uses the existing dashboard and Morek decoders and
+  health logic. It makes independent dashboard and Morek status observations and
+  invalidates late results on selection, disconnect or teardown. It never invokes
+  Morek fetch/send/clear, settings, or charging actions. Missing general power,
+  historical data, per-window cost and real prices are unavailable. Backend plan
+  totals retain their own currency; no frontend cost rule or sample fallback is used.
+  Historical, expired or stale proposals are suppressed. SOC freshness uses the
+  existing 180-second backend threshold; dashboard observations age after 90 seconds.
+- The host is read-only, including for admins. 5.4b2 must implement guarded settings
+  and debug actions and truly stable incremental updates. The current shared `update`
+  still closes/reopens the dialog and cannot guarantee focus, selection or scroll.
+  5.4c must bind the real chart with proper timezone/DST behavior. This is not a final
+  installable release. Actual HA, mobile app, physical touch and mixed Web Awesome
+  versions remain unverified. Existing `wa-*` registrations win; compatibility with
+  an independently installed version is not guaranteed.
+- `tools/test_sidebar_registration.py`: 2 mocked-boundary tests passed (duplicate
+  setup, cleanup/reload, missing bundle). `frontend/test/sidebar.test.ts` exercises
+  the actual host and decoder against a backend fixture, stale/missing status,
+  non-admin reads, switching and out-of-order dashboard/status responses, disconnect
+  and read-only requests. jsdom reports CSS parsing warnings; it is not a browser.
+  Full Vitest run passed 2,385 tests before the last additional focused race test;
+  the three focused sidebar tests passed afterward. Type-check, build, check-dist,
+  four shared-plan tests and diff check passed; line-ending warnings are present.
+- Local Chromium mock-host/preview captures using the same backend fixture at
+  1440×1000 and emulated 390×844 are in the temp directory
+  `opencode/spotnav-54b1/{desktop,mobile}-{preview,panel}.png`. The panel adds a
+  navigation/charger bar and has a slightly narrower content area; shared card
+  layout/styles are the same. The check observed 28 local/data requests and no
+  runtime exceptions. It does not prove HA compatibility or pixel identity.
+- Build bundles Web Awesome and ECharts into `www/sidebar/panel.js`, isolates the
+  shared styles in `panel.css`, and copies MIT/Apache/BSD and icon notices beside
+  them. The mock browser used only local/data resources. No live HA, charger, phone,
+  profile operation, deployment or restart occurred. Stop for coordinator review.
+
+### Historical 5.4b partial shared-view work (superseded above)
+
+- The shared preview can accept explicit backend-supplied plan totals and a currency;
+  absent currency can be marked unknown and non-EUR totals are not labelled EUR.
+  The sample price chart still assumes cents and is not suitable for real prices.
+- An experimental update restores dirty input values, zoom and dialog visibility
+  after a remount, and puts warning/status text in the dialog. This is not a true
+  incremental update: focus/selection and all scroll positions are not guaranteed,
+  and the dialog is actually closed and reopened. Hosts must change `draftKey` on
+  charger/revision changes. This is not yet wired to settings or safe for production.
+- `node --test shared-dashboard/plan-view.test.mjs shared-dashboard/boundaries.test.mjs`
+  passed four tests. The local preview browser check passed at 1440×1000 and emulated
+  390×844, including a basic draft/dialog/zoom/warning restoration check; its captures
+  are in `opencode/spotnav-54a/shared-{desktop,mobile}-full.png` in the temp directory.
+  These are preview captures, not panel parity screenshots. Physical touch and HA
+  were not tested. An initial run attached to a browser with extensions and failed
+  the local-only network assertion; a clean browser passed.
+- Version bumped to 2.5.35; frontend type-check, build and check-dist passed.
+  The first full frontend test run failed 29 tests on five-second timeouts when
+  npm consumed the intended worker option; a direct `npx vitest run --maxWorkers=2`
+  rerun passed all 2,383 tests. Isolated notifier tests passed 14 (with existing
+  pytest configuration/deprecation warnings). These do not test a panel host.
+- Historical entry: the absence of sidebar registration and a real adapter described
+  here was superseded by 5.4b1 above. 5.4b remains open for guarded controls and
+  stable updates; 5.4c remains future work.
+
+### Stage 5.4a — shared dashboard foundation (coordinator review pending)
+
+- `frontend/shared-dashboard/dashboard.js` exports `mountDashboard(root, adapter)`
+  with `update` and `dispose`. Shared components, native modal, stepped-area
+  ECharts and CSS are used by the thin `frontend/prototype/dashboard.js` host.
+  `frontend/prototype/sample-adapter.js` injects all fictional scenarios, values,
+  display context and the local scenario callback. Preview Save/Send/Refresh are
+  disabled; no HA/OCPP client or charger action was added. The default now shows
+  only the selected stepped chart; `?comparison=bar` adds the old comparison.
+  The required model/format/action contract, missing-data behavior, local assets,
+  licenses and lifecycle are in `frontend/shared-dashboard/README.md`.
+- Run from `frontend/`: `npm run prototype:build`, then
+  `python -m http.server 8765 --bind 127.0.0.1`; open
+  `http://127.0.0.1:8765/prototype/`. The build copies Web Awesome MIT, ECharts
+  Apache license/notice, zrender BSD license and Font Awesome inline-icon notice.
+  It does not build or change the shipped integration/card.
+- Focused node tests: 22 passed using the command in `frontend/prototype/README.md`.
+  `shared-browser-check.mjs` passed at 1440×1000 and emulated 390×844: sample
+  scenarios, unknown/invalid inputs, dialog focus/Escape/backdrop, wheel/reset,
+  overlays, tooltip, fake-host mount/update/dispose/remount, unsafe text, callback
+  wiring, observer/chart cleanup and 162 local/data requests. The comparison
+  `browser-check.mjs` passed desktop/mobile (both chart modes, endpoints, missing
+  gap, zoom/pan/reset, tooltips, emulated pinch/taps, scenarios and 156 local/data
+  requests). An initial browser run contained extension resource requests and was
+  rerun successfully with extensions disabled; emulation is not physical touch.
+  `git diff --check` passed with Windows line-ending warnings.
+- Visual comparison used the earlier 5.1d full-page mismatch baseline at the same
+  desktop/mobile widths and current comparison-mode captures, plus new default
+  single-chart captures. Files are under the temporary `opencode/spotnav-54a/`:
+  `baseline-{desktop,mobile}-comparison.png`, `shared-{desktop,mobile}-comparison.png`,
+  and `shared-{desktop,mobile}-full.png`. The dark layout, plan, stepped chart and
+  hierarchy remain recognizable; default removal of the bar is intentional.
+  Minor wording/formatting in insights and evidence changed when sample-specific
+  prose moved into the adapter. No pixel-identity claim is made. The baseline is
+  an earlier saved capture, not a fresh render of a preserved old source tree.
+- Remaining: 5.4b registers the panel and maps real 5.2/5.3 sources and guarded
+  actions, addressing global CSS/shadow isolation, theme, registrations, safe
+  areas, asynchronous lifecycle and actual HA behavior. 5.4c supplies actual
+  intervals, timezone/DST-aware dates, source-boundary navigation and real chart
+  data; the current sample axis is not a live implementation. Updates currently
+  close the modal and reset chart zoom. No real HA, mobile app, physical touch,
+  phone, charger or physical charging was tested. Dispatch remains unarmed.
+  Stop for coordinator review; do not proceed to 5.4b or 5.4c automatically.
+
+### Stage 5.4a — partial extraction, not complete
+
+Historical partial entry; superseded by the completed foundation above.
+
+- `frontend/shared-dashboard/plan-view.js` and `plan-data.js` extract the existing
+  plan renderer and its arithmetic. The prototype wrapper supplies its sample
+  time/day formatters; formatter output is escaped. Missing or invalid estimates
+  remain unknown. The renderer retains sample-specific labels and is not yet a
+  complete real-data adapter or a production-ready dashboard entry point.
+- `npm run prototype:build` passed; `node --test prototype/sample.test.mjs
+  prototype/insights.test.mjs prototype/daily-sample.test.mjs
+  prototype/vehicle-evidence.test.mjs shared-dashboard/plan-view.test.mjs` passed
+  21 tests. No browser comparison, screenshots, lifecycle/network check, production
+  build, HA or physical-device test was performed for this partial change.
+- 5.4a remains open: dashboard layout, styles, chart, dialogs, sample-only evidence,
+  insights and history still need extraction with an explicit host contract, safe
+  text handling and teardown. In particular, current charts and other views directly
+  import fictional fixtures and the preview still displays both comparisons. Do not
+  use the existing prototype as a live host. Complete the requested browser/visual
+  checks and adapter documentation before coordinator review; 5.4b/5.4c are untouched.
+
+### 2.5.34 — 5.3a plug-in proposal notifications
+
+- A recognized connection records an owed notification. The planner increments a
+  connection generation on connection events and stamps the calculation's start time,
+  settled generation and resolved vehicle identity at its start. The notifier listens to
+  every publication, including unchanged plans, and checks that its calculation began
+  after the plug-in, still belongs to the settled generation and current attempt/settings,
+  and still matches the resolved vehicle. Unknown identity evidence fails closed. An old
+  immediate listener callback, superseded attempt or prior connection cannot provide a
+  proposed window. An owed notice is persisted; after restart a historical snapshot is
+  not accepted, and waiting continues until a qualifying new connection calculation.
+- After settling, opted-in selected phones receive the next `shown_periods` window with
+  local dates and proposed wording. Available backend ready-by, target, estimated cost,
+  shortfall and validated backend SOC projection are included; missing estimates are
+  omitted. The existing tag, hourly and per-event limits apply. A bounded waiting notice
+  is replaced by the proposal. Person Stop prevents proposal notices. The legacy
+  installed-plan fallback remains for installations without a planner. Notifications
+  do not send charger commands. Existing important shortfall notices remain separate.
+- Portable actual-module tests: `python tools/run_isolated_notifier_tests.py`, 14 passed;
+  planning 492 passed/1 deselected, lifecycle 26 passed. The test harness mocks HA
+  scheduling, storage and notify boundaries, not a running HA instance. Build and
+  `check-dist` passed. pytest reports an unavailable timeout option and HA/dependency
+  deprecation warnings. Full HA-plugin tests on Windows are still blocked by `fcntl`.
+- No physical phone, HA or charger was contacted. Morek mismatch/uncertainty is not
+  connected to phone notifications; its trustworthy event and deduplication lifecycle
+  remains an activation-stage follow-up. ACK/readback is not proof of charging.
+  Dispatch remains unarmed. Stop for coordinator review; do not proceed to 5.4.
+
+### 2.5.33 — 5.3 complete locally (coordinator review pending)
+
+- Final follow-up reconciled card tests with the English-only contract, retaining
+  independent translation utility tests and settings, action and accessibility
+  checks. Full frontend suite: **2,383 passed across 100 files**. Type-check, build,
+  check-dist and diff check passed (Windows line-ending warnings). Isolated real-module
+  planning tests passed 492 with one deselected; isolated lifecycle tests passed 26.
+  Mocked boundaries are not live HA or charger tests.
+- The built card was tested with mocked boundaries at 1440×1000 and 390×844,
+  Swedish HA language, successful and rejected/conflicting saves, refresh, dialog
+  close/Escape/backdrop/focus and open-dialog mismatch/uncertainty. Unsaved edits
+  and settings saves issued no Morek action. Physical touch, HA theme/Sections,
+  live HA and physical charging were not tested. Per-window energy, price and cost
+  remain unknown because the API does not supply them. Dispatch remains unarmed.
+  Stop after 5.3 for coordinator review; do not proceed to 5.3a automatically.
+
+- Earlier follow-up: revised the settings-editor, card lifecycle and language-loader
+  expectations for English while preserving their save, accessibility and loading
+  assertions. Added an open-dialog disconnect/reconnect and late-evidence test.
+  Corrected a real regression: a changed HA administrator status now causes a
+  card refresh even though a language change alone does not. The five focused
+  suites passed 169 tests before the additional daily lifecycle test, which passed
+  in its 25-test suite. An intermediate full frontend suite passed 2,274 and failed
+  109 in 27 files; those failures were subsequently reconciled in the final run above.
+  Build, type-check and check-dist passed;
+  isolated planning passed 492 (one deselected), lifecycle 26. The built-card local
+  desktop/mobile mock browser check passed, including successful/rejected saves and
+  Swedish HA language. Physical touch, HA themes, live HA and charging remain untested.
+- User decision: the shipped card, dashboard and dialogs use English regardless
+  of HA language. Existing translation resources and backend localization are not
+  deleted. The card forces English at its existing language-selection boundary.
+- Open proposal dialogs now receive Morek health changes without replacement,
+  including simultaneous uncertainty and mismatch, in a persistent live region.
+  A focused actual-card test exercises that state and forced charger replacement.
+  A policy-save test verifies revision, committed result, dashboard refresh and
+  re-read. Existing backend tests exercise real settings/controller/planner with
+  mocked boundaries and no open browser.
+- An earlier frontend run: 2,259 passed and 122 failed across 30 files because legacy card
+  tests explicitly expect non-English card text/number formats, language loads and
+  language-change rerenders. These tests were subsequently revised for the English-only
+  contract, not suppressed. Focused new
+  policy save and health tests passed. Isolated planner 492 passed, one deselected;
+  lifecycle 26 passed. A built-card browser test with Swedish HA language exercised
+  desktop/mobile modal, focus, Escape/backdrop, refresh, conflict, refusal and
+  successful mocked save/confirmation without a Morek action. This is not a live
+  HA, physical touchscreen, theme or charger test.
+- The prior instruction below to translate new strings is superseded by the English-
+  only decision. Per-window energy, cost and price remain unavailable; no browser
+  cost model was added. Automatic Morek dispatch remains unarmed. No HA access,
+  deployment, profile operation or other hardware action occurred.
+
+### 2.5.32 — Stage 5.3 partial implementation (not complete)
+
+- The existing revision-checked Plan editor now decodes and preserves the policy
+  fields, exposes minimum ready-by SOC, soft-cap enable/value and price basis, and
+  retains its target, deadline, permissions, conflict and confirmation flow. The
+  cap uses major currency units/kWh (0.10 is 10 cents); negative caps are accepted.
+  Existing browser-independent backend replanning is unchanged. Manual Morek
+  actions and unarmed dispatch are unchanged.
+- The daily view presents all backend `shown_periods`, including seconds and
+  partial ends, and opens the same list in a native dialog from the next window.
+  Touching periods are grouped when no minimum exception is reported; in exception
+  cases boundaries are kept rather than guessing equivalence. Backend policy reason
+  codes are shown. Per-window energy, cost, price and weighted average are unknown:
+  the dashboard API does not provide them. Totals are backend estimates; unpriced
+  cost is hidden. The proposal is not an installed Morek profile or measurement.
+- Validation: full frontend suite passed 2,379 tests; isolated planning tests
+  passed 492 with one deselected and lifecycle tests 26. Type-check, build and
+  check-dist passed. Earlier full runs exposed a no-settings button regression and
+  stale built language hashes; both were corrected before the final run.
+  The actual built card was browser-tested at 1440×1000 and 390×844 with mocked
+  backend boundaries: dialog open/close, Escape, outside click, focus return,
+  refresh while the dialog was open, unsaved draft, rejected revision-checked save
+  and no Morek action. This does not
+  test live HA, physical touch, all themes, successful save confirmation, or charging.
+- **Outstanding before claiming 5.3 complete:** the new strings are English in
+  non-English translation files; translate and review them. Strengthen lifecycle
+  and race tests for forced card replacement and successful save, and per-policy/
+  partial-data coverage. Normal card renders and daily status repaint are deferred
+  while the dialog is open; a forced config change still dismisses it.
+  No HA access, deployment or hardware action was performed.
+
+### 2.5.31 — Stage 5.2 daily overview (coordinator review pending)
+
+- The existing shipped card displays a localized daily overview from its decoded
+  dashboard: connection, SOC and reading age, next remaining proposed window,
+  estimated proposal energy/cost, and planner calculation time/age and historical
+  flag. It uses no prototype data and does not label legacy `plan.installed` as
+  Morek inventory. SOC age advances from the dashboard generation time; missing or
+  future timestamps give unknown age. Dates use the market zone, or labelled UTC
+  when no market zone is available. The manual Morek preview has its own separate
+  calculation time and is not the planner timestamp.
+- Morek status is read separately after a successful dashboard read, without waiting
+  for it to render. The read coalesces, times out after 10 seconds, and is invalidated
+  on config change, disconnect or a newer manual action. Late manual and follow-up
+  results are guarded by lifecycle, charger and operation. Existing evidence ages on
+  the normal card timer even if the next dashboard read stalls. Status updates replace only
+  the overview (unless the diagnostic panel is open); no OCPP fetch is performed.
+  Dashboard and status are not atomic. The summary reports observation, last send/ACK
+  and effective-readback times, and expressly leaves association with the displayed
+  proposal unknown. A match is shown only for internally consistent, recent accepted
+  evidence with valid remaining coverage; it is a last-read fact, not a current plan
+  verification or proof of physical flow. Offline, mismatch, uncertainty and stale,
+  superseded, missing and unsupported states remain visible without opening details.
+- There is no verified, fresh general Morek power source in this API. The overview says
+  measured power unavailable, including when current is zero; it does not infer power
+  from the plan or current limit. Capacity and estimated efficiency are not used for
+  new projections, and no separate low-SOC warning threshold is inferred. Automatic
+  dispatch remains unarmed and all existing manual authorization/interlocks remain.
+- Local checks: the full frontend suite passed 2,376 tests with two workers before the
+  final matching-evidence consistency check; focused daily, panel, lifecycle, ownership
+  and card tests passed 91 after it. Isolated actual-module backend planning/Morek tests
+  passed 492, one deselected, two warnings; the isolated lifecycle suite passed 26
+  with six warnings. Desktop 1440×1000 and emulated mobile
+  390×844 rendered the shipped bundle with a backend-produced dashboard fixture and
+  mocked status, with only dashboard/status requests and no horizontal overflow.
+  Screenshots are in the temporary `opencode/spotnav-52-{desktop,mobile}.png` files.
+  A mobile overflow in the existing visually-hidden text was corrected. Physical touch,
+  actual HA Sections/theme behavior, real OCPP and physical charging are unverified.
+  No HA access, deployment or hardware operation occurred. Stop after 5.2 for review;
+  5.1 visual approval and chart choice remain pending and 5.3 has not begun.
+- Actual contracts: `get_dashboard` captures the planner, connection, SOC and plan
+  together. `planning.calculated_at`, `reason` and `historical` belong to that planner
+  snapshot; `morek_schedule`'s `preview.calculated_at` is instead the time its manual
+  preview was built. These are separate requests, not an atomic combined snapshot.
+  Proposal windows, energy and estimated cost are backend-derived; the legacy
+  `plan.installed` is the controller's plan, not Morek profile inventory.
+- `soc` supplies value, source, estimated flag and age in seconds, plus capacity,
+  backend efficiency and wall-energy need when available. Capacity is reported or
+  configured, and efficiency can be a default or learned estimate, not an independently
+  measured current efficiency. An independently defined low-SOC warning threshold has
+  not been established; do not substitute a ready-by minimum or the protection floor.
+- Current dashboard live facts include charging and measured current, but charging is
+  serialized as a boolean even without a controller, so availability/startup must be
+  considered. Captured `measured_power_kw` comes from the smart-plug power entity and
+  feeds progress; it is not a general Morek power reading in the live API. No verified
+  source timestamp or freshness for general Morek measured power has been established.
+  Do not use planned power as measured power or turn unavailable into zero.
+- Morek status exposes sent profile/time/ACK, effective readback/time, coverage,
+  verification and operator/uncertainty state. Backend checks attempt identity,
+  current intent and supersession before reporting verification. ACK and readback do
+  not establish physical charging, and composite readback is not a profile inventory.
+  Status builds a preview but does not contact OCPP; the separate `fetch` does.
+
+### Stage 5.1e — sample vehicle and evidence (review pending)
+
+- The sample vehicle card shows a battery with a target marker, estimated usable
+  battery energy, battery- and wall-side target deficits, and plan active time.
+  The fictional assumptions are 60 kWh usable and 90% efficiency; estimates are not
+  measurements or guaranteed completion. Only the `infeasible` fixture independently
+  defines a 20% low-SOC warning; it is not the 40% minimum or a protection threshold.
+  The `stale` fixture shows the last SOC with a stale label and suppresses SOC-based
+  projections/estimates; its older proposal and readback are also labelled stale.
+- The fictional activity view separately identifies proposal calculation/reason, last
+  send and ACK, effective-readback time/coverage, and SOC/power freshness, with mismatch,
+  matching, unavailable and stale examples. It explicitly leaves the association
+  between the current proposal and last sent plan unknown. Readback is not a profile
+  inventory and neither ACK nor readback proves charging. These fields are design
+  examples, not evidence of live system capability.
+- In 5.2 verify actual availability and freshness of usable capacity, efficiency,
+  independently configured low-SOC warning, SOC/power timestamps, proposal time/reason,
+  sent-plan/ACK times and identity, readback timestamp/coverage and comparison/association.
+  Missing fields must remain unknown; do not assume this sample schema exists in the API.
+- Prototype build and 19 focused tests passed. Desktop 1440×1000 and emulated mobile
+  390×844 checked battery/plan/modal, missing/stale/low-SOC scenarios, evidence, both
+  charts and overflow; the battery-note color contrast check passed. 156 observed
+  requests were local/data only. Screenshots inspected in temporary `opencode` folder:
+  `spotnav-51e-{desktop|mobile}-{vehicle|evidence}.png` and
+  `spotnav-51e-{desktop|mobile}-{stale|unavailable|infeasible}-{vehicle|evidence}.png`.
+  Existing debugging browser used; physical touch, complete accessibility and HA
+  integration remain unverified. No HA or hardware access; dispatch remains unarmed.
+  Stop for coordinator/user review before 5.2; overall 5.1 and chart choice await approval.
+
+### Stage 5.1d — daily sample dashboard (review pending)
+
+- The daily area shows sample measured power, the next proposal and estimated wall
+  energy/cost beside compact simulated controls. A visible mismatch warning separates
+  sample effective-limit disagreement from measured power. Technical evidence stays
+  available in a disclosure; duplicated cost and status cards were removed. Both
+  chart alternatives remain. Above-cap exceptions are labelled in all plan displays.
+- The local scenario selector demonstrates mismatch, normal waiting, charging,
+  unavailable vehicle/current price, minimum shortfall, partial stop and an above-cap
+  minimum exception. It changes only local sample data. The shortfall is a hand-authored
+  proposal, not proof that every possible schedule is infeasible. The missing-price
+  insight deliberately masks its inputs while the chart/plan retain separate fictional
+  prices. Cap is explicitly enabled at 35 c/kWh (€0.35/kWh) on the stated price basis.
+- Recent charging compares an independently authored last-sent 22:00–23:00 sample
+  window and fictional quarter-hour readings: 21:45 sample out-of-plan flow and a
+  22:30–22:45 unknown gap. Three of four sent-window readings are available; selection
+  is disabled and this is not real history. The 5.1c opportunity label now explicitly
+  limits the comparison to Now/interval-boundary starts, not all continuous starts.
+- Prototype build and 16 focused tests passed. Desktop 1440×1000 and emulated mobile
+  390×844 checked both charts, modal/focus, all six alternate states, sample selector,
+  missing data, history labels and no horizontal overflow; 144 observed requests were
+  local/data only. Screenshots inspected in temporary `opencode` folder:
+  `spotnav-51d-{desktop|mobile}-{full|history|waiting|charging|unavailable|infeasible|partial|exception}.png`.
+  Browser was an existing debugging session; emulated touch is not physical touch.
+  Full accessibility, HA integration and real telemetry remain unverified. No HA or
+  hardware access; dispatch remains unarmed. Stop for coordinator/user review, not 5.1e;
+  overall 5.1 and chart preference remain unapproved.
+
+### Stage 5.1c — sample price insights (review pending)
+
+- A compact local panel compares current chart price to the preceding 30 fictional
+  days. The synthetic history joins the chart's historical fixture; duration-weighted
+  quartiles define lower/typical/higher, requiring 90% coverage and 24 intervals.
+  One lowest-known fully priced one-hour opportunity uses starts at Now or source
+  boundaries and the same future chart prices. Missing spans are not zero, and the
+  opportunity is explicitly not the proposal or a feasibility/charging guarantee.
+  October 2026 shows available-price duration-weighted average, range and coverage;
+  it is neither charging cost nor savings. No same-weekday claim is made.
+- `?insights=missing` deliberately masks insight inputs, not the unchanged chart,
+  and labels the distinction. Historical samples are synthetic, fixed-day, not
+  retrieved Nord Pool data; real timezone/DST, price basis and source coverage need
+  Stage 7.4/7.5 validation. No live binding, planner or charger code changed.
+- Prototype build and 14 focused tests passed, including gap, negative-price,
+  duration, insufficient-baseline and no-future cases. Desktop 1440×1000 and
+  emulated mobile 390×844 browser checks passed normal/missing states, no overflow,
+  modal and chart regressions and local-only requests; 60 requests observed were
+  local/data. Screenshots inspected in temporary `opencode` folder:
+  `spotnav-51c-{desktop|mobile}-{insights|missing}.png`. The existing debugging
+  browser was used; physical touchscreen, full accessibility and HA remain untested.
+  No HA access or hardware action; dispatch remains unarmed. Overall 5.1 and chart
+  choice await visual approval; stop for coordinator review before 5.1d.
+
+### Stage 5.1b4a — balanced cards and unknown values (review pending)
+
+- The two desktop cards use equal-width, naturally stretched grid items; mobile stacks.
+  The compact list retains all windows, projected SOC and totals, with full pricing,
+  energy and cost in both chart cards and a modal reachable from either card. Very long
+  plans naturally stretch the overview as well; this can leave space in that card, but
+  avoids clipping windows or a fixed height. The sample-only renderer shares formatting
+  and keeps known wall energy separate from unknown cost and weighted price.
+- `?plan=missing`, `?plan=invalid` and `?plan=long` exercise the real prototype UI;
+  the missing pricing fixture is separate from the unchanged sample chart prices.
+  Invalid values and missing assumptions display Unknown; target feasibility is unknown
+  when the projection is unavailable. No production planner or charger code changed.
+- Prototype build and ten sample tests passed. Desktop 1440×1000 and emulated mobile
+  390×844 checked card alignment, four-display consistency, missing/invalid data, eight
+  windows, modal keyboard/focus/inside/outside/Escape and existing chart interactions;
+  48 observed requests were local/data only. Two intermediate browser checks failed
+  while testing Enter via DevTools; using the existing Space-key activation passed.
+  A new Edge process could not bind occupied port 9227; the existing debugging browser
+  ran the checks. Physical touch, full accessibility and HA integration remain unverified.
+- Inspected screenshots in the temporary `opencode` folder use
+  `spotnav-51b4a-{desktop|mobile}-{cards|missing|missing-modal|long}.png`.
+  No HA or hardware access; Morek dispatch remains unarmed. Overall 5.1 and chart
+  choice await user visual approval; stop for coordinator review, not 5.1c.
+
+### Stage 5.1b4 — compact controls and plan (review pending)
+
+- The sample controls and complete shared plan sit beside the vehicle overview on
+  desktop and stack on mobile. Both chart cards and the next-window modal retain
+  identical windows and totals. The fictional 48% start, 60 kWh usable capacity and
+  90% efficiency project 53.6% and 57.0% after the windows, using cumulative wall
+  energy × efficiency for battery energy. Projections are bounded and unknown for
+  invalid or missing inputs; they are not observations or guarantees.
+- Prototype build and nine sample tests passed. One initial test failed because of
+  floating-point precision; the corrected tolerance passes. Desktop 1440×1000 and
+  emulated mobile 390×844 browser checks passed four-display consistency, overflow,
+  keyboard opening, focus, Escape, close and inside/outside mouse clicks, plus the
+  existing chart interactions. Twelve observed requests were local/data only. The
+  check used an already-running debugging browser because port 9227 was occupied;
+  a new Edge instance could not bind. Physical touch, complete accessibility and HA
+  integration remain unverified. Emulated pinch/taps worked; backdrop clicks were
+  mouse-emulated at mobile size, not tested on a physical touchscreen.
+- Screenshots: temporary `opencode/spotnav-51b4-{desktop|mobile}-{full|modal}.png`.
+  No HA access, deployment or charger action; dispatch remains unarmed. Overall 5.1
+  and chart choice await visual approval; stop for coordinator review, not 5.1c.
+
+### Stage 5.1b3 — proposal gradient (visual review pending)
+
+- The sample charts replace dashed proposal borders with a bottom-bright green
+  gradient and an aligned pale plan track, identified in the legend. Their widths
+  use exact clipped window boundaries, including 00:37:30. The complete plan and
+  price tooltip remain available; the gradient does not identify cheap prices as a plan.
+  Earlier 5.1b3 entries describing dashed proposal borders are superseded.
+- Prototype build, seven sample tests and headless Edge browser checks passed;
+  the browser asserts the rendered track and gradient pixel boundaries. Desktop
+  1440×1000 and emulated mobile 390×844 screenshots were inspected; narrow windows
+  remain narrow on mobile. Emulated touch is not physical touchscreen validation.
+  Screenshots are in the temp opencode folder as
+  `spotnav-51b3-gradient-{desktop|mobile}-{bar|step}-{default|zoom}.png`.
+  The prototype is local-only; no HA or hardware access occurred. Keep 5.1b3,
+  overall 5.1 and chart choice pending review and visual approval.
+
+### Stage 5.1b3 — sample day/date band (review pending)
+
+- Both charts show a slim aligned day band and midnight lines. The fixed fictional
+  dates are Sun 8, Mon 9 and Tue 10 Nov 2026; exact interval dates appear in tooltips.
+  Partial day labels shorten or disappear when too narrow. Missing price spans use
+  hatching, with a text label where space permits and an explanatory note on each card.
+  The default fixture has all three days; separate rendered test fixtures contain gaps
+  and negative prices and do not replace the surrounding plan or price summary.
+- Prototype build and seven sample tests passed. Headless Edge 1440×1000 and emulated
+  mobile 390×844 checked both charts, day-band and midnight pixel alignment through
+  zoom/pan, dated tooltips, missing intervals, no page overflow and local-only requests.
+  Emulated pinch and taps worked; physical touch remains unverified. Screenshots were
+  inspected; the first capture exposed band overlap with pins/units and was corrected.
+  Captures are in the temp opencode directory, named
+  `spotnav-51b3-dates-{desktop|mobile}-{bar|step}-{default|zoom|missing}.png`.
+- This is not timezone or DST validation. Production must use the configured local
+  timezone, handle local dates/midnight and 23/25-hour DST days, and verify actual
+  historical and published future price availability before binding. No HA or hardware
+  access occurred; Morek dispatch remains unarmed. Keep 5.1b3 and overall 5.1 pending
+  coordinator review and user visual approval; do not advance automatically.
+
+### Stage 5.1b3 — follow-up (sample-only; coordinator and visual review pending)
+
+- Both cards open 1.5 sample hours before Now through the available sample horizon;
+  Full horizon restores all 72 hours. Anchored responsive DOM labels remain aligned to
+  sample clock boundaries as the chart pans; desktop default uses two-hour ticks and
+  mobile uses sparser ticks, each with a day. The 10 c/kWh axis includes negatives.
+  The prior unanchored-axis limitation below is superseded. Future real data requires
+  source boundaries and timezone/DST-aware labels, not this fixed-day sample.
+- Black past and dark-blue future, solid blue Now, green dashed proposal areas and
+  numerical horizon-extrema pins are shown with the existing price-colored bars and
+  stepped line. The exact partial 00:37:30 plan end is untouched. Touch taps select
+  the exact interval by horizontal coordinate; two-finger scaling uses snapped viewport
+  boundaries. Chart gestures consume touch on the plot; scroll elsewhere on the page.
+- Prototype build and six focused sample tests passed; one intermediate test expectation
+  failed after changing the responsive cadence and was corrected. Edge headless at
+  1440×1000 and emulated 390×844 exercised both charts, mouse wheel/plot/slider,
+  keyboard zoom and reset, snapping, rendered labels, modal and local-only requests.
+  Simulated pinch changed [13,48] to [20.25,39] for both; emulated taps showed actual
+  interval tooltips without test fallback. Neither is physical-touch validation.
+  Full-card screenshots for each chart/default and zoomed view are in the temp opencode
+  directory as `spotnav-51b3-final-{desktop|mobile}-{bar|step}-{default|zoom}.png`.
+  Captures were inspected; mobile uses sparse time ticks and narrow windows retain
+  outlines. Full accessibility, HA shadow-root integration, actual source updates,
+  production timezones and real devices remain unverified. No HA or hardware access;
+  dispatch stays unarmed. Overall 5.1 and chart choice await user visual approval;
+  stop for coordinator review before 5.1b4.
+
+### Stage 5.1b3 — partial chart fidelity and navigation (review required)
+
+- Both sample charts show price-colored intervals, complete-horizon low/high pins,
+  and blue dashed proposed-window outlines, with exact partial stops in tooltips and
+  plan. Step color uses a piecewise visual map; it is a line/area, not bars. Pins are
+  offscreen when their horizon extrema are offscreen. Snapping uses fixture boundaries,
+  not price, now or plan rounding. No production code, HA or hardware was touched.
+- Prototype build and five sample tests pass. Existing Edge headless browser on desktop
+  1440×1000 and emulated mobile 390×844 passed ordinary wheel, desktop plot drag and
+  slider drag, button/keyboard zoom, reset, snapped boundary assertions, modal checks,
+  and local-only requests (12). Full-card and zoom screenshots are in the temporary
+  `opencode` folder, named `spotnav-51b3-{desktop|mobile}-{bar|step}[-zoom].png`.
+  Desktop and mobile screenshots were inspected: overlays and colors are visible, but
+  the mobile zoom capture can contain a tooltip. Emulated pinch did not zoom; narrow
+  mobile touch targets needed programmatic tooltip fallback. Physical touch is untested.
+- **Outstanding:** ECharts anchors ticks to the viewport edge after a pan, producing
+  e.g. 21:30, 01:30 rather than the requested even-hour cadence, and midnight/day context
+  can therefore disappear. The adaptive interval alone does not satisfy this request.
+  Screenshots do not establish complete accessibility, production timezone/DST handling,
+  or live data behavior. Keep 5.1b3 and overall 5.1 open; chart choice awaits approval.
+  Do not proceed to 5.1b4 without coordinator review. Dispatch remains unarmed.
+
+### Stage 5.1b2 — chart and sample-plan corrections (review pending)
+
+- The local prototype keeps both full-width alternatives below side-by-side overview
+  and controls. The step view now uses a continuous interval-correct line with a
+  subtle gradient and explicit gap breaks. The bar renderer keeps narrow mobile
+  intervals visible. Both views use the same fictional reference-derived fixture.
+- Adjacent same-control, same-power blocks are grouped; a real pause separates the
+  second window. Estimated window costs integrate overlapping prices, including
+  partial intervals. The hand-authored two-window example totals 6.00 kWh,
+  €1.59 and 26.45 c/kWh weighted. The next-window button opens a native modal
+  reusing the same plan display. No production planner or charger behavior changed.
+- Local prototype build, sample tests and browser checks passed. Edge headless at
+  1440×1000 and 390×844 checked card layout, overflow, plan consistency, ordinary
+  wheel events on each chart, slider drag, zoom/reset, desktop tooltips, modal
+  keyboard activation, Escape, close, focus return and local-only requests. Rendered
+  variable-width negative/missing fixtures were visually checked for both charts;
+  screenshot files are in the local temporary `opencode` directory. The simulated
+  pinch did not change zoom; full-overview emulated taps missed their narrow target
+  and required a programmatic tooltip fallback. Physical touch, full accessibility,
+  HA shadow roots and hardware remain unverified. Wheel zoom consumes page wheel
+  scrolling over the plots; scroll outside the chart or use the scrollbar/keyboard.
+  No HA access, deployment or hardware action occurred; dispatch stays unarmed.
+  Overall 5.1 and chart choice remain pending user approval; stop for review.
+
+### Stage 5.1b1 — full-width comparison (review pending)
+
+- The local prototype displays bar and stepped-area alternatives concurrently with
+  the same sample, markers, overview and complete hand-authored plan. Hourly values
+  come from the supplied examples; their 15-minute fluctuations are synthetic and
+  fictional, not verified Nord Pool data. The example is fixed-day, not DST-aware.
+  The 35 c/kWh cap is separate from illustrative price bands and proposed windows.
+  The three estimated windows total 3.75 kWh, €0.85 and 22.61 c/kWh weighted;
+  the last ends at 00:37:30. No optimization or live price pipeline is claimed.
+- Prototype build and sample unit tests passed. Edge headless desktop 1440×1000
+  and mobile 390×844 checked layout, no horizontal overflow, both charts' endpoints,
+  zoom/reset, focused Space-key zoom, desktop hover, disabled actions and local-only requests. Focused
+  negative/missing fixtures check data segments but are not rendered browser
+  fixtures. Simulated mobile touch at full overview did not reliably show a tooltip;
+  the browser check falls back to a programmatic tooltip. Real touchscreen,
+  pinch/drag, full keyboard navigation, HA integration and hardware remain unverified.
+  Screenshots are in the local temporary `opencode` directory. No HA access,
+  deployment or hardware operation occurred; production dispatch remains unarmed.
+  Overall 5.1 and chart choice remain pending user approval; stop for review.
+
+### Stage 5.1b — dark chart comparison (choice and approval pending)
+
+- The same local prototype now offers switchable interval-width bars and a
+  gradient stepped-area treatment, sharing one fictional variable-duration fixture,
+  price/cap/now/deadline markers, window shading, full plan and zoom controls.
+  It includes negative prices, a missing interval, partial future publication and
+  a partial charging window. Sample total: 15 kWh, €0.51, 3.40 c/kWh; the
+  fictional negative-price first window contributes −€0.12. Unknown is not zero.
+  Time is a fixed relative-hour sample axis, not real timezone/DST handling.
+- ECharts 6.1.0 and Web Awesome 3.14.0 remain locally bundled, with the existing
+  Apache, zrender and Web Awesome license/notice output. No new dependency or
+  production card/backend change. The stepped renderer terminates each segment at
+  its interval boundary and does not bridge the sample price gap.
+- Edge headless desktop 1440×1000 and mobile 390×844 rendered both variants.
+  The browser check exercises switching, three plan rows, data gap/final boundary,
+  negative-price mouse and emulated-touch tooltips, zoom/reset buttons, mouse drag
+  of the overview, disabled charger actions and local-only requests. Four full-page
+  captures are in the local temporary `opencode` folder. Real touchscreen gestures,
+  keyboard chart operation, accessibility and HA integration remain unverified.
+  Sample arithmetic tests and the existing TypeScript check passed; prototype JS
+  is outside that check. Keep 5.1 and 5.1b pending user visual/chart choice; do
+  not proceed to 5.1c without review. No HA or hardware operations occurred.
+
+### Stage 5.1a — prototype refinement (visual approval pending)
+
+- `frontend/prototype/` now illustrates a balanced desktop composition and the
+  same mobile cards, with an immediately visible sample mismatch and expandable
+  evidence, a three-window plan, per-window energy/cost and consistent totals.
+  A 48% sample SOC already exceeds its 40% minimum; the 80% target is projected
+  short within the 10 c/kWh sample cap. Controls are inert/simulated.
+- Apache ECharts 6.1.0 (Apache-2.0) is bundled only in the prototype; its LICENSE
+  and NOTICE and zrender 6.1.0 BSD license are copied into the local output. A
+  custom interval-width price bar chart shows sample prices, cap and proposal;
+  a separate stepped gradient chart illustrates sample measured power and a gap.
+  The sample meter difference is independent of the chart and plan. Real telemetry,
+  timezone/DST, production chart interactions and bindings are not implemented.
+- Edge headless browser checks cover 1440×1000 and 390×844, six cards, mobile
+  stacking, three windows, two canvases, no horizontal overflow, price hover,
+  simulated touch, disabled actions, local input and evidence disclosure. Ten
+  observed requests were local/data only. Screenshots are in the local temporary
+  opencode directory; no physical touch, HA or physical charger validation.
+  Sample arithmetic/missing-data node tests and existing project type-check pass;
+  prototype JS is not type-checked. Build passes. npm reports Node 23 engine
+  warnings and five dependency audit findings (two moderate, three high).
+  5.1 and 5.1a remain unchecked for user visual approval; no 5.2 work was done.
+
+### Stage 5.1 — isolated dashboard design study (visual approval pending)
+
+- `frontend/prototype/` contains a local sample-only browser dashboard with
+  shared tokens, reusable panel/badge/metric helpers and Web Awesome Core controls.
+  It proposes a single Sections view, with a larger Prices & Plan area, the same
+  cards stacked on mobile, explicit missing measurement and mismatch examples,
+  and disabled actions. The chart is an illustration, not ECharts or history.
+  No shipped card, integration or safety/dispatch code changed. The README covers
+  startup, intended composition, local assets, licenses and HA caveats.
+- Web Awesome 3.14.0 is MIT; selected components and theme are bundled locally.
+  Its general icon resolver has a CDN default; no icons are used in this study.
+  Actual HA shadow-root integration, theme mapping, dialogs/popovers and touch
+  still require validation; this prototype is not a claim of compatibility in HA.
+  Future distribution must audit transitive notices and avoid runtime CDN assets.
+- Chromium Edge headless rendered 1440×1000 and 390×844; browser assertions
+  check six cards, mobile order/alignment, no horizontal overflow, library input
+  rendering, disabled actions, local editing and local-only requests. Screenshots
+  are temporary, not committed. Type-check passed for the existing TS project;
+  prototype JavaScript is not included in that type-check. Visual approval is
+  outstanding; keep 5.1 unchecked and stop for coordinator review. No HA access,
+  hardware operation or deployment occurred; autonomous dispatch remains unarmed.
+- Prototype build and the existing focused Morek panel suite (21 tests) passed;
+  `git diff --check` passed with line-ending warnings. npm reported unsupported
+  engine warnings for existing test dependencies on Node 23 and five audit findings
+  (two moderate, three high); the focused test still passed. npm also warned about
+  forwarded test CLI options. The screenshot reflects the test's in-memory edit of
+  the sample target field, not a saved setting.
+
+### 2.5.30 — Stage 4.3 operator state (unarmed; review required)
+
+- The existing status response derives an operator summary from current connection,
+  preview, attempt and verification evidence. An in-flight upload is tracked only
+  in memory and bound to its attempt; after interruption the durable uncertain record
+  takes precedence over offline or stale matches. The existing panel shows manual
+  readiness, sending, checking, mismatch, verified remaining effective limits and
+  intervention guidance, plus the unarmed activation blockers. It requests fresh
+  status after manual actions. No new outcome store or uncertainty reset was added.
+- The panel and manual procedure distinguish proposal, ACK, effective readback and
+  measurement. Unknown actions, possible final 0 A, person Stop, protection and
+  downgrade/handback need a supervised decision; selective removal does not settle
+  an earlier unknown upload. Automatic dispatch, transition and recovery are not
+  enabled. No live HA, deployment, restart or charger action occurred.
+- Validation: isolated actual-module planning suite 492 passed, one deselected,
+  two warnings; focused Morek selection 115 passed, 378 deselected, two warnings;
+  isolated lifecycle suite 26 passed, six warnings. The focused panel suite passed
+  21 tests; frontend build, check-dist and type-check, targeted Ruff and diff check
+  passed (diff check reported Windows line-ending warnings). HA/OCPP and storage
+  boundaries are mocked; these are neither full HA nor physical validation. Full
+  HA pytest collection remains blocked on Windows by the plugin's `fcntl` import.
+
+### 2.5.29 — Stage 4.2 remaining-schedule verification (unarmed; review required)
+
+- The existing comparator checks the remaining effective limits and transitions
+  from the later of reported start, response receipt and sent-profile start.
+  It refuses missing/stale/short coverage, an initial boundary within 90 seconds
+  of a planned transition, or no remaining transitions. It reports coverage,
+  maximum drift and the 90-second tolerance. A match says nothing about elapsed
+  periods, installed-profile inventory, authorization or physical charging.
+- Accepted worker uploads enter the same bounded read-only check path only after
+  connector admission is released. Manual actions retain their existing admission
+  and interlocks. Attempts have unique IDs and revisions; readback is checked
+  against the accepted attempt, current intent, identity and entry lifecycle, with
+  checks around network and storage awaits. Superseded evidence is not reported as
+  verification of the current plan. Repeated publications may conservatively mark
+  a previous match historical; no automatic resend, clear or uncertainty reset is
+  introduced. Legacy evidence without the new attempt ID is not treated as current
+  verification and requires a fresh eligible action/read.
+- Production owned-profile admission remains unconditionally unarmed. Ownership
+  transitions, lost-state recovery, electrical protection, transaction authorization
+  and retained-profile exit remain activation blockers. Operator recovery/health is
+  Stage 4.3. These changes have not been validated against live HA or hardware.
+- Validation: isolated actual-module planning suite 481 passed, one deselected and
+  two warnings; focused Morek selection 102 passed, 380 deselected, two warnings;
+  isolated lifecycle suite 26 passed, six warnings. Focused frontend panel tests
+  passed 12 tests; frontend build, check-dist and type-check, targeted Ruff,
+  compileall and diff check passed (diff check reported Windows line-ending
+  warnings). During development the panel test twice failed on obsolete expected
+  wording; the expectations were updated and the final run passed. Tests use
+  simulated worker authority and mocked HA/OCPP/persistence, not full HA or
+  physical validation. No live HA, deployment, restart or charger action occurred.
+
+### 2.5.28 — Stage 4.1 restart and reconnect (unarmed; review required)
+
+- The startup worker subscribes to the current planner publication. The existing
+  control-entity availability listener now invalidates queued worker work on both
+  disconnect and reconnect, and resumes reconciliation after connector ownership
+  initialization. A transition generation prevents an older initialization from
+  resuming after a newer disconnect. Worker startup and pre-dispatch checks require
+  the control entity to be available, and identity and current planner intent are
+  rechecked through the existing connector admission and shared Send path. A later
+  reconnect needs neither a browser nor another settings edit. The listener depends
+  on HA OCPP exposing reconnect as a control-entity availability transition; other
+  reconnect signals are not independently monitored.
+- The ledger is evidence and deduplication, not a cached profile to replay or proof
+  of installation. An unchanged acknowledged fingerprint is not re-sent on restart
+  or reconnect; a changed valid intent can be reconciled only under simulated test
+  authority. Unknown/interrupted attempts stay latched across restart; there is no
+  automatic retry or reset. Identity ambiguity and duplicate discovered contenders
+  fail closed. As previously documented, an unrecorded duplicate cannot be detected
+  before it initializes. Lost outcome/ownership documents remain indistinguishable
+  from first use; neither is solved by this substage.
+- Production `owned_profile` admission remains unconditionally unarmed. Activation,
+  durable ownership transitions, lost-state recovery, electrical protection,
+  transaction authorization and retained-profile exit remain blockers. Stage 4.2
+  active-window verification and Stage 4.3 operator recovery/health remain open.
+  No composite readback is a profile inventory, and no ACK proves physical flow.
+- Validation: isolated planning suite 460 passed, one deselected, two warnings;
+  focused worker selection 32 passed, 429 deselected, two warnings; isolated
+  lifecycle suite 26 passed, six warnings. The functional reconciliation tests
+  use simulated authorization and mocked persistence/OCPP; the production gate
+  is separately exercised and refuses. Frontend build and `npm run check-dist`,
+  targeted Ruff and compileall passed. These are not full HA or physical tests;
+  no live HA, deployment, restart or charger action was performed.
+
+### 2.5.27 — Stage 3.3 shared manual actions and evidence (unarmed; review required)
+
+- Manual Send and selective removal now take the existing physical connector
+  admission lock; the manual-only entry point does not use or activate the
+  permanently unarmed `owned_profile` gate. Admin, pause, preview fingerprint,
+  settings revision and Morek identity checks remain; Send rechecks after each
+  pre-dispatch persistence await. Refresh uses the connector read-only path and
+  sends only `GetCompositeSchedule`, though it persists readback evidence.
+- A connector-scoped atomic outcome document complements the old per-entry
+  manual record. It records desired fixed-time intent, a pre-dispatch attempt,
+  acknowledgement, a separately verified readback fingerprint, and removal
+  outcome. It is bound to the first entry; a different entry is refused. Existing
+  manual records are read conservatively: unknown legacy upload/removal outcomes
+  remain uncertain, and old Accepted profiles do not supply a dedup fingerprint.
+  This is not proof of installed profiles, transaction authorization or charging.
+- A timed-out, unknown, cancelled or interrupted attempt remains uncertain on
+  disk; automatic **and manual** sends are refused, including after restart.
+  There is no automatic retry or reset. Explicit selective removal is still
+  available, targets only ID 42001, invalidates deduplication and cannot clear a
+  pre-existing uncertain-upload latch. Readback cannot resolve that latch. Failed
+  or cancelled ledger writes poison the current process; writes are checked by
+  reading the stored envelope back before dispatch. A lost entire outcome file
+  remains indistinguishable from first use; missing-document recovery and robust
+  transition protocols remain mandatory activation blockers, not solved here.
+- The worker uses the same durable record and connector lock; manual replacement
+  and removal cannot leave a stale worker success fingerprint. Status exposes the
+  record or an unavailable/uncertain state, and the panel warns and disables
+  Send when uncertain. No automatic sends are enabled, and no mode API, active
+  readback verification, broader restart/reconnect recovery or exit policy was
+  added. Electrical protection and transaction authorization remain unresolved.
+- Validation: the isolated actual-module planning suite passed 451 tests with
+  one deselected and two warnings; the isolated lifecycle suite passed 26 tests
+  with six warnings. The focused Morek panel suite passed 12 tests. Frontend
+  build, `npm run check-dist`, type-check, targeted Ruff, compileall and
+  `git diff --check` passed; diff check reported Windows line-ending warnings.
+  Persistence, HA and OCPP boundaries were mocked; these are not full HA or
+  physical validation. No live HA, deployment or charger action was performed.
+
+### 2.5.26 — Stage 3.2 backend worker (unarmed; review required)
+
+- Each charger with an Auto planner attaches a worker to its calculation
+  publications, including equal-result calculations. Existing planning paths
+  supply settings, deadline, SOC and price updates; the current snapshot is
+  delivered on subscription. The worker coalesces bursts, evaluates the 3.1
+  displayed-window intent and fingerprint, and queues through the existing
+  physical-connector admission lock. Inside that lock it rechecks generation,
+  identity/ownership via admission, the planner instance, current intent,
+  settings revision and calculation freshness before the OCPP boundary. No
+  controller, assignment or profile lock is acquired inside admission.
+- **Production dispatch is impossible:** `owned_profile` admission still always
+  returns `schedule_mode_unarmed`, including for a purported Morek owner. No
+  activation API, ownership change or weakening of manual Send was added. Tests
+  use a deliberately simulated admission with mocked OCPP for the worker's
+  functional send path. No active-window readback verification was added.
+- Successful ACKs and definite rejections are deduplicated in process memory per
+  physical connector. Before a send the worker latches uncertainty; timeout,
+  unknown reply, exception or cancellation can mean the request applied, so all
+  further sends for that connector are blocked in this HA process, even for a
+  changed intent or entry reload. This is not durable across HA restart, does not
+  reconcile manual Send/clear, and has no retry or recovery mechanism. Stage 3.3
+  must establish durable attempted/ACK/verified outcomes and safe uncertainty
+  handling and integrate manual actions before any activation-capable release.
+- Unavailable, stale, expired or invalid intent performs no clear or replacement;
+  an existing final 0 A may remain. The worker records only an in-memory reason,
+  not persisted operator health. ACK is not verification, authorization or proof
+  of physical charging; composite schedules are not profile inventories. Lost
+  ownership state, durable transitions, electrical protection, authorization and
+  safe retained-profile exit remain activation blockers. Reconnect/restart
+  reconciliation and active-window verification remain Stage 4 work.
+- Validation: the isolated actual-module planning suite passed 439 tests, one
+  deselected and two warnings; the isolated lifecycle suite passed 26 tests with
+  six warnings. The first planning run failed one existing import-inventory test
+  because it did not yet name the new worker; after updating that assertion the
+  suite passed. Frontend build and `npm run check-dist`, targeted Ruff and
+  compileall, and `git diff --check` passed (the latter reported Windows line
+  ending warnings). Tests use mocked HA/OCPP boundaries and simulated admission;
+  they are not full HA integration or physical validation. No live HA, deployment,
+  restart or charger action was performed.
+
+### 2.5.25 — Stage 3.1 shared schedule intent (review required)
+
+- The existing `_proposed_profile` is the shared current-intent entry point for
+  manual preview and Send and a future backend caller. It uses the displayed
+  fixed-time windows and existing profile builder; elapsed windows are dropped,
+  active windows start at the request time rounded up to a whole second, and
+  all ends round down. No energy is added to compensate for elapsed time; the
+  original estimated kWh is not a measurement or an estimate of remaining energy.
+  An active initial 16 A profile cannot be verified by the current future-only
+  comparator; it remains unverified, with active readback work deferred to 4.2.
+- Fingerprints include profile attributes, initial limit/phases, absolute future
+  transitions and settings revision, but not the moving initial timestamp. A
+  future-to-active transition changes the fingerprint and requires a new preview;
+  changes to a shortened end, profile attributes or revision also invalidate it.
+  Pause, admin, identity, current, revision and preview checks remain in place.
+- No plan, expired plan, invalid windows, unpriced or stale/unavailable prices
+  are refusals, not instructions to clear or release a limit. Only price states
+  `ready` and `waiting_for_tomorrow` are accepted; `degraded` and `incomplete`
+  are conservatively refused because the snapshot lacks per-window freshness.
+  Freshness relies on the planner's current snapshot and price-state reporting,
+  not an independent price-source fetch at Send. A retained final 0 A can persist
+  after expiration. Composite readback is not a profile inventory; Accepted does
+  not prove transaction authorization or physical charging.
+- No worker, automatic send/retry/clear, ownership activation or durable transition
+  was added. Lost-state recovery, electrical protection, authorization and safe
+  retained-profile exit remain activation blockers. Stage 3.2 is next only after
+  coordinator review; this intent is not itself an actuator admission protocol.
+- Isolated actual-module regressions with mocked boundaries: planning suite 424
+  passed, one deselected, two warnings; lifecycle suite 26 passed, six warnings.
+  These are not full HA or physical tests. No live HA or charger was contacted.
+
+### 2.5.24 — Stage 2.3 unarmed lifecycle and regression (review required)
+
+- Shared connector admission has an internal, unexposed reload-oriented quiesce:
+  it latches before waiting for the connector lock, drains admitted operations,
+  refuses queued/new ordinary writes and advances the generation. Cancellation
+  leaves it closed. It neither cancels an already dispatched command nor stops
+  producers, persists a transition, changes owner, or arms schedule mode. A future
+  handover must coordinate all producers and durable state before any reload. The
+  admission service belongs to the HA process: reloading an entry does not reset
+  the latch. No production path invokes this future seam.
+- An existing valid ownership document missing the entry binding is no longer
+  silently filled in as legacy; status reports no recorded owner. A wholly absent
+  document is still migrated as first use, but absence alone cannot distinguish
+  a genuinely pre-ownership installation from a deleted/lost ownership document.
+  Coordinator permits this first-use migration in this release because no integration
+  action can activate schedule ownership. Resolving lost-document ambiguity is a
+  mandatory blocker before any activation-capable release or safe recovery claim;
+  a new marker by itself cannot prove a missing document was never lost.
+- Startup installs the adapter guard and awaits metadata initialization before Auto
+  startup, planning and restore. The controller restore consults admission before
+  its immediate re-arm decision, retaining the saved plan and later guarded timers
+  if denied. An older person's Stop is preserved if its transfer to Auto settings
+  fails, including across intervening controller-record saves. Ordinary target
+  dispatch is refused for simulated Morek-owned, corrupt, unresolved or known
+  conflicting state.
+- This release only initializes the supported Morek physical connector. An unrelated
+  new charger requires no Morek record and does not create the document; a first
+  supported connector can still initialize when the document is absent. A valid
+  document with a missing binding is left untouched as uncertain, including an empty
+  document (not produced by normal initialization). A stale record for the same
+  physical connector or a duplicate entry is a conflict, not a new legacy binding.
+- Offline/unresolved OCPP connector identity still fails closed unless a different
+  connector number is established; no new assumption about aliases or unrelated
+  offline stations was introduced: a configured alias, cpids mapping or past record
+  alone is not a verified current physical binding. Duplicate contenders are held
+  in memory; after restart an unrecorded duplicate is rediscovered only when it
+  initializes, so a command admitted before discovery cannot be recalled.
+  If restore denied an already-open window while offline, late metadata initialization
+  does not itself replay that immediate start; future guarded timers remain. A
+  reconnect/reload recovery policy is still future work, not an automatic retry.
+  Regulator protection continues unchanged and can compete with schedule control;
+  external HA/OCPP actors are outside these guards.
+- Schedule mode remains unavailable and unarmed. A retained profile may continue
+  enforcing its final 0 A after reload, pause or exit; no automatic clear or upload
+  was added. Composite readback is not a profile inventory; a profile does not
+  authorize a new transaction. Electrical protection, transaction authorization,
+  retained-profile handling and safe exit require separate decisions.
+- Checks: `python tools/run_isolated_lifecycle_tests.py` passed 26 tests with six
+  warnings; `python tools/run_isolated_planning_tests.py` passed 416 tests, with
+  one deselected and two warnings. The lifecycle suite loads actual integration,
+  ownership, controller, Auto and handback modules with mocked HA/storage/charger
+  I/O. The actual entry setup function is exercised through restore with mocked
+  collaborators, not as a real HA config-entry setup. Neither suite is full HA or
+  physical testing. `python -m pytest -q
+  tests/test_ownership_lifecycle.py` failed before collection because the HA
+  plugin imports Unix-only `fcntl` on Windows. Targeted Ruff and compileall,
+  frontend build, `npm run check-dist`, and `git diff --check` passed; diff
+  check reported Windows line-ending warnings. No live system was contacted.
+
+### 2.5.23 — Stage 2.2 shared writer guards (review required)
+
+- Corrected controller callbacks that ignored a denied Auto turn: hold, stray,
+  person-hold, battery-probe resume, owed work, final-window stop and top-off.
+  A denied callback does not dispatch or feed a success; an existing person Stop
+  intent is retained. Denied owed automatic work is discarded rather than
+  repeatedly retried. Final-window completion recording now happens after the
+  boundary admits the action, not in the earlier timer callback.
+- Controller adapters now share a connector-aware admission check immediately
+  around ordinary start/stop, current and phase dispatch, including deferred,
+  resend, setting, solar and restore writes. Start/stop also check before their
+  controller preparation. The direct button fallback checks before acting, and
+  deletion handback builds a guarded adapter. The own-mode API/webhook uses the
+  same guard. Refused current/phase writes are not reported as sent. The existing
+  connector lock is taken after controller/assignment locks; no controller or
+  assignment lock is acquired inside it.
+- Regulator current writes and regulator-classified stops deliberately remain
+  permitted, including protective lowering and safety stops. They can conflict
+  with schedule-only operation: status includes the conservative
+  `site_regulation_conflict_unresolved` activation blocker, alongside the existing
+  isolation, safety and authorization blockers. It is not a live assessment.
+- A positively identified different connector number is unrelated even when its
+  station is offline; ambiguous stations still fail closed. An offline OCPP
+  connector 1 whose physical identity cannot be established still fails closed,
+  including potentially unrelated or legacy chargers: aliases or a record without
+  a verified current binding are not safe proof. Non-OCPP chargers and uniquely
+  resolved unrelated connectors keep their ordinary behavior.
+- These guards do not establish ownership before startup in every case, quiesce
+  producers for handover, atomically change ownership/generation, recall in-flight
+  commands, or control external HA/OCPP actors. Stage 2.3 must cover lifecycle,
+  aliases/duplicates, restore and end-to-end regression. Protection remains an
+  intentional competing writer until safety is resolved. Mode remains unarmed and
+  unavailable; no profile uploads or Send safeguard changes were made.
+- Isolated actual-module tests with mocked charger/HA boundaries cover controller
+  callbacks, write categories, manual fallback, own-mode, deletion handback,
+  queued admission and protection classification. They are not full HA or
+  hardware validation. `python tools/run_isolated_planning_tests.py` passed 413
+  tests, with one deselected and two warnings. Ruff, compileall, frontend build,
+  `npm run check-dist` and `git diff --check` passed (the latter reported only
+  Windows line-ending warnings). Full HA test collection remains blocked on Windows by the
+  HA plugin's Unix-only `fcntl` dependency. No HA, deployment, restart or physical
+  charger operation was performed.
+
+### 2.5.22 — Stage 2.1 Auto boundary (review required)
+
+- The Auto executor checks connector-aware ownership using the existing identity
+  classification and admission store after taking its own lock. Valid Morek
+  ownership blocks ordinary plan reconciliation, pending installs/stand-down,
+  automatic controller turns (including starts, stops and resumes), solar and
+  immediate-SOC-floor starts/stops, and pause expiry/resume. Manual start, stop,
+  cancel, follow, pause, resume and manual API actions refuse before preparation
+  with `legacy_execution_ownership_blocked`. Planning and observations continue.
+  A proven unrelated connector and valid legacy ownership retain their behavior;
+  unresolved OCPP identity or uncertain target ownership fails closed at this
+  boundary. Non-OCPP chargers retain the existing path.
+- This is a preparation/boundary check, **not** final dispatch serialization: the
+  admission lock is released before controller operations, and there is no owner
+  transition API. Already in-flight commands cannot be recalled. Stage 2.2 must
+  guard direct current/phase writes, setting and deferred/resend/restore writes,
+  direct adapter/button fallback, deletion handback and other bypasses using shared
+  guards. Site regulator protection remains unchanged; its conflict with
+  schedule-only operation must block activation, not be silently suppressed.
+  Startup/restore ordering, alias/duplicate lifecycle and full end-to-end
+  regression remain Stage 2.3. External writers remain outside SpotNav.
+- Schedule mode remains unarmed/unavailable and is not ready. Independent safety,
+  transaction authorization, transition and stored-profile/exit policy are still
+  unresolved. Manual Morek Send safeguards are unchanged; no automatic uploads.
+- `python tools/run_isolated_planning_tests.py`: 355 passed, one deselected;
+  real modules with mocked HA/charger boundaries, not full HA integration or
+  physical testing. Full HA tests require a supported Linux environment. No HA
+  access, charger command, deployment or restart was performed.
+
+### 2.5.21 — Stage 1.3 reactive planning and explanation
+
+- Settings API writes continue through the existing store/reconciliation path;
+  price events reuse the existing subscription. For capped target-SOC plans the
+  existing SOC reader now reports even small actual changes and source loss;
+  uncapped plans retain their original notification threshold. No browser is
+  required and no Morek upload trigger was added.
+- Calculations and subscription reconciliation are ordered; new attempts
+  invalidate older work before price-event pause-lock waits. Snapshots retain
+  their originating attempt, publication checks the settings revision, and a
+  proposal-summary write checks its revision. Stale/refused work cannot relabel
+  a prior plan as a newer settings revision. The shared Morek preview/Send
+  builder also refuses a snapshot while a newer calculation is pending or its
+  calculation reports an error such as a failed proposal-summary save;
+  its existing manual Send interlock and identity checks remain intact. Manual
+  and floor behavior and protection were not changed.
+- Dashboard `plan.price_policy` and preview `price_policy` share one serializer:
+  cap/basis, minimum/target/deadline, reason codes, exception periods/energy,
+  minimum and target shortfalls, and estimated plan/exception costs and energy.
+  `minimum_covered` is a projection, not a guarantee. Exception cost is the
+  estimated total cost of exception energy, not a saving or incremental cost
+  against a baseline; cost uses configured variable fees/taxes even if the cap
+  uses the source price. Missing/refused data stays null, never measured energy.
+- `python tools/run_isolated_planning_tests.py`: 334 passed, one HA-fixture test
+  deselected, with two warnings. Tests exercise actual repository modules and
+  the settings API, store, controller, SOC reader, planner and real execution
+  boundary with mocked transport/persistence/charger; they are not full HA tests.
+  The added HA SOC wiring tests and full HA collection remain unrun on Windows:
+  the HA pytest plugin imports Unix-only `fcntl`. Run them on supported Linux/HA.
+- Frontend build, check-dist and type-check, Ruff and compileall passed. The full
+  frontend suite passed 2,342 tests (99 files) with two workers; the earlier
+  unrestricted run timed out, and its reported timer-test timeout passed alone.
+  `npm ci` reported five dependency vulnerabilities (two moderate, three high).
+  No HA access, deployment, Morek profile action or hardware test was performed.
+
+### 2.5.20 — Stage 1.2c capped Auto planning
+
+- Cheapest-price Auto now resolves fresh actual SOC and the vehicle's effective
+  target into target/minimum wall-energy deficits and uses the existing capped
+  planner. Manual kWh plans have no minimum exception. Unknown prices never enter
+  the unpriced/history fallback. Missing inputs and zero eligible energy stand
+  down the current Auto-owned plan; the executor preserves independently owned
+  manual and immediate-SOC-floor charges. The immediate floor remains independent
+  and the cap is not a restriction on every manual or safety action.
+- Capped Auto plans persist `strict_windows`, preventing top-off, leave-to-car and
+  deferred replacement outside selected windows; older stored plans default to
+  the legacy behavior. Failed policy stand-down is reported and remains retryable.
+  Dashboard and preview plan responses carry price-basis, shortfall and exception
+  facts. Solar/hybrid with a cap is explicitly unavailable, not an unpriced bypass.
+- This completes Stage 1.2 software planning and legacy Auto reconciliation, not
+  Stage 1.3 triggers, Morek ownership/activation or automatic uploads. Hardware
+  behavior is not established, and full HA integration tests remain to run on a
+  supported host. No live action or deployment was performed.
+- Checks: 282 isolated tests passed against actual repository modules, including
+  persisted-format settings to real calculation/preview, and real reconciliation
+  and controller methods with mocked charger boundaries. One dependency
+  deprecation warning was emitted. Full `tests/test_auto_controller.py` collection
+  remains blocked on Windows by the HA pytest plugin's `fcntl` import; its added
+  HA integration cases were not run. Ruff, compileall, frontend build, check-dist
+  and diff-check passed.
+
+### 2.5.19 — Stage 1.2c incomplete; Auto cap guard retained
+
+- Added capped target-energy resolution using a fresh, non-estimated actual SOC,
+  usable capacity, the resolved vehicle target and existing wall-energy/learned
+  conversion. Fractional minimum percentages retain their precision. The normal
+  target-energy path has been prepared to pass this deficit to the planner, and
+  capped requests are excluded from the unpriced price-wait/history fallback.
+- **This path is not active:** the existing Auto cap refusal remains. Removing it
+  safely also requires reconciling an existing installed plan when the capped
+  result is empty or inputs become unavailable, suppressing vehicle-limit top-off
+  and leave-to-car behavior for capped plans (including restart), and encoding
+  policy facts in proposal/status APIs. Hybrid/solar interactions also need a
+  deliberate safe decision. Stage 1.2 remains unchecked.
+- The isolated harness passed 268 cases against actual repository modules,
+  including 12 capped-energy cases, one feeding the actual planner directly;
+  it does not exercise Auto reconciliation or execution. Full HA/controller pytest
+  collection remains blocked on Windows because the HA plugin imports `fcntl`.
+  Ruff, targeted compileall, frontend build, check-dist and diff-check passed.
+  No HA, charger, deployment or restart operations were performed.
+
+### 2.5.18 — Stage 1.2b pure minimum-energy exceptions
+
+- `PlanRequest.minimum_energy_kwh` is an optional, validated wall-energy deficit;
+  no value or zero authorizes no above-cap exception. The capped planner searches
+  known cheap and expensive intervals together under the period limit if cheap
+  energy cannot reach that minimum. Minimum coverage takes priority, followed by
+  minimizing exception energy and configured variable cost. The exception search
+  is bounded by the minimum, never the higher target; unknown prices stay excluded.
+- Capped results expose `minimum_shortfall_kwh`, the existing target
+  `policy_shortfall_kwh`, and actual `exception_periods`/`exception_kwh`. Exact
+  selected periods and costs include partial intervals. This is pure planner work:
+  Auto still refuses capped settings, and `plan_unpriced` keeps its cap guard.
+- **Stage 1.2 remains incomplete.** A subsequent slice must resolve fresh vehicle
+  SOC, capacity, efficiency, and the effective target, then integrate and test the
+  policy in normal Auto planning without an unpriced fallback. No subscriptions,
+  uploads, activation or hardware actions were added here.
+- Checks: the isolated harness passed 256 cases against actual repository planner
+  modules; `python -m ruff check .`, targeted compileall, frontend build,
+  `npm run check-dist` and `git diff --check` passed. Full HA collection remains
+  blocked on Windows by the HA plugin's `fcntl` import.
+
+### 2.5.17 — Stage 1.2a pure cheap-only planning
+
+- `calculate_plan` now selects only published intervals at or below the requested
+  price basis, respecting a numeric run limit and real gaps. Automatic periods
+  have no hard run limit in this capped-only branch; unlike the uncapped automatic
+  optimizer it does not apply a start cost or minimum block length. It maximizes
+  eligible energy up to the request, then minimizes variable cost, and reports
+  `policy_shortfall_kwh` or `no_eligible_energy`. Actual slot/period durations
+  and cost include fractional slots and a clipped deadline interval.
+- This is **not** full Stage 1.2: no minimum-SOC exceptions or vehicle-energy
+  resolution were added. Auto still refuses capped settings and `plan_unpriced`
+  still refuses capped requests. No production execution or automatic uploads
+  have been enabled. Stage 1.2 and 1.3 remain unchecked.
+- Checks: 234 cases passed in the isolated harness using the repository planner
+  modules; `python -m ruff check .`, targeted compileall, frontend build and
+  `npm run check-dist` passed. HA/controller pytest remains blocked on Windows by
+  the HA test plugin's `fcntl` import. No HA or charger operation was performed.
+
+### 2.5.16 — Stage 1.2 remains incomplete
+
+- Added and tested a pure price-cap comparison helper using the existing fiscal
+  arithmetic, including negative prices and major/minor conversion. It is not yet
+  wired into selection. The existing fail-closed guards remain in place.
+- Cap-aware selection, minimum-energy calculation, partial-window consistency,
+  controller integration and the requested numerical acceptance cases remain to be
+  implemented. Do not treat this helper as an enforced price policy.
+- Checks: the isolated harness loaded the repository's actual planner modules and
+  passed 216 cases (including the existing refusal tests and nine new comparison
+  cases); `python -m ruff check .`, compileall, frontend build and check-dist passed.
+  `python -m pytest -q tests/test_auto_controller.py` could not collect because the
+  Home Assistant test plugin imports `fcntl`, unavailable on Windows. No HA or
+  charger operation was performed.
+
+### 2.5.15 — Stage 1.2 partial fail-closed guard
+
+- Follow-up: `PlanRequest` carries `soft_price_cap` and `cap_price_basis`, and both
+  `calculate_plan` and `plan_unpriced` explicitly refuse configured caps until
+  the cap-aware algorithm exists. Eleven added pure tests and 196 existing tests
+  passed in the isolated actual-module harness (207 total). This is still a refusal,
+  not policy enforcement or a substitute for the requested optimizer tests.
+- **Stage 1.2 is not complete.** Normal Auto planning now returns
+  `planning_unavailable` / `price_policy_unavailable` for a non-null cap, including
+  zero and negative caps. This prevents that calculation from reaching its normal
+  uncapped planner or its unpriced-price-wait fallback. A disabled cap retains the
+  existing path. This is a temporary refusal, not price-policy optimization.
+- This does not establish charger-side protection: previously installed schedules,
+  the independent immediate SOC floor and other execution paths are not audited or
+  controlled by this guard. It does not implement cheap-slot selection, minimum
+  exceptions, partial intervals, shortfall facts, either price basis, or reactive
+  planning. Do not present a cap as enforced, and do not mark 1.2 complete.
+- A controller regression test was added for positive, zero and negative caps, but
+  could not run here: HA pytest's Windows plugin imports unavailable `fcntl` before
+  collection. The isolated pure-planner harness passed 196 existing tests against
+  repository modules; those tests do not exercise this controller guard. Ruff and
+  Python compileall passed. The frontend was rebuilt for version 2.5.15.
+
+### Stage 1.2 investigation — not implemented
+
+- Stage 1.2 remains **unchecked**: the cap and ready-by minimum are still stored
+  inputs only and must not be presented as effective protection. No planner or
+  execution behavior was changed by this investigation.
+- `calculate_plan` selects whole quarter-hour slots and its normal short-deadline
+  path may choose every slot. `ending_at_need` shortens only the final displayed
+  window, whereas legacy Auto execution consumes `proposal.periods`; Morek's
+  profile builder consumes `proposal.shown_periods`. A policy implementation must
+  make the actual selected windows and their energy/cost consistent on both paths,
+  including a partial above-cap exception that is not the final selected interval.
+- The normal controller's missing-price handling can call `plan_unpriced`, including
+  on a short deadline. A cap-aware path must not admit that fallback as though
+  unpublished prices were eligible. Vehicle facts include SOC age and estimated
+  status, while the existing target-energy path can plan from the immediate SOC
+  floor and uses learned wall energy or efficiency; policy integration must resolve
+  freshness, the vehicle's effective target, and minimum energy consistently.
+- Baseline: 196 existing pure planner tests passed on Windows by copying the three
+  planner test modules, their helper and scenario fixture to a temporary directory,
+  disabling pytest plugin autoload, and loading the **actual repository planner and
+  pricing modules** through lightweight package stubs. This did not run HA fixtures,
+  controller integration, settings tests, or any Stage 1.2 policy tests. No live HA
+  or charger operation was performed.
+
+### 2.5.14 — Stage 1.1 settings and API only
+
+- The existing charger settings store and settings API add `soft_price_cap` (nullable
+  currency/kWh, e.g. 0.10 for 10 cents/kWh), `cap_price_basis` (nullable
+  `nord_pool` or `configured_variable_cost`), and `minimum_ready_by_soc` (nullable
+  percent). Null cap disables it; zero and negative values are valid. A non-null cap
+  requires an explicit basis; a basis can remain stored when the cap is cleared.
+  `nord_pool` denotes the published source price as supplied, including anything
+  already included by that source; `configured_variable_cost` denotes that price
+  with the existing configured variable fees and taxes, not fixed/demand charges.
+  The actual price-basis calculation and currency/source compatibility remain for 1.2.
+- Missing legacy fields load as null; no 40% minimum is imposed. Omitted API fields
+  retain their existing values, and null clears one. The minimum is distinct from
+  the vehicle's immediate `min_percent` SOC floor. It must not exceed a numeric
+  normal target. An unknown target stays unknown; the comparison is deferred until
+  a numeric target is committed, including a remembered target on a vehicle switch.
+  A vehicle-target propagation below a configured minimum is refused for that
+  charger, so its earlier target remains; no adjustment is invented.
+- **No policy enforcement, automatic uploads or Morek activation are implemented.**
+  The stored cap is not effective protection. No default basis has been selected;
+  the user must explicitly choose one. Replanning and explanations are Stage 1.3.
+- Checks: frontend `npm run build`, `npm run check-dist`, `npm run type-check`, and
+  `npm test` (2,342 passed); `python -m ruff check .`, Python compileall and
+  `git diff --check` passed. Isolated AST-extracted code with stubbed dependencies
+  exercised legacy load, cap/wire round-trips, invalid inputs, basis/target checks,
+  partial updates, vehicle target resolution, and a stubbed in-memory store's reload
+  and revision conflict. This is not the full HA test suite. The requested pytest
+  settings tests could not start on Windows because HA's test plugin imports `fcntl`;
+  run `tests/test_price_policy_settings.py` and the existing settings tests on a
+  supported HA/Linux environment. No hardware, HA or deployment actions were performed.
 
 ### 2.5.7 displayed-window Send fix
 

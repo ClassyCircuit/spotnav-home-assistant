@@ -225,7 +225,7 @@ describe("the banner", () => {
     for (const language of LANGUAGES) {
       document.body.innerHTML = "";
       const { element } = await mounted(dashboard(true), language);
-      expect(banner(element)?.textContent, language).toContain(translate(language, "identify.question"));
+      expect(banner(element)?.textContent, language).toContain(translate("en", "identify.question"));
     }
     document.body.innerHTML = "";
     const { hass, element } = await mounted(dashboard(true), "en", false);
@@ -388,18 +388,18 @@ describe("the car line", () => {
   });
 
   it.each([
-    ["plug_sensor", "identifierad via bilens laddkabel"],
-    ["location", "identifierad via position"],
-    ["answered", "vald manuellt"],
-    ["manual", "vald manuellt"],
-    ["assumed", "antagen"],
+    ["plug_sensor", "identified by the car's charging cable"],
+    ["location", "identified by position"],
+    ["answered", "selected manually"],
+    ["manual", "selected manually"],
+    ["assumed", "assumed"],
   ])("says how the car was decided (%s)", async (method, words) => {
     const { element } = await mounted(decided(method), "sv");
     expect(carLine(element)?.textContent).toContain(words);
   });
 
   it("says it is identifying while the question is open, and nothing without identification", async () => {
-    expect(carLine((await mounted(dashboard(true), "sv")).element)?.textContent).toContain("identifierar…");
+    expect(carLine((await mounted(dashboard(true), "sv")).element)?.textContent).toContain("identifying…");
     document.body.innerHTML = "";
     expect(carLine((await mounted(dashboard(false), "sv")).element)?.textContent).not.toContain("identifier");
   });
@@ -419,14 +419,14 @@ describe("Byt bil", () => {
       { vehicle_id: NIRO, plug: null, location: null, verdict: null },
     ];
     const { hass, element } = await mounted(decided("plug_sensor", evidence), "sv", false);
-    expect(changeCar(element)?.getAttribute("aria-label")).toBe("Byt bil – EV6");
+    expect(changeCar(element)?.getAttribute("aria-label")).toBe("Change car – EV6");
     expect(changeCar(element)?.querySelector("[data-icon='swap']")).not.toBeNull();
     expect(changeCar(element)?.lastElementChild?.getAttribute("data-icon")).toBe("swap");
     expect(shadow(element).querySelector("[data-change-car]")).toBeNull();
     changeCar(element)!.click();
     await settle();
     const dialog = openDialog(element)!;
-    expect(dialog.textContent).toContain("Laddkabeln säger inkopplad");
+    expect(dialog.textContent).toContain("Its charging cable says plugged in");
     const radios = Array.from(dialog.querySelectorAll<HTMLInputElement>("input[data-identify-choice]"));
     expect(radios.map((radio) => [radio.value, radio.checked])).toEqual([[EV6, true], [NIRO, false]]);
     radios[1]!.click();

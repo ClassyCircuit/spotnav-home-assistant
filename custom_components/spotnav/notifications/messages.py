@@ -88,7 +88,22 @@ def compose(event: str, name: str, facts: dict[str, Any], language: str) -> tupl
     title = text["title"].format(name=name)
     kwh = facts.get("kwh")
     cost = facts.get("cost")
-    if event == "plan_stopped":
+    if facts.get("proposal_notice"):
+        if facts.get("waiting"):
+            message = "Car connected. Waiting for a current proposed charging plan."
+        else:
+            message = f"Car connected. Proposed charging: {facts['start']}–{facts['end']}."
+            if facts.get("ready_by"):
+                message += f" Ready by {facts['ready_by']}."
+            if facts.get("estimated_soc") is not None:
+                message += f" Estimated SOC by ready-by: {percent_text('en', facts['estimated_soc'])}."
+            if facts.get("target") is not None:
+                message += f" Target: {percent_text('en', facts['target'])}."
+            if isinstance(cost, Money):
+                message += f" Estimated plan cost: {money_text('en', cost)}."
+            if facts.get("shortfall"):
+                message += " The proposed plan may fall short."
+    elif event == "plan_stopped":
         message = text.get(f"stopped.{facts.get('reason')}", text["stopped.not_started"])
     elif event == "plan_at_risk":
         time = facts.get("time")

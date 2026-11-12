@@ -57,7 +57,7 @@ async function openSettings(payload: Record<string, unknown>, language = "sv") {
   await settle();
   hass.entityHandler = async (message) =>
     message["type"] === "spotnav/get_entity_config" ? read("entity_config", "v1", "get_direct.json") : new Promise(() => undefined);
-  shadow(element).querySelector<HTMLButtonElement>(`[aria-label='${translate(language as "sv", "header.settings")}']`)!.click();
+  shadow(element).querySelector<HTMLButtonElement>(`[aria-label='${translate("en", "header.settings")}']`)!.click();
   await settle();
   return { hass, element };
 }
@@ -137,7 +137,7 @@ describe("a value's editor returns to where the page was", () => {
     await settle();
     page(element).querySelector<HTMLButtonElement>("button[aria-label]")?.click();
     await settle();
-    shadow(element).querySelector<HTMLButtonElement>(`[aria-label='${translate("sv", "header.settings")}']`)!.click();
+    shadow(element).querySelector<HTMLButtonElement>(`[aria-label='${translate("en", "header.settings")}']`)!.click();
     await settle();
     expect(scrollable(element).scrollTop).toBe(0);
   });
@@ -172,7 +172,7 @@ describe("the owner's wording", () => {
   it("crops the parking spot", async () => {
     const { element } = await openSettings(twoCars());
     const row = page(element).querySelector("[data-row='identify_frame']")!;
-    expect(row.textContent).toBe("Beskär bild laddplatsHela bilden");
+    expect(row.textContent).toBe("Crop parking spotWhole picture");
     expect(translate("sv", "camera.frame.drawn")).toBe("Beskuren");
     for (const language of LANGUAGES) {
       expect(translate(language, "camera.frame.label")).not.toBe("");
@@ -182,22 +182,22 @@ describe("the owner's wording", () => {
   it("leaves out the texts the owner found redundant, and keeps the sources' note", async () => {
     const { element } = await openSettings(twoCars());
     const text = page(element).textContent ?? "";
-    expect(text).not.toContain(translate("sv", "settings.vehicle.plannedHere"));
-    expect(text).not.toContain(translate("sv", "site.applies.one"));
-    expect(text).not.toContain(translate("sv", "settings.vehicle.targetHelp"));
-    expect(text).not.toContain(translate("sv", "entity.help.chargerPriority"));
-    expect(text).not.toContain(translate("sv", "camera.help"));
-    expect(text).toContain(translate("sv", "settings.vehicle.sourcesHelp"));
+    expect(text).not.toContain(translate("en", "settings.vehicle.plannedHere"));
+    expect(text).not.toContain(translate("en", "site.applies.one"));
+    expect(text).not.toContain(translate("en", "settings.vehicle.targetHelp"));
+    expect(text).not.toContain(translate("en", "entity.help.chargerPriority"));
+    expect(text).not.toContain(translate("en", "camera.help"));
+    expect(text).toContain(translate("en", "settings.vehicle.sourcesHelp"));
     page(element).querySelector<HTMLButtonElement>("[data-vehicle='vehicle_ev6'] [data-edit='target']")!.click();
     await settle();
-    expect(page(element).textContent).toContain(translate("sv", "settings.vehicle.targetHelp"));
+    expect(page(element).textContent).toContain(translate("en", "settings.vehicle.targetHelp"));
   });
 
   it("still says which chargers a site applies to when it has several", async () => {
     const payload = twoCars();
     payload["site"]["charger_count"] = 2;
     const { element } = await openSettings(payload);
-    expect(page(element).querySelector("[data-section='site']")?.textContent).toContain("Gäller alla 2 laddare");
+    expect(page(element).querySelector("[data-section='site']")?.textContent).toContain("Applies to all 2 chargers");
   });
 });
 
@@ -206,9 +206,9 @@ describe("two or more cars", () => {
     const { element } = await openSettings(twoCars());
     const sections = page(element).querySelectorAll<HTMLElement>("[data-section='vehicle']");
     expect(sections).toHaveLength(1);
-    expect(sections[0]!.querySelector("h4")?.textContent).toBe("Bil");
+    expect(sections[0]!.querySelector("h4")?.textContent).toBe("Car");
     const tabs = Array.from(page(element).querySelectorAll<HTMLButtonElement>("[role='tab']"));
-    expect(tabs.map((tab) => tab.textContent)).toEqual(["EV6", "Testbil", "Gästbil"]);
+    expect(tabs.map((tab) => tab.textContent)).toEqual(["EV6", "Testbil", "Guest car"]);
     expect(tabs[0]!.getAttribute("aria-selected")).toBe("true");
     tabs[1]!.click();
     expect(page(element).querySelector("[data-section='vehicle']")?.getAttribute("data-vehicle")).toBe("vehicle_niro");
@@ -234,7 +234,7 @@ describe("two or more cars", () => {
     payload["vehicle_choices"] = payload["vehicle_choices"].slice(0, 1);
     delete payload["guest"];
     const { element } = await openSettings(payload);
-    expect(page(element).querySelector("[data-section='vehicle'] h4")?.textContent).toBe("Bil · EV6");
+    expect(page(element).querySelector("[data-section='vehicle'] h4")?.textContent).toBe("Car · EV6");
     expect(page(element).querySelector("[role='tab']")).toBeNull();
   });
 
@@ -243,8 +243,8 @@ describe("two or more cars", () => {
     payload["vehicles"] = payload["vehicles"].slice(0, 1);
     payload["vehicle_choices"] = payload["vehicle_choices"].slice(0, 1);
     const { element } = await openSettings(payload);
-    expect(page(element).querySelector("[data-section='vehicle'] h4")?.textContent).toBe("Bil");
+    expect(page(element).querySelector("[data-section='vehicle'] h4")?.textContent).toBe("Car");
     const tabs = Array.from(page(element).querySelectorAll<HTMLButtonElement>("[role='tab']"));
-    expect(tabs.map((tab) => tab.textContent)).toEqual(["EV6", "Gästbil"]);
+    expect(tabs.map((tab) => tab.textContent)).toEqual(["EV6", "Guest car"]);
   });
 });

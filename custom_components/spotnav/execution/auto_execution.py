@@ -23,7 +23,7 @@ import hashlib
 import json
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, nullcontext
 from dataclasses import dataclass, replace
 from datetime import datetime, time as dt_time, timedelta, timezone
 from typing import Any, Final, Literal
@@ -102,6 +102,7 @@ EXECUTION_RECONCILE_FAILED: Final = "reconcile_failed"
 #: A strategy change to `solar` while a `cheapest` plan Auto installed was running, and stopping
 #: the charger to clear it failed.
 EXECUTION_SOLAR_STAND_DOWN_FAILED: Final = "solar_stand_down_failed"
+EXECUTION_POLICY_STAND_DOWN_FAILED: Final = "policy_stand_down_failed"
 
 #: The one manual-action vocabulary: a control description and the action command that
 #: carries it out use the same names, so a client renders what the backend named.
@@ -138,6 +139,7 @@ CONTROL_ACTION_PENDING: Final = "action_pending"
 #: failure after the effect is `EXECUTION_RECONCILE_FAILED`.)
 EXECUTION_ACTION_UNAVAILABLE: Final = "action_unavailable"
 EXECUTION_ACTION_FAILED: Final = "action_failed"
+EXECUTION_OWNERSHIP_BLOCKED: Final = "legacy_execution_ownership_blocked"
 #: A Start refused because the charger says no car is plugged in: nothing was sent and nothing paused.
 EXECUTION_VEHICLE_NOT_CONNECTED: Final = "vehicle_not_connected"
 
@@ -417,6 +419,7 @@ class AutoApplication:
             self.plan.target_soc_percent,
             self.plan.vehicle_id,
             self.plan.to_vehicle_limit,
+            self.plan.strict_windows,
         )
 
 
@@ -457,6 +460,7 @@ def auto_plan_for(
         auto_identity=application_identity,
         auto_settings_revision=settings.revision,
         auto_price_identity=snapshot.price_identity,
+        strict_windows=settings.soft_price_cap is not None,
     )
 
 
@@ -559,6 +563,10 @@ class AutoExecutor:
         *,
         live_snapshot: Callable[[], Any] | None = None,
         now: Callable[[], datetime] | None = None,
+        legacy_admission: Callable[[], Awaitable[bool]] | None = None,
+        person_stop_scope: Callable[[], Any] | None = None,
+        person_stop_admission: Callable[[], Awaitable[bool]] | None = None,
+        owned_manual_action: Callable[[str], Awaitable[bool]] | None = None,
     ) -> None:
         self._hass = hass
         self._controller = controller
@@ -568,6 +576,10 @@ class AutoExecutor:
         # proposal identity through this seam without depending on the preview controller.
         self._live_snapshot = live_snapshot
         self._now: Callable[[], datetime] = now if now is not None else dt_util.utcnow
+        self._legacy_admission = legacy_admission
+        self._person_stop_scope = person_stop_scope or nullcontext
+        self._person_stop_admission = person_stop_admission
+        self._owned_manual_action = owned_manual_action
         self._lock = asyncio.Lock()
         self._attempt = 0
         self._shutdown = False
@@ -684,10 +696,10 @@ class AutoExecutor:
         if self._shutdown:
             return False
         applied = self.applied
+        if self._clear_waiting is not None:
+            return applied is not None
         if applied is None or not self._superseded_by_settings(applied):
             return False
-        if self._clear_waiting is not None:
-            return True
         snapshot = None if self._live_snapshot is None else self._live_snapshot()
         return (
             getattr(snapshot, "state", None) == "waiting_for_publication"
@@ -706,7 +718,27 @@ class AutoExecutor:
         act (`automatic_allowed`), decided at the moment it acts: a person's Start, Stop or pause cannot
         land between the answer and the command."""
         async with self._lock:
-            yield self.automatic_allowed(kind)
+            yield await self._legacy_allowed() and self.automatic_allowed(kind)
+
+    async def _legacy_allowed(self) -> bool:
+        """Check ownership after acquiring the Auto lock, including queued work."""
+        return self._legacy_admission is None or await self._legacy_admission()
+
+    async def _require_legacy(self, *, person_stop: bool = False) -> None:
+        allowed = (await self._person_stop_admission() if person_stop and self._person_stop_admission is not None
+                   else await self._legacy_allowed())
+        if not allowed:
+            if person_stop and self._person_stop_admission is not None:
+                connected = self._controller.adapter.vehicle_connected()
+                if connected is None:
+                    connected = self._controller.known_connected
+                scope = MANUAL_SCOPE_NEXT_PLUG_IN if connected is False else MANUAL_SCOPE_PLUG_IN
+                try:
+                    await self._store_manual_pause(self._manual_intent(MANUAL_STOP, scope))
+                except Exception:  # noqa: BLE001 - intent remains held if storage failed
+                    _LOGGER.warning("Could not persist a blocked person's Stop intent")
+                self._last_error = EXECUTION_PAUSE_STOP_FAILED
+            raise AutoControlRefused(EXECUTION_OWNERSHIP_BLOCKED, "Legacy execution is blocked by connector ownership")
 
     @property
     def controller(self) -> ChargingController:
@@ -806,6 +838,8 @@ class AutoExecutor:
         * a recorded failure with nothing on the charger is `execution_error`;
         * otherwise `not_applied`.
         """
+        if self._last_error == EXECUTION_POLICY_STAND_DOWN_FAILED:
+            return EXECUTION_ERROR
         if self.paused:
             if self._last_error == EXECUTION_PAUSE_STOP_FAILED and self.applied is not None:
                 # A pause whose stop failed is not a clean pause: the plan is still on the charger and
@@ -959,6 +993,12 @@ class AutoExecutor:
         self, settings: AutoSettings, snapshot: Any, *, attempt: int
     ) -> AutoApplication | None:
         """`async_reconcile` itself, with this boundary's lock held."""
+        if not await self._legacy_allowed():
+            self._pending = None
+            self._clear_waiting = None
+            return self.applied
+        if not self.current(attempt) or self._store.settings(self._entry_id).revision != settings.revision:
+            return self.applied
         application = application_for(settings, snapshot, effective_phases(self._hass, self._entry_id))
         applied = self.applied
         if application is None:
@@ -967,6 +1007,11 @@ class AutoExecutor:
             if self.current(attempt):
                 self._pending = None
                 self._clear_waiting = None
+            if settings.soft_price_cap is not None:
+                if applied is None:
+                    self._last_error = None
+                    return None
+                return await self._clear_superseded_locked(attempt)
             if settings.strategy == STRATEGY_SOLAR and applied is not None:
                 # A charge the sun's rules keep is handed over to the sun with no stop (the plan's window, or the
                 # sun carrying it past one); anything else is stopped once, as ever. The floor's charge is not the
@@ -1057,7 +1102,15 @@ class AutoExecutor:
             # stale attempt must not touch newer state, so the wait is dropped only if this is newest.
             if self.current(attempt):
                 self._pending = None
+                if application.plan.strict_windows and applied is not None:
+                    return await self._clear_superseded_locked(attempt)
             return applied
+        if application.plan.strict_windows:
+            # A new capped calculation supersedes both an old pending install
+            # and any earlier stand-down retry, even when the old plan is idle.
+            self._pending = None
+            self._clear_waiting = None
+            self._unwatch_unseen_charge()
         if applied is not None and applied.identity == application.identity:
             self._applied = applied
             self._pending = None
@@ -1070,7 +1123,20 @@ class AutoExecutor:
                 await self._confirm_revision(applied, application)
                 return self.applied
             return applied
-        if self.window_charging_now():
+        if (application.plan.strict_windows and applied is not None) or (
+            self.window_charging_now() and applied is not None and applied.plan.strict_windows
+        ):
+            # Never leave old windows behind if a strict replacement fails, and
+            # never let an active strict window defer its own replacement.
+            if not self._prices_still_live(application, attempt):
+                return await self._clear_superseded_locked(attempt) if applied is not None else None
+            if applied is not None:
+                await self._clear_superseded_locked(attempt)
+                if self.applied is not None or self._clear_waiting is not None:
+                    return self.applied
+            if not self._may_apply(application, attempt):
+                return self.applied
+        elif self.window_charging_now():
             # A window is charging and a new plan never shortens it: the change waits for the boundary
             # the plan's timers mark. (A change answered by a wait stops the plan's own charge instead, above.)
             self._pending = PendingApplication(
@@ -1082,7 +1148,9 @@ class AutoExecutor:
             await self._notify_change()
             return applied
         if not self._prices_still_live(application, attempt):
-            return applied
+            if application.plan.strict_windows and applied is not None:
+                return await self._clear_superseded_locked(attempt)
+            return self.applied
         await self._install_application(application)
         return self.applied
 
@@ -1132,12 +1200,23 @@ class AutoExecutor:
         next change, and nothing of it starts meanwhile. Nothing is told. Returns what remains applied."""
         self._clear_waiting = None
         self._unwatch_unseen_charge()
+        current_plan = self._controller.plan
+        policy_clear = self._store.settings(self._entry_id).soft_price_cap is not None or (
+            current_plan is not None and current_plan.strict_windows
+        )
         try:
             cleared = await self._controller.async_end_superseded_plan()
         except Exception as err:  # noqa: BLE001 - reported, the next calculation retries
             _LOGGER.warning("Clearing a plan whose settings changed failed: %s", type(err).__name__)
+            if policy_clear:
+                self._last_error = EXECUTION_POLICY_STAND_DOWN_FAILED
+                self._clear_waiting = attempt
+                self._watch_unseen_charge()
+                await self._notify_change()
             return self.applied
         if not cleared:
+            if policy_clear:
+                self._last_error = EXECUTION_POLICY_STAND_DOWN_FAILED
             self._clear_waiting = attempt
             self._watch_unseen_charge()
             await self._notify_change()
@@ -1147,6 +1226,8 @@ class AutoExecutor:
             self._entry_id,
         )
         self._applied = None
+        if policy_clear:
+            self._last_error = None
         await self._notify_change()
         return None
 
@@ -1177,6 +1258,9 @@ class AutoExecutor:
         charge ran, once that charge has ended, or while its own charge could not be seen, once it can (stopping it if it
         runs), if that still holds (`_clear_superseded_locked` keeps it again while it still cannot be seen)."""
         async with self._lock:
+            if not await self._legacy_allowed():
+                self._clear_waiting = None
+                return self.applied
             attempt = self._clear_waiting
             if attempt is None:
                 return self.applied
@@ -1191,10 +1275,10 @@ class AutoExecutor:
                 self._applied = None
                 await self._notify_change()
                 return None
-            if not self._superseded_by_settings(applied):
+            if not self._superseded_by_settings(applied) and self._store.settings(self._entry_id).soft_price_cap is None:
                 self._clear_waiting = None
                 return applied
-            if self._superseded_runs_to_end():
+            if self._store.settings(self._entry_id).soft_price_cap is None and self._superseded_runs_to_end():
                 return applied
             return await self._clear_superseded_locked(attempt)
 
@@ -1206,6 +1290,9 @@ class AutoExecutor:
         dropped.
         """
         async with self._lock:
+            if not await self._legacy_allowed():
+                self._pending = None
+                return self.applied
             pending = self._pending
             if pending is None:
                 return None
@@ -1325,6 +1412,8 @@ class AutoExecutor:
             return code
         self._applied = application
         self._pending = None
+        if application.plan.strict_windows and self._last_error == EXECUTION_POLICY_STAND_DOWN_FAILED:
+            self._last_error = None
         await self._notify_change()
         return None
 
@@ -1358,6 +1447,7 @@ class AutoExecutor:
         dropped, so a manual decision cannot be overwritten by an Auto installation.
         """
         async with self._lock:
+            await self._require_legacy()
             await self._manual_start_locked(amps)
 
     async def _manual_start_locked(self, amps: int | None = None) -> None:
@@ -1670,18 +1760,27 @@ class AutoExecutor:
 
     async def async_manual_stop(self) -> None:
         """A person stopping a charge: it pauses Auto, schedule and strategy, for the plug-in session."""
-        async with self._lock:
-            await self._immediate_stop_locked()
+        with self._person_stop_scope():
+            async with self._lock:
+                if self._owned_manual_action is not None and await self._owned_manual_action(ACTION_STOP):
+                    return
+                await self._require_legacy(person_stop=True)
+                await self._immediate_stop_locked()
 
     async def async_manual_cancel(self) -> None:
         """A person cancelling the schedule: a Stop, which clears the plan and pauses Auto for the plug-in."""
-        async with self._lock:
-            await self._immediate_stop_locked()
+        with self._person_stop_scope():
+            async with self._lock:
+                if self._owned_manual_action is not None and await self._owned_manual_action(ACTION_STOP):
+                    return
+                await self._require_legacy(person_stop=True)
+                await self._immediate_stop_locked()
 
     async def async_manual_follow(self) -> None:
         """A person re-arming the saved plan. A manual pause ends first (the person hands the charger back
         to Auto, which replans from the live proposal); then the plan in force is followed, if there is one."""
         async with self._lock:
+            await self._require_legacy()
             self.begin_attempt()
             self._pending = None
             # Following the plan hands the charger back: a Stop's wait is not what is outstanding any more.
@@ -1712,8 +1811,12 @@ class AutoExecutor:
           admission.
         * A failure to store the pause changes nothing and issues no charger command.
         """
-        async with self._lock:
-            await self._pause_locked(choice)
+        with self._person_stop_scope():
+            async with self._lock:
+                if choice == PAUSE_UNTIL_RESUMED and self._owned_manual_action is not None and await self._owned_manual_action(ACTION_STOP):
+                    return
+                await self._require_legacy(person_stop=True)
+                await self._pause_locked(choice)
 
     async def _pause_locked(self, choice: PauseChoice = PAUSE_UNTIL_RESUMED) -> None:
         """The pause itself. Runs with this boundary's lock held, and never translates failures."""
@@ -1771,6 +1874,9 @@ class AutoExecutor:
     async def async_resume(self) -> None:
         """Resume: the next calculation may apply again, through the same boundary."""
         async with self._lock:
+            if self._owned_manual_action is not None and await self._owned_manual_action(ACTION_RESUME):
+                return
+            await self._require_legacy()
             await self._resume_locked()
 
     async def _resume_locked(self) -> None:
@@ -1842,6 +1948,17 @@ class AutoExecutor:
     async def async_manual_action(
         self, action: str, choice: PauseChoice | None = None
     ) -> ControlDecision:
+        """Reserve a person Stop before waiting for the Auto lock."""
+        with self._person_stop_scope() if action == ACTION_STOP else nullcontext():
+            if self._owned_manual_action is not None and action in (ACTION_STOP, ACTION_RESUME) and choice in (None, PAUSE_UNTIL_RESUMED):
+                async with self._lock:
+                    if await self._owned_manual_action(action):
+                        return ControlDecision(action, None, ())
+            return await self._async_manual_action(action, choice)
+
+    async def _async_manual_action(
+        self, action: str, choice: PauseChoice | None = None
+    ) -> ControlDecision:
         """Admit and carry out one manual action against the state that exists now.
 
         Admission happens inside the lock with the state re-read there; a dashboard read is not an
@@ -1859,6 +1976,7 @@ class AutoExecutor:
         `pause_stop_failed` in the refreshed facts.
         """
         async with self._lock:
+            await self._require_legacy(person_stop=action == ACTION_STOP)
             # One capture, both axes: the facts are read once and both decisions derive from that
             # object.
             facts = self.control_facts()
@@ -2027,6 +2145,8 @@ class AutoExecutor:
         After the car ended the charge, a window of the plan already open is not started again
         (`ChargingController.async_note_car_ended`): the car is full.
         """
+        if not await self._legacy_allowed():
+            return False
         intent = self._store.settings(self._entry_id).pause
         if not intent.manual:
             return False
@@ -2205,10 +2325,13 @@ class AutoExecutor:
         async with self._lock:
             legacy = self._controller.take_legacy_person_stop()
             if legacy:
+                migrated = True
                 if not self.pause_intent.admitted:
                     try:
                         await self._store_pause(self._manual_intent(MANUAL_STOP, MANUAL_SCOPE_PLUG_IN))
                     except Exception as err:  # noqa: BLE001 - logged; nothing is started by this either way
+                        migrated = False
+                        self._controller.retain_legacy_person_stop()
                         _LOGGER.warning("Carrying over a stored person's Stop failed: %s", type(err).__name__)
                     else:
                         _LOGGER.info(
@@ -2216,7 +2339,8 @@ class AutoExecutor:
                             self._entry_id,
                         )
                 # The charger's record is saved without the older key from here on.
-                await self._controller.async_save_record()
+                if migrated:
+                    await self._controller.async_save_record()
             self._sync_manual_watch()
         # A charge running under a person's Stop (the charger began it while Home Assistant was down) is
         # stopped now, not at the charger's next report.
@@ -2227,6 +2351,8 @@ class AutoExecutor:
         waiting for a calculation that may not get that far (prices missing, say). Returns whether a
         plan was cleared."""
         async with self._lock:
+            if not await self._legacy_allowed():
+                return False
             if self._shutdown or self.applied is None:
                 return False
             self.begin_attempt()
@@ -2239,6 +2365,8 @@ class AutoExecutor:
         """A guest car's amount is delivered (`met`), or its plan ended without an unplug: the charger is held until
         the unplug, or no longer (`ChargingController.async_guest_met`). Returns whether a stop went out."""
         async with self._lock:
+            if not await self._legacy_allowed():
+                return False
             if self._shutdown:
                 return False
             stopped = await self._controller.async_guest_met(met)
@@ -2251,6 +2379,8 @@ class AutoExecutor:
         Nothing while a pause holds execution. Returns whether a start was sent.
         """
         async with self._lock:
+            if not await self._legacy_allowed():
+                return False
             if self._shutdown or pause_blocks_execution(self._store.settings(self._entry_id)):
                 return False
             if self._controller.plan is None or not self._controller.plan_window_active_now:
@@ -2271,6 +2401,8 @@ class AutoExecutor:
         executed by the charger's control is `False`, and solar must not believe it runs a charge.
         """
         async with self._lock:
+            if not await self._legacy_allowed():
+                return False
             settings = self._store.settings(self._entry_id)
             token = self._runner.begin()
             strategy_ok = settings.strategy in (STRATEGY_SOLAR, STRATEGY_HYBRID)
@@ -2299,6 +2431,8 @@ class AutoExecutor:
         left for solar to do.
         """
         async with self._lock:
+            if not await self._legacy_allowed():
+                return False
             token = self._runner.begin()
             outcome: CommandOutcome | None = None
             try:
@@ -2350,6 +2484,8 @@ class AutoExecutor:
         Returns whether it stopped.
         """
         async with self._lock:
+            if not await self._legacy_allowed():
+                return False
             settings = self._store.settings(self._entry_id)
             controller = self._controller
             token = self._runner.begin()
@@ -2436,6 +2572,8 @@ class AutoExecutor:
         (a person's pause or Stop wins), never a charge a person started, and not again while the floor's charge
         runs or load balancing holds it back. Returns whether the start went out."""
         async with self._lock:
+            if not await self._legacy_allowed():
+                return False
             if self._shutdown:
                 return False
             controller = self._controller
@@ -2462,6 +2600,8 @@ class AutoExecutor:
         over, or the sun (solar, hybrid), with no command; else it is stopped once. Under a pause it is stopped.
         Returns whether the floor's charge ended (handed over, or its stop went out)."""
         async with self._lock:
+            if not await self._legacy_allowed():
+                return False
             controller = self._controller
             if self._shutdown or controller.charge_origin != ORIGIN_MIN_SOC:
                 return False
@@ -2532,6 +2672,8 @@ class AutoExecutor:
         the intent, reports `pause_clear_failed` and applies nothing.
         """
         async with self._lock:
+            if not await self._legacy_allowed():
+                return False
             intent = self._store.settings(self._entry_id).pause
             if not intent.admitted or not intent.ended_at(self._now()):
                 return False

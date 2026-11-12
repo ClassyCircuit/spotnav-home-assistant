@@ -55,11 +55,22 @@ def manual_actions(
     covers a missing boundary.
     """
     if executor is None:
+        def guarded(action: Callable[[], Awaitable[None]]) -> Callable[[], Awaitable[None]]:
+            async def invoke() -> None:
+                async def check() -> None:
+                    return None
+
+                admission = await controller.adapter._guarded(check)  # noqa: SLF001 - same write boundary
+                if not admission.allowed:
+                    raise HomeAssistantError("Legacy charger control is blocked by connector ownership")
+                await action()
+            return invoke
+
         return [
-            ("start", controller.async_start),
-            ("stop", partial(controller.async_stop, by_person=True)),
-            ("follow", controller.async_follow_schedule),
-            ("cancel", partial(controller.async_cancel, by_person=True)),
+            ("start", guarded(controller.async_start)),
+            ("stop", guarded(partial(controller.async_stop, by_person=True))),
+            ("follow", guarded(controller.async_follow_schedule)),
+            ("cancel", guarded(partial(controller.async_cancel, by_person=True))),
         ]
     return [
         ("start", executor.async_manual_start),
