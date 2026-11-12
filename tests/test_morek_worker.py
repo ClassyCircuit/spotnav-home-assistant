@@ -410,6 +410,7 @@ async def test_resume_rejection_and_unknown_do_not_retry(monkeypatch, outcome):
 
 @pytest.mark.asyncio
 async def test_stop_during_resume_save_invalidates_resume_ticket(monkeypatch):
+    from custom_components.spotnav.execution.auto_execution import AutoControlCommitted
     w = setup(monkeypatch)
     entry = SimpleNamespace(entry_id="charger", runtime_data=SimpleNamespace(morek_worker=w.worker))
     monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
@@ -432,7 +433,7 @@ async def test_stop_during_resume_save_invalidates_resume_ticket(monkeypatch):
     await entered.wait()
     with w.admission.person_stop_reservation("charger", lambda: w.identity):
         release.set()
-        with pytest.raises(morek_schedule.ScheduleRefused, match="resume_interrupted"):
+        with pytest.raises(AutoControlCommitted):
             await task
     w.worker.trigger()
     await drain(w.worker)
@@ -1121,6 +1122,9 @@ async def test_real_admission_late_composite_readback_after_stop_is_not_verified
 @pytest.mark.asyncio
 async def test_real_admission_stop_overtakes_resume_intent_save(monkeypatch, tmp_path):
     from custom_components.spotnav.execution import command_admission, execution_ownership
+    from custom_components.spotnav.execution.auto_execution import AutoControlCommitted
+    from custom_components.spotnav import time_zones
+    await asyncio.to_thread(time_zones.zone, "Europe/Stockholm")
     w, _, _ = await real_admission_planner_worker(monkeypatch, tmp_path)
     entry = SimpleNamespace(entry_id="test", runtime_data=SimpleNamespace(morek_worker=w.worker))
     monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
@@ -1142,7 +1146,7 @@ async def test_real_admission_stop_overtakes_resume_intent_save(monkeypatch, tmp
     await asyncio.wait_for(reached.wait(), 2)
     with w.admission.person_stop_reservation("test", lambda: w.identity):
         proceed.set()
-        with pytest.raises(morek_schedule.ScheduleRefused, match="resume_interrupted"):
+        with pytest.raises(AutoControlCommitted):
             await task
     assert w.worker.resume_ticket is None
     assert not w.admission.owned_ticket_current("test", physical_connector(w.identity))

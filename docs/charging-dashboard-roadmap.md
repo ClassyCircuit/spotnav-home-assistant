@@ -1396,7 +1396,14 @@ action, weaken admission/safety checks, or claim physical behavior is verified.
     adapter/backend contracts with fresh, stale, absent, restored and estimated SOC,
     old report versus newer HA timestamps, source changes and updates over time.
 
-- [ ] **12.7 Resume outcomes and ownership/evidence diagnosis**
+- [x] **12.7 Resume outcomes and ownership/evidence diagnosis** (2.5.74 local; review pending)
+  - Manual-action feedback now preserves codes and distinguishes refusal, committed
+    follow-up failure and unknown outcome. A Stop racing a saved Resume invalidates
+    its ticket and reports the committed request, not an unchanged-state refusal.
+    Status distinguishes missing, unsettled, uncertain and unavailable outcome
+    evidence without changing admission. `pause_stop_failed` is not physical proof.
+    The earlier uncaptured Resume error remains unknown; 12.4's broader evidence
+    redesign and live verification remain open.
   - The observed Resume request returned only a generic rejection in the sidebar;
     its exact backend code was not captured and must not be guessed. Preserve and
     translate stable action error codes into actionable messages. Distinguish a

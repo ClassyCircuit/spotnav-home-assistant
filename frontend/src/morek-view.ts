@@ -129,7 +129,7 @@ export function morekPanel(
     intervention_needed: "Intervention needed — action outcome uncertain", ready: "Manual preview ready, not sent",
   };
   const sending = busy && activeAction === "send" && !state.outcomes?.uncertain;
-  health.textContent = `Operator state: ${sending ? labels.sending : labels[state.operator?.state ?? ""] ?? "Unavailable — recalculate status"}` +
+  health.textContent = `Operator state: ${state.outcomes?.state === "storage_unavailable" ? "Profile evidence unavailable" : sending ? labels.sending : labels[state.operator?.state ?? ""] ?? "Unavailable — recalculate status"}` +
     (!sending && state.operator?.reason ? ` (${state.operator.reason})` : "");
   section.append(health);
   const reconciliation = state.reconciliation?.reason;
@@ -159,9 +159,16 @@ export function morekPanel(
     section.append(detail);
   }
   const availability = doc.createElement("p");
+  const blockers: Record<string, string> = {
+    profile_history_unavailable: "No settled profile attempt is recorded; schedule sending remains blocked. This does not prove a profile is absent.",
+    profile_outcome_unsettled: "Profile evidence is unsettled; schedule sending remains blocked.",
+    profile_outcome_uncertain: "A profile action has an uncertain outcome; schedule sending remains blocked.",
+    outcome_storage_unavailable: "Profile evidence storage is unavailable; schedule sending remains blocked.",
+  };
+  const blocker = state.ownership?.blockers?.find((value) => blockers[value]);
   availability.textContent = state.ownership?.completion_authorized
     ? "Schedule ownership is confirmed for this process. External OCPP writers and native protection cannot be verified here."
-    : `Schedule sending is blocked pending migration or reconfirmation. Recorded owner: ${state.ownership?.recorded_owner ?? "unknown"}.`;
+    : `${blocker ? blockers[blocker] : "Schedule sending is blocked; review ownership and recovery status."} Recorded owner: ${state.ownership?.recorded_owner ?? "unknown"}.`;
   section.append(availability);
   if (state.ownership?.local_regulator === "linked_may_write") {
     const conflict = doc.createElement("p");
@@ -221,7 +228,7 @@ export function morekPanel(
     : state.verification?.pending ? " · Awaiting follow-up readback — NOT verified" : " · NOT verified";
   status.textContent = ack + verification;
   section.append(status);
-  if (state.outcomes?.uncertain) {
+  if (state.outcomes?.uncertain && state.outcomes.state !== "storage_unavailable") {
     const warning = doc.createElement("p");
     warning.textContent = "A profile action or its stored outcome is uncertain and may have applied. Further sends are blocked; readback cannot prove which profiles are installed.";
     section.append(warning);

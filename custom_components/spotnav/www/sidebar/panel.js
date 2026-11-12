@@ -59541,7 +59541,7 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
     ready: "Manual preview ready, not sent"
   };
   const sending = busy && activeAction === "send" && !state.outcomes?.uncertain;
-  health.textContent = `Operator state: ${sending ? labels.sending : labels[state.operator?.state ?? ""] ?? "Unavailable \u2014 recalculate status"}` + (!sending && state.operator?.reason ? ` (${state.operator.reason})` : "");
+  health.textContent = `Operator state: ${state.outcomes?.state === "storage_unavailable" ? "Profile evidence unavailable" : sending ? labels.sending : labels[state.operator?.state ?? ""] ?? "Unavailable \u2014 recalculate status"}` + (!sending && state.operator?.reason ? ` (${state.operator.reason})` : "");
   section.append(health);
   const reconciliation = state.reconciliation?.reason;
   const reconciliationMessages = {
@@ -59570,7 +59570,14 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
     section.append(detail);
   }
   const availability = doc.createElement("p");
-  availability.textContent = state.ownership?.completion_authorized ? "Schedule ownership is confirmed for this process. External OCPP writers and native protection cannot be verified here." : `Schedule sending is blocked pending migration or reconfirmation. Recorded owner: ${state.ownership?.recorded_owner ?? "unknown"}.`;
+  const blockers = {
+    profile_history_unavailable: "No settled profile attempt is recorded; schedule sending remains blocked. This does not prove a profile is absent.",
+    profile_outcome_unsettled: "Profile evidence is unsettled; schedule sending remains blocked.",
+    profile_outcome_uncertain: "A profile action has an uncertain outcome; schedule sending remains blocked.",
+    outcome_storage_unavailable: "Profile evidence storage is unavailable; schedule sending remains blocked."
+  };
+  const blocker = state.ownership?.blockers?.find((value2) => blockers[value2]);
+  availability.textContent = state.ownership?.completion_authorized ? "Schedule ownership is confirmed for this process. External OCPP writers and native protection cannot be verified here." : `${blocker ? blockers[blocker] : "Schedule sending is blocked; review ownership and recovery status."} Recorded owner: ${state.ownership?.recorded_owner ?? "unknown"}.`;
   section.append(availability);
   if (state.ownership?.local_regulator === "linked_may_write") {
     const conflict = doc.createElement("p");
@@ -59616,7 +59623,7 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
   const verification = state.sent === null ? "" : state.verified && !state.outcomes?.uncertain ? state.verification?.reason === "matched_with_drift" ? " \xB7 Remaining schedule matched within tolerance, NOT exact" : " \xB7 Remaining schedule matched at last read" : state.verification?.pending ? " \xB7 Awaiting follow-up readback \u2014 NOT verified" : " \xB7 NOT verified";
   status.textContent = ack + verification;
   section.append(status);
-  if (state.outcomes?.uncertain) {
+  if (state.outcomes?.uncertain && state.outcomes.state !== "storage_unavailable") {
     const warning = doc.createElement("p");
     warning.textContent = "A profile action or its stored outcome is uncertain and may have applied. Further sends are blocked; readback cannot prove which profiles are installed.";
     section.append(warning);
@@ -59962,10 +59969,25 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.73";
+var CARD_VERSION = "2.5.74";
 
 // sidebar/panel.js
 var settingsWritesByConnection = /* @__PURE__ */ new WeakMap();
+function actionFailure(code) {
+  const reasons = {
+    spotnav_action_unavailable: "The action is no longer available. Refresh and check the current Auto state.",
+    spotnav_action_failed: "The action failed. Check the current Auto state before proceeding.",
+    schedule_owner_unavailable: "Schedule ownership is unavailable. Review Morek status before proceeding.",
+    identity_unresolved: "The charger identity could not be confirmed. Check the Morek connection.",
+    identity_changed: "The charger identity changed. Refresh and check the Morek connection.",
+    resume_unavailable: "Resume is blocked by missing pause intent, an uncertain outcome or a pending Stop. Review Morek status.",
+    resume_interrupted: "Resume was interrupted by a Stop or a state change. Refresh before deciding what to do.",
+    ownership_blocked: "Connector ownership blocks this action. Review Morek status.",
+    spotnav_action_reconcile_failed: "The request was recorded, but follow-up failed or was interrupted. Check fresh status; a newer Stop may take precedence.",
+    spotnav_action_outcome_unknown: "The request outcome is unknown. Check fresh status; do not retry blindly."
+  };
+  return `${reasons[code] || "The request could not be confirmed. Check fresh status before proceeding."} (${code || "unknown_code"})`;
+}
 var SpotnavEnhancedPanel = class extends HTMLElement {
   constructor() {
     super();
@@ -60158,13 +60180,14 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       const readback = pause?.readback === "bounded_match" ? `bounded effective readback match${coverage}` : "readback unconfirmed";
       const canPause = fresh && statusFresh && !!control?.can_act && !this.controlPermissionPending && !this.autoBusy && !this.autoUncertain && !this.morekBusy && !this.morekUncertain && !this.settingsBusy && this._hass?.connected !== false;
       const can2 = canPause && status?.ownership?.completion_authorized === true;
-      this.shadowRoot.querySelector("#pause-state").textContent = `${intent}; request ${request}; ACK ${ack}; ${readback}; physical charging unknown.${can2 ? "" : " Controls unavailable until schedule ownership is confirmed."}`;
+      this.shadowRoot.querySelector("#pause-state").textContent = `${intent}; request ${request}; ACK ${ack}; ${readback}; physical charging unknown.${control?.execution_error === "pause_stop_failed" ? " Stop request failed." : ""}${can2 ? "" : " Resume unavailable; review Morek status."}`;
       this.shadowRoot.querySelector("#pause-auto").disabled = !(canPause && admittedAction(control, "stop", "until_resumed"));
       this.shadowRoot.querySelector("#resume-auto").disabled = !(can2 && admittedAction(control, "resume", null));
       this.shadowRoot.querySelector("#pause-notice").textContent = this.autoNotice || "";
       return;
     }
-    this.shadowRoot.querySelector("#pause-state").textContent = control && fresh ? active ? `Pause intent: ${active}; physical stop not confirmed.` : "No pause reported." : "Auto state unavailable or stale.";
+    const stopFailed = control?.execution_error === "pause_stop_failed" ? " Stop request failed; physical charging state unknown." : "";
+    this.shadowRoot.querySelector("#pause-state").textContent = control && fresh ? active ? `Pause intent: ${active}; physical stop not confirmed.${stopFailed}` : `No pause reported.${stopFailed}` : "Auto state unavailable or stale.";
     const can = fresh && !!control?.can_act && !this.controlPermissionPending && !this.autoBusy && !this.autoUncertain && !this.morekBusy && !this.morekUncertain && !this.settingsBusy && this._hass?.connected !== false;
     this.shadowRoot.querySelector("#pause-auto").disabled = !(can && admittedAction(control, "stop", "until_resumed"));
     this.shadowRoot.querySelector("#resume-auto").disabled = !(can && admittedAction(control, "resume", null));
@@ -60187,7 +60210,8 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       const result = await this.bounded(performAction(hass, charger, action, choice));
       if (!this.connected || generation !== this.generation || permissionEpoch !== this.permissionEpoch || charger !== this.charger) return;
       this.autoExpected = result.ok ? { action, choice, dispatchedAt } : null;
-      this.autoNotice = result.ok ? "Accepted; waiting for a fresh confirmed state." : "Request rejected; prior state is not changed here.";
+      if (!result.ok && (result.error === "spotnav_action_failed" || result.error === "spotnav_action_outcome_unknown" || !result.error || !["spotnav_action_unavailable", "spotnav_action_reconcile_failed", "schedule_owner_unavailable", "identity_unresolved", "identity_changed", "resume_unavailable", "resume_interrupted", "ownership_blocked", "invalid_pause", "no_settings", "pause_unsettled", "action_pending"].includes(result.error))) this.autoUncertain = true;
+      this.autoNotice = result.ok ? "Accepted; waiting for a fresh confirmed state." : actionFailure(result.error);
     } catch {
       if (this.connected && generation === this.generation && charger === this.charger) {
         this.autoUncertain = true;

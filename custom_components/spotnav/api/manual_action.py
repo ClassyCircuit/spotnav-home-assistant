@@ -60,6 +60,7 @@ ERROR_ACTION_UNAVAILABLE: Final = "spotnav_action_unavailable"
 ERROR_ACTION_FAILED: Final = "spotnav_action_failed"
 #: The effect is durable and its follow-up failed (cf. `spotnav_settings_reconcile_failed`).
 ERROR_ACTION_RECONCILE_FAILED: Final = "spotnav_action_reconcile_failed"
+ERROR_ACTION_OUTCOME_UNKNOWN: Final = "spotnav_action_outcome_unknown"
 
 #: The boundary's two codes renamed here; every other domain code (`invalid_pause`,
 #: `switch_unavailable`, ...) travels unchanged.
@@ -151,8 +152,8 @@ async def websocket_manual_action(
     """Carry out one immediate manual action for any signed-in user: at most one write.
 
     `AutoControlRefused` means nothing moved; `AutoControlCommitted` means the effect is durable and
-    its follow-up failed. Anything else is logged by type and answered with the generic
-    action-failure code; exception prose never reaches a client.
+    its follow-up failed. Anything else is logged by type and answered as an unknown
+    outcome; exception prose never reaches a client.
     """
     if msg.get("api_version") != ACTION_API_VERSION:
         send_unsupported_version(connection, msg, ACTION_API_VERSION)
@@ -177,7 +178,7 @@ async def websocket_manual_action(
         return
     except Exception as err:  # noqa: BLE001 - logged by type, answered by a stable code
         _LOGGER.error("A manual action failed unexpectedly (%s)", type(err).__name__)
-        connection.send_result(msg["id"], action_failure(ERROR_ACTION_FAILED))
+        connection.send_result(msg["id"], action_failure(ERROR_ACTION_OUTCOME_UNKNOWN))
         return
     connection.send_result(msg["id"], action_envelope(action, choice))
 

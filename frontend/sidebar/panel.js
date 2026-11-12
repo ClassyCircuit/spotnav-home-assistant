@@ -13,6 +13,22 @@ import { capInput, capForSave, displayPrice } from '../shared-dashboard/price-fo
 // A dispatched write outlives its host element, including a newly mounted panel.
 const settingsWritesByConnection = new WeakMap();
 
+function actionFailure(code) {
+  const reasons={
+    spotnav_action_unavailable:'The action is no longer available. Refresh and check the current Auto state.',
+    spotnav_action_failed:'The action failed. Check the current Auto state before proceeding.',
+    schedule_owner_unavailable:'Schedule ownership is unavailable. Review Morek status before proceeding.',
+    identity_unresolved:'The charger identity could not be confirmed. Check the Morek connection.',
+    identity_changed:'The charger identity changed. Refresh and check the Morek connection.',
+    resume_unavailable:'Resume is blocked by missing pause intent, an uncertain outcome or a pending Stop. Review Morek status.',
+    resume_interrupted:'Resume was interrupted by a Stop or a state change. Refresh before deciding what to do.',
+    ownership_blocked:'Connector ownership blocks this action. Review Morek status.',
+    spotnav_action_reconcile_failed:'The request was recorded, but follow-up failed or was interrupted. Check fresh status; a newer Stop may take precedence.',
+    spotnav_action_outcome_unknown:'The request outcome is unknown. Check fresh status; do not retry blindly.'
+  };
+  return `${reasons[code] || 'The request could not be confirmed. Check fresh status before proceeding.'} (${code || 'unknown_code'})`;
+}
+
 export class SpotnavEnhancedPanel extends HTMLElement {
   constructor() {
     super();
@@ -135,13 +151,14 @@ export class SpotnavEnhancedPanel extends HTMLElement {
       const readback=pause?.readback==='bounded_match' ? `bounded effective readback match${coverage}` : 'readback unconfirmed';
       const canPause=fresh && statusFresh && !!control?.can_act && !this.controlPermissionPending && !this.autoBusy && !this.autoUncertain && !this.morekBusy && !this.morekUncertain && !this.settingsBusy && this._hass?.connected!==false;
       const can=canPause && status?.ownership?.completion_authorized===true;
-      this.shadowRoot.querySelector('#pause-state').textContent=`${intent}; request ${request}; ACK ${ack}; ${readback}; physical charging unknown.${can ? '' : ' Controls unavailable until schedule ownership is confirmed.'}`;
+      this.shadowRoot.querySelector('#pause-state').textContent=`${intent}; request ${request}; ACK ${ack}; ${readback}; physical charging unknown.${control?.execution_error==='pause_stop_failed' ? ' Stop request failed.' : ''}${can ? '' : ' Resume unavailable; review Morek status.'}`;
       this.shadowRoot.querySelector('#pause-auto').disabled=!(canPause && admittedAction(control,'stop','until_resumed'));
       this.shadowRoot.querySelector('#resume-auto').disabled=!(can && admittedAction(control,'resume',null));
       this.shadowRoot.querySelector('#pause-notice').textContent=this.autoNotice || '';
       return;
     }
-    this.shadowRoot.querySelector('#pause-state').textContent=control && fresh ? (active ? `Pause intent: ${active}; physical stop not confirmed.` : 'No pause reported.') : 'Auto state unavailable or stale.';
+    const stopFailed=control?.execution_error==='pause_stop_failed' ? ' Stop request failed; physical charging state unknown.' : '';
+    this.shadowRoot.querySelector('#pause-state').textContent=control && fresh ? (active ? `Pause intent: ${active}; physical stop not confirmed.${stopFailed}` : `No pause reported.${stopFailed}`) : 'Auto state unavailable or stale.';
     const can=fresh && !!control?.can_act && !this.controlPermissionPending && !this.autoBusy && !this.autoUncertain && !this.morekBusy && !this.morekUncertain && !this.settingsBusy && this._hass?.connected!==false;
     this.shadowRoot.querySelector('#pause-auto').disabled=!(can && admittedAction(control,'stop','until_resumed'));
     this.shadowRoot.querySelector('#resume-auto').disabled=!(can && admittedAction(control,'resume',null));
@@ -158,7 +175,9 @@ export class SpotnavEnhancedPanel extends HTMLElement {
       const result=await this.bounded(performAction(hass,charger,action,choice));
       if (!this.connected || generation!==this.generation || permissionEpoch!==this.permissionEpoch || charger!==this.charger) return;
       this.autoExpected=result.ok ? {action,choice,dispatchedAt} : null;
-      this.autoNotice=result.ok ? 'Accepted; waiting for a fresh confirmed state.' : 'Request rejected; prior state is not changed here.';
+      // Older backends also used action_failed for unexpected post-dispatch errors.
+      if (!result.ok && (result.error==='spotnav_action_failed' || result.error==='spotnav_action_outcome_unknown' || !result.error || !['spotnav_action_unavailable','spotnav_action_reconcile_failed','schedule_owner_unavailable','identity_unresolved','identity_changed','resume_unavailable','resume_interrupted','ownership_blocked','invalid_pause','no_settings','pause_unsettled','action_pending'].includes(result.error))) this.autoUncertain=true;
+      this.autoNotice=result.ok ? 'Accepted; waiting for a fresh confirmed state.' : actionFailure(result.error);
     } catch {if(this.connected && generation===this.generation && charger===this.charger){this.autoUncertain=true;this.autoNotice='Request failed or outcome unknown; no retry is offered in this session.';}}
     finally {if(this.connected && generation===this.generation && charger===this.charger){this.autoBusy=false;this.paint();this.refresh();}}
   }

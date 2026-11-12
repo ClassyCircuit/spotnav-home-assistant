@@ -640,12 +640,17 @@ async def async_record_owned_pause(hass: HomeAssistant, entry_id: str, *, resume
             if resume and (intent is None or record["uncertain"] or admission._person_stops.get(connector)):
                 raise ScheduleRefused("resume_unavailable")
             desired = "resume_requested" if resume else "pause_until_resumed"
+            committed = False
             if intent is None or intent["type"] != desired:
                 intent = {"version": 1, "type": desired, "id": uuid4().hex,
                           "station_id": connector.station_id, "connector_id": connector.connector_id}
                 record["schedule_pause"] = intent
                 await outcomes_for(hass).write(record)
+                committed = True
             if resume and (generation != admission.generation(connector) or admission._person_stops.get(connector)):
+                if committed:
+                    from ..execution.auto_execution import AutoControlCommitted, EXECUTION_RECONCILE_FAILED
+                    raise AutoControlCommitted(EXECUTION_RECONCILE_FAILED)
                 raise ScheduleRefused("resume_interrupted")
             if not resume and physical_connector(identity()) == connector:
                 admission.renew_ticket_for_durable_pause(entry_id, connector, generation)
@@ -1248,12 +1253,19 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
                        and attempt.get("state") in ("accepted", "rejected", "aborted_before_dispatch")
                        and (removal is None or (isinstance(removal, dict) and removal.get("state") in
                                                 ("accepted", "rejected", "notsupported"))))
+            removal_unsettled = removal is not None and (not isinstance(removal, dict) or removal.get("state") not in
+                                                            ("accepted", "rejected", "notsupported"))
+            evidence_blocker = ("outcome_storage_unavailable" if outcomes.get("state") == "storage_unavailable"
+                                else "profile_outcome_uncertain" if outcomes.get("uncertain") is True
+                                else "profile_outcome_unsettled" if removal_unsettled
+                                else "profile_history_unavailable" if not isinstance(attempt, dict)
+                                else "profile_outcome_unsettled")
             if not settled:
                 # Reconfirmation cannot repair an uncertain profile outcome.
                 current_ticket = False
                 ownership["completion_authorized"] = False
                 ownership["reconfirmation_required"] = False
-                ownership["blockers"] = ["profile_outcome_uncertain"]
+                ownership["blockers"] = [evidence_blocker]
             verified_evidence = outcomes.get("verified") or {}
             worker = getattr(getattr(entry, "runtime_data", None), "morek_worker", None)
             verified = bool(data.get("verified") and verified_evidence.get("attempt_id") == data.get("attempt_id")
@@ -1288,7 +1300,7 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
             readiness = _session_readiness(hass, controller, identity, online, datetime.now(timezone.utc))
             readiness["activation_blockers"] = [] if current_ticket else ["migration_or_reconfirmation_required"]
             if not settled:
-                readiness["activation_blockers"].append("profile_outcome_uncertain")
+                readiness["activation_blockers"].append(evidence_blocker)
             result = {**identity,
                       "readiness": readiness,
                       "schedule_pause": _owned_pause_status(outcomes, verification, verified, worker, stop_pending=stop_pending),

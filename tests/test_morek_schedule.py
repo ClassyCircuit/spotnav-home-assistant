@@ -22,6 +22,26 @@ from custom_components.spotnav.api.morek_schedule import (
 NOW = datetime(2026, 11, 6, 20, 0, tzinfo=timezone.utc)
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("error", "code"), [
+    ("refused", "resume_unavailable"),
+    ("committed", "spotnav_action_reconcile_failed"),
+    ("unexpected", "spotnav_action_outcome_unknown"),
+])
+async def test_manual_action_envelope_preserves_outcome(monkeypatch, error, code):
+    from custom_components.spotnav.api import manual_action
+    from custom_components.spotnav.execution.auto_execution import AutoControlCommitted, AutoControlRefused
+    errors = {"refused": AutoControlRefused("resume_unavailable"),
+              "committed": AutoControlCommitted("reconcile_failed"), "unexpected": RuntimeError("private")}
+    perform = AsyncMock(side_effect=errors[error])
+    monkeypatch.setattr(manual_action, "async_perform_action", perform)
+    connection = SimpleNamespace(send_result=Mock())
+    await manual_action.websocket_manual_action.__wrapped__(SimpleNamespace(), connection,
+        {"id": 1, "api_version": 1, "charger_id": "charger", "action": "resume"})
+    assert connection.send_result.call_args.args[1]["error"] == code
+    perform.assert_awaited_once()
+
+
 def _supported_identity():
     return {"supported": True, "resolved_id": morek_schedule.MOREK_STATION_ID,
             "connector_id": 1, "match_count": 1, "ocpp_version": "1.6"}
@@ -203,6 +223,38 @@ async def test_initializer_refuses_real_unsupported_and_ambiguous_identities():
     with pytest.raises(ScheduleRefused):
         _charge_point(hass, target)
     store._async_ensure_locked_connector.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("attempt", "uncertain", "expected"), [
+    (None, False, "profile_history_unavailable"),
+    ({"state": "pending"}, False, "profile_outcome_unsettled"),
+    ({"state": "uncertain"}, True, "profile_outcome_uncertain"),
+    ({"state": "accepted"}, False, None),
+])
+async def test_status_distinguishes_outcome_evidence_without_writes(monkeypatch, attempt, uncertain, expected):
+    entry = SimpleNamespace(entry_id="charger")
+    ownership = {"record_state": "missing", "recorded_owner": None}
+    store = SimpleNamespace(async_status=AsyncMock(return_value=ownership))
+    ledger = SimpleNamespace(read=AsyncMock(return_value={"schema": 1, "entry_id": "charger",
+        "uncertain": uncertain, "attempt": attempt}), write=AsyncMock())
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=None))
+    monkeypatch.setattr(morek_schedule, "ownership_store", lambda *_: store)
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda *_: SimpleNamespace(
+        _recovery_status={}, _person_stops={}, owned_ticket_current=lambda *_: False,
+        async_recovery_status=AsyncMock(return_value={"state": "ownership_missing"})))
+    monkeypatch.setattr(morek_schedule, "_state", AsyncMock(return_value=({}, None)))
+    monkeypatch.setattr(morek_schedule, "_preview", lambda *_: {})
+    monkeypatch.setattr(morek_schedule, "outcomes_for", lambda *_: ledger)
+    connection = SimpleNamespace(send_result=Mock(), send_error=Mock())
+    await morek_schedule.websocket_morek_schedule.__wrapped__(SimpleNamespace(data={}), connection,
+        {"id": 1, "api_version": 1, "charger_id": "charger", "action": "status"})
+    result = connection.send_result.call_args.args[1]["schedule"]
+    assert result["ownership"]["recovery"]["state"] == "ownership_missing"
+    assert result["outcomes"]["uncertain"] is uncertain
+    assert result["ownership"]["blockers"] == ([expected] if expected else ["migration_or_reconfirmation_required"])
+    ledger.write.assert_not_awaited()
 
 
 @pytest.mark.asyncio

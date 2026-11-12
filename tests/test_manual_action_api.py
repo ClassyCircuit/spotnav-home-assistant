@@ -777,7 +777,7 @@ async def test_an_unexpected_failure_is_a_stable_code_and_never_the_exception_pr
 
     assert frame["success"] is True, "a contract envelope, not an unhandled error frame"
     assert frame["result"]["ok"] is False
-    assert frame["result"]["error"] == ERROR_ACTION_FAILED
+    assert frame["result"]["error"] == "spotnav_action_outcome_unknown"
     assert "secret" not in str(frame), "no exception prose reaches a client"
     assert "RuntimeError" not in str(frame)
     assert effects["start"].calls == 0, "and the failing boundary ran no effect"

@@ -355,6 +355,29 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-12 — Stage 12.7 Resume and evidence (2.5.74; review pending)
+
+- The manual-action endpoint preserves domain refusals and reports unexpected
+  exceptions as unknown outcomes. Resume saved before a concurrent person Stop is
+  a committed request with interrupted follow-up, not a no-effect refusal; its
+  ticket is not issued. The sidebar retains codes, reports failed Stop requests
+  without claiming physical flow, refreshes observations, and does not retry an
+  unknown action. Older `spotnav_action_failed` answers are treated conservatively.
+- The connector ledger migrates legacy evidence in memory when missing; that is not
+  proof of an empty charger. Migration/restart authorization requires a valid owner,
+  connector-bound completion proof and settled attempt, among other guards. Status
+  previously called any missing/unsettled attempt uncertain even with `uncertain:
+  false`; it now reports missing, unsettled, uncertain or unavailable separately,
+  without granting admission. Recovery diagnostics retain their existing codes.
+  Missing ownership routes away from owned actions and remains subject to legacy
+  admission. None of these observations identifies the earlier uncaptured error.
+- Focused mocked actual-module status, action, person Stop and restart tests and
+  sidebar tests passed; build and check-dist passed. Existing pytest/dependency and
+  jsdom CSS warnings remain. Full HA-plugin, browser and hardware tests were not
+  run; no HA access, deployment or charger operation occurred. A prior final 0 A
+  may remain; readback is not inventory or physical charging. Broader 12.4 evidence
+  redesign remains open.
+
 ### 2026-11-12 — Stage 12.3 plan details (2.5.73; review pending)
 
 - The dashboard API exposes the current calculation's ready-by instant and

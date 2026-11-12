@@ -143,7 +143,7 @@ describe('actual sidebar read-only host', () => {
     const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();
     const select=panel.shadowRoot.querySelector('#charger');select.value='a';select.dispatchEvent(new Event('change'));await tick();
     const root=panel.shadowRoot;
-    expect(root.querySelector('#pause-state').textContent).toMatch(/Pause requested.*uncertain.*physical charging unknown.*Controls unavailable/);
+    expect(root.querySelector('#pause-state').textContent).toMatch(/Pause requested.*uncertain.*physical charging unknown.*Resume unavailable/);
     expect(root.querySelector('#pause-auto').disabled).toBe(false);
     expect(root.querySelector('#resume-auto').disabled).toBe(true);
     panel.rawStatus={...owned,schedule:{...owned.schedule,schedule_pause:{intent:'resume_requested',request:'accepted',ack:'Accepted',readback:'bounded_match',measured:'unknown'}}};panel.paint();
@@ -428,7 +428,7 @@ describe('actual sidebar read-only host', () => {
     const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();const select=panel.shadowRoot.querySelector('#charger');select.value='a';select.dispatchEvent(new Event('change'));await tick();
     raw.generated_at='2000-01-01T00:00:00Z';await panel.automaticAction('stop','until_resumed');expect(calls.filter(m=>m.type==='spotnav/manual_action')).toHaveLength(0);
     raw.generated_at=new Date().toISOString();const first=panel.automaticAction('stop','until_resumed');await panel.automaticAction('stop','until_resumed');expect(calls.filter(m=>m.type==='spotnav/manual_action')).toHaveLength(1);
-    finish({api_version:1,ok:false,error:'spotnav_action_failed',action:'stop',choice:'until_resumed'});await first;expect(panel.autoNotice).toMatch(/rejected/i);panel.remove();
+    finish({api_version:1,ok:false,error:'spotnav_action_failed',action:'stop',choice:'until_resumed'});await first;expect(panel.autoNotice).toMatch(/action failed/i);panel.remove();
   });
   it.each(['stop','resume'])('confirms %s only from a matching post-dispatch observation', async action => {
     vi.useFakeTimers();
@@ -476,6 +476,17 @@ describe('actual sidebar read-only host', () => {
     const values={target:'85',minimum:'40',cap:'0.1',capEnabled:true,capBasis:'nord_pool',deadlineEnabled:true,readyBy:'06:30'};const pending=first.savePlan(values);first.remove();await pending;
     const second=document.createElement('spotnav-enhanced-panel');second.hass=hass;document.body.append(second);await tick();select=second.shadowRoot.querySelector('#charger');select.value='replacement-test';select.dispatchEvent(new Event('change'));await tick();expect(second.settingsConflict).toBe(true);await second.savePlan(values);expect(calls.filter(m=>m.type==='spotnav/update_settings')).toHaveLength(1);
     finish(envelope({...record(),revision:8}));await tick();expect(second.settingsConflict).toBe(true);expect(second.shadowRoot.textContent).not.toContain('Saved and confirmed.');second.remove();
+  });
+  it.each([
+    ['resume_unavailable', /blocked.*resume_unavailable/i, false],
+    ['spotnav_action_reconcile_failed', /recorded.*follow-up failed.*spotnav_action_reconcile_failed/i, false],
+    ['spotnav_action_outcome_unknown', /outcome is unknown.*spotnav_action_outcome_unknown/i, true],
+  ])('reports Resume result %s without guessing', async (code, message, uncertain) => {
+    const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';raw.control.automatic_action='resume';raw.control.pause_choices=[];raw.control.pause_blocks_execution=true;raw.control.pause={choice:'until_resumed',admitted_at:raw.generated_at,expires_at:null};raw.control.execution_error='pause_stop_failed';const calls=[];
+    const hass={connected:true,user:{is_admin:true},callWS:msg=>{calls.push(msg);if(msg.type==='spotnav/list_chargers')return Promise.resolve({api_version:1,chargers:[{charger_id:'a',charger_name:'A'}]});if(msg.type==='spotnav/get_dashboard')return Promise.resolve(raw);if(msg.type==='spotnav/get_settings')return Promise.resolve(envelope(record()));if(msg.type==='spotnav/manual_action')return Promise.resolve({api_version:1,ok:false,error:code,action:null,choice:null});return Promise.resolve(status);}};
+    const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();const select=panel.shadowRoot.querySelector('#charger');select.value='a';select.dispatchEvent(new Event('change'));await tick();
+    expect(panel.shadowRoot.querySelector('#pause-state').textContent).toMatch(/stop request failed.*physical charging state unknown/i);
+    await panel.automaticAction('resume',null);await tick();expect(panel.autoNotice).toMatch(message);expect(!!panel.autoUncertain).toBe(uncertain);expect(calls.filter(m=>m.type==='spotnav/manual_action')).toHaveLength(1);expect(calls.filter(m=>m.type==='spotnav/get_dashboard').length).toBeGreaterThan(1);panel.remove();
   });
   it.each(['stop','resume'])('does not retry timed-out %s or accept stale confirmation', async action => {
     vi.useFakeTimers();try {
