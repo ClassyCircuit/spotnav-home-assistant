@@ -478,6 +478,7 @@ describe('actual sidebar read-only host', () => {
   });
   it.each([
     ['resume_unavailable', /blocked.*resume_unavailable/i, false],
+    ['legacy_execution_ownership_blocked', /Resume was refused before taking effect.*legacy_execution_ownership_blocked/i, false],
     ['spotnav_action_reconcile_failed', /recorded.*follow-up failed.*spotnav_action_reconcile_failed/i, false],
     ['spotnav_action_outcome_unknown', /outcome is unknown.*spotnav_action_outcome_unknown/i, true],
   ])('reports Resume result %s without guessing', async (code, message, uncertain) => {
@@ -486,6 +487,13 @@ describe('actual sidebar read-only host', () => {
     const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();const select=panel.shadowRoot.querySelector('#charger');select.value='a';select.dispatchEvent(new Event('change'));await tick();
     expect(panel.shadowRoot.querySelector('#pause-state').textContent).toMatch(/stop request failed.*physical charging state unknown/i);
     await panel.automaticAction('resume',null);await tick();expect(panel.autoNotice).toMatch(message);expect(!!panel.autoUncertain).toBe(uncertain);expect(calls.filter(m=>m.type==='spotnav/manual_action')).toHaveLength(1);expect(calls.filter(m=>m.type==='spotnav/get_dashboard').length).toBeGreaterThan(1);panel.remove();
+  });
+  it('explains fresh admission evidence without retrying Resume', async () => {
+    const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';raw.control.automatic_action='resume';raw.control.pause_choices=[];raw.control.pause_blocks_execution=true;raw.control.pause={choice:'until_resumed',admitted_at:raw.generated_at,expires_at:null};const calls=[];
+    const evidence={api_version:1,schedule:{...status.schedule,ownership:{record_state:'missing',legacy_admission:{allowed:false,reason:'lifecycle_initializing'}}}};
+    const hass={connected:true,user:{is_admin:true},callWS:msg=>{calls.push(msg);if(msg.type==='spotnav/list_chargers')return Promise.resolve({api_version:1,chargers:[{charger_id:'a',charger_name:'A'}]});if(msg.type==='spotnav/get_dashboard')return Promise.resolve(raw);if(msg.type==='spotnav/get_settings')return Promise.resolve(envelope(record()));if(msg.type==='spotnav/manual_action')return Promise.resolve({api_version:1,ok:false,error:'legacy_execution_ownership_blocked',action:null,choice:null});return Promise.resolve(evidence);}};
+    const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();const select=panel.shadowRoot.querySelector('#charger');select.value='a';select.dispatchEvent(new Event('change'));await tick();await panel.automaticAction('resume',null);await tick();
+    expect(panel.shadowRoot.querySelector('#pause-notice').textContent).toMatch(/lifecycle barrier.*ownership record is missing.*First use and lost records/i);expect(!!panel.autoUncertain).toBe(false);expect(calls.filter(m=>m.type==='spotnav/manual_action')).toHaveLength(1);expect(calls.filter(m=>m.type==='spotnav/morek_schedule' && m.action!=='status')).toHaveLength(0);panel.remove();
   });
   it.each(['stop','resume'])('does not retry timed-out %s or accept stale confirmation', async action => {
     vi.useFakeTimers();try {

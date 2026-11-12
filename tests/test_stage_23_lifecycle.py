@@ -52,6 +52,105 @@ def record(owner="legacy", station=MOREK_STATION_ID, connector=1):
     return {"station_id": station, "connector_id": connector, "owner": owner}
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("case", "expected"), [
+    ("missing", "lifecycle_initializing"),
+    ("missing_unbarriered", "ownership_missing"),
+    ("legacy", "allowed_legacy"),
+    ("transition", "ownership_transition"),
+    ("barrier", "lifecycle_initializing"),
+    ("stop", "stale_generation"),
+])
+async def test_resume_routing_diagnoses_real_admission(environment, monkeypatch, case, expected):
+    from custom_components.spotnav.execution import auto_execution, morek_outcomes
+    hass, _, gate, target, _, entry = environment
+    monkeypatch.setattr(morek_outcomes, "Store", FakeStore)
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=target))
+    if case not in ("missing", "missing_unbarriered"):
+        owner = record()
+        if case == "transition":
+            owner["transition"] = {"version": 1, "state": "requested"}
+        persist(hass, {"a": owner})
+    controller = MagicMock(entry_id="a", ocpp_target=target, charge_control="switch.charger")
+    if case != "missing_unbarriered":
+        await integration._async_setup_ownership_metadata(hass, entry, controller, migrate=case == "missing")
+    identity = lambda: morek_schedule._identity_status(hass, target)  # noqa: E731
+    if case == "barrier":
+        gate.reserve_lifecycle_barrier("a", identity)
+    async def owned(action):
+        return await morek_schedule.async_maybe_owned_action(hass, "a", action)
+    settings = MagicMock()
+    settings.settings.return_value = AutoSettings()
+    executor = AutoExecutor(hass, controller, settings, legacy_admission=lambda: command_admission.async_auto_legacy_allowed(gate, "a", identity), owned_manual_action=owned)
+    executor._apply_manual_action = AsyncMock()
+    executor.control_facts = MagicMock(return_value=SimpleNamespace(action_pending=False, stop_pending=False, pause=SimpleNamespace(manual=False), pause_choices=()))
+    monkeypatch.setattr(auto_execution, "decide_axes", lambda _: SimpleNamespace(automatic=SimpleNamespace(action="resume", reason=None, choices=(), admits=lambda *_: True)))
+    from contextlib import nullcontext
+    with gate.person_stop_reservation("a", identity) if case == "stop" else nullcontext():
+        diagnosis = await command_admission.async_auto_legacy_diagnosis(gate, "a", identity)
+        assert diagnosis.reason == expected
+        if case == "legacy":
+            await executor.async_manual_action("resume")
+            executor._apply_manual_action.assert_awaited_once()
+        else:
+            with pytest.raises(AutoControlRefused) as refusal:
+                await executor.async_manual_action("resume")
+            assert refusal.value.code == "legacy_execution_ownership_blocked"
+            executor._apply_manual_action.assert_not_awaited()
+    hass.services.async_call.assert_not_awaited()
+    hass.station.call.assert_not_awaited()
+    if case in ("missing", "missing_unbarriered"):
+        assert (await gate._store.async_status("a", identity()))["record_state"] == "missing"
+        monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+        monkeypatch.setattr(morek_schedule, "_state", AsyncMock(return_value=({}, None)))
+        monkeypatch.setattr(morek_schedule, "_preview", lambda *_: {})
+        connection = MagicMock()
+        await morek_schedule.websocket_morek_schedule.__wrapped__(hass, connection,
+            {"id": 1, "api_version": 1, "charger_id": "a", "action": "status"})
+        ownership = connection.send_result.call_args.args[1]["schedule"]["ownership"]
+        assert ownership["record_state"] == "missing"
+        assert ownership["legacy_admission"] == {"allowed": False, "reason": expected}
+        hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("ledger_state", ["settled", "missing", "uncertain"])
+async def test_resume_schedule_owner_routes_through_durable_intent(environment, monkeypatch, ledger_state):
+    from custom_components.spotnav.execution import morek_outcomes
+    hass, _, gate, target, _, entry = environment
+    monkeypatch.setattr(morek_outcomes, "Store", FakeStore)
+    monkeypatch.setattr(morek_schedule, "Store", FakeStore)
+    controller = MagicMock(entry_id="a", ocpp_target=target, charge_control="switch.charger")
+    entry.runtime_data = SimpleNamespace(morek_worker=None)
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: controller)
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "_state", AsyncMock(return_value=({}, None)))
+    persist(hass, {"a": record("morek_schedule")})
+    await integration._async_setup_ownership_metadata(hass, entry, controller, migrate=True)
+    ledger = morek_outcomes.outcomes_for(hass)
+    if ledger_state != "missing":
+        await ledger.write({"schema": 1, "entry_id": "a", "uncertain": ledger_state == "uncertain",
+            "attempt": {"state": "uncertain" if ledger_state == "uncertain" else "accepted"},
+            "schedule_pause": {"version": 1, "type": "pause_until_resumed", "id": "pause",
+                               "station_id": MOREK_STATION_ID, "connector_id": 1}})
+    async def owned(action):
+        try:
+            return await morek_schedule.async_maybe_owned_action(hass, "a", action)
+        except morek_schedule.ScheduleRefused as error:
+            raise AutoControlRefused(error.code) from None
+    identity = lambda: morek_schedule._identity_status(hass, target)  # noqa: E731
+    executor = AutoExecutor(hass, controller, MagicMock(), legacy_admission=lambda: command_admission.async_auto_legacy_allowed(gate, "a", identity), owned_manual_action=owned)
+    if ledger_state == "settled":
+        await executor.async_manual_action("resume")
+        assert (await ledger.read())["schedule_pause"]["type"] == "resume_requested"
+    else:
+        with pytest.raises(AutoControlRefused) as refusal:
+            await executor.async_manual_action("resume")
+        assert refusal.value.code == "resume_unavailable"
+    hass.services.async_call.assert_not_awaited()
+    hass.station.call.assert_not_awaited()
+
+
 def adapter_for(hass, target, entry_id="a"):
     path = MagicMock(writes_current=False)
     path.async_start = AsyncMock(return_value=True)

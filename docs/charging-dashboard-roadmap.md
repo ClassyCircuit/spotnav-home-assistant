@@ -1403,6 +1403,11 @@ action, weaken admission/safety checks, or claim physical behavior is verified.
     old report versus newer HA timestamps, source changes and updates over time.
 
 - [x] **12.7 Resume outcomes and ownership/evidence diagnosis** (2.5.74 local; review pending)
+  - 2.5.76 recognizes `legacy_execution_ownership_blocked` as a pre-effect refusal,
+    not an unknown action, and displays a fresh read-only legacy admission diagnosis.
+    A missing owner remains blocked: first use and lost records are indistinguishable
+    without further evidence. The reported code alone does not identify which current
+    barrier or record caused it; supervised investigation is still required.
   - Manual-action feedback now preserves codes and distinguishes refusal, committed
     follow-up failure and unknown outcome. A Stop racing a saved Resume invalidates
     its ticket and reports the committed request, not an unchanged-state refusal.

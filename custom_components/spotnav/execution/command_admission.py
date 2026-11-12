@@ -1179,20 +1179,26 @@ async def async_auto_legacy_allowed(
     This is a boundary check, not transition serialization or final dispatch admission.
     Unknown OCPP identity fails closed rather than treating an alias as unrelated.
     """
+    return (await async_auto_legacy_diagnosis(admission, entry_id, resolve_identity)).allowed
+
+
+async def async_auto_legacy_diagnosis(
+    admission: CommandAdmission, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]]
+) -> AdmissionResult:
+    """Read the same admission decision using a no-op, never a charger operation."""
     try:
         classification = classify_morek_identity(resolve_identity())
         if classification == "non_target":
-            return True
+            return AdmissionResult(True, "non_target")
         if classification != "supported_morek":
-            return False
+            return AdmissionResult(False, "identity_unresolved")
 
         async def checked() -> bool:
             return True
 
-        result = await admission.async_execute(entry_id, "legacy_actuator", resolve_identity, checked)
-        return result.allowed
+        return await admission.async_execute(entry_id, "legacy_actuator", resolve_identity, checked)
     except Exception:  # noqa: BLE001 - unknown ownership cannot permit execution
-        return False
+        return AdmissionResult(False, "ownership_unavailable")
 
 
 def legacy_write_guard(

@@ -355,6 +355,28 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-12 — Resume ownership refusal (2.5.76; review pending)
+
+- `legacy_execution_ownership_blocked` is a pre-effect refusal from the legacy
+  admission boundary, not an unknown transport outcome. The sidebar now preserves
+  that code without latching an unknown action. After the normal read-only refresh,
+  it displays the actual current legacy admission reason and separately notes a
+  missing ownership record, when reported. A later status cannot prove the exact
+  cause of an earlier refusal.
+- Actual-module mocks reproduce routing: an established schedule owner receives
+  a durable Resume intent only with eligible pause evidence; otherwise Resume falls
+  through to guarded legacy admission. Missing ownership, an unfinished transition,
+  a lifecycle barrier and a person Stop can each prevent that fallback. Startup
+  deliberately does not create missing ownership during migration; there is no safe
+  automatic correction when first use cannot be distinguished from lost metadata.
+  Seek a supervised ownership and retained-profile decision rather than assuming
+  the old schedule is absent or clearing it. No profile is written by diagnosis.
+- Focused actual setup/admission/outcome/routing tests and sidebar tests pass;
+  frontend build and check-dist were run. Browser, full HA-plugin and live hardware
+  tests remain unrun. No HA access, Resume retry, deployment, vehicle refresh or
+  charger operation occurred. A final 0 A may remain; no physical behavior or
+  installed-profile inventory is established.
+
 ### 2026-11-12 — Stage 12.4 Morek evidence (2.5.75; review pending)
 
 - The shared sidebar presents a short plan-confirmation summary and separate
