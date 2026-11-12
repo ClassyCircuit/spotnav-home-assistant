@@ -229,7 +229,7 @@ class CommandAdmission:
     async def async_reconfirm_completed(
         self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]], *, expected_migration: str | None = None,
         expected_revision: int | None = None, require_dispatch_evidence: bool = False,
-        expected_stop_revision: int | None = None,
+        expected_stop_revision: int | None = None, persist_recovery_proof: bool = False,
     ) -> str:
         """Explicitly reconfirm a completed owner; never operate the charger."""
         from .execution_ownership import _decode, _read_envelope
@@ -278,20 +278,42 @@ class CommandAdmission:
                         or (outcome.get("removal") is not None and outcome["removal"].get("state") not in
                             ("accepted", "rejected", "notsupported"))):
                     return "profile_outcome_unavailable"
+                pause = outcome.get("schedule_pause")
+                if pause is not None and (not isinstance(pause, dict) or set(pause) != {
+                        "version", "type", "id", "station_id", "connector_id"}
+                        or type(pause.get("version")) is not int or pause["version"] != 1
+                        or pause.get("type") not in ("pause_until_resumed", "resume_requested")
+                        or not isinstance(pause.get("id"), str) or not pause["id"]
+                        or pause.get("station_id") != connector.station_id
+                        or type(pause.get("connector_id")) is not int or pause["connector_id"] != connector.connector_id):
+                    return "profile_outcome_unavailable"
                 if require_dispatch_evidence:
                     proof = outcome.get("migration_dispatch_evidence")
-                    if (not isinstance(proof, dict) or set(proof) != {
+                    dispatch_valid = (isinstance(proof, dict) and set(proof) == {
                             "version", "migration_id", "station_id", "connector_id", "attempt_id", "ack"}
-                            or type(proof.get("version")) is not int or proof["version"] != 1
-                            or proof.get("migration_id") != status["handover_id"]
-                            or proof.get("station_id") != connector.station_id
-                            or type(proof.get("connector_id")) is not int or proof["connector_id"] != connector.connector_id
-                            or not isinstance(proof.get("attempt_id"), str) or len(proof["attempt_id"]) != 32
-                            or any(c not in "0123456789abcdef" for c in proof["attempt_id"])
-                            or proof.get("ack") not in ("accepted", "rejected", "notsupported")):
+                            and type(proof.get("version")) is int and proof["version"] == 1
+                            and proof.get("migration_id") == status["handover_id"]
+                            and proof.get("station_id") == connector.station_id
+                            and type(proof.get("connector_id")) is int and proof["connector_id"] == connector.connector_id
+                            and isinstance(proof.get("attempt_id"), str) and len(proof["attempt_id"]) == 32
+                            and all(c in "0123456789abcdef" for c in proof["attempt_id"])
+                            and proof.get("ack") in ("accepted", "rejected", "notsupported"))
+                    durable_proof = outcome.get("migration_recovery_proof")
+                    if not dispatch_valid and not (isinstance(durable_proof, dict)
+                            and type(durable_proof.get("version")) is int
+                            and type(durable_proof.get("connector_id")) is int and durable_proof == {
+                            "version": 1, "migration_id": status["handover_id"],
+                            "station_id": connector.station_id, "connector_id": connector.connector_id}):
                         return "restart_dispatch_evidence_unavailable"
                 if not current():
                     return "reconfirmation_interrupted"
+                if persist_recovery_proof:
+                    outcome["migration_recovery_proof"] = {"version": 1, "migration_id": status["handover_id"],
+                                                           "station_id": connector.station_id,
+                                                           "connector_id": connector.connector_id}
+                    await outcomes_for(self._store._hass).write(outcome)
+                    if not current():
+                        return "reconfirmation_interrupted"
                 ticket = (connector, status["handover_id"], revision, generation)
                 self._completion_tickets[entry_id] = ticket
             if entry_id in self._lifecycle_barriers:
@@ -849,6 +871,12 @@ class CommandAdmission:
                     if result != "completed" or not can_commit():
                         return result if result != "completed" else "completion_interrupted"
                     migration_id = self._store._records[entry_id]["handover"]["id"]
+                    outcome["migration_recovery_proof"] = {"version": 1, "migration_id": migration_id,
+                                                           "station_id": connector.station_id,
+                                                           "connector_id": connector.connector_id}
+                    await outcomes_for(self._store._hass).write(outcome)
+                    if not can_commit():
+                        return "completion_interrupted"
                     # No await between final checks and the ticket/latch update.
                     del self._entry_draining[connector]
                     self._completion_tickets[entry_id] = (connector, migration_id, lifecycle_revision, generation)

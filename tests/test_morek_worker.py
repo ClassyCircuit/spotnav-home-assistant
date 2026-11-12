@@ -1181,10 +1181,10 @@ async def test_actual_restart_recovers_bound_settled_dispatch_and_sends_fresh_pl
     await asyncio.to_thread(time_zones.zone, "Europe/Stockholm")
 
     w, world, _ = await real_admission_planner_worker(monkeypatch, tmp_path)
-    w.worker.start()
-    await drain(w.worker)
-    assert w.point.call.await_count == 1
-    proof = (await w.ledger.read())["migration_dispatch_evidence"]
+    assert await w.admission.async_reconfirm_completed(
+        "test", lambda: w.identity, persist_recovery_proof=True) == "reconfirmed"
+    w.point.call.assert_not_awaited()
+    proof = (await w.ledger.read())["migration_recovery_proof"]
     assert proof["migration_id"] == "a" * 32
     w.worker.close()
 
@@ -1201,7 +1201,7 @@ async def test_actual_restart_recovers_bound_settled_dispatch_and_sends_fresh_pl
     gate = command_admission.command_admission(hass)
     assert isinstance(gate._store, execution_ownership.ExecutionOwnershipStore)
     assert gate.owned_ticket_current("test", physical_connector(w.identity))
-    assert w.point.call.await_count == 1  # recovery itself did not send
+    w.point.call.assert_not_awaited()  # recovery itself did not send
     hass.data[morek_schedule._DATA_KEY] = {"test": ({}, FakeStore(hass, 1, "entry-restart"), asyncio.Lock())}
     world.facts[0] = replace(world.facts[0], soc_percent=30)
     await world.controller.async_recalculate()
@@ -1209,7 +1209,7 @@ async def test_actual_restart_recovers_bound_settled_dispatch_and_sends_fresh_pl
     worker.start()
     await drain(worker)
     assert worker.reason == "upload_accepted_unverified"
-    assert w.point.call.await_count == 2
+    assert w.point.call.await_count == 1
     worker.close()
 
 

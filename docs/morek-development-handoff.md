@@ -347,6 +347,71 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-12 — non-profile automatic recovery (2.5.66; coordinator review pending)
+
+- The existing connector outcome store now carries a minimal versioned recovery
+  proof bound to the completed owner migration ID and physical connector. Migration
+  writes it after producer drain, verified completion and current lifecycle/Stop
+  checks; admin reconfirmation of an eligible old completed owner writes the same
+  proof. Neither operation sends or clears a profile. Recovery validates ownership,
+  unique connector, settled outcome and durable Pause/Resume intent, and the worker
+  still requires current planner provenance. Old records without a proof or the
+  existing post-dispatch evidence require one admin reconfirmation.
+- **Landed-write policy:** a valid proof on disk is accepted on restart even if the
+  prior save raised or was cancelled. A Stop requested but not durably saved before
+  a crash may be lost; no process can reconstruct it. A newer durable Pause remains
+  authoritative and a pending Resume still requires fresh confirmation after restart.
+  Unknown OCPP outcomes remain blocked, never automatically retried. The proof does
+  not establish physical charging, profile inventory or installation protection.
+- Actual-module mocked tests cover migration without a profile send, automatic
+  restart, eligible old-owner reconfirmation, landed proof with failure/cancellation
+  and Stop races, retained durable Pause, and real admission/worker execution. The
+  user-reported native protection, external writers and charger behavior remain
+  unverified. 5.7a is marked locally complete for coordinator review; 5.7b remains
+  open for broader end-to-end regression and practical charging/health monitoring.
+- Checks: `python tools/run_isolated_planning_tests.py -x` 584 passed, 1 skipped,
+  1 deselected; `python tools/run_isolated_lifecycle_tests.py -x` 198 passed;
+  `python tools/run_isolated_lifecycle_tests.py tests/test_execution_ownership.py
+  tests/test_command_admission.py tests/test_morek_schedule.py tests/test_morek_outcomes.py
+  tests/test_morek_readiness.py -x` 347 passed. The actual-bootstrap focused run
+  `python tools/run_isolated_lifecycle_tests.py tests/test_morek_worker.py -k
+  "actual_restart_recovers_bound or landed_nonprofile_proof or actual_setup_to_real_worker_profile_send or completed_restart_requires" -x`
+  passed 7. Targeted Ruff, frontend type-check/build/check-dist and sidebar/Morek
+  tests (62 passed), and diff check passed. The planning runner skips the actual
+  bootstrap test, which was run by the focused lifecycle command. Existing pytest
+  timeout/deprecation, jsdom CSS and Git line-ending warnings remain. The full
+  5.4c HA-plugin suite was not run; no live access or deployment occurred.
+
+### 2026-11-12 — non-profile restart proof boundary (2.5.65; incomplete)
+
+- Added an actual handover/storage/admission regression in
+  `tests/test_stage_23_lifecycle.py`: the completion write lands, a Stop is
+  reserved, and the save raises. Ownership and outcome bytes remain present,
+  while a restarted gate refuses automatic recovery. A successful completion can
+  leave the same bytes; its process-local ticket and the failed caller's exception
+  or non-durable Stop do not survive restart. This test does not implement a
+  non-profile proof or complete 5.7a.
+- The requested distinction between an ordinary successful proof write and a
+  proof write that landed before failure/cancellation is not represented by HA
+  Store's atomic file contents. A further proof/commit marker has the same final
+  write boundary. A durable Stop, if recorded, remains actionable; a Stop never
+  recorded before a crash cannot be reconstructed. The smallest unresolved choice
+  is whether to accept a landed, correctly ordered proof as sufficient even when
+  its caller did not observe successful return, or require an external transactional
+  mechanism that durably orders proof and Stop. Neither is assumed here. Existing
+  automatic recovery after a settled migration-bound worker response is retained;
+  older or never-sent completed records still need reconfirmation on restart.
+- Mocked checks: `python tools/run_isolated_planning_tests.py -x` 584 passed,
+  1 skipped and 1 deselected; `python tools/run_isolated_lifecycle_tests.py -x`
+  194 passed; the expanded lifecycle run with `tests/test_execution_ownership.py
+  tests/test_command_admission.py tests/test_morek_schedule.py tests/test_morek_outcomes.py
+  tests/test_morek_readiness.py -x` 343 passed. Focused lifecycle runner with
+  `tests/test_morek_worker.py -k "actual_restart_recovers_bound or
+  clean_handover_and_possibly_landed_completion" -x` passed 2. Ruff on the changed
+  test, frontend type-check/build/check-dist and focused frontend tests (62 passed),
+  and diff check passed. Existing pytest timeout/deprecation, jsdom CSS and Git
+  line-ending warnings remain. The full HA-plugin dashboard suite was not run.
+
 ### 2026-11-12 — bounded automatic restart recovery (2.5.65; partial)
 
 - A settled OCPP response to an actual ticket-admitted worker call stores a

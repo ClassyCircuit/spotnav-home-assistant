@@ -1311,6 +1311,7 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
             code = await admission.async_reconfirm_completed(
                 entry.entry_id,
                 lambda: _identity_status(hass, getattr(controller_for(hass, entry.entry_id), "ocpp_target", None)),
+                persist_recovery_proof=True,
             )
             if code != "reconfirmed":
                 raise ScheduleRefused(code)

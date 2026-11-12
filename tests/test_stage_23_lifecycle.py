@@ -145,9 +145,10 @@ async def test_actual_setup_to_real_worker_profile_send(environment, monkeypatch
     restarted = command_admission.CommandAdmission(execution_ownership.ExecutionOwnershipStore(hass))
     hass.data["spotnav_command_admission"] = restarted
     hass.data["spotnav_execution_ownership_store"] = restarted._store
-    revision = restarted.reserve_lifecycle_barrier("a", identity)
-    assert not await restarted.async_release_lifecycle_barrier("a", identity, revision, lambda: True)
-    assert await restarted.async_reconfirm_completed("a", identity) == "reconfirmed"
+    hass.data.pop("spotnav_morek_outcomes", None)
+    release = await integration._async_setup_ownership_metadata(hass, entry, charger, migrate=True)
+    await release()
+    assert restarted.owned_ticket_current("a", command_admission.physical_connector(identity()))
     point.call.assert_not_awaited()
     monkeypatch.setattr(morek_worker, "controller_for", lambda *_: charger)
     monkeypatch.setattr(morek_worker, "domain_data", lambda *_: SimpleNamespace(auto_store=settings))
@@ -1479,16 +1480,109 @@ async def test_completed_restart_requires_explicit_reconfirmation(environment, m
     restarted = command_admission.CommandAdmission(execution_ownership.ExecutionOwnershipStore(hass))
     revision = restarted.reserve_lifecycle_barrier("a", identity)
     assert not await restarted.async_release_lifecycle_barrier("a", identity, revision, lambda: True)
-    assert await restarted.async_reconfirm_completed("a", identity) == "reconfirmed"
+    # Model a 2.5.64 completion: no non-profile proof or worker evidence.
+    ledger = morek_outcomes.outcomes_for(hass)
+    old = await ledger.read()
+    old.pop("migration_recovery_proof", None)
+    await ledger.write(old)
+    assert await restarted.async_reconfirm_completed("a", identity, persist_recovery_proof=True) == "reconfirmed"
+    fresh = command_admission.CommandAdmission(execution_ownership.ExecutionOwnershipStore(hass))
+    fresh_revision = fresh.reserve_lifecycle_barrier("a", identity)
+    assert await fresh.async_recover_after_restart("a", identity, fresh_revision, 0) == "automatic_recovery_ready"
+    hass.station.call.assert_not_awaited()
     op = AsyncMock()
     assert (await restarted.async_execute("a", "owned_profile", identity, op)).allowed
     op.assert_awaited_once()
     restarted.reserve_lifecycle_barrier("a", identity)
     assert not (await restarted.async_execute("a", "owned_profile", identity, op)).allowed
-    ledger = morek_outcomes.outcomes_for(hass)
     await ledger.write({"schema": 1, "entry_id": "a", "uncertain": True, "attempt": {"state": "uncertain"}})
     assert await restarted.async_reconfirm_completed("a", identity) == "profile_outcome_unavailable"
     assert target.connector_id == 1 and store._records["a"]["handover"]["state"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_clean_handover_and_possibly_landed_completion_are_restart_indistinguishable(environment, monkeypatch):
+    """A disk marker cannot report whether the save's caller saw success or Stop."""
+    hass, _, _, _, _, _ = environment
+    store, gate, identity, executor, _, _ = await handover_fixture(environment, monkeypatch)
+    ledger_path = hass.root / "spotnav.morek_schedule.connector_outcomes"
+    ledger_path.write_text(json.dumps({"version": 1, "data": {"schema": 1, "entry_id": "a",
+        "uncertain": False, "attempt": {"state": "accepted"}}}), encoding="utf-8")
+    original = store._store.async_save
+    reached, proceed = asyncio.Event(), asyncio.Event()
+    async def save_then_fail(data):
+        await original(data)
+        if data["records"]["a"].get("handover", {}).get("state") == "completed":
+            reached.set()
+            await proceed.wait()
+            raise OSError("write landed but completion was not observed")
+    monkeypatch.setattr(store._store, "async_save", save_then_fail)
+    task = asyncio.create_task(gate.async_handover_unarmed("a", identity, executor, require_outcome=True))
+    await asyncio.wait_for(reached.wait(), 2)
+    owner_path = hass.root / execution_ownership.STORAGE_KEY
+    landed_owner, landed_ledger = owner_path.read_bytes(), ledger_path.read_bytes()
+    with gate.person_stop_reservation("a", identity):
+        proceed.set()
+        assert await task == "save_uncertain"
+    assert owner_path.read_bytes() == landed_owner and ledger_path.read_bytes() == landed_ledger
+    # A clean save produces these same durable records; process-local Stop and
+    # save-error evidence disappear at restart. Neither record grants recovery.
+    restarted = command_admission.CommandAdmission(execution_ownership.ExecutionOwnershipStore(hass))
+    revision = restarted.reserve_lifecycle_barrier("a", identity)
+    assert await restarted.async_recover_after_restart("a", identity, revision, 0) == "restart_dispatch_evidence_unavailable"
+    op = AsyncMock()
+    assert not (await restarted.async_execute("a", "owned_profile", identity, op)).allowed
+    op.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("race", ["failure", "cancel", "stop", "durable_stop"])
+async def test_landed_nonprofile_proof_recovers_after_restart(environment, monkeypatch, race):
+    from custom_components.spotnav.execution import morek_outcomes
+
+    hass, _, _, _, _, _ = environment
+    _, gate, identity, executor, _, _ = await handover_fixture(environment, monkeypatch)
+    (hass.root / "spotnav.morek_schedule.connector_outcomes").write_text(json.dumps({
+        "version": 1, "data": {"schema": 1, "entry_id": "a", "uncertain": False,
+                                "attempt": {"state": "accepted"}}}), encoding="utf-8")
+    ledger = morek_outcomes.outcomes_for(hass)
+    original = ledger.store.async_save
+    reached, proceed = asyncio.Event(), asyncio.Event()
+    async def landed(data):
+        await original(data)
+        if "migration_recovery_proof" in data:
+            reached.set()
+            await proceed.wait()
+            if race == "failure":
+                raise OSError("proof landed before failure")
+    monkeypatch.setattr(ledger.store, "async_save", landed)
+    task = asyncio.create_task(gate.async_handover_unarmed("a", identity, executor, require_outcome=True))
+    await asyncio.wait_for(reached.wait(), 2)
+    if race == "cancel":
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    elif race in ("stop", "durable_stop"):
+        with gate.person_stop_reservation("a", identity):
+            proceed.set()
+            assert await task == "completion_interrupted"
+    else:
+        proceed.set()
+        assert await task == "handover_evidence_unavailable"
+    assert "a" not in gate._completion_tickets
+    hass.data.pop("spotnav_morek_outcomes", None)
+    if race == "durable_stop":
+        durable_ledger = morek_outcomes.outcomes_for(hass)
+        outcome = await durable_ledger.read()
+        outcome["schedule_pause"] = {"version": 1, "type": "pause_until_resumed", "id": "new-stop",
+                                     "station_id": MOREK_STATION_ID, "connector_id": 1}
+        await durable_ledger.write(outcome)
+    restarted = command_admission.CommandAdmission(execution_ownership.ExecutionOwnershipStore(hass))
+    revision = restarted.reserve_lifecycle_barrier("a", identity)
+    assert await restarted.async_recover_after_restart("a", identity, revision, 0) == "automatic_recovery_ready"
+    pause = (await morek_outcomes.outcomes_for(hass).read()).get("schedule_pause")
+    assert (pause and pause["id"]) == ("new-stop" if race == "durable_stop" else None)
+    hass.station.call.assert_not_awaited()
 
 
 @pytest.mark.asyncio

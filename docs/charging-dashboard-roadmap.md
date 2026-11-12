@@ -808,7 +808,26 @@ tests are documented there; full HA collection is still blocked on Windows.
     run it on a supported local host if available. If not, report the exact gap
     and evidence to the user before installation; do not claim it passed or halt
     unrelated implementation just to provision the test environment.
-- [ ] **5.7a Replace Morek execution with the schedule owner** (local mocked implementation; automatic restart recovery open)
+- [x] **5.7a Replace Morek execution with the schedule owner** (local mocked implementation; coordinator review pending)
+  - **2.5.66:** a minimal connector/migration-bound non-profile recovery proof is
+    stored in the existing outcome document after completed handover checks or an
+    explicit admin reconfirmation of an eligible older owner. Startup rereads the
+    owner, settled outcome and durable intent before recovering. Under the user's
+    landed-write policy, a valid proof is usable after restart even if its save
+    raised or was cancelled. A Stop never durably recorded before a crash may be
+    lost; a durable Pause is preserved. Old owners without proof need one eligible
+    admin reconfirmation; unknown outcomes and unverified owners remain blocked.
+    No proof establishes physical charging, protection or profile inventory.
+  - **Non-profile proof boundary:** a proof save that landed before raising or
+    cancellation has the same durable bytes as a successful save. A Stop that
+    occurs after those bytes land and is never durably recorded is likewise absent
+    after restart. The actual-module regression
+    `test_clean_handover_and_possibly_landed_completion_are_restart_indistinguishable`
+    exercises the existing completion boundary. Requiring automatic recovery from
+    the successful bytes while requiring a block for identical interrupted bytes
+    needs an additional persistence/ordering guarantee or a product decision about
+    the latter case; adding another ordinary marker does not supply that guarantee.
+    The existing response-bound recovery remains in place; 5.7a stays open.
   - **2.5.65 partial restart recovery:** a settled response from a worker request
     admitted with the completed migration's current process ticket is now stored
     as connector/migration-bound dispatch evidence. A later startup can recover
