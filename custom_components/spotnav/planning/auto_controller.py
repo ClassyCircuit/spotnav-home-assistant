@@ -637,6 +637,13 @@ class AutoSnapshot:
     #: is expected to reach by then, from the live reading, the planned energy and the charging
     #: efficiency; `None` for a manual need or a plan that is not short.
     expected_soc_percent: float | None = None
+    #: When this process began the calculation, before waiting for the calculation
+    #: lock. Unlike calculated_at this cannot make an already-running calculation
+    #: appear to have begun after a connection event.
+    calculation_started_at: datetime | None = None
+    connection_generation: int | None = None
+    notification_vehicle_id: str | None = None
+    notification_vehicle_checked: bool = False
     #: The price entry's revision this calculation priced with (`price_source.PriceSource.plan_revision`), or
     #: `None` when the charger's own settings are its price source. A change of it is news, and it enters the
     #: application's identity, so a fee change on the price entry replans and reinstalls.
@@ -777,6 +784,8 @@ class AutoPlannerController:
         self._departure_cancel: Callable[[], None] | None = None
         self._connection_cancel: Callable[[], None] | None = None
         self._plug_in_pending = False
+        self._connection_generation = 0
+        self._connection_ready_generation: int | None = None
         self._energy_cancel: Callable[[], None] | None = None
         self._energy_watched: str | None = None
         # The count the register watcher keeps between calculations (`_baseline`), and the epoch whose
@@ -952,6 +961,25 @@ class AutoPlannerController:
             and self._attempt_current(snapshot.attempt)
             and snapshot.settings_revision == self._store.settings(self._entry_id).revision
         )
+
+    def snapshot_matches_connection(self, snapshot: AutoSnapshot) -> bool:
+        """The calculation began after the current connection debounce settled."""
+        checked, vehicle_id = self._notification_vehicle()
+        return (
+            self.snapshot_is_current(snapshot)
+            and checked and snapshot.notification_vehicle_checked
+            and snapshot.notification_vehicle_id == vehicle_id
+            and snapshot.connection_generation is not None
+            and snapshot.connection_generation == self._connection_generation
+            and snapshot.connection_generation == self._connection_ready_generation
+        )
+
+    def _notification_vehicle(self) -> tuple[bool, str | None]:
+        try:
+            return True, resolved_vehicle_id(self._hass, self._entry_id)
+        except Exception:  # noqa: BLE001 - notification evidence must never break planning
+            # Without a readable identity do not claim the proposal is for this car.
+            return False, None
 
     @property
     def entry_id(self) -> str:
@@ -1308,6 +1336,9 @@ class AutoPlannerController:
         if self._shutdown:
             # Shutdown is terminal: no calculation, and therefore nothing that could apply.
             return await self._state_only("planning_unavailable", "shutdown")
+        started_at = self._now()
+        connection_generation = self._connection_ready_generation
+        vehicle_checked, vehicle_id = self._notification_vehicle()
         self._attempt = (
             self._executor.begin_attempt() if self._executor is not None else self._attempt + 1
         )
@@ -1322,7 +1353,11 @@ class AutoPlannerController:
             settings = with_source(settings, source)
             self._price_revision = None if source is None else source.plan_revision
             self._lapse_target_stop(settings)
-            snapshot = replace(await self._compute(settings, attempt), attempt=attempt)
+            snapshot = replace(
+                await self._compute(settings, attempt), attempt=attempt, calculation_started_at=started_at,
+                connection_generation=connection_generation,
+                notification_vehicle_id=vehicle_id, notification_vehicle_checked=vehicle_checked,
+            )
             if not self._attempt_current(attempt) or self._shutdown:
                 return snapshot
             await self._apply(settings, snapshot, attempt)
@@ -2720,6 +2755,8 @@ class AutoPlannerController:
         """
         if self._shutdown:
             return False
+        self._connection_generation += 1
+        self._connection_ready_generation = None
         self._cancel_connection()
         if event == CONNECTION_PLUGGED_IN:
             self._plug_in_pending = True
@@ -2731,6 +2768,7 @@ class AutoPlannerController:
                 return
             plug_in = self._plug_in_pending
             self._plug_in_pending = False
+            self._connection_ready_generation = self._connection_generation
             self._hass.async_create_task(self._async_replan_for_connection(plug_in))
 
         self._connection_cancel = self._manager.schedule_at(

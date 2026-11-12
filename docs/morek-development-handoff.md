@@ -234,6 +234,34 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2.5.34 — 5.3a plug-in proposal notifications
+
+- A recognized connection records an owed notification. The planner increments a
+  connection generation on connection events and stamps the calculation's start time,
+  settled generation and resolved vehicle identity at its start. The notifier listens to
+  every publication, including unchanged plans, and checks that its calculation began
+  after the plug-in, still belongs to the settled generation and current attempt/settings,
+  and still matches the resolved vehicle. Unknown identity evidence fails closed. An old
+  immediate listener callback, superseded attempt or prior connection cannot provide a
+  proposed window. An owed notice is persisted; after restart a historical snapshot is
+  not accepted, and waiting continues until a qualifying new connection calculation.
+- After settling, opted-in selected phones receive the next `shown_periods` window with
+  local dates and proposed wording. Available backend ready-by, target, estimated cost,
+  shortfall and validated backend SOC projection are included; missing estimates are
+  omitted. The existing tag, hourly and per-event limits apply. A bounded waiting notice
+  is replaced by the proposal. Person Stop prevents proposal notices. The legacy
+  installed-plan fallback remains for installations without a planner. Notifications
+  do not send charger commands. Existing important shortfall notices remain separate.
+- Portable actual-module tests: `python tools/run_isolated_notifier_tests.py`, 14 passed;
+  planning 492 passed/1 deselected, lifecycle 26 passed. The test harness mocks HA
+  scheduling, storage and notify boundaries, not a running HA instance. Build and
+  `check-dist` passed. pytest reports an unavailable timeout option and HA/dependency
+  deprecation warnings. Full HA-plugin tests on Windows are still blocked by `fcntl`.
+- No physical phone, HA or charger was contacted. Morek mismatch/uncertainty is not
+  connected to phone notifications; its trustworthy event and deduplication lifecycle
+  remains an activation-stage follow-up. ACK/readback is not proof of charging.
+  Dispatch remains unarmed. Stop for coordinator review; do not proceed to 5.4.
+
 ### 2.5.33 — 5.3 complete locally (coordinator review pending)
 
 - Final follow-up reconciled card tests with the English-only contract, retaining

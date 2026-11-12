@@ -424,7 +424,13 @@ tests are documented there; full HA collection is still blocked on Windows.
     suspension, charging pause, selective removal or mode exit as equivalent or operational.
   - Regression-test settings save → backend trigger → replan → coherent dashboard update,
     without browser-dependent planning; preserve uncapped and safety behavior.
-- [ ] **5.3a Phone notifications for plug-in and plan**
+- [x] **5.3a Phone notifications for plug-in and plan** (local implementation; coordinator review pending)
+  - 2.5.34 associates notifications with the debounced connection generation, calculation
+    start, current attempt/settings and resolved vehicle; a current unchanged publication
+    is accepted. A persisted owed notice waits rather than using a restored proposal.
+    Waiting and proposed-window updates use the existing phone choices, limits and tag.
+    Mocked tests and remaining limitations are recorded in the handoff; no phone or
+    charger was contacted. Morek mismatch/uncertainty phone events remain future work.
   - Reuse the existing per-charger HA mobile notification service, phone selection,
     event tracker, rate limiting and restart-safe deduplication. Inspect current
     `plan_installed` and plug-in/quiet-after-write behavior before changing it; do not
