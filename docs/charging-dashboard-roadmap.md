@@ -1223,7 +1223,13 @@ action, weaken admission/safety checks, or claim physical behavior is verified.
     or persist a policy merely by displaying defaults. Distinguish the cap's price
     basis from the actual price provider; preserve revision checks and draft safety.
 
-- [ ] **12.2 Price provenance, cents and consistent formatting**
+- [x] **12.2 Price provenance, cents and consistent formatting** (local implementation; review pending)
+  - 2.5.69 reports the current provider route separately from the actual held
+    market-day file providers, states and fetch times, including mixed and unknown
+    provenance. Existing routing already prefers loaded Nord Pool for supported
+    areas; no provider preference is overwritten. EUR chart and cap displays use
+    c/kWh at the UI boundary while settings remain major currency/kWh. Focused
+    mocked tests pass; browser, actual HA rendering and physical touch were not run.
   - Trace the real published-price pipeline and show the actual available provider,
     market/area, applicable data day, price basis and fetch freshness. Make missing,
     stale, mixed or unavailable source information explicit. Verify whether and how

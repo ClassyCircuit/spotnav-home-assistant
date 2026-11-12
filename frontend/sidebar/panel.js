@@ -8,6 +8,7 @@ import { decodeMorekState, morekPanel } from '../src/morek-view.ts';
 import { reconcile } from '../shared-dashboard/reconcile.js';
 import { dashboardAdapter } from './adapter.js';
 import { CARD_VERSION } from '../src/generated/version.ts';
+import { capInput, capForSave, displayPrice } from '../shared-dashboard/price-format.js';
 
 // A dispatched write outlives its host element, including a newly mounted panel.
 const settingsWritesByConnection = new WeakMap();
@@ -66,7 +67,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
   stopObservations(preserveDraft=false) {
     const dirty=preserveDraft && this.settingsDirty;
     if (dirty && this.settingsRecord) this.draftRevision=this.settingsRecord.revision;
-    else if (!preserveDraft) this.draftRevision=null;
+    else if (!preserveDraft) {this.draftRevision=null;this.draftCurrency=undefined;}
     if (this.settingsBusy && this.charger) this.unknownSettingsWrites.add(this.charger);
     this.generation++;
     clearInterval(this.ageTimer); this.ageTimer=null;
@@ -92,12 +93,15 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     const allowed=this._hass?.user?.is_admin===true || dashboard?.settings?.users_change_plan===true;
     if (this.settingsRecord) {
       const record=this.settingsRecord;
-      adapter.model.settings={target:record.target.target_percent,minimum:record.minimum_ready_by_soc,cap:record.soft_price_cap,readyBy:record.departure_time,capEnabled:record.soft_price_cap!=null,capBasis:record.cap_price_basis,deadlineEnabled:record.departure_enabled};
+      const currency=dashboard?.market?.currency || null;
+      if (this.settingsDirty && this.draftCurrency!==undefined && this.draftCurrency!==currency) {this.settingsConflict=true;this.settingsNotice='Price currency changed while editing. Reload settings before saving.';}
+      adapter.model.capCurrency=currency;
+      adapter.model.settings={target:record.target.target_percent,minimum:record.minimum_ready_by_soc,cap:capInput(record.soft_price_cap,currency),readyBy:record.departure_time,capEnabled:record.soft_price_cap!=null,capBasis:record.cap_price_basis,deadlineEnabled:record.departure_enabled};
       // The planner's nord_pool basis compares the source's converted published
       // major-unit price, even when that source includes its own charges. A
       // configured-variable-cost cap must not be drawn on this raw series.
       if (adapter.model.chart && record.revision===dashboard?.settings?.revision && record.cap_price_basis==='nord_pool' && Number.isFinite(record.soft_price_cap)) {
-        adapter.model.chart.cap=record.soft_price_cap;
+        adapter.model.chart.cap=displayPrice(record.soft_price_cap,currency);
       }
       adapter.model.settingsEditor=true;
       adapter.model.targetSupported=record.driver==='target_soc';
@@ -108,7 +112,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
       adapter.model.labels.saveLabel=this.settingsBusy ? 'Saving…' : 'Save plan';
       adapter.actions.save=values=>this.savePlan(values);
       adapter.actions.reloadSettings=()=>this.reloadSettings();
-      adapter.actions.edit=()=>{this.settingsDirty=true;this.paintMorek();};
+      adapter.actions.edit=()=>{if(!this.settingsDirty)this.draftCurrency=currency;this.settingsDirty=true;this.paintMorek();};
     } else adapter.model.settingsNotice=this.settingsLoading ? 'Loading settings…' : (this.settingsNotice || 'Settings unavailable.');
     this.message(this.dashboardFailed ? 'Dashboard refresh failed; the last observation may be stale.' : '');
     if (this.view) this.view.update(adapter);
@@ -161,7 +165,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
   reloadSettings() {
     if (!this.connected || this.settingsBusy || !this.charger || this.pendingSettingsWrites.has(this.charger)) return;
     if (!window.confirm('Discard the current draft and reload the latest settings?')) return;
-    this.view?.resetDrafts();this.draftRevision=null;this.settingsRecord=null;this.settingsConflict=false;this.settingsDirty=false;this.unknownSettingsWrites.delete(this.charger);this.settingsNotice='Loading settings…';
+    this.view?.resetDrafts();this.draftRevision=null;this.draftCurrency=undefined;this.settingsRecord=null;this.settingsConflict=false;this.settingsDirty=false;this.unknownSettingsWrites.delete(this.charger);this.settingsNotice='Loading settings…';
     void this.loadSettings();
   }
   paintMorek() {
@@ -238,7 +242,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     const allowed=hass?.user?.is_admin===true || (decoded.ok && decoded.value.settings?.users_change_plan===true);
     if (!this.connected || hass?.connected===false || !charger || !record || this.settingsBusy || this.pendingSettingsWrites.has(charger) || this.morekBusy || this.autoBusy || this.settingsConflict || !allowed) {this.settingsNotice='Save unavailable or permission denied.';this.paint();return;}
     if (record.driver!=='target_soc' && values.target!==String(record.target.target_percent ?? '')) {this.settingsNotice='Target SOC cannot be changed in manual energy mode.';this.paint();return;}
-    const form={...formFromRecord(record),targetPercent:values.target,minimumReadySoc:values.minimum,capValue:values.cap,capEnabled:values.capEnabled,capBasis:values.capBasis,deadlineEnabled:values.deadlineEnabled,deadlineTime:values.readyBy};
+    const form={...formFromRecord(record),targetPercent:values.target,minimumReadySoc:values.minimum,capValue:capForSave(values.cap,decoded.ok ? decoded.value.market?.currency : null,record.soft_price_cap),capEnabled:values.capEnabled,capBasis:values.capBasis,deadlineEnabled:values.deadlineEnabled,deadlineTime:values.readyBy};
     const check=replacementFor('plan',record,form);
     if (!check.ok) {this.settingsNotice=translate('en',check.errorKey);this.paint();return;}
     if (!check.changed) {this.settingsNotice='No changes to save.';this.paint();return;}
@@ -250,7 +254,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
       const answer=decodeSettingsAnswer(await this.bounded(request));
       if (!this.connected || generation!==this.generation || permissionEpoch!==this.permissionEpoch || charger!==this.charger) return;
       if (!answer.ok) {this.settingsConflict=true;this.settingsNotice='Save response unavailable; outcome unknown. Reload before retrying.';}
-      else if (answer.value.ok) {this.settingsRecord=answer.value.settings;this.settingsDirty=false;this.draftRevision=null;this.settingsNotice='Saved and confirmed.';this.view?.resetDrafts();this.dashboardEpoch++;}
+      else if (answer.value.ok) {this.settingsRecord=answer.value.settings;this.settingsDirty=false;this.draftRevision=null;this.draftCurrency=undefined;this.settingsNotice='Saved and confirmed.';this.view?.resetDrafts();this.dashboardEpoch++;}
       else if (answer.value.code==='revision_conflict') {this.settingsConflict=true;this.settingsNotice='Settings conflict. Reload the charger and review the new values.';}
       else if (answer.value.code==='spotnav_settings_reconcile_failed') {this.settingsConflict=true;this.settingsNotice='Settings may be saved, but replanning failed; reload and inspect confirmed settings.';}
       else this.settingsNotice='Settings save rejected.';

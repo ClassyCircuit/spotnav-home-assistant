@@ -1,9 +1,10 @@
 import { total, money, validSocAssumptions } from './plan-data.js';
+import { priceText } from './price-format.js';
 
 export const number = (value, digits, unit = '', valid = () => true) =>
   Number.isFinite(value) && valid(value) ? `${value.toFixed(digits)}${unit}` : 'Unknown';
 const energy = value => number(value, 2, ' kWh', n => n >= 0);
-const price = value => number(value, 2, ' c/kWh');
+const price = value => Number.isFinite(value) ? `${priceText(value)} c/kWh` : 'Unknown';
 const soc = value => number(value, 1, '%', n => n >= 0 && n <= 100);
 const escapeText = value => String(value ?? 'Unknown').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 

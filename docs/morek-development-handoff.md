@@ -347,6 +347,28 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-12 — Stage 12.2 price display and provenance (2.5.69; review pending)
+
+- The current provider route is not necessarily the provider of a held day file.
+  Repository day snapshots now retain each contributing file's provider, market
+  date, fetch time and state; the dashboard API exposes these separately from the
+  current route, including split-day mixed sources. Older backends or records with
+  unknown provenance show it as unavailable, rather than inferring it from a cap
+  basis. Freshness includes fetch age and failed/stale state, not a guarantee that
+  market data is current. Routing already prefers the loaded Nord Pool integration
+  for supported areas, otherwise its existing alternatives; no selection is forced.
+- EUR source prices and the cap are displayed in c/kWh, with edits converted back
+  to the existing major-unit/kWh settings contract; other currencies stay in their
+  major units. An unchanged saved cap keeps its exact stored value, and a market
+  currency change blocks an open draft. Chart price text uses consistent rounding;
+  interval boundaries and underlying planner values are unchanged. Unknown live
+  per-window costs and weighted prices remain 12.3, not fabricated here.
+- Fast checks: focused sidebar/price tests, isolated actual-module repository/API
+  provenance tests, shared-plan tests, Ruff, frontend type-check, build and
+  check-dist. No browser, visual or large-suite checks were run, per request;
+  actual HA rendering and physical behavior remain unverified. The full HA-plugin
+  dashboard suite remains unrun. No live HA access, deployment or charger action.
+
 ### 2026-11-12 — Stage 12.1 sidebar controls (2.5.67; review pending)
 
 - The sidebar selects a sole charger, restores a valid session selection, handles

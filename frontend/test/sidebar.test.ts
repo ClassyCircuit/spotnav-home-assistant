@@ -75,6 +75,23 @@ describe('actual sidebar read-only host', () => {
     await panel.savePlan({target:'80',minimum:'40',cap:'0.1',capEnabled:true,capBasis:'configured_variable_cost',deadlineEnabled:false,readyBy:'06:30'});await tick();
     const write=calls.find(m=>m.type==='spotnav/update_settings');expect(write.expected_revision).toBe(7);expect(write.settings.driver).toBe('manual_kwh');expect(write.settings.target.target_percent).toBe(80);expect(write.settings.cap_price_basis).toBe('configured_variable_cost');panel.remove();
   });
+  it('shows an EUR cap in cents and saves back in EUR/kWh once', async () => {
+    const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';raw.market.currency='EUR';const calls=[];
+    const initial={...record(),soft_price_cap:0.12345};
+    const hass={connected:true,user:{is_admin:true},callWS:msg=>{calls.push(msg);return Promise.resolve(msg.type==='spotnav/list_chargers'?{api_version:1,chargers:[{charger_id:'a',charger_name:'A'}]}:msg.type==='spotnav/get_dashboard'?raw:msg.type==='spotnav/get_settings'?envelope(initial):msg.type==='spotnav/update_settings'?envelope({...msg.settings,revision:8}):status);}};
+    const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();const root=panel.shadowRoot, cap=root.querySelector('[data-setting="cap"]');
+    expect(cap.value).toBe('12.345');expect(cap.getAttribute('label')).toContain('c/kWh');
+    await panel.savePlan({target:'85',minimum:'40',cap:'12.345',capEnabled:true,capBasis:'nord_pool',deadlineEnabled:true,readyBy:'06:30'});await tick();
+    expect(calls.find(m=>m.type==='spotnav/update_settings').settings.soft_price_cap).toBe(0.12345);
+    await panel.savePlan({target:'85',minimum:'40',cap:'-2.125',capEnabled:true,capBasis:'nord_pool',deadlineEnabled:true,readyBy:'06:30'});await tick();
+    expect(calls.filter(m=>m.type==='spotnav/update_settings').at(-1).settings.soft_price_cap).toBe(-0.02125);expect(root.querySelector('[data-setting="cap"]').value).toBe('-2.125');panel.remove();
+  });
+  it('blocks a draft if the market currency changes while editing', async () => {
+    const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';raw.market.currency='EUR';
+    const hass={connected:true,user:{is_admin:true},callWS:msg=>Promise.resolve(msg.type==='spotnav/list_chargers'?{api_version:1,chargers:[{charger_id:'a',charger_name:'A'}]}:msg.type==='spotnav/get_dashboard'?raw:msg.type==='spotnav/get_settings'?envelope(record()):status)};
+    const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();const input=panel.shadowRoot.querySelector('[data-setting="cap"]');input.value='12';input.dispatchEvent(new Event('input',{bubbles:true}));
+    raw.market.currency='SEK';panel.paint();expect(panel.settingsConflict).toBe(true);expect(panel.shadowRoot.querySelector('#save-plan').disabled).toBe(true);expect(input.value).toBe('12');panel.remove();
+  });
   it('offers admin reconfirmation without sending on render', async () => {
     const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';
     const owned={api_version:1,schedule:{...status.schedule,supported:true,ownership:{recorded_owner:'morek_schedule',reconfirmation_required:true,completion_authorized:false}}};

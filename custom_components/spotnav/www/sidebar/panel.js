@@ -52215,6 +52215,22 @@ function install16(registers) {
 // shared-dashboard/text.js
 var escapeText = (value2) => String(value2 ?? "Unknown").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
 
+// shared-dashboard/price-format.js
+var priceUnit = (currency) => currency === "EUR" ? "c/kWh" : /^[A-Z]{3}$/.test(currency || "") ? `${currency}/kWh` : "currency unknown/kWh";
+var displayPrice = (price2, currency) => Number.isFinite(price2) ? currency === "EUR" ? price2 * 100 : price2 : null;
+var priceText = (value2) => {
+  if (!Number.isFinite(value2)) return "Unknown";
+  if (value2 !== 0 && Math.abs(value2) < 1e-4) return value2.toExponential(3);
+  return new Intl.NumberFormat("en", { maximumFractionDigits: 4, useGrouping: false }).format(Object.is(value2, -0) ? 0 : value2);
+};
+var capInput = (price2, currency) => Number.isFinite(price2) ? String(Number(displayPrice(price2, currency).toPrecision(15))) : "";
+var capForSave = (text3, currency, saved) => {
+  if (text3 === capInput(saved, currency)) return saved == null ? "" : String(saved);
+  const normalized = text3.trim().replace(",", ".");
+  if (currency !== "EUR" || !normalized || !Number.isFinite(Number(normalized))) return text3;
+  return String(Number(normalized) / 100);
+};
+
 // shared-dashboard/charts.js
 use([install3, install, install5, install6, install8, install9, install7, install15, install12, install16]);
 var axis = { axisLine: { lineStyle: { color: "#536b76" } }, axisLabel: { color: "#bed0d5", fontSize: 12 }, splitLine: { lineStyle: { color: "#34444d" } } };
@@ -52242,9 +52258,9 @@ function mountCharts(root, data, format2, modes) {
     const setPriceOption = (initial) => priceChart.setOption({
       animation: false,
       grid: { left: 48, right: 20, top: 82, bottom: 92, show: true, backgroundColor: "#101f30", borderWidth: 0 },
-      tooltip: { trigger: "item", confine: true, hideDelay: 0, transitionDuration: 0, backgroundColor: "#233942", borderColor: "#5b7b7a", textStyle: { color: "#f0faf8" }, formatter: (p4) => `${escapeText(tooltipDate(p4.value[0]))} ${escapeText(time(p4.value[0]))}\u2013${escapeText(tooltipDate(p4.value[1]))} ${escapeText(time(p4.value[1]))}<br>${bands ? p4.value[2].toFixed(2) : p4.value[2]} ${escapeText(unit)}${windows.filter((w2) => w2.start < p4.value[1] && w2.end > p4.value[0]).map((w2) => `<br>Proposal: ${escapeText(tooltipDate(w2.start))} ${escapeText(time(w2.start))}\u2013${escapeText(time(w2.end))}`).join("")}` },
+      tooltip: { trigger: "item", confine: true, hideDelay: 0, transitionDuration: 0, backgroundColor: "#233942", borderColor: "#5b7b7a", textStyle: { color: "#f0faf8" }, formatter: (p4) => `${escapeText(tooltipDate(p4.value[0]))} ${escapeText(time(p4.value[0]))}\u2013${escapeText(tooltipDate(p4.value[1]))} ${escapeText(time(p4.value[1]))}<br>${priceText(p4.value[2])} ${escapeText(unit)}${windows.filter((w2) => w2.start < p4.value[1] && w2.end > p4.value[0]).map((w2) => `<br>Proposal: ${escapeText(tooltipDate(w2.start))} ${escapeText(time(w2.start))}\u2013${escapeText(time(w2.end))}`).join("")}` },
       xAxis: { ...axis, type: "value", min: horizon[0], max: horizon[1], axisLabel: { show: false }, axisTick: { show: false }, splitLine: { show: false } },
-      yAxis: { ...axis, type: "value", name: unit, nameTextStyle: { color: "#bed0d5", align: "left" }, ...bands ? { interval: 10, min: (value2) => Math.min(0, Math.floor(value2.min / 10) * 10), max: (value2) => Math.ceil(value2.max / 10) * 10 } : { scale: true } },
+      yAxis: { ...axis, axisLabel: { ...axis.axisLabel, formatter: priceText }, type: "value", name: unit, nameTextStyle: { color: "#bed0d5", align: "left" }, ...bands ? { interval: 10, min: (value2) => Math.min(0, Math.floor(value2.min / 10) * 10), max: (value2) => Math.ceil(value2.max / 10) * 10 } : { scale: true } },
       dataZoom: [{ type: "inside", xAxisIndex: 0, startValue: initial[0], endValue: initial[1], filterMode: "weakFilter", zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false, preventDefaultMouseMove: false }, { type: "slider", xAxisIndex: 0, startValue: initial[0], endValue: initial[1], filterMode: "weakFilter", height: 28, bottom: 12, borderColor: "#4b6871", backgroundColor: "#142630", fillerColor: "rgba(91,205,180,.22)", textStyle: { color: "#d0e1df" }, showDetail: false }],
       ...mode === "step" && bands ? { visualMap: { show: false, type: "piecewise", seriesIndex: 1, dimension: 1, pieces: [{ lte: bands[0], color: "#37c48f" }, { gt: bands[0], lte: bands[1], color: "#e9b34e" }, { gt: bands[1], lte: bands[2], color: "#ef8845" }, { gt: bands[2], color: "#ec6266" }] } } : {},
       series: [
@@ -52257,14 +52273,14 @@ function mountCharts(root, data, format2, modes) {
           lineStyle: { opacity: 0 },
           tooltip: { show: false },
           markArea: { silent: true, label: { show: false }, data: [[{ xAxis: horizon[0], itemStyle: { color: "#000000" } }, { xAxis: now }]] },
-          markPoint: { symbol: "pin", symbolSize: 54, label: { color: "#fff", fontSize: 11, fontWeight: "bold", formatter: (p4) => bands ? p4.value.toFixed(2) : String(p4.value) }, data: [(() => {
+          markPoint: { symbol: "pin", symbolSize: 54, label: { color: "#fff", fontSize: 11, fontWeight: "bold", formatter: (p4) => priceText(p4.value) }, data: [(() => {
             const p4 = prices.reduce((a4, b3) => a4.cents < b3.cents ? a4 : b3);
             return { name: "LOW", coord: [(p4.start + p4.end) / 2, p4.cents], value: p4.cents, itemStyle: { color: "#16825d" } };
           })(), (() => {
             const p4 = prices.reduce((a4, b3) => a4.cents > b3.cents ? a4 : b3);
             return { name: "HIGH", coord: [(p4.start + p4.end) / 2, p4.cents], value: p4.cents, itemStyle: { color: "#b93f50" } };
           })()] },
-          markLine: { silent: true, symbol: "none", label: { color: "#e5d2ac", fontSize: 11 }, lineStyle: { color: "#d4a969", type: "dashed" }, data: [...Number.isFinite(cap) ? [{ yAxis: cap, label: { formatter: `Cap ${cap} ${unit}`, position: "insideEndTop" } }] : [], { xAxis: now, label: { formatter: "Now", position: "insideStartTop", color: "#8fc5ff" }, lineStyle: { color: "#398dff", type: "solid", width: 2 } }, ...Number.isFinite(deadline) ? [{ xAxis: deadline, label: { formatter: "Ready by", position: "insideStartTop" }, lineStyle: { color: "#e1c390" } }] : []] }
+          markLine: { silent: true, symbol: "none", label: { color: "#e5d2ac", fontSize: 11 }, lineStyle: { color: "#d4a969", type: "dashed" }, data: [...Number.isFinite(cap) ? [{ yAxis: cap, label: { formatter: `Cap ${priceText(cap)} ${unit}`, position: "insideEndTop" } }] : [], { xAxis: now, label: { formatter: "Now", position: "insideStartTop", color: "#8fc5ff" }, lineStyle: { color: "#398dff", type: "solid", width: 2 } }, ...Number.isFinite(deadline) ? [{ xAxis: deadline, label: { formatter: "Ready by", position: "insideStartTop" }, lineStyle: { color: "#e1c390" } }] : []] }
         }
       ]
     });
@@ -52479,7 +52495,7 @@ var money = (value2, currency = "EUR") => {
 // shared-dashboard/plan-view.js
 var number = (value2, digits, unit = "", valid = () => true) => Number.isFinite(value2) && valid(value2) ? `${value2.toFixed(digits)}${unit}` : "Unknown";
 var energy = (value2) => number(value2, 2, " kWh", (n6) => n6 >= 0);
-var price = (value2) => number(value2, 2, " c/kWh");
+var price = (value2) => Number.isFinite(value2) ? `${priceText(value2)} c/kWh` : "Unknown";
 var soc = (value2) => number(value2, 1, "%", (n6) => n6 >= 0 && n6 <= 100);
 var escapeText2 = (value2) => String(value2 ?? "Unknown").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
 function renderPlan(windows, assumptions = {}, stale = false, formatters, totals) {
@@ -52488,14 +52504,14 @@ function renderPlan(windows, assumptions = {}, stale = false, formatters, totals
   const day = (value2) => Number.isFinite(value2) ? escapeText2(formatters.day(value2)) : "Unknown";
   const summary = totals === void 0 ? total(windows) : totals || {};
   const currency = formatters.currency;
-  const priceUnit = currency === void 0 || currency === "EUR" ? " c/kWh" : "";
-  const displayPrice = (value2) => priceUnit ? price(value2) : "Unknown";
+  const priceUnit2 = currency === void 0 || currency === "EUR" ? " c/kWh" : "";
+  const displayPrice2 = (value2) => priceUnit2 ? price(value2) : "Unknown";
   const validAssumptions = validSocAssumptions(assumptions);
-  const rows = windows.map((w2, i7) => `<div class="plan-row ${i7 === 0 ? "next-window" : ""}"><span><b>${time(w2.start)}\u2013${time(w2.end)}</b><small>${day(w2.start)}${i7 === 0 ? " \xB7 NEXT" : ""}${w2.control === "minimum-exception" ? " \xB7 ABOVE-CAP MINIMUM" : ""}</small></span><span><b>${displayPrice(w2.centsPerKwh)}</b><small>weighted price</small></span><span><b>${energy(w2.energy)}</b><small>wall energy</small></span><span><b>${money(w2.cost, currency)}</b><small>cost</small></span><span><b>${soc(validAssumptions ? w2.projectedSoc : null)}</b><small>projected SOC</small></span></div>`).join("");
+  const rows = windows.map((w2, i7) => `<div class="plan-row ${i7 === 0 ? "next-window" : ""}"><span><b>${time(w2.start)}\u2013${time(w2.end)}</b><small>${day(w2.start)}${i7 === 0 ? " \xB7 NEXT" : ""}${w2.control === "minimum-exception" ? " \xB7 ABOVE-CAP MINIMUM" : ""}</small></span><span><b>${displayPrice2(w2.centsPerKwh)}</b><small>weighted price</small></span><span><b>${energy(w2.energy)}</b><small>wall energy</small></span><span><b>${money(w2.cost, currency)}</b><small>cost</small></span><span><b>${soc(validAssumptions ? w2.projectedSoc : null)}</b><small>projected SOC</small></span></div>`).join("");
   const start2 = soc(assumptions.startingSoc);
   const capacity = number(assumptions.capacityKwh, 0, " kWh", (n6) => n6 > 0);
   const efficiency = number(Number.isFinite(assumptions.efficiency) ? assumptions.efficiency * 100 : null, 0, "%", (n6) => n6 > 0 && n6 <= 100);
-  return `<div class="plan-heading"><div><h3>Complete proposed plan${stale ? ` \xB7 ${escapeText2(formatters.staleLabel ?? "stale")}` : ""}</h3><p>Estimated, not measured or guaranteed \xB7 wall energy \xB7 ${escapeText2(currency === void 0 ? "EUR" : currency || "currency unknown")}</p></div><wa-badge variant="neutral" pill>${windows.length} windows</wa-badge></div><div class="plan-label"><span>Window</span><span>Weighted price</span><span>Wall energy</span><span>Cost</span><span>SOC after</span></div>${rows || "<p>No proposed windows</p>"}<div class="plan-total"><div><small>WALL ENERGY</small><strong>${energy(summary.energy)}</strong></div><div><small>TOTAL COST</small><strong>${money(summary.cost, currency)}</strong></div><div><small>WEIGHTED AVERAGE</small><strong>${displayPrice(summary.centsPerKwh)}</strong></div></div><p class="projection-note">SOC projection: ${start2} start, ${capacity} usable capacity, ${efficiency} efficiency. Battery energy = wall energy \xD7 efficiency; capped at 100%.</p>`;
+  return `<div class="plan-heading"><div><h3>Complete proposed plan${stale ? ` \xB7 ${escapeText2(formatters.staleLabel ?? "stale")}` : ""}</h3><p>Estimated, not measured or guaranteed \xB7 wall energy \xB7 ${escapeText2(currency === void 0 ? "EUR" : currency || "currency unknown")}</p></div><wa-badge variant="neutral" pill>${windows.length} windows</wa-badge></div><div class="plan-label"><span>Window</span><span>Weighted price</span><span>Wall energy</span><span>Cost</span><span>SOC after</span></div>${rows || "<p>No proposed windows</p>"}<div class="plan-total"><div><small>WALL ENERGY</small><strong>${energy(summary.energy)}</strong></div><div><small>TOTAL COST</small><strong>${money(summary.cost, currency)}</strong></div><div><small>WEIGHTED AVERAGE</small><strong>${displayPrice2(summary.centsPerKwh)}</strong></div></div><p class="projection-note">SOC projection: ${start2} start, ${capacity} usable capacity, ${efficiency} efficiency. Battery energy = wall energy \xD7 efficiency; capped at 100%.</p>`;
 }
 
 // shared-dashboard/vehicle-view.js
@@ -52649,7 +52665,7 @@ function mountDashboard(root, adapter) {
     const prices = Array.isArray(chart?.prices) ? chart.prices.filter((p4) => Number.isFinite(p4?.start) && Number.isFinite(p4?.end) && p4.end > p4.start && Number.isFinite(p4.cents)) : [];
     const validBands = Array.isArray(chart?.bands) && chart.bands.length === 3 && chart.bands.every(Number.isFinite) && chart.bands[0] < chart.bands[1] && chart.bands[1] < chart.bands[2];
     const unit = chart?.unit || "c/kWh";
-    const priceNumber = (value2) => validBands ? number(value2, 2) : Number.isFinite(value2) ? String(value2) : "Unknown";
+    const priceNumber = priceText;
     const chartReady = prices.length > 0 && Array.isArray(chart?.horizon) && chart.horizon.length === 2 && chart.horizon.every(Number.isFinite) && chart.horizon[0] < chart.horizon[1] && Number.isFinite(chart.now) && (chart.bands == null || validBands) && ["date", "days", "priceGaps", "stepSegments", "stepPoints", "snapRange", "initialRange", "timeTicks"].every((key3) => typeof f3[key3] === "function");
     const readings = Array.isArray(m4.history?.readings) ? m4.history.readings.filter((r7) => Number.isFinite(r7?.time)).map((r7) => ({ time: r7.time, kw: Number.isFinite(r7.kw) && r7.kw >= 0 ? r7.kw : null })) : [];
     const sentHistory = m4.history?.sentHistory;
@@ -52658,16 +52674,17 @@ function mountDashboard(root, adapter) {
     const priceAt = (h3) => prices.find((p4) => p4.start <= h3 && h3 < p4.end)?.cents;
     const priceCard = (mode) => {
       const title = mode === "bar" ? "Bars" : "Stepped area";
-      if (!chartReady) return card(`Prices & plan \xB7 ${title}`, labels.chartEyebrow || "PRICES & PLAN", `<p>Price chart unavailable.</p>${plan}`, `prices prices-${mode}`, tag);
+      if (!chartReady) return card(`Prices & plan \xB7 ${title}`, labels.chartEyebrow || "PRICES & PLAN", `<p>Price chart unavailable.</p><p class="subtext">${escapeText(labels.chartIntro)} ${escapeText(labels.chartNote)}</p>${plan}`, `prices prices-${mode}`, tag);
       const extremum = (p4) => p4 ? `${priceNumber(p4.cents)} ${escapeText(unit)} \xB7 ${escapeText(day(p4.start))} ${escapeText(time(p4.start))}` : "Unknown";
-      return card(`Prices & plan \xB7 ${title}`, labels.chartEyebrow || "PRICES & PLAN", `<div class="chart-intro"><div><strong>${icon} ${mode === "bar" ? "A \xB7 Interval bars" : (chart?.comparison ? "B \xB7 " : "") + "Stepped area"}</strong><p>${escapeText(labels.chartIntro)}</p></div><div class="chart-actions"><wa-button data-zoom="${mode}" size="small" aria-label="Zoom in ${title}">Zoom +</wa-button><wa-button data-reset="${mode}" size="small" aria-label="Reset ${title} overview">Full horizon</wa-button><span>Wheel zooms \xB7 scroll outside chart</span></div></div><div class="price-context"><span>Now <b>${priceNumber(priceAt(chart.now))} ${escapeText(unit)}</b></span><span>Next window starts at <b>${priceNumber(m4.nextPriceUnavailable ? null : priceAt(next?.start))} ${escapeText(unit)}</b></span><span>Horizon low <b>${extremum(extremes[0])}</b></span><span>Horizon high <b>${extremum(extremes[1])}</b></span></div><div id="price-${mode}" class="chart price-chart" role="img" aria-label="Price intervals and proposed windows"></div><p class="legend">${escapeText(labels.bands)} ${validBands ? `<span class="band-green">\u25CF</span> \u2264${chart.bands[0]} <span class="band-amber">\u25CF</span> &gt;${chart.bands[0]}\u2013${chart.bands[1]} <span class="band-orange">\u25CF</span> &gt;${chart.bands[1]}\u2013${chart.bands[2]} <span class="band-red">\u25CF</span> &gt;${chart.bands[2]} ${escapeText(unit)}` : "Neutral price color."} <span class="shade"></span> Proposed charging \xB7 gradient + pale track ${Number.isFinite(chart.cap) ? `<span class="cap-key"></span> Soft cap ${number(chart.cap, 2)} ${escapeText(unit)}` : ""} <span class="now-key">\u2502</span> Now</p><p class="subtext">${escapeText(labels.chartNote)}</p>${plan}`, `prices prices-${mode}`, tag);
+      return card(`Prices & plan \xB7 ${title}`, labels.chartEyebrow || "PRICES & PLAN", `<div class="chart-intro"><div><strong>${icon} ${mode === "bar" ? "A \xB7 Interval bars" : (chart?.comparison ? "B \xB7 " : "") + "Stepped area"}</strong><p>${escapeText(labels.chartIntro)}</p></div><div class="chart-actions"><wa-button data-zoom="${mode}" size="small" aria-label="Zoom in ${title}">Zoom +</wa-button><wa-button data-reset="${mode}" size="small" aria-label="Reset ${title} overview">Full horizon</wa-button><span>Wheel zooms \xB7 scroll outside chart</span></div></div><div class="price-context"><span>Now <b>${priceNumber(priceAt(chart.now))} ${escapeText(unit)}</b></span><span>Next window starts at <b>${priceNumber(m4.nextPriceUnavailable ? null : priceAt(next?.start))} ${escapeText(unit)}</b></span><span>Horizon low <b>${extremum(extremes[0])}</b></span><span>Horizon high <b>${extremum(extremes[1])}</b></span></div><div id="price-${mode}" class="chart price-chart" role="img" aria-label="Price intervals and proposed windows"></div><p class="legend">${escapeText(labels.bands)} ${validBands ? `<span class="band-green">\u25CF</span> \u2264${chart.bands[0]} <span class="band-amber">\u25CF</span> &gt;${chart.bands[0]}\u2013${chart.bands[1]} <span class="band-orange">\u25CF</span> &gt;${chart.bands[1]}\u2013${chart.bands[2]} <span class="band-red">\u25CF</span> &gt;${chart.bands[2]} ${escapeText(unit)}` : "Neutral price color."} <span class="shade"></span> Proposed charging \xB7 gradient + pale track ${Number.isFinite(chart.cap) ? `<span class="cap-key"></span> Soft cap ${priceText(chart.cap)} ${escapeText(unit)}` : ""} <span class="now-key">\u2502</span> Now</p><p class="subtext">${escapeText(labels.chartNote)}</p>${plan}`, `prices prices-${mode}`, tag);
     };
     const scenario = m4.scenarios;
     const option = (s4) => `<option value="${escapeText(s4.value)}" ${s4.value === scenario.selected ? "selected" : ""}>${escapeText(s4.label)}</option>`;
-    const capCurrency = f3.currency === void 0 ? "EUR" : f3.currency;
-    const fields = [["Target SOC (%)", "target", "number"], ["Minimum SOC (%)", "minimum", "number"], [`Soft cap (${typeof capCurrency === "string" && /^[A-Z]{3}$/.test(capCurrency) ? capCurrency : "currency unknown"}/kWh)`, "cap", "number"], ["Ready by", "readyBy", "time"]].map(([label, key3, type]) => `<wa-input data-setting="${key3}" label="${escapeText(label)}" value="${escapeText(value(settings[key3]))}" type="${type}"${key3 === "cap" ? ' step="0.01"' : ""}${m4.canSave === true && !(m4.settingsEditor && (key3 === "target" && !m4.targetSupported || ["minimum", "cap"].includes(key3) && !m4.policySupported)) ? "" : " disabled"}></wa-input>`).join("");
+    const capCurrency = m4.capCurrency === void 0 ? f3.currency === void 0 ? "EUR" : f3.currency : m4.capCurrency;
+    const capUnit = priceUnit(capCurrency);
+    const fields = [["Target SOC (%)", "target", "number"], ["Minimum SOC (%)", "minimum", "number"], [`Soft cap (${capUnit})`, "cap", "number"], ["Ready by", "readyBy", "time"]].map(([label, key3, type]) => `<wa-input data-setting="${key3}" label="${escapeText(label)}" value="${escapeText(value(settings[key3]))}" type="${type}"${key3 === "cap" ? ' step="any"' : ""}${m4.canSave === true && !(m4.settingsEditor && (key3 === "target" && !m4.targetSupported || ["minimum", "cap"].includes(key3) && !m4.policySupported)) ? "" : " disabled"}></wa-input>`).join("");
     const policyFields = m4.settingsEditor ? `<label><input type="checkbox" data-setting="capEnabled" ${settings.capEnabled ? "checked" : ""} ${m4.canSave && m4.policySupported ? "" : "disabled"}> Enable soft cap</label><label>Cap price basis <select data-setting="capBasis" ${m4.canSave && m4.policySupported ? "" : "disabled"}><option value="">Not set (suggested: Nord Pool)</option><option value="nord_pool" ${settings.capBasis === "nord_pool" ? "selected" : ""}>Nord Pool</option><option value="configured_variable_cost" ${settings.capBasis === "configured_variable_cost" ? "selected" : ""}>Configured variable cost</option></select></label><label><input type="checkbox" data-setting="deadlineEnabled" ${settings.deadlineEnabled ? "checked" : ""} ${m4.canSave ? "" : "disabled"}> Enable ready-by</label>` : "";
-    const policyHelp = m4.settingsEditor ? `<div class="settings-help"><p>Saved target: ${escapeText(settings.target == null ? "not set" : `${settings.target}%`)}. Minimum ready-by SOC: ${escapeText(settings.minimum == null ? "not set (optional)" : `${settings.minimum}%`)}.</p><p>Soft cap: ${settings.capEnabled ? `enabled, ${escapeText(settings.cap)} ${escapeText(capCurrency || "currency unknown")}/kWh` : "off (no saved cap)"}. Enter a cap and choose its basis to enable it. The cap basis defines which price is compared; it does not select the price provider.</p><p>Ready-by: ${settings.deadlineEnabled ? `enabled at ${escapeText(settings.readyBy)}` : `off (saved time ${escapeText(settings.readyBy)})`}. Changes are saved only when you choose Save plan.</p></div>` : "";
+    const policyHelp = m4.settingsEditor ? `<div class="settings-help"><p>Saved target: ${escapeText(settings.target == null ? "not set" : `${settings.target}%`)}. Minimum ready-by SOC: ${escapeText(settings.minimum == null ? "not set (optional)" : `${settings.minimum}%`)}.</p><p>Soft cap: ${settings.capEnabled ? `enabled, ${escapeText(priceText(Number(settings.cap)))} ${escapeText(capUnit)}` : "off (no saved cap)"}. Enter a cap and choose its basis to enable it. The cap basis defines which price is compared; it does not select the price provider.</p><p>Ready-by: ${settings.deadlineEnabled ? `enabled at ${escapeText(settings.readyBy)}` : `off (saved time ${escapeText(settings.readyBy)})`}. Changes are saved only when you choose Save plan.</p></div>` : "";
     const html = `<div class="shell"><header class="masthead"><div><div class="brand">SPOTNAV <span>ENHANCED</span></div><h1>Charging, in focus.</h1><p>A single view of your vehicle, plan and charger.</p></div>${labels.banner ? `<div class="sample-banner">${escapeText(labels.banner)}<br><span>${escapeText(labels.bannerDetail)}</span></div>` : ""}</header>
       ${scenario ? `<div class="scenario-picker"><label for="sample-state">${escapeText(scenario.label)}</label><select id="sample-state">${(scenario.options || []).map(option).join("")}</select><span>${escapeText(scenario.note)}</span></div>` : ""}
       <div id="critical-live" role="status" aria-live="polite">${m4.warning ? `<div class="alert"><div><strong>${escapeText(m4.warning.title)}</strong><p>${escapeText(m4.warning.detail)}</p></div><a href="#details">View details \u2193</a></div>` : ""}</div><div class="dashboard">
@@ -59731,7 +59748,7 @@ function publishedChart(raw, market, now, stale) {
     if (!row || typeof row.start !== "string" || typeof row.end !== "string" || !/(?:Z|[+-]\d\d:\d\d)$/i.test(row.start) || !/(?:Z|[+-]\d\d:\d\d)$/i.test(row.end)) return null;
     const start2 = Date.parse(row.start), end2 = Date.parse(row.end);
     if (!Number.isFinite(start2) || !Number.isFinite(end2) || end2 <= start2 || start2 < previous || !(row.raw_price === null || Number.isFinite(row.raw_price))) return null;
-    if (row.raw_price !== null) prices.push({ start: start2, end: end2, cents: row.raw_price });
+    if (row.raw_price !== null) prices.push({ start: start2, end: end2, cents: displayPrice(row.raw_price, currency) });
     previous = end2;
   }
   if (!prices.length) return null;
@@ -59780,7 +59797,7 @@ function publishedChart(raw, market, now, stale) {
     for (let t6 = Math.ceil(start2 / step) * step; t6 < end2; t6 += step) out2.push(t6);
     return out2;
   };
-  return { chart: { prices, now, horizon, cap: null, bands: null, unit: `${currency}/kWh` }, format: { chartTime: time, date: date2, tooltipDate: date2, days, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks } };
+  return { chart: { prices, now, horizon, cap: null, bands: null, unit: priceUnit(currency) }, format: { chartTime: time, date: date2, tooltipDate: date2, days, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks } };
 }
 
 // sidebar/adapter.js
@@ -59802,6 +59819,27 @@ var part = (ms, zone, options) => {
     return U;
   }
 };
+var providerName = (key3) => ({ nordpool: "Nord Pool", entsoe: "ENTSO-E", pvpc: "PVPC", octopus: "Octopus Energy", zonneplan: "Zonneplan", relay: "Legacy relay" })[key3] || (typeof key3 === "string" && key3 ? key3 : "unknown provider");
+function priceProvenance(prices, market, zone, stale = false, now = Date.now()) {
+  const selected = prices?.provider?.name || (prices?.provider?.key ? providerName(prices.provider.key) : "Unavailable");
+  const area = [market?.area_name, market?.area_id].filter(Boolean).join(" \xB7 ") || "Unknown";
+  const fetched = (value2) => {
+    const ms = Date.parse(value2 || "");
+    if (!Number.isFinite(ms) || ms > now) return "unknown or future timestamp";
+    const hours = (now - ms) / 36e5;
+    return `${date(value2, zone)} (${hours < 1 ? "less than 1 hour ago" : `${Math.floor(hours)} hours ago`})`;
+  };
+  const describe = (prefix) => {
+    const day = typeof prices?.[prefix] === "string" ? prices[prefix] : "unknown day";
+    const state = typeof prices?.[`${prefix}_state`] === "string" ? prices[`${prefix}_state`] : "unknown";
+    const facts = prices?.[`${prefix}_provenance`];
+    if (!Array.isArray(facts) || !facts.length) return `${prefix} ${day}: ${state}; held provider unavailable; fetched ${fetched(prices?.[`${prefix}_fetched_at`])}.`;
+    const names = new Set(facts.map((f3) => providerName(f3?.provider)));
+    const detail = facts.map((f3) => `${providerName(f3?.provider)} (market day ${typeof f3?.market_day === "string" ? f3.market_day : "unknown"}, ${typeof f3?.state === "string" ? f3.state : "unknown"}, fetched ${fetched(f3?.fetched_at)})`).join("; ");
+    return `${prefix} ${day}: ${state}${names.size > 1 ? " \xB7 mixed providers" : ""}; ${detail}.`;
+  };
+  return `Current provider route: ${selected}; market/area: ${area}. ${describe("today")} ${describe("tomorrow")} ${stale ? "Dashboard observation stale or unavailable." : "Provider route may differ from held files."}`;
+}
 function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed = false, dashboardFailed = false) {
   const decoded = decodeDashboard(raw);
   if (!decoded.ok) return null;
@@ -59826,7 +59864,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
   const currency = proposal?.cost?.currency || null;
   const warning = status?.outcomes?.uncertain || status?.operator?.state === "mismatch" || status?.verification?.reason === "limits_or_transitions_differ";
   const published = publishedChart(raw, d3.market, now, stale || dashboardFailed);
-  const priceFreshness = `Today source fetched ${date(raw?.prices?.today_fetched_at, zone)}; tomorrow source fetched ${date(raw?.prices?.tomorrow_fetched_at, zone)}.`;
+  const priceFreshness = priceProvenance(raw?.prices, d3.market, zone, stale || dashboardFailed, now);
   return {
     draftKey: d3.charger.charger_id,
     format: { currency, minutesPerTimeUnit: 1 / 6e4, time: (ms) => part(ms, zone, { timeStyle: "short" }), day: (ms) => part(ms, zone, { dateStyle: "medium" }), ...published?.format },
@@ -59852,7 +59890,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.67";
+var CARD_VERSION = "2.5.69";
 
 // sidebar/panel.js
 var settingsWritesByConnection = /* @__PURE__ */ new WeakMap();
@@ -59939,7 +59977,10 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
   stopObservations(preserveDraft = false) {
     const dirty = preserveDraft && this.settingsDirty;
     if (dirty && this.settingsRecord) this.draftRevision = this.settingsRecord.revision;
-    else if (!preserveDraft) this.draftRevision = null;
+    else if (!preserveDraft) {
+      this.draftRevision = null;
+      this.draftCurrency = void 0;
+    }
     if (this.settingsBusy && this.charger) this.unknownSettingsWrites.add(this.charger);
     this.generation++;
     clearInterval(this.ageTimer);
@@ -59999,9 +60040,15 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     const allowed = this._hass?.user?.is_admin === true || dashboard?.settings?.users_change_plan === true;
     if (this.settingsRecord) {
       const record3 = this.settingsRecord;
-      adapter.model.settings = { target: record3.target.target_percent, minimum: record3.minimum_ready_by_soc, cap: record3.soft_price_cap, readyBy: record3.departure_time, capEnabled: record3.soft_price_cap != null, capBasis: record3.cap_price_basis, deadlineEnabled: record3.departure_enabled };
+      const currency = dashboard?.market?.currency || null;
+      if (this.settingsDirty && this.draftCurrency !== void 0 && this.draftCurrency !== currency) {
+        this.settingsConflict = true;
+        this.settingsNotice = "Price currency changed while editing. Reload settings before saving.";
+      }
+      adapter.model.capCurrency = currency;
+      adapter.model.settings = { target: record3.target.target_percent, minimum: record3.minimum_ready_by_soc, cap: capInput(record3.soft_price_cap, currency), readyBy: record3.departure_time, capEnabled: record3.soft_price_cap != null, capBasis: record3.cap_price_basis, deadlineEnabled: record3.departure_enabled };
       if (adapter.model.chart && record3.revision === dashboard?.settings?.revision && record3.cap_price_basis === "nord_pool" && Number.isFinite(record3.soft_price_cap)) {
-        adapter.model.chart.cap = record3.soft_price_cap;
+        adapter.model.chart.cap = displayPrice(record3.soft_price_cap, currency);
       }
       adapter.model.settingsEditor = true;
       adapter.model.targetSupported = record3.driver === "target_soc";
@@ -60013,6 +60060,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       adapter.actions.save = (values) => this.savePlan(values);
       adapter.actions.reloadSettings = () => this.reloadSettings();
       adapter.actions.edit = () => {
+        if (!this.settingsDirty) this.draftCurrency = currency;
         this.settingsDirty = true;
         this.paintMorek();
       };
@@ -60086,6 +60134,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     if (!window.confirm("Discard the current draft and reload the latest settings?")) return;
     this.view?.resetDrafts();
     this.draftRevision = null;
+    this.draftCurrency = void 0;
     this.settingsRecord = null;
     this.settingsConflict = false;
     this.settingsDirty = false;
@@ -60207,7 +60256,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       this.paint();
       return;
     }
-    const form = { ...formFromRecord(record3), targetPercent: values.target, minimumReadySoc: values.minimum, capValue: values.cap, capEnabled: values.capEnabled, capBasis: values.capBasis, deadlineEnabled: values.deadlineEnabled, deadlineTime: values.readyBy };
+    const form = { ...formFromRecord(record3), targetPercent: values.target, minimumReadySoc: values.minimum, capValue: capForSave(values.cap, decoded.ok ? decoded.value.market?.currency : null, record3.soft_price_cap), capEnabled: values.capEnabled, capBasis: values.capBasis, deadlineEnabled: values.deadlineEnabled, deadlineTime: values.readyBy };
     const check = replacementFor("plan", record3, form);
     if (!check.ok) {
       this.settingsNotice = translate2("en", check.errorKey);
@@ -60240,6 +60289,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
         this.settingsRecord = answer.value.settings;
         this.settingsDirty = false;
         this.draftRevision = null;
+        this.draftCurrency = void 0;
         this.settingsNotice = "Saved and confirmed.";
         this.view?.resetDrafts();
         this.dashboardEpoch++;

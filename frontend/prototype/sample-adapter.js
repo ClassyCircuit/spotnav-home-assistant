@@ -25,7 +25,7 @@ export function createSampleAdapter() {
   const missingInsights = dailyScenario === 'unavailable' || new URLSearchParams(location.search).get('insights') === 'missing';
   return { format:{time,day,minutesPerTimeUnit:60,staleLabel:'stale sample',date:sampleDate,tooltipDate:h=>`${sampleDate(h)} 2026`,days:sampleDays,priceGaps,stepSegments,stepPoints,snapRange,initialRange,timeTicks},
     actions:{selectScenario(selected) { const url = new URL(location.href); url.searchParams.set('state',selected); location.href = url.href; }},
-    model:{sample:true,windows,assumptions:socAssumptions,vehicle:state,settings:{target:80,minimum:40,cap:.35,readyBy:'07:00'},untilDeadline:'16h 30m',targetNote,nextPriceUnavailable:scenario==='missing',
+    model:{sample:true,windows,assumptions:socAssumptions,vehicle:state,settings:{target:80,minimum:40,cap:35,readyBy:'07:00'},untilDeadline:'16h 30m',targetNote,nextPriceUnavailable:scenario==='missing',
       scenarios:{label:'Sample scenario',selected:dailyScenario,options:Object.entries(dailyStates).map(([value,s])=>({value,label:s.label})),note:'Local illustration only · no settings or charger actions'},
       warning:state.warning ? {title:dailyScenario==='mismatch'?'Schedule needs attention':'Sample state needs attention',detail:dailyScenario==='mismatch'?'Sample effective limits differ from the last sent plan. This is not proof of charging; measured power is shown separately.':state.policy}:null,
       chart:{prices,now,deadline,horizon,cap,bands:[30,45,60],comparison:new URLSearchParams(location.search).get('comparison')==='bar'},
