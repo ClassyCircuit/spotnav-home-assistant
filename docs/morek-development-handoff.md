@@ -355,6 +355,18 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-13 — single-vehicle planning selector (2.5.81)
+
+- The sidebar incorrectly populated and validated planning vehicles from the SOC
+  alternatives list, which may be empty when one vehicle is already resolved. It
+  now reuses the old card's charger-eligible vehicle choices for both display and
+  save validation. A missing explicit target remains unsaved until the user selects
+  and saves; loading the sidebar does not change settings or command a charger.
+- Focused sidebar tests passed (83, with jsdom CSS warnings); frontend build and
+  check-dist passed. Read-only HA diagnostics confirmed the relevant contract shape;
+  no settings write, vehicle refresh or charger action was performed. Actual HA
+  rendering and behavior of this new version remain unverified until deployed.
+
 ### 2026-11-13 — sidebar plan mode (2.5.80; local, review pending)
 
 - The shared sidebar exposes explicit requested-kWh or target-SOC planning, requested

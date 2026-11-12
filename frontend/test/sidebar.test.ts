@@ -38,7 +38,7 @@ describe('actual sidebar read-only host', () => {
     expect(panel.settingsRecord.driver).toBe(to);panel.remove();
   });
   it('validates mode inputs, preserves drafts and refuses unavailable or guest vehicle choices', async () => {
-    const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';raw.soc.vehicle_id=null;raw.soc.vehicle_name=null;raw.soc.capacity_kwh=null;raw.soc.vehicles=[];const calls=[];
+    const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';raw.soc.vehicle_id=null;raw.soc.vehicle_name=null;raw.soc.capacity_kwh=null;raw.soc.vehicles=[];raw.vehicle_choices=[];raw.vehicles=[];const calls=[];
     const initial={...record(),driver:'manual_kwh',target:{vehicle_id:null,target_percent:null}};
     const hass={connected:true,user:{is_admin:true},callWS:msg=>{calls.push(msg);return Promise.resolve(msg.type==='spotnav/list_chargers'?{api_version:1,chargers:[{charger_id:'a',charger_name:'A'}]}:msg.type==='spotnav/get_dashboard'?raw:msg.type==='spotnav/get_settings'?envelope(initial):status);}};
     const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();const root=panel.shadowRoot;
@@ -48,6 +48,17 @@ describe('actual sidebar read-only host', () => {
     const vals={driver:'target_soc',energy:'20',vehicleId:'guest',target:'80',minimum:'40',cap:'0.1',capEnabled:true,capBasis:'nord_pool',deadlineEnabled:true,readyBy:'06:30'};await panel.savePlan(vals);expect(panel.settingsNotice).toMatch(/available discovered vehicle/);
     await panel.savePlan({...vals,vehicleId:'',target:'30',minimum:'40'});expect(panel.settingsNotice).toMatch(/Minimum SOC/);
     await panel.savePlan({...vals,driver:'manual_kwh',vehicleId:'',energy:'-1'});expect(calls.filter(m=>m.type==='spotnav/update_settings')).toHaveLength(0);panel.remove();
+  });
+  it('offers and saves the sole discovered vehicle even when the SOC alternatives list is empty', async () => {
+    const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';raw.soc.vehicles=[];
+    raw.vehicle_choices=[{id:'vehicle_ev6',name:'Vehicle'}];raw.settings.vehicle_ids=null;
+    let saved={...record(),driver:'target_soc',target:{vehicle_id:null,target_percent:80}};const calls=[];
+    const hass={connected:true,user:{is_admin:true},callWS:msg=>{calls.push(msg);if(msg.type==='spotnav/list_chargers')return Promise.resolve({api_version:1,chargers:[{charger_id:'a',charger_name:'A'}]});if(msg.type==='spotnav/get_dashboard')return Promise.resolve(raw);if(msg.type==='spotnav/get_settings')return Promise.resolve(envelope(saved));if(msg.type==='spotnav/update_settings'){saved={...msg.settings,revision:8};return Promise.resolve(envelope(saved));}return Promise.resolve(status);}};
+    const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();
+    const select=panel.shadowRoot.querySelector('[data-setting="vehicleId"]');expect([...select.options].map(o=>o.value)).toContain('vehicle_ev6');expect(select.value).toBe('');
+    expect(calls.filter(m=>m.type==='spotnav/update_settings')).toHaveLength(0);
+    select.value='vehicle_ev6';select.dispatchEvent(new Event('change',{bubbles:true}));panel.shadowRoot.querySelector('#save-plan').click();await tick();
+    expect(calls.find(m=>m.type==='spotnav/update_settings').settings.target.vehicle_id).toBe('vehicle_ev6');panel.remove();
   });
   it.each(['denied','conflict','rejected'])('retains mode draft on %s save', async outcome => {
     const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';raw.settings.users_change_plan=false;const calls=[];const initial={...record(),driver:'manual_kwh'};

@@ -59473,6 +59473,13 @@ function progressOrNull(root) {
 }
 
 // src/model.ts
+function chargerCarsOf(dashboard) {
+  if (dashboard.vehicle_choices.length === 0) {
+    return dashboard.vehicles.map((row) => ({ id: row.id, name: row.name }));
+  }
+  const allowed = dashboard.settings?.vehicle_ids ?? null;
+  return dashboard.vehicle_choices.filter((choice) => allowed === null || allowed.includes(choice.id));
+}
 function admittedAction(control, action, choice) {
   if (action === ACTION_START) {
     return choice === null && control.immediate_action === ACTION_START;
@@ -60070,7 +60077,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.80";
+var CARD_VERSION = "2.5.81";
 
 // sidebar/panel.js
 var fresh = (timestamp, failed = false) => observationFreshness(timestamp, Date.now(), failed) === "fresh";
@@ -60287,7 +60294,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       }
       adapter.model.capCurrency = currency;
       adapter.model.settings = { driver: record3.driver, energy: record3.requested_kwh, vehicleId: record3.target.vehicle_id || "", target: record3.target.target_percent, minimum: record3.minimum_ready_by_soc, cap: capInput(record3.soft_price_cap, currency), readyBy: record3.departure_time, capEnabled: record3.soft_price_cap != null, capBasis: record3.cap_price_basis, deadlineEnabled: record3.departure_enabled };
-      adapter.model.planVehicles = (dashboard?.soc?.vehicles || []).filter((v2) => v2.id && v2.id !== "guest");
+      adapter.model.planVehicles = dashboard ? chargerCarsOf(dashboard).filter((v2) => v2.id && v2.id !== "guest") : [];
       const discovered = dashboard?.soc?.vehicle_id, selected = record3.target.vehicle_id;
       adapter.model.vehicleHelp = selected === "guest" || dashboard?.guest?.active ? "Guest charging uses requested energy; choose a configured vehicle for a target-SOC plan." : selected ? adapter.model.planVehicles.some((v2) => v2.id === selected) ? "Saved vehicle selected." : "Saved vehicle is not currently discovered; check vehicle configuration." : discovered && discovered !== "guest" ? `No vehicle saved; currently discovered: ${dashboard?.soc?.vehicle_name || discovered}. Choose it explicitly if desired.` : "No unambiguous vehicle selected. Choose a discovered vehicle or configure vehicle discovery.";
       adapter.model.vehicleHelp += ` ${dashboard?.soc?.capacity_kwh > 0 ? "Capacity is available for the observed vehicle." : "Usable battery capacity is unavailable for the observed vehicle; configure it before relying on an SOC plan."} ${adapter.model.vehicle.socDetail} An old reading can be inaccurate after driving.`;
@@ -60504,7 +60511,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       return;
     }
     const base2 = formFromRecord(record3), driver = values.driver ?? base2.driver, vehicleId = values.vehicleId ?? base2.vehicleId;
-    if (vehicleId !== base2.vehicleId && (!decoded.ok || !decoded.value.soc?.vehicles.some((v2) => v2.id === vehicleId && v2.id !== "guest"))) {
+    if (vehicleId !== base2.vehicleId && (!decoded.ok || !chargerCarsOf(decoded.value).some((v2) => v2.id === vehicleId && v2.id !== "guest"))) {
       this.settingsNotice = "Choose an available discovered vehicle.";
       this.paint();
       return;

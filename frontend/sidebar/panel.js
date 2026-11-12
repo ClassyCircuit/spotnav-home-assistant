@@ -1,6 +1,6 @@
 import { mountDashboard } from '../shared-dashboard/dashboard.js';
 import { listChargers, getDashboard, morekSchedule, getSettings, updateSettings, performAction } from '../src/api.ts';
-import { admittedAction } from '../src/model.ts';
+import { admittedAction, chargerCarsOf } from '../src/model.ts';
 import { decodeSettingsAnswer, formFromRecord, replacementFor } from '../src/settings.ts';
 import { decodeDashboard } from '../src/validate.ts';
 import { translate } from '../src/i18n/index.ts';
@@ -165,7 +165,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
       if (this.settingsDirty && this.draftCurrency!==undefined && this.draftCurrency!==currency) {this.settingsConflict=true;this.settingsNotice='Price currency changed while editing. Reload settings before saving.';}
       adapter.model.capCurrency=currency;
       adapter.model.settings={driver:record.driver,energy:record.requested_kwh,vehicleId:record.target.vehicle_id || '',target:record.target.target_percent,minimum:record.minimum_ready_by_soc,cap:capInput(record.soft_price_cap,currency),readyBy:record.departure_time,capEnabled:record.soft_price_cap!=null,capBasis:record.cap_price_basis,deadlineEnabled:record.departure_enabled};
-      adapter.model.planVehicles=(dashboard?.soc?.vehicles || []).filter(v=>v.id && v.id!=='guest');
+      adapter.model.planVehicles=dashboard ? chargerCarsOf(dashboard).filter(v=>v.id && v.id!=='guest') : [];
       const discovered=dashboard?.soc?.vehicle_id, selected=record.target.vehicle_id;
       adapter.model.vehicleHelp=selected==='guest' || dashboard?.guest?.active ? 'Guest charging uses requested energy; choose a configured vehicle for a target-SOC plan.' : selected ? (adapter.model.planVehicles.some(v=>v.id===selected) ? 'Saved vehicle selected.' : 'Saved vehicle is not currently discovered; check vehicle configuration.') : discovered && discovered!=='guest' ? `No vehicle saved; currently discovered: ${dashboard?.soc?.vehicle_name || discovered}. Choose it explicitly if desired.` : 'No unambiguous vehicle selected. Choose a discovered vehicle or configure vehicle discovery.';
       adapter.model.vehicleHelp+=` ${dashboard?.soc?.capacity_kwh > 0 ? 'Capacity is available for the observed vehicle.' : 'Usable battery capacity is unavailable for the observed vehicle; configure it before relying on an SOC plan.'} ${adapter.model.vehicle.socDetail} An old reading can be inaccurate after driving.`;
@@ -324,7 +324,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     const allowed=hass?.user?.is_admin===true || (decoded.ok && decoded.value.settings?.users_change_plan===true);
     if (!this.connected || hass?.connected===false || !charger || !record || this.settingsBusy || this.pendingSettingsWrites.has(charger) || this.morekBusy || this.autoBusy || this.settingsConflict || !allowed) {this.settingsNotice='Save unavailable or permission denied.';this.paint();return;}
     const base=formFromRecord(record), driver=values.driver ?? base.driver, vehicleId=values.vehicleId ?? base.vehicleId;
-    if (vehicleId!==base.vehicleId && (!decoded.ok || !decoded.value.soc?.vehicles.some(v=>v.id===vehicleId && v.id!=='guest'))) {this.settingsNotice='Choose an available discovered vehicle.';this.paint();return;}
+    if (vehicleId!==base.vehicleId && (!decoded.ok || !chargerCarsOf(decoded.value).some(v=>v.id===vehicleId && v.id!=='guest'))) {this.settingsNotice='Choose an available discovered vehicle.';this.paint();return;}
     const form={...base,driver,energy:values.energy ?? base.energy,vehicleId,targetPercent:values.target ?? base.targetPercent,minimumReadySoc:values.minimum,capValue:capForSave(values.cap,decoded.ok ? decoded.value.market?.currency : null,record.soft_price_cap),capEnabled:values.capEnabled,capBasis:values.capBasis,deadlineEnabled:values.deadlineEnabled,deadlineTime:values.readyBy};
     const check=replacementFor('plan',record,form);
     if (!check.ok) {this.settingsNotice=translate('en',check.errorKey);this.paint();return;}
