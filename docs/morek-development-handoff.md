@@ -355,14 +355,27 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-13 — single-car plan defaults (2.5.82)
+
+- When no planning vehicle is saved and exactly one eligible non-guest vehicle is
+  discovered, the sidebar proposes it with target-SOC mode, an 80% target, 40%
+  ready-by minimum and 07:30 deadline. The UI marks these as unsaved proposals;
+  only an explicit Save plan writes them and can trigger normal guarded replanning.
+  An existing saved vehicle and plan are not overridden on subsequent visits, and
+  ambiguous or guest vehicle cases are not automatically selected.
+- Focused sidebar tests passed (85; jsdom CSS warnings). Frontend build and
+  check-dist passed. No HA settings or charger action was performed, and the
+  new version has not been validated in deployed HA.
+
 ### 2026-11-13 — single-vehicle planning selector (2.5.81)
 
 - The sidebar incorrectly populated and validated planning vehicles from the SOC
   alternatives list, which may be empty when one vehicle is already resolved. It
   now reuses the old card's charger-eligible vehicle choices for both display and
-  save validation. A missing explicit target remains unsaved until the user selects
-  and saves; loading the sidebar does not change settings or command a charger.
-- Focused sidebar tests passed (83, with jsdom CSS warnings); frontend build and
+  save validation. When no target is saved, the sole eligible vehicle is selected
+  as a default in the form, but remains unsaved until Save plan; loading the sidebar
+  does not change settings or command a charger. Multiple vehicles require a choice.
+- Focused sidebar tests passed (84, with jsdom CSS warnings); frontend build and
   check-dist passed. Read-only HA diagnostics confirmed the relevant contract shape;
   no settings write, vehicle refresh or charger action was performed. Actual HA
   rendering and behavior of this new version remain unverified until deployed.
