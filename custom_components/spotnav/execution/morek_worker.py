@@ -39,6 +39,7 @@ class MorekScheduleWorker:
         self._availability_generation = 0
         self._suspended = False
         self.reason = "not_started"
+        self.reason_serial = -1
         self.resume_ticket = None
 
     def start(self) -> None:
@@ -87,6 +88,9 @@ class MorekScheduleWorker:
         if preview_for(self._hass, self._entry_id) is not self._planner:
             raise morek_schedule.ScheduleRefused("planner_changed")
         profile = morek_schedule._proposed_profile(self._hass, self._entry_id, datetime.now(timezone.utc))
+        blocker = self._planner.morek_plan_blocker(self._planner.snapshot(), datetime.now(timezone.utc))
+        if blocker is not None:
+            raise morek_schedule.ScheduleRefused(blocker)
         return profile, morek_schedule._preview_id(profile, [settings.revision, pause["id"]] if pause is not None else settings.revision)
 
     async def _run(self) -> None:
@@ -104,6 +108,7 @@ class MorekScheduleWorker:
                     self.reason = "worker_unavailable"
                     _LOGGER.exception("Morek schedule worker failed")
                 if serial == self._serial:
+                    self.reason_serial = serial
                     return
         finally:
             self._task = None

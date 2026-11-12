@@ -33,6 +33,38 @@ class StatusStore:
 
 
 @pytest.mark.asyncio
+async def test_manual_profile_stop_reservation_during_owner_lookup_refuses_write():
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    class DelayedStore:
+        async def async_status(self, entry, resolved):
+            entered.set()
+            await release.wait()
+            return status()
+
+    gate = CommandAdmission(DelayedStore())
+    write = AsyncMock()
+    task = asyncio.create_task(gate.async_manual_profile("a", identity, write))
+    await entered.wait()
+    with gate.person_stop_reservation("a", identity):
+        release.set()
+        result = await task
+    assert not result.allowed and result.reason == "stale_generation"
+    write.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_new_ordinary_and_manual_writes_waiting_on_reserved_stop_are_refused():
+    gate = CommandAdmission(StatusStore())
+    write = AsyncMock()
+    with gate.person_stop_reservation("a", identity):
+        ordinary = await gate.async_execute("a", "legacy_actuator", identity, write)
+        manual = await gate.async_manual_profile("a", identity, write)
+    assert ordinary.reason == manual.reason == "stale_generation"
+    write.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_aliases_serialize_and_different_connectors_run_independently():
     class Store:
         async def async_status(self, entry, resolved):

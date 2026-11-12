@@ -6,6 +6,22 @@ Re-check the live system and Git state before acting; observations below may bec
 
 ## Approved next direction (planning, not implemented)
 
+**BMW limit and current monitoring:** the user relies on the BMW's own configured
+charge limit to stop charging at its target, not a second SpotNav live SOC-stop
+controller. The car's setting and SpotNav's planning target are separate; their
+agreement and actual behavior are not verified here. The app must still show useful
+current charging and execution health: use genuine available status and measured
+power/energy, label freshness and source, distinguish reported state from measured
+flow, and show unknown/offline/mismatch/errors honestly. Basic monitoring belongs in
+5.7, not only later history or Stage 11; no source or physical behavior is assumed.
+
+**Stage 11 — adaptive Morek estimates:** the user wants future charging-time and
+target-SOC estimates to improve from actual charging and a shortfall to trigger safe
+replanning. Existing learned-power, learned-energy and plan-watch code is groundwork,
+but its Morek-owned wiring and usable measurement sources are not established. Reuse
+and verify it rather than build a second learner; do not infer measurements from a
+schedule. This is post-installation work, not a new 5.8 prerequisite.
+
 **Stage 5 deployment clarification:** once development is complete and reviewed,
 the user intends to merge the current branch to `main`, install it in HA and test
 the deployed system personally. 5.8 is a user-owned milestone, not an LLM task or
@@ -315,8 +331,84 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
-### 2026-11-12 — 5.6b Pause and Resume (2.5.52; local mocked, review pending)
+### 2026-11-12 — 5.6c invalid plans and writers (2.5.54; mocked, review pending)
 
+- Automatic Morek intent now compares the calculation's process-local source,
+  vehicle and connection evidence with current inputs, synchronously at each existing
+  shared-send validation. It checks current per-day state/authority and actual UTC
+  price intervals covering the remaining windows, including day boundaries and DST.
+  It refuses stale/changed/missing evidence without clearing a retained limit; unchanged
+  SOC age alone is not a change, while existing SOC freshness rules still apply.
+  Pause's held-off intent does not require a plan or prices. Manual preview/send keeps
+  its existing plan-validation contract. Production owned-profile admission is still
+  unconditionally unarmed; schedule-owned sidebar controls stay disabled.
+- This is deliberately conservative: only target-SOC cheapest-price plan provenance
+  is currently supported; manual-kWh and solar/hybrid plans fail closed as
+  `plan_input_provenance_unavailable`. Manual energy's mutable register/session
+  accounting and hybrid forecasts do not have a demonstrated synchronous provenance
+  boundary here. This restriction must be reviewed and resolved if those modes are
+  needed for activation; it does not prohibit the existing manual experiment.
+- Stop reservations now also invalidate manual Send/Clear across their ledger and
+  entry-store awaits. A known pre-dispatch abort is recorded and prior sent evidence
+  is restored; an interrupted restoration is not described as a sent attempt in
+  status. Existing unknown-outcome latch, restart Resume reconfirmation, identity and
+  ownership checks, and regulator-protection exception remain. The status API and
+  Morek details show worker blockers without conflating ACK/readback and measurement.
+- External/OCPP writers and the installation's native protection cannot be proved or
+  controlled by these mocks; composite schedules are not profile inventory. Held exit
+  still has no release and is an explicit 5.7 activation blocker. First-use/lost-state
+  provenance, authorization and protection conflict resolution remain open. No live
+  HA, charger, deployment or physical behavior was tested.
+- `python tools/run_isolated_planning_tests.py -x`: 544 passed, 1 deselected.
+  `python tools/run_isolated_lifecycle_tests.py tests/test_morek_schedule.py
+  tests/test_morek_readiness.py tests/test_command_admission.py
+  tests/test_execution_ownership.py tests/test_morek_outcomes.py -x`: 270 passed.
+  Targeted Ruff passed; in `frontend/`, `npm run build`, `npm run check-dist`,
+  `npm run type-check`, and `npm run test -- test/sidebar.test.ts
+  test/morek-view.test.ts` passed (61 tests). A first run of a new DST test failed
+  because `shown_periods` is computed, not an initializer field; its fixture was fixed.
+  Pytest reported the existing timeout-option and dependency deprecation warnings;
+  jsdom reported CSS parse warnings. Full 5.4c HA-plugin suite remains unrun.
+  Stop for coordinator review; 5.7 remains open.
+
+### 2026-11-12 — 5.6c partial investigation (2.5.53; not complete)
+
+- Manual profile admission now checks connector generation again after its awaited
+  ownership lookup. A mocked person Stop reservation at that boundary refuses the
+  older operation before its callback. This does not recall an already admitted or
+  external operation, or establish a complete competing-writer policy.
+- Existing worker paths refuse reported unavailable/stale/unpriced/invalid plans,
+  retain pending Resume confirmation across restart and latch uncertain outcomes.
+  However, `snapshot_is_current` establishes latest calculation/settings identity,
+  not by itself time-based price or other input freshness at dispatch. Whether all
+  relevant changes reliably publish before dispatch requires further actual-module
+  investigation, implementation where needed, and delayed/restart/recovery tests.
+  The full requested 5.6c status and competing-writer matrix remains outstanding.
+- Ordinary SpotNav writers use ownership guards; the explicitly classified regulator
+  protection path is separate. External/OCPP or installation-specific writers are
+  not controlled or inventoried here. Protection must not be disabled. Held exit has
+  no release path and is an explicit 5.7 activation blocker; no profile removal or
+  release mechanism was added. Owned dispatch remains unconditionally unarmed and
+  schedule-owned sidebar controls remain disabled. No live behavior is claimed.
+- Checks: `python tools/run_isolated_planning_tests.py -x` 523 passed, 1 deselected;
+  `python tools/run_isolated_lifecycle_tests.py tests/test_morek_schedule.py
+  tests/test_morek_readiness.py tests/test_command_admission.py
+  tests/test_execution_ownership.py tests/test_morek_outcomes.py -x` 269 passed;
+  `ruff check custom_components/spotnav/execution/command_admission.py
+  tests/test_command_admission.py` passed. In `frontend/`, `npm run build`,
+  `npm run check-dist`, `npm run type-check`, and `npm run test --
+  test/sidebar.test.ts test/morek-view.test.ts` passed (60 frontend tests).
+  Pytest reported existing timeout-option and dependency deprecation warnings;
+  jsdom reported CSS parse warnings. Full 5.4c HA-plugin suite remains unrun.
+  No live HA, hardware or deployment actions. Stop for coordinator review.
+
+### 2026-11-12 — 5.6b Pause and Resume (2.5.52; local mocked, quick review)
+
+- Quick coordinator review found no blocker to 5.6c. Independently reran the
+  isolated planning suite (522 passed, 1 deselected) and listed lifecycle suite
+  (256 passed); existing pytest configuration/deprecation warnings remain. This
+  review was not a comprehensive safety audit or deployed verification. Preserve
+  the restart reconfirmation limitation and unresolved held-exit interlock.
 - The existing Auto person Stop, Pause and Resume entry points now route a uniquely
   identified Morek schedule owner through the connector-bound outcome ledger rather
   than issuing legacy actuator commands. Legacy owner behavior remains separate.

@@ -648,6 +648,9 @@ class AutoSnapshot:
     #: `None` when the charger's own settings are its price source. A change of it is news, and it enters the
     #: application's identity, so a fee change on the price entry replans and reinstalls.
     price_revision: str | None = None
+    # Process-local evidence for automatic Morek dispatch, never restored from storage.
+    morek_price_evidence: Any = None
+    morek_input_evidence: Any = None
 
     def meaningful_key(self) -> tuple[Any, ...]:
         """What a listener hears about, and is not told twice.
@@ -961,6 +964,93 @@ class AutoPlannerController:
             and self._attempt_current(snapshot.attempt)
             and snapshot.settings_revision == self._store.settings(self._entry_id).revision
         )
+
+    @staticmethod
+    def _morek_price_evidence(area: Any) -> tuple[Any, ...]:
+        """Capture immutable source content and authority, not just a fetch timestamp."""
+        return (area.area_id, area.state, area.today, area.tomorrow, area.generation,
+                area.catalogue, area.today_state, area.tomorrow_state,
+                area.today_authority, area.tomorrow_authority,
+                area.today_snapshot.document, area.tomorrow_snapshot.document,
+                area.today_snapshot.attempt_error, area.tomorrow_snapshot.attempt_error)
+
+    def _morek_input_evidence(self, settings: AutoSettings) -> tuple[Any, ...]:
+        source = self._source()
+        effective = with_source(settings, source)
+        facts = None if self._vehicle_reader is None else self._vehicle_reader(effective.target.vehicle_id or "")
+        # Age changes continuously; retain value/source identity and validate age separately.
+        vehicle = None if facts is None else (facts.vehicle_id, facts.soc_percent,
+            facts.reported_capacity_kwh, facts.max_percent, facts.min_percent,
+            facts.soc_source, facts.soc_estimated)
+        controller = None if self._executor is None else self._executor.controller
+        return (settings.revision, self._key_of(source), effective.area_id, vehicle,
+                self._notification_vehicle(), self._connection_generation, self._connection_ready_generation,
+                effective_phases(self._hass, self._entry_id), voltage_between_phases_v(self._hass, self._entry_id),
+                self._plan_power_cap_kw(effective), self._learned_energy_for(facts), self._consumption_for(effective),
+                None if controller is None else controller.plugged_in_for_count,
+                None if controller is None else controller.target_stop_record)
+
+    def morek_plan_blocker(self, snapshot: AutoSnapshot, now: datetime) -> str | None:
+        """Recheck automatic dispatch evidence synchronously, without changing the plan."""
+        try:
+            settings = self._effective(self._store.settings(self._entry_id))
+            if settings.driver != DRIVER_TARGET_SOC or settings.strategy in (STRATEGY_SOLAR, STRATEGY_HYBRID):
+                return "plan_input_provenance_unavailable"
+            if snapshot.morek_input_evidence is None or snapshot.morek_input_evidence != self._morek_input_evidence(self._store.settings(self._entry_id)):
+                return "plan_inputs_changed"
+            facts = None if self._vehicle_reader is None else self._vehicle_reader(settings.target.vehicle_id or "")
+            if facts is None or facts.soc_percent is None:
+                return "vehicle_input_unavailable"
+            if (isinstance(facts.soc_percent, bool) or not isinstance(facts.soc_percent, (int, float))
+                    or not math.isfinite(facts.soc_percent) or not 0 <= facts.soc_percent <= 100):
+                return "vehicle_input_unavailable"
+            checked, vehicle_id = self._notification_vehicle()
+            if not checked or not vehicle_id or facts.vehicle_id != vehicle_id:
+                return "vehicle_identity_unavailable"
+            if settings.soft_price_cap is not None:
+                age = facts.soc_age_s
+                if (facts.soc_estimated or isinstance(age, bool) or not isinstance(age, (int, float))
+                        or not math.isfinite(age) or not 0 <= age <= SOC_FRESH_MAX_AGE_S):
+                    return "vehicle_input_stale"
+            else:
+                controller = None if self._executor is None else self._executor.controller
+                age = facts.soc_age_s
+                if (not facts.soc_estimated and (isinstance(age, bool) or not isinstance(age, (int, float))
+                        or not math.isfinite(age) or age < 0)):
+                    return "vehicle_input_stale"
+                if known_soc(soc_percent=facts.soc_percent, estimated=facts.soc_estimated, age_s=age,
+                             plugged_in_at=None if controller is None else controller.plugged_in_for_count,
+                             now=now) is None:
+                    return "vehicle_input_stale"
+            area = self._manager.area_snapshot(settings.area_id)
+            if area is None or snapshot.morek_price_evidence is None:
+                return "price_evidence_unavailable"
+            if self._morek_price_evidence(area) != snapshot.morek_price_evidence:
+                return "price_inputs_changed"
+            if area.state not in ("ready", "waiting_for_tomorrow"):
+                return "prices_stale_or_unavailable"
+            intervals = []
+            for state, authority, day in ((area.today_state, area.today_authority, area.today_snapshot),
+                                          (area.tomorrow_state, area.tomorrow_authority, area.tomorrow_snapshot)):
+                if state == "ready" and authority == "listed" and day.document is not None:
+                    intervals.extend(day.document.intervals)
+            intervals.sort(key=lambda item: item.utc_start)
+            for start, end in snapshot.proposal.shown_periods:
+                cursor = max(start.astimezone(timezone.utc), now.astimezone(timezone.utc))
+                end = end.astimezone(timezone.utc)
+                for interval in intervals:
+                    if interval.utc_end <= cursor:
+                        continue
+                    if interval.utc_start > cursor or not math.isfinite(interval.eur_per_kwh):
+                        break
+                    cursor = max(cursor, interval.utc_end)
+                    if cursor >= end:
+                        break
+                if cursor < end:
+                    return "price_coverage_unavailable"
+            return None
+        except Exception:  # noqa: BLE001 - unknown evidence cannot authorize a write
+            return "plan_input_provenance_unavailable"
 
     def snapshot_matches_connection(self, snapshot: AutoSnapshot) -> bool:
         """The calculation began after the current connection debounce settled."""
@@ -1353,11 +1443,21 @@ class AutoPlannerController:
             settings = with_source(settings, source)
             self._price_revision = None if source is None else source.plan_revision
             self._lapse_target_stop(settings)
+            try:
+                morek_inputs = self._morek_input_evidence(self._store.settings(self._entry_id))
+            except Exception:  # noqa: BLE001 - planner remains usable; Morek refuses unknown evidence
+                morek_inputs = None
             snapshot = replace(
                 await self._compute(settings, attempt), attempt=attempt, calculation_started_at=started_at,
                 connection_generation=connection_generation,
                 notification_vehicle_id=vehicle_id, notification_vehicle_checked=vehicle_checked,
             )
+            try:
+                if morek_inputs != self._morek_input_evidence(self._store.settings(self._entry_id)):
+                    morek_inputs = None
+            except Exception:  # noqa: BLE001
+                morek_inputs = None
+            snapshot = replace(snapshot, morek_input_evidence=morek_inputs)
             if not self._attempt_current(attempt) or self._shutdown:
                 return snapshot
             await self._apply(settings, snapshot, attempt)
@@ -3311,6 +3411,10 @@ class AutoPlannerController:
         if area_snapshot is not None:
             stamp = None if fetched_at is None else fetched_at.isoformat()
             identity = f"{today}/{tomorrow}|{stamp or '-'}"
+        try:
+            morek_prices = None if area_snapshot is None else self._morek_price_evidence(area_snapshot)
+        except Exception:  # noqa: BLE001 - incomplete evidence must not break ordinary planning
+            morek_prices = None
         return AutoSnapshot(
             state=state,
             reason=reason,
@@ -3344,6 +3448,7 @@ class AutoPlannerController:
             history=history,
             wait_rule=wait_rule,
             price_revision=self._price_revision,
+            morek_price_evidence=morek_prices,
         )
 
     async def _state_only(self, state: AutoState, reason: AutoReason) -> AutoSnapshot:

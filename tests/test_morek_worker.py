@@ -56,6 +56,9 @@ class Planner:
     def snapshot_is_current(self, snapshot):
         return snapshot is self.current and getattr(snapshot, "current", True)
 
+    def morek_plan_blocker(self, snapshot, now):
+        return None
+
     def add_publication_listener(self, listener):
         self.listeners.append(listener)
         listener(self.current)
@@ -891,6 +894,225 @@ async def test_real_planner_publications_drive_worker_without_browser(monkeypatc
     worker.close()
 
 
+async def real_planner_worker(monkeypatch):
+    from .test_stage_13_reactive import _world
+
+    world = await _world(monkeypatch)
+    w = setup(monkeypatch)
+    class Clock:
+        now = staticmethod(lambda _: world.request.now)
+
+    monkeypatch.setattr(morek_worker, "datetime", Clock)
+    monkeypatch.setattr(morek_schedule, "domain_data", lambda _: SimpleNamespace(auto_store=world.store))
+    monkeypatch.setattr(morek_worker, "domain_data", lambda _: SimpleNamespace(auto_store=world.store))
+    monkeypatch.setattr(morek_schedule, "preview_for", lambda *_: world.controller)
+    monkeypatch.setattr(morek_worker, "preview_for", lambda *_: world.controller)
+    w.worker = morek_worker.MorekScheduleWorker(w.hass, "test", world.controller)
+    return w, world
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("change", ["state", "authority", "document", "generation", "date", "vehicle", "source"])
+async def test_live_inputs_change_without_publication_blocks_worker(monkeypatch, change):
+    w, world = await real_planner_worker(monkeypatch)
+    if change == "state":
+        world.area.state = "stale"
+    elif change == "authority":
+        world.area.today_authority = "unknown"
+    elif change == "document":
+        world.area.today_snapshot.document = replace(world.area.today_snapshot.document, prices=(.3,) * 8)
+    elif change == "generation":
+        world.area.generation += 1
+    elif change == "date":
+        world.area.today += timedelta(days=1)
+    elif change == "vehicle":
+        world.facts[0] = replace(world.facts[0], soc_percent=30)
+    else:
+        from custom_components.spotnav.pricing.price_source import PriceSource
+        from custom_components.spotnav.planning.auto_settings import AreaAutoSettings
+        source = PriceSource("price", "charger", world.area.area_id, AreaAutoSettings(area_id=world.area.area_id), None, "new")
+        monkeypatch.setattr(world.controller, "_source", lambda: source)
+    w.worker.start()
+    await drain(w.worker)
+    assert w.worker.reason in ("price_inputs_changed", "plan_inputs_changed")
+    w.point.call.assert_not_awaited()
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("boundary", ["ledger", "entry_store"])
+async def test_live_source_changes_during_persistence_abort_wire_payload(monkeypatch, boundary):
+    w, world = await real_planner_worker(monkeypatch)
+    _, disk = await morek_schedule._state(w.hass, "test")
+    entered, release = asyncio.Event(), asyncio.Event()
+    if boundary == "ledger":
+        original = w.ledger.write
+        async def blocked(value):
+            if value.get("attempt") and not entered.is_set():
+                entered.set()
+                await release.wait()
+            await original(value)
+        monkeypatch.setattr(w.ledger, "write", blocked)
+    else:
+        async def blocked(_value):
+            entered.set()
+            await release.wait()
+        disk.async_save.side_effect = blocked
+    w.worker.start()
+    await entered.wait()
+    world.area.today_authority = "unknown"
+    release.set()
+    await drain(w.worker)
+    assert w.worker.reason == "price_inputs_changed"
+    assert w.ledger.value["attempt"]["state"] == "aborted_before_dispatch"
+    assert not w.ledger.value["uncertain"]
+    w.point.call.assert_not_awaited()
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_real_plan_coverage_and_fresh_recovery(monkeypatch):
+    w, world = await real_planner_worker(monkeypatch)
+    document = world.area.today_snapshot.document
+    world.area.today_snapshot.document = replace(document, intervals=())
+    await world.controller.async_recalculate()
+    w.worker.start()
+    await drain(w.worker)
+    assert w.worker.reason == "price_coverage_unavailable"
+    w.point.call.assert_not_awaited()
+    world.area.today_snapshot.document = document
+    await world.controller.async_recalculate()
+    await drain(w.worker)
+    assert w.point.call.await_count == 1
+    world.controller._publish(world.controller.snapshot())
+    await drain(w.worker)
+    assert w.point.call.await_count == 1
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_pause_ignores_missing_prices_and_resume_preserves_held_limit(monkeypatch):
+    w, world = await real_planner_worker(monkeypatch)
+    entry = SimpleNamespace(entry_id="test", runtime_data=SimpleNamespace(morek_worker=w.worker))
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=w.target))
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda *_: w.admission)
+    status = {"record_state": "valid", "recorded_owner": "morek_schedule", "armed": False,
+              "transition_state": None, "station_id": IDENTITY["resolved_id"], "connector_id": 1}
+    monkeypatch.setattr(morek_schedule, "ownership_store", lambda *_: SimpleNamespace(async_status=AsyncMock(return_value=status)))
+    world.area.today_authority = "unknown"
+    await morek_schedule.async_record_owned_pause(w.hass, "test")
+    await drain(w.worker)
+    assert w.point.call.await_count == 1
+    sent = w.point.call.await_args.args[0].payload["cs_charging_profiles"]
+    assert sent["chargingSchedule"]["chargingSchedulePeriod"][0]["limit"] == 0
+    await morek_schedule.async_record_owned_pause(w.hass, "test", resume=True)
+    await drain(w.worker)
+    assert w.worker.reason == "price_inputs_changed"
+    assert w.ledger.value["schedule_pause"]["type"] == "resume_requested"
+    assert w.point.call.await_count == 1
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_unchanged_vehicle_age_does_not_change_provenance_but_expiry_blocks(monkeypatch):
+    w, world = await real_planner_worker(monkeypatch)
+    world.facts[0] = replace(world.facts[0], soc_age_s=2)
+    assert world.controller.morek_plan_blocker(world.controller.snapshot(), world.request.now) is None
+    world.facts[0] = replace(world.facts[0], soc_age_s=100000)
+    w.worker.start()
+    await drain(w.worker)
+    assert w.worker.reason == "vehicle_input_stale"
+    w.point.call.assert_not_awaited()
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("start", [datetime(2026, 10, 25, 0, 30, tzinfo=timezone.utc),
+                                  datetime(2026, 10, 24, 21, 30, tzinfo=timezone.utc)])
+async def test_utc_interval_coverage_across_dst_and_midnight_with_negative_prices(monkeypatch, start):
+    from zoneinfo import ZoneInfo
+    from custom_components.spotnav.pricing.relay_contract import PriceInterval
+
+    w, world = await real_planner_worker(monkeypatch)
+    # Berlin's repeated 02:00 hour: the two UTC intervals meet despite the clock moving back.
+    zone = ZoneInfo("Europe/Berlin")
+    rows = tuple(PriceInterval.from_instants(start + timedelta(minutes=30 * i),
+                 start + timedelta(minutes=30 * (i + 1)), zone=zone, eur_per_kwh=-.1) for i in range(2))
+    doc = replace(world.area.today_snapshot.document, intervals=rows)
+    world.area.today_snapshot.document = doc
+    snapshot = world.controller.snapshot()
+    proposal = SimpleNamespace(shown_periods=((start, start + timedelta(hours=1)),))
+    snapshot = replace(snapshot, proposal=proposal,
+                       morek_price_evidence=world.controller._morek_price_evidence(world.area))
+    assert world.controller.morek_plan_blocker(snapshot, start) is None
+    world.area.today_snapshot.document = replace(doc, intervals=(rows[0],))
+    snapshot = replace(snapshot, morek_price_evidence=world.controller._morek_price_evidence(world.area))
+    assert world.controller.morek_plan_blocker(snapshot, start) == "price_coverage_unavailable"
+    w.point.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_tomorrow_window_requires_its_own_authoritative_intervals(monkeypatch):
+    from zoneinfo import ZoneInfo
+    from custom_components.spotnav.pricing.relay_contract import PriceInterval
+
+    w, world = await real_planner_worker(monkeypatch)
+    start = datetime(2026, 10, 24, 21, 30, tzinfo=timezone.utc)
+    zone = ZoneInfo("Europe/Berlin")
+    first = PriceInterval.from_instants(start, start + timedelta(minutes=30), zone=zone, eur_per_kwh=-.1)
+    second = PriceInterval.from_instants(first.utc_end, first.utc_end + timedelta(minutes=30), zone=zone, eur_per_kwh=.2)
+    doc = world.area.today_snapshot.document
+    world.area.today_snapshot.document = replace(doc, intervals=(first,))
+    world.area.tomorrow_snapshot.document = replace(doc, intervals=(second,))
+    snapshot = replace(world.controller.snapshot(), proposal=SimpleNamespace(shown_periods=((start, second.utc_end),)))
+    snapshot = replace(snapshot, morek_price_evidence=world.controller._morek_price_evidence(world.area))
+    assert world.controller.morek_plan_blocker(snapshot, start) == "price_coverage_unavailable"
+    world.area.state = "ready"
+    world.area.tomorrow_state = "ready"
+    world.area.tomorrow_authority = "listed"
+    snapshot = replace(snapshot, morek_price_evidence=world.controller._morek_price_evidence(world.area))
+    assert world.controller.morek_plan_blocker(snapshot, start) is None
+    w.point.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_actual_area_snapshot_authority_change_without_publication(monkeypatch):
+    from custom_components.spotnav.pricing.price_refresh import PriceRefreshManager
+    from custom_components.spotnav.pricing.price_repository import DaySnapshot
+
+    w, world = await real_planner_worker(monkeypatch)
+    old = world.area
+    today = DaySnapshot(old.area_id, old.today, "ready", old.today_snapshot.document,
+                        None, old.fetched_at, None, None, "listed", False)
+    tomorrow = DaySnapshot(old.area_id, old.tomorrow, "unavailable", None,
+                           None, None, None, None, "not_listed", False)
+    authority = {old.today: "listed", old.tomorrow: "not_listed"}
+    repository = SimpleNamespace(day_snapshot=lambda _area, day: today if day == old.today else tomorrow,
+                                 file_authority=lambda _area, day: authority[day],
+                                 area_entry=lambda _area: old.catalogue)
+    manager = object.__new__(PriceRefreshManager)
+    manager._now = lambda: world.request.now
+    manager._repository = repository
+    manager._next_global_attempt = None
+    manager._areas = {old.area_id: SimpleNamespace(active=True, area_id=old.area_id, tz=doc_zone(old),
+                                                   principal=lambda day: day, generation=1,
+                                                   subscriber_count=1)}
+    monkeypatch.setattr(world.controller, "_manager", manager)
+    await world.controller.async_recalculate()
+    assert world.controller.morek_plan_blocker(world.controller.snapshot(), world.request.now) is None
+    authority[old.today] = "unknown"
+    w.worker.start()
+    await drain(w.worker)
+    assert w.worker.reason == "price_inputs_changed"
+    w.point.call.assert_not_awaited()
+    w.worker.close()
+
+
+def doc_zone(area):
+    return area.catalogue.tz
+
+
 def auto_controller_zone(name):
     from custom_components.spotnav import time_zones
     return time_zones.require_zone(name)
@@ -914,6 +1136,40 @@ def manual_setup(monkeypatch):
         GetCompositeSchedule=lambda **kw: SimpleNamespace(action="fetch", payload=kw),
         ClearChargingProfile=lambda **kw: SimpleNamespace(action="clear", payload=kw))))
     return w
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action", ["send", "clear"])
+@pytest.mark.parametrize("boundary", ["ledger", "entry_store"])
+async def test_manual_profile_stop_during_persistence_aborts_before_dispatch(monkeypatch, action, boundary):
+    w = manual_setup(monkeypatch)
+    _, disk = await morek_schedule._state(w.hass, "charger")
+    entered, release = asyncio.Event(), asyncio.Event()
+    if boundary == "ledger":
+        original = w.ledger.write
+        async def blocked(value):
+            if (value.get("attempt") or value.get("removal")) and not entered.is_set():
+                entered.set()
+                await release.wait()
+            await original(value)
+        monkeypatch.setattr(w.ledger, "write", blocked)
+    else:
+        async def blocked(_value):
+            entered.set()
+            await release.wait()
+        disk.async_save.side_effect = blocked
+    task = asyncio.create_task(morek_schedule.async_schedule_action(
+        w.hass, "charger", action, w.worker._intent()[1] if action == "send" else None,
+        confirm_profile_id=42001 if action == "clear" else None))
+    await entered.wait()
+    with w.admission.person_stop_reservation("charger", lambda: w.identity):
+        release.set()
+        with pytest.raises(morek_schedule.ScheduleRefused, match="stale_generation"):
+            await task
+    field = "attempt" if action == "send" else "removal"
+    assert w.ledger.value[field]["state"] == "aborted_before_dispatch"
+    assert not w.ledger.value["uncertain"]
+    w.point.call.assert_not_awaited()
 
 
 @pytest.mark.asyncio

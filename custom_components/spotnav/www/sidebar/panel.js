@@ -59506,6 +59506,32 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
   const sending = busy && activeAction === "send" && !state.outcomes?.uncertain;
   health.textContent = `Operator state: ${sending ? labels.sending : labels[state.operator?.state ?? ""] ?? "Unavailable \u2014 recalculate status"}` + (!sending && state.operator?.reason ? ` (${state.operator.reason})` : "");
   section.append(health);
+  const reconciliation = state.reconciliation?.reason;
+  const reconciliationMessages = {
+    plan_inputs_changed: "Plan inputs changed; waiting for a fresh calculation. The retained limit may remain.",
+    price_inputs_changed: "Price source changed; waiting for a fresh calculation. The retained limit may remain.",
+    price_coverage_unavailable: "Published prices do not cover the proposed windows; the retained limit may remain.",
+    price_evidence_unavailable: "Price source evidence is unavailable; the retained limit may remain.",
+    plan_input_provenance_unavailable: "Plan input evidence is unavailable; automatic sending is blocked.",
+    vehicle_input_stale: "Vehicle state of charge is stale; waiting for a fresh reading.",
+    vehicle_input_unavailable: "Vehicle state of charge is unavailable or invalid; automatic sending is blocked.",
+    vehicle_identity_unavailable: "Vehicle identity is unavailable or changed; automatic sending is blocked.",
+    prices_stale_or_unavailable: "Prices are stale or unavailable; the retained limit may remain.",
+    prices_unavailable: "Prices are unavailable; the retained limit may remain.",
+    no_current_plan: "No current plan is available; the retained limit may remain.",
+    invalid_plan: "The proposed windows are invalid; the retained limit may remain.",
+    identity_unresolved: "Charger identity is unresolved or ambiguous; automatic sending is blocked.",
+    ownership_conflict: "Another SpotNav binding conflicts with ownership; resolve the binding before activation.",
+    retained_profile_exit_held: "Exit is held until retained-profile resolution is reviewed.",
+    resume_requires_confirmation: "Confirm Resume again after restart; the retained limit may remain.",
+    schedule_mode_unarmed: "Automatic schedule sending is not enabled.",
+    upload_uncertain: "The previous write outcome is unknown; automatic retry is blocked."
+  };
+  if (reconciliation && reconciliationMessages[reconciliation]) {
+    const detail = doc.createElement("p");
+    detail.textContent = reconciliationMessages[reconciliation];
+    section.append(detail);
+  }
   const availability = doc.createElement("p");
   availability.textContent = `Automatic Morek mode unavailable and unarmed. Recorded owner: ${state.ownership?.recorded_owner ?? "unknown"}. Durable ownership transitions and lost-state recovery, conflicting control and household protection, transaction authorization, and safe retained-profile exit remain unresolved.`;
   section.append(availability);
@@ -59820,7 +59846,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.52";
+var CARD_VERSION = "2.5.54";
 
 // sidebar/panel.js
 var settingsWritesByConnection = /* @__PURE__ */ new WeakMap();

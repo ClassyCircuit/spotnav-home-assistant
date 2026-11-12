@@ -29,6 +29,8 @@ def test_connector_status_is_not_authorization_or_measurement(monkeypatch, raw, 
     assert result["control"] == "available"
     assert result["transaction"] == result["measurement"] == "unknown"
     assert "production_dispatch_unarmed" in result["activation_blockers"]
+    assert {"held_exit_has_no_release", "external_writers_unverified",
+            "installation_protection_conflict_unresolved"} <= set(result["activation_blockers"])
 
 
 @pytest.mark.parametrize("age", [181, -1, None])

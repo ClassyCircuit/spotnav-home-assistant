@@ -466,7 +466,9 @@ def _session_readiness(hass: HomeAssistant, controller: Any, identity: dict[str,
     result: dict[str, Any] = {
         "control": "unknown", "vehicle": "unknown", "transaction": "unknown",
         "measurement": "unknown", "vehicle_observed_at": None,
-        "activation_blockers": ["production_dispatch_unarmed", "transaction_authorization_unverified"],
+        "activation_blockers": ["production_dispatch_unarmed", "transaction_authorization_unverified",
+                                "held_exit_has_no_release", "external_writers_unverified",
+                                "installation_protection_conflict_unresolved"],
     }
     if not identity.get("supported") or identity.get("match_count") != 1:
         if identity.get("supported") and identity.get("match_count") == 0:
@@ -779,6 +781,7 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
         await ledger.write(record)
         raise
     _cancel_verification(hass, entry_id)
+    prior_data = dict(data)
     data.update({"sent_at": now, "attempt_id": attempt_id, "profile": wire_profile, "ack": "unknown", "verified": False,
                  "effective": None, "cleanup": None,
                  "verification": {"pending": False, "reason": "upload_unconfirmed",
@@ -790,6 +793,9 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
         record["attempt"]["state"] = "aborted_before_dispatch"
         record["uncertain"] = False
         await ledger.write(record)
+        data.clear()
+        data.update(prior_data)
+        await store.async_save(data)
         raise
     from ocpp.v16 import call as ocpp_call
     sending = hass.data.setdefault("spotnav_morek_sending", {})
@@ -901,11 +907,23 @@ async def async_schedule_action(hass: HomeAssistant, entry_id: str, action: str,
         return _identity_status(hass, getattr(controller, "ocpp_target", None))
 
     async def run() -> dict[str, Any]:
+        from ..execution.command_admission import physical_connector
+        admission = command_admission(hass)
+        connector = physical_connector(identity()) if action != "fetch" else None
+        generation = admission.generation(connector) if connector is not None else None
+
+        def validate_manual_generation() -> None:
+            if (connector is None or physical_connector(identity()) != connector
+                    or admission.generation(connector) != generation
+                    or admission._person_stops.get(connector)):
+                raise ScheduleRefused("stale_generation")
+
         return await _async_schedule_action_locked(hass, entry_id, action, preview_id, confirm_profile_id,
-                                                    expected_sent_at=expected_sent_at,
-                                                   verification_attempt=verification_attempt,
-                                                   expected_attempt_id=expected_attempt_id,
-                                                   verification_handle=verification_handle)
+                                                     expected_sent_at=expected_sent_at,
+                                                    verification_attempt=verification_attempt,
+                                                    expected_attempt_id=expected_attempt_id,
+                                                    verification_handle=verification_handle,
+                                                    validate_manual_generation=validate_manual_generation)
 
     admission = command_admission(hass)
     if action == "fetch":
@@ -921,7 +939,7 @@ async def _async_schedule_action_locked(hass: HomeAssistant, entry_id: str, acti
                                         preview_id: str | None, confirm_profile_id: int | None, *,
                                         expected_sent_at: str | None,
                                         verification_attempt: int | None, expected_attempt_id: str | None,
-                                        verification_handle: Any) -> dict[str, Any]:
+                                        verification_handle: Any, validate_manual_generation: Any) -> dict[str, Any]:
     entry, failure = lookup_charger(hass, entry_id)
     if failure is not None or entry is None:
         raise ScheduleRefused(failure or "unknown_charger")
@@ -951,6 +969,7 @@ async def _async_schedule_action_locked(hass: HomeAssistant, entry_id: str, acti
             if preview_id is None or preview_id != _preview_id(profile, settings.revision):
                 raise ScheduleRefused("preview_changed")
             def validate():
+                validate_manual_generation()
                 current_controller = controller_for(hass, entry_id)
                 current_target = getattr(current_controller, "ocpp_target", None)
                 if not _identity_status(hass, current_target)["supported"]:
@@ -974,19 +993,40 @@ async def _async_schedule_action_locked(hass: HomeAssistant, entry_id: str, acti
             ledger = outcomes_for(hass)
             record = await _outcome_record(hass, entry_id, data)
             was_uncertain = record["uncertain"]
+            previous_acknowledged, previous_verified = record.get("acknowledged"), record.get("verified")
             record.update({"acknowledged": None, "verified": None, "uncertain": True,
                            "removal": {"at": now.isoformat(), "state": "uncertain"}})
             await ledger.write(record)
+            try:
+                validate_manual_generation()
+            except ScheduleRefused:
+                record["uncertain"] = was_uncertain
+                record["removal"]["state"] = "aborted_before_dispatch"
+                record["acknowledged"], record["verified"] = previous_acknowledged, previous_verified
+                await ledger.write(record)
+                raise
             if not _identity_status(hass, target)["supported"]:
                 raise ScheduleRefused("not_morek_connector")
             cp = _charge_point(hass, target)
             # By OCPP 1.6, id alone selects this exact profile. Never send an empty
             # ClearChargingProfile request or use the generic HA clear service.
+            prior_data = dict(data)
             data.update({"cleanup": {"requested_at": now.isoformat(), "profile_id": PROFILE_ID,
                                       "status": "unknown"}, "effective": None, "verified": False,
                          "verification": {"pending": False, "reason": "cleanup_requested",
                                           "next_check_at": None, "attempts": 0}})
             await store.async_save(data)
+            try:
+                validate_manual_generation()
+            except ScheduleRefused:
+                record["uncertain"] = was_uncertain
+                record["removal"]["state"] = "aborted_before_dispatch"
+                record["acknowledged"], record["verified"] = previous_acknowledged, previous_verified
+                await ledger.write(record)
+                data.clear()
+                data.update(prior_data)
+                await store.async_save(data)
+                raise
             current_controller = controller_for(hass, entry_id)
             target = getattr(current_controller, "ocpp_target", None)
             if not _identity_status(hass, target)["supported"]:
@@ -1178,14 +1218,20 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
             from ..execution.command_admission import physical_connector
             connector = physical_connector(identity)
             stop_pending = connector is not None and bool(admission._person_stops.get(connector))
+            aborted_attempt = outcomes.get("attempt") or {}
+            aborted_display = (aborted_attempt.get("state") == "aborted_before_dispatch"
+                               and aborted_attempt.get("id") == data.get("attempt_id"))
             result = {**identity,
                       "readiness": _session_readiness(hass, controller, identity, online, datetime.now(timezone.utc)),
                       "schedule_pause": _owned_pause_status(outcomes, verification, verified, worker, stop_pending=stop_pending),
+                      "reconciliation": {"reason": worker.reason if worker is not None and
+                                         getattr(worker, "reason_serial", -1) == worker._serial else "pending"},
                       "ownership": ownership,
                       "outcomes": outcomes,
                       "operator": operator,
-                      "sent_at": data.get("sent_at"), "ack": data.get("ack"), "verified": verified,
-                      "sent": data.get("profile"), "effective": data.get("effective"),
+                      "sent_at": None if aborted_display else data.get("sent_at"),
+                      "ack": None if aborted_display else data.get("ack"), "verified": verified,
+                      "sent": None if aborted_display else data.get("profile"), "effective": data.get("effective"),
                       "preview": preview,
                       "cleanup": data.get("cleanup"), "cleanup_supported": True,
                       "verification": verification}

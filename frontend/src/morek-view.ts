@@ -7,6 +7,7 @@ export interface MorekState {
   cleanup?: { requested_at: string; profile_id: number; status: string } | null;
   outcomes?: { uncertain: boolean; state?: string } | null;
   operator?: { state: string; reason?: string | null };
+  reconciliation?: { reason: string };
   schedule_pause?: { intent?: string; request?: string; ack?: string | null; readback?: string; measured?: string; coverage_start?: string | null; coverage_end?: string | null };
   readiness?: { control?: string; vehicle?: string; transaction?: string; measurement?: string; vehicle_observed_at?: string | null };
   ownership?: { recorded_owner?: string | null; blockers?: string[]; schedule_mode_available?: boolean };
@@ -131,6 +132,32 @@ export function morekPanel(
   health.textContent = `Operator state: ${sending ? labels.sending : labels[state.operator?.state ?? ""] ?? "Unavailable — recalculate status"}` +
     (!sending && state.operator?.reason ? ` (${state.operator.reason})` : "");
   section.append(health);
+  const reconciliation = state.reconciliation?.reason;
+  const reconciliationMessages: Record<string, string> = {
+    plan_inputs_changed: "Plan inputs changed; waiting for a fresh calculation. The retained limit may remain.",
+    price_inputs_changed: "Price source changed; waiting for a fresh calculation. The retained limit may remain.",
+    price_coverage_unavailable: "Published prices do not cover the proposed windows; the retained limit may remain.",
+    price_evidence_unavailable: "Price source evidence is unavailable; the retained limit may remain.",
+    plan_input_provenance_unavailable: "Plan input evidence is unavailable; automatic sending is blocked.",
+    vehicle_input_stale: "Vehicle state of charge is stale; waiting for a fresh reading.",
+    vehicle_input_unavailable: "Vehicle state of charge is unavailable or invalid; automatic sending is blocked.",
+    vehicle_identity_unavailable: "Vehicle identity is unavailable or changed; automatic sending is blocked.",
+    prices_stale_or_unavailable: "Prices are stale or unavailable; the retained limit may remain.",
+    prices_unavailable: "Prices are unavailable; the retained limit may remain.",
+    no_current_plan: "No current plan is available; the retained limit may remain.",
+    invalid_plan: "The proposed windows are invalid; the retained limit may remain.",
+    identity_unresolved: "Charger identity is unresolved or ambiguous; automatic sending is blocked.",
+    ownership_conflict: "Another SpotNav binding conflicts with ownership; resolve the binding before activation.",
+    retained_profile_exit_held: "Exit is held until retained-profile resolution is reviewed.",
+    resume_requires_confirmation: "Confirm Resume again after restart; the retained limit may remain.",
+    schedule_mode_unarmed: "Automatic schedule sending is not enabled.",
+    upload_uncertain: "The previous write outcome is unknown; automatic retry is blocked.",
+  };
+  if (reconciliation && reconciliationMessages[reconciliation]) {
+    const detail = doc.createElement("p");
+    detail.textContent = reconciliationMessages[reconciliation];
+    section.append(detail);
+  }
   const availability = doc.createElement("p");
   availability.textContent = `Automatic Morek mode unavailable and unarmed. Recorded owner: ${state.ownership?.recorded_owner ?? "unknown"}. ` +
     "Durable ownership transitions and lost-state recovery, conflicting control and household protection, transaction authorization, and safe retained-profile exit remain unresolved.";

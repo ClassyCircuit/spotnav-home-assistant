@@ -23,6 +23,13 @@ const state = {
 };
 
 describe("Morek manual test panel", () => {
+  it("shows an automatic reconciliation blocker without issuing any action", () => {
+    const act = vi.fn();
+    const panel = morekPanel(document, { ...state, reconciliation: { reason: "price_coverage_unavailable" } }, true, false, null, act);
+    expect(panel.textContent).toContain("Published prices do not cover the proposed windows");
+    expect(panel.textContent).toContain("retained limit may remain");
+    expect(act).not.toHaveBeenCalled();
+  });
   it.each([
     ["waiting", "Waiting for a usable plan"], ["offline", "Offline"],
     ["sending", "Sending — outcome not yet known"], ["checking", "Checking readback"],

@@ -673,7 +673,7 @@ class CommandAdmission:
                 return AdmissionResult(False, "person_stop_not_reserved")
             if connector in self._entry_draining and not person:
                 return AdmissionResult(False, "connector_quiescing")
-            if not person and expected_generation != self.generation(connector):
+            if not person and (expected_generation != self.generation(connector) or self._person_stops.get(connector)):
                 return AdmissionResult(False, "stale_generation")
             try:
                 identity = dict(resolve_identity())
@@ -687,7 +687,7 @@ class CommandAdmission:
 
             if not isinstance(status, Mapping):
                 return AdmissionResult(False, "ownership_unavailable")
-            if not person and expected_generation != self.generation(connector):
+            if not person and (expected_generation != self.generation(connector) or self._person_stops.get(connector)):
                 return AdmissionResult(False, "stale_generation")
             state = status.get("record_state")
             uncertain_stop = person and state == "save_failed" and status.get("person_stop_safe_during_transition_failure") is True
@@ -760,6 +760,10 @@ class CommandAdmission:
                     return AdmissionResult(False, "legacy_not_owner")
                 if (status.get("station_id"), status.get("connector_id")) != (connector.station_id, connector.connector_id):
                     return AdmissionResult(False, "ownership_identity_mismatch")
+                # A person Stop can reserve the connector while the durable owner
+                # lookup is awaiting. Do not admit the older manual profile action.
+                if generation != self.generation(connector) or self._person_stops.get(connector):
+                    return AdmissionResult(False, "stale_generation")
                 if connector in self._quiescing or connector in self._entry_draining:
                     return AdmissionResult(False, "connector_quiescing")
             except Exception:  # noqa: BLE001 - unverified durable state cannot admit profile writes

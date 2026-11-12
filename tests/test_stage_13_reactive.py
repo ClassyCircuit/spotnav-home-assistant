@@ -34,9 +34,11 @@ async def _world(monkeypatch):
     doc = request.documents[0]
     entry = SimpleNamespace(id=doc.area_id, tz=doc.tz, currency="EUR", major_unit="EUR", minor_unit="cent")
     area = SimpleNamespace(
+        area_id=doc.area_id, generation=1, today_authority="listed", tomorrow_authority="not_listed",
         catalogue=entry, today_state="ready", tomorrow_state="unavailable", fetched_at=request.now,
-        today=doc.day, tomorrow=doc.day + timedelta(days=1), state="ready",
-        today_snapshot=SimpleNamespace(document=doc), tomorrow_snapshot=SimpleNamespace(document=None),
+        today=doc.day, tomorrow=doc.day + timedelta(days=1), state="waiting_for_tomorrow",
+        today_snapshot=SimpleNamespace(document=doc, attempt_error=None),
+        tomorrow_snapshot=SimpleNamespace(document=None, attempt_error=None),
     )
     hass = MagicMock()
     hass.async_create_task.side_effect = asyncio.create_task
@@ -61,6 +63,7 @@ async def _world(monkeypatch):
     manager.async_subscribe = subscribe
     facts = [LiveVehicleFacts(vehicle_id="veh-1", soc_percent=25, soc_age_s=1, reported_capacity_kwh=60)]
     controller = AutoPlannerController(hass, "test", store, manager, vehicle_reader=lambda _: facts[0], now=lambda: request.now)
+    monkeypatch.setattr(controller, "_notification_vehicle", lambda: (True, "veh-1"))
     monkeypatch.setattr(auto_controller, "effective_phases", lambda *_: 3)
     monkeypatch.setattr(auto_controller, "voltage_between_phases_v", lambda *_: 400)
     monkeypatch.setattr(auto_controller.hybrid_execution, "clear_hybrid_state", lambda *_: None)

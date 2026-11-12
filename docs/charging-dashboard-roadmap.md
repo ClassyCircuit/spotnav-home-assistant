@@ -54,6 +54,15 @@ override early; charging may continue if the automatic plan selects the current
 time. These are target semantics, not a claim that schedule-owned Pause/Resume
 or Charge Now works today. Charge Now is deferred to Stage 10 after 5.8.
 
+**BMW target and monitoring:** the user intends the BMW's own configured charge
+limit to stop the car at its target (for example 80%). Morek's schedule controls
+allowed charging windows; do not require a second live SOC-stop controller or
+re-enable competing legacy commands. The SpotNav planning target and the limit
+actually configured in the car are separate settings: do not assume they match,
+that SpotNav changes the BMW limit, or that a stale SOC proves the target was met.
+The app must still show whether charging and execution appear healthy using available
+genuine observations, with unknown clearly shown where evidence is absent or stale.
+
 **Complete the necessary development in order before installation.** After development
 and review, the user plans to merge the branch to `main`, install it in HA and perform
 deployed testing personally. 5.8 records that user-owned milestone, not an LLM task
@@ -89,6 +98,7 @@ Detailed requirements and acceptance cases follow outside this checklist.
 | 8 | Yesterday, costs and savings | Later; depends on genuine data |
 | 9 | Targeted dashboard fixes | Only where needed; initial installation is in Stage 5 |
 | 10 | Optional Charge Now override | After the initial 5.8 installation and user-directed validation; independent of Stages 6–9 |
+| 11 | Adaptive charging estimates for Morek | Later work; reuse existing learning and genuine measurement sources |
 
 ### Stage 0 — Completed baseline: preserve and reuse
 
@@ -697,7 +707,10 @@ tests are documented there; full HA collection is still blocked on Windows.
     be known about a new charging session. Do not change authorization settings or
     infer that a stored schedule authorizes charging. Test unknown/offline/refused
     cases with mocked boundaries; surface installation-specific decisions for the user.
-- [x] **5.6b Person Stop and retained-schedule policy** (2.5.52 local, unarmed, mocked; coordinator review pending)
+- [x] **5.6b Person Stop and retained-schedule policy** (2.5.52 local, unarmed, mocked; quick coordinator review)
+  - Quick review found no blocker to proceeding to 5.6c; the isolated planning and
+    lifecycle suites were independently rerun (522 passed, 1 deselected; 256 passed).
+    This is not a comprehensive safety audit or evidence of deployed behavior.
   - Auto's existing Stop/Pause and Resume boundaries route a unique schedule owner
     to connector-bound durable intent; the worker requests a held-off profile or the
     latest valid plan under its existing admission and uncertainty guards. Offline
@@ -734,11 +747,38 @@ tests are documented there; full HA collection is still blocked on Windows.
     outcomes and measurements without claiming physical stopping from ACK/readback.
     The optional Stage 10 **Return to Auto** cancels only Charge Now; it is not
     Pause and may allow charging immediately if the automatic plan calls for it.
-- [ ] **5.6c Invalid-plan and competing-writer policy**
+- [x] **5.6c Invalid-plan and competing-writer policy** (2.5.54 local, mocked; coordinator review pending)
+  - The unarmed worker now checks process-local planner provenance against current
+    selected source and revisions, authoritative per-day documents and UTC window
+    coverage, relevant vehicle/settings/connection facts and the existing SOC freshness
+    rules at every pre-dispatch validation. Invalid evidence leaves retained limits and
+    pending Resume untouched; Pause's held-off intent is independent of prices. Manual
+    preview retains its previous contract. The existing unarmed gate is unchanged.
+  - Conservative scope: only target-SOC cheapest-price plans have checked provenance;
+    manual-kWh and solar/hybrid proposals are blocked as `plan_input_provenance_unavailable`.
+    Do not activate those cases without implementing and reviewing their energy/forecast
+    evidence. This is a refusal, not a claim that such plans are intrinsically invalid.
+  - Manual Send/Clear now also honor Stop generation across persistence waits; ordinary
+    admission refuses work while a Stop is reserved. The separate regulator protection
+    path remains unchanged. External writers and installation protection cannot be
+    inventoried or controlled here; they and held-exit resolution remain 5.7 blockers.
+    Tests are mocked and no physical behavior or operational mode is claimed.
+  - **2.5.53 partial; not complete:** manual profile admission now rechecks the
+    connector generation after the awaited ownership lookup, refusing a Stop that
+    superseded it there. Existing worker and admission tests pass, but this is not
+    the full invalid-plan/competing-writer policy or its requested test matrix.
+    In particular, dispatch-time freshness independent of a new planner publication
+    and actionable conflict reporting still need investigation and coverage.
+    External/OCPP writers and installation-specific regulator interactions cannot
+    be ruled out locally; composite readback is not a profile inventory.
   - Handle no/stale/invalid prices or plan and existing conflicting writers without
     silently releasing a stored limit or disabling protection. Report blockers and
     test mocked reconnection, person Stop and regulator exceptions. Do not implement
     household load balancing or dynamically adjust amps for house load.
+  - Reuse 5.6b's durable Pause/Resume intent, generation checks and uncertainty
+    handling. Keep the unarmed production gate; a restarted pending Resume requires
+    fresh confirmation. The held-exit interlock has no release path and must not be
+    bypassed; resolve or explicitly carry it as an activation blocker into 5.7.
 - [ ] **5.7 Activation implementation and pre-install automated validation**
   - Umbrella only: assign 5.7a–5.7b individually; deployed activation and testing
     are the user's own 5.8 milestone, not LLM implementation tasks.
@@ -749,6 +789,13 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Test changed and unchanged settings/prices/SOC → backend replan → guarded schedule
     reconciliation, startup/reconnect and conflict/uncertainty cases. Show proposal,
     sent ACK, effective readback and real measured flow separately on the live dashboard.
+  - Provide practical current charging and execution-health monitoring in the sidebar:
+    reuse available genuine charger/vehicle status and fresh measured power or energy,
+    identify the source and freshness, and show offline, waiting, mismatch, failure or
+    uncertain states when supported. Distinguish a charger-reported charging state from
+    measured flow; never label an ACK, offered current or proposed window as charging.
+    If a trustworthy source is unavailable, show unknown and the limitation rather
+    than inventing a reading or blocking development on a live hardware test.
   - Verify restart/reconnect and safe person Stop/protection behavior with automated
     coverage. Summarize useful manual checks and known limitations for the user;
     ACK or matching effective limits are not proof of physical flow. No overnight
@@ -761,12 +808,20 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Implement the reviewed, reversible and explicitly enabled ownership/worker path
     after 5.5–5.6; default unarmed and enforce all blockers. Test with mocked charger,
     HA and persistence boundaries. No live activation or deployment is authorized.
+  - The held-exit interlock has no release path. Retained-profile resolution and any
+    required user decision are activation blockers; do not silently release a limit
+    or bypass the interlock. Existing protection and external-writer conflicts also
+    require a reviewed installation-specific resolution before activation.
 - [ ] **5.7b End-to-end local regression and release handoff**
   - Exercise settings/price/SOC → plan → guarded reconciliation, stable-plan
     deduplication, restart/reconnect, uncertainty and operator status with mocks;
     include the deferred 5.4c suite if a supported local host is available.
     Report exact unrun tests, known blockers and useful manual checks to the user;
     do not install or access the deployed system as part of this substage.
+  - Mock-test the actual monitoring path for charging/not charging where supported,
+    unavailable/stale data, offline status, errors and schedule mismatch; show what is
+    known and what is not without treating status alone as measured power. Document
+    available source limitations for the user's own deployed checks.
 
 ### 5.8 — User-owned installation and deployed validation milestone
 
@@ -800,6 +855,9 @@ before adding storage or an importer. `debug_day.py` retains limited diagnostic
 rows for debug use, not an established production charging-history source. The
 existing Morek outcome record is not a complete versioned history. None of these
 facts proves which historical or live measurements this installation exposes.
+Use the source inventory to improve the current charging/health view as well as
+history; do not defer the basic honest status and unknown indicators in 5.7 to
+historical analytics.
 
 - [ ] **6.1 Source inventory**
   - Inventory existing session, energy-register, integrated-power, OCPP and Recorder
@@ -952,6 +1010,40 @@ specific approvals; this roadmap grants none.
     unknown schedule updates as unconfirmed, not as proof that charging stopped.
     Any later deployment, restart, profile operation or physical test requires the
     user's specific approval; do not claim mocked checks verify live behavior.
+
+### Stage 11 — Adaptive charging estimates for Morek
+
+The user wants charging-time and target-SOC estimates to improve from actual
+charging and to replan when a car falls behind. Existing `planning/learned_power.py`,
+`planning/learned_energy.py` and `planning/plan_watch.py` provide learning and
+behind-plan groundwork for the existing Auto path; **their operation with Morek
+schedule ownership and this installation's measurements is not yet verified**.
+Reuse them where suitable, not a new AI or duplicate learning system. This is later
+work, not a prerequisite for 5.8; Stage 6's verified source inventory can inform it.
+The BMW's own configured limit stops charging at the car's target; these estimates
+and progress checks do not replace or prove that separate vehicle setting.
+
+- [ ] **11.1 Verify and connect measured learning**
+  - Inspect how the existing samplers receive genuine charger power/energy and fresh
+    vehicle SOC, identify whether the Morek-owned path feeds them, and extend the
+    smallest existing seam if necessary. Use trustworthy measured sources and vehicle
+    association, with coverage and freshness; do not learn from scheduled current,
+    profile ACK/readback, estimated SOC presented as measured, or missing data.
+  - Reuse existing sample-quality, trust, bounds and persistence rules where suitable.
+    Until sufficient trustworthy evidence exists, retain the normal estimates and
+    show that learned values are unavailable rather than inventing a result.
+- [ ] **11.2 Use learned estimates and replan safely**
+  - Verify and, where needed, connect learned actual power and wall energy per SOC
+    percentage to the Morek planner, so a slower-than-expected charge can receive
+    more time within available windows and the configured deadline. Reuse the
+    existing behind-plan checks to trigger a fresh plan when reliable observations
+    show a shortfall; reconcile only through the same guarded schedule owner.
+  - Respect Pause/Stop, price and minimum-SOC policy, unavailable inputs, charger
+    limits and unknown write outcomes. Report when the target is infeasible; never
+    promise it will be reached or claim the car is charging based on a schedule.
+  - Test reliable and insufficient samples, incorrect initial estimates, slow or
+    interrupted charging, stale readings, restart, vehicle changes and safe replans
+    with mocked boundaries. Deployed testing remains the user's decision.
 
 ### Execution boundaries — avoid another prerequisite spiral
 
