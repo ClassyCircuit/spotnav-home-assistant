@@ -4148,6 +4148,52 @@ dialog[open] {
 .dot.dot-unknown {
   background: #e5b879;
 }
+.controls .fields label {
+  color: #f0f3f8;
+  line-height: 1.4;
+}
+.controls wa-input {
+  color: #f0f3f8;
+  --wa-form-control-label-color:#f0f3f8;
+  --wa-color-text-normal:#f0f3f8;
+  --wa-color-text-quiet:#c5d0df;
+}
+.controls wa-input::part(form-control-label),
+.controls wa-input::part(label) {
+  color: #f0f3f8;
+}
+.controls wa-input[disabled]::part(form-control-label),
+.controls wa-input[disabled]::part(label) {
+  color: #c5d0df;
+}
+.controls .fields select {
+  color: #f0f3f8;
+  background: #161e29;
+  border: 1px solid #8191a4;
+  border-radius: 8px;
+  padding: 8px;
+  min-height: 42px;
+  max-width: 100%;
+}
+.controls .fields select:disabled {
+  color: #c5d0df;
+  background: #293342;
+  opacity: 1;
+}
+.controls .fields input[type=checkbox] {
+  accent-color: #75b9ef;
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+}
+.controls .settings-help {
+  color: #c5d0df;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.settings-help p {
+  margin: 6px 0;
+}
 .overview {
   gap: 12px;
 }

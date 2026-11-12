@@ -8,6 +8,7 @@ import { decodeMorekState, morekPanel } from '../src/morek-view.ts';
 import { reconcile } from '../shared-dashboard/reconcile.js';
 import { dashboardAdapter } from './adapter.js';
 import { CARD_VERSION } from '../src/generated/version.ts';
+import { capInput, capForSave, displayPrice } from '../shared-dashboard/price-format.js';
 
 // A dispatched write outlives its host element, including a newly mounted panel.
 const settingsWritesByConnection = new WeakMap();
@@ -18,6 +19,8 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     this.attachShadow({mode:'open'});
     this.generation = 0;
     this.permissionEpoch = 0;
+    this.dashboardEpoch = 0;
+    this.statusEpoch = 0;
     this.pendingSettingsWrites = new Map();
     this.unknownSettingsWrites = new Set();
     this.connected = false;
@@ -27,11 +30,11 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     this.classList.add('wa-dark');
     this.shadowRoot.innerHTML = `<link rel="stylesheet" href="/spotnav-sidebar/panel.css?v=${CARD_VERSION}"><style>:host{display:block;min-height:100%;padding-bottom:env(safe-area-inset-bottom)}.hostbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top));background:#11151d;color:white}.hostbar label{flex:1 1 180px}.hostbar select{max-width:100%}.hostbar button,.hostbar select{font:inherit;padding:8px}.message{padding:16px;color:white;background:#11151d}</style><div class="hostbar"><button id="menu" aria-label="Open navigation">☰</button><strong>SpotNav Enhanced</strong><label>Charger <select id="charger"><option value="">Select charger</option></select></label><button id="refresh">Refresh observations</button><div id="automatic-controls"><span id="pause-state">Auto state unknown.</span> <button id="pause-auto" disabled>Pause Auto until resumed</button> <button id="resume-auto" disabled>Resume Auto</button><span id="pause-notice" role="status"></span></div></div><div class="message" role="status">Select a charger.</div><main></main>`;
     const hostStyle=document.createElement('style');
-    hostStyle.textContent='#automatic-controls{display:flex;flex-wrap:wrap;gap:6px;min-width:0;max-width:100%} #automatic-controls button{max-width:100%;white-space:normal}';
+    hostStyle.textContent='.hostbar label{color:#f0f3f8}.hostbar select{color:#f0f3f8;background:#202b39;border:1px solid #8191a4;border-radius:8px;min-height:42px} #automatic-controls{display:flex;flex-wrap:wrap;gap:6px;min-width:0;max-width:100%} #automatic-controls button{max-width:100%;white-space:normal}';
     this.shadowRoot.append(hostStyle);
     this.shadowRoot.querySelector('#menu').onclick = () => this.dispatchEvent(new CustomEvent('hass-toggle-menu',{bubbles:true,composed:true}));
-    this.shadowRoot.querySelector('#charger').onchange = e => {this.stopObservations(); this.charger = e.target.value; this.refresh();};
-    this.shadowRoot.querySelector('#refresh').onclick = () => this.refresh();
+    this.shadowRoot.querySelector('#charger').onchange = e => {if (e.target.value===this.charger) return; this.stopObservations(); this.charger = e.target.value; this.rememberCharger(); this.refresh();};
+    this.shadowRoot.querySelector('#refresh').onclick = () => this.loaded ? this.refresh() : this.loadChargers();
     this.shadowRoot.querySelector('#pause-auto').onclick = () => void this.automaticAction('stop','until_resumed');
     this.shadowRoot.querySelector('#resume-auto').onclick = () => void this.automaticAction('resume',null);
     if (this._hass) this.loadChargers();
@@ -49,7 +52,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     const wasAdmin = this._hass?.user?.is_admin === true;
     this._hass=value;
     if (!this.connected) return;
-    if (value?.connected === false) { this.stopObservations(); this.message('Home Assistant disconnected.'); }
+    if (value?.connected === false) { if (was) this.stopObservations(true); this.message('Home Assistant disconnected.'); }
     else if (!this.loaded || !was) this.loadChargers();
     else if (wasAdmin !== (value?.user?.is_admin === true)) {
       this.permissionEpoch++;this.dashboardEpoch++;this.controlPermissionPending=true;
@@ -61,7 +64,10 @@ export class SpotnavEnhancedPanel extends HTMLElement {
   }
   get hass() { return this._hass; }
   message(text) { const el=this.shadowRoot.querySelector('.message'); el.textContent=text; el.hidden=!text; }
-  stopObservations() {
+  stopObservations(preserveDraft=false) {
+    const dirty=preserveDraft && this.settingsDirty;
+    if (dirty && this.settingsRecord) this.draftRevision=this.settingsRecord.revision;
+    else if (!preserveDraft) {this.draftRevision=null;this.draftCurrency=undefined;}
     if (this.settingsBusy && this.charger) this.unknownSettingsWrites.add(this.charger);
     this.generation++;
     clearInterval(this.ageTimer); this.ageTimer=null;
@@ -69,11 +75,12 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     this.cancellations=new Set();
     this.dashboardRead=null; this.statusRead=null;
     this.rawDashboard=null; this.rawStatus=null; this.statusAt=null; this.statusFailed=false; this.dashboardFailed=false;
-    this.settingsRecord=null; this.settingsLoading=false; this.settingsBusy=false; this.settingsConflict=false; this.settingsDirty=false; this.settingsNotice='';
+    this.settingsRecord=null; this.settingsLoading=false; this.settingsBusy=false; this.settingsConflict=false; this.settingsDirty=!!dirty; this.settingsNotice='';
     this.morekBusy=false; this.morekError=null; this.morekUncertain=false; this.statusEpoch=(this.statusEpoch || 0)+1; this.dashboardEpoch=(this.dashboardEpoch || 0)+1;this.autoBusy=false;this.autoUncertain=false;this.autoNotice='';this.autoExpected=null;this.controlPermissionPending=false;
     const pause=this.shadowRoot.querySelector('#pause-state');if(pause) pause.textContent='Auto state unknown.';
     for(const id of ['pause-auto','resume-auto']) {const button=this.shadowRoot.querySelector(`#${id}`);if(button)button.disabled=true;}
-    this.view?.dispose(); this.view=null;
+    if (!preserveDraft) {this.view?.dispose(); this.view=null;}
+    const main=this.shadowRoot.querySelector('main');if(main)main.hidden=preserveDraft;
   }
   paint() {
     if (!this.rawDashboard) return;
@@ -86,27 +93,31 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     const allowed=this._hass?.user?.is_admin===true || dashboard?.settings?.users_change_plan===true;
     if (this.settingsRecord) {
       const record=this.settingsRecord;
-      adapter.model.settings={target:record.target.target_percent,minimum:record.minimum_ready_by_soc,cap:record.soft_price_cap,readyBy:record.departure_time,capEnabled:record.soft_price_cap!=null,capBasis:record.cap_price_basis,deadlineEnabled:record.departure_enabled};
+      const currency=dashboard?.market?.currency || null;
+      if (this.settingsDirty && this.draftCurrency!==undefined && this.draftCurrency!==currency) {this.settingsConflict=true;this.settingsNotice='Price currency changed while editing. Reload settings before saving.';}
+      adapter.model.capCurrency=currency;
+      adapter.model.settings={target:record.target.target_percent,minimum:record.minimum_ready_by_soc,cap:capInput(record.soft_price_cap,currency),readyBy:record.departure_time,capEnabled:record.soft_price_cap!=null,capBasis:record.cap_price_basis,deadlineEnabled:record.departure_enabled};
       // The planner's nord_pool basis compares the source's converted published
       // major-unit price, even when that source includes its own charges. A
       // configured-variable-cost cap must not be drawn on this raw series.
       if (adapter.model.chart && record.revision===dashboard?.settings?.revision && record.cap_price_basis==='nord_pool' && Number.isFinite(record.soft_price_cap)) {
-        adapter.model.chart.cap=record.soft_price_cap;
+        adapter.model.chart.cap=displayPrice(record.soft_price_cap,currency);
       }
       adapter.model.settingsEditor=true;
       adapter.model.targetSupported=record.driver==='target_soc';
       adapter.model.policySupported=record.soft_price_cap!==undefined;
       adapter.model.canSave=allowed && !this.settingsBusy && !this.settingsConflict;
       adapter.model.settingsNotice=this.settingsNotice || (!allowed ? 'You do not have permission to change this plan.' : '');
-      adapter.model.labels.settingsNote=record.driver === 'target_soc' ? 'Edits use revision-checked SpotNav settings.' : 'Target SOC is unavailable in manual energy mode.';
+      adapter.model.labels.settingsNote=record.driver === 'target_soc' ? 'SOC-based planning. The planning target is separate from the car’s charge limit.' : 'Manual energy mode uses a requested kWh amount, so target SOC cannot be edited here. In the SpotNav card’s Plan settings, choose target SOC mode and configure a vehicle and target.';
       adapter.model.labels.saveLabel=this.settingsBusy ? 'Saving…' : 'Save plan';
       adapter.actions.save=values=>this.savePlan(values);
       adapter.actions.reloadSettings=()=>this.reloadSettings();
-      adapter.actions.edit=()=>{this.settingsDirty=true;this.paintMorek();};
+      adapter.actions.edit=()=>{if(!this.settingsDirty)this.draftCurrency=currency;this.settingsDirty=true;this.paintMorek();};
     } else adapter.model.settingsNotice=this.settingsLoading ? 'Loading settings…' : (this.settingsNotice || 'Settings unavailable.');
     this.message(this.dashboardFailed ? 'Dashboard refresh failed; the last observation may be stale.' : '');
     if (this.view) this.view.update(adapter);
     else this.view=mountDashboard(this.shadowRoot.querySelector('main'),adapter);
+    this.shadowRoot.querySelector('main').hidden=false;
     this.paintMorek();
   }
   paintAutomatic(dashboard) {
@@ -154,7 +165,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
   reloadSettings() {
     if (!this.connected || this.settingsBusy || !this.charger || this.pendingSettingsWrites.has(this.charger)) return;
     if (!window.confirm('Discard the current draft and reload the latest settings?')) return;
-    this.view?.resetDrafts();this.settingsRecord=null;this.settingsConflict=false;this.settingsDirty=false;this.unknownSettingsWrites.delete(this.charger);this.settingsNotice='Loading settings…';
+    this.view?.resetDrafts();this.draftRevision=null;this.draftCurrency=undefined;this.settingsRecord=null;this.settingsConflict=false;this.settingsDirty=false;this.unknownSettingsWrites.delete(this.charger);this.settingsNotice='Loading settings…';
     void this.loadSettings();
   }
   paintMorek() {
@@ -219,8 +230,9 @@ export class SpotnavEnhancedPanel extends HTMLElement {
       if (!this.connected || generation!==this.generation || charger!==this.charger) return;
       if (!decoded.ok || !decoded.value.ok || !decoded.value.settings) {this.settingsNotice='Settings unavailable.';return;}
       this.settingsRecord=decoded.value.settings;
-      this.settingsConflict=this.unknownSettingsWrites.has(charger) || this.pendingSettingsWrites.has(charger);
-      this.settingsNotice=this.settingsConflict ? 'A previous dispatched save has an unknown outcome. Wait for it to settle, then explicitly reload settings.' : '';
+      const unknown=this.unknownSettingsWrites.has(charger) || this.pendingSettingsWrites.has(charger);
+      this.settingsConflict=unknown || (this.settingsDirty && this.draftRevision!=null && this.draftRevision!==this.settingsRecord.revision);
+      this.settingsNotice=unknown ? 'A previous dispatched save has an unknown outcome. Wait for it to settle, then explicitly reload settings.' : this.settingsConflict ? 'Settings changed while disconnected. Reload settings before saving this draft.' : '';
     } catch { if (this.connected && generation===this.generation) this.settingsNotice='Settings unavailable.'; }
     finally { if (this.connected && generation===this.generation) {this.settingsLoading=false;this.paint();} }
   }
@@ -230,7 +242,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     const allowed=hass?.user?.is_admin===true || (decoded.ok && decoded.value.settings?.users_change_plan===true);
     if (!this.connected || hass?.connected===false || !charger || !record || this.settingsBusy || this.pendingSettingsWrites.has(charger) || this.morekBusy || this.autoBusy || this.settingsConflict || !allowed) {this.settingsNotice='Save unavailable or permission denied.';this.paint();return;}
     if (record.driver!=='target_soc' && values.target!==String(record.target.target_percent ?? '')) {this.settingsNotice='Target SOC cannot be changed in manual energy mode.';this.paint();return;}
-    const form={...formFromRecord(record),targetPercent:values.target,minimumReadySoc:values.minimum,capValue:values.cap,capEnabled:values.capEnabled,capBasis:values.capBasis,deadlineEnabled:values.deadlineEnabled,deadlineTime:values.readyBy};
+    const form={...formFromRecord(record),targetPercent:values.target,minimumReadySoc:values.minimum,capValue:capForSave(values.cap,decoded.ok ? decoded.value.market?.currency : null,record.soft_price_cap),capEnabled:values.capEnabled,capBasis:values.capBasis,deadlineEnabled:values.deadlineEnabled,deadlineTime:values.readyBy};
     const check=replacementFor('plan',record,form);
     if (!check.ok) {this.settingsNotice=translate('en',check.errorKey);this.paint();return;}
     if (!check.changed) {this.settingsNotice='No changes to save.';this.paint();return;}
@@ -242,7 +254,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
       const answer=decodeSettingsAnswer(await this.bounded(request));
       if (!this.connected || generation!==this.generation || permissionEpoch!==this.permissionEpoch || charger!==this.charger) return;
       if (!answer.ok) {this.settingsConflict=true;this.settingsNotice='Save response unavailable; outcome unknown. Reload before retrying.';}
-      else if (answer.value.ok) {this.settingsRecord=answer.value.settings;this.settingsDirty=false;this.settingsNotice='Saved and confirmed.';this.view?.resetDrafts();this.dashboardEpoch++;}
+      else if (answer.value.ok) {this.settingsRecord=answer.value.settings;this.settingsDirty=false;this.draftRevision=null;this.draftCurrency=undefined;this.settingsNotice='Saved and confirmed.';this.view?.resetDrafts();this.dashboardEpoch++;}
       else if (answer.value.code==='revision_conflict') {this.settingsConflict=true;this.settingsNotice='Settings conflict. Reload the charger and review the new values.';}
       else if (answer.value.code==='spotnav_settings_reconcile_failed') {this.settingsConflict=true;this.settingsNotice='Settings may be saved, but replanning failed; reload and inspect confirmed settings.';}
       else this.settingsNotice='Settings save rejected.';
@@ -259,17 +271,26 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     });
     return Promise.race([request,timeout]).finally(()=>{clearTimeout(timer);cancellations.delete(cancel);});
   }
+  rememberCharger() {
+    try { if (this.charger) sessionStorage.setItem('spotnav.sidebar.charger',this.charger); else sessionStorage.removeItem('spotnav.sidebar.charger'); } catch { /* Storage is optional. */ }
+  }
   async loadChargers() {
     const generation=++this.generation; this.loaded=true;
     try {
       const result=await listChargers(this._hass);
-      if (!this.connected || generation!==this.generation) return;
-      const chargers=result?.api_version===1 && Array.isArray(result.chargers) ? result.chargers.filter(c=>typeof c?.charger_id==='string' && typeof c?.charger_name==='string') : [];
+      if (!this.connected || this._hass?.connected===false || generation!==this.generation) return;
+      if (result?.api_version!==1 || !Array.isArray(result.chargers)) throw new Error('Invalid charger list');
+      const chargers=result.chargers.filter(c=>typeof c?.charger_id==='string' && c.charger_id && typeof c?.charger_name==='string');
       const select=this.shadowRoot.querySelector('#charger'); select.replaceChildren(new Option('Select charger',''));
       for (const charger of chargers) select.add(new Option(charger.charger_name,charger.charger_id));
-      if (chargers.some(c=>c.charger_id===this.charger)) {select.value=this.charger; this.refresh();}
-      else {this.charger=''; this.message(chargers.length ? 'Select a charger.' : 'No chargers available.');}
-    } catch { if (this.connected && generation===this.generation) {this.loaded=false;this.message('Charger list unavailable.');} }
+      let remembered=''; try { remembered=sessionStorage.getItem('spotnav.sidebar.charger') || ''; } catch { /* Storage is optional. */ }
+      const previous=this.charger || remembered;
+      const chosen=chargers.some(c=>c.charger_id===previous) ? previous : chargers.length===1 ? chargers[0].charger_id : '';
+      if (chosen!==this.charger && this.view) this.stopObservations();
+      this.charger=chosen; select.value=chosen;
+      if (chosen) {this.rememberCharger();this.refresh();}
+      else {this.rememberCharger();this.message(chargers.length ? 'Select a charger.' : 'No chargers available.');}
+    } catch { if (this.connected && generation===this.generation) {this.stopObservations(true);this.loaded=false;this.message('Charger list unavailable. Use Refresh observations to retry.');} }
   }
   refresh() {
     const generation=this.generation, charger=this.charger, hass=this._hass;

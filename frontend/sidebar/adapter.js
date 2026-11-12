@@ -15,6 +15,27 @@ const part = (ms, zone, options) => {
   if (!Number.isFinite(ms)) return U;
   try { return new Intl.DateTimeFormat('en', {...options,timeZone:zone || 'UTC'}).format(ms) + (zone ? '' : ' UTC'); } catch { return U; }
 };
+const providerName = key => ({nordpool:'Nord Pool',entsoe:'ENTSO-E',pvpc:'PVPC',octopus:'Octopus Energy',zonneplan:'Zonneplan',relay:'Legacy relay'})[key] || (typeof key === 'string' && key ? key : 'unknown provider');
+export function priceProvenance(prices, market, zone, stale = false, now = Date.now()) {
+  const selected=prices?.provider?.name || (prices?.provider?.key ? providerName(prices.provider.key) : 'Unavailable');
+  const area=[market?.area_name,market?.area_id].filter(Boolean).join(' · ') || 'Unknown';
+  const fetched = value => {
+    const ms=Date.parse(value || '');
+    if (!Number.isFinite(ms) || ms>now) return 'unknown or future timestamp';
+    const hours=(now-ms)/3600000;
+    return `${date(value,zone)} (${hours<1 ? 'less than 1 hour ago' : `${Math.floor(hours)} hours ago`})`;
+  };
+  const describe = prefix => {
+    const day=typeof prices?.[prefix] === 'string' ? prices[prefix] : 'unknown day';
+    const state=typeof prices?.[`${prefix}_state`] === 'string' ? prices[`${prefix}_state`] : 'unknown';
+    const facts=prices?.[`${prefix}_provenance`];
+    if (!Array.isArray(facts) || !facts.length) return `${prefix} ${day}: ${state}; held provider unavailable; fetched ${fetched(prices?.[`${prefix}_fetched_at`])}.`;
+    const names=new Set(facts.map(f=>providerName(f?.provider)));
+    const detail=facts.map(f=>`${providerName(f?.provider)} (market day ${typeof f?.market_day==='string' ? f.market_day : 'unknown'}, ${typeof f?.state==='string' ? f.state : 'unknown'}, fetched ${fetched(f?.fetched_at)})`).join('; ');
+    return `${prefix} ${day}: ${state}${names.size>1 ? ' · mixed providers' : ''}; ${detail}.`;
+  };
+  return `Current provider route: ${selected}; market/area: ${area}. ${describe('today')} ${describe('tomorrow')} ${stale ? 'Dashboard observation stale or unavailable.' : 'Provider route may differ from held files.'}`;
+}
 
 export function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed = false, dashboardFailed = false) {
   const decoded = decodeDashboard(raw);
@@ -41,7 +62,7 @@ export function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), f
   const currency = proposal?.cost?.currency || null;
   const warning = status?.outcomes?.uncertain || status?.operator?.state === 'mismatch' || status?.verification?.reason === 'limits_or_transitions_differ';
   const published = publishedChart(raw, d.market, now, stale || dashboardFailed);
-  const priceFreshness = `Today source fetched ${date(raw?.prices?.today_fetched_at,zone)}; tomorrow source fetched ${date(raw?.prices?.tomorrow_fetched_at,zone)}.`;
+  const priceFreshness = priceProvenance(raw?.prices,d.market,zone,stale || dashboardFailed,now);
   return {
     draftKey: d.charger.charger_id,
     format: {currency, minutesPerTimeUnit:1/60000, time: ms=>part(ms,zone,{timeStyle:'short'}), day: ms=>part(ms,zone,{dateStyle:'medium'}), ...published?.format},

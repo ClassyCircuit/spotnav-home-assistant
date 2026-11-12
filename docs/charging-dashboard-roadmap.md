@@ -99,6 +99,7 @@ Detailed requirements and acceptance cases follow outside this checklist.
 | 9 | Targeted dashboard fixes | Only where needed; initial installation is in Stage 5 |
 | 10 | Optional Charge Now override | After the initial 5.8 installation and user-directed validation; independent of Stages 6–9 |
 | 11 | Adaptive charging estimates for Morek | Later work; reuse existing learning and genuine measurement sources |
+| 12 | Fix real sidebar usability, price presentation and evidence | Prioritize before 5.8; implement bounded 12.1–12.7 separately alongside remaining 5.7b work |
 
 ### Stage 0 — Completed baseline: preserve and reuse
 
@@ -1211,6 +1212,197 @@ and progress checks do not replace or prove that separate vehicle setting.
   - Test reliable and insufficient samples, incorrect initial estimates, slow or
     interrupted charging, stale readings, restart, vehicle changes and safe replans
     with mocked boundaries. Deployed testing remains the user's decision.
+
+### Stage 12 — Real sidebar usability and data clarity
+
+**Priority:** address the user's observed HA sidebar problems before the initial
+5.8 installation milestone, alongside—not instead of—the remaining 5.7b work.
+This stage covers the existing shared dashboard and real adapter, not a rewrite or
+a new hardware-testing stage. The screenshots are observations of an installed
+system. A subsequent user-authorized read-only HA investigation found an update
+entity reporting installed commit `dc7a8b4` (repository manifest 2.5.68), while
+the local checkout was 2.5.66 with subsequent uncommitted 12.1 work. The update
+entity is not independent proof of running code or deployed bundle contents; recheck
+Git and installed/running versions before making version-specific assumptions.
+Source inspection identified likely or confirmed defects; verify each fix with
+representative tests rather than assuming deployment parity.
+Assign one bounded substage at a time and stop for review. No deployment, HA access,
+restart or charger operation is authorized by this stage.
+
+**Backend is in scope:** these are functional fixes, not just visual polish. Trace
+each issue through the real settings, provider, planner and dashboard API paths;
+fix the underlying backend or contract where it causes incorrect, missing, stale or
+misleading data. Add actual-module backend tests and frontend-to-API regression tests
+as appropriate. Preserve existing valid settings and safe scheduling behavior. Do
+not fabricate data, force a source, change charging policy without explicit user
+action, weaken admission/safety checks, or claim physical behavior is verified.
+
+- [x] **12.1 Charger selection and understandable plan controls** (local implementation; coordinator review pending)
+  - 2.5.67 adds sole-charger selection and session-scoped selection restoration,
+    guarded reconnect/list races and retained drafts with revision-conflict blocking.
+    Shared dark controls and saved-value/mode guidance are updated; an absent SOC
+    target no longer blocks an unrelated supported settings edit. Nord Pool is a
+    suggestion, not a persisted default or provider selection. Local mocked tests
+    pass; actual HA shadow-root appearance and physical touch remain unverified.
+  - Automatically select and load the sole available charger when opening the
+    sidebar. Preserve an existing valid choice on reload/reconnect, handle no
+    chargers and list errors clearly, and retain explicit selection when multiple
+    chargers exist; opening the panel must not issue a charger write. Test loading,
+    reconnect, changed lists, stale responses and teardown.
+  - Fix the dark-theme contrast of the charger label, Web Awesome input labels,
+    checkboxes and other plan-control text in the actual shadow-root sidebar, not
+    just the preview. Keep labels and enabled/disabled states legible on desktop
+    and mobile. Preserve accessibility and the shared UI.
+  - Explain each control, its units, saved value and enabled state. In particular,
+    explain why target SOC is disabled in manual energy mode and how to configure
+    SOC-based planning using supported existing settings; fix any underlying settings
+    or API defect that prevents a supported mode/value from loading or being saved.
+    Make absent optional
+    minimum/cap values and ready-by enablement understandable.
+  - Offer sensible, explicitly identified initial values where supported, including
+    Nord Pool as the proposed cap basis when appropriate. Do not silently overwrite
+    existing choices, invent a target or minimum, enable a cap, change plan mode,
+    or persist a policy merely by displaying defaults. Distinguish the cap's price
+    basis from the actual price provider; preserve revision checks and draft safety.
+
+- [x] **12.2 Price provenance, cents and consistent formatting** (local implementation; review pending)
+  - 2.5.69 reports the current provider route separately from the actual held
+    market-day file providers, states and fetch times, including mixed and unknown
+    provenance. Existing routing already prefers loaded Nord Pool for supported
+    areas; no provider preference is overwritten. EUR chart and cap displays use
+    c/kWh at the UI boundary while settings remain major currency/kWh. Focused
+    mocked tests pass; browser, actual HA rendering and physical touch were not run.
+  - Trace the real published-price pipeline and show the actual available provider,
+    market/area, applicable data day, price basis and fetch freshness. Make missing,
+    stale, mixed or unavailable source information explicit. Verify whether and how
+    Nord Pool can be preferred by default without overriding an existing provider;
+    the cap-basis dropdown is not provider selection. Do not label a source Nord
+    Pool based solely on a dropdown, nor substitute sample data. Correct defects in
+    source selection, published data, freshness or API attribution where found,
+    with backend tests; do not restrict this work to changing the displayed label.
+    A read-only dashboard observation reported Nord Pool as market source; this is
+    attribution, not independent verification of each interval, and may change.
+  - Present EUR prices in **c/kWh** throughout the chart, price summaries, tooltips,
+    extrema, plan price and soft-cap input/line. Convert at a clearly defined display
+    boundary and convert edited caps back to the backend's existing currency/kWh
+    contract exactly once. Preserve saved settings, planner behavior and price-basis
+    semantics; never silently reinterpret a saved cap. Handle non-EUR currencies
+    honestly and do not label them euro cents.
+  - Apply consistent human-readable rounding to axes, tooltips, badges, extrema and
+    cap labels without changing underlying prices or window boundaries. Exercise
+    floating-point artifacts, negative prices, fractional cents, unavailable values,
+    non-EUR currencies, cap round trips, source intervals, gaps and DST. Test actual
+    shared chart/sidebar rendering and backend contract compatibility.
+
+- [ ] **12.3 Useful plan details and honest missing data**
+  - Investigate each prominent Unknown using the real dashboard contract. Bind
+    available deadline and planning information; provide the total weighted average
+    when valid priced total cost, positive wall energy, currency and cost basis support
+    it. Label estimates and basis consistently. Avoid calculating from rounded
+    display totals where authoritative unrounded values are available. Correct or
+    extend backend calculation and serialization when the required reliable data
+    exists but is not exposed correctly; verify settings-to-planner-to-API flow.
+  - Supply per-window estimated energy, cost and weighted price only from authoritative
+    planner output or a verified calculation consistent with the actual planner,
+    tariff basis, partial windows and total; extend the existing contract if needed.
+    Explain missing inputs instead of fabricating results. Test consistency across
+    the compact plan, full plan, modal and chart, including partial and unpriced plans.
+  - For SOC projections, identify missing usable capacity, efficiency, fresh SOC or
+    mode and guide the user to supported configuration; never invent assumptions or
+    report estimates as measured. Preserve the distinction between the car's own
+    target and SpotNav's planning target.
+  - Keep measured power, genuine history and price insights unavailable where reliable
+    sources or sufficient coverage do not exist. Reuse 5.7b and later Stages 6–8;
+    do not infer measured charging from planned windows or duplicate those stages.
+
+- [ ] **12.4 Clear Morek status and evidence**
+  - Replace the confusing wall of repeated warnings with a concise, actionable daily
+    status and expandable technical details. Clearly separate the current proposal,
+    last upload and ACK, effective readback with coverage/freshness, and genuinely
+    measured charging. Show each timestamp and explain stale or superseded evidence
+    in plain language, including why an old accepted readback does not verify a new
+    proposal. Do not present a historical comparison as current charger state.
+  - Explain ownership/migration or reconfirmation blockers only when supported by
+    actual status and show when the reason is unknown. Preserve material warnings:
+    retained final 0 A, uncertain outcomes, Stop and protection, readback not being
+    profile inventory, and ACK/readback not proving physical charging. Keep detailed
+    transitions, drift and diagnostics accessible without overwhelming the daily view.
+    Trace and fix any incorrect backend status, freshness, attempt association or
+    verification logic found, with mocked actual-module regressions; do not merely
+    hide an erroneous status or relax a legitimate blocker.
+  - Preserve all existing authorization, identity, revision, pause, uncertainty,
+    ownership and confirmation interlocks. No automatic send, reconfirmation, clear,
+    Resume or recovery may result from opening or simplifying the panel. Test current,
+    stale, superseded, mismatched, missing, offline and uncertain evidence, as well
+    as mobile rendering and no-write behavior.
+
+- [ ] **12.5 Plan-mode selection in the shared sidebar**
+  - The real settings observation reported `manual_kwh`, which plans a requested
+    energy amount rather than an SOC target. The existing card has a revision-checked
+    **Charge by** mode choice, but the sidebar only explains that the card must be
+    used. Let the user explicitly select manual energy or target SOC in the shared
+    sidebar, reusing the canonical settings contract and validation; this is not a
+    new controller or an instruction to switch automatically. Explain the difference,
+    the requested kWh, the selected vehicle and the independent car-side limit.
+  - For target SOC, present the discovered vehicle, target and missing prerequisites;
+    make stale SOC and unavailable capacity understandable. Preserve an existing
+    vehicle/target and other settings, enforce valid target/minimum relationships,
+    revision conflicts, permission checks and unsaved drafts. Do not invent a target,
+    wake the car or change BMW settings. Switching can replan and, when a legitimately
+    armed executor exists, trigger its normal guarded reconciliation; explicitly
+    explain this before saving rather than pretending the change is display-only.
+  - Test explicit mode changes in both directions, manual and SOC settings round
+    trips, stale/missing inputs, guest/ambiguous vehicles, permissions, failed and
+    concurrent saves, unchanged drafts and settings-to-planner flow. Opening or
+    editing without saving must not write. Keep existing execution interlocks.
+
+- [ ] **12.6 BavarianData SOC provenance and freshness**
+  - A read-only HA observation established that the selected vehicle came from the
+    loaded `bavariandata` integration and the dashboard API contained an SOC reading
+    roughly 23 minutes old; the sidebar hid it under its 180-second freshness rule.
+    This is a time-specific observation, not proof of current data or update cadence.
+    Trace vehicle selection, report-time versus HA-state timestamp, freshness and
+    estimates end to end. Fix incorrect source/timestamp handling if found; do not
+    assume an unchanged value or entity refresh is a new vehicle measurement.
+  - Show a valid last-reported SOC with its age, source and clear stale/estimated
+    label instead of replacing it with Unknown. Show truly missing/unavailable data
+    honestly and identify the missing prerequisite. Separate presentation freshness
+    from planner/execution freshness: never treat the old reading as current or
+    relax the existing safety threshold merely to populate the UI. Do not wake or
+    poll the vehicle without an explicitly designed and approved action.
+  - Surface available capacity/efficiency and why SOC projections are unavailable,
+    sharing the relevant 12.3 work rather than duplicating calculation. Test real
+    adapter/backend contracts with fresh, stale, absent, restored and estimated SOC,
+    old report versus newer HA timestamps, source changes and updates over time.
+
+- [ ] **12.7 Resume outcomes and ownership/evidence diagnosis**
+  - The observed Resume request returned only a generic rejection in the sidebar;
+    its exact backend code was not captured and must not be guessed. Preserve and
+    translate stable action error codes into actionable messages. Distinguish a
+    refusal before effect, a durable action whose follow-up failed, and an unknown
+    transport outcome; never assert the prior state is unchanged for all failures.
+    Display recorded `pause_stop_failed` as a failed stop request, not proof of
+    physical stopping or charging, and show fresh state after an action when available.
+  - The read-only status observation reported a manual pause, missing ownership and
+    no recorded outcome attempt; `uncertain` was false while the blocker said
+    `profile_outcome_uncertain`. Investigate the real ownership/outcome migration,
+    admission and status logic in actual modules. Distinguish a missing or unsettled
+    record from a confirmed uncertain action in backend codes and UI; establish why
+    Resume is refused using mocked reproduction or future authorized diagnostics,
+    without falsely claiming these observations prove its cause. Reuse 5.7b and
+    12.4; fix genuine backend defects instead of just relabeling them.
+  - Provide only evidence-supported, supervised next steps. Never automatically
+    reconfirm ownership, clear profiles, erase records, retry Resume or infer an
+    absent retained schedule. Preserve person Stop, pending/unknown outcomes,
+    final 0 A and protection interlocks. Test missing/settled/uncertain records,
+    migration, restart, refusal, committed-follow-up failure, transport uncertainty,
+    stale responses and no automatic writes using mocked HA/OCPP boundaries.
+
+Each substage includes focused automated tests and documentation. For integration or
+card changes, bump the manifest, build the frontend and verify `npm run check-dist`
+as required by `AGENTS.md`. Report any unrun HA-plugin suite and distinguish mocked
+tests from actual HA rendering or physical charging; never claim live validation from
+these changes.
 
 ### Execution boundaries — avoid another prerequisite spiral
 

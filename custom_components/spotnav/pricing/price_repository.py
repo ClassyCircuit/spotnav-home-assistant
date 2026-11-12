@@ -201,6 +201,9 @@ class DaySnapshot:
     refreshing: bool
     #: Set for a composed display day; `None` means "the document covers its whole day" decides.
     complete: bool | None = None
+    # Actual held files, not the router's current provider. A display day can
+    # combine market-day files from different providers or acquisition times.
+    provenance: tuple[tuple[date, str | None, datetime | None, DayState], ...] = ()
 
     @property
     def interval_count(self) -> int | None:
@@ -403,6 +406,7 @@ class PriceRepository:
             index_authority=principal.index_authority,
             refreshing=any(item.refreshing for item in files),
             complete=principal.is_complete,
+            provenance=tuple(fact for item in files for fact in item.provenance) if document is not None else (),
         )
 
     def catalogue_snapshot(self) -> CatalogueSnapshot:
@@ -976,6 +980,7 @@ class PriceRepository:
             attempt_error=error,
             index_authority=authority,
             refreshing=refreshing,
+            provenance=() if cached is None else ((day, cached.provider, cached.fetched_at, state),),
         )
 
     def _attempt(self, key: tuple[str, ...]) -> tuple[datetime | None, FailureCode | None]:

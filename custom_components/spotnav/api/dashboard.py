@@ -1870,6 +1870,15 @@ def serialize_prices(capture: CapturedDashboard) -> dict[str, Any]:
     snapshot = capture.snapshot
     rows = serialize_intervals(capture)
     resolutions = _held_resolutions(capture)
+    def provenance(day: Any) -> list[dict[str, Any]] | None:
+        if day is None or day.document is None:
+            return None
+        return [
+            {"market_day": _day(file_day), "provider": _text(provider),
+             "fetched_at": aware_iso(fetched_at), "state": state}
+            for file_day, provider, fetched_at, state in getattr(day, "provenance", ())
+        ]
+
     return {
         "area_id": None if area is None else area.area_id,
         "state": None if area is None else area.state,
@@ -1880,6 +1889,8 @@ def serialize_prices(capture: CapturedDashboard) -> dict[str, Any]:
         "tomorrow_state": None if tomorrow is None else tomorrow.state,
         "today_source": None if today is None else _text(today.source),
         "tomorrow_source": None if tomorrow is None else _text(tomorrow.source),
+        "today_provenance": provenance(today),
+        "tomorrow_provenance": provenance(tomorrow),
         "today_fetched_at": aware_iso(None if today is None else today.fetched_at),
         "tomorrow_fetched_at": aware_iso(None if tomorrow is None else tomorrow.fetched_at),
         "today_attempt_at": aware_iso(None if today is None else today.attempt_at),

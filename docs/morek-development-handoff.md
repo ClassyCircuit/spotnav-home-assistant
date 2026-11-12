@@ -355,6 +355,20 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-12 — merge dashboard work into main (2.5.70)
+
+- Combined the 2.5.68 Web Awesome registration/refresh work from main with the
+  independently developed 12.1 and 12.2 dashboard changes. Resolved the version
+  conflict with 2.5.70 and rebuilt the card and sidebar assets from merged sources;
+  neither branch's generated bundle was used as a conflict resolution shortcut.
+- Local checks: frontend build and check-dist passed; focused sidebar and price-chart
+  tests passed 54 tests, with jsdom CSS parsing warnings. The isolated published
+  interval and sidebar registration checks passed; isolated planning plus price
+  provenance tests passed with one skip. Direct pytest collection failed because
+  the installed HA plugin imports Unix-only `fcntl` on Windows. No live HA access,
+  deployment or charger action was made for this merge; the full HA-plugin suite
+  remains unrun.
+
 ### 2026-11-12 — sidebar Web Awesome collision (2.5.68; local only)
 
 - The installed 2.5.66 blank panel's reported duplicate `wa-icon` exception was
@@ -422,6 +436,47 @@ requirements, not features claimed implemented in the manual baseline below.
   writes remain blocked. Disabling the integration may leave a stored schedule or
   0 A limit. ACK and effective readback are neither profile inventory nor physical
   charging; external writers and native protection remain unverified.
+### 2026-11-12 — Stage 12.2 price display and provenance (2.5.69; review pending)
+
+- The current provider route is not necessarily the provider of a held day file.
+  Repository day snapshots now retain each contributing file's provider, market
+  date, fetch time and state; the dashboard API exposes these separately from the
+  current route, including split-day mixed sources. Older backends or records with
+  unknown provenance show it as unavailable, rather than inferring it from a cap
+  basis. Freshness includes fetch age and failed/stale state, not a guarantee that
+  market data is current. Routing already prefers the loaded Nord Pool integration
+  for supported areas, otherwise its existing alternatives; no selection is forced.
+- EUR source prices and the cap are displayed in c/kWh, with edits converted back
+  to the existing major-unit/kWh settings contract; other currencies stay in their
+  major units. An unchanged saved cap keeps its exact stored value, and a market
+  currency change blocks an open draft. Chart price text uses consistent rounding;
+  interval boundaries and underlying planner values are unchanged. Unknown live
+  per-window costs and weighted prices remain 12.3, not fabricated here.
+- Fast checks: focused sidebar/price tests, isolated actual-module repository/API
+  provenance tests, shared-plan tests, Ruff, frontend type-check, build and
+  check-dist. No browser, visual or large-suite checks were run, per request;
+  actual HA rendering and physical behavior remain unverified. The full HA-plugin
+  dashboard suite remains unrun. No live HA access, deployment or charger action.
+
+### 2026-11-12 — Stage 12.1 sidebar controls (2.5.67; review pending)
+
+- The sidebar selects a sole charger, restores a valid session selection, handles
+  list failures and stale replies, and preserves an unsaved draft on reconnect;
+  a changed settings revision blocks its save until explicit reload. Opening only
+  performs read requests. The shared dark controls include explicit shadow-root
+  colors and clearer saved values, units, mode, ready-by and optional cap/minimum
+  guidance. Nord Pool is suggested as a cap basis only; it is not selected or
+  saved automatically and does not identify the actual provider. Manual energy
+  mode points to the existing SpotNav card Plan settings for SOC configuration.
+- A valid SOC-mode settings record with a missing target can now save an unrelated
+  edit without creating a target. Existing permission, revision and Morek action
+  checks remain. No planner policy or charger safety interlock changed.
+- Mocked sidebar and settings tests: 170 passed; frontend type-check, build and
+  check-dist passed. Existing jsdom CSS parser warnings occur. A local browser
+  smoke attempt did not reach its fixture; further browser tests were not run at
+  the user's request. Actual HA rendering, mobile touch and hardware remain
+  unverified; no HA access, deployment or charger operation occurred. The full
+  HA-plugin dashboard suite remains unrun. 12.2–12.4 and 5.7b remain open.
 
 ### 2026-11-12 — non-profile automatic recovery (2.5.66; coordinator review pending)
 
