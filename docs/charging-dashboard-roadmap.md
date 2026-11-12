@@ -809,6 +809,20 @@ tests are documented there; full HA collection is still blocked on Windows.
     and evidence to the user before installation; do not claim it passed or halt
     unrelated implementation just to provision the test environment.
 - [ ] **5.7a Replace Morek execution with the schedule owner**
+  - **2.5.59 partial:** reconnect may release its generation-bound barrier only
+    after unique schedule ownership is compared against the durable document and
+    the settled outcome ledger, with lifecycle, connector and Stop rechecked under
+    admission. Existing owner admission still excludes ordinary writers and
+    production owned-profile admission remains unconditionally unarmed. Stale,
+    uncertain, cancelled or ambiguous release attempts stay closed. This is mocked
+    groundwork; the full wired migration race matrix and 5.7a remain open.
+  - **2.5.58 partial:** availability callbacks synchronously reserve a target
+    writer barrier before scheduling initialization. A barrier remains closed for
+    the process lifetime, including failed or stale recovery; person Stop and the
+    separately classified protection path retain their existing treatment. Mocked
+    lifecycle tests cover the pre-task gap, a pre-admitted writer and a real setup
+    path through the unarmed owner. The full requested lifecycle/race matrix and
+    production admission remain open; see handoff before treating this as complete.
   - **2.5.57 partial:** charger setup now starts the existing unarmed connector
     drain before Auto startup and invokes the existing producer-locked handover.
     A unique durable legacy binding and settled connector-ledger attempt are required;

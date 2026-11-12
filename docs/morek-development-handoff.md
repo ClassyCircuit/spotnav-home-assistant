@@ -340,6 +340,73 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-12 — verified reconnect barrier release (2.5.59; partial)
+
+- A reconnect callback captures a per-entry barrier revision. After initialization,
+  release takes connector admission, verifies the unique current schedule owner,
+  rereads and compares the durable ownership document, and checks the settled outcome
+  ledger. It then rechecks revision, lifecycle epoch, identity, connector generation,
+  person Stop and in-process uncertainty before removing only that entry's barrier.
+  Another entry's barrier is not removed. The owner admission path continues to refuse
+  legacy/manual writers, and production owned-profile admission still unconditionally
+  returns `schedule_mode_unarmed`; release is not a profile-write authorization.
+- Wired mocked callback tests cover a successful release and refusal after a newer
+  disconnect, uncertain ledger, ambiguous identity, Stop reservation or cancellation.
+  They verify the actual production gate and legacy/manual exclusion. No simulated
+  production activation or charger operation is claimed. Full requested callback-bound
+  duplicate-contender and each persistence/Stop-boundary matrix remains unproven;
+  existing lower-level handover regressions remain in place. The 2.5.58 process-lifetime
+  barrier description below is historical and superseded by this bounded release.
+- First-use/lost-state provenance, historical profile mismatch, unknown retained
+  consequences, external writers, protection, authorization and measured flow remain
+  unresolved. No live HA, profile action or deployment occurred. 5.7a and 5.7b remain open.
+- Local checks: `python tools/run_isolated_planning_tests.py -x` 548 passed,
+  1 deselected; `python tools/run_isolated_lifecycle_tests.py -x` 153 passed;
+  `python tools/run_isolated_lifecycle_tests.py tests/test_morek_schedule.py
+  tests/test_morek_readiness.py tests/test_command_admission.py
+  tests/test_execution_ownership.py tests/test_morek_outcomes.py -x` 297 passed.
+  Targeted Ruff, frontend type-check, build, check-dist and focused sidebar/Morek
+  tests (61 passed), and diff check passed. Existing pytest timeout-option and
+  dependency-deprecation, jsdom CSS and Git line-ending warnings remain. The full
+  5.4c HA-plugin suite was not run.
+
+### 2026-11-12 — reconnect writer barrier (2.5.58; partial)
+
+- Availability callbacks now synchronously reserve a process-local entry/connector
+  barrier before scheduling initialization, invalidate queued generation tokens and
+  interrupt an active drain. The legacy and manual profile admissions recheck the
+  barrier; already admitted work is drained through the existing connector lock.
+  Positively unrelated connectors bypass it, and the separately reserved person Stop
+  and regulator-protection paths are not reclassified. Unresolved identity retains
+  an entry barrier rather than being treated as an unrelated connector.
+- The barrier is deliberately not released in this unarmed implementation, even
+  after a successful migration; no task completion or unload can reopen it. Lifecycle
+  epochs suppress stale initialization after a newer availability transition or unload.
+  The existing durable ownership/transition record remains necessary across restart.
+  Production owned-profile dispatch stays unconditionally unarmed. Future activation
+  must explicitly review barrier lifecycle and final dispatch validation.
+- Mocked actual-module tests now exercise the real charger setup through ownership
+  handover before the real Auto executor start boundary; a reconnect callback with
+  its background coroutine held; a Stop reservation; stale reconnect completion;
+  and a writer already in admission before reconnect. The full requested matrix of
+  duplicate contenders, identity changes, interruption and persistence boundaries
+  through the newly wired callback has not been established. Existing lower-level
+  transition regressions remain; do not infer full 5.7a completion from them.
+  External writers, profile inventory, native protection and physical flow remain
+  unverified. No live HA, profile operation or deployment was performed.
+- Validation: `python tools/run_isolated_planning_tests.py -x` 548 passed,
+  1 deselected; `python tools/run_isolated_lifecycle_tests.py -x` 141 passed;
+  `python tools/run_isolated_lifecycle_tests.py tests/test_morek_schedule.py
+  tests/test_morek_readiness.py tests/test_command_admission.py
+  tests/test_execution_ownership.py tests/test_morek_outcomes.py -x` 285 passed.
+  Targeted Ruff, frontend type-check/build/check-dist and focused sidebar/Morek
+  tests (61 passed), and diff check passed. Two early lifecycle runs timed out
+  because the new test waited at the wrong barrier; the test was corrected. One
+  subsequent run failed an existing unsubscribe identity expectation; the non-migration
+  path now keeps the original callback and the rerun passed. Existing pytest timeout
+  configuration and dependency deprecations, jsdom CSS and Git line-ending warnings
+  remain. The full 5.4c HA-plugin suite was not run. 5.7a and 5.7b remain open.
+
 ### 2026-11-12 — 5.7a wired unarmed migration (2.5.57; partial)
 
 - Charger setup now uses existing entry/drain and producer-locked handover before

@@ -312,8 +312,9 @@ async def _async_setup_ownership_metadata(
     """Initialize metadata now and on the control entity's next availability transition."""
     if controller.ocpp_target is None:
         return
+    lifecycle_epoch = 0
 
-    async def ensure() -> None:
+    async def ensure(expected_epoch: int) -> None:
         admission = command_admission(hass)
         def identity():
             return _identity_status(hass, controller.ocpp_target)
@@ -328,9 +329,12 @@ async def _async_setup_ownership_metadata(
         # An interrupted migration is not a request to restore the old Morek
         # executor. Preserve its durable interlock on startup and reconnect.
         evidence = await admission.async_recovery_status(entry.entry_id, identity)
+        if expected_epoch != lifecycle_epoch:
+            return
         if (migrate and existing.get("record_state") == "valid"
                 and existing.get("recorded_owner") == "legacy" and existing.get("transition_state") is None):
-            result = await admission.async_begin_unarmed_entry(entry.entry_id, identity, lambda: False)
+            result = await admission.async_begin_unarmed_entry(
+                entry.entry_id, identity, lambda: expected_epoch != lifecycle_epoch)
             admission._recovery_status[entry.entry_id] = {**evidence, "migration_result": result}
             if result == "drained_unarmed":
                 from .execution.command_admission import physical_connector
@@ -338,30 +342,52 @@ async def _async_setup_ownership_metadata(
                 if connector is not None:
                     admission._migration_controllers[connector] = controller
             executor = getattr(getattr(entry, "runtime_data", None), "executor", None)
-            if result == "drained_unarmed" and executor is not None:
+            if result == "drained_unarmed" and executor is not None and expected_epoch == lifecycle_epoch:
                 await _async_finish_morek_migration(hass, entry, controller, executor)
 
     @callback
     def control_available(event: Event) -> None:
+        nonlocal lifecycle_epoch
         old, new = event.data.get("old_state"), event.data.get("new_state")
         was_available = old is not None and old.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN)
         is_available = new is not None and new.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN)
         if was_available == is_available:
             return
+        lifecycle_epoch += 1
+        epoch = lifecycle_epoch
+        barrier_revision = None
+        if migrate:
+            # Do this synchronously, before creating a task. A writer already
+            # holding admission is drained by the existing entry protocol.
+            barrier_revision = command_admission(hass).reserve_lifecycle_barrier(
+                entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target))
         # Invalidate queued worker work synchronously, including on disconnect.
         worker = getattr(getattr(entry, "runtime_data", None), "morek_worker", None)
         generation = worker.suspend_for_availability_change() if worker is not None else None
         if is_available:
             async def initialize_and_reconcile() -> None:
-                await ensure()  # Never acquire admission recursively in the worker.
+                await ensure(epoch)  # Never acquire admission recursively in the worker.
+                if migrate and barrier_revision is not None:
+                    await command_admission(hass).async_release_lifecycle_barrier(
+                        entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target),
+                        barrier_revision, lambda: epoch == lifecycle_epoch)
                 current = getattr(getattr(entry, "runtime_data", None), "morek_worker", None)
                 if current is worker and current is not None:
                     current.resume_after_availability_change(generation)
 
             entry.async_create_background_task(hass, initialize_and_reconcile(), "spotnav ownership initialization")
 
-    entry.async_on_unload(async_track_state_change_event(hass, [controller.charge_control], control_available))
-    await ensure()
+    remove_listener = async_track_state_change_event(hass, [controller.charge_control], control_available)
+    def close_ownership_listener() -> None:
+        nonlocal lifecycle_epoch
+        lifecycle_epoch += 1
+        if migrate:
+            command_admission(hass).reserve_lifecycle_barrier(
+                entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target))
+        remove_listener()
+
+    entry.async_on_unload(close_ownership_listener if migrate else remove_listener)
+    await ensure(lifecycle_epoch)
 
 
 async def _async_finish_morek_migration(hass, entry, controller, executor) -> None:

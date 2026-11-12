@@ -258,6 +258,241 @@ async def test_reconnect_preserves_migration_interlocks(environment, monkeypatch
 
 
 @pytest.mark.asyncio
+async def test_reconnect_callback_closes_writer_admission_before_task_runs(environment, monkeypatch):
+    hass, _, gate, target, _, entry = environment
+    persist(hass, {"a": record()})
+    callbacks, pending = [], []
+    monkeypatch.setattr(integration, "async_track_state_change_event",
+                        lambda _h, _ids, cb: callbacks.append(cb) or (lambda: None))
+    entry.async_create_background_task = lambda _h, coro, _name: pending.append(coro)
+    real_identity = integration._identity_status
+    offline = [True]
+    monkeypatch.setattr(integration, "_identity_status", lambda h, t: (
+        {"supported": False, "resolved_id": None, "connector_id": 1} if offline[0] else real_identity(h, t)))
+    entry.runtime_data = SimpleNamespace(executor=None, morek_worker=None)
+    await integration._async_setup_ownership_metadata(
+        hass, entry, SimpleNamespace(ocpp_target=target, charge_control="switch.charger"), migrate=True)
+    offline[0] = False
+    callbacks[0](SimpleNamespace(data={"old_state": SimpleNamespace(state="unavailable"),
+                                       "new_state": SimpleNamespace(state="off")}))
+    identity = lambda: real_identity(hass, target)  # noqa: E731
+    write = AsyncMock()
+    assert (await gate.async_execute("a", "legacy_actuator", identity, write)).reason == "lifecycle_initializing"
+    assert (await gate.async_manual_profile("a", identity, write)).reason == "lifecycle_initializing"
+    write.assert_not_awaited()
+    unrelated, unrelated_path, _, _ = adapter_for(hass, SimpleNamespace(devid="alias-a", connector_id=2))
+    assert await unrelated.async_start(16)
+    unrelated_path.async_start.assert_awaited_once()
+    protected, protected_path, _, _ = adapter_for(hass, target)
+    assert await protected.async_stop(protection=True)
+    protected_path.async_stop.assert_awaited_once()
+    stop = AsyncMock()
+    with gate.person_stop_reservation("a", identity):
+        assert (await gate.async_execute("a", "person_stop", identity, stop)).allowed
+    stop.assert_awaited_once()
+    callbacks[0](SimpleNamespace(data={"old_state": SimpleNamespace(state="off"),
+                                       "new_state": SimpleNamespace(state="unavailable")}))
+    await pending.pop()
+    assert (await gate._store.async_status("a", identity()))["transition_state"] is None
+    assert (await gate.async_execute("a", "legacy_actuator", identity, write)).reason == "lifecycle_initializing"
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_reconnect_drains_already_admitted_writer(environment, monkeypatch):
+    hass, store, gate, target, _, entry = environment
+    persist(hass, {"a": record()})
+    callbacks, tasks = [], []
+    monkeypatch.setattr(integration, "async_track_state_change_event",
+                        lambda _h, _ids, cb: callbacks.append(cb) or (lambda: None))
+    def create_task(_h, coro, _name):
+        task = asyncio.create_task(coro)
+        tasks.append(task)
+        return task
+    entry.async_create_background_task = create_task
+    real_identity = integration._identity_status
+    offline = [True]
+    monkeypatch.setattr(integration, "_identity_status", lambda h, t: (
+        {"supported": False, "resolved_id": None, "connector_id": 1} if offline[0] else real_identity(h, t)))
+    entry.runtime_data = SimpleNamespace(executor=None, morek_worker=None)
+    await integration._async_setup_ownership_metadata(
+        hass, entry, SimpleNamespace(ocpp_target=target, charge_control="switch.charger"), migrate=True)
+    offline[0] = False
+    identity = lambda: real_identity(hass, target)  # noqa: E731
+    entered, release, marker = asyncio.Event(), asyncio.Event(), asyncio.Event()
+    async def write():
+        entered.set()
+        await release.wait()
+    writer = asyncio.create_task(gate.async_execute("a", "legacy_actuator", identity, write))
+    await entered.wait()
+    original = gate.async_ensure_initialized
+    async def track(*args):
+        marker.set()
+        return await original(*args)
+    monkeypatch.setattr(gate, "async_ensure_initialized", track)
+    callbacks[0](SimpleNamespace(data={"old_state": SimpleNamespace(state="unavailable"),
+                                       "new_state": SimpleNamespace(state="off")}))
+    await marker.wait()
+    assert not tasks[0].done()
+    release.set()
+    assert (await writer).allowed
+    await asyncio.gather(*tasks)
+    assert (await store.async_status("a", identity()))["transition_state"] == "drained_unarmed"
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_reconnect_migrates_and_releases_after_real_handover(environment, monkeypatch):
+    from homeassistant.helpers import storage
+    from custom_components.spotnav.execution import morek_outcomes
+
+    hass, _, gate, target, _, entry = environment
+    monkeypatch.setattr(storage, "Store", FakeStore)
+    monkeypatch.setattr(morek_outcomes, "Store", FakeStore)
+    persist(hass, {"a": record()})
+    (hass.root / "spotnav.morek_schedule.connector_outcomes").write_text(json.dumps({
+        "version": 1, "data": {"schema": 1, "entry_id": "a", "uncertain": False,
+                                "attempt": {"state": "accepted"}}}), encoding="utf-8")
+    adapter, path, _, _ = adapter_for(hass, target)
+    monkeypatch.setattr(controller_module, "Store", lambda *_args, **_kwargs: MagicMock())
+    monkeypatch.setattr(controller_module, "build_adapter", lambda *_args, **_kwargs: adapter)
+    monkeypatch.setattr(controller_module, "ocpp_target_of", lambda *_: (target, "stored"))
+    monkeypatch.setattr(controller_module, "energy_register_entity_for", lambda *_: None)
+    monkeypatch.setattr(controller_module, "CoreFailureRepairs", MagicMock())
+    charger = ChargingController(hass, "a", {"charge_control": "switch.charger"})
+    settings = await paused_settings_for_recovery(hass, monkeypatch)
+    entry.runtime_data = SimpleNamespace(executor=AutoExecutor(hass, charger, settings), morek_worker=None)
+    callbacks, tasks = [], []
+    monkeypatch.setattr(integration, "async_track_state_change_event",
+                        lambda _h, _ids, cb: callbacks.append(cb) or (lambda: None))
+    def create_task(_h, coro, _name):
+        task = asyncio.create_task(coro)
+        tasks.append(task)
+        return task
+    entry.async_create_background_task = create_task
+    real_identity = integration._identity_status
+    offline = [True]
+    monkeypatch.setattr(integration, "_identity_status", lambda h, t: (
+        {"supported": False, "resolved_id": None, "connector_id": 1} if offline[0] else real_identity(h, t)))
+    await integration._async_setup_ownership_metadata(hass, entry, charger, migrate=True)
+    offline[0] = False
+    callbacks[0](SimpleNamespace(data={"old_state": SimpleNamespace(state="unavailable"),
+                                       "new_state": SimpleNamespace(state="off")}))
+    await asyncio.gather(*tasks)
+    identity = lambda: real_identity(hass, target)  # noqa: E731
+    status = await execution_ownership.ExecutionOwnershipStore(hass).async_status("a", identity())
+    assert status["recorded_owner"] == "morek_schedule" and not status["armed"]
+    assert "a" not in gate._lifecycle_barriers
+    op = AsyncMock()
+    assert (await gate.async_execute("a", "owned_profile", identity, op)).reason == "schedule_mode_unarmed"
+    assert not (await gate.async_execute("a", "legacy_actuator", identity, op)).allowed
+    assert not (await gate.async_manual_profile("a", identity, op)).allowed
+    op.assert_not_awaited()
+    path.async_start.assert_not_awaited()
+    path.async_stop.assert_not_awaited()
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("case", ["current", "supersede", "uncertain", "identity", "stop", "cancel"])
+async def test_reconnect_releases_only_current_verified_owned_barrier(environment, monkeypatch, case):
+    from custom_components.spotnav.execution import morek_outcomes
+
+    hass, _, gate, target, _, entry = environment
+    monkeypatch.setattr(morek_outcomes, "Store", FakeStore)
+    persist(hass, {"a": record("morek_schedule")})
+    (hass.root / "spotnav.morek_schedule.connector_outcomes").write_text(json.dumps({
+        "version": 1, "data": {"schema": 1, "entry_id": "a", "uncertain": False,
+                                "attempt": {"state": "accepted"}}}), encoding="utf-8")
+    callbacks, tasks = [], []
+    monkeypatch.setattr(integration, "async_track_state_change_event",
+                        lambda _h, _ids, cb: callbacks.append(cb) or (lambda: None))
+    def create_task(_h, coro, _name):
+        task = asyncio.create_task(coro)
+        tasks.append(task)
+        return task
+    entry.async_create_background_task = create_task
+    entry.runtime_data = SimpleNamespace(executor=None, morek_worker=None)
+    await integration._async_setup_ownership_metadata(
+        hass, entry, SimpleNamespace(ocpp_target=target, charge_control="switch.charger"), migrate=True)
+    reached, proceed = asyncio.Event(), asyncio.Event()
+    original = gate.async_release_lifecycle_barrier
+    async def delayed(*args):
+        reached.set()
+        await proceed.wait()
+        return await original(*args)
+    monkeypatch.setattr(gate, "async_release_lifecycle_barrier", delayed)
+    callbacks[0](SimpleNamespace(data={"old_state": SimpleNamespace(state="unavailable"),
+                                       "new_state": SimpleNamespace(state="off")}))
+    await reached.wait()
+    identity = lambda: morek_schedule._identity_status(hass, target)  # noqa: E731
+    if case == "supersede":
+        callbacks[0](SimpleNamespace(data={"old_state": SimpleNamespace(state="off"),
+                                           "new_state": SimpleNamespace(state="unavailable")}))
+    if case == "uncertain":
+        (hass.root / "spotnav.morek_schedule.connector_outcomes").write_text(json.dumps({
+            "version": 1, "data": {"schema": 1, "entry_id": "a", "uncertain": True}}), encoding="utf-8")
+    if case == "identity":
+        hass.data["ocpp"]["duplicate"] = hass.data["ocpp"]["one"]
+    if case == "cancel":
+        tasks[0].cancel()
+    if case == "stop":
+        with gate.person_stop_reservation("a", identity):
+            proceed.set()
+            await asyncio.gather(*tasks)
+    else:
+        proceed.set()
+        await asyncio.gather(*tasks, return_exceptions=case == "cancel")
+    assert ("a" in gate._lifecycle_barriers) == (case != "current")
+    op = AsyncMock()
+    owned = await gate.async_execute("a", "owned_profile", identity, op)
+    assert owned.reason == ("schedule_mode_unarmed" if case == "current" else
+                            "identity_unresolved" if case == "identity" else "lifecycle_initializing")
+    assert not (await gate.async_execute("a", "legacy_actuator", identity, op)).allowed
+    assert not (await gate.async_manual_profile("a", identity, op)).allowed
+    op.assert_not_awaited()
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("case", ["missing", "malformed", "held", "interrupted", "uncertain"])
+async def test_reconnect_never_releases_untrusted_state(environment, monkeypatch, case):
+    from custom_components.spotnav.execution import morek_outcomes
+
+    hass, _, gate, target, _, entry = environment
+    monkeypatch.setattr(morek_outcomes, "Store", FakeStore)
+    if case == "malformed":
+        (hass.root / execution_ownership.STORAGE_KEY).write_text("{broken", encoding="utf-8")
+    elif case in ("held", "interrupted"):
+        marker = "exit_held_unarmed" if case == "held" else "interrupted"
+        persist(hass, {"a": {**record(), "transition": {"version": 1, "state": marker}}})
+    elif case == "uncertain":
+        persist(hass, {"a": record("morek_schedule")})
+        (hass.root / "spotnav.morek_schedule.connector_outcomes").write_text(json.dumps({
+            "version": 1, "data": {"schema": 1, "entry_id": "a", "uncertain": True}}), encoding="utf-8")
+    callbacks, tasks = [], []
+    monkeypatch.setattr(integration, "async_track_state_change_event",
+                        lambda _h, _ids, cb: callbacks.append(cb) or (lambda: None))
+    def create_task(_h, coro, _name):
+        task = asyncio.create_task(coro)
+        tasks.append(task)
+        return task
+    entry.async_create_background_task = create_task
+    entry.runtime_data = SimpleNamespace(executor=None, morek_worker=None)
+    await integration._async_setup_ownership_metadata(
+        hass, entry, SimpleNamespace(ocpp_target=target, charge_control="switch.charger"), migrate=True)
+    callbacks[0](SimpleNamespace(data={"old_state": SimpleNamespace(state="unavailable"),
+                                       "new_state": SimpleNamespace(state="off")}))
+    await asyncio.gather(*tasks)
+    identity = lambda: morek_schedule._identity_status(hass, target)  # noqa: E731
+    op = AsyncMock()
+    assert (await gate.async_execute("a", "legacy_actuator", identity, op)).reason == "lifecycle_initializing"
+    assert (await gate.async_manual_profile("a", identity, op)).reason == "lifecycle_initializing"
+    op.assert_not_awaited()
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_reconnect_rechecks_new_uncertain_profile_evidence(environment, monkeypatch):
     from custom_components.spotnav.execution import morek_outcomes
 
@@ -426,6 +661,60 @@ async def test_actual_entry_setup_orders_ownership_before_start_and_restore(envi
     assert controller.async_initialize.await_count == 1
     assert executor.async_after_restore.await_count == 1
     assert path.async_start.await_count == writes
+
+
+@pytest.mark.asyncio
+async def test_actual_setup_migrates_before_real_executor_start(environment, monkeypatch):
+    from homeassistant.helpers import storage
+    from custom_components.spotnav.execution import morek_outcomes
+
+    hass, _, gate, target, _, entry = environment
+    monkeypatch.setattr(storage, "Store", FakeStore)
+    monkeypatch.setattr(morek_outcomes, "Store", FakeStore)
+    persist(hass, {"a": record()})
+    (hass.root / "spotnav.morek_schedule.connector_outcomes").write_text(json.dumps({
+        "version": 1, "data": {"schema": 1, "entry_id": "a", "uncertain": False,
+                                "attempt": {"state": "accepted"}}}), encoding="utf-8")
+    adapter, path, _, _ = adapter_for(hass, target)
+    monkeypatch.setattr(controller_module, "Store", lambda *_args, **_kwargs: MagicMock())
+    monkeypatch.setattr(controller_module, "build_adapter", lambda *_args, **_kwargs: adapter)
+    monkeypatch.setattr(controller_module, "ocpp_target_of", lambda *_: (target, "stored"))
+    monkeypatch.setattr(controller_module, "energy_register_entity_for", lambda *_: None)
+    monkeypatch.setattr(controller_module, "CoreFailureRepairs", MagicMock())
+    charger = ChargingController(hass, "a", {"charge_control": "switch.charger"})
+    settings = await paused_settings_for_recovery(hass, monkeypatch)
+    reader = MagicMock(async_load=AsyncMock(), async_shutdown=AsyncMock())
+    entry.data = {"charge_control": "switch.charger"}
+    monkeypatch.setattr(integration, "_drop_core_ownership_choice", lambda *_: None)
+    monkeypatch.setattr(integration, "async_store_detected_register", lambda *_: None)
+    monkeypatch.setattr(integration, "charger_power_counted", lambda *_: None)
+    monkeypatch.setattr(integration, "SocReader", lambda *_args, **_kwargs: reader)
+    monkeypatch.setattr(integration, "ChargingController", lambda *_args, **_kwargs: charger)
+    monkeypatch.setattr(integration, "_async_start_debug_day", AsyncMock())
+    monkeypatch.setattr(integration, "domain_data", lambda _: SimpleNamespace(auto_store=settings, price_refresh=None))
+    monkeypatch.setattr(integration, "async_migrate_settings_phases", AsyncMock())
+
+    class BeforeProducer(Exception):
+        pass
+
+    async def before_start(executor):
+        assert isinstance(executor, AutoExecutor)
+        identity = morek_schedule._identity_status(hass, target)
+        status = await execution_ownership.ExecutionOwnershipStore(hass).async_status("a", identity)
+        assert status["recorded_owner"] == "morek_schedule" and not status["armed"]
+        operation = AsyncMock()
+        assert not (await gate.async_execute("a", "legacy_actuator", lambda: identity, operation)).allowed
+        assert not (await gate.async_manual_profile("a", lambda: identity, operation)).allowed
+        assert (await gate.async_execute("a", "owned_profile", lambda: identity, operation)).reason == "schedule_mode_unarmed"
+        operation.assert_not_awaited()
+        raise BeforeProducer
+
+    monkeypatch.setattr(AutoExecutor, "async_start", before_start)
+    with pytest.raises(BeforeProducer):
+        await integration._async_setup_charger_entry(hass, entry)
+    path.async_start.assert_not_awaited()
+    path.async_stop.assert_not_awaited()
+    hass.station.call.assert_not_awaited()
 
 
 @pytest.mark.asyncio

@@ -86,9 +86,96 @@ class CommandAdmission:
         self._quiescing: set[PhysicalConnector] = set()
         self._entry_draining: dict[PhysicalConnector, str] = {}
         self._migration_controllers: dict[PhysicalConnector, Any] = {}
+        # Reconnect barriers are process-local; only verified durable ownership
+        # and current evidence permit release. The entry key covers identities
+        # unavailable at the callback.
+        self._lifecycle_barriers: dict[str, PhysicalConnector | None] = {}
+        self._lifecycle_revisions: dict[str, int] = {}
         self._person_stops: dict[PhysicalConnector, int] = {}
         self._uncertain_operations: set[PhysicalConnector] = set()
         self._recovery_status: dict[str, dict[str, Any]] = {}
+
+    def reserve_lifecycle_barrier(self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]]) -> int:
+        """Synchronously invalidate ordinary target writes before scheduling recovery."""
+        revision = self._lifecycle_revisions.get(entry_id, 0) + 1
+        self._lifecycle_revisions[entry_id] = revision
+        try:
+            identity = dict(resolve_identity())
+            classification = classify_morek_identity(identity)
+            if classification == "non_target":
+                return revision
+            connector = physical_connector(identity) if classification == "supported_morek" else None
+        except Exception:  # noqa: BLE001 - unknown identity is not permission
+            connector = None
+        previous = self._lifecycle_barriers.get(entry_id)
+        self._lifecycle_barriers[entry_id] = connector or previous
+        connector = connector or previous
+        if connector is not None:
+            self._generations[connector] = self._generations.get(connector, 0) + 1
+            if connector in self._entry_draining:
+                self._entry_draining[connector] = "interrupted"
+        return revision
+
+    async def async_release_lifecycle_barrier(
+        self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]], revision: int,
+        lifecycle_current: Callable[[], bool],
+    ) -> bool:
+        """Release only after a current, durable owner and settled ledger are verified.
+
+        This is not dispatch authority. Connector lock precedes the ownership
+        store lock; synchronous reservations can invalidate the final check.
+        """
+        from .execution_ownership import _decode, _read_envelope
+        from .morek_outcomes import outcomes_for
+
+        try:
+            identity = dict(resolve_identity())
+            connector = physical_connector(identity)
+            if classify_morek_identity(identity) != "supported_morek" or connector is None:
+                return False
+            generation = self.generation(connector)
+
+            def current() -> bool:
+                fresh = dict(resolve_identity())
+                return (entry_id in self._lifecycle_barriers and self._lifecycle_revisions.get(entry_id) == revision
+                        and lifecycle_current() and generation == self.generation(connector)
+                        and not self._person_stops.get(connector) and connector not in self._entry_draining
+                        and connector not in self._quiescing and connector not in self._uncertain_operations
+                        and classify_morek_identity(fresh) == "supported_morek"
+                        and physical_connector(fresh) == connector)
+
+            async with self._lock_for(connector):
+                if not current():
+                    return False
+                status = await self._store.async_status(entry_id, identity)
+                if (status.get("record_state") != "valid" or status.get("recorded_owner") != "morek_schedule"
+                        or status.get("transition_state") is not None or status.get("armed") is not False
+                        or (status.get("station_id"), status.get("connector_id")) !=
+                           (connector.station_id, connector.connector_id)):
+                    return False
+                async with self._store._lock:
+                    raw = await self._store._hass.async_add_executor_job(_read_envelope, self._store._store.path)
+                    state, disk = _decode(raw)
+                    if (state != "valid" or disk != self._store._records or self._store._state != "valid"
+                            or self._store._cancelled_write or self._store._transition_save_uncertain):
+                        return False
+                outcome = await outcomes_for(self._store._hass).read()
+                if (outcome is None or outcome.get("entry_id") != entry_id or outcome.get("uncertain") is not False
+                        or not isinstance(outcome.get("attempt"), dict)
+                        or outcome["attempt"].get("state") not in ("accepted", "rejected", "aborted_before_dispatch")
+                        or (outcome.get("removal") is not None and outcome["removal"].get("state") not in
+                            ("accepted", "rejected", "notsupported")) or not current()):
+                    return False
+                del self._lifecycle_barriers[entry_id]
+                return True
+        except Exception:  # noqa: BLE001 - no evidence, no release
+            return False
+
+    def lifecycle_blocked(self, entry_id: str, connector: PhysicalConnector) -> bool:
+        """Do not apply a target barrier to a positively unrelated connector."""
+        if (connector.station_id, connector.connector_id) != (MOREK_STATION_ID, MOREK_CONNECTOR_ID):
+            return False
+        return entry_id in self._lifecycle_barriers or connector in self._lifecycle_barriers.values()
 
     @contextmanager
     def person_stop_reservation(self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]]):
@@ -709,6 +796,8 @@ class CommandAdmission:
             person = (kind == "person_stop" and reservation == (self, entry_id, connector, asyncio.current_task()))
             if kind == "person_stop" and not person:
                 return AdmissionResult(False, "person_stop_not_reserved")
+            if not person and self.lifecycle_blocked(entry_id, connector):
+                return AdmissionResult(False, "lifecycle_initializing")
             if connector in self._entry_draining and not person:
                 return AdmissionResult(False, "connector_quiescing")
             if not person and (expected_generation != self.generation(connector) or self._person_stops.get(connector)):
@@ -725,6 +814,8 @@ class CommandAdmission:
 
             if not isinstance(status, Mapping):
                 return AdmissionResult(False, "ownership_unavailable")
+            if not person and self.lifecycle_blocked(entry_id, connector):
+                return AdmissionResult(False, "lifecycle_initializing")
             if not person and (expected_generation != self.generation(connector) or self._person_stops.get(connector)):
                 return AdmissionResult(False, "stale_generation")
             state = status.get("record_state")
@@ -777,6 +868,8 @@ class CommandAdmission:
             return AdmissionResult(False, "identity_unresolved")
         generation = self.generation(connector)
         async with self._lock_for(connector):
+            if self.lifecycle_blocked(entry_id, connector):
+                return AdmissionResult(False, "lifecycle_initializing")
             if connector in self._quiescing or connector in self._entry_draining:
                 return AdmissionResult(False, "connector_quiescing")
             if generation != self.generation(connector):
@@ -802,6 +895,8 @@ class CommandAdmission:
                 # lookup is awaiting. Do not admit the older manual profile action.
                 if generation != self.generation(connector) or self._person_stops.get(connector):
                     return AdmissionResult(False, "stale_generation")
+                if self.lifecycle_blocked(entry_id, connector):
+                    return AdmissionResult(False, "lifecycle_initializing")
                 if connector in self._quiescing or connector in self._entry_draining:
                     return AdmissionResult(False, "connector_quiescing")
             except Exception:  # noqa: BLE001 - unverified durable state cannot admit profile writes
