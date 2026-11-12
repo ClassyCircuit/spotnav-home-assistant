@@ -100,6 +100,7 @@ Detailed requirements and acceptance cases follow outside this checklist.
 | 10 | Optional Charge Now override | After the initial 5.8 installation and user-directed validation; independent of Stages 6–9 |
 | 11 | Adaptive charging estimates for Morek | Later work; reuse existing learning and genuine measurement sources |
 | 12 | Fix real sidebar usability, price presentation and evidence | Prioritize before 5.8; implement bounded 12.1–12.8 separately alongside remaining 5.7b work |
+| 13 | Migrate useful old-card configuration into the sidebar | Follow the related Stage 12 work; 13.1–13.4 are separate, bounded tasks |
 
 ### Stage 0 — Completed baseline: preserve and reuse
 
@@ -1294,13 +1295,17 @@ action, weaken admission/safety checks, or claim physical behavior is verified.
     non-EUR currencies, cap round trips, source intervals, gaps and DST. Test actual
     shared chart/sidebar rendering and backend contract compatibility.
 
-- [ ] **12.3 Useful plan details and honest missing data**
+- [x] **12.3 Useful plan details and honest missing data** (local implementation; review pending)
+  - 2.5.73 exposes the calculation's ready-by instant and reconciled per-window
+    estimates from selected planner slots, with configured-variable cost basis and
+    unrounded weighted totals. Calculation-time SOC inputs support explicitly
+    labelled projections even when old. Unpriced or inconsistent details remain
+    unavailable. Focused mocked checks pass; actual HA/browser remains unverified.
   - **Scope after 12.6 and 12.8:** 12.6 already displays last-known SOC, its
     provenance/age and available capacity/efficiency (local implementation;
     review pending). Reuse those paths rather than reimplementing them. 12.8's
-    flexible last-known-SOC planning policy is in progress, not yet established:
-    coordinate with its completed implementation before depending on it, and do
-    not revert its agreed no-age-cutoff policy or claim it already works.
+    flexible last-known-SOC planning policy is locally implemented for review;
+    do not revert its agreed no-age-cutoff policy or claim live operation.
   - Investigate each prominent Unknown using the real dashboard contract. Bind
     available deadline and planning information; provide the total weighted average
     when valid priced total cost, positive wall energy, currency and cost basis support
@@ -1452,6 +1457,94 @@ card changes, bump the manifest, build the frontend and verify `npm run check-di
 as required by `AGENTS.md`. Report any unrun HA-plugin suite and distinguish mocked
 tests from actual HA rendering or physical charging; never claim live validation from
 these changes.
+
+### Stage 13 — Useful configuration without the old card
+
+The user wants the new sidebar to be the practical daily interface, including the
+useful setup currently reachable only through the old card. Add a compact, organized
+advanced-settings area to the existing shared sidebar UI; do not recreate the old
+card or duplicate settings already provided. Reuse its canonical backend APIs,
+validation and saved configuration. Inspect current source before each substage:
+Stage 12.5 handles target-SOC/manual mode and vehicle selection, 12.2 price
+provenance, 12.3 plan details, and 12.4/12.7 Morek evidence and action errors.
+Implement and review one substage at a time. This is not authorization to access
+HA, deploy, restart, change electrical protection or operate the charger.
+
+- [ ] **13.1 Vehicle sources and planning properties**
+  - Provide a focused vehicle settings view for inspecting the selected vehicle's
+    actual SOC source and integration, choosing among ambiguous suitable sensors,
+    configuring usable battery capacity when not reported, and choosing the car's
+    onboard charging phases where supported by existing settings. Reuse existing
+    discovery/confirmation, validation and vehicle-property APIs; distinguish
+    reported values from user overrides and show missing or unavailable inputs.
+  - Coordinate with 12.5's vehicle selection and target mode and 12.6/12.8's
+    last-known SOC handling. Never silently choose an ambiguous source, invent
+    capacity, overwrite a saved selection or treat an old reading as new. Avoid
+    unnecessary options for the user's single-vehicle daily workflow.
+  - Test ambiguous/missing/removed sensors, reported versus overridden capacity,
+    phases, permissions, saves, errors, revisions and stale observations. Show when
+    a change can recalculate the plan; opening the view must not wake the car or
+    write anything.
+
+- [ ] **13.2 Market and charging-cost settings**
+  - Expose relevant existing market/price-area selection and tariff settings in
+    the sidebar: applicable VAT, energy tax and grid fees, including existing
+    supported time-dependent or percentage fee options where relevant. Reuse the
+    old card's backend contracts and fiscal calculations rather than building a
+    second tariff model. Keep the current provider route, held data provenance,
+    selected market, raw source price and configured variable cost distinct.
+  - Preserve existing values and explicit user choices; never silently switch price
+    provider, enable fees or assume Nord Pool prices exclude all charges. Show
+    currency/units, price inclusions, missing data and when a save affects planning
+    or cost estimates. Keep 12.2's c/kWh display and saved-unit conversions intact.
+  - Test supported/missing providers, area changes, variable and negative prices,
+    fee/tax basis, currencies, revision conflicts, permissions and resulting
+    settings-to-plan/cost updates. Do not invent historical tariffs; history remains
+    in Stages 6–8.
+
+- [ ] **13.3 Practical plan and charger parameters**
+  - Add relevant existing plan settings not already covered by 12.5: maximum
+    charging periods, planned current, and supported departure date/weekday options.
+    Preserve stored values and the same canonical validation/revision checks; show
+    defaults, limitations and when edits affect replanning. Avoid duplicating the
+    existing ready-by, cap, minimum or target controls.
+  - Explain that planned current is a schedule/planning input, not a household
+    load-balancing control; respect existing charger/electrical bounds and Morek
+    schedule transition/period limits. Never raise current or change protection
+    automatically, bypass Morek admission, or present unavailable modes as working.
+  - Test valid/invalid period counts and currents, date/weekday/deadline changes,
+    DST, permissions, conflicting revisions, unchanged saves and backend replanning.
+    Explicitly warn that a saved change can lead to normal guarded reconciliation
+    when the schedule owner is armed; opening/editing alone must not write.
+
+- [ ] **13.4 Notification settings and concise setup diagnostics**
+  - Reuse existing per-charger phone/recipient and event settings to let the user
+    select available HA mobile-app recipients and relevant plug-in, plan and
+    charging/problem events. Show no-recipient, unavailable, permission and save
+    failures clearly. Existing notification delivery and evidence limitations must
+    remain honest; do not claim a plan was sent or charging measured from a notice.
+  - Provide a compact, actionable view of existing capability/setup warnings,
+    including missing or ambiguous vehicle/charger measurement sources, pricing
+    configuration and execution blockers where actually exposed. Link to relevant
+    sidebar settings and reuse 12.4/12.7 instead of duplicating Morek debug text.
+    Preserve real warnings and distinguish reported states from measurements.
+  - Test missing phones, selected events, opt-in, notification persistence and
+    permissions, unavailable capabilities, stale data and concurrent changes with
+    mocked boundaries. Opening these views must not send a notification or command.
+
+**Intentionally excluded:** solar/hybrid and home-energy flows, site load balancing
+or dynamic household-current controls, the legacy immediate minimum-SOC start
+controller, direct legacy Start/Stop, automatic BMW wake or BMW charge-limit writes,
+and external debug upload. Keep existing protections intact. Temporary Charge Now
+remains Stage 10; genuine history/export and financial analysis remain Stages 6–8;
+live measured charging remains 5.7b2. Do not copy these features from the old card
+as part of Stage 13 or imply their backend behavior disappears when its UI is hidden.
+
+Each substage needs focused fast tests and accurate documentation, including real
+backend validation and settings-to-plan behavior where applicable. Preserve drafts,
+permissions, conflict handling and user settings. Follow `AGENTS.md` for manifest
+version, frontend build and check-dist; mock tests are not proof of installed HA or
+physical behavior. Any deployment or hardware action requires separate approval.
 
 ### Execution boundaries — avoid another prerequisite spiral
 

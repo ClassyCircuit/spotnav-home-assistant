@@ -1608,6 +1608,10 @@ def serialize_planning(capture: CapturedDashboard) -> dict[str, Any] | None:
         "settings_revision": snapshot.settings_revision,
         "generation": snapshot.generation,
         "calculated_at": aware_iso(snapshot.calculated_at),
+        # Dashboard settings may use a composed wire revision; compare the
+        # underlying charger revision before exposing this calculation's deadline.
+        "departure_at": aware_iso(snapshot.departure_at) if capture.settings is not None
+        and snapshot.settings_revision == capture.settings.revision else None,
         "historical": not snapshot.in_process,
         "missing": list(snapshot.missing),
         "price_state": _text(snapshot.price_state),
@@ -2014,6 +2018,62 @@ def _need_progress(snapshot: AutoSnapshot | None) -> dict[str, float | None]:
     }
 
 
+def _proposal_window_details(proposal: Any, snapshot: AutoSnapshot) -> list[dict[str, Any]] | None:
+    """Reconcile shown windows against selected slots and unrounded planner totals."""
+    power = finite_number(proposal.power_kw)
+    total_energy = finite_number(proposal.delivered_kwh)
+    if power is None or power <= 0 or total_energy is None or total_energy < 0:
+        return None
+    rows: list[dict[str, Any]] = []
+    for start, end in proposal.shown_periods:
+        start, end = _utc(start), _utc(end)
+        if start is None or end is None or end <= start:
+            return None
+        duration = 0.0
+        spans: list[tuple[datetime, datetime]] = []
+        energy = 0.0
+        cost = 0.0
+        priced = not proposal.unpriced
+        for slot in proposal.slots:
+            left, right = _utc(slot.start), _utc(slot.end)
+            if left is None or right is None or right <= left:
+                return None
+            seconds = max(0.0, (min(end, right) - max(start, left)).total_seconds())
+            if not seconds:
+                continue
+            spans.append((max(start, left), min(end, right)))
+            duration += seconds
+            part = seconds * power / 3600
+            energy += part
+            price = finite_number(slot.effective_minor_per_kwh)
+            if slot.unpriced or price is None:
+                priced = False
+            elif priced:
+                cost += part * price / 100
+        cursor = start
+        for left, right in sorted(spans):
+            if left != cursor:
+                return None
+            cursor = right
+        if cursor != end or abs(duration - (end - start).total_seconds()) > 0.001:
+            return None
+        rows.append({"start": aware_iso(start), "end": aware_iso(end), "energy_kwh": energy,
+                     "cost": cost if priced else None})
+    if abs(sum(row["energy_kwh"] for row in rows) - total_energy) > max(1e-6, total_energy * 1e-8):
+        return None
+    cost_total = finite_number(proposal.estimated_cost)
+    if not proposal.unpriced and (cost_total is None or any(row["cost"] is None for row in rows)
+                                 or abs(sum(row["cost"] for row in rows) - cost_total) > max(1e-6, abs(cost_total) * 1e-8)):
+        return None
+    soc = finite_number(getattr(snapshot, "projection_soc", None))
+    ratio = finite_number(getattr(snapshot, "projection_kwh_per_percent", None))
+    if soc is not None and 0 <= soc <= 100 and ratio is not None and ratio > 0:
+        for row in rows:
+            soc = min(100.0, soc + row["energy_kwh"] / ratio)
+            row["projected_soc"] = soc
+    return rows
+
+
 def _proposal_section(capture: CapturedDashboard) -> dict[str, Any] | None:
     """The preview's proposal, or `None`. A refusal is not a proposal: it lives in
     `planning.state`/`planning.reason`, so a card cannot draw an empty plan as a plan.
@@ -2022,7 +2082,7 @@ def _proposal_section(capture: CapturedDashboard) -> dict[str, Any] | None:
     proposal = None if snapshot is None else snapshot.proposal
     if proposal is None or proposal.reason is not None or not proposal.periods:
         return None
-    currency = None if capture.area_entry is None else _text(capture.area_entry.currency)
+    currency = _text(proposal.currency)
     cost = finite_number(proposal.estimated_cost)
     # Amps and phases are the settings the proposal was calculated with; absent once the stored
     # record has moved on.
@@ -2034,12 +2094,20 @@ def _proposal_section(capture: CapturedDashboard) -> dict[str, Any] | None:
         "settings_revision": current,
         # A plan that stops at its need ends its last period where the need is expected to be met.
         "periods": [{"start": aware_iso(start), "end": aware_iso(end)} for start, end in proposal.shown_periods],
+        "window_details": _proposal_window_details(proposal, snapshot),
+        "cost_basis": None if proposal.unpriced else "configured_variable_cost",
+        "projection": {"starting_soc": finite_number(getattr(snapshot, "projection_soc", None)),
+                       "kwh_per_percent": finite_number(getattr(snapshot, "projection_kwh_per_percent", None)),
+                       "age_s": finite_number(getattr(snapshot, "projection_age_s", None)),
+                       "source": getattr(snapshot, "projection_source", None),
+                       "estimated": getattr(snapshot, "projection_estimated", False),
+                       "time_basis": getattr(snapshot, "projection_time_basis", None)},
         "amps": _count(settings.amps) if same_generation else None,
         "phases": _count(_effective_phases(capture)) if same_generation else None,
         "power_kw": finite_number(proposal.power_kw),
         "requested_kwh": finite_number(proposal.requested_kwh),
         "planned_kwh": finite_number(proposal.delivered_kwh),
-        "cost": None if cost is None or currency is None else {"value": cost, "currency": currency},
+        "cost": None if proposal.unpriced or cost is None or currency is None else {"value": cost, "currency": currency},
         "distance_mil": finite_number(proposal.distance_mil),
         "unpriced": proposal.unpriced,
         "unpriced_slots": proposal.unpriced_slots,

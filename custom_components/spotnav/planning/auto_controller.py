@@ -79,6 +79,7 @@ from .auto_settings import (
     PAUSE_UNTIL_RESUMED,
     PauseChoice,
     StoredProposal,
+    STRATEGY_CHEAPEST,
     STRATEGY_HYBRID,
     STRATEGY_SOLAR,
 )
@@ -437,6 +438,7 @@ class LiveVehicleFacts:
     #: A vehicle-provided timestamp, not an HA state-write timestamp.
     soc_report_at: datetime | None = None
     soc_entity_id: str | None = None
+    soc_time_basis: str | None = None
     #: The car's minimum charge level (`vehicle_properties`), `None` when off.
     min_percent: float | None = None
 
@@ -467,6 +469,7 @@ def live_vehicle_facts(
         soc_estimated=bool(reading is not None and reading.estimated),
         soc_report_at=None if reading is None else reading.reported_at,
         soc_entity_id=None if reading is None else reading.entity_id,
+        soc_time_basis=None if reading is None else reading.time_basis,
         min_percent=stored_properties(hass, vehicle_id).min_percent,
     )
 
@@ -510,6 +513,10 @@ class _EnergyResolution:
     kwh_per_percent: float | None = None
     #: Resolved minimum wall-energy deficit for capped target planning; None forbids exceptions.
     minimum_energy_kwh: float | None = None
+    soc_age_s: float | None = None
+    soc_source: str | None = None
+    soc_estimated: bool = False
+    soc_time_basis: str | None = None
 
 
 def capped_vehicle_energy(
@@ -642,6 +649,13 @@ class AutoSnapshot:
     #: is expected to reach by then, from the live reading, the planned energy and the charging
     #: efficiency; `None` for a manual need or a plan that is not short.
     expected_soc_percent: float | None = None
+    #: Inputs captured by this calculation for display-only SOC projections.
+    projection_soc: float | None = None
+    projection_kwh_per_percent: float | None = None
+    projection_age_s: float | None = None
+    projection_source: str | None = None
+    projection_estimated: bool = False
+    projection_time_basis: str | None = None
     #: When this process began the calculation, before waiting for the calculation
     #: lock. Unlike calculated_at this cannot make an already-running calculation
     #: appear to have begun after a connection event.
@@ -1733,6 +1747,15 @@ class AutoPlannerController:
             settings, state, reason, calculated_at, entry=entry, price_snapshot=area_snapshot,
             proposal=result, attempt=attempt, **wait_facts,
         )
+        if settings.driver == DRIVER_TARGET_SOC and settings.strategy == STRATEGY_CHEAPEST:
+            ratio = resolved.kwh_per_percent
+            if ratio is None and resolved.capacity_kwh is not None and resolved.capacity_kwh > 0:
+                ratio = resolved.capacity_kwh / (100 * CHARGE_EFFICIENCY)
+            if resolved.soc_percent is not None:
+                snapshot = replace(snapshot, projection_soc=resolved.soc_percent,
+                    projection_kwh_per_percent=ratio, projection_age_s=resolved.soc_age_s,
+                    projection_source=resolved.soc_source, projection_estimated=resolved.soc_estimated,
+                    projection_time_basis=resolved.soc_time_basis)
         if result.short_of_deadline:
             # Best effort: the departure leaves too little time for the need, so every slot up to it is
             # planned and charged. A warning, not a refusal; the status says what the car will reach.
@@ -2517,7 +2540,8 @@ class AutoPlannerController:
             return _EnergyResolution(
                 kwh=target_kwh, delivered_energy_trustworthy=True, soc_percent=live_soc,
                 capacity_kwh=capacity, kwh_per_percent=learned.use_kwh_per_percent,
-                minimum_energy_kwh=minimum_kwh,
+                minimum_energy_kwh=minimum_kwh, soc_age_s=facts.soc_age_s,
+                soc_source=facts.soc_source, soc_estimated=facts.soc_estimated, soc_time_basis=facts.soc_time_basis,
             )
         planned_from = self._planned_from_floor(settings, facts, live_soc, calculated_at)
         # Energy the wall must deliver: battery need divided by charging efficiency
@@ -2557,6 +2581,10 @@ class AutoPlannerController:
         return _EnergyResolution(
             kwh=kwh, delivered_energy_trustworthy=True, soc_percent=live_soc, capacity_kwh=capacity,
             kwh_per_percent=learned.use_kwh_per_percent,
+            soc_age_s=None if facts is None else facts.soc_age_s,
+            soc_source=None if facts is None else facts.soc_source,
+            soc_estimated=bool(facts is not None and facts.soc_estimated),
+            soc_time_basis=None if facts is None else facts.soc_time_basis,
         )
 
     def _planned_from_floor(

@@ -52231,13 +52231,13 @@ var escapeText = (value2) => String(value2 ?? "Unknown").replace(/[&<>"']/g, (ch
 
 // shared-dashboard/price-format.js
 var priceUnit = (currency) => currency === "EUR" ? "c/kWh" : /^[A-Z]{3}$/.test(currency || "") ? `${currency}/kWh` : "currency unknown/kWh";
-var displayPrice = (price2, currency) => Number.isFinite(price2) ? currency === "EUR" ? price2 * 100 : price2 : null;
+var displayPrice = (price, currency) => Number.isFinite(price) ? currency === "EUR" ? price * 100 : price : null;
 var priceText = (value2) => {
   if (!Number.isFinite(value2)) return "Unknown";
   if (value2 !== 0 && Math.abs(value2) < 1e-4) return value2.toExponential(3);
   return new Intl.NumberFormat("en", { maximumFractionDigits: 4, useGrouping: false }).format(Object.is(value2, -0) ? 0 : value2);
 };
-var capInput = (price2, currency) => Number.isFinite(price2) ? String(Number(displayPrice(price2, currency).toPrecision(15))) : "";
+var capInput = (price, currency) => Number.isFinite(price) ? String(Number(displayPrice(price, currency).toPrecision(15))) : "";
 var capForSave = (text3, currency, saved) => {
   if (text3 === capInput(saved, currency)) return saved == null ? "" : String(saved);
   const normalized = text3.trim().replace(",", ".");
@@ -52509,7 +52509,6 @@ var money = (value2, currency = "EUR") => {
 // shared-dashboard/plan-view.js
 var number = (value2, digits, unit = "", valid = () => true) => Number.isFinite(value2) && valid(value2) ? `${value2.toFixed(digits)}${unit}` : "Unknown";
 var energy = (value2) => number(value2, 2, " kWh", (n6) => n6 >= 0);
-var price = (value2) => Number.isFinite(value2) ? `${priceText(value2)} c/kWh` : "Unknown";
 var soc = (value2) => number(value2, 1, "%", (n6) => n6 >= 0 && n6 <= 100);
 var escapeText2 = (value2) => String(value2 ?? "Unknown").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
 function renderPlan(windows, assumptions = {}, stale = false, formatters, totals) {
@@ -52518,14 +52517,18 @@ function renderPlan(windows, assumptions = {}, stale = false, formatters, totals
   const day = (value2) => Number.isFinite(value2) ? escapeText2(formatters.day(value2)) : "Unknown";
   const summary = totals === void 0 ? total(windows) : totals || {};
   const currency = formatters.currency;
-  const priceUnit2 = currency === void 0 || currency === "EUR" ? " c/kWh" : "";
-  const displayPrice2 = (value2) => priceUnit2 ? price(value2) : "Unknown";
-  const validAssumptions = validSocAssumptions(assumptions);
-  const rows = windows.map((w2, i7) => `<div class="plan-row ${i7 === 0 ? "next-window" : ""}"><span><b>${time(w2.start)}\u2013${time(w2.end)}</b><small>${day(w2.start)}${i7 === 0 ? " \xB7 NEXT" : ""}${w2.control === "minimum-exception" ? " \xB7 ABOVE-CAP MINIMUM" : ""}</small></span><span><b>${displayPrice2(w2.centsPerKwh)}</b><small>weighted price</small></span><span><b>${energy(w2.energy)}</b><small>wall energy</small></span><span><b>${money(w2.cost, currency)}</b><small>cost</small></span><span><b>${soc(validAssumptions ? w2.projectedSoc : null)}</b><small>projected SOC</small></span></div>`).join("");
+  const priceCurrency = currency === void 0 ? "EUR" : currency;
+  const displayPrice2 = (value2, legacy) => {
+    const actual = value2 === void 0 && priceCurrency === "EUR" ? legacy : value2;
+    return Number.isFinite(actual) && typeof priceCurrency === "string" && /^[A-Z]{3}$/.test(priceCurrency) ? `${priceText(actual)} ${priceUnit(priceCurrency)}` : "Unknown";
+  };
+  const validAssumptions = assumptions.projectionSupported === true || validSocAssumptions(assumptions);
+  const rows = windows.map((w2, i7) => `<div class="plan-row ${i7 === 0 ? "next-window" : ""}"><span><b>${time(w2.start)}\u2013${time(w2.end)}</b><small>${day(w2.start)}${i7 === 0 ? " \xB7 NEXT" : ""}${w2.control === "minimum-exception" ? " \xB7 ABOVE-CAP MINIMUM" : ""}</small></span><span><b>${displayPrice2(w2.pricePerKwh, w2.centsPerKwh)}</b><small>weighted price</small></span><span><b>${energy(w2.energy)}</b><small>wall energy</small></span><span><b>${money(w2.cost, currency)}</b><small>cost</small></span><span><b>${soc(validAssumptions ? w2.projectedSoc : null)}</b><small>projected SOC</small></span></div>`).join("");
   const start2 = soc(assumptions.startingSoc);
   const capacity = number(assumptions.capacityKwh, 0, " kWh", (n6) => n6 > 0);
   const efficiency = number(Number.isFinite(assumptions.efficiency) ? assumptions.efficiency * 100 : null, 0, "%", (n6) => n6 > 0 && n6 <= 100);
-  return `<div class="plan-heading"><div><h3>Complete proposed plan${stale ? ` \xB7 ${escapeText2(formatters.staleLabel ?? "stale")}` : ""}</h3><p>Estimated, not measured or guaranteed \xB7 wall energy \xB7 ${escapeText2(currency === void 0 ? "EUR" : currency || "currency unknown")}</p></div><wa-badge variant="neutral" pill>${windows.length} windows</wa-badge></div><div class="plan-label"><span>Window</span><span>Weighted price</span><span>Wall energy</span><span>Cost</span><span>SOC after</span></div>${rows || "<p>No proposed windows</p>"}<div class="plan-total"><div><small>WALL ENERGY</small><strong>${energy(summary.energy)}</strong></div><div><small>TOTAL COST</small><strong>${money(summary.cost, currency)}</strong></div><div><small>WEIGHTED AVERAGE</small><strong>${displayPrice2(summary.centsPerKwh)}</strong></div></div><p class="projection-note">SOC projection: ${start2} start, ${capacity} usable capacity, ${efficiency} efficiency. Battery energy = wall energy \xD7 efficiency; capped at 100%.</p>`;
+  const projectionBasis = assumptions.projectionSupported ? `${start2} start, ${number(assumptions.projectionKwhPerPercent, 3, " wall kWh per SOC point", (n6) => n6 > 0)}` : `${start2} start, ${capacity} usable capacity, ${efficiency} efficiency`;
+  return `<div class="plan-heading"><div><h3>Complete proposed plan${stale ? ` \xB7 ${escapeText2(formatters.staleLabel ?? "stale")}` : ""}</h3><p>Estimated, not measured or guaranteed \xB7 wall energy \xB7 ${escapeText2(currency === void 0 ? "EUR" : currency || "currency unknown")}${formatters.costBasis ? ` \xB7 ${escapeText2(formatters.costBasis)}` : ""}</p></div><wa-badge variant="neutral" pill>${windows.length} windows</wa-badge></div><div class="plan-label"><span>Window</span><span>Weighted price</span><span>Wall energy</span><span>Cost</span><span>SOC after</span></div>${rows || "<p>No proposed windows</p>"}<div class="plan-total"><div><small>WALL ENERGY</small><strong>${energy(summary.energy)}</strong></div><div><small>TOTAL COST</small><strong>${money(summary.cost, currency)}</strong></div><div><small>WEIGHTED AVERAGE</small><strong>${displayPrice2(summary.pricePerKwh, summary.centsPerKwh)}</strong></div></div><p class="projection-note">SOC projection: ${projectionBasis}. ${escapeText2(assumptions.projectionNote || "Battery energy = wall energy \xD7 efficiency; capped at 100%.")}</p>${formatters.detailsNote ? `<p class="projection-note">${escapeText2(formatters.detailsNote)}</p>` : ""}`;
 }
 
 // shared-dashboard/vehicle-view.js
@@ -52552,7 +52555,7 @@ function renderBattery({ soc: soc2, target, capacityKwh, efficiency, stale = fal
   const socText = s4 == null ? "Unknown" : `${s4}%`;
   const caption = s4 == null ? "SOC unavailable" : socEstimated ? "Estimated SOC - not a measurement" : stale ? `Last ${sample ? "sample " : ""}SOC - stale or freshness unknown` : `${sample ? "Sample b" : "B"}attery SOC`;
   const activeText = values.active == null ? "Unknown" : `${Math.round(values.active)} min`;
-  return `<div class="battery-card ${stale ? "battery-stale" : ""}"><div class="battery-title"><div><span class="battery-caption">${escapeText(caption)}</span><strong>${socText}</strong></div><div class="battery-target">Target <b>${t6 == null ? "Unknown" : `${t6}%`}</b><small>Minimum ${number(minimum, 0, "%", percent)} \xB7 by ${escapeText(deadline)}</small></div></div>${socDetail ? `<p class="battery-note">${escapeText(socDetail)}</p>` : ""}<div class="battery-track" role="img" aria-label="${stale ? "Stale " : ""}SOC ${socText}; target ${t6 == null ? "unknown" : `${t6}%`}${low == null ? "" : `; separate low SOC warning ${low}%`}">${s4 == null ? "" : `<span class="battery-fill" style="width:${s4}%"></span>`}${t6 == null ? "" : `<span class="battery-marker target-marker" style="left:${t6}%"></span>`}${low == null ? "" : `<span class="battery-marker low-marker" style="left:${low}%"></span>`}</div><div class="battery-legend"><span>\u25CF ${stale ? "Stale SOC" : "SOC"}</span><span>\u2502 Target${t6 == null ? " unknown" : ` ${t6}%`}</span>${low == null ? "" : `<span class="battery-low">\u250A Low-SOC warning ${low}%${s4 != null && !stale && s4 <= low ? " \xB7 below warning" : ""}</span>`}</div>${low == null ? "" : '<p class="battery-note">Low-SOC warning is a separate illustrative value, not the ready-by minimum or a protection floor.</p>'}<div class="battery-facts"><div><small>In usable battery \xB7 est.</small><b>${showKwh(values.battery)}</b></div><div><small>To target \xB7 battery est.</small><b>${showKwh(values.needed)}</b></div><div><small>To target \xB7 wall est.</small><b>${showKwh(values.wall)}</b></div><div><small>Plan active time \xB7 est.</small><b>${activeText}</b></div></div><p class="battery-note">Assumptions: ${number(capacityKwh, 0, " kWh", positive)} usable; ${number(Number.isFinite(efficiency) ? efficiency * 100 : null, 0, "%", (n6) => n6 > 0 && n6 <= 100)} charging efficiency. Battery energy = wall energy \xD7 efficiency. Estimates, not measurements or a guaranteed finish.${stale ? " Stale or uncertain SOC is not used in estimates." : ""}${!positive(capacityKwh) ? " Configure usable battery capacity in vehicle settings." : ""}${!positive(efficiency) || efficiency > 1 ? " Charging efficiency is unavailable." : ""}</p></div>`;
+  return `<div class="battery-card ${stale ? "battery-stale" : ""}"><div class="battery-title"><div><span class="battery-caption">${escapeText(caption)}</span><strong>${socText}</strong></div><div class="battery-target">Target <b>${t6 == null ? "Unknown" : `${t6}%`}</b><small>Minimum ${number(minimum, 0, "%", percent)} \xB7 by ${escapeText(deadline)}</small></div></div>${socDetail ? `<p class="battery-note">${escapeText(socDetail)}</p>` : ""}<div class="battery-track" role="img" aria-label="${stale ? "Stale " : ""}SOC ${socText}; target ${t6 == null ? "unknown" : `${t6}%`}${low == null ? "" : `; separate low SOC warning ${low}%`}">${s4 == null ? "" : `<span class="battery-fill" style="width:${s4}%"></span>`}${t6 == null ? "" : `<span class="battery-marker target-marker" style="left:${t6}%"></span>`}${low == null ? "" : `<span class="battery-marker low-marker" style="left:${low}%"></span>`}</div><div class="battery-legend"><span>\u25CF ${stale ? "Stale SOC" : "SOC"}</span><span>\u2502 Target${t6 == null ? " unknown" : ` ${t6}%`}</span>${low == null ? "" : `<span class="battery-low">\u250A Low-SOC warning ${low}%${s4 != null && !stale && s4 <= low ? " \xB7 below warning" : ""}</span>`}</div>${low == null ? "" : '<p class="battery-note">Low-SOC warning is a separate illustrative value, not the ready-by minimum or a protection floor.</p>'}<div class="battery-facts"><div><small>In usable battery \xB7 est.</small><b>${showKwh(values.battery)}</b></div><div><small>To target \xB7 battery est.</small><b>${showKwh(values.needed)}</b></div><div><small>To target \xB7 wall est.</small><b>${showKwh(values.wall)}</b></div><div><small>Plan active time \xB7 est.</small><b>${activeText}</b></div></div><p class="battery-note">Assumptions: ${number(capacityKwh, 0, " kWh", positive)} usable; ${number(Number.isFinite(efficiency) ? efficiency * 100 : null, 0, "%", (n6) => n6 > 0 && n6 <= 100)} charging efficiency. Battery energy = wall energy \xD7 efficiency. Estimates, not measurements or a guaranteed finish.${stale ? " The battery summary excludes stale or uncertain SOC; plan projections may use the labelled last-known reading." : ""}${!positive(capacityKwh) ? " Configure usable battery capacity in vehicle settings." : ""}${!positive(efficiency) || efficiency > 1 ? " Charging efficiency is unavailable." : ""}</p></div>`;
 }
 
 // shared-dashboard/evidence-view.js
@@ -59892,39 +59895,74 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
   const readiness = `Control ${control} \xB7 vehicle ${vehicle} \xB7 transaction / authorization unknown \xB7 measured charging unknown. Authorization for a new session requires installation-specific verification; no active transaction is not a schedule prohibition.`;
   const proposal = d3.plan.proposal;
   const planStale = stale || d3.planning?.historical === true || !!(proposal?.periods.length && proposal.periods.every((p4) => p4.endMs <= now));
-  const windows = !planStale && proposal ? proposal.periods.map((p4) => ({ start: p4.startMs, end: p4.endMs })) : null;
+  const rawProposal = raw?.plan?.proposal;
+  const details = rawProposal?.window_details;
+  const rawProjection = rawProposal?.projection;
+  const validDetails = Array.isArray(details) && proposal && details.length === proposal.periods.length && details.every((item, i7) => item && Date.parse(item.start) === proposal.periods[i7].startMs && Date.parse(item.end) === proposal.periods[i7].endMs && Number.isFinite(item.energy_kwh) && item.energy_kwh >= 0 && (item.cost === null || Number.isFinite(item.cost)) && (item.projected_soc === void 0 || validPercent(item.projected_soc))) && Number.isFinite(proposal.planned_kwh) && Math.abs(details.reduce((sum, row) => sum + row.energy_kwh, 0) - proposal.planned_kwh) < Math.max(1e-6, Math.abs(proposal.planned_kwh) * 1e-8) && (proposal.unpriced || !proposal.cost || details.every((row) => Number.isFinite(row.cost)) && Math.abs(details.reduce((sum, row) => sum + row.cost, 0) - proposal.cost.value) < Math.max(1e-6, Math.abs(proposal.cost.value) * 1e-8));
+  const planCurrency = proposal?.cost?.currency || d3.market?.currency || null;
+  const pricedBasis = rawProposal?.cost_basis === "configured_variable_cost" && !proposal?.unpriced && proposal?.cost?.currency === planCurrency && /^[A-Z]{3}$/.test(planCurrency || "");
+  const projectionValid = !planStale && validPercent(rawProjection?.starting_soc) && Number.isFinite(rawProjection?.kwh_per_percent) && rawProjection.kwh_per_percent > 0;
+  const windows = !planStale && proposal ? proposal.periods.map((p4, i7) => {
+    const detail = validDetails ? details[i7] : null;
+    return {
+      start: p4.startMs,
+      end: p4.endMs,
+      energy: detail?.energy_kwh,
+      cost: pricedBasis ? detail?.cost : null,
+      pricePerKwh: pricedBasis && detail?.energy_kwh > 0 && Number.isFinite(detail?.cost) ? displayPrice(detail.cost / detail.energy_kwh, planCurrency) : null,
+      projectedSoc: projectionValid ? detail?.projected_soc : null
+    };
+  }) : null;
   const nextWindow = windows?.find((w2) => w2.end > now) || null;
-  const currency = proposal?.cost?.currency || null;
+  const currency = planCurrency;
+  const avg = pricedBasis && proposal?.planned_kwh > 0 && Number.isFinite(proposal?.cost?.value) ? displayPrice(proposal.cost.value / proposal.planned_kwh, currency) : null;
+  const computed = Date.parse(d3.planning?.calculated_at || "");
+  const projectionAge = Number.isFinite(rawProjection?.age_s) && rawProjection.age_s >= 0 && Number.isFinite(computed) && computed <= now ? Math.floor((rawProjection.age_s + (now - computed) / 1e3) / 60) : null;
+  const ageText = projectionAge == null ? "age unavailable" : `${projectionAge} min old`;
+  const projectionTime = rawProjection?.time_basis === "vehicle_timestamp" ? `vehicle report ${ageText}` : rawProjection?.time_basis === "last_updated" ? `HA state ${ageText}${rawProjection?.source === "vehicle" ? "; vehicle report time unavailable" : ""}` : `anchor/time basis unknown, ${ageText}; vehicle report time unavailable`;
+  const projectionNote = projectionValid ? `Based on the plan's last-known ${rawProjection?.source === "charger" ? "charger" : rawProjection?.source === "vehicle" ? "vehicle" : "unknown-source"} SOC${rawProjection?.estimated ? " estimate" : ""} (${projectionTime}); it may be inaccurate after driving. Car charge limit is separate from the planning target.` : "SOC projection unavailable: target-SOC planning, a valid SOC and usable capacity or a trusted energy-per-percent estimate are required.";
+  const deadlineText = raw?.planning?.departure_at;
+  const deadline = typeof deadlineText === "string" && /(?:Z|[+-]\d\d:\d\d)$/i.test(deadlineText) ? Date.parse(deadlineText) : NaN;
+  const deadlineCurrent = !stale && !d3.planning?.historical;
+  const untilDeadline = d3.settings?.departure_enabled === false ? "Not enabled" : deadlineCurrent && Number.isFinite(deadline) ? deadline > now ? `${Math.ceil((deadline - now) / 6e4)} min` : "Deadline passed" : "Unavailable";
   const warning = status?.outcomes?.uncertain || status?.operator?.state === "mismatch" || status?.verification?.reason === "limits_or_transitions_differ";
   const published = publishedChart(raw, d3.market, now, stale || dashboardFailed);
   const priceFreshness = priceProvenance(raw?.prices, d3.market, zone, stale || dashboardFailed, now);
   return {
     draftKey: d3.charger.charger_id,
-    format: { currency, minutesPerTimeUnit: 1 / 6e4, time: (ms) => part(ms, zone, { timeStyle: "short" }), day: (ms) => part(ms, zone, { dateStyle: "medium" }), ...published?.format },
+    format: {
+      currency,
+      costBasis: pricedBasis ? "configured variable cost, including configured additions" : null,
+      detailsNote: !validDetails ? "Window energy and costs are unavailable because reconciled planner details are missing." : proposal?.unpriced ? "Window costs and prices are unavailable for an unpriced plan." : !pricedBasis ? "Window prices and weighted average are unavailable because the cost basis or currency is unknown." : null,
+      minutesPerTimeUnit: 1 / 6e4,
+      time: (ms) => part(ms, zone, { timeStyle: "short" }),
+      day: (ms) => part(ms, zone, { dateStyle: "medium" }),
+      ...published?.format
+    },
     model: {
       windows,
       nextWindow,
       chart: published?.chart,
-      totals: !planStale && proposal ? { energy: proposal.planned_kwh, cost: proposal.unpriced ? null : proposal.cost?.value } : null,
+      totals: !planStale && proposal ? { energy: proposal.planned_kwh, cost: proposal.unpriced ? null : proposal.cost?.value, pricePerKwh: avg } : null,
       vehicle: { status: stale ? "Connection unavailable \xB7 stale dashboard" : d3.charger.available ? d3.connection?.state || U : "Charger unavailable", detail: `Dashboard observed ${date(d3.generated_at, zone)}${stale ? " \xB7 stale" : ""}`, power: "Unavailable", soc: validPercent(soc2) ? soc2 : null, stale: socStale, planStale, socDetail, socEstimated: !useRaw && d3.soc?.estimated === true, policy: (d3.plan.price_policy?.explanations || []).map((code) => {
         const keys2 = { minimum_exception: "exception", minimum_shortfall: "minimumShortfall", target_shortfall: "targetShortfall", recalculating: "recalculating", unavailable: "unavailable", minimum_covered: "covered", within_cap: "within", target_met: "targetMet", error: "error" };
         return keys2[code] ? translate2("en", `daily.policy.${keys2[code]}`) : U;
       }).join(" ") || U },
-      assumptions: { startingSoc: !socStale && !d3.soc?.estimated ? soc2 : null, capacityKwh: d3.soc?.capacity_kwh, efficiency: d3.soc?.efficiency },
+      assumptions: { startingSoc: projectionValid ? rawProjection.starting_soc : null, capacityKwh: d3.soc?.capacity_kwh, efficiency: d3.soc?.efficiency, projectionSupported: projectionValid, projectionKwhPerPercent: rawProjection?.kwh_per_percent, projectionNote },
       settings: { target: d3.soc?.target_percent, minimum: d3.settings?.minimum_ready_by_soc, cap: d3.settings?.soft_price_cap, readyBy: d3.settings?.departure_time },
       canSave: false,
-      untilDeadline: U,
+      untilDeadline,
       targetNote: d3.settings?.driver === "target_soc" && d3.soc?.value != null ? `Plan energy, projected SOC and cost are estimates based on the last-known SOC${d3.soc.estimated ? " and an energy-derived SOC estimate" : ""}; an old reading may not reflect driving since then.` : "",
       warning: warning ? { title: "Morek health requires attention", detail: `${health}${status?.outcomes?.uncertain && (status?.operator?.state === "mismatch" || status?.verification?.reason === "limits_or_transitions_differ") ? " \xB7 Effective limits mismatch the sent schedule." : ""}` } : null,
       evidence: { status: health, context: `Morek status observed ${date(observedAt, zone)}${failed ? " \xB7 unavailable" : ""}; separate from dashboard`, readiness, proposal: date(d3.planning?.calculated_at, zone), sent: `${date(status?.sent_at, zone)} \xB7 ${status?.ack || U}`, readback: date(status?.effective?.fetched_at, zone), measurement: "SOC age and measured power unavailable when stale or unsupported", dispatch: `${status?.ownership?.completion_authorized ? "Schedule ownership confirmed for this process." : "Schedule dispatch blocked; recovery needs valid durable ownership and outcome evidence. Older completed ownership may need one admin reconfirmation."} External OCPP writers and native protection are not verified; the historical mismatch does not establish current state. A held exit or uncertain outcome remains blocked. Disabling the integration may leave a schedule or 0 A limit; no physical stop or profile removal is implied.` },
-      labels: { settingsNote: "Read-only preview. Plan controls are unavailable in this slice.", saveLabel: "Save plan \xB7 unavailable", powerNote: "No verified general Morek power source", planLabel: "Backend policy:", chartIntro: "Published source price before configured fiscal additions; source-included charges may apply.", chartNote: `Held published intervals only. ${priceFreshness} Unpublished future and history are unavailable. Cap is omitted if its basis differs or is unknown.`, bands: "", dialogNote: "Proposal only; not necessarily sent.", footer: "Dashboard and Morek status are separate observations." }
+      labels: { settingsNote: "Read-only preview. Plan controls are unavailable in this slice.", saveLabel: "Save plan \xB7 unavailable", powerNote: "No verified general Morek power source", deadlineNote: d3.settings?.departure_enabled === false ? "Ready-by is off" : deadlineCurrent && Number.isFinite(deadline) ? `Ready by ${date(deadline, zone)}; not a predicted finish` : "Ready-by time or current plan unavailable", planLabel: "Backend policy:", chartIntro: "Published source price before configured fiscal additions; source-included charges may apply.", chartNote: `Held published intervals only. ${priceFreshness} Unpublished future and history are unavailable. Cap is omitted if its basis differs or is unknown.`, bands: "", dialogNote: "Proposal only; not necessarily sent.", footer: "Dashboard and Morek status are separate observations." }
     },
     actions: {}
   };
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.72";
+var CARD_VERSION = "2.5.73";
 
 // sidebar/panel.js
 var settingsWritesByConnection = /* @__PURE__ */ new WeakMap();

@@ -355,6 +355,25 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-12 — Stage 12.3 plan details (2.5.73; review pending)
+
+- The dashboard API exposes the current calculation's ready-by instant and
+  per-window wall energy and configured-variable cost, derived from selected
+  planner slots and exact shown-window boundaries. It verifies coverage and
+  reconciliation with unrounded planner totals; inconsistent details are withheld.
+  Unpriced plans no longer present zero as a cost. A total weighted average is
+  displayed only with a known currency, cost basis and positive energy.
+- Cheapest target-SOC plans retain their calculation-time SOC and effective wall
+  kWh per SOC point for per-window projections. A valid old reading is permitted
+  and explicitly labelled with source/age when known; the estimate can be wrong
+  after driving and is not measured charge or the BMW's own charge limit. Manual,
+  hybrid, missing-input and older-backend projections remain unavailable rather
+  than guessing. Historical or stale proposals remain unavailable.
+- Focused planner/API and shared sidebar tests, Ruff, frontend type-check, build
+  and check-dist were run; see session results. Browser, visual regression, full
+  HA-plugin suite and actual HA/vehicle behavior were not tested. No HA contact,
+  vehicle refresh, deployment or charger action occurred.
+
 ### 2026-11-12 — Stage 12.8 last-known SOC planning (2.5.72; review pending)
 
 - Capped target/minimum planning accepts a valid last-known actual SOC regardless

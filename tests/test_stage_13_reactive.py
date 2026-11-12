@@ -100,6 +100,12 @@ def test_settings_api_replans_and_preview_policy_matches_dashboard(monkeypatch):
         w = await _world(monkeypatch)
         initial = w.controller.snapshot()
         assert initial.proposal.exception_kwh == pytest.approx(10)
+        assert initial.projection_soc == 25
+        assert initial.projection_kwh_per_percent == pytest.approx(60 / 90)
+        assert initial.projection_age_s == 1
+        details = dashboard._proposal_section(SimpleNamespace(snapshot=initial, settings=None, area_entry=None))
+        assert sum(row["energy_kwh"] for row in details["window_details"]) == pytest.approx(initial.proposal.delivered_kwh)
+        assert sum(row["cost"] for row in details["window_details"]) == pytest.approx(initial.proposal.estimated_cost)
         initial_policy = encode_preview(initial, w.store.settings("test"))["price_policy"]
         assert {item["code"] for item in initial_policy["explanations"]} >= {"minimum_exception", "target_shortfall"}
         assert initial_policy["estimated_exception_cost"]["value"] == pytest.approx(2)

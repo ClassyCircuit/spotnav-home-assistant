@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dashboardAdapter } from '../sidebar/adapter.js';
 import { renderBattery } from '../shared-dashboard/vehicle-view.js';
+import { renderPlan } from '../shared-dashboard/plan-view.js';
 import '../sidebar/panel.js';
 
 // jsdom does not implement form-associated custom-element internals.
@@ -23,6 +24,37 @@ const tick = async () => { for(let i=0;i<20;i++) await Promise.resolve(); };
 beforeEach(()=>sessionStorage.clear());
 
 describe('actual sidebar read-only host', () => {
+  it('renders reconciled planner windows, costs, deadline and last-known SOC consistently', async () => {
+    const now=Date.now(), raw=fixture();raw.generated_at=new Date(now).toISOString();raw.charger.charger_id='a';
+    raw.market.currency='EUR';raw.settings.departure_enabled=true;raw.planning.settings_revision=raw.settings.revision;
+    raw.planning.calculated_at=raw.generated_at;raw.planning.departure_at=new Date(now+7200000).toISOString();
+    raw.soc={...raw.soc,value:62,age_s:86400,source:'vehicle',estimated:false,capacity_kwh:70,efficiency:.9};
+    const periods=[{start:new Date(now+3600000).toISOString(),end:new Date(now+4200000).toISOString()},{start:new Date(now+4800000).toISOString(),end:new Date(now+6000000).toISOString()}];
+    Object.assign(raw.plan.proposal,{periods,planned_kwh:3,cost:{value:.45,currency:'EUR'},unpriced:false,cost_basis:'configured_variable_cost',
+      window_details:[{...periods[0],energy_kwh:1,cost:.2,projected_soc:63},{...periods[1],energy_kwh:2,cost:.25,projected_soc:65}],
+      projection:{starting_soc:62,kwh_per_percent:1,age_s:86400,source:'vehicle',estimated:false,time_basis:'vehicle_timestamp'}});
+    const model=dashboardAdapter(raw,status,now,now);expect(model.model.untilDeadline).toBe('120 min');
+    expect(model.model.windows.map(w=>w.energy)).toEqual([1,2]);expect(model.model.totals.pricePerKwh).toBe(15);
+    expect(model.model.assumptions.projectionNote).toMatch(/1440 min old.*may be inaccurate/);
+    expect(model.model.assumptions.projectionNote).toMatch(/vehicle report 1440 min old/);
+    const html=renderPlan(model.model.windows,model.model.assumptions,false,model.format,model.model.totals);
+    expect(html).toContain('20 c/kWh');expect(html).toContain('12.5 c/kWh');expect(html).toContain('15 c/kWh');expect(html).toContain('65.0%');
+    const hass={connected:true,user:{is_admin:true},callWS:msg=>Promise.resolve(msg.type==='spotnav/list_chargers'?{api_version:1,chargers:[{charger_id:'a',charger_name:'A'}]}:msg.type==='spotnav/get_dashboard'?raw:msg.type==='spotnav/get_settings'?envelope(record()):status)};
+    const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();
+    for(const root of [panel.shadowRoot.querySelector('.controls-plan'),panel.shadowRoot.querySelector('.prices'),panel.shadowRoot.querySelector('#plan-dialog')]) expect(root.textContent).toContain('15 c/kWh');
+    panel.remove();
+    raw.plan.proposal.projection.time_basis='last_updated';expect(dashboardAdapter(raw,status,now,now).model.assumptions.projectionNote).toMatch(/HA state 1440 min old; vehicle report time unavailable/);
+    raw.market.currency='SEK';raw.plan.proposal.cost.currency='SEK';const sek=dashboardAdapter(raw,status,now,now);const sekHtml=renderPlan(sek.model.windows,sek.model.assumptions,false,sek.format,sek.model.totals);
+    expect(sekHtml).toContain('0.15 SEK/kWh');expect(sekHtml).not.toContain('c/kWh');
+    raw.plan.proposal.unpriced=true;raw.plan.proposal.cost=null;raw.plan.proposal.window_details.forEach(row=>row.cost=null);
+    const unpriced=dashboardAdapter(raw,status,now,now);expect(unpriced.model.totals.cost).toBeNull();expect(unpriced.model.totals.pricePerKwh).toBeNull();expect(unpriced.format.detailsNote).toMatch(/unpriced/);
+    raw.plan.proposal.unpriced=false;raw.plan.proposal.cost={value:.45,currency:'SEK'};raw.plan.proposal.cost_basis=null;
+    expect(dashboardAdapter(raw,status,now,now).model.totals.pricePerKwh).toBeNull();
+    raw.plan.proposal.cost_basis='configured_variable_cost';raw.plan.proposal.planned_kwh=0;
+    expect(dashboardAdapter(raw,status,now,now).model.totals.pricePerKwh).toBeNull();
+    raw.settings.departure_enabled=false;expect(dashboardAdapter(raw,status,now,now).model.untilDeadline).toBe('Not enabled');
+    raw.settings.departure_enabled=true;raw.planning.departure_at=null;expect(dashboardAdapter(raw,status,now,now).model.untilDeadline).toBe('Unavailable');
+  });
   it('selects only a sole charger, preserves a valid selection, and never writes on open', async () => {
     const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';const calls=[];
     let chargers=[{charger_id:'a',charger_name:'A'}];
@@ -147,7 +179,7 @@ describe('actual sidebar read-only host', () => {
     expect(adapter.model.totals.energy).toBe(34.5);
     expect(adapter.model.totals.cost).toBeCloseTo(62.548);
     expect(adapter.format.currency).toBe('SEK');
-    expect(adapter.model.windows[0].cost).toBeUndefined();
+    expect(adapter.model.windows[0].cost).toBeNull();
     expect(renderBattery({windows:adapter.model.windows,minutesPerTimeUnit:adapter.format.minutesPerTimeUnit})).toContain('60 min');
     const start=Date.now();
     expect(renderBattery({windows:[{start,end:start+3600000},{start:start+4000000,end:start+4900000}],minutesPerTimeUnit:adapter.format.minutesPerTimeUnit})).toContain('75 min');
