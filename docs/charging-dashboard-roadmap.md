@@ -808,7 +808,16 @@ tests are documented there; full HA collection is still blocked on Windows.
     run it on a supported local host if available. If not, report the exact gap
     and evidence to the user before installation; do not claim it passed or halt
     unrelated implementation just to provision the test environment.
-- [ ] **5.7a Replace Morek execution with the schedule owner**
+- [x] **5.7a Replace Morek execution with the schedule owner** (local mocked implementation; coordinator review pending)
+  - **2.5.64 local verification:** a clean reconnect can revalidate
+    a ticket known in the same process; Stop, identity changes, uncertain outcomes and
+    stale lifecycle events fail closed. Process restart still requires an administrator
+    to reconfirm completed ownership; an interrupted completion write can have landed
+    and an unrecorded Stop cannot be reconstructed. Real-admission planner input
+    races at both persistence boundaries and late ACK/composite readback after Stop
+    have new tests. Real-admission Resume/Stop during pause-intent persistence and
+    cancellation/newer-barrier contention during reconnect revalidation are covered.
+    This is local mocked evidence, not proof of deployed or physical behavior.
   - **2.5.63 wired, full matrix/review outstanding:** connector-bound completion,
     a generation/lifecycle-bound process ticket, explicit admin reconfirmation after
     restart/reconnect, production owned admission and final worker persistence checks

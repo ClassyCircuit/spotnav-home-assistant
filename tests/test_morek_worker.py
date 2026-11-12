@@ -917,6 +917,255 @@ async def real_planner_worker(monkeypatch):
     return w, world
 
 
+async def real_admission_planner_worker(monkeypatch, tmp_path):
+    """Use the real planner, ownership, connector gate and disk-backed ledger."""
+    import json
+    from .test_execution_ownership import FakeHass, FakeStore
+    from custom_components.spotnav.execution import command_admission, execution_ownership, morek_outcomes
+
+    actual_state = morek_schedule._state
+    w, world = await real_planner_worker(monkeypatch)
+    hass = FakeHass(tmp_path)
+    hass.async_create_task = asyncio.create_task
+    monkeypatch.setattr(execution_ownership, "Store", FakeStore)
+    monkeypatch.setattr(morek_outcomes, "Store", FakeStore)
+    monkeypatch.setattr(morek_schedule, "Store", FakeStore)
+    monkeypatch.setattr(morek_schedule, "_state", actual_state)
+    monkeypatch.setattr(morek_schedule, "outcomes_for", morek_outcomes.outcomes_for)
+    (tmp_path / execution_ownership.STORAGE_KEY).write_text(json.dumps({"version": 1, "data": {
+        "schema_version": 1, "records": {"test": {"station_id": IDENTITY["resolved_id"], "connector_id": 1,
+            "owner": "morek_schedule", "handover": {"version": 1, "state": "completed", "id": "a" * 32}}}}}), encoding="utf-8")
+    (tmp_path / "spotnav.morek_schedule.connector_outcomes").write_text(json.dumps({"version": 1, "data": {
+        "schema": 1, "entry_id": "test", "uncertain": False, "attempt": {"state": "accepted"}}}), encoding="utf-8")
+    gate = command_admission.command_admission(hass)
+    identity = lambda: w.identity  # noqa: E731
+    gate.reserve_lifecycle_barrier("test", identity)
+    assert await gate.async_reconfirm_completed("test", identity) == "reconfirmed"
+    monkeypatch.setattr(morek_worker, "command_admission", command_admission.command_admission)
+    w.hass, w.admission = hass, gate
+    w.ledger = morek_outcomes.outcomes_for(hass)
+    disk = FakeStore(hass, 1, "entry")
+    hass.data[morek_schedule._DATA_KEY] = {"test": ({}, disk, asyncio.Lock())}
+    w.worker = morek_worker.MorekScheduleWorker(hass, "test", world.controller)
+    return w, world, disk
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("boundary", ["ledger", "entry_store"])
+@pytest.mark.parametrize("change", ["authority", "state", "document", "coverage", "generation", "source",
+                                    "soc", "age", "vehicle", "settings", "connection"])
+async def test_real_admission_rechecks_planner_inputs_after_persistence(monkeypatch, tmp_path, boundary, change):
+    w, world, disk = await real_admission_planner_worker(monkeypatch, tmp_path)
+    reached, proceed = asyncio.Event(), asyncio.Event()
+    original = w.ledger.write if boundary == "ledger" else disk.async_save
+    async def blocked(value):
+        if not reached.is_set():
+            reached.set()
+            await proceed.wait()
+        await original(value)
+    monkeypatch.setattr(w.ledger if boundary == "ledger" else disk,
+                        "write" if boundary == "ledger" else "async_save", blocked)
+    w.worker.start()
+    await asyncio.wait_for(reached.wait(), 2)
+    if change == "authority":
+        world.area.today_authority = "unknown"
+    elif change == "state":
+        world.area.state = "stale"
+    elif change == "document":
+        world.area.today_snapshot.document = replace(world.area.today_snapshot.document, prices=(.3,) * 8)
+    elif change == "coverage":
+        world.area.today_snapshot.document = replace(world.area.today_snapshot.document, intervals=())
+    elif change == "generation":
+        world.area.generation += 1
+    elif change == "source":
+        from custom_components.spotnav.pricing.price_source import PriceSource
+        from custom_components.spotnav.planning.auto_settings import AreaAutoSettings
+        source = PriceSource("price", "charger", world.area.area_id, AreaAutoSettings(area_id=world.area.area_id), None, "new")
+        monkeypatch.setattr(world.controller, "_source", lambda: source)
+    elif change == "soc":
+        world.facts[0] = replace(world.facts[0], soc_percent=30)
+    elif change == "age":
+        world.facts[0] = replace(world.facts[0], soc_age_s=100000)
+    elif change == "vehicle":
+        world.facts[0] = replace(world.facts[0], vehicle_id="other")
+    elif change == "settings":
+        await world.store.async_update("test", mutate=lambda value: replace(value, minimum_ready_by_soc=35))
+    else:
+        world.controller._connection_generation += 1
+    proceed.set()
+    await drain(w.worker)
+    assert w.worker.reason in ("price_inputs_changed", "plan_inputs_changed", "vehicle_input_stale", "no_current_plan")
+    assert (await w.ledger.read())["attempt"]["state"] == "aborted_before_dispatch"
+    w.point.call.assert_not_awaited()
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_real_admission_late_ack_never_verifies_during_or_after_stop(monkeypatch, tmp_path):
+    w, world, _ = await real_admission_planner_worker(monkeypatch, tmp_path)
+    entry = SimpleNamespace(entry_id="test", runtime_data=SimpleNamespace(morek_worker=w.worker),
+                            async_on_unload=lambda _: None)
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=w.target))
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return world.request.now
+    monkeypatch.setattr(morek_schedule, "datetime", Clock)
+    morek_schedule._verification_lifecycle(w.hass, "test", entry)
+    reached, proceed = asyncio.Event(), asyncio.Event()
+    async def late_ack(_request):
+        reached.set()
+        await proceed.wait()
+        return SimpleNamespace(status="Accepted")
+    w.point.call.side_effect = late_ack
+    w.worker.start()
+    await asyncio.wait_for(reached.wait(), 2)
+    with w.admission.person_stop_reservation("test", lambda: w.identity):
+        proceed.set()
+        await drain(w.worker)
+        data = w.hass.data[morek_schedule._DATA_KEY]["test"][0]
+        record = await w.ledger.read()
+        assert record["attempt"]["state"] == "accepted"  # historical ACK, not a current confirmation
+        assert not morek_schedule._verification_current(w.hass, "test", entry, data, record, data["sent_at"])
+    assert not morek_schedule._verification_current(w.hass, "test", entry, data, record, data["sent_at"])
+    assert w.point.call.await_count == 1
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_real_admission_fresh_replan_age_and_deduplication(monkeypatch, tmp_path):
+    w, world, _ = await real_admission_planner_worker(monkeypatch, tmp_path)
+    world.area.today_authority = "unknown"
+    w.worker.start()
+    await drain(w.worker)
+    assert w.worker.reason == "price_inputs_changed"
+    w.point.call.assert_not_awaited()
+    world.area.today_authority = "listed"
+    world.facts[0] = replace(world.facts[0], soc_age_s=2)
+    await world.controller.async_recalculate()
+    await drain(w.worker)
+    assert w.point.call.await_count == 1
+    world.facts[0] = replace(world.facts[0], soc_age_s=3)
+    w.worker.trigger()
+    await drain(w.worker)
+    assert w.worker.reason == "unchanged" and w.point.call.await_count == 1
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_real_admission_does_not_retry_unknown_profile_result(monkeypatch, tmp_path):
+    w, _, _ = await real_admission_planner_worker(monkeypatch, tmp_path)
+    w.point.call.side_effect = TimeoutError()
+    w.worker.start()
+    await drain(w.worker)
+    assert w.worker.reason == "upload_uncertain"
+    assert (await w.ledger.read())["uncertain"] is True
+    w.worker.trigger()
+    await drain(w.worker)
+    assert w.point.call.await_count == 1
+    assert w.worker.reason == "profile_outcome_unavailable"
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_real_admission_late_composite_readback_after_stop_is_not_verified(monkeypatch, tmp_path):
+    import sys
+    w, world, _ = await real_admission_planner_worker(monkeypatch, tmp_path)
+    entry = SimpleNamespace(entry_id="test", runtime_data=SimpleNamespace(morek_worker=w.worker),
+                            async_on_unload=lambda _: None)
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=w.target))
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return world.request.now
+    monkeypatch.setattr(morek_schedule, "datetime", Clock)
+    morek_schedule._verification_lifecycle(w.hass, "test", entry)
+    w.worker.start()
+    await drain(w.worker)
+    data = w.hass.data[morek_schedule._DATA_KEY]["test"][0]
+    record = await w.ledger.read()
+    assert morek_schedule._verification_current(w.hass, "test", entry, data, record, data["sent_at"])
+    reached, proceed = asyncio.Event(), asyncio.Event()
+    async def delayed_read(_request):
+        reached.set()
+        await proceed.wait()
+        profile = data["profile"]["chargingSchedule"]
+        return SimpleNamespace(status="Accepted", connector_id=1, schedule_start=profile["startSchedule"],
+                               charging_schedule={**profile, "duration": 172800})
+    w.point.call.side_effect = delayed_read
+    monkeypatch.setitem(sys.modules, "ocpp.v16", SimpleNamespace(call=SimpleNamespace(
+        GetCompositeSchedule=lambda **kw: SimpleNamespace(payload=kw))))
+    task = asyncio.create_task(morek_schedule.async_schedule_action(w.hass, "test", "fetch"))
+    await asyncio.wait_for(reached.wait(), 2)
+    with w.admission.person_stop_reservation("test", lambda: w.identity):
+        proceed.set()
+        result = await task
+    assert not result["verified"]
+    assert (await w.ledger.read()).get("verified") is None
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_real_admission_stop_overtakes_resume_intent_save(monkeypatch, tmp_path):
+    from custom_components.spotnav.execution import command_admission, execution_ownership
+    w, _, _ = await real_admission_planner_worker(monkeypatch, tmp_path)
+    entry = SimpleNamespace(entry_id="test", runtime_data=SimpleNamespace(morek_worker=w.worker))
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=w.target))
+    monkeypatch.setattr(morek_schedule, "command_admission", command_admission.command_admission)
+    monkeypatch.setattr(morek_schedule, "ownership_store", execution_ownership.ownership_store)
+    record = await w.ledger.read()
+    record["schedule_pause"] = {"version": 1, "type": "pause_until_resumed", "id": "old-pause",
+                                "station_id": IDENTITY["resolved_id"], "connector_id": 1}
+    await w.ledger.write(record)
+    original = w.ledger.write
+    reached, proceed = asyncio.Event(), asyncio.Event()
+    async def delayed(value):
+        reached.set()
+        await proceed.wait()
+        await original(value)
+    monkeypatch.setattr(w.ledger, "write", delayed)
+    task = asyncio.create_task(morek_schedule.async_record_owned_pause(w.hass, "test", resume=True))
+    await asyncio.wait_for(reached.wait(), 2)
+    with w.admission.person_stop_reservation("test", lambda: w.identity):
+        proceed.set()
+        with pytest.raises(morek_schedule.ScheduleRefused, match="resume_interrupted"):
+            await task
+    assert w.worker.resume_ticket is None
+    assert not w.admission.owned_ticket_current("test", physical_connector(w.identity))
+    w.point.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mode", ["manual_kwh", "solar", "hybrid"])
+async def test_real_admission_refuses_unsupported_plans(monkeypatch, tmp_path, mode):
+    w, world, _ = await real_admission_planner_worker(monkeypatch, tmp_path)
+    await world.store.async_update("test", mutate=lambda value: replace(
+        value, driver="manual_kwh" if mode == "manual_kwh" else value.driver,
+        strategy=mode if mode != "manual_kwh" else value.strategy))
+    w.worker.start()
+    await drain(w.worker)
+    assert w.worker.reason in ("no_current_plan", "plan_input_provenance_unavailable")
+    w.point.call.assert_not_awaited()
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_real_admission_pending_resume_after_restart_requires_confirmation(monkeypatch, tmp_path):
+    w, _, _ = await real_admission_planner_worker(monkeypatch, tmp_path)
+    record = await w.ledger.read()
+    record["schedule_pause"] = {"version": 1, "type": "resume_requested", "id": "old-resume",
+                                "station_id": IDENTITY["resolved_id"], "connector_id": 1}
+    await w.ledger.write(record)
+    w.worker.start()
+    await drain(w.worker)
+    assert w.worker.reason == "resume_requires_confirmation"
+    w.point.call.assert_not_awaited()
+    w.worker.close()
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("change", ["state", "authority", "document", "generation", "date", "vehicle", "source"])
 async def test_live_inputs_change_without_publication_blocks_worker(monkeypatch, change):

@@ -362,7 +362,7 @@ async def _async_setup_ownership_metadata(
             # Do this synchronously, before creating a task. A writer already
             # holding admission is drained by the existing entry protocol.
             barrier_revision = command_admission(hass).reserve_lifecycle_barrier(
-                entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target))
+                entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target), reconnect=True)
         # Invalidate queued worker work synchronously, including on disconnect.
         worker = getattr(getattr(entry, "runtime_data", None), "morek_worker", None)
         generation = worker.suspend_for_availability_change() if worker is not None else None
@@ -370,6 +370,8 @@ async def _async_setup_ownership_metadata(
             async def initialize_and_reconcile() -> None:
                 await ensure(epoch)  # Never acquire admission recursively in the worker.
                 if migrate and barrier_revision is not None:
+                    await command_admission(hass).async_restore_reconnect(
+                        entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target), barrier_revision)
                     await command_admission(hass).async_release_lifecycle_barrier(
                         entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target),
                         barrier_revision, lambda: epoch == lifecycle_epoch)

@@ -340,6 +340,41 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-12 — real-admission provenance and reconnect (2.5.64; coordinator review pending)
+
+- The existing process ticket is invalidated on disconnect, but a separately held
+  in-process reconnect candidate can be revalidated against durable completed owner,
+  settled ledger, unique identity, lifecycle and Stop generation. Only a clean
+  reconnect originating from a current ticket can restore it. A Stop, changed identity,
+  uncertain outcome, unload or superseding lifecycle event prevents that recovery.
+  On an HA process restart there is no candidate: an admin must use **Reconfirm
+  schedule ownership**. A completion write that landed before interruption and a
+  Stop never recorded before a crash cannot be ordered from the disk marker alone.
+- Actual planner plus production admission and disk-backed ledger tests cover changed
+  price state, authority, document, coverage, source and revision; SOC value and age,
+  vehicle identity, settings and connection changes during each pre-dispatch store
+  boundary. They also cover fresh replanning, unchanged-value ageing, deduplication,
+  no retry after an unknown write, and late ACK and composite readback after Stop.
+  Verification now rejects a worker's superseded ticket or pending Stop even when a
+  late ACK is recorded as historical. None of this establishes physical charging.
+- Additional actual-admission tests cover concurrent Resume/Stop during pause-intent
+  persistence, cancelled reconnect revalidation and a newer barrier while its ledger
+  read is pending, as well as unsupported plan modes and pending Resume after restart.
+  5.7a is marked locally complete for coordinator review. 5.7b remains open for
+  broader end-to-end and charging/health monitoring; mocks are not deployed evidence.
+- External writers and native protection remain unverified; effective readback is not
+  profile inventory or measured physical flow. Disabling SpotNav can leave a schedule
+  or 0 A limit. No live HA, deployment or charger operation was performed.
+- Checks: `python tools/run_isolated_planning_tests.py -x` 584 passed, 1 deselected;
+  `python tools/run_isolated_lifecycle_tests.py -x` 186 passed; the lifecycle runner
+  with `tests/test_execution_ownership.py tests/test_command_admission.py
+  tests/test_morek_schedule.py tests/test_morek_outcomes.py tests/test_morek_readiness.py
+  -x` 335 passed. Focused real-admission worker tests reported 31 passed; focused
+  reconnect tests reported 7 passed. Targeted Ruff, frontend type-check, build,
+  check-dist and sidebar/Morek tests (62 passed) and `git diff --check` passed.
+  Existing pytest timeout-option/deprecation, jsdom CSS and Git line-ending warnings
+  remain. The full 5.4c HA-plugin suite was not run.
+
 ### 2026-11-12 — wired completion and guarded worker (2.5.63; review required)
 
 - A versioned `completed` handover carries the original connector-bound migration

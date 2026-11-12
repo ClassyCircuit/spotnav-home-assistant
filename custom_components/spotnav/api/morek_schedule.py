@@ -693,11 +693,19 @@ def _verification_current(hass: HomeAssistant, entry_id: str, entry: Any, data: 
         if worker is not None and (worker._closed or worker._suspended or not worker._available()):
             return False
         target = getattr(controller_for(hass, entry_id), "ocpp_target", None)
-        from ..execution.command_admission import classify_morek_identity
-        if classify_morek_identity(_identity_status(hass, target)) != "supported_morek":
+        from ..execution.command_admission import classify_morek_identity, physical_connector
+        identity = _identity_status(hass, target)
+        if classify_morek_identity(identity) != "supported_morek":
             return False
         _charge_point(hass, target)
         attempt, ack = record.get("attempt") or {}, record.get("acknowledged") or {}
+        admission = hass.data.get("spotnav_command_admission")
+        connector = physical_connector(identity)
+        if (admission is not None and connector is not None
+                and (admission._person_stops.get(connector)
+                     or (attempt.get("source") == "worker"
+                         and not admission.owned_ticket_current(entry_id, connector)))):
+            return False
         fingerprint = attempt.get("fingerprint")
         if (record.get("entry_id") != entry_id or record.get("uncertain") is not False
                 or data.get("cleanup") or data.get("sent_at") != sent_at

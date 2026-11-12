@@ -95,24 +95,36 @@ class CommandAdmission:
         self._uncertain_operations: set[PhysicalConnector] = set()
         self._recovery_status: dict[str, dict[str, Any]] = {}
         self._completion_tickets: dict[str, tuple[PhysicalConnector, str, int, Generation]] = {}
+        self._reconnect_candidates: dict[str, tuple[PhysicalConnector, str, int, Generation]] = {}
         self._stop_prior_tickets: dict[asyncio.Task, tuple[PhysicalConnector, str, int, Generation]] = {}
 
-    def reserve_lifecycle_barrier(self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]]) -> int:
+    def reserve_lifecycle_barrier(self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]], *,
+                                  reconnect: bool = False) -> int:
         """Synchronously invalidate ordinary target writes before scheduling recovery."""
-        revision = self._lifecycle_revisions.get(entry_id, 0) + 1
+        old_revision = self._lifecycle_revisions.get(entry_id, 0)
+        ticket = self._completion_tickets.pop(entry_id, None)
+        prior_candidate = self._reconnect_candidates.pop(entry_id, None)
+        prior = ticket or prior_candidate
+        revision = old_revision + 1
         self._lifecycle_revisions[entry_id] = revision
-        self._completion_tickets.pop(entry_id, None)
         try:
             identity = dict(resolve_identity())
             classification = classify_morek_identity(identity)
             connector = physical_connector(identity) if classification == "supported_morek" else None
         except Exception:  # noqa: BLE001 - unknown identity is not permission
             connector = None
+            classification = "unresolved"
         previous = self._lifecycle_barriers.get(entry_id)
         self._lifecycle_barriers[entry_id] = connector or previous
-        connector = connector or previous
+        connector = connector or previous or (prior[0] if prior else None)
+        self._lifecycle_barriers[entry_id] = connector
         if connector is not None:
+            can_reconnect = (reconnect and classification != "non_target" and prior is not None
+                             and prior[0] == connector and prior[2] == old_revision
+                             and prior[3] == self.generation(connector) and not self._person_stops.get(connector))
             self._generations[connector] = self._generations.get(connector, 0) + 1
+            if can_reconnect:
+                self._reconnect_candidates[entry_id] = (connector, prior[1], revision, self.generation(connector))
             if connector in self._entry_draining:
                 self._entry_draining[connector] = "interrupted"
         return revision
@@ -214,7 +226,7 @@ class CommandAdmission:
             return False
 
     async def async_reconfirm_completed(
-        self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]],
+        self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]], *, expected_migration: str | None = None,
     ) -> str:
         """Explicitly reconfirm a completed owner; never operate the charger."""
         from .execution_ownership import _decode, _read_envelope
@@ -243,6 +255,7 @@ class CommandAdmission:
                 status = await self._store.async_status(entry_id, identity)
                 if (status.get("record_state") != "valid" or status.get("recorded_owner") != "morek_schedule"
                         or status.get("handover_evidence") != "completed" or not status.get("handover_id")
+                        or (expected_migration is not None and status.get("handover_id") != expected_migration)
                         or status.get("transition_state") is not None):
                     return "completion_unavailable"
                 async with self._store._lock:
@@ -273,6 +286,18 @@ class CommandAdmission:
         except Exception:  # noqa: BLE001 - missing or malformed evidence is not authority
             return "reconfirmation_unavailable"
 
+    async def async_restore_reconnect(self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]],
+                                      revision: int) -> bool:
+        """Restore only authority observed in this process before a clean reconnect."""
+        candidate = self._reconnect_candidates.get(entry_id)
+        if (candidate is None or candidate[2] != revision or candidate[3] != self.generation(candidate[0])
+                or self._lifecycle_revisions.get(entry_id, 0) != revision):
+            return False
+        result = await self.async_reconfirm_completed(entry_id, resolve_identity, expected_migration=candidate[1])
+        if self._reconnect_candidates.get(entry_id) == candidate:
+            self._reconnect_candidates.pop(entry_id, None)
+        return result == "reconfirmed" and self._completion_tickets.get(entry_id) == candidate
+
     @contextmanager
     def person_stop_reservation(self, entry_id: str, resolve_identity: Callable[[], Mapping[str, Any]]):
         """Reserve before outer locks; interrupt an unarmed entry without reopening writes."""
@@ -290,6 +315,11 @@ class CommandAdmission:
             connector = physical_connector(identity) if classify_morek_identity(identity) == "supported_morek" or offline_intent else None
         except Exception:  # noqa: BLE001 - the ordinary identity checks still apply
             connector = None
+        candidate = self._reconnect_candidates.pop(entry_id, None)
+        if connector is None and candidate is not None:
+            # A Stop while offline must invalidate the in-process reconnect
+            # candidate even when the resolver cannot currently identify Morek.
+            connector = candidate[0]
         if connector is not None:
             prior = self._completion_tickets.pop(entry_id, None)
             if prior is not None and asyncio.current_task() is not None:

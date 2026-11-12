@@ -1478,6 +1478,95 @@ async def test_completed_restart_requires_explicit_reconfirmation(environment, m
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("case", ["clean", "stop", "uncertain", "identity_away_back"])
+async def test_real_reconnect_only_recovers_prior_current_process_ticket(environment, monkeypatch, case):
+    from custom_components.spotnav.execution import morek_outcomes
+
+    hass, _, gate, target, _, entry = environment
+    monkeypatch.setattr(morek_outcomes, "Store", FakeStore)
+    persist(hass, {"a": {**record("morek_schedule"), "handover": {
+        "version": 1, "state": "completed", "id": "a" * 32}}})
+    path = hass.root / "spotnav.morek_schedule.connector_outcomes"
+    path.write_text(json.dumps({"version": 1, "data": {"schema": 1, "entry_id": "a", "uncertain": False,
+                              "attempt": {"state": "accepted"}}}), encoding="utf-8")
+    callbacks, tasks = [], []
+    monkeypatch.setattr(integration, "async_track_state_change_event",
+                        lambda _h, _ids, callback: callbacks.append(callback) or (lambda: None))
+    entry.async_create_background_task = lambda _h, coro, _name: tasks.append(asyncio.create_task(coro))
+    entry.runtime_data = SimpleNamespace(executor=None, morek_worker=None)
+    await integration._async_setup_ownership_metadata(
+        hass, entry, SimpleNamespace(ocpp_target=target, charge_control="switch.charger"), migrate=True)
+    identity = lambda: morek_schedule._identity_status(hass, target)  # noqa: E731
+    assert await gate.async_reconfirm_completed("a", identity) == "reconfirmed"
+    callbacks[0](SimpleNamespace(data={"old_state": SimpleNamespace(state="off"),
+                                      "new_state": SimpleNamespace(state="unavailable")}))
+    if case == "stop":
+        with gate.person_stop_reservation("a", identity):
+            pass
+    elif case == "uncertain":
+        path.write_text(json.dumps({"version": 1, "data": {"schema": 1, "entry_id": "a", "uncertain": True,
+                                  "attempt": {"state": "uncertain"}}}), encoding="utf-8")
+    elif case == "identity_away_back":
+        target.connector_id = 2
+    callbacks[0](SimpleNamespace(data={"old_state": SimpleNamespace(state="unavailable"),
+                                      "new_state": SimpleNamespace(state="off")}))
+    target.connector_id = 1
+    await asyncio.gather(*tasks)
+    connector = command_admission.physical_connector(identity())
+    assert gate.owned_ticket_current("a", connector) == (case == "clean")
+    operation = AsyncMock()
+    result = await gate.async_execute("a", "owned_profile", identity, operation)
+    assert result.allowed == (case == "clean")
+    hass.station.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("race", ["cancel", "stop", "newer_barrier"])
+async def test_automatic_reconnect_cannot_publish_stale_ticket(environment, monkeypatch, race):
+    from custom_components.spotnav.execution import morek_outcomes
+
+    hass, _, gate, target, _, _ = environment
+    monkeypatch.setattr(morek_outcomes, "Store", FakeStore)
+    persist(hass, {"a": {**record("morek_schedule"), "handover": {
+        "version": 1, "state": "completed", "id": "a" * 32}}})
+    (hass.root / "spotnav.morek_schedule.connector_outcomes").write_text(json.dumps({"version": 1, "data": {
+        "schema": 1, "entry_id": "a", "uncertain": False, "attempt": {"state": "accepted"}}}), encoding="utf-8")
+    identity = lambda: morek_schedule._identity_status(hass, target)  # noqa: E731
+    gate.reserve_lifecycle_barrier("a", identity)
+    assert await gate.async_reconfirm_completed("a", identity) == "reconfirmed"
+    gate.reserve_lifecycle_barrier("a", identity, reconnect=True)
+    revision = gate.reserve_lifecycle_barrier("a", identity, reconnect=True)
+    ledger = morek_outcomes.outcomes_for(hass)
+    original = ledger.read
+    reached, proceed = asyncio.Event(), asyncio.Event()
+    async def delayed():
+        reached.set()
+        await proceed.wait()
+        return await original()
+    monkeypatch.setattr(ledger, "read", delayed)
+    task = asyncio.create_task(gate.async_restore_reconnect("a", identity, revision))
+    await asyncio.wait_for(reached.wait(), 2)
+    if race == "cancel":
+        task.cancel()
+        proceed.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    elif race == "stop":
+        with gate.person_stop_reservation("a", identity):
+            proceed.set()
+            assert not await task
+    else:
+        gate.reserve_lifecycle_barrier("a", identity, reconnect=True)
+        proceed.set()
+        assert not await task
+    connector = command_admission.physical_connector(identity())
+    assert not gate.owned_ticket_current("a", connector)
+    op = AsyncMock()
+    assert not (await gate.async_execute("a", "owned_profile", identity, op)).allowed
+    op.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("race", ["stop", "cancel", "lifecycle"])
 async def test_completion_readback_cannot_restore_stale_ticket(environment, monkeypatch, race):
     hass, _, _, _, _, _ = environment
