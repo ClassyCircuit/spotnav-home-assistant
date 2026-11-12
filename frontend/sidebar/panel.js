@@ -26,6 +26,9 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     this.connected = true;
     this.classList.add('wa-dark');
     this.shadowRoot.innerHTML = `<link rel="stylesheet" href="/spotnav-sidebar/panel.css?v=${CARD_VERSION}"><style>:host{display:block;min-height:100%;padding-bottom:env(safe-area-inset-bottom)}.hostbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top));background:#11151d;color:white}.hostbar label{flex:1 1 180px}.hostbar select{max-width:100%}.hostbar button,.hostbar select{font:inherit;padding:8px}.message{padding:16px;color:white;background:#11151d}</style><div class="hostbar"><button id="menu" aria-label="Open navigation">☰</button><strong>SpotNav Enhanced</strong><label>Charger <select id="charger"><option value="">Select charger</option></select></label><button id="refresh">Refresh observations</button><div id="automatic-controls"><span id="pause-state">Auto state unknown.</span> <button id="pause-auto" disabled>Pause Auto until resumed</button> <button id="resume-auto" disabled>Resume Auto</button><span id="pause-notice" role="status"></span></div></div><div class="message" role="status">Select a charger.</div><main></main>`;
+    const hostStyle=document.createElement('style');
+    hostStyle.textContent='#automatic-controls{display:flex;flex-wrap:wrap;gap:6px;min-width:0;max-width:100%} #automatic-controls button{max-width:100%;white-space:normal}';
+    this.shadowRoot.append(hostStyle);
     this.shadowRoot.querySelector('#menu').onclick = () => this.dispatchEvent(new CustomEvent('hass-toggle-menu',{bubbles:true,composed:true}));
     this.shadowRoot.querySelector('#charger').onchange = e => {this.stopObservations(); this.charger = e.target.value; this.refresh();};
     this.shadowRoot.querySelector('#refresh').onclick = () => this.refresh();
@@ -74,7 +77,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
   }
   paint() {
     if (!this.rawDashboard) return;
-    const adapter=dashboardAdapter(this.rawDashboard,this.rawStatus,this.statusAt,Date.now(),this.statusFailed);
+    const adapter=dashboardAdapter(this.rawDashboard,this.rawStatus,this.statusAt,Date.now(),this.statusFailed,this.dashboardFailed);
     if (!adapter || adapter.draftKey!==this.charger) { this.message('Dashboard unavailable or unsupported.'); return; }
     const decoded=decodeDashboard(this.rawDashboard);
     const dashboard=decoded.ok ? decoded.value : null;
@@ -84,6 +87,12 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     if (this.settingsRecord) {
       const record=this.settingsRecord;
       adapter.model.settings={target:record.target.target_percent,minimum:record.minimum_ready_by_soc,cap:record.soft_price_cap,readyBy:record.departure_time,capEnabled:record.soft_price_cap!=null,capBasis:record.cap_price_basis,deadlineEnabled:record.departure_enabled};
+      // The planner's nord_pool basis compares the source's converted published
+      // major-unit price, even when that source includes its own charges. A
+      // configured-variable-cost cap must not be drawn on this raw series.
+      if (adapter.model.chart && record.revision===dashboard?.settings?.revision && record.cap_price_basis==='nord_pool' && Number.isFinite(record.soft_price_cap)) {
+        adapter.model.chart.cap=record.soft_price_cap;
+      }
       adapter.model.settingsEditor=true;
       adapter.model.targetSupported=record.driver==='target_soc';
       adapter.model.policySupported=record.soft_price_cap!==undefined;

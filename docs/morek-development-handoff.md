@@ -6,6 +6,17 @@ Re-check the live system and Git state before acting; observations below may bec
 
 ## Approved next direction (planning, not implemented)
 
+**2026-11-12 user clarification:** Morek is reported to handle household load
+protection natively. The requested SpotNav Morek mode only schedules charging
+on/off windows; do not implement household load balancing or change amps dynamically
+in response to house load. Scheduled 0 A/allowed-current limits are window controls,
+not a load regulator. This is the user's report, not an independent verification of
+the actual installation. Existing protection, regulator configuration, activation
+blockers and electrical limits must not be changed or bypassed without explicit
+authorization. Resolve any existing regulator conflict before activation; do not
+turn it into a new SpotNav load-management project or a separate hardware-test stage.
+Historical notes below describe previous understanding, not a competing requirement.
+
 **2026-11-09 coordination update:** the roadmap now begins with a concise numbered
 task checklist. Completed audit/ownership/admission/identity/start-evidence work
 through 2.5.13 is Stage 0, not work to repeat. **Stage 1 price-policy settings,
@@ -233,6 +244,59 @@ requirements, not features claimed implemented in the manual baseline below.
   Do not assume `GetCompositeSchedule` lists stored profiles.
 
 ## Tests, build, and next steps
+
+### Stage 5.4c — partial implementation (not yet accepted)
+
+- Version 2.5.38 adds `prices.published_intervals`, separate from the unchanged
+  merged rows. It exposes captured published boundaries and source prices in
+  major currency/kWh (the source calculation uses 100 subdivisions regardless
+  of ISO minor-unit convention). Market currency/timezone and existing per-day
+  fetched timestamps are reused. Invalid or overlapping rows fail closed. Only
+  held today/tomorrow documents are available; no historical coverage is promised.
+- The sidebar uses the shared chart with neutral colors, explicit source-price
+  basis, exact gaps and timezone offset in chart tooltips. A cap is drawn only for
+  matching-revision settings with the planner's published-price basis; the
+  configured-variable-cost cap is omitted from this raw-price plot. Proposal
+  shading is not sent or measured charging. Chart data and overlays update in
+  place while retaining valid zoom; missing/stale data shows unavailable.
+- Local validation: actual serializer test 1 passed (mocked capture); registration
+  tests 2 passed; focused sidebar/bundle tests 61 passed; shared/sample tests 23
+  passed; full Vitest 2,423 passed before final small formatting/control changes.
+  Build, type-check, check-dist and diff check passed. The initial full test run
+  had 1 stale-bundle version failure before the build; the subsequent run passed.
+  jsdom reported CSS parsing warnings; Python reported an HA voluptuous warning;
+  Git reported CRLF warnings. The full HA-plugin dashboard/golden suite was not
+  run on Windows. Its old golden comparison now checks the additive field
+  separately, but that change needs execution on a supported HA test host.
+- Built-panel mock browser checks passed desktop and emulated mobile for prices,
+  proposal changes, formatter output, zoom/reset actions, retained zoom, shrinking
+  and unavailable/restored data, no horizontal overflow, local requests and no
+  implicit writes. Captures: temporary `opencode/spotnav-54c/{desktop,mobile}.png`.
+  Pointer-triggered tooltips and real wheel gestures have not been verified for
+  this live binding; neither have actual HA, physical touch or charger behavior.
+  Do not mark 5.4c complete until those checks and the backend contract suite pass.
+  No deployment or live operation occurred; autonomous dispatch remains unarmed.
+
+### Historical 5.4c source inspection (superseded above)
+
+- **Incomplete; coordinator review required.** No chart or backend code was changed.
+  `get_dashboard.prices.intervals` is a merged presentation: the serializer may
+  substitute proposal horizon rows and split published rows into quarters. It is
+  therefore not always an authoritative record of source resolution. Captured
+  `ChartInterval` rows originate in held published documents and retain their start,
+  end and raw/effective minor-unit-per-kWh values; held documents are today and
+  tomorrow only. The existing market supplies currency and timezone when available.
+  An additive read-only representation of the captured source intervals is a likely
+  path; validate basis, freshness, overlap and missing metadata before binding.
+- The shared chart assumes sample cents and fixed bands, and chart handlers close
+  over their initial data. Live binding must address units/basis, DST, source-aware
+  navigation and in-place updates together; passing merged rows straight through
+  would not satisfy the acceptance criteria. No browser or contract tests for the
+  requested live binding were performed in this inspection.
+- `docs/sidebar-installation-preparation.md` documents the future non-destructive
+  update path and existing locally bundled assets and notices. It is not approval
+  to install. No HA, share, charger or deployment access occurred; automatic
+  Morek dispatch remains unarmed. Do not proceed to 5.5.
 
 ### Stage 5.4b2 — complete locally, coordinator review pending
 

@@ -6,8 +6,16 @@ import { dashboardAdapter } from './adapter.js';
 fixture.generated_at = new Date().toISOString();
 fixture.plan.proposal.periods = [{start:new Date(Date.now()+3600000).toISOString(),end:new Date(Date.now()+7200000).toISOString()}];
 fixture.planning.calculated_at = fixture.generated_at;
+if (location.search.includes('prices')) {
+  const base=Date.now()-3600000;
+  fixture.prices.published_intervals=[
+    {start:new Date(base).toISOString(),end:new Date(base+1800000).toISOString(),raw_price:-0.15},
+    {start:new Date(base+2700000).toISOString(),end:new Date(base+6300000).toISOString(),raw_price:0.35},
+    {start:new Date(base+6300000).toISOString(),end:new Date(base+14400000).toISOString(),raw_price:0.42},
+  ];
+}
 const status={api_version:1,schedule:{supported:true,cleanup_supported:true,verified:false,sent:null,sent_at:null,ack:null,effective:null,preview:{calculated_at:new Date().toISOString(),reason:null,preview_id:'fixture-preview',profile:{chargingProfileId:42001,chargingSchedule:{startSchedule:new Date().toISOString(),chargingSchedulePeriod:[{startPeriod:0,limit:0}]}}}}};
-if (location.search === '?panel') {
+if (location.search.startsWith('?panel')) {
   // Exercise the exact production bundle served by the local test server.
   const panelUrl='/spotnav-sidebar/panel.js';
   await import(panelUrl);

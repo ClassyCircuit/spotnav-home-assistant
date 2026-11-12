@@ -827,6 +827,10 @@ async def test_the_golden_fixture_is_the_shape_this_contract_promises(
     serve(transport, rising=True)
     await go_auto(hass)
     response = normalized(response_for(hass, entry))
+    # The older golden remains the compatibility contract; the additive
+    # source-resolution rows are verified independently below.
+    published = response["prices"].pop("published_intervals")
+    assert isinstance(published, list) and published
     # Set `SPOTNAV_WRITE_FIXTURES=1` to (re)write these two fixtures; the default run only compares. A geometry change is a reviewed, written change -- never a silent
     # drift -- and the diff it produces is the shape the card promises. Both fixtures are written by one
     # such run: the second describes a state this same test has to reach first.
@@ -851,6 +855,7 @@ async def test_the_golden_fixture_is_the_shape_this_contract_promises(
     await hass.async_block_till_done()
     raw = response_for(hass, entry)
     pending = normalized(raw)
+    assert isinstance(pending["prices"].pop("published_intervals"), list)
     if write:
         pending_path.write_text(json.dumps(pending, indent=2) + "\n", encoding="utf-8")
         return
@@ -1165,10 +1170,12 @@ async def test_a_fresh_unconfigured_charger_serializes_the_contract_shape(
         "unpriced",
         "interval_count",
         "intervals",
+        "published_intervals",
         "provider",
     }
     assert prices["provider"] is None, "no area, no source"
     assert prices["intervals"] == []
+    assert prices["published_intervals"] is None
     assert prices["interval_count"] == 0
     assert prices["resolutions_minutes"] == []
     assert prices["resolution_minutes"] is None

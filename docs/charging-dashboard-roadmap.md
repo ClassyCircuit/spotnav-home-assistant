@@ -1,7 +1,7 @@
 # Morek autonomous charging and dashboard roadmap
 
 Status: **in progress; manual baseline and ownership groundwork complete; autonomous mode not active**.
-Updated 2026-11-11. The checklist below is the authoritative work queue.
+Updated 2026-11-12. The checklist below is the authoritative work queue.
 
 This is the forward-looking plan for SpotNav Enhanced. Implement **one work block
 at a time**, not a dashboard rewrite and controller rewrite in one release.
@@ -27,11 +27,21 @@ and its sidebar/header remain subject to integration testing, not assumed pixel-
 
 Current production dispatch is **unarmed**, not because that is the desired final
 behavior, but because safe ownership transitions, lost-state/uncertainty recovery,
-load protection, transaction authorization and retained-profile exit are unresolved.
+the existing site-regulator conflict, transaction authorization and retained-profile exit are unresolved.
 The Stage 5.5–5.7 work must resolve these blockers rather than merely display them.
 Do not remove the fail-closed gate before the complete reviewed activation path is safe.
 If a required hardware capability or installation-specific decision prevents safe
 operation, surface it and get a decision; do not label the initial release complete.
+
+**2026-11-12 clarification:** the user says Morek handles household load protection
+natively. SpotNav's requested role is scheduling fixed on/off charging windows, not
+household load balancing or dynamically changing amps in response to house load.
+The schedule's 0 A/allowed-current limits express those windows; they are not a
+load-management algorithm. The reported native protection has not been independently
+verified in this development session. Do not change or disable existing protections,
+electrical limits, regulator configuration or code without explicit authorization.
+Existing regulator conflicts remain an activation concern, not an instruction to
+build a second load controller. Hardware checks are user-directed.
 
 **Complete the necessary development in order before installation.** The final Stage 5
 milestone, 5.8, installs the working release, deliberately enables its reviewed automatic
@@ -537,6 +547,12 @@ tests are documented there; full HA collection is still blocked on Windows.
     except explicitly requested and authorized existing actions. No deployment or live
     charger operation; coordinator review of both slices remains pending.
 - [ ] **5.4c Real stepped-area price chart and install preparation**
+  - 2.5.38 adds a published-interval contract and sidebar binding locally, with
+    neutral raw-price rendering and in-place updates. Mocked desktop/mobile checks
+    and focused tests are recorded in the handoff. Keep open: full HA-plugin backend
+    contract/golden tests were not run on this Windows host, and browser coverage
+    does not yet verify real pointer-triggered tooltips or wheel zoom. Future
+    installation guidance is in `sidebar-installation-preparation.md`.
   - Bind the shared ECharts chart to real available prices and proposed windows, with
     correct units/basis, timezone/DST, missing/negative prices and source resolution.
     Show unavailable history honestly; defer historical tracks and monthly insights.
@@ -550,10 +566,16 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Test actual modules with mocked HA/OCPP/storage across crashes, races, migration,
     rollback and competing ordinary writers. Keep production dispatch unarmed until the
     full activation path is reviewed and all remaining blockers are resolved.
-- [ ] **5.6 Protection, authorization and safe operating policy**
-  - Resolve how household load protection remains effective, how a new charging
-    transaction is authorized, how person Stop and competing writers are respected,
-    and how retained 0 A, invalid/no-price plans and leaving the mode are handled.
+- [ ] **5.6 Authorization and safe schedule-only operation**
+  - Resolve how a new charging transaction is authorized, how person Stop and
+    competing writers are respected, and how retained 0 A, invalid/no-price plans
+    and leaving the mode are handled. Address any existing regulator conflict
+    without implementing household load management or dynamic amp regulation.
+  - The user reports Morek provides native household load protection; do not build
+    a SpotNav replacement or add a load-balancing feature. Preserve existing safety
+    and fail-closed activation safeguards; establish the applicable protection and
+    configuration before changing any dependency or enabling a conflicting mode.
+    Do not require a separate hardware-testing stage.
   - Implement only an explicitly reviewed, fail-closed policy; identify any user or
     installation-specific decisions and stop for them rather than assuming safety.
     A stored current limit cannot start or authorize charging by itself.
@@ -766,10 +788,12 @@ For the connector in Morek schedule mode:
 
 ### Safety and authorization
 
-- Do not disable household load protection, raise electrical limits, or assume
-  that disabling a SpotNav software actuator leaves equivalent protection.
-  Audit any dependency on live software load management before gating its writes;
-  if independent protection is not established, block schedule-only daily readiness.
+- Do not implement household load balancing or dynamic amp changes in SpotNav's
+  Morek schedule-only mode. The user reports that Morek handles protection natively;
+  this report is not independent verification of the installation. Do not disable
+  existing protection, raise electrical limits or assume that gating a software
+  actuator leaves equivalent protection. Resolve any actual dependency or conflict
+  before activation, without implementing a replacement load-management system.
 - OCPP current limits **do not authorize a charging transaction**. Establish how
   a newly plugged-in car becomes authorized without legacy start commands. Do not
   silently change charger authorization mode, credentials, RFID or vehicle settings.

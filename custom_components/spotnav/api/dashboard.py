@@ -1833,6 +1833,31 @@ def serialize_intervals(capture: CapturedDashboard) -> list[dict[str, Any]]:
     return [merged[instant] for instant in sorted(merged)]
 
 
+def serialize_published_intervals(capture: CapturedDashboard) -> list[dict[str, Any]] | None:
+    """Captured published rows, without proposal regridding, in major currency/kWh.
+
+    ChartInterval uses one hundredth of a major unit, not necessarily the
+    currency's actual minor unit. Refuse malformed/overlapping geometry rather
+    than choosing a winner. Existing per-day state and fetched timestamps remain
+    in the enclosing prices object.
+    """
+    if capture.intervals is None or capture.area_entry is None:
+        return None
+    if not _text(capture.area_entry.currency) or not _text(capture.area_entry.tz):
+        return None
+    result = []
+    previous_end = None
+    for row in capture.intervals:
+        start, end = _utc(row.start), _utc(row.end)
+        if start is None or end is None or start >= end or (previous_end is not None and start < previous_end):
+            return None
+        raw = finite_number(row.raw_minor_per_kwh)
+        result.append({"start": aware_iso(row.start), "end": aware_iso(row.end),
+                       "raw_price": None if raw is None else raw / 100})
+        previous_end = end
+    return result
+
+
 def serialize_prices(capture: CapturedDashboard) -> dict[str, Any]:
     """The area's held price data and the chart rows built from it. Always an object.
 
@@ -1873,6 +1898,9 @@ def serialize_prices(capture: CapturedDashboard) -> dict[str, Any]:
         "unpriced": None if snapshot is None else snapshot.unpriced,
         "interval_count": len(rows),
         "intervals": rows,
+        # Published source price in major currency units/kWh, before the
+        # configured fiscal additions. Null is unavailable, [] is known empty.
+        "published_intervals": serialize_published_intervals(capture),
         # Additive: where the area's prices come from and what the person can do when it has no source of its
         # own (`pricing/providers/notices.py`); `null` without an area. An app reads it only with
         # `reads: ["price_provider"]` (`api/webhook.py`).

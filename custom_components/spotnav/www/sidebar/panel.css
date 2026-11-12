@@ -3970,6 +3970,10 @@ dialog[open] {
   outline: 3px solid #a9ceff;
   outline-offset: 3px;
 }
+.next-metric button {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
 .dashboard {
   grid-template-areas: "overview controls" "insights insights" "bar bar" "step step" "morek history" "costs costs";
 }

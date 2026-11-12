@@ -21,8 +21,8 @@ Dirty input values and active input selection are not overwritten, current plan 
 health text are updated, and scroll positions are restored. Changing `draftKey`
 disposes the old view and clears its draft. The host owns revision/identity checks;
 the sidebar marks a changed revision as a conflict requiring explicit reload.
-Mounted chart instances retain their viewport; updating real chart series and
-source-aware navigation remain 5.4c, not provided by this reconciliation.
+Mounted price chart instances update series and overlays while retaining a valid
+viewport. A missing chart is disposed and recreated when data returns.
 `dispose` disconnects observers, removes listeners,
 disposes ECharts and clears the root. Mounting again on the same root disposes
 the previous instance. The host owns subscriptions, async requests, permissions,
@@ -36,8 +36,8 @@ Host-supplied display strings and formatter results are treated as text. No
 field accepts HTML. The current presentation is English. The fixture uses EUR/cents;
 live hosts must set `format.currency` to an authoritative ISO currency or `null`.
 An optional `model.totals` supplies backend totals instead of summing windows.
-The sample chart and its price units are still EUR/cents-specific and must not be
-used with live data until 5.4c replaces those assumptions.
+The live sidebar uses published major-currency prices and an explicit unit;
+the sample retains its fictional EUR/cents display.
 
 - `windows`: array of `{start,end,energy,cost,centsPerKwh,projectedSoc,control}`;
   `null`/missing means unavailable, `[]` means known empty. Times are numeric
@@ -55,9 +55,10 @@ used with live data until 5.4c replaces those assumptions.
   and `targetNote` are display strings. The host is responsible for freshness,
   status, feasibility and price-basis interpretation. Invalid numeric SOC and
   energy estimates do not become zero.
-- `chart`: `{prices,now,deadline,horizon,cap,bands,comparison}`; `prices` are
+- `chart`: `{prices,now,deadline,horizon,cap,bands,unit,comparison}`; `prices` are
   `{start,end,cents}` intervals and `horizon` is `[start,end]`. Three strictly
-  increasing numerical `bands` are explicit host-supplied visual thresholds,
+  increasing numerical `bands` are explicit host-supplied visual thresholds, or
+  null for neutral coloring. `unit` supplies the label (sample defaults to c/kWh).
   never universal price judgments. Invalid/missing price intervals are gaps;
   missing chart prerequisites show unavailable. `comparison: true` adds the
   old bar view for local comparison; default is the chosen stepped area.
@@ -96,8 +97,8 @@ real adapter. It isolates the bundled styles in a shadow root; previously
 registered `wa-*` components take precedence and mixed versions are unverified.
 The sidebar owns guarded settings and manual diagnostic actions, not the shared
 view or preview. Automatic Morek dispatch remains unarmed.
-The shared styles currently include global `:root` and `body` rules. 5.4c must
-implement source-boundary navigation, actual price/timezone/DST handling,
-published availability, and real chart data; this sample hour-axis chart is not
-proof of those behaviors. Physical touch,
+The shared styles include global `:root` and `body` rules and are isolated by
+the sidebar bundle. The live adapter uses published intervals, instant-based
+boundaries and the market timezone; its acceptance checks remain incomplete.
+Physical touch,
 actual HA mobile app and theme behavior remain unverified.
