@@ -1927,8 +1927,7 @@ handoff and checklist truthfully; follow AGENTS.md version/build requirements.
     Only fresh unplugged releases the window; unknown keeps it and is exposed as
     `reconciliation.continuity.reason = active_window_state_unknown`. Pause/Stop, Charge Now,
     protection, identity/ownership/generation and uncertain-write guards run as before and
-    win; a settings edit (e.g. a raised price cap) conservatively keeps the window until 14.4
-    implements material-edit interruption. If keeping
+    win; a raised cap keeps the window; 14.4 (below) decides which edits or price changes may release it. If keeping
     the window would exceed three windows the update is refused (`active_window_block_limit`)
     and the accepted schedule stays. A timer replans just after a preserved window ends.
     Not done: no sidebar text for `continuity` yet, no measured-power evidence, manual
@@ -1980,7 +1979,27 @@ handoff and checklist truthfully; follow AGENTS.md version/build requirements.
     elapsed transitions, tolerance boundaries, changed settings, reconnect, unknown
     outcomes and controls racing a queued update. Assert actual send counts.
 
-- [ ] **14.4 Meaningful active-window interruption policy**
+- [x] **14.4 Meaningful active-window interruption policy** (2.5.107 local, mocked)
+  - 2.5.107 review corrections: the cap rule needs a cap strictly lower than the one stored with the
+    accepted profile (older records: preserve); the price rule verifies the minimum is delivered by
+    ready-by minus 15 minutes from the proposed periods and a real 30-minute gap (no-resume included);
+    a pending price event survives stale/refused/rejected/unavailable runs until decided. See the handoff.
+  - Implemented in the existing worker/planner path: `morek_schedule.window_release` is called from the
+    worker's `_continued_profile` with the planner's current proposal; a release means the acknowledged
+    window is not unioned in, so the replanned schedule replaces it (existing guarded send path, same
+    owner/Pause/Stop/Charge Now/identity/uncertain-write guards, which run before and win). Only two
+    events can release: a settings revision newer than the accepted profile's (cap rule) or a run whose
+    triggers include a price change (price rule); routine SOC/recalc/plug-in/sensor runs never do.
+    Cap rule: needs a cap, the published price of now above it, and (when a minimum SOC is set) a plan
+    that meets the minimum (`minimum_shortfall_kwh` 0); a raised cap or one still covering now keeps the
+    window; a plan that still needs the current interval for the minimum replaces the window (only that
+    energy). Price rule (EUR only): saving >= EUR 0.50 AND >= 10% of the cost of the same energy
+    through the preserved windows (chronological), baseline > 0, gap >= 30 min, and ready-by minus
+    resumption minus minimum-energy time >= 15 min. Unknown or stale state/evidence, missing price,
+    non-EUR currency, missing ready-by or minimum, or any error keeps the window; the reason is exposed
+    in `reconciliation.continuity.reason` (`cap_lowered`, `price_improvement`, `release_*`). Not done:
+    no sidebar text, no per-window cost history, non-EUR areas never interrupt on price, a missed event
+    (refused/stale run) is not re-evaluated until the next price/settings event. Mocked tests only.
   - Implement the explicit cap-edit and price-improvement decisions above using the
     existing cost, deadline and minimum-SOC calculation. Keep the current window for
     routine changes or uncertain evidence; allow guarded interruption only when the

@@ -663,6 +663,16 @@ def _as_int(value: Any) -> int:
 
 
 @dataclass(frozen=True, slots=True)
+class CurrentInterval:
+    """The published price interval that contains a calculation's `now`, priced like a horizon row."""
+
+    start: datetime
+    end: datetime
+    effective_minor_per_kwh: float
+    within_cap: bool | None
+
+
+@dataclass(frozen=True, slots=True)
 class PlanResult:
     """One plan, or the reason there is none; never `None` and never an exception.
 
@@ -722,6 +732,11 @@ class PlanResult:
     #: Extra estimated cost (major unit) and energy the limit costs against that unrestricted plan; `None` unknown.
     block_limit_extra_cost: float | None = None
     block_limit_shortfall_kwh: float | None = None
+    #: The published interval holding `now` and whether it is within the soft cap (`None`: no cap), and the
+    #: wall-energy deficit to the minimum this calculation used (`None`: none supplied). Evidence for the
+    #: Morek active-window interruption policy only; `None` means unknown, never "zero".
+    current_interval: CurrentInterval | None = None
+    minimum_energy_kwh: float | None = None
 
     @property
     def block_limit_compromise(self) -> bool:
@@ -1170,6 +1185,9 @@ def calculate_plan(request: PlanRequest) -> PlanResult:
     """
     request = request.validated()
     result = _calculate(request)
+    if result.has_plan:
+        result = replace(result, current_interval=_current_interval(request),
+                         minimum_energy_kwh=request.minimum_energy_kwh)
     limit = request.max_blocks
     if limit is None or not result.has_plan:
         return result
@@ -1184,6 +1202,23 @@ def calculate_plan(request: PlanRequest) -> PlanResult:
         block_limit_extra_cost=max(0.0, result.estimated_cost - free.estimated_cost) if priced else None,
         block_limit_shortfall_kwh=max(0.0, free.delivered_kwh - result.delivered_kwh),
     )
+
+
+def _current_interval(request: PlanRequest) -> CurrentInterval | None:
+    """The published interval holding `request.now`, or `None` when it is not published or cannot be read."""
+    try:
+        now = request.now.astimezone(timezone.utc)
+        for slot in planning_slots(request.documents, currency=request.currency, timezone=request.timezone):
+            start = slot.start.astimezone(timezone.utc)
+            if start <= now < start + timedelta(minutes=STEP_MINUTES):
+                return CurrentInterval(
+                    start=start, end=start + timedelta(minutes=STEP_MINUTES),
+                    effective_minor_per_kwh=effective_minor_per_kwh(slot.local_major_per_kwh, request.fiscal, slot.start),
+                    within_cap=None if request.soft_price_cap is None else _slot_within_cap(request, slot),
+                )
+    except (PlannerInputError, ArithmeticError, ValueError):
+        return None
+    return None
 
 
 def _effective_limit(request: PlanRequest) -> int | None:

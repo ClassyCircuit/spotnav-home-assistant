@@ -24,6 +24,7 @@ _COALESCE_SECONDS = 0.1  # explicit controls, plug-in, settings: do not wait
 _ROUTINE_COALESCE_SECONDS = 2.0  # routine SOC/price bursts
 _SOC_END_TOLERANCE = timedelta(minutes=5)  # SOC-only: an end instant that moves less is not news
 _TRIGGER_RANK = ("plug_in", "sync", "settings", "control", "sensor", "recalc", "price", "routine")
+_SETTLED = ("upload_accepted_unverified", "unchanged")  # outcomes that end a pending price decision
 _SOC_CAUSE = "soc"  # the only planner cause that is routine and may use the SOC tolerance
 
 
@@ -56,6 +57,11 @@ class MorekScheduleWorker:
         self._wake = asyncio.Event()
         self._strict = False  # sticky until a run completes: no SOC tolerance for this run
         self._kinds: set[str] = set()
+        # A price publication that may still deserve an interruption decision. It survives stale work,
+        # a refused or rejected send, an unavailable charger and a reconnect (a direct trigger re-evaluates it
+        # against fresh data); it ends once a run decided it or the schedule was accepted/unchanged.
+        self._price_pending = False
+        self._price_evaluated = False
         self._seen: tuple[Any, Any] | None = None
         self.last_trigger: str | None = None
         self._evidence: set[str] = set()
@@ -91,6 +97,8 @@ class MorekScheduleWorker:
                             else "recalc" if same else "price")
         kind = kind or "control"
         self._kinds.add(kind)
+        if kind == "price":
+            self._price_pending = True
         if not routine or sync:
             self._strict = True
         wait = _COALESCE_SECONDS if urgent or sync else _ROUTINE_COALESCE_SECONDS
@@ -190,7 +198,8 @@ class MorekScheduleWorker:
         Pause, Stop, Charge Now and protection never reach here. Evidence is only the
         connector status (not measured power): a fresh unplugged vehicle releases the
         window, while charging, waiting and unknown all keep it, so unknown state never
-        causes an automatic interruption. A settings edit is a planning change: until 14.4 it conservatively keeps the window.
+        causes an automatic interruption. Only a planning edit (cap rule) or a price event (savings rule) may
+        release it, through `morek_schedule.window_release` (Stage 14.4); anything uncertain keeps it.
         """
         self.continuity = None
         self._continuity_end = None
@@ -205,10 +214,18 @@ class MorekScheduleWorker:
             self.continuity = {"evidence": evidence, "preserved": False, "until": until,
                                "reason": "vehicle_unplugged"}
             return None
+        lowered = morek_schedule.cap_lowered(record, settings)
+        price_event = self._price_pending and not lowered
+        release, reason = morek_schedule.window_release(
+            self._planner.snapshot(), settings, now, profile, cap_lowered=lowered,
+            price_event=price_event, evidence=evidence)
+        self._price_evaluated = price_event and not release
+        if release:
+            self.continuity = {"evidence": evidence, "preserved": False, "until": until, "reason": reason}
+            return None
         self._continuity_end = active[0]
         self.continuity = {"evidence": evidence, "preserved": True, "until": until,
-                           "reason": "active_window_state_unknown" if evidence == "unknown"
-                           else "active_window_preserved"}
+                           "reason": "active_window_state_unknown" if evidence == "unknown" else reason}
         return profile
 
     def _arm_continuity_timer(self) -> None:
@@ -282,6 +299,7 @@ class MorekScheduleWorker:
                 await self._wait_for_burst()
                 serial = self._serial
                 kinds = set(self._kinds)
+                self._price_evaluated = False
                 try:
                     await self._reconcile(serial, None if self._strict else _SOC_END_TOLERANCE)
                 except morek_schedule.ScheduleRefused as error:
@@ -290,6 +308,8 @@ class MorekScheduleWorker:
                     self.reason = "worker_unavailable"
                     _LOGGER.exception("Morek schedule worker failed")
                 if serial == self._serial:
+                    if self._price_pending and (self._price_evaluated or self.reason in _SETTLED):
+                        self._price_pending = False
                     self.reason_serial = serial
                     self._strict = False
                     self._kinds -= kinds

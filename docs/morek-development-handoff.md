@@ -383,6 +383,57 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-13 — Stage 14.4 active-window interruption policy (2.5.107; local mocked)
+
+**Review corrections (2.5.107):**
+
+- Cap rule needs real evidence: the accepted profile's `acknowledged.cap` (`{value, basis}`, non-sensitive,
+  written at acceptance) is compared with the current settings by `morek_schedule.cap_lowered`. Only a
+  strictly lower cap on the same basis (or a cap where none applied) counts. An unrelated edit, a raised,
+  unchanged or removed cap, a changed basis and every record without `cap` (older ledgers) preserve the
+  window. `window_release(..., cap_lowered=, price_event=, ...)` replaced `edited=`.
+- Price rule now checks the proposed schedule itself: price state `ready`, minimum shortfall known and 0
+  when a minimum is configured, gap >= 30 min from the stop to the next resumption (no resumption: to
+  ready-by), and the minimum energy (no configured minimum: the whole plan) delivered between now and
+  ready-by minus 15 min at the plan's power. Same-energy cost through preserved windows as before.
+  With no later window the same energy costs the same, so a no-resume stop never releases on price.
+- A price event is kept in `MorekScheduleWorker._price_pending` until a run decided it (evaluated, preserved)
+  or the schedule was accepted/`unchanged`. A refused/stale run, an unavailable charger, a rejected send or an
+  uncertain write keeps it, and any later trigger (reconnect, retry) re-evaluates against fresh data; an
+  uncertain write still blocks sends, and a rejected fingerprint is not resent. In memory only (lost on restart).
+- Tests: 50 in `tests/test_stage_144_interruption_policy.py` (unrelated edit, raise, lowered, older record,
+  fragmented insufficient minimum, no resume, thresholds, unavailable/rejected/uncertain price retention).
+  With Stage 13/14, Morek, planner and capped suites 751 passed; the 5 failures are environmental or
+  pre-existing (missing `Europe/Stockholm` tzdata x2 and the 3 listed below, identical without the change).
+  Build and check-dist pass. No HA access; mocked only.
+
+(Original 2.5.106 notes follow; where they differ, the corrections above win.)
+
+
+- `morek_schedule.window_release(snapshot, settings, now, active_profile, edited=, price_event=, evidence=)`
+  decides whether a replanned schedule replaces (rather than extends) the acknowledged active window;
+  `MorekScheduleWorker._continued_profile` calls it after the Stage 14.2 evidence check and passes
+  `active_profile=None` to `_proposed_profile` on release. `edited` = the accepted profile's
+  `acknowledged_revision` differs from the current settings revision; `price_event` = the run's triggers
+  (`_run_kinds`) include a `price` publication and the revision is unchanged. Nothing else can release,
+  so routine SOC/recalc/plug-in/sensor runs and Pause/Stop/Charge Now/protection behave as before.
+- Planner evidence: `PlanResult.current_interval` (`CurrentInterval`: the published interval holding
+  `now`, its effective minor price, `within_cap`) and `PlanResult.minimum_energy_kwh`, set in
+  `calculate_plan`; `AutoSnapshot.departure_at` supplies ready-by. Missing = unknown = keep.
+- Thresholds (constants `RELEASE_*`, not settings): EUR 0.50 and 10% of the baseline (same energy, chronological
+  through the preserved windows, configured fees via effective prices), baseline > 0, gap >= 30 min,
+  slack >= 15 min beyond the minimum-energy time before ready-by; EUR areas only. Cap rule as in the roadmap.
+  No loop: the replacement becomes the accepted profile, a repeated event is `unchanged`, and a flip between
+  the two intent calculations yields `stale_work` then a non-price retrigger that preserves.
+- Tests: `tests/test_stage_144_interruption_policy.py` (36: exact thresholds, negative/zero baseline, gap,
+  slack, missing data, unknown state, cap rules, real planner evidence, worker send counts, uncertain write,
+  Pause). Run with `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -p pytest_asyncio.plugin --noconftest
+  -c /dev/null --rootdir . -o asyncio_mode=auto`; with Stage 14.1-14.3, Morek, planner and capped suites 748
+  passed, 3 failed that also fail without this change in that harness (`test_morek_worker::manual_api_routes...`,
+  `test_stage_13_reactive::...not_measured_energy`, `test_capped_auto_execution_isolated::...real_calculation`).
+  Frontend build and check-dist passed (no frontend source changed). No HA/charger access; mocks do not prove
+  savings, deployed behavior or physical charging.
+
 ### 2026-11-13 — Stage 14.3 recalculation triggers and send deduplication (2.5.105; local mocked)
 
 - Cause tracking (review fix, 2.5.105): unchanged revisions alone no longer mean "SOC-only".

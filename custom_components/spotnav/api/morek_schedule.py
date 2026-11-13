@@ -159,9 +159,9 @@ def acknowledged_profile(record: dict[str, Any] | None, revision: Any = None) ->
     `acknowledged` is only replaced by a later accepted write, so a settings revision or a
     definitely rejected newer attempt does not hide it; an uncertain write, or an accepted
     pause or Charge Now (which replaces `acknowledged`), means no continuation. `revision`
-    is accepted for compatibility and deliberately ignored: until Stage 14.4 implements
-    material-edit interruption, planning edits conservatively keep the active window. This
-    is a sent intent, never proof of charging.
+    is accepted for compatibility and deliberately ignored: whether a planning edit or price
+    change may release the active window is decided separately (`window_release`, Stage 14.4).
+    This is a sent intent, never proof of charging.
     """
     if not isinstance(record, dict) or record.get("uncertain") is not False:
         return None
@@ -219,6 +219,150 @@ def continue_active_window(periods: tuple[tuple[datetime, datetime], ...], amps:
         else:
             merged.append((start, stop))
     return tuple(merged), end
+
+
+RELEASE_MIN_SAVING_EUR = 0.50  # Stage 14.4 internal defaults, deliberately not settings
+RELEASE_MIN_SAVING_FRACTION = 0.10
+RELEASE_MIN_GAP = timedelta(minutes=30)
+RELEASE_MIN_SLACK = timedelta(minutes=15)
+_RELEASE_EPSILON = 1e-6
+
+
+def cap_snapshot(settings: Any) -> dict[str, Any] | None:
+    """Non-sensitive cap evidence stored with an accepted profile (`None`: not readable, so unknown later)."""
+    try:
+        value, basis = settings.soft_price_cap, getattr(settings, "cap_price_basis", None)
+    except AttributeError:
+        return None
+    numeric = value is None or (isinstance(value, (int, float)) and not isinstance(value, bool))
+    return {"value": value, "basis": basis if isinstance(basis, str) else None} if numeric else None
+
+
+def cap_lowered(record: dict[str, Any] | None, settings: Any) -> bool:
+    """True only when the settings now hold a tighter cap than the last accepted routine profile was planned with.
+
+    Needs the cap stored at acceptance (older records have none: unknown, so False) and the same price basis.
+    A changed revision alone, a raised or removed cap, an unchanged cap or any unreadable value is False.
+    """
+    try:
+        stored = (record.get("acknowledged") or {}).get("cap")
+        if not isinstance(stored, dict) or "value" not in stored:
+            return False
+        current = cap_snapshot(settings)
+        if current is None or current["value"] is None or current["basis"] != stored.get("basis"):
+            return False
+        old = stored["value"]
+        if old is None:
+            return True  # a cap now applies where none did
+        return isinstance(old, (int, float)) and not isinstance(old, bool) and current["value"] < old - _RELEASE_EPSILON
+    except (AttributeError, TypeError):
+        return False
+
+
+def _priced_cost(windows: list[tuple[datetime, datetime]], rows: list[tuple[datetime, datetime, float]],
+                 power_kw: float, energy_kwh: float | None = None) -> float | None:
+    """Major-unit cost of charging in `windows` (chronologically, at most `energy_kwh`), or None if any part is unpriced."""
+    total, left = 0.0, energy_kwh
+    for start, end in sorted(windows):
+        cursor = start
+        while cursor < end:
+            row = next((r for r in rows if r[0] <= cursor < r[1]), None)
+            if row is None:
+                return None
+            stop = min(end, row[1])
+            kwh = (stop - cursor).total_seconds() / 3600 * power_kw
+            if left is not None:
+                taken = min(kwh, left)
+                kwh, left = taken, left - taken
+            total += kwh * row[2] / 100
+            cursor = stop
+            if left is not None and left <= _RELEASE_EPSILON:
+                return total
+    return total if left is None or left <= _RELEASE_EPSILON else None
+
+
+def _energy_between(periods: tuple[tuple[datetime, datetime], ...], start: datetime, end: datetime,
+                    power_kw: float) -> float:
+    """kWh the periods deliver at the plan's power between `start` and `end` (nothing optimistic added)."""
+    return sum(max(0.0, (min(e, end) - max(s, start)).total_seconds()) for s, e in periods) / 3600 * power_kw
+
+
+def window_release(snapshot: Any, settings: Any, now: datetime, active_profile: dict[str, Any] | None, *,
+                   cap_lowered: bool, price_event: bool, evidence: str) -> tuple[bool, str]:
+    """Whether the replanned schedule may replace (not just extend) the acknowledged active window.
+
+    Returns (release, reason). Only two things can release it: a cap that is actually lower than the one the
+    accepted profile was planned with (`cap_lowered`, see that function) or a pending price event (price rule);
+    a routine update or an unrelated settings edit never does. Unknown or uncertain cost, price, currency,
+    state or feasibility preserves the window. The price rule verifies the proposed schedule itself: the same
+    energy, fresh known prices throughout, a real gap of at least 30 minutes (to the next resumption or, with
+    none, to ready-by) and the minimum (or, with no minimum configured, the whole plan) delivered at least
+    15 minutes before ready-by. Not proof of savings or of physical charging.
+    """
+    if not (cap_lowered or price_event):
+        return False, "active_window_preserved"  # a routine update never releases a window
+    try:
+        proposal = snapshot.proposal
+        now = _utc(now)
+        active = active_window(active_profile, now)
+        if proposal is None or active is None or not proposal.has_plan or not getattr(snapshot, "in_process", False):
+            return False, "active_window_preserved"
+        if evidence not in ("charging", "waiting"):
+            return False, "active_window_state_unknown"
+        power = float(proposal.power_kw)
+        periods = tuple(sorted((_utc(s), _utc(e)) for s, e in proposal.shown_periods if _utc(e) > now))
+        if not periods or not power > 0:
+            return False, "active_window_preserved"
+        union, _ = continue_active_window(periods, active[1], now, active_profile)
+        if union == periods:
+            return False, "active_window_preserved"  # the new plan already carries the window
+        interval = proposal.current_interval
+        known_now = interval is not None and _utc(interval.start) <= now < _utc(interval.end)
+        has_minimum = settings.minimum_ready_by_soc is not None
+        if has_minimum and (proposal.minimum_energy_kwh is None or proposal.minimum_shortfall_kwh is None
+                            or proposal.minimum_shortfall_kwh > _RELEASE_EPSILON):
+            return False, "release_minimum_uncertain"
+        if cap_lowered:
+            if settings.soft_price_cap is None:
+                return False, "active_window_preserved"
+            if not known_now or interval.within_cap is None:
+                return False, "release_price_unknown"
+            if interval.within_cap:
+                return False, "cap_still_covers_now"
+            return True, "cap_lowered"
+        if getattr(snapshot, "price_state", None) != "ready":
+            return False, "release_price_unknown"
+        if str(proposal.currency).upper() != "EUR":
+            return False, "release_currency_unknown"
+        deadline = getattr(snapshot, "departure_at", None)
+        if deadline is None or _utc(deadline) <= now:
+            return False, "release_ready_by_unknown"
+        deadline = _utc(deadline)
+        rows = [(_utc(h.utc_start), _utc(h.utc_end), float(h.effective_minor_per_kwh)) for h in proposal.horizon]
+        if known_now:
+            rows.append((_utc(interval.start), _utc(interval.end), float(interval.effective_minor_per_kwh)))
+        energy = _energy_between(periods, now, periods[-1][1], power)
+        baseline = _priced_cost(list(union), rows, power, energy)
+        alternative = _priced_cost(list(periods), rows, power)
+        if baseline is None or alternative is None:
+            return False, "release_price_unknown"
+        if baseline <= 0:
+            return False, "release_baseline_not_positive"
+        if periods[0][0] > now:
+            gap_start, resume = now, periods[0][0]
+        else:
+            gap_start, resume = periods[0][1], periods[1][0] if len(periods) > 1 else None
+        if (deadline if resume is None else resume) - gap_start < RELEASE_MIN_GAP:
+            return False, "release_gap_too_short"
+        needed = float(proposal.minimum_energy_kwh or 0.0) if has_minimum else energy
+        if _energy_between(periods, now, deadline - RELEASE_MIN_SLACK, power) < needed - _RELEASE_EPSILON:
+            return False, "release_slack_too_small"
+        saving = round(baseline - alternative, 6)
+        if saving < RELEASE_MIN_SAVING_EUR or saving < round(RELEASE_MIN_SAVING_FRACTION * baseline, 6):
+            return False, "release_saving_too_small"
+        return True, "price_improvement"
+    except Exception:  # noqa: BLE001 - an unreadable decision never interrupts charging
+        return False, "release_decision_unavailable"
 
 
 def connector_evidence(hass: Any, controller: Any, now: datetime) -> str:
@@ -1198,7 +1342,9 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
         return "upload_rejected"
     now = datetime.now(timezone.utc).isoformat()
     attempt_id = uuid4().hex
-    revision = domain_data(hass).auto_store.settings(entry_id).revision
+    settings_now = domain_data(hass).auto_store.settings(entry_id)
+    revision = settings_now.revision
+    cap_evidence = cap_snapshot(settings_now)
     record.update({"desired": {"fingerprint": fingerprint, "profile": profile},
                    "attempt": {"fingerprint": fingerprint, "profile": profile, "at": now, "id": attempt_id,
                                "revision": revision,
@@ -1267,7 +1413,8 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
     if state == "accepted":
         record.update({"acknowledged": {
             "fingerprint": fingerprint, "at": now, "id": attempt_id, "profile": wire_profile,
-            "revision": revision, "routine": pause_id is None and override_id is None}, "uncertain": False})
+            "revision": revision, "routine": pause_id is None and override_id is None,
+            **({} if cap_evidence is None else {"cap": cap_evidence})}, "uncertain": False})
         record["attempt"]["state"] = "accepted"
     elif state in ("rejected", "notsupported"):
         record["attempt"]["state"] = "rejected"
