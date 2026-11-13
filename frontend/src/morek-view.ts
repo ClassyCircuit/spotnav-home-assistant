@@ -10,7 +10,7 @@ export interface MorekState {
   operator?: { state: string; reason?: string | null };
   reconciliation?: { reason: string };
   schedule_pause?: { intent?: string; request?: string; ack?: string | null; readback?: string; measured?: string; coverage_start?: string | null; coverage_end?: string | null };
-  readiness?: { control?: string; vehicle?: string; transaction?: string; measurement?: string; vehicle_observed_at?: string | null };
+  readiness?: { control?: string; vehicle?: string; transaction?: string; measurement?: string; vehicle_observed_at?: string | null; session_start?: { state: string; reason: string } };
   ownership?: { recorded_owner?: string | null; blockers?: string[]; schedule_mode_available?: boolean; completion_authorized?: boolean; reconfirmation_required?: boolean; local_regulator?: string; recovery?: { state?: string; migration_result?: string } };
   reason?: string | null;
   configured_id?: string | null;

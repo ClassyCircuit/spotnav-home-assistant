@@ -316,6 +316,15 @@ describe('actual sidebar read-only host', () => {
     expect(failed.totals).toBeNull();
     expect(current().windows).toHaveLength(1);
   });
+  it('reports the unimplemented session start without inventing authorization', () => {
+    const now=Date.now(), raw=fixture(); raw.generated_at=new Date(now).toISOString();
+    const current={api_version:1,schedule:{...status.schedule,supported:true,readiness:{control:'available',vehicle:'connected',vehicle_observed_at:new Date(now).toISOString(),session_start:{state:'blocked',reason:'authorization_path_unimplemented'}}}};
+    const text=(failed=false)=>dashboardAdapter(raw,current,now,now,failed).model.evidence.readiness;
+    expect(text()).toMatch(/authorization unknown.*Automatic session start is not implemented/);
+    expect(text(true)).toMatch(/Automatic session start status unavailable/);
+    current.schedule.readiness.session_start={state:'offline',reason:'charger_offline'};
+    expect(text()).toMatch(/Automatic session start is offline/);
+  });
   it('blocks cached Resume immediately after an actual failed dashboard refresh', async () => {
     const raw=fixture();raw.generated_at=new Date(Date.now()+100).toISOString();raw.charger.charger_id='a';let fail=false;const calls=[];
     const owned={api_version:1,schedule:{...status.schedule,supported:true,outcomes:{uncertain:false},ownership:{recorded_owner:'morek_schedule',completion_authorized:true},schedule_pause:{intent:'pause_until_resumed',request:'pending'}}};

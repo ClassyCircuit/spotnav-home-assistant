@@ -74,3 +74,10 @@ async def test_offline_startup_then_control_availability(tmp_path, monkeypatch):
     assert events == ["suspend", ("resume", 1)]
     assert (await store.async_status("c", current[0]))["record_state"] == "valid"
     hass.services.async_call.assert_not_awaited()
+    entry.runtime_data.morek_worker.session = SimpleNamespace(availability_lost=lambda: events.append("offline"))
+    calls[0][1](SimpleNamespace(data={"old_state": SimpleNamespace(state="off"),
+                                      "new_state": SimpleNamespace(state="unavailable")}))
+    calls[0][1](SimpleNamespace(data={"old_state": SimpleNamespace(state="unavailable"),
+                                      "new_state": SimpleNamespace(state="off")}))
+    await asyncio.gather(*tasks)
+    assert events.count("offline") == 1

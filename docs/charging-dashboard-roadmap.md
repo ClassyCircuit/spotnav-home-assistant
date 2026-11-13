@@ -711,7 +711,80 @@ tests are documented there; full HA collection is still blocked on Windows.
     be known about a new charging session. Do not change authorization settings or
     infer that a stored schedule authorizes charging. Test unknown/offline/refused
     cases with mocked boundaries; surface installation-specific decisions for the user.
-- [ ] **5.6d Automatic Morek session authorization and recovery**
+- [x] **5.6d Automatic Morek session authorization and recovery** (2.5.89 local mocked; review and live validation pending)
+  - The user accepts a possible immediate start if the retained schedule is absent
+    or ineffective, and one bounded request for ambiguous Preparing. The earlier
+    pre-start composite-confirmation requirement below is superseded by this decision;
+    ownership, Stop, identity, uncertainty and protection guards remain.
+  - A real resolved OCPP offline-to-online edge now creates one recovery generation
+    even without a boot counter. A transaction-bound switch being unavailable is
+    not by itself such an edge. Duplicate callbacks and HA restart reuse durable
+    outcomes; pending or unknown requests remain blocked. A new physical plug-in,
+    explicit Resume, observed reconnect or in-process boot-counter increase can
+    create a new opportunity. A reboot with no observable offline or boot evidence
+    cannot be distinguished from duplicates; explicit Resume or a later observable
+    reconnect can provide another opportunity. Completion holds remain in force.
+  - Mocked actual coordinator, command admission, outcome and Resume paths plus
+    availability callback, late-ACK/Stop, logging and restart cases were checked.
+    Runtime INFO for `custom_components.ocpp` or the charge point's OCPP logger,
+    or DEBUG for its websocket logger, blocks the start path; unsupported OCPP
+    logger/interface shapes also block. An ACK is not an established session or
+    measured charging, and readback is not profile inventory. Live behavior,
+    installed integration compatibility and physical charging remain unverified.
+  - **2.5.88 partial:** the user accepts one additional request for an ambiguous
+    initial/reconnected Preparing state. Fresh initial observations and Resume now
+    enter the coordinator, and a stable recovery generation deduplicates an ACK
+    across repeated events and HA restart; pending/unknown remains blocked. A
+    reported Finishing state is recorded as a completion hold. A new physical
+    Available-to-Preparing event or explicit Resume can establish a new generation.
+    This is not proof the prior session ended or that a car charged. The full
+    requested event/admission/restart and logging acceptance matrix remains open.
+    A reported boot counter increase within one process supplies another generation;
+    versions without that evidence cannot distinguish another reboot from a duplicate.
+    Review and complete before calling 5.6d locally complete.
+  - **2.5.87 partial production path; not complete:** the user accepts that
+    requesting a session can allow immediate charging when the retained schedule
+    is absent or ineffective. A fresh composite or exact match is not a start
+    prerequisite. An event-driven coordinator now requests a connector-bound
+    start after an observed Available-to-Preparing transition under schedule-owner
+    admission, records the attempt first, and retains unknown outcomes across
+    unplug/replug. Runtime logging compatibility can block a request. The UI warns
+    of immediate charging; ACK is not transaction or measured-power evidence.
+    Recovery of a vehicle connected while HA was offline, known-ended restart
+    evidence, and the full production admission/race/logging matrix remain open;
+    do not consider 5.6d complete or physically verified.
+  - **2.5.86 partial; no coordinator or start:** the read-only schedule diagnostic
+    can compare up to 90 seconds of drift, but blocks within that interval of an
+    expected or observed transition and checks current limits agree. The default
+    helper still requires exact matching. This diagnostic does not associate a
+    checked plan/attempt or give dispatch authority. The public OCPP library 2.1.0
+    logs serialized OCPP messages at INFO, and websockets 14.1 can log text frames
+    at DEBUG, in addition to the integration's tag log. A scoped redaction adapter
+    and its asynchronous logging tests remain unimplemented; do not call the start
+    method on the strength of this diagnostic. The production coordinator and full
+    acceptance matrix remain open.
+  - **2.5.85 partial, not a start coordinator:** public OCPP v0.12.3 source was
+    inspected; its switch uses connector status for state, delegates start to the
+    charge point, and `start_transaction` returns an ACK boolean. It logs its
+    configured remote ID tag at INFO before sending. The task prohibits logging the
+    tag, so calling that method as-is cannot meet that requirement when INFO is
+    enabled. Preparing does not establish that a transaction ended; transaction
+    recovery and runtime interface/version checks still need implementation. A new
+    diagnostic checks a same-preview readback at most 30 seconds old with exact
+    transition comparison and bounded coverage; it is not dispatch authority and
+    cannot rule out external writers. The requested production event-to-start path,
+    persistent deduplication and race/restart tests remain unimplemented.
+  - **2.5.84 partial, read-only:** status and sidebar explicitly say automatic
+    session start is unimplemented or offline; no session request is dispatched.
+    The checkout contains only the screenshot-demo OCPP switch, not installed OCPP
+    source. SpotNav's generic switch path calls HA `switch.turn_on`/`turn_off` and
+    receives no OCPP response; its success is not a transaction ACK. The installed
+    integration's actual command, switch state and response semantics, transaction-ID
+    lifecycle after reconnect/restart, and sufficiently fresh effective schedule and
+    electrical evidence before authorization remain unestablished. The full start,
+    deduplication, persistence, race/recovery and requested test matrix remain open.
+    Do not use the demo switch as installed integration evidence or treat status as
+    permission to start. No live access or charger operation occurred.
   - **Priority:** implement and review after inspecting the actual installed OCPP
     integration's charge-control semantics and existing guarded executor paths,
     before calling schedule-only daily operation complete. A user-reported overnight

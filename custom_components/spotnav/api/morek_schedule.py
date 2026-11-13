@@ -285,6 +285,54 @@ def compare_schedule(profile: dict[str, Any] | None, actual: dict[str, Any] | No
     return _compare_remaining(profile, actual, tolerance_s=VERIFY_TOLERANCE_S, require_coverage=True)
 
 
+def session_start_schedule_evidence(profile: dict[str, Any] | None, actual: dict[str, Any] | None,
+                                    now: datetime, *, tolerance_s: int = 0) -> str:
+    """Conservative read-only prerequisite, not authorization to dispatch.
+
+    Require a comparison covering the remaining profile and a read at most 30
+    seconds old. Optional bounded drift is never permission to start near either
+    schedule's transition. External writers remain unobservable.
+    """
+    if profile is None:
+        return "no_current_plan"
+    if not actual:
+        return "readback_unavailable"
+    if actual.get("rate_unit") != "A":
+        return "readback_unit_unavailable"
+    if type(tolerance_s) is not int or not 0 <= tolerance_s <= VERIFY_TOLERANCE_S:
+        return "invalid_tolerance"
+    try:
+        fetched = _utc(datetime.fromisoformat(actual["fetched_at"]))
+        age = (_utc(now) - fetched).total_seconds()
+        if not 0 <= age <= 30:
+            return "readback_stale"
+        comparison = _compare_remaining(profile, actual, tolerance_s=tolerance_s, require_coverage=True)
+        if not comparison["matched"]:
+            return comparison["reason"]
+        start = _utc(datetime.fromisoformat(comparison["coverage_start"]))
+        end = _utc(datetime.fromisoformat(comparison["coverage_end"]))
+        if not start <= _utc(now) < end:
+            return "coverage_stale"
+        current = next(p["amps"] for p in reversed(actual["periods"])
+                       if _utc(datetime.fromisoformat(p["at"])) <= _utc(now))
+        if isinstance(current, bool) or not isinstance(current, (int, float)) or not 0 <= current <= 16:
+            return "unsafe_current_limit"
+        schedule = profile["chargingSchedule"]
+        profile_start = _utc(datetime.fromisoformat(schedule["startSchedule"].replace("Z", "+00:00")))
+        expected = [(profile_start + timedelta(seconds=p["startPeriod"]), p["limit"])
+                    for p in schedule["chargingSchedulePeriod"]]
+        observed = [(_utc(datetime.fromisoformat(p["at"])), p["amps"]) for p in actual["periods"]]
+        if tolerance_s and any(abs((at - _utc(now)).total_seconds()) <= tolerance_s
+                               for at, _ in expected[1:] + observed[1:]):
+            return "transition_boundary_ambiguous"
+        intended = next(amps for at, amps in reversed(expected) if at <= _utc(now))
+        if current != intended:
+            return "limits_or_transitions_differ"
+    except (KeyError, TypeError, ValueError, AttributeError, OverflowError, StopIteration, ScheduleRefused):
+        return "readback_unavailable"
+    return "matched"
+
+
 def _cancel_verification(hass: HomeAssistant, entry_id: str) -> None:
     cancel = hass.data.get(_VERIFY_KEY, {}).pop(entry_id, None)
     if cancel is not None:
@@ -483,6 +531,10 @@ def _session_readiness(hass: HomeAssistant, controller: Any, identity: dict[str,
     result: dict[str, Any] = {
         "control": "unknown", "vehicle": "unknown", "transaction": "unknown",
         "measurement": "unknown", "vehicle_observed_at": None,
+        # This is not an admission decision: no session-start dispatcher exists.
+        # Keep it separate from schedule upload readiness and never infer a session
+        # from the control switch or a connector status.
+        "session_start": {"state": "blocked", "reason": "authorization_path_unimplemented"},
         "activation_blockers": ["production_dispatch_unarmed", "activation_path_incomplete",
                                 "first_use_or_lost_state_unverified", "retained_profile_unresolved",
                                 "transaction_authorization_unverified", "held_exit_has_no_release",
@@ -491,9 +543,11 @@ def _session_readiness(hass: HomeAssistant, controller: Any, identity: dict[str,
     if not identity.get("supported") or identity.get("match_count") != 1:
         if identity.get("supported") and identity.get("match_count") == 0:
             result["control"] = "unavailable"
+            result["session_start"] = {"state": "offline", "reason": "charger_offline"}
         return result
     if not online:
         result["control"] = "unavailable"
+        result["session_start"] = {"state": "offline", "reason": "charger_offline"}
         return result
     try:
         control = hass.states.get(controller.charge_control)
@@ -675,6 +729,8 @@ async def async_record_owned_pause(hass: HomeAssistant, entry_id: str, *, resume
     if worker is not None:
         if resume:
             worker.resume_ticket = (intent["id"], generation)
+            if getattr(worker, "session", None) is not None:
+                worker.session.resume(intent["id"])
         else:
             worker.hold_ticket = (intent["id"], generation)
         worker.trigger()
@@ -1340,6 +1396,13 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
             aborted_display = (aborted_attempt.get("state") == "aborted_before_dispatch"
                                and aborted_attempt.get("id") == data.get("attempt_id"))
             readiness = _session_readiness(hass, controller, identity, online, datetime.now(timezone.utc))
+            session = getattr(worker, "session", None)
+            if session is not None and online:
+                readiness["session_start"] = dict(session.state)
+            # Diagnostic only: the preview is not a checked dispatch intent and
+            # even a matching readback cannot itself authorize a session start.
+            readiness["session_schedule_evidence"] = session_start_schedule_evidence(
+                preview.get("profile"), effective, datetime.now(timezone.utc), tolerance_s=VERIFY_TOLERANCE_S)
             readiness["activation_blockers"] = [] if current_ticket else ["migration_or_reconfirmation_required"]
             if not settled:
                 readiness["activation_blockers"].append(evidence_blocker)

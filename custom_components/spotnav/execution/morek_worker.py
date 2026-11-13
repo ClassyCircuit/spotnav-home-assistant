@@ -50,6 +50,9 @@ class MorekScheduleWorker:
     def trigger(self, _snapshot: Any = None) -> None:
         if self._closed:
             return
+        session = getattr(self, "session", None)
+        if session is not None:
+            session.trigger()
         self._serial += 1
         if self._task is None or self._task.done():
             self._task = self._hass.async_create_task(self._run())
@@ -65,6 +68,9 @@ class MorekScheduleWorker:
         if not self._closed and generation == self._availability_generation:
             self._suspended = False
             self.trigger()
+            session = getattr(self, "session", None)
+            if session is not None:
+                session.reconnect()
 
     def close(self) -> None:
         """Unsubscribe and cancel pending work; an in-flight send remains uncertain."""

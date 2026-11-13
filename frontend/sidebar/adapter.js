@@ -76,7 +76,8 @@ export function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), f
   const vehicleAt = Date.parse(ready?.vehicle_observed_at || '');
   const vehicleFresh = Number.isFinite(vehicleAt) && vehicleAt <= now && now-vehicleAt <= 180000;
   const vehicle = vehicleFresh && ready?.vehicle === 'connected' ? 'connected' : vehicleFresh && ready?.vehicle === 'disconnected' ? 'disconnected' : 'unknown';
-  const readiness = `Control ${control} · vehicle ${vehicle} · transaction / authorization unknown · measured charging unknown. Authorization for a new session requires installation-specific verification; no active transaction is not a schedule prohibition.`;
+  const sessionStart = ready?.session_start?.state === 'offline' ? 'Automatic session start is offline.' : ready?.session_start?.reason === 'authorization_path_unimplemented' ? 'Automatic session start is not implemented; OCPP command, transaction and safe scheduling evidence require verification.' : ready?.session_start?.state ? `Session start ${ready.session_start.state} (${ready.session_start.reason || 'reason unavailable'}). ON may allow immediate charging if the schedule is unconfirmed; ACK is not charging.` : 'Automatic session start status unavailable.';
+  const readiness = `Control ${control} · vehicle ${vehicle} · transaction / authorization unknown · measured charging unknown. ${sessionStart} No active transaction is not a schedule prohibition.`;
   const proposal = d.plan.proposal;
   const planStale = stale || d.planning?.historical === true || !!(proposal?.periods.length && proposal.periods.every(p=>p.endMs<=now));
   const rawProposal=raw?.plan?.proposal;

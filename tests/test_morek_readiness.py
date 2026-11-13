@@ -28,6 +28,7 @@ def test_connector_status_is_not_authorization_or_measurement(monkeypatch, raw, 
     assert result["vehicle"] == vehicle
     assert result["control"] == "available"
     assert result["transaction"] == result["measurement"] == "unknown"
+    assert result["session_start"] == {"state": "blocked", "reason": "authorization_path_unimplemented"}
     assert "production_dispatch_unarmed" in result["activation_blockers"]
     assert {"held_exit_has_no_release", "external_writers_unverified",
             "installation_protection_conflict_unresolved", "activation_path_incomplete",
@@ -59,3 +60,12 @@ def test_offline_unrelated_and_missing_control_never_read_vehicle(monkeypatch):
         result = morek_schedule._session_readiness(hass, controller, identity, online, NOW)
         assert result["control"] == expected and result["vehicle"] == "unknown"
     sensor.assert_not_called()
+
+
+def test_offline_start_status_does_not_claim_authorization():
+    hass = SimpleNamespace(states=SimpleNamespace(get=Mock(side_effect=AssertionError("no state reads"))))
+    result = morek_schedule._session_readiness(
+        hass, object(), {"supported": True, "match_count": 1}, False, NOW
+    )
+    assert result["session_start"] == {"state": "offline", "reason": "charger_offline"}
+    assert result["transaction"] == result["measurement"] == "unknown"

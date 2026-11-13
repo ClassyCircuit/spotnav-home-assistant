@@ -8,7 +8,7 @@ entry starts is stopped by `entry.async_on_unload` where it is started; live obj
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import partial
 from typing import Any, Callable
 
@@ -373,6 +373,10 @@ async def _async_setup_ownership_metadata(
                 entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target), reconnect=True)
         # Invalidate queued worker work synchronously, including on disconnect.
         worker = getattr(getattr(entry, "runtime_data", None), "morek_worker", None)
+        if worker is not None and not is_available:
+            session = getattr(worker, "session", None)
+            if session is not None:
+                session.availability_lost()
         generation = worker.suspend_for_availability_change() if worker is not None else None
         if is_available:
             async def initialize_and_reconcile() -> None:
@@ -885,7 +889,26 @@ async def _async_setup_auto_preview(
         return state is not None and state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN)
 
     worker = data.morek_worker = MorekScheduleWorker(hass, entry_id, preview, charger_available)
+    from .execution.morek_session import MorekSessionCoordinator
+    from .vehicles.ocpp_identity import STATUS_CONNECTOR_KEY, connector_sensor_entity_id
+
+    session = worker.session = MorekSessionCoordinator(worker)
+    target = getattr(data.controller, "ocpp_target", None)
+    if target is not None:
+        sensor = connector_sensor_entity_id(hass, target, STATUS_CONNECTOR_KEY)
+        def session_status_changed(event):
+            old, new = event.data.get("old_state"), event.data.get("new_state")
+            session.observe(getattr(old, "state", None), getattr(new, "state", None))
+        entry.async_on_unload(async_track_state_change_event(hass, [sensor], session_status_changed))
+    entry.async_on_unload(session.close)
     worker.start()
+    if target is not None:
+        current_status = hass.states.get(sensor)
+        if current_status is not None and not current_status.attributes.get("restored", False):
+            stamp = getattr(current_status, "last_reported", None) or getattr(current_status, "last_updated", None)
+            now = datetime.now(timezone.utc)
+            if stamp is not None and stamp.tzinfo is not None and 0 <= (now - stamp).total_seconds() <= 180:
+                session.observe(None, current_status.state)
     entry.async_on_unload(worker.close)
 
     def _soc_moved() -> None:

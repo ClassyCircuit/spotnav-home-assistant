@@ -355,6 +355,130 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-13 — observed reconnect recovery (2.5.89; local mocked)
+
+- The user approved one recovery opportunity per observed OCPP offline-to-online
+  edge without requiring a boot counter, as well as bounded ambiguous Preparing
+  recovery and possible immediate charging if a schedule is ineffective. A switch
+  becoming unavailable while the resolved OCPP charge point is still online is not
+  treated as an offline edge. Repeated online callbacks do not create new attempts;
+  durable outcome records deduplicate after HA restart, and pending/unknown outcomes
+  remain blocked. Finishing holds, person Stop/Pause, ownership, connector identity
+  and protection remain checked. A genuine plug-in, explicit Resume, observable
+  reconnect or observed in-process boot-counter increase can supply an opportunity.
+- A reboot with no observed offline transition or boot evidence cannot be separated
+  from duplicate callbacks; explicit Resume or a later observable reconnect can
+  supply a new opportunity, subject to the guards. The completion hold is written
+  asynchronously: a crash before that write cannot be reconstructed. An accepted
+  remote-start response does not establish an authorized session or measured flow.
+- The local runtime blocks starts if INFO is enabled for `custom_components.ocpp`
+  or the charge point's OCPP logger, or DEBUG is enabled for its websocket logger;
+  unknown OCPP object/logger shapes also block. Request-task logging is filtered,
+  without suppressing other tasks' diagnostics. Compatibility with the installed
+  version and third-party logging remains unverified.
+- Focused mocked session/readiness/lifecycle tests use the real command-admission
+  boundary, a Resume action, availability callback and sentinel logging; targeted
+  existing worker reconnect regressions, Ruff, build and check-dist were run.
+  No browser, live HA, deployment, profile operation or charger action occurred.
+
+### 2026-11-13 — ambiguous Preparing recovery (2.5.88; incomplete)
+
+- The user accepted one extra request in ambiguous initial/reconnected Preparing;
+  this is neither proof a prior session ended nor permission for live actions.
+  Initial fresh non-restored connector status, reconnect, and explicit Resume now
+  feed the coordinator. A durable fixed recovery generation prevents repeated ACKed
+  starts across restarts, while a newly observed unplug/replug or explicit Resume
+  has a distinct generation. Pending/unknown starts still block across generations.
+  A recorded Finishing status holds recovery until new plug-in or explicit Resume.
+- A reported charger boot counter increase within the same process creates a new
+  generation; without that evidence, a further reboot cannot be distinguished from
+  repeated callbacks and can remain blocked. Finishing is persisted asynchronously and can be lost if HA
+  crashes before the write. Runtime INFO on `custom_components.ocpp` or the point's
+  OCPP logger, or DEBUG on its websocket logger, blocks dispatch. No claim is made
+  about unknown versions or physical charging. Full acceptance coverage and
+  production review remain open; do not mark 5.6d complete.
+- Local checks: isolated lifecycle, session and readiness tests 270 passed;
+  Ruff, frontend build and check-dist passed. This includes a mocked real-admission
+  start, but not the full requested production-wiring and crash/logging matrix.
+
+### 2026-11-13 — initial Morek session coordinator (2.5.87; incomplete)
+
+- The user explicitly accepts immediate charging if a schedule is absent or
+  ineffective when a session is requested. No composite comparison is a start
+  prerequisite; this does not authorize live operation during development.
+- The worker owns a connector-status event coordinator. An observed Available to
+  Preparing transition can request one start via the connected OCPP v1.6 object,
+  under owned-profile admission, durable pre-dispatch outcome, person-Stop,
+  ownership, identity, plan, pause and protection checks. A second definite
+  rejection retry is bounded by a 60-second cooldown. Unknown/pending outcomes
+  stay blocked even on replug. This is not a plan-window actuator; it never clears
+  profiles or modifies current. No claim of physical flow follows an ACK.
+- The request task's known OCPP and websocket logging is filtered; other tasks'
+  protocol INFO and websocket DEBUG must already be disabled or the runtime path
+  is refused. Runtime class and logger shape are checked. This is not a complete
+  audit of future OCPP/library versions or third-party logging handlers.
+- An initial Preparing status, including a vehicle connected while HA was offline,
+  is still ambiguous and does not initiate a start. Surviving versus ended sessions
+  after restart is not fully reconciled; retries, Resume, real admission, lifecycle,
+  cancellation and late-response coverage remains incomplete. The substage stays
+  open; do not infer production readiness or live behavior from mocks.
+
+### 2026-11-13 — 5.6d drift and logging investigation (2.5.86; incomplete)
+
+- The tagged OCPP integration requires `ocpp>=2.1.0` and `websockets>=14.1`;
+  inspected OCPP 2.1.0 source logs serialized sent/received messages at INFO and
+  websockets 14.1 logs frames at DEBUG. These can expose authentication material
+  independently of the integration's own INFO message. Installed versions are not
+  confirmed. No scoped redaction adapter has been implemented or tested, and no
+  production start path, event wiring, persistence or recovery was added.
+- The existing read-only schedule prerequisite now optionally allows up to 90s
+  drift. It rejects a current time within tolerance of an expected or observed
+  transition and a present limit that differs from intent; the status diagnostic
+  uses that option. It does not associate the evidence with a validated worker
+  attempt or rule out a later external limit change. It is not admission authority.
+- Focused comparator tests, Ruff, frontend build and check-dist only; no browser,
+  live HA or charger action. 5.6d remains incomplete and must not be marked done.
+
+### 2026-11-13 — 5.6d tagged-source investigation (2.5.85; incomplete)
+
+- Inspected the public v0.12.3 `switch.py`, `api.py` and `ocppv16.py`, not the
+  installed system. The charge-control switch derives its on state from reported
+  Charging/Suspended status; its start delegates to `start_transaction`, whose bool
+  is the remote-start ACK, not proof of a transaction or flow. Preparing does not
+  prove a previous transaction ended. Runtime version and compatibility remain unknown.
+  The tagged start method itself logs the configured remote ID tag at INFO; the
+  requested prohibition on logging that tag is not met by an unconditional call.
+  Do not suppress or alter another integration's logging globally as a shortcut.
+- Added a read-only same-preview schedule evidence diagnostic: at most 30 seconds
+  old, exact transition comparison, bounded coverage and at most 16 A now. It is
+  not a checked dispatch intent, profile inventory, authorization or protection
+  proof. External writers can change limits after any read. It does not issue a
+  fresh query or start. Event wiring, connector-bound start persistence, outcome
+  recovery and all production start race tests remain open; 5.6d is not complete.
+- Isolated lifecycle runner including the new comparator tests: 243 passed; Ruff,
+  frontend build and check-dist passed. No browser, live HA, deployment, profile
+  operation or charger action occurred. Mocked comparisons do not prove charging.
+
+### 2026-11-13 — 5.6d read-only blocker groundwork (2.5.84; incomplete)
+
+- The local checkout has no installed HA OCPP source; the screenshot demo switch
+  merely changes a mock state. SpotNav's generic switch path issues blocking HA
+  `switch.turn_on`/`turn_off`, returns a service-call success without an OCPP ACK,
+  and cannot prove transaction authorization. The connector transaction sensor's
+  sentinel, lifecycle and reconnect semantics are unverified. An effective composite
+  schedule is not profile inventory and old verification does not establish safe
+  limits at a future start. Installed source and trustworthy connector-bound fresh
+  scheduling/electrical and session evidence are needed before dispatch can be designed.
+- Read-only readiness now explicitly reports session start unimplemented or offline;
+  the sidebar reports this separately from unknown transaction and measured flow.
+  No automatic start/recovery, retry ledger or session action was implemented. The
+  5.6d test matrix remains open; 5.7b2 owns measured-power binding. No HA contact,
+  settings change, deployment, profile operation or charger command occurred.
+- Local checks: isolated lifecycle runner with readiness tests (250 passed), sidebar
+  tests (88 passed, plus the new focused status assertion passed separately), Ruff,
+  frontend build and check-dist. Existing Python warnings and jsdom CSS warnings remain; no browser,
+  full HA-plugin suite or hardware tests were run.
+
 ### 2026-11-13 — estimates, Morek target window and evidence (2.5.83; local)
 
 - Battery energy estimates use valid last-known SOC even when old, restored or
