@@ -60366,7 +60366,7 @@ function recoveryBanner(state, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.122";
+var CARD_VERSION = "2.5.124";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {

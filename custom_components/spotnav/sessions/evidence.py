@@ -20,8 +20,9 @@ Two kinds of records live here, in one small HA `Store`, and they never stand in
 Duplicates (same source entity and observed time) are dropped, a differing value at the same observed time is kept
 and flagged, out-of-order arrivals and counter decreases are kept and flagged, nothing is repaired or bridged.
 `derive_energy` turns stored samples, gap rows and restart marks into separately labelled segments
-(`meter_counter` delta versus `power_integrated_estimate`) and unknown segments; it is the seam Stage 6.3 queries
-build on. Explicit gaps, restarts, stale/future/conflicting/out-of-order rows and source changes are never bridged.
+(`meter_counter` delta versus `power_integrated_estimate`) and unknown segments; it is the seam the Stage 6.3 queries
+(`sessions/history.py`) build on. Plan versions also keep, once per distinct content, the tariff and published prices in
+force when they were made (`blobs`), and finished local days are compacted into small digests (`days`). Explicit gaps, restarts, stale/future/conflicting/out-of-order rows and source changes are never bridged.
 
 Retention is bounded by age (`RETENTION_DAYS`) AND by count per list (whichever is hit first); oldest rows go first.
 Measurements are one row per kind per capture tick at most, so `MAX_SAMPLES_PER_KIND` rows are only
@@ -31,6 +32,8 @@ Measurements are one row per kind per capture tick at most, so `MAX_SAMPLES_PER_
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import math
 from collections.abc import Callable, Iterable
@@ -52,6 +55,8 @@ MAX_EVENTS: Final = 600
 MAX_SAMPLES_PER_KIND: Final = 4320
 MAX_CAPTURE_MARKS: Final = 100
 MAX_READBACK_PERIODS: Final = 96
+#: Compact per-local-day digests kept after the raw rows are gone (Stage 6.3).
+MAX_DIGEST_DAYS: Final = 62
 SAVE_DELAY_S: Final = 120
 #: How many recent rows are searched for a duplicate or the previous reading of a source.
 LOOKBACK: Final = 200
@@ -149,6 +154,8 @@ class ChargingEvidenceStore:
             mine["plans"].extend(item for item in doc["plans"] if item.get("id") not in known)
             mine["events"].extend(doc["events"])
             mine["captures"].extend(doc["captures"])
+            mine["blobs"].update({key: value for key, value in doc["blobs"].items() if key not in mine["blobs"]})
+            mine["days"].update({key: value for key, value in doc["days"].items() if key not in mine["days"]})
             for kind, rows in doc["samples"].items():
                 mine["samples"][kind].extend(rows)
         if dropped:
@@ -167,6 +174,11 @@ class ChargingEvidenceStore:
                     mine[name].append(item)
                 else:
                     dropped += 1
+        for name in ("blobs", "days"):
+            found = doc.get(name)
+            if isinstance(found, dict):
+                mine[name].update({key: value for key, value in found.items() if isinstance(key, str)
+                                   and isinstance(value, dict)})
         samples = doc.get("samples")
         if isinstance(samples, dict):
             for kind in SAMPLE_KINDS:
@@ -197,20 +209,30 @@ class ChargingEvidenceStore:
 
     def record_plan(self, charger_id: str, *, plan_id: str, fingerprint: str, profile: dict[str, Any],
                     intent_at: str, source: str, intent: str, revision: Any = None,
-                    context: dict[str, Any] | None = None) -> str:
+                    context: dict[str, Any] | None = None, blobs: dict[str, Any] | None = None) -> str:
         """Keep the profile that was put on the wire as an immutable version. `plan_id` is the attempt id.
 
-        A second call with an id already kept changes nothing (`duplicate`): a version is never edited."""
+        `blobs` are the tariff/price facts in force when it was made (Stage 6.3), kept once per distinct content and
+        referenced by digest, so a later settings or price change can never rewrite what an older version was made
+        under. A second call with an id already kept changes nothing (`duplicate`): a version is never edited."""
         if not plan_id or not isinstance(profile, dict):
             return REJECTED
         doc = self._charger(charger_id)
         if any(item.get("id") == plan_id for item in doc["plans"]):
             return DUPLICATE
+        refs: dict[str, str] = {}
+        for name, blob in (blobs or {}).items():
+            if blob is None:
+                continue
+            digest = hashlib.sha256(json.dumps(blob, sort_keys=True, separators=(",", ":"),
+                                               default=str).encode()).hexdigest()[:16]
+            doc["blobs"].setdefault(digest, {"name": name, "value": deepcopy(blob)})
+            refs[name] = digest
         self._seq += 1
         doc["plans"].append({
             "id": plan_id, "seq": self._seq, "recorded_at": _iso(self._now()), "intent_at": intent_at,
             "fingerprint": fingerprint, "source": source, "intent": intent, "revision": revision,
-            "context": deepcopy(context or {}), "profile": deepcopy(profile),
+            "context": deepcopy(context or {}), "refs": refs, "profile": deepcopy(profile),
         })
         self._prune(doc, self._now())
         self._changed()
@@ -322,14 +344,46 @@ class ChargingEvidenceStore:
     # ---- reads (copies; the seam for Stage 6.3 queries)
 
     def plan_versions(self, charger_id: str) -> list[dict[str, Any]]:
-        """The kept plan versions, oldest first."""
-        return deepcopy(self._charger(charger_id, create=False).get("plans", []))
+        """The kept plan versions, oldest first, each with its own tariff/price blobs resolved (`None`: not kept)."""
+        doc = self._charger(charger_id, create=False)
+        return [self._resolved(doc, item) for item in doc.get("plans", [])]
 
     def plan_version(self, charger_id: str, plan_id: str) -> dict[str, Any] | None:
-        for item in self._charger(charger_id, create=False).get("plans", []):
+        doc = self._charger(charger_id, create=False)
+        for item in doc.get("plans", []):
             if item.get("id") == plan_id:
-                return deepcopy(item)
+                return self._resolved(doc, item)
         return None
+
+    @staticmethod
+    def _resolved(doc: dict[str, Any], item: dict[str, Any]) -> dict[str, Any]:
+        out = deepcopy(item)
+        found = doc.get("blobs", {})
+        out["blobs"] = {name: deepcopy((found.get(ref) or {}).get("value")) for name, ref in (item.get("refs") or {}).items()}
+        return out
+
+    def oldest_evidence(self, charger_id: str) -> datetime | None:
+        """The earliest retained observation, receipt, plan or capture start: nothing before it can be answered."""
+        doc = self._charger(charger_id, create=False)
+        stamps = [_parse(row.get(name)) for rows in doc.get("samples", {}).values() for row in rows[:1]
+                  for name in ("t", "r")]
+        stamps += [_parse(item.get(name)) for name, items in (("recorded_at", doc.get("plans", [])[:1]),
+                                                              ("at", doc.get("captures", [])[:1])) for item in items]
+        found = [stamp for stamp in stamps if stamp is not None]
+        return min(found) if found else None
+
+    def digests(self, charger_id: str) -> dict[str, dict[str, Any]]:
+        return deepcopy(self._charger(charger_id, create=False).get("days", {}))
+
+    def keep_digest(self, charger_id: str, day: str, digest: dict[str, Any]) -> bool:
+        """Keep one finished local day's compact summary once; it is never replaced (`False`: already kept)."""
+        doc = self._charger(charger_id)
+        if day in doc["days"]:
+            return False
+        doc["days"][day] = deepcopy(digest)
+        self._prune(doc, self._now())
+        self._changed()
+        return True
 
     def events(self, charger_id: str, *, plan_id: str | None = None, kinds: Iterable[str] | None = None,
                since: datetime | None = None, until: datetime | None = None) -> list[dict[str, Any]]:
@@ -398,7 +452,8 @@ class ChargingEvidenceStore:
     def _charger(self, charger_id: str, create: bool = True) -> dict[str, Any]:
         doc = self._chargers.get(charger_id)
         if doc is None:
-            doc = {"plans": [], "events": [], "captures": [], "samples": {kind: [] for kind in SAMPLE_KINDS}}
+            doc = {"plans": [], "events": [], "captures": [], "blobs": {}, "days": {},
+                   "samples": {kind: [] for kind in SAMPLE_KINDS}}
             if create:
                 self._chargers[charger_id] = doc
         return doc
@@ -418,6 +473,9 @@ class ChargingEvidenceStore:
         doc["captures"][:] = [item for item in doc["captures"] if fresh(item, "at")][-MAX_CAPTURE_MARKS:]
         for rows in doc["samples"].values():
             rows[:] = [row for row in rows if fresh(row, "t", "r")][-MAX_SAMPLES_PER_KIND:]
+        used = {ref for item in doc["plans"] for ref in (item.get("refs") or {}).values()}
+        doc["blobs"] = {key: value for key, value in doc["blobs"].items() if key in used}
+        doc["days"] = dict(sorted(doc["days"].items())[-MAX_DIGEST_DAYS:])
 
 
 def evidence_for(hass: Any) -> ChargingEvidenceStore | None:
@@ -484,7 +542,8 @@ def derive_energy(samples: list[dict[str, Any]], kind: str, *, restarts: Iterabl
         start, end = _parse(before["t"]), _parse(after["t"])
         if end <= start:
             continue  # same instant: a conflict is reported by the neighbours below, never as a zero-length segment
-        base = {"start": _iso(start), "end": _iso(end), "entity": after.get("e")}
+        base = {"start": _iso(start), "end": _iso(end), "entity": after.get("e"),
+                "from_value": before["v"], "to_value": after["v"], "unit": after.get("u")}
         lower = max(start, _as_of(before.get("r"), start))
         upper = max(end, _as_of(after.get("r"), end))
         flags = {*(before.get("q") or ()), *(after.get("q") or ())}
@@ -550,6 +609,7 @@ class MeasurementCapture:
         self._store = store
         self._now = now or (lambda: datetime.now(timezone.utc))
         self._cancel: Callable[[], None] | None = None
+        self._compacted_on: Any = None
 
     def start(self) -> None:
         from homeassistant.helpers.event import async_track_time_interval
@@ -564,9 +624,26 @@ class MeasurementCapture:
             self._cancel()
             self._cancel = None
 
+    def _compact(self, now: datetime) -> None:
+        """Once per local day (and at the first tick): keep digests of finished days. Never raises."""
+        try:
+            from .. import time_zones
+            from .history import compact_days
+
+            zone = time_zones.zone(getattr(getattr(self._hass, "config", None), "time_zone", None))
+            if zone is None:
+                return
+            today = now.astimezone(zone).date()
+            if self._compacted_on != today:
+                self._compacted_on = today
+                compact_days(self._store, self._charger_id, zone, now)
+        except Exception:  # noqa: BLE001 - a digest is a convenience; capture must continue
+            _LOGGER.debug("Charging evidence digests were not compacted", exc_info=True)
+
     def capture(self, now: datetime | None = None) -> None:
         """One read of every source; never raises, never writes to the charger."""
         now = now or self._now()
+        self._compact(now)
         try:
             from ..api.morek_schedule import _live_measurements
 

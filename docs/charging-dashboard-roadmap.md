@@ -1235,7 +1235,32 @@ historical analytics.
   - Label measurement-derived energy estimates separately from meter counters; handle
     resets, duplicates and gaps. Never substitute plans, offered limits, ACKs or
     schedule windows for observations; unknown is not zero.
-- [ ] **6.3 Queries and retention**
+- [x] **6.3 Queries and retention** (2.5.124, local mocked; no live HA/charger/BMW check; coordinator review pending)
+  - Implemented: `sessions/history.py` (`charging_history`, `compact_days`), command `spotnav/get_charging_history`
+    (`api/sessions.py`), see `docs/api.md`. Plan versions now keep the tariff and published prices in force when they were
+    made (`plan_tariff_snapshot`, stored once per distinct content as `blobs`, referenced by digest, dropped with their
+    versions); an unreadable tariff is `unknown`, never a default and never today's tariff. A version is only the **last acknowledged
+    intent** (accepted ACK), never proof of the effective profile: it is known until the next accepted ACK, a recorded
+    removal, or the first retained uncertain write (unanswered dispatch marker, conflict, ACK of `unknown`, dispatch
+    events of a pruned version, a version whose events are gone); then the plan is `unknown` (`unknown_plan_spans`,
+    flow there is `plan_unknown`), not carried forward. Writers outside SpotNav and restarts leave no event: only
+    `restarts_after_ack` is reported. Effective-limit readbacks never restore knowledge or act as inventory. Observed charging intervals use only
+    trustworthy measured `power_w` pairs (>= 100 W, 2 consecutive samples; the 100 W/2-sample thresholds are assumptions,
+    unverified on the Morek); an edge beside a gap, restart or the data edge is unbounded. Planned blocks (known spans only; `intent_uncertain_after`
+    flags one cut short) are `flow_observed`, `no_flow_observed` (only when measured samples cover the whole block and it
+    starts inside retained evidence) or `unknown`; flow outside an
+    applying plan (120 s tolerance) is `outside_plan`, flow with no applying version is `no_plan_evidence`. Energy bases are
+    never summed and a basis with no segment in the window is `null` with `coverage`, not 0 (a measured zero is 0.0); unobserved meter energy has no placement. Windows are UTC instants (a DST day is 23/25 h); max 7 days,
+    200 rows per list. Finished local days are digested once (capture tick, first tick per day), kept up to 62 days, never
+    replaced, and keep the fiscal choice but not price rows.
+  - Tests (`tests/test_stage_63_history.py`, 19, isolated runner): midnight + restart, gap inside a block, in-plan flow and
+    an isolated spike, unacknowledged/rejected versions, replaced/removed plans with their own tariffs, unreadable tariff,
+    blob sharing/retention, counter reset and unobserved energy, empty/partial retention, digests, DST/windows/timestamps,
+    API refusals and non-admin read, send-path tariff wiring; 2.5.124 review fixes: ACK then unknown upload, later ACK, pruned/orphan events with restarts and readback, block before retained evidence, absent energy versus measured zero. A review-time bug was fixed: same-zone aware datetimes
+    subtract by wall clock, so windows are normalised to UTC.
+  - **Not done / limits:** no per-session link (sessions overlap by time only, cost is not recomputed here); no card/panel UI;
+    digests rely on the capture tick running; only Morek is captured; what the real entities, cadence and noise floor look
+    like, readback against the real fetch path and storage size are unverified; Bavarian CarData unused.
   - Extend existing session/history APIs where suitable with bounded retention and
     queries carrying original tariff, plan, source and coverage context. Do not use
     today's plan or changed tariff to silently reconstruct older sessions.

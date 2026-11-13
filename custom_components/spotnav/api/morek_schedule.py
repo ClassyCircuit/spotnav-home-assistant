@@ -82,8 +82,22 @@ def _evidence_plan(hass: HomeAssistant, entry_id: str, attempt: dict[str, Any], 
     intent = "charge_now" if attempt.get("override_id") else "pause_resume" if attempt.get("pause_id") else "schedule"
     _evidence_call(hass, entry_id, "record_plan", plan_id=attempt.get("id"), fingerprint=attempt.get("fingerprint"),
                    profile=profile, intent_at=attempt.get("at"), source=attempt.get("source"), intent=intent,
-                   revision=attempt.get("revision"),
-                   context={"time_zone": getattr(getattr(hass, "config", None), "time_zone", None)})
+                   revision=attempt.get("revision"), **_evidence_tariff(hass, entry_id))
+
+
+def _evidence_tariff(hass: HomeAssistant, entry_id: str) -> dict[str, Any]:
+    """Stage 6.3: the tariff/price context in force when this version is made, kept with it (unknown if unreadable)."""
+    context: dict[str, Any] = {"time_zone": getattr(getattr(hass, "config", None), "time_zone", None)}
+    blobs: dict[str, Any] = {}
+    try:
+        from ..sessions.inputs import plan_tariff_snapshot
+
+        tariff, blobs = plan_tariff_snapshot(hass, entry_id, datetime.now(timezone.utc))
+        context.update(tariff)
+    except Exception:  # noqa: BLE001 - history must never alter a charger operation
+        _LOGGER.debug("Plan tariff context was not recorded", exc_info=True)
+        context.update({"fiscal_state": "unknown", "prices_state": "none"})
+    return {"context": context, "blobs": blobs}
 
 
 class ScheduleRefused(Exception):

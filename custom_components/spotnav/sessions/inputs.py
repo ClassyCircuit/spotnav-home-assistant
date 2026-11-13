@@ -12,6 +12,7 @@ before) with the charger's own stored row for that area, as always.
 
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -250,3 +251,40 @@ def current_fiscal(hass: HomeAssistant, charger_id: str, area_id: str | None = N
     chosen = area_id or settings.area_id
     area = None if chosen is None else repository.catalogue_snapshot().area(chosen)
     return None if area is None else fiscal_choice_for(settings, area)
+
+
+#: The most published intervals one plan-version price snapshot keeps (3 days at 15 min is 288).
+PLAN_PRICE_ROWS: Final = 300
+
+
+def plan_tariff_snapshot(hass: HomeAssistant, charger_id: str, now: datetime) -> tuple[dict[str, Any], dict[str, Any]]:
+    """The tariff and published prices in force *now*, to be kept with the plan version made now (Stage 6.3).
+
+    Returns `(context, blobs)`. Nothing here is a later or current substitute for an older plan: the caller stores
+    this beside the version when it is made. A part that cannot be read is reported as unknown in `context` and
+    left out of `blobs` (never filled with a default): `fiscal_state` is `resolved` or `unknown`, `prices_state`
+    `published` or `none`. `fiscal` is the person's resolved fee/tax choice (as the plan itself prices with it) and
+    `prices` the raw published intervals `[start_ts, end_ts, eur_per_kwh, fx]` in instant order, with the market's
+    currency/units; both are kept once per distinct content."""
+    context: dict[str, Any] = {"fiscal_state": "unknown", "prices_state": "none", "market": None}
+    blobs: dict[str, Any] = {}
+    try:
+        market = price_market(hass, charger_id)
+        if market is None:
+            return context, blobs
+        context["market"] = {"area_id": market.area_id, "currency": market.area.currency,
+                             "major_unit": market.area.major_unit, "minor_unit": market.area.minor_unit,
+                             "zone": getattr(market.area, "tz", None)}
+        if market.fiscal is not None:
+            blobs["fiscal"] = {key: value for key, value in dataclasses.asdict(market.fiscal).items()}
+            context["fiscal_state"] = "resolved"
+        book = price_book_for(hass, charger_id, now)
+        if book is not None and book.spot:
+            rows = [[int(item.utc_start.timestamp()), int(item.utc_end.timestamp()), item.eur_per_kwh, item.fx]
+                    for item in book.spot[:PLAN_PRICE_ROWS]]
+            blobs["prices"] = {"rows": rows, "truncated": len(book.spot) > PLAN_PRICE_ROWS,
+                               "unit": "eur_per_kwh_raw_spot_times_fx"}
+            context["prices_state"] = "published"
+    except Exception:  # noqa: BLE001 - an unreadable tariff is unknown, never a reason to fail a send
+        return {"fiscal_state": "unknown", "prices_state": "none", "market": context.get("market")}, {}
+    return context, blobs

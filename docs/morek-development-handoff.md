@@ -384,6 +384,28 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-13 — Stage 6.3 history queries (2.5.124; local mocked; coordinator review pending)
+
+- New `sessions/history.py` and `spotnav/get_charging_history` (`api/sessions.py`); `ChargingEvidenceStore` gained
+  `blobs` (per-version tariff/price snapshots, content-addressed, pruned with their versions), `days` (digests, 62 max),
+  `oldest_evidence`, `digests`, `keep_digest`; `energy_segments` rows now carry `from_value`/`to_value`/`unit`.
+  `_evidence_plan` records `plan_tariff_snapshot` (in `sessions/inputs.py`) with each version; failure there is
+  swallowed and recorded as `unknown`. `MeasurementCapture` compacts finished days once per local day.
+- Completed from the previous (out-of-tokens) session's uncommitted partial edits; kept as designed. Fixed: wall-clock
+  subtraction for same-zone aware datetimes (DST days) by normalising windows to UTC.
+- Tests: `python tools/run_isolated_logs_tests.py tests/test_stage_63_history.py tests/test_stage_62_evidence.py
+  tests/test_morek_start_schedule_evidence.py` -> 51 passed (ruff clean); `npm run build` and `check-dist` current at 2.5.124.
+  No browser, broad suite, live HA, charger, deployment, commit or push.
+- 2.5.124 review fixes: `applies*` fields became `acked_intent`/`acked_at`/`intent_ended_at`/`known_until`/`unknown_from`/
+  `unknown_reason`: an accepted ACK is the last acknowledged intent, ended at the next accepted ACK or removal and made
+  `unknown` (not carried forward) by the first retained uncertain write (unanswered marker, conflict, ACK `unknown`, dispatch
+  events of a pruned version, a version with no events older than all retained events); events are ordered by recording
+  sequence. Comparison adds `unknown_plan_spans` and `plan_unknown` flow; blocks starting before retained evidence are
+  `unknown`. `_energy` returns `null` (with per-basis `coverage`) when no segment lies in the window; a measured zero
+  stays 0.0. External writers and restarts are not detectable (restarts only counted); readback is never inventory.
+  Frontend does not consume these fields; the bump only rebuilds the artifacts.
+- Unverified/limits: see the roadmap's 6.3 entry (thresholds, real entities/cadence, storage size, no UI, no session link).
+
 ### 2026-11-13 — Stage 6.2 capture and provenance (2.5.121; local mocked; coordinator review pending)
 
 - New `sessions/evidence.py` (`ChargingEvidenceStore`, `MeasurementCapture`, `derive_energy`); store key

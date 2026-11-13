@@ -24,7 +24,7 @@ the day's average price) and say so. Nothing here writes.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Any, Final
 
 import re
@@ -35,6 +35,8 @@ from homeassistant.core import callback, HomeAssistant
 from homeassistant.util import dt as dt_util
 
 from ..runtime import domain_data
+from ..sessions.evidence import evidence_for
+from ..sessions.history import HISTORY_API_VERSION, MAX_SPAN, charging_history
 from ..sessions.inputs import local_zone
 from ..sessions.model import ChargeSession
 from ..sessions.store import RETENTION_DAYS
@@ -69,6 +71,7 @@ FORMATS: Final = ("json", "csv")
 COST_BASIS: Final = "current_settings"
 
 ERROR_INVALID_RANGE: Final = "spotnav_invalid_range"
+ERROR_HISTORY_UNAVAILABLE: Final = "spotnav_history_unavailable"
 
 #: Every key of the JSON answer, in order.
 SESSIONS_RESPONSE_KEYS: Final = (
@@ -248,6 +251,79 @@ async def websocket_get_sessions(
     connection.send_result(msg["id"], answer)
 
 
+def _history_window(request: dict[str, Any], zone) -> tuple[datetime, datetime]:
+    """`date` (that local day), `night` (12:00 that local day to 12:00 the next) or `from`/`to` (aware ISO instants)."""
+    day, night = _date(request.get("date")), _date(request.get("night"))
+    if day is False or night is False or (day is not None and night is not None):
+        raise SessionsRefusal(ERROR_INVALID_RANGE, "date and night must be one local date")
+    if day is not None or night is not None:
+        if request.get("from") is not None or request.get("to") is not None:
+            raise SessionsRefusal(ERROR_INVALID_RANGE, "date or night cannot be combined with from/to")
+        base = day if day is not None else night
+        offset = time.min if day is not None else time(12)
+        start = datetime.combine(base, offset, tzinfo=zone)
+        stop = datetime.combine(base + timedelta(days=1), offset, tzinfo=zone)
+        # UTC instants: same-zone aware datetimes subtract by wall clock, which would make a 25-hour day 24.
+        return start.astimezone(timezone.utc), stop.astimezone(timezone.utc)
+    try:
+        start, stop = (datetime.fromisoformat(request[key]) for key in ("from", "to"))
+    except (KeyError, TypeError, ValueError):
+        raise SessionsRefusal(ERROR_INVALID_RANGE, "give date, night or aware from and to instants") from None
+    if start.tzinfo is None or stop.tzinfo is None:
+        raise SessionsRefusal(ERROR_INVALID_RANGE, "from and to need a UTC offset")
+    return start.astimezone(timezone.utc), stop.astimezone(timezone.utc)
+
+
+def charging_history_answer(hass: HomeAssistant, entry_id: str, request: dict[str, Any]) -> dict[str, Any]:
+    """Stage 6.3: the plan-versus-measured story of one window, from retained evidence only (read-only)."""
+    zone = local_zone(hass)
+    start, stop = _history_window(request, zone)
+    include_prices = request.get("include_prices", False)
+    if type(include_prices) is not bool or stop <= start or stop - start > MAX_SPAN:
+        raise SessionsRefusal(ERROR_INVALID_RANGE, f"the window must be positive and at most {MAX_SPAN.days} days")
+    evidence = evidence_for(hass)
+    if evidence is None:
+        raise SessionsRefusal(ERROR_HISTORY_UNAVAILABLE, "charging evidence is not kept for this installation")
+    store = domain_data(hass).session_store
+    sessions = () if store is None else store.closed_raw(entry_id)
+    return charging_history(evidence, entry_id, since=start, until=stop, zone=zone, now=dt_util.utcnow(),
+                            sessions=sessions, include_prices=include_prices)
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "spotnav/get_charging_history",
+        vol.Optional("api_version"): object,
+        vol.Optional("charger_id"): object,
+        vol.Optional("date"): object,
+        vol.Optional("night"): object,
+        vol.Optional("from"): object,
+        vol.Optional("to"): object,
+        vol.Optional("include_prices"): object,
+    }
+)
+@websocket_api.async_response
+async def websocket_get_charging_history(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Retained plan versions (with their own tariff), measured flow, gaps and the comparison for one window."""
+    version = msg.get("api_version")
+    if type(version) is not int or version != HISTORY_API_VERSION:
+        send_unsupported_version(connection, msg, HISTORY_API_VERSION)
+        return
+    charger = resolve_charger_request(hass, msg)
+    if isinstance(charger, DashboardFailure):
+        connection.send_error(msg["id"], charger.code, charger.message)
+        return
+    try:
+        answer = charging_history_answer(hass, charger.entry_id, msg)
+    except SessionsRefusal as refusal:
+        connection.send_error(msg["id"], refusal.code, refusal.message)
+        return
+    connection.send_result(msg["id"], answer)
+
+
 @callback
 def async_setup_sessions_api(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, websocket_get_sessions)
+    websocket_api.async_register_command(hass, websocket_get_charging_history)
