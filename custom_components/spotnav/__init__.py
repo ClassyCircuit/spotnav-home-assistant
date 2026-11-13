@@ -831,7 +831,9 @@ def _setup_morek_session_observation(hass, entry, session, target):
         return
     sensor = connector_sensor_entity_id(hass, target, STATUS_CONNECTOR_KEY)
 
+    @callback
     def session_status_changed(event):
+        # Must be a loop callback: observe schedules tasks, which is only legal on the event loop.
         old, new = event.data.get("old_state"), event.data.get("new_state")
         session.observe(getattr(old, "state", None), getattr(new, "state", None))
 

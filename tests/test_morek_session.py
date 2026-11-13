@@ -98,12 +98,12 @@ async def test_charge_now_plugin_uses_existing_session_coordinator(monkeypatch):
     intent = {"version": 1, "id": "b" * 32, "station_id": IDENTITY["resolved_id"], "connector_id": 1,
               "start": now.isoformat(), "end": (now + timedelta(minutes=50)).isoformat()}
     ledger.value["charge_now"] = intent
-    seen = []
-    coordinator.worker._intent = lambda pause, override: (seen.append(override) or ({}, "plan"))
+    def forbidden(*_a, **_k):
+        raise AssertionError("session start must not build the schedule intent")
+    coordinator.worker._intent = forbidden
     coordinator.observe("Available", "Preparing")
     await coordinator.task
     assert point.calls == 1
-    assert seen and all(value == intent for value in seen)
     assert ledger.value["charge_now"]["end"] == intent["end"]
     assert ledger.value["session_start"]["state"] == "accepted"
 
@@ -417,7 +417,7 @@ async def test_stop_while_waiting_for_real_admission_prevents_start(monkeypatch)
     await coordinator.task
     assert point.calls == 0
     assert "session_start" not in ledger.value
-    assert coordinator.state["reason"] == "stale_generation"
+    assert coordinator.state["reason"] == "person_stop_active"
 
 
 @pytest.mark.asyncio

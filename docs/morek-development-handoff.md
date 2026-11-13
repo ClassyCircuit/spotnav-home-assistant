@@ -384,6 +384,62 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-13 — Plug-in session activation fix (2.5.126, review of 2.5.125; local mocked; no live HA/charger action)
+
+- **Root cause (from the installed 2.5.124 log):** `session_status_changed` in `__init__.py` was an undecorated
+  function, so HA ran it as an executor job. `observe` -> `_note_schedule_evidence` -> `worker.note_plug_in` ->
+  `hass.async_create_task` raised `RuntimeError` (loop-only). `observe` had already stored the new observation but
+  aborted before assigning the connection token, so `Preparing` later reconciled as `stale_or_ambiguous_session` and no
+  RemoteStartTransaction was sent. Existing tests called `observe` inline on the loop and never exercised job
+  classification.
+- **Fixes:** the listener is `@callback`; `observe` is exception-safe and settles its own state (observation, connection
+  token, trigger) before the guarded worker-evidence call. A failure there is logged by class name only.
+  Preparing that follows a flap (unknown/unavailable and back) re-triggers the *same* connection (reconcile stays
+  idempotent: a recorded request is never repeated, a never-dispatched one proceeds); Available -> flap -> Preparing is
+  one new plug-in connection, created once (`available_before_loss`), not an inherited "recovery".
+- **2.5.126 review corrections:** (1) `_observe` now reports whether it created a fresh connection; that alone drives
+  exactly one `note_plug_in` (so Available -> unknown/unavailable -> Preparing recalculates once, and never also as a
+  sensor event). A Preparing that reuses an existing connection, or a never-seen-Available recovery, stays a sensor
+  event or none; it is not a plug-in. (2) `validate()` no longer calls `worker._intent` at all (it mutated
+  `continuity`/`override_degraded` and its refusals were swallowed). Audit of the gates that remain, each independent
+  of plan/SOC/price freshness: person Stop reservation, explicit Pause (`paused_until_resume`), legacy pause,
+  start-cap protection conflict, supported-Morek identity, current ownership ticket and generation, completed or
+  ambiguous session, recorded `session_start` unknown/pending, record validation (`_outcome_record` raises on an invalid
+  pause/Charge Now/binding and the start then reports `session_evidence_unavailable`), an explicit `uncertain` profile
+  outcome (`profile_outcome_uncertain`; admission's `profile_outcome_unavailable` normally refuses first), and the
+  planner object mismatch (`planner_changed`, timer-retried). Dropped on purpose: `current_must_be_16` for Charge Now
+  and plan-quality blockers; the worker's own send path still enforces them for profile uploads. Nothing here claims the
+  charger's retained schedule is effective or that charging will occur.
+- **Individual blocker reasons** replace `stale_or_ambiguous_session`: `session_closed`, `worker_suspended`,
+  `charger_unavailable`, `stale_generation`, `person_stop_active`, `ownership_not_current`, `identity_changed`,
+  `waiting_for_new_connection`, `session_ended_or_completion_ambiguous`, `connection_changed`, `session_completed`,
+  `connector_not_preparing`, plus the existing `paused_until_resume`, `legacy_pause_active`,
+  `protection_conflict_unresolved`, `previous_start_may_have_applied`. Admission's `stale_generation` is reported as
+  `person_stop_active` while a person Stop is reserved.
+- **Bounded recovery:** transient reasons (suspended, unavailable, stale generation, ownership not current, identity
+  changed, quiescing/initializing, retry cooldown, planner changed) re-evaluate on a memory-only timer
+  (5, 15, 30, 60, 120, 300 s; at most 12 runs per blocked episode); events still re-evaluate at once. Person Stop/Pause,
+  completion, unknown/pending earlier requests and protection conflicts are never retried by timer.
+- **Authorization no longer depends on plan/SOC freshness:** `worker._intent` refusing (stale SOC, prices, no valid
+  plan, too many blocks) does not withhold the start; only `planner_changed` does. The charger keeps its own schedule and
+  the single worker keeps reconciling it. Attempts aborted before dispatch no longer consume the two-attempt budget and
+  have no 60 s cooldown (nothing was sent). The post-dispatch re-check ignores the connector moving to Charging.
+- **Accepted but no transaction:** an accepted request with the connector still Preparing after 120 s shows
+  `accepted / no_transaction_observed`; it is never repeated automatically (an explicit person Resume is the only new
+  request). Unknown/pending outcomes remain visible and block duplicates.
+- **Deliberately unchanged:** an unknown/pending start for an *earlier* connection still blocks later starts
+  (`previous_start_may_have_applied`); there is still no automatic or person-facing way to clear it. A completion record
+  followed by restart/recovery without an observed unplug still blocks (`car_completion_reported`). The frontend does not
+  map these codes to text (it only carries `session_start` through); the bump just rebuilds the artifacts.
+- **Tests:** `tests/test_morek_session_activation.py` (21 cases: real listener `HassJob` type is Callback, an
+  event-loop-thread rule on task creation with an executor-vs-callback dispatch emulation, worker-evidence failure,
+  prior ended session, flaps, transient clear and bound, Stop/Pause, missing plan/SOC, accepted-no-transaction, Charging
+  during the request, Stop during the request, unknown/pending). One existing assertion in `test_morek_session.py`
+  changed to the new specific reason. Run on Windows, where the HA pytest plugin cannot import (`fcntl`):
+  `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -p pytest_asyncio.plugin -p no:cacheprovider --noconftest ...`
+  (session, 14.3, 9.4, 9.5 files: all passed). The stub hass is not real HA: it does not prove the installed dispatch,
+  real OCPP timing, or physical charging. No browser, broad or slow suite, live HA, charger, restart, deploy, commit or push.
+
 ### 2026-11-13 — Stage 6.3 history queries (2.5.124; local mocked; coordinator review pending)
 
 - New `sessions/history.py` and `spotnav/get_charging_history` (`api/sessions.py`); `ChargingEvidenceStore` gained

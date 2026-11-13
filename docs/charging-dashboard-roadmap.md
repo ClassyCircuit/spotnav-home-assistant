@@ -1480,6 +1480,16 @@ when identified, rather than remaining indefinite roadmap tasks.
       outage relies on the reconnect/price events; the status route is not exercised end to end; layout is unchecked
       in a browser; physical charging and the deployed version remain unverified.
 
+### Stage 9.6 — Plug-in activation fix (2.5.126, local mocked; not deployed or live-verified)
+
+- Installed 2.5.124 failed to authorize on plug-in: an undecorated state listener ran in the executor and
+  `note_plug_in` -> `async_create_task` raised before the connection token was set. Fixed with `@callback`, an
+  exception-safe `observe`, individual blocker reasons, bounded timer recovery of transient blockers, flap handling
+  that never creates a duplicate connection, plan/SOC freshness no longer gating the start, and a visible
+  `accepted / no_transaction_observed` state. Details, limits and the unchanged earlier-unknown-start interlock are in
+  the handoff entry "Plug-in session activation fix". 2.5.126 review: a flap-created connection now yields exactly
+  one plug-in recalculation, and the start no longer calls `worker._intent` (side effects, swallowed refusals).
+
 ### Stage 10 — Optional Charge Now (after initial installation)
 
 This is a user-requested **nice-to-have after 5.8**, not a prerequisite for the
