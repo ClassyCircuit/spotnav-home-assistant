@@ -384,6 +384,17 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-13 — Stage 6.1 source inventory (docs only; no version change)
+
+- Repository inspection only; no live HA, Recorder, charger or BMW access and no code change (manifest stays 2.5.119;
+  no build needed). The roadmap's "6.1 source inventory" section lists each source (session store/recorder, energy
+  register, integrated power, live connector reading, Morek outcomes, debug day, Recorder statistics, BMW SOC and the
+  BavarianData fixture) with evidence kind, timestamp, resolution, provenance, retention, association and limits.
+- For 6.2/6.3: reuse `SessionStore`; genuine measurements are only HA entity states; no code reads Recorder state
+  history or raw OCPP MeterValues; Morek outcomes and `debug_day` are not measured history; BMW data is a fixture
+  catalogue only, and its domain (`bavariandata`) differs from the `cardata` named in `docs/supported.md`.
+- Unverified: every installed source, cadence, Recorder coverage, Morek session-recorder wiring and BMW association.
+
 ### 2026-11-13 — 5.7b3 partial local acceptance (no version change; local mocked; PARTIAL)
 
 - Scope limits: the user prohibited expensive/long-running tests including browser suites. No browser, live HA,
