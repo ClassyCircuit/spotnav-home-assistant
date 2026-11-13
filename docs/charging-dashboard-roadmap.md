@@ -90,16 +90,16 @@ Detailed requirements and acceptance cases follow outside this checklist.
 | 2 | Isolate Morek from legacy control | Unarmed lifecycle groundwork complete; activation blocked |
 | 3 | Automatically send changed schedules | Stages 1 and 2 before activation |
 | 4 | Recover and report execution health | Stage 3 |
-| 5 | Installable real-data daily dashboard and safe route to charging | Guarded automatic dispatch implemented; monitoring and acceptance remain open |
+| 5 | Installable real-data daily dashboard and safe route to charging | 5.7b2 monitoring implemented locally; 5.7b3 acceptance partial, 5.1 visual approval and 5.8 user-owned validation remain open |
 | 6 | Genuine charging history | Later; not a prerequisite for initial installation |
 | 7 | Extended charts, tracks and price insights | After initial real-data chart; actual track uses Stage 6 |
 | 8 | Yesterday, costs and savings | Later; depends on genuine data |
-| 9 | Recovery and diagnostics | 9.4 logging implemented locally (2.5.113, mocked); 9.5 automatic recovery remains open |
+| 9 | Recovery and diagnostics | 9.4 logging implemented locally (2.5.113, mocked); 9.5 blocker re-evaluation and visible blockers implemented locally (2.5.117, mocked; automatic recovery of a never-dispatched Resume deliberately not provided; not deployed or live-verified) |
 | 10 | Charge Now and partial-price planning | 10.1–10.3 locally complete; deployed behavior unverified |
 | 11 | Adaptive charging estimates for Morek | Later work; reuse existing learning and genuine measurement sources |
 | 12 | Fix real sidebar usability, price presentation and evidence | Prioritize before 5.8; implement bounded 12.1–12.8 separately alongside remaining 5.7b work |
 | 13 | Migrate useful old-card configuration into the sidebar | Follow the related Stage 12 work; 13.1–13.4 are separate, bounded tasks |
-| 14 | Predictable planning and stable Morek schedule updates | 14.1–14.6 in order; 14.1–14.6 locally implemented (14.6: 2.5.111); 14.1 locally implemented (2.5.101, mocked; review corrections applied); coordinates with 9.4/9.5 and 11 without duplicating them |
+| 14 | Predictable planning and stable Morek schedule updates | 14.1–14.6 locally implemented and mock-tested; 14.6 review corrections through 2.5.112; deployed behavior unverified |
 
 ### Stage 0 — Completed baseline: preserve and reuse
 
@@ -1107,7 +1107,23 @@ tests are documented there; full HA collection is still blocked on Windows.
     components already registered, including use alongside the existing card where
     applicable. Do not globally weaken HA's custom-element registry or conceal real
     import errors. Local browser tests do not prove the installed HA fix.
-- [ ] **5.7b2 Live charging and health binding**
+- [x] **5.7b2 Live charging and health binding** (2.5.119, local mocked tests only; not
+  deployed or verified against a real charger. Which of the sources below exist on the user's
+  installation is unknown.)
+  - Implemented: Morek status `readiness.live` (backend `_live_measurements`) reads, read-only
+    and bound to the OCPP connector target, the connector's reported status, `current_import`
+    (A), power (W) and the cumulative energy register (kWh; not session energy). Power has no assumed
+    entity: it is the user-configured power entity, else the one enabled OCPP registry sensor whose
+    unique id names `Power.Active.Import` of exactly this connector; none or two candidates read as
+    unknown (`live.sources`). The energy register uses the same strict identity match. Each carries its own
+    HA timestamp and a `fresh` flag (180 s). Missing, unavailable, non-finite, negative-energy,
+    unknown-unit or untimestamped values are null; a real 0 stays 0. Power is never derived from
+    current or a schedule. The sidebar's `live-charging.js` shows reported state, measured power
+    or current, and the register separately, requires matching connector ids, withdraws
+    everything on a stale/failed status refresh (2.5.67 handling), and raises a warning on a
+    reported-vs-measured disagreement without resolving it. Sent ACK/effective limits remain
+    separate evidence. Not done: session energy/history (Stages 6–8), a power source for
+    chargers that expose none, per-connector selection beyond the Morek connector.
   - The existing sidebar adapter still reports measured power as unavailable. Inspect
     the backend's existing reported charger state, measured-power, energy-register
     and integration paths; bind only evidence with an appropriate source, connector
@@ -1116,7 +1132,12 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Include mocked backend/frontend tests for normal, unavailable, stale, offline,
     error and mismatch states. No rendering-triggered charger writes, invented readings
     or assumed installed measurement source. Reuse 2.5.67's failed-refresh handling.
-- [ ] **5.7b3 Local acceptance and release handoff**
+- [ ] **5.7b3 Local acceptance and release handoff** (PARTIAL, 2026-11-13, local mocked only; the
+  user excluded browser and long-running suites, so those acceptance items are unrun, not passed.
+  Done: worker timezone harness fix, stale unit-test fixture fix, stale browser-check wording
+  fix; see the handoff entry "5.7b3 partial local acceptance". Open: browser rerun
+  (desktop/emulated mobile), full worker/planning suites, 5.4c on a supported host,
+  installed-HA/physical observations.)
   - Investigate the mocked browser check's failed Pause-status assertion against the
     current UI/fixture; fix the real defect or stale test, not just its expectation.
     Rerun it through desktop and emulated mobile and all remaining interactions.
@@ -1300,7 +1321,7 @@ when identified, rather than remaining indefinite roadmap tasks.
       and charger-availability changes are covered by the existing 14.6 decision line (blocker codes), not by
       separate new lines; the viewer has no browser test. A stored warning from before a restart has no sequence
       number, so it appears only on a fresh (non-incremental) load.
-- [ ] **9.5 Automatic Morek recovery and visible failures:** make the existing Auto
+- [~] **9.5 Automatic Morek recovery and visible failures (2.5.117 local, mocked; PARTIALLY met: transient-blocker re-evaluation and the banner are done, automatic recovery of a never-dispatched Resume after restart is NOT; see "Implemented" below):** make the existing Auto
   schedule and session paths recover from ordinary failures without requiring repeated
   manual Resume or sync. This is a focused reliability task, not a new controller.
   - Audit and fix restart/reconnect, offline charger, unavailable prices and other
@@ -1327,6 +1348,46 @@ when identified, rather than remaining indefinite roadmap tasks.
     for reconnect/restart, delayed prices, settled versus interrupted Resume, rejected
     and unknown uploads, mismatch, Stop races, session start and Charge Now, including
     bounded retries and visible failure states. No live operation is authorized.
+  - Implemented (2.5.115, local, mocked only; not deployed, not verified in a live HA, no browser run). Reuses the
+    14.5 rejection retry, the 14.6 decision/blocker evidence, the reconnect/availability hook in `__init__.py` and
+    planner price/SOC events; no new controller or store:
+    - **Transient blockers** (`morek_schedule.TRANSIENT_BLOCKERS`: charger/identity unavailable, prices
+      stale/unavailable/incomplete, plan inputs changed, stale or missing vehicle input, a finished Stop's
+      `stale_generation`, worker error) are re-evaluated by `MorekScheduleWorker._arm_blocker_timer` when no event
+      arrives: 60 s, 180 s, 600 s, then every 900 s, at most 12 timer-driven re-evaluations per blocked episode
+      (about 2.5 h; counting continues across unrelated triggers and resets only when the blocker ends). Events
+      (reconnect, price publication, SOC, plug-in) still re-evaluate at any time, also after the timed checks stop.
+      A re-evaluation only runs the normal guarded read-and-compare path; a send still passes ownership, identity,
+      generation, person-Stop and protection checks. In memory: a restart re-arms from the first run.
+    - **Never timer-retried:** an uncertain/unknown write, a person pause/Stop, Charge Now, ownership or protection
+      conflicts, settings problems. A definite rejection keeps its own 14.5 cooldown (300 s, 900 s, then stops).
+    - **Interrupted Resume - automatic restart recovery NOT delivered (2.5.117):** after a restart a durable
+      `resume_requested` continues only when this process holds its ticket or the pre-existing 2.5.98 evidence
+      matches (settled accepted attempt carrying the Resume's id, matching acknowledgement and fingerprint). A Resume
+      that was never dispatched, was rejected, or was aborted before dispatch is **not** recovered automatically; the
+      person must press Resume again. Reason: a person Stop can be reserved in memory while the Resume is being made
+      durable and the process can die before the Stop's own record or the `resume_interrupted` marker is written; the
+      ledger cannot distinguish that from an ordinary interrupted Resume, and no write ordering closes the window (the
+      2.5.115 evidence-based recovery and the 2.5.116 `resume_unsettled` two-write marker only narrowed it, and were
+      removed). Still protected: a Resume that a person Stop pre-empted in this process (`worker.resume_interrupted`) or
+      durably (ledger `resume_interrupted` id, written under the connector lock when a Stop pre-empts a committed Resume;
+      a new person Resume uses a fresh id), an unknown outcome, and a recorded Stop (it replaces the Resume record).
+      Applies to the session-start coordinator's use of `_resume_authorized` too.
+      **This item therefore falls short of the "no reconfirmation after ordinary restart" goal for a never-dispatched
+      Resume; do not claim the Stop race is eliminated.**
+    - **Sidebar:** a prominent `#recovery-banner` (`frontend/sidebar/recovery-banner.js`, shown only from a fresh
+      status) states the blocker, what SpotNav does next (next automatic check time, remaining rejection retries,
+      timed checks stopped) or that a person is needed; an unknown write is shown as an error that is not retried and
+      not cleared, and no accepted request or readback is called charging. Status adds
+      `reconciliation.recovery.blocker_retry` (code, attempts, limit, next_retry_at, exhausted) and more blocker codes
+      mapped to actions.
+    - Tests: `tests/test_stage_95_recovery.py` (real worker and send path, mocked HA/OCPP/admission, including a crash
+      after the Resume commit with an unrecorded Stop) and `frontend/test/recovery-banner.test.ts` (5, including the
+      real panel). The two `test_morek_worker` tests keep their original "requires confirmation after restart" results.
+    - Limits: timed re-evaluation state and the in-process `resume_interrupted` mark are memory only; a Stop whose
+      request was lost by a crash before its record was written cannot be seen; the 12-check cap means a very long
+      outage relies on the reconnect/price events; the status route is not exercised end to end; layout is unchecked
+      in a browser; physical charging and the deployed version remain unverified.
 
 ### Stage 10 — Optional Charge Now (after initial installation)
 
@@ -2079,7 +2140,7 @@ handoff and checklist truthfully; follow AGENTS.md version/build requirements.
   - Test stale/out-of-order SOC, fresh SOC after measured energy, unavailable meters,
     restart, reconnect, definite rejection, timeout/unknown outcome and Stop races.
 
-- [x] **14.6 Decision evidence and end-to-end regression** (2.5.111 local, mocked)
+- [x] **14.6 Decision evidence and end-to-end regression** (2.5.112 local, mocked; review corrections applied)
   - Implemented: after each finished worker run `MorekScheduleWorker._record_decision` builds one
     non-sensitive event (`morek_schedule.decision_event`): trigger (+ coalesced kinds), planner input state
     (plan state/reason, SOC source, age, estimated, uncertain), connector evidence (fresh 180 s status or

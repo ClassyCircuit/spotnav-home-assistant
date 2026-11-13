@@ -798,6 +798,9 @@ def _resume_authorized(record: dict[str, Any], worker: Any, generation: int) -> 
     pause = record.get("schedule_pause") or {}
     if pause.get("type") != "resume_requested":
         return False
+    if (getattr(worker, "resume_interrupted", None) == pause.get("id")
+            or record.get("resume_interrupted") == pause.get("id")):
+        return False  # a recorded Stop pre-empted this Resume: only a new person Resume continues
     if getattr(worker, "resume_ticket", None) == (pause.get("id"), generation):
         return True
     attempt = record.get("attempt") or {}
@@ -819,7 +822,9 @@ def _owned_pause_status(outcomes: dict[str, Any], verification: dict[str, Any], 
     matching = not stop_pending and attempt.get("pause_id") == pause.get("id")
     # A worker reason may describe the previous intent; never attach it to a new one.
     request = "stop_pending" if stop_pending else attempt.get("state", "unknown") if matching else "pending"
-    if not matching and not stop_pending and pause.get("type") == "resume_requested" and worker is not None and getattr(worker, "resume_ticket", None) is None:
+    if (not matching and not stop_pending and pause.get("type") == "resume_requested" and worker is not None
+            and getattr(worker, "resume_ticket", None) is None
+            and not _resume_authorized(outcomes, worker, 0)):
         request = "resume_requires_confirmation"
     return {"intent": pause.get("type", "unknown"), "request": request,
             "ack": attempt.get("ack") if matching else None,
@@ -901,6 +906,98 @@ def _charge_point(hass: HomeAssistant, target: Any) -> Any:
     return point
 
 
+LIVE_MAX_AGE_S = 180  # same bound as the connector observation: a presentation limit, not a heartbeat
+
+
+def _live_reading(state: Any, now: datetime, value: Any, unit: str) -> dict[str, Any] | None:
+    """One connector sensor reading with its own timestamp, or None when unreadable.
+
+    A real 0 stays 0. A reading is stamped, never refreshed: a stale one keeps its old
+    `observed_at` and `fresh: False`, so the reader can say how old it is.
+    """
+    if state is None or value is None:
+        return None
+    stamp = getattr(state, "last_reported", None) or getattr(state, "last_updated", None)
+    if not isinstance(stamp, datetime) or stamp.tzinfo is None:
+        return None  # an unknown observation time is not evidence of anything current
+    age = (now - stamp).total_seconds()
+    return {"value": value, "unit": unit, "observed_at": stamp.isoformat(),
+            "fresh": 0 <= age <= LIVE_MAX_AGE_S}
+
+
+def _live_measurements(hass: HomeAssistant, controller: Any, now: datetime) -> dict[str, Any]:
+    """Read-only, connector-bound charger observations; nothing is inferred or written.
+
+    `status` is the connector's *reported* state, `current_a` and `power_w` are measured flow,
+    `energy_register_kwh` is the cumulative import register (not this session's energy). Each is
+    None when its source is missing, unavailable or unreadable. Power and current are never derived
+    from each other or from a schedule limit.
+
+    Power has no assumed entity. It is read from (1) the user's explicitly configured power entity for this
+    charger, else (2) the one enabled OCPP sensor whose registry identity names `Power.Active.Import` of
+    exactly this connector (`connector_measurand_entity`); two candidates or none read as None. The energy
+    register uses the same strict identity match. `sources` says which rule produced each, or why not.
+    """
+    from ..execution.charge_progress import connector_current
+    from ..execution.charger_connection import normalise_ocpp
+    from ..execution.power_energy import power_w_of
+    from ..vehicles.ocpp_identity import (CURRENT_IMPORT_KEY, ENERGY_REGISTER_KEY, POWER_ACTIVE_IMPORT_KEY,
+                                          STATUS_CONNECTOR_KEY, _classes_allow_register, connector_measurand_entity,
+                                          connector_sensor_entity_id)
+
+    target = getattr(controller, "ocpp_target", None)
+    live: dict[str, Any] = {"connector_id": getattr(target, "connector_id", None), "status": None,
+                            "current_a": None, "power_w": None, "energy_register_kwh": None,
+                            "sources": {"power": "none", "energy": "none"}}
+    if target is None:
+        return live
+
+    def read(entity_id: str | None) -> Any:
+        return hass.states.get(entity_id) if entity_id else None
+
+    def attempt(compute: Any) -> Any:
+        try:
+            return compute()
+        except Exception:  # noqa: BLE001 - an unreadable source is unknown, not an API failure
+            return None
+
+    status_state = attempt(lambda: read(connector_sensor_entity_id(hass, target, STATUS_CONNECTOR_KEY)))
+    raw = None if status_state is None or str(status_state.state).lower() in ("unknown", "unavailable", "") \
+        else str(status_state.state)
+    if raw is not None:
+        reading = _live_reading(status_state, now, raw, "")
+        if reading is not None:
+            reading["normalized"] = attempt(lambda: normalise_ocpp(raw))
+            live["status"] = {k: v for k, v in reading.items() if k != "unit"}
+    state = attempt(lambda: read(connector_sensor_entity_id(hass, target, CURRENT_IMPORT_KEY)))
+    live["current_a"] = attempt(lambda: _live_reading(state, now, connector_current(state), "A"))
+    configured = getattr(controller, "power_entity_id", None)
+    if isinstance(configured, str) and configured:
+        power_id, live["sources"]["power"] = configured, "configured_entity"
+    else:
+        found = attempt(lambda: connector_measurand_entity(hass, target, POWER_ACTIVE_IMPORT_KEY))
+        power_id = found.entity_id if found is not None else None
+        live["sources"]["power"] = "ocpp_registry" if power_id else found.status if found is not None else "none"
+    state = attempt(lambda: read(power_id))
+    live["power_w"] = attempt(lambda: _live_reading(state, now, power_w_of(state), "W"))
+
+    def energy() -> Any:
+        found = connector_measurand_entity(hass, target, ENERGY_REGISTER_KEY)
+        live["sources"]["energy"] = "ocpp_registry" if found.entity_id else found.status
+        sensor = read(found.entity_id) if found.entity_id and _classes_allow_register(hass, found.entity_id) else None
+        if sensor is None or str(sensor.state).lower() in ("unknown", "unavailable", ""):
+            return None
+        unit = (sensor.attributes or {}).get("unit_of_measurement")
+        factor = {"kWh": 1.0, "Wh": 0.001}.get(str(unit))
+        value = float(sensor.state)
+        if factor is None or value != value or value in (float("inf"), float("-inf")) or value < 0:
+            return None
+        return _live_reading(sensor, now, value * factor, "kWh")
+
+    live["energy_register_kwh"] = attempt(energy)
+    return live
+
+
 def _session_readiness(hass: HomeAssistant, controller: Any, identity: dict[str, Any], online: bool,
                        now: datetime) -> dict[str, Any]:
     """Read connector observations only; no inference of authorization or physical flow.
@@ -910,7 +1007,7 @@ def _session_readiness(hass: HomeAssistant, controller: Any, identity: dict[str,
     """
     result: dict[str, Any] = {
         "control": "unknown", "vehicle": "unknown", "transaction": "unknown",
-        "measurement": "unknown", "vehicle_observed_at": None,
+        "measurement": "unknown", "vehicle_observed_at": None, "live": None,
         # This is not an admission decision: no session-start dispatcher exists.
         # Keep it separate from schedule upload readiness and never infer a session
         # from the control switch or a connector status.
@@ -935,6 +1032,10 @@ def _session_readiness(hass: HomeAssistant, controller: Any, identity: dict[str,
             result["control"] = "unavailable"
             return result
         result["control"] = "available"
+        result["live"] = _live_measurements(hass, controller, now)
+        live = result["live"]
+        if any((live.get(k) or {}).get("fresh") for k in ("current_a", "power_w")):
+            result["measurement"] = "measured"  # flow was measured; never implies a transaction or authorization
         from ..execution.charger_connection import normalise_ocpp
         from ..vehicles.ocpp_identity import STATUS_CONNECTOR_KEY, connector_sensor_entity_id
 
@@ -1082,6 +1183,43 @@ DECISION_BLOCKERS: dict[str, str] = {
     "too_many_blocks": "adjust_planning_settings",
     "invalid_plan": "adjust_planning_settings",
 }
+DECISION_BLOCKERS.update({
+    "prices_unavailable": "wait_for_prices", "prices_stale_or_unavailable": "wait_for_prices",
+    "price_evidence_unavailable": "wait_for_prices", "price_inputs_changed": "wait_for_prices",
+    "price_coverage_unavailable": "wait_for_prices",
+    "vehicle_input_unavailable": "wait_for_fresh_inputs", "vehicle_input_stale": "wait_for_fresh_inputs",
+    "vehicle_identity_unavailable": "wait_for_fresh_inputs", "plan_inputs_changed": "wait_for_planner",
+    "no_current_plan": "wait_for_planner", "plan_input_provenance_unavailable": "adjust_planning_settings",
+    "current_must_be_16": "adjust_planning_settings",
+})
+#: Stage 9.5: blockers that clear on their own (a reconnect, prices, a fresh reading, a finished Stop). The worker
+#: re-evaluates them after a bounded backoff when no event arrives; every one is only a read-and-compare, a send
+#: still passes every guard. Never here: an uncertain write (`upload_uncertain`), a rejection (own cooldown), a
+#: person pause, an ownership or protection conflict, settings problems.
+TRANSIENT_BLOCKERS = frozenset({
+    "charger_unavailable", "identity_unresolved", "identity_changed", "stale_generation", "planner_changed",
+    "worker_unavailable", "planning_unavailable", "target_soc_stale", "target_progress_uncertain",
+    "waiting_for_vehicle_update", "prices_unavailable", "prices_stale_or_unavailable", "price_evidence_unavailable",
+    "price_inputs_changed", "price_coverage_unavailable", "plan_inputs_changed", "no_current_plan",
+    "vehicle_input_unavailable", "vehicle_input_stale", "vehicle_identity_unavailable",
+})
+BLOCKER_RETRY_DELAYS = (60, 180, 600, 900)  # seconds; the last repeats
+BLOCKER_RETRY_LIMIT = 12  # timer-driven re-evaluations per blocked episode (about 2.5 h); events still re-evaluate
+
+
+def blocker_retry_delay(runs: int) -> int | None:
+    """Seconds until the next timer-driven re-evaluation after `runs` of them, or None when used up."""
+    if runs >= BLOCKER_RETRY_LIMIT:
+        return None
+    return BLOCKER_RETRY_DELAYS[min(runs, len(BLOCKER_RETRY_DELAYS) - 1)]
+
+
+def blocker_retry_status(worker: Any) -> dict[str, Any] | None:
+    """The worker's current transient blocker and its bounded re-evaluation, or None when not blocked that way."""
+    state = getattr(worker, "blocker_retry", None)
+    return dict(state) if isinstance(state, dict) else None
+
+
 _DECISION_OK = ("upload_accepted_unverified", "unchanged")
 _DECISION_SENT = ("upload_accepted_unverified", "upload_rejected", "upload_uncertain")
 _DECISION_ACK = {"upload_accepted_unverified": "accepted", "upload_rejected": "rejected",
@@ -1253,15 +1391,26 @@ async def async_record_owned_pause(hass: HomeAssistant, entry_id: str, *, resume
                 raise ScheduleRefused("resume_unavailable")
             desired = "resume_requested" if resume else "pause_until_resumed"
             committed = False
-            if intent is None or intent["type"] != desired or (not resume and record.get("charge_now") is not None):
+            interrupted_before = resume and intent is not None and (
+                record.get("resume_interrupted") == intent["id"])
+            if (intent is None or intent["type"] != desired or interrupted_before
+                    or (not resume and record.get("charge_now") is not None)):
                 intent = {"version": 1, "type": desired, "id": uuid4().hex,
                           "station_id": connector.station_id, "connector_id": connector.connector_id}
                 record["schedule_pause"] = intent
+                record.pop("resume_interrupted", None)  # a fresh intent id: a person's new Resume may continue
                 if not resume:
                     record.pop("charge_now", None)
                 await outcomes_for(hass).write(record)
                 committed = True
             if resume and (generation != admission.generation(connector) or admission._person_stops.get(connector)):
+                interrupted = getattr(getattr(entry, "runtime_data", None), "morek_worker", None)
+                if interrupted is not None:
+                    interrupted.resume_interrupted = intent["id"]  # a Stop took precedence: never auto-recover it
+                # Durable too, before anything else can run: a restart before the Stop's own record must not
+                # recover this superseded Resume. Written under the connector lock; a failed write propagates.
+                record["resume_interrupted"] = intent["id"]
+                await outcomes_for(hass).write(record)
                 if committed:
                     from ..execution.auto_execution import AutoControlCommitted, EXECUTION_RECONCILE_FAILED
                     raise AutoControlCommitted(EXECUTION_RECONCILE_FAILED)
@@ -2128,7 +2277,8 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
                       "reconciliation": {"reason": worker.reason if worker is not None and
                                          getattr(worker, "reason_serial", -1) == worker._serial else "pending",
                                          "continuity": getattr(worker, "continuity", None),
-                                         "recovery": recovery_status(outcomes, datetime.now(timezone.utc)),
+                                         "recovery": {**recovery_status(outcomes, datetime.now(timezone.utc)),
+                                                      "blocker_retry": blocker_retry_status(worker)},
                                          "inputs": _planning_inputs(hass, entry.entry_id),
                                          "last_trigger": getattr(worker, "last_trigger", None),
                                          "blocker": decision_blocker(worker.reason if worker is not None and

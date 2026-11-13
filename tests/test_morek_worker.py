@@ -489,7 +489,7 @@ async def test_manual_api_routes_owned_pause_without_legacy_executor(monkeypatch
     monkeypatch.setattr(manual_action, "resolve_charger_request", lambda *_: entry)
     async def owned(action):
         return await morek_schedule.async_maybe_owned_action(w.hass, "charger", action)
-    executor = AutoExecutor(w.hass, controller, SimpleNamespace(), owned_manual_action=owned)
+    executor = AutoExecutor(w.hass, controller, SimpleNamespace(settings=lambda _: SimpleNamespace(pause=SimpleNamespace(admitted=False))), owned_manual_action=owned)
     monkeypatch.setattr(manual_action, "preview_for", lambda *_: SimpleNamespace(async_manual_action=executor.async_manual_action))
     monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
     monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: controller)

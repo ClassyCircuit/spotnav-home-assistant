@@ -283,7 +283,7 @@ describe('actual sidebar read-only host', () => {
     raw.plan.proposal.periods=[{start:new Date(Date.now()+3600000).toISOString(),end:new Date(Date.now()+7200000).toISOString()}];
     const adapter=dashboardAdapter(raw,status,Date.now());
     expect(adapter.model.evidence.status).toMatch(/unsupported/i);
-    expect(adapter.model.vehicle.power).toBe('Unavailable');
+    expect(adapter.model.vehicle.power).toBe('Unknown');
     expect(adapter.model.canSave).toBe(false);
     expect(adapter.model.chart).toBeUndefined();
     expect(adapter.model.windows).toHaveLength(1);

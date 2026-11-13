@@ -281,6 +281,78 @@ def connector_sensor_entity_id(hass: HomeAssistant, target: OcppConnectorTarget,
     return template
 
 
+POWER_ACTIVE_IMPORT_KEY = "power_active_import"
+"""The OCPP measurand `Power.Active.Import` spelled like the other keys here. It is only ever *matched*
+against a registered entity's own identity (`connector_measurand_entity`); it is never turned into an
+entity id, because no deployed integration source was available to confirm how it names this sensor."""
+
+
+@dataclass(frozen=True)
+class MeasurandLookup:
+    """What a strict registry lookup found: `bound` (one entity), `none` or `ambiguous` (several)."""
+
+    entity_id: str | None
+    status: str
+
+
+def _sensor_identity(unique_id: Any) -> tuple[str, int | None, str] | None:
+    """`(cpid, connector or None for flat, normalised key)` of an OCPP sensor unique id, else `None`.
+
+    Shapes, as `connector_sensor_entity_id` already reads them: `ocpp.<cpid>.conn<n>.<key>.sensor`,
+    `sensor.ocpp.<cpid>.conn<n>.<key>` and the flat forms without `conn<n>`. A key spelled with dots
+    (`power.active.import`) or hyphens is normalised to underscores.
+    """
+    if not isinstance(unique_id, str):
+        return None
+    parts = unique_id.split(".")
+    if parts[-1:] == ["sensor"]:
+        parts = parts[:-1]
+    elif parts[:1] == ["sensor"]:
+        parts = parts[1:]
+    else:
+        return None
+    if len(parts) < 3 or parts[0] != OCPP_DOMAIN or not parts[1]:
+        return None
+    cpid, rest = parts[1], parts[2:]
+    connector: int | None = None
+    if rest[0].startswith("conn") and rest[0][4:].isdigit():
+        connector = int(rest[0][4:])
+        rest = rest[1:]
+        if connector < 1 or not rest:
+            return None
+    return cpid, connector, "_".join(rest).lower().replace("-", "_")
+
+
+def connector_measurand_entity(hass: HomeAssistant, target: OcppConnectorTarget, key: str) -> MeasurandLookup:
+    """The one enabled OCPP sensor whose *registry identity* says it is `key` of exactly this connector.
+
+    No entity id is built or guessed: each registered OCPP sensor is parsed from its unique id and kept only
+    when its charge point, connector and measurand all match. A flat unique id (no `conn<n>`) counts only for
+    connector 1 of a charge point known to have one connector, never as a station-wide reading of a
+    multi-connector charger. Another connector's sensor, a different measurand (`power_offered`,
+    `power_active_export`, ...) and disabled entities never match. Two different matching entities are
+    `ambiguous` and answer no entity, so the caller reads nothing rather than a coin flip. Read-only.
+    """
+    registry = er.async_get(hass)
+    single = _single_connector(registry, hass, target)
+    wanted = key.lower().replace("-", "_")
+    matches: set[str] = set()
+    for entry in registry.entities.values():
+        if entry.platform != OCPP_DOMAIN or entry.domain != "sensor" or entry.disabled_by is not None:
+            continue
+        identity = _sensor_identity(entry.unique_id)
+        if identity is None:
+            continue
+        cpid, connector, entry_key = identity
+        if cpid != target.charge_point_id or entry_key != wanted:
+            continue
+        if connector == target.connector_id or (connector is None and single):
+            matches.add(entry.entity_id)
+    if len(matches) == 1:
+        return MeasurandLookup(next(iter(matches)), "bound")
+    return MeasurandLookup(None, "ambiguous" if matches else "none")
+
+
 def target_from_entity_id(entity_id: str) -> OcppConnectorTarget | None:
     """The connector an OCPP control entity names: the charge control's, else the session limit's."""
     return charge_control_target_from_entity_id(entity_id) or session_limit_target_from_entity_id(

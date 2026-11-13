@@ -55,6 +55,11 @@ class MorekScheduleWorker:
         self.continuity: dict[str, Any] | None = None
         self._continuity_timer = None
         self._retry_timer = None
+        # Stage 9.5: bounded timer re-evaluation of a transient blocker (memory only; events still re-evaluate).
+        self._blocker_timer = None
+        self._blocker_runs = 0
+        self.blocker_retry: dict[str, Any] | None = None
+        self.resume_interrupted: str | None = None  # a Resume id a person Stop pre-empted in this process
         self._continuity_end: datetime | None = None
         self._deadline: float | None = None
         self._wake = asyncio.Event()
@@ -200,6 +205,9 @@ class MorekScheduleWorker:
         if self._retry_timer is not None:
             self._retry_timer.cancel()
             self._retry_timer = None
+        if self._blocker_timer is not None:
+            self._blocker_timer.cancel()
+            self._blocker_timer = None
         if self._remove is not None:
             self._remove()
             self._remove = None
@@ -268,6 +276,33 @@ class MorekScheduleWorker:
         if delay <= 1:
             return  # already due: this very run is the retry; never a tight re-arm loop
         self._retry_timer = asyncio.get_running_loop().call_later(delay, lambda: self.trigger(kind="recovery"))
+
+    def _arm_blocker_timer(self, kinds: set[str]) -> None:
+        """A transient blocker (reconnect, prices, fresh reading, a finished Stop) usually ends with an event.
+        Where none arrives, re-evaluate after a bounded backoff (`morek_schedule.blocker_retry_delay`).
+
+        This only re-runs the guarded read-and-compare path: an uncertain write, a person pause, an ownership or
+        protection conflict and a rejection (its own cooldown) are never in the transient set, and a
+        send still passes every admission check. Counting continues across other triggers; only a run that
+        is no longer blocked that way resets it."""
+        if self._blocker_timer is not None:
+            self._blocker_timer.cancel()
+            self._blocker_timer = None
+        if self._closed or self.reason not in morek_schedule.TRANSIENT_BLOCKERS:
+            self._blocker_runs = 0
+            self.blocker_retry = None
+            return
+        if "recovery" in kinds:
+            self._blocker_runs += 1
+        delay = morek_schedule.blocker_retry_delay(self._blocker_runs)
+        state: dict[str, Any] = {"code": self.reason, "attempts": self._blocker_runs,
+                                 "limit": morek_schedule.BLOCKER_RETRY_LIMIT, "next_retry_at": None,
+                                 "exhausted": delay is None}
+        self.blocker_retry = state
+        if delay is None:
+            return
+        state["next_retry_at"] = (datetime.now(timezone.utc) + timedelta(seconds=delay)).isoformat()
+        self._blocker_timer = asyncio.get_running_loop().call_later(delay, lambda: self.trigger(kind="recovery"))
 
     def _arm_continuity_timer(self) -> None:
         """Replan again just after a preserved window ends; planner events may not."""
@@ -359,6 +394,7 @@ class MorekScheduleWorker:
                     self._kinds -= kinds
                     self.last_trigger = next((k for k in _TRIGGER_RANK if k in kinds), None)
                     self._record_decision(kinds)
+                    self._arm_blocker_timer(kinds)
                     return
         finally:
             self._task = None

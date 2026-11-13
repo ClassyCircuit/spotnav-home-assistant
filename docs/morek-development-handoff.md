@@ -15,9 +15,10 @@ raised the working-tree manifest to 2.5.99, then 2.5.100 after review and 2.5.10
 and deployed version on arrival. The current coordinator initialization is
 `prompts/coordinator-handoff.md`.
 
-**Open priorities:** Stage 9.5 is the requested practical automatic-recovery and
-visible-failure work; 9.4 is native HA Core logging with a SpotNav-filtered view.
-5.7b2 measured charging/health binding and 5.7b3 local acceptance remain open.
+**Open priorities:** Stage 9.5 (automatic recovery and visible blockers) and 9.4 (SpotNav log
+view) are implemented locally with mocked tests (2.5.117 / 2.5.113); neither is deployed or live-verified. 9.5 is
+only partly met: a never-dispatched Resume after restart needs a fresh explicit Resume (see its entry below).
+5.7b2 measured charging/health binding is implemented locally (2.5.119, see its entry); 5.7b3 local acceptance is partial (see its entry); browser checks remain unrun.
 Follow the current roadmap and user's selected priority rather than stale historical
 directions. Preserve the user's approved one-time clean-start risk, explicit Stop,
 electrical protection and actually recorded uncertain dispatched operations.
@@ -33,8 +34,8 @@ tasks, not permission to deploy or operate the user's charger.
 **Automatic restart recovery requested:** the user does not want to press a
 reconfirmation button after ordinary HA restarts. Local 2.5.98 recovers a settled
 Resume from matching durable evidence, but interrupted Resume and other recovery
-cases remain for Stage 9.5. Unknown/interrupted outcomes must remain visible and
-must not be blindly retried; no live action is authorized by this note.
+cases are only partly addressed by Stage 9.5 (2.5.117, see below: an undispatched Resume still needs a fresh click). Unknown outcomes remain
+visible and are never blindly retried; no live action is authorized by this note.
 
 **Single Morek execution path:** the user no longer wants a runtime switch back to
 the legacy controller or a separate dynamic handback protocol. Replace Morek's old
@@ -382,6 +383,61 @@ requirements, not features claimed implemented in the manual baseline below.
   Do not assume `GetCompositeSchedule` lists stored profiles.
 
 ## Tests, build, and next steps
+
+### 2026-11-13 — 5.7b3 partial local acceptance (no version change; local mocked; PARTIAL)
+
+- Scope limits: the user prohibited expensive/long-running tests including browser suites. No browser, live HA,
+  deployment, charger command, commit or push happened. Integration and card are unchanged (manifest stays
+  2.5.119; `npm run check-dist` still current).
+- Worker timezone failure: cause was the isolated runner (`--noconftest`) skipping `tests/conftest.py`'s zone
+  prewarm; `tzdata` is installed. `tools/run_isolated_logs_tests.py` now prewarms the same zones through a small
+  plugin. `test_real_planner_publications_drive_worker_without_browser` now passes there.
+- `test_manual_api_routes_owned_pause_without_legacy_executor` failed because its `AutoExecutor` store stub lacked
+  `settings()`, which `_finish_owned_resume` reads; the stub now returns a non-admitted pause (test fixture only).
+- Results: `python tools/run_isolated_logs_tests.py tests/test_morek_worker.py tests/test_stage_95_recovery.py`:
+  156 passed, 1 skipped (real-planner to guarded worker, Stop, restart, stale and uncertain cases included).
+  `test_morek_outcomes` and the 14.5 files: 27 passed. Frontend sidebar/live-charging/recovery-banner/morek-view
+  vitest: 139 passed. Ruff clean on the changed Python.
+- Pause-status browser assertion (source/jsdom only): `frontend/sidebar/browser-check.mjs` still expected
+  "Controls unavailable until schedule ownership is confirmed", text no longer produced; current
+  `paintAutomatic` emits "Resume unavailable: Schedule ownership is not currently authorized...", which
+  `frontend/test/sidebar.test.ts` already asserts. Expectation updated; button-state and zero-write assertions kept.
+  The 2.5.67 "Pause intent unknown" output was not reproduced or explained without a browser (a freshness/timing
+  cause is only a hypothesis). The browser script has NOT been rerun.
+- Unrun: browser check (desktop + mobile + interactions), broader planning/lifecycle runners, 5.4c HA-plugin suite
+  (Windows `fcntl`), `test_morek_session.py` under the real plugin. Unverified: installed HA rendering, external
+  writers, protection, physical charging.
+- User checklist: install the release; open the sidebar; confirm the loaded version; check the live-charging panel
+  shows reported state, measured power (or unknown) and the register separately; try Stop/Resume only when you accept
+  the effect; after an HA restart confirm Morek status and that an unsent Resume asks for a fresh click; compare the
+  BMW's own limit with SpotNav's plan; report anything saying unknown/uncertain.
+
+### 2026-11-13 — Stage 9.5 recovery and visible blockers (2.5.117; local mocked; PARTIALLY met)
+
+- Worker `_arm_blocker_timer` re-evaluates transient blockers (`morek_schedule.TRANSIENT_BLOCKERS`) after 60/180/600/900 s,
+  at most 12 timer runs per episode, in addition to the existing reconnect, price, SOC and plug-in events; it only
+  triggers the normal guarded reconcile. Sidebar `#recovery-banner` (`frontend/sidebar/recovery-banner.js`) from
+  `reconciliation.blocker` / `.recovery.blocker_retry`.
+- **Automatic recovery of an interrupted Resume was deliberately removed (2.5.117).** 2.5.115 recovered a
+  never-dispatched/rejected/aborted Resume on affirmative ledger evidence and 2.5.116 added a `resume_unsettled`
+  marker with a second settle write. Neither can exclude this crash window: a person Stop reserved only in memory
+  while the Resume becomes durable, then a crash before the Stop's own record or the `resume_interrupted` marker.
+  The ledger looks the same as an ordinary interrupted Resume, and any write ordering only narrows the window. So
+  `resume_interrupted_recoverable`, `resume_unsettled` and the two-write sequence are gone. After a restart a
+  `resume_requested` continues only with this process's ticket or the pre-existing 2.5.98 matching settled accepted
+  attempt (id, acknowledgement, fingerprint); otherwise the person presses Resume again
+  (`resume_requires_confirmation`). Kept: durable `resume_interrupted` marker (a Stop that pre-empts a committed
+  Resume, written under the connector lock before the action returns), the in-process mark, uncertain-outcome
+  blocking, and Stop precedence. **The race is not eliminated** (a Stop observed in memory whose record never lands
+  still cannot be seen by a restart; it now only costs one explicit Resume instead of risking an unwanted one).
+  9.5's "no reconfirmation after ordinary restart" goal is therefore not fully met for a never-dispatched Resume.
+- Tests (isolated runner `python tools/run_isolated_logs_tests.py <paths>`): `tests/test_stage_95_recovery.py` covers
+  blockers/banner status, never-dispatched/rejected/aborted Resume requiring a fresh Resume, a crash after the Resume
+  commit with an unrecorded Stop, the in-process ticket, preserved matching settled recovery and recorded-Stop
+  blocking; the two `test_morek_worker` tests are back to their original "requires confirmation" expectations.
+  Run: stage 9.5 + worker 154 passed, with the known failures `test_manual_api_routes_owned_pause...` and
+  `test_real_planner_publications...` (missing Europe/Stockholm tzdata, identical without the change). No browser,
+  live HA, deployment or charger operation.
 
 ### 2026-11-13 — Stage 9.4 SpotNav log viewer (2.5.113; local mocked)
 
@@ -4028,3 +4084,36 @@ Historical partial entry; superseded by the completed foundation above.
   `frontend/`, and commit the built bundle in `custom_components/spotnav/www/`.
   A push to `main` is not an HA deployment: Marketplace checks custom forks on
   its own schedule, downloads an offered update, and HA must load the new code.
+
+### 2026-11-13 — 5.7b2 live charging and health binding (2.5.119; local, mocked)
+
+- `api/morek_schedule.py`: `_session_readiness` adds `readiness.live` (null when offline/unsupported):
+  `{connector_id, status, current_a, power_w, energy_register_kwh}`, each `{value, unit, observed_at,
+  fresh}` or null (status also has `normalized`). Sources: connector `status_connector`, `current_import`,
+  power and the energy register (kWh/Wh; cumulative, not session). **No power entity name is assumed
+  (2.5.119 review; the earlier `power_active_import` template guess was removed).** Power is the user-configured
+  `power_entity` of this charger entry (`sources.power = configured_entity`), else
+  `ocpp_identity.connector_measurand_entity`: the one enabled OCPP-platform registry sensor whose unique id
+  (`ocpp.<cpid>.conn<n>.<key>.sensor` / `sensor.ocpp.<cpid>.conn<n>.<key>`, dotted/hyphenated keys normalised)
+  names this charge point, this connector and `power_active_import`. A flat unique id counts only for connector 1
+  of a charge point whose charge-control switch is the flat one; other measurands (`power_offered`, export),
+  disabled entities and other platforms never match; two matches are `ambiguous`, none `none` (both null,
+  reported in `live.sources`). The energy register uses the same strict lookup plus the existing device/state
+  class check. Still requires device class power and W/kW at read time. No local OCPP integration source exists
+  (`ocpp` is not installed), so whether a real install registers that exact key is **unverified**: if not, power
+  simply reads Unknown, and the user can configure a power entity. Status and current still use
+  `connector_sensor_entity_id` (existing convention with a default-name fallback; tests confirm connector 2 never
+  reads connector 1's). Known gap, untouched: the controller's own `energy_register_entity_for` still accepts a
+  flat register as connector 1 without a single-connector check.
+  `readiness.measurement` becomes `measured` only for a fresh current/power reading, never for status alone;
+  `transaction` and `session_start` are unchanged.
+- Frontend: `frontend/sidebar/live-charging.js` (pure) feeds the adapter's "Measured now", evidence
+  measurement, readiness line and a mismatch warning. Evidence must carry the status connector id; stale,
+  future, malformed or failed-refresh data reads Unknown; measured 0 is shown as 0.
+- Tests: `tests/test_morek_readiness.py` (+4, then +10 for the registry boundary: per-connector, ambiguity,
+  absence, flat/single, other measurands, freshness, real-zero; real `RegistryEntry` objects behind a fake registry) and `frontend/test/live-charging.test.ts` (new). Run with the
+  `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ... --noconftest` harness above (the HA plugin needs `fcntl`). Old
+  `sidebar.test.ts` placeholder assertion changed from `Unavailable` to `Unknown` deliberately.
+  No browser, broad or HA-plugin suites were run. No HA access, deployment or charger action.
+- Limits: whether the user's charger exposes these sensors, their real update cadence, and physical
+  agreement are unverified. The 5.1 visual approval was not touched. 5.7b3 remains open.

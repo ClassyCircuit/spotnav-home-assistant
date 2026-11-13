@@ -8,9 +8,11 @@ export interface MorekState {
   cleanup?: { requested_at: string; profile_id: number; status: string } | null;
   outcomes?: { uncertain: boolean; state?: string } | null;
   operator?: { state: string; reason?: string | null };
-  reconciliation?: { reason: string };
+  reconciliation?: { reason: string; blocker?: { code: string; action: string } | null;
+    recovery?: { next_retry_at?: string | null; retries_left?: number | null; exhausted?: boolean;
+      blocker_retry?: { code: string; attempts: number; limit: number; next_retry_at: string | null; exhausted: boolean } | null } };
   schedule_pause?: { intent?: string; request?: string; ack?: string | null; readback?: string; measured?: string; coverage_start?: string | null; coverage_end?: string | null };
-  readiness?: { control?: string; vehicle?: string; transaction?: string; measurement?: string; vehicle_observed_at?: string | null; session_start?: { state: string; reason: string } };
+  readiness?: { control?: string; vehicle?: string; transaction?: string; measurement?: string; vehicle_observed_at?: string | null; live?: unknown; session_start?: { state: string; reason: string } };
   ownership?: { recorded_owner?: string | null; blockers?: string[]; schedule_mode_available?: boolean; completion_authorized?: boolean; reconfirmation_required?: boolean; local_regulator?: string; recovery?: { state?: string; migration_result?: string } };
   reason?: string | null;
   configured_id?: string | null;
@@ -189,7 +191,7 @@ export function morekPanel(
     identity_unresolved: "Charger identity is unresolved or ambiguous; automatic sending is blocked.",
     ownership_conflict: "Another SpotNav binding conflicts with ownership; resolve the binding before activation.",
     retained_profile_exit_held: "Exit is held until retained-profile resolution is reviewed.",
-    resume_requires_confirmation: "Confirm Resume again after restart; the retained limit may remain.",
+    resume_requires_confirmation: "Resume could not be continued automatically; confirm Resume again. The retained limit may remain.",
     schedule_mode_unarmed: "Automatic schedule sending is not enabled.",
     upload_uncertain: "The previous write outcome is unknown; automatic retry is blocked.",
     upload_rejected: "Morek rejected the schedule; it was not confirmed.",

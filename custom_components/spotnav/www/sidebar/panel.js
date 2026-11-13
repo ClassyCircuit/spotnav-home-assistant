@@ -2183,26 +2183,26 @@ var init_chunk_M45NRQFW = __esm({
       noResults: "No matching results",
       notCompleted: "Not completed",
       now: "Now",
-      numCharacters: (num) => {
-        if (num === 1) return "1 character";
-        return `${num} characters`;
+      numCharacters: (num2) => {
+        if (num2 === 1) return "1 character";
+        return `${num2} characters`;
       },
-      numCharactersRemaining: (num) => {
-        if (num === 1) return "1 character remaining";
-        return `${num} characters remaining`;
+      numCharactersRemaining: (num2) => {
+        if (num2 === 1) return "1 character remaining";
+        return `${num2} characters remaining`;
       },
-      numOptionsAvailable: (num) => {
-        if (num === 0) return "No options available";
-        if (num === 1) return "1 option available";
-        return `${num} options available`;
+      numOptionsAvailable: (num2) => {
+        if (num2 === 0) return "No options available";
+        if (num2 === 1) return "1 option available";
+        return `${num2} options available`;
       },
-      numOptionsSelected: (num) => {
-        if (num === 0) return "No options selected";
-        if (num === 1) return "1 option selected";
-        return `${num} options selected`;
+      numOptionsSelected: (num2) => {
+        if (num2 === 0) return "No options selected";
+        if (num2 === 1) return "1 option selected";
+        return `${num2} options selected`;
       },
-      numRowsCopied: (num) => num === 1 ? "1 row copied" : `${num} rows copied`,
-      numRowsSelected: (num) => num === 1 ? "1 row selected" : `${num} rows selected`,
+      numRowsCopied: (num2) => num2 === 1 ? "1 row copied" : `${num2} rows copied`,
+      numRowsSelected: (num2) => num2 === 1 ? "1 row selected" : `${num2} rows selected`,
       optionPosition: (label, position, total2) => `${label}, ${position} of ${total2}`,
       optionsLoadError: "Options could not be loaded",
       pageXOfY: (page, total2) => `Page ${page} of ${total2}`,
@@ -10269,7 +10269,7 @@ var Track = (function() {
   Track2.prototype.getAdditiveTrack = function() {
     return this._additiveTrack;
   };
-  Track2.prototype.addKeyframe = function(time, rawValue, easing) {
+  Track2.prototype.addKeyframe = function(time2, rawValue, easing) {
     this._needsSort = true;
     var keyframes = this.keyframes;
     var len2 = keyframes.length;
@@ -10318,7 +10318,7 @@ var Track = (function() {
     }
     this.discrete = this.discrete || discrete;
     var kf = {
-      time,
+      time: time2,
       value: value2,
       rawValue,
       percent: 0
@@ -10520,10 +10520,10 @@ var Animator = (function() {
   Animator2.prototype.changeTarget = function(target) {
     this._target = target;
   };
-  Animator2.prototype.when = function(time, props, easing) {
-    return this.whenWithKeys(time, props, keys(props), easing);
+  Animator2.prototype.when = function(time2, props, easing) {
+    return this.whenWithKeys(time2, props, keys(props), easing);
   };
-  Animator2.prototype.whenWithKeys = function(time, props, propNames, easing) {
+  Animator2.prototype.whenWithKeys = function(time2, props, propNames, easing) {
     var tracks = this._tracks;
     for (var i7 = 0; i7 < propNames.length; i7++) {
       var propName = propNames[i7];
@@ -10545,14 +10545,14 @@ var Animator = (function() {
         if (initialValue == null) {
           continue;
         }
-        if (time > 0) {
+        if (time2 > 0) {
           track.addKeyframe(0, cloneValue(initialValue), easing);
         }
         this._trackKeys.push(propName);
       }
-      track.addKeyframe(time, cloneValue(props[propName]), easing);
+      track.addKeyframe(time2, cloneValue(props[propName]), easing);
     }
-    this._maxTime = Math.max(this._maxTime, time);
+    this._maxTime = Math.max(this._maxTime, time2);
     return this;
   };
   Animator2.prototype.pause = function() {
@@ -10699,8 +10699,8 @@ var Animator = (function() {
     }
     this._abortedCallback();
   };
-  Animator2.prototype.delay = function(time) {
-    this._delay = time;
+  Animator2.prototype.delay = function(time2) {
+    this._delay = time2;
     return this;
   };
   Animator2.prototype.during = function(cb) {
@@ -10873,12 +10873,12 @@ var Animation = (function(_super) {
     animator.animation = null;
   };
   Animation2.prototype.update = function(notTriggerFrameAndStageUpdate) {
-    var time = getTime() - this._pausedTime;
-    var delta = time - this._time;
+    var time2 = getTime() - this._pausedTime;
+    var delta = time2 - this._time;
     var clip = this._head;
     while (clip) {
       var nextClip = clip.next;
-      var finished = clip.step(time, delta);
+      var finished = clip.step(time2, delta);
       if (finished) {
         clip.ondestroy();
         this.removeClip(clip);
@@ -10887,7 +10887,7 @@ var Animation = (function(_super) {
         clip = nextClip;
       }
     }
-    this._time = time;
+    this._time = time2;
     if (!notTriggerFrameAndStageUpdate) {
       this.trigger("frame", delta);
       this.stage.update && this.stage.update();
@@ -21310,8 +21310,8 @@ function getDefaultFormatPrecisionOfInterval(timeUnit) {
       return "second";
   }
 }
-function format(time, template, isUTC, lang) {
-  var date2 = parseDate(time);
+function format(time2, template, isUTC, lang) {
+  var date2 = parseDate(time2);
   var y3 = date2[fullYearGetterName(isUTC)]();
   var M2 = date2[monthGetterName(isUTC)]() + 1;
   var q = Math.floor((M2 - 1) / 3) + 1;
@@ -21471,8 +21471,8 @@ function makeValueReadable(value2, valueType, useUTC) {
   function stringToUserReadable(str) {
     return str && trim(str) ? str : "-";
   }
-  function isNumberUserReadable(num) {
-    return isNullableNumberFinite(num);
+  function isNumberUserReadable(num2) {
+    return isNullableNumberFinite(num2);
   }
   var isTypeTime = valueType === "time";
   var isValueDate = value2 instanceof Date;
@@ -28548,8 +28548,8 @@ function normalizeSymbolOffset(symbolOffset, symbolSize) {
 }
 
 // node_modules/zrender/lib/canvas/helper.js
-function isSafeNum(num) {
-  return isFinite(num);
+function isSafeNum(num2) {
+  return isFinite(num2);
 }
 function createLinearGradient(ctx, obj, rect) {
   var x2 = obj.x == null ? 0 : obj.x;
@@ -46032,12 +46032,12 @@ var TooltipHTMLContent = (
         return _this._longHide = true;
       }, 500);
     };
-    TooltipHTMLContent2.prototype.hideLater = function(time) {
+    TooltipHTMLContent2.prototype.hideLater = function(time2) {
       if (this._show && !(this._inContent && this._enterable) && !this._alwaysShowContent) {
-        if (time) {
-          this._hideDelay = time;
+        if (time2) {
+          this._hideDelay = time2;
           this._show = false;
-          this._hideTimeout = setTimeout(bind(this.hide, this), time);
+          this._hideTimeout = setTimeout(bind(this.hide, this), time2);
         } else {
           this.hide();
         }
@@ -46171,12 +46171,12 @@ var TooltipRichContent = (
       }
       this._show = false;
     };
-    TooltipRichContent2.prototype.hideLater = function(time) {
+    TooltipRichContent2.prototype.hideLater = function(time2) {
       if (this._show && !(this._inContent && this._enterable) && !this._alwaysShowContent) {
-        if (time) {
-          this._hideDelay = time;
+        if (time2) {
+          this._hideDelay = time2;
           this._show = false;
-          this._hideTimeout = setTimeout(bind(this.hide, this), time);
+          this._hideTimeout = setTimeout(bind(this.hide, this), time2);
         } else {
           this.hide();
         }
@@ -52251,8 +52251,8 @@ use([install3, install, install5, install6, install8, install9, install7, instal
 var axis = { axisLine: { lineStyle: { color: "#536b76" } }, axisLabel: { color: "#bed0d5", fontSize: 12 }, splitLine: { lineStyle: { color: "#34444d" } } };
 function mountCharts(root, data, format2, modes) {
   let { prices, windows, now, deadline, horizon, cap, readings, sentHistory, bands, historyAxis, unit = "c/kWh" } = data;
-  let { time, date: sampleDate, days: sampleDays, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks } = format2;
-  time = format2.chartTime || time;
+  let { time: time2, date: sampleDate, days: sampleDays, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks } = format2;
+  time2 = format2.chartTime || time2;
   let tooltipDate = format2.tooltipDate || sampleDate;
   const controller = new AbortController();
   const signal = controller.signal;
@@ -52273,7 +52273,7 @@ function mountCharts(root, data, format2, modes) {
     const setPriceOption = (initial) => priceChart.setOption({
       animation: false,
       grid: { left: 48, right: 20, top: 82, bottom: 92, show: true, backgroundColor: "#101f30", borderWidth: 0 },
-      tooltip: { trigger: "item", confine: true, hideDelay: 0, transitionDuration: 0, backgroundColor: "#233942", borderColor: "#5b7b7a", textStyle: { color: "#f0faf8" }, formatter: (p4) => `${escapeText(tooltipDate(p4.value[0]))} ${escapeText(time(p4.value[0]))}\u2013${escapeText(tooltipDate(p4.value[1]))} ${escapeText(time(p4.value[1]))}<br>${priceText(p4.value[2])} ${escapeText(unit)}${windows.filter((w2) => w2.start < p4.value[1] && w2.end > p4.value[0]).map((w2) => `<br>Proposal: ${escapeText(tooltipDate(w2.start))} ${escapeText(time(w2.start))}\u2013${escapeText(time(w2.end))}`).join("")}` },
+      tooltip: { trigger: "item", confine: true, hideDelay: 0, transitionDuration: 0, backgroundColor: "#233942", borderColor: "#5b7b7a", textStyle: { color: "#f0faf8" }, formatter: (p4) => `${escapeText(tooltipDate(p4.value[0]))} ${escapeText(time2(p4.value[0]))}\u2013${escapeText(tooltipDate(p4.value[1]))} ${escapeText(time2(p4.value[1]))}<br>${priceText(p4.value[2])} ${escapeText(unit)}${windows.filter((w2) => w2.start < p4.value[1] && w2.end > p4.value[0]).map((w2) => `<br>Proposal: ${escapeText(tooltipDate(w2.start))} ${escapeText(time2(w2.start))}\u2013${escapeText(time2(w2.end))}`).join("")}` },
       xAxis: { ...axis, type: "value", min: horizon[0], max: horizon[1], axisLabel: { show: false }, axisTick: { show: false }, splitLine: { show: false } },
       yAxis: { ...axis, axisLabel: { ...axis.axisLabel, formatter: priceText }, type: "value", name: unit, nameTextStyle: { color: "#bed0d5", align: "left" }, ...bands ? { interval: 10, min: (value2) => Math.min(0, Math.floor(value2.min / 10) * 10), max: (value2) => Math.ceil(value2.max / 10) * 10 } : { scale: true } },
       dataZoom: [{ type: "inside", xAxisIndex: 0, startValue: initial[0], endValue: initial[1], filterMode: "weakFilter", zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false, preventDefaultMouseMove: false }, { type: "slider", xAxisIndex: 0, startValue: initial[0], endValue: initial[1], filterMode: "weakFilter", height: 28, bottom: 12, borderColor: "#4b6871", backgroundColor: "#142630", fillerColor: "rgba(91,205,180,.22)", textStyle: { color: "#d0e1df" }, showDetail: false }],
@@ -52314,8 +52314,8 @@ function mountCharts(root, data, format2, modes) {
         const el = document.createElement("span");
         el.dataset.hour = h3;
         el.style.left = `${priceChart.convertToPixel({ xAxisIndex: 0 }, h3)}px`;
-        el.textContent = h3 % 24 === 0 ? `${time(h3)}
-${sampleDate(h3)}` : time(h3);
+        el.textContent = h3 % 24 === 0 ? `${time2(h3)}
+${sampleDate(h3)}` : time2(h3);
         return el;
       }));
       const pixel = (h3) => priceChart.convertToPixel({ xAxisIndex: 0 }, h3);
@@ -52453,9 +52453,9 @@ ${sampleDate(h3)}` : time(h3);
       grid: { left: 45, right: 20, top: 30, bottom: 34 },
       tooltip: { trigger: "axis", confine: true, formatter: (items) => {
         const p4 = items[0];
-        return `${escapeText(time(p4.value[0]))}<br>${p4.value[1] == null ? "Unavailable" : `${p4.value[1].toFixed(1)} kW`}`;
+        return `${escapeText(time2(p4.value[0]))}<br>${p4.value[1] == null ? "Unavailable" : `${p4.value[1].toFixed(1)} kW`}`;
       } },
-      xAxis: { ...axis, type: "value", min: readings[0].time, max: readings.at(-1).time, ...Number.isFinite(historyAxis?.interval) && historyAxis.interval > 0 ? { interval: historyAxis.interval } : {}, axisLabel: { ...axis.axisLabel, formatter: time } },
+      xAxis: { ...axis, type: "value", min: readings[0].time, max: readings.at(-1).time, ...Number.isFinite(historyAxis?.interval) && historyAxis.interval > 0 ? { interval: historyAxis.interval } : {}, axisLabel: { ...axis.axisLabel, formatter: time2 } },
       yAxis: { ...axis, type: "value", name: "kW", min: 0, ...Number.isFinite(historyAxis?.max) && historyAxis.max > 0 ? { max: historyAxis.max } : {}, nameTextStyle: { color: "#bed0d5", align: "left" } },
       series: [{
         type: "line",
@@ -52479,8 +52479,8 @@ ${sampleDate(h3)}` : time(h3);
   if (powerChart) resize.observe(root.querySelector("#power-chart"));
   return { priceCharts, update(next, nextFormat) {
     ({ prices, windows, now, deadline, horizon, cap, bands, unit = "c/kWh" } = next);
-    ({ time, date: sampleDate, days: sampleDays, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks } = nextFormat);
-    time = nextFormat.chartTime || time;
+    ({ time: time2, date: sampleDate, days: sampleDays, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks } = nextFormat);
+    time2 = nextFormat.chartTime || time2;
     tooltipDate = nextFormat.tooltipDate || sampleDate;
     refreshers.forEach((refresh) => refresh());
   }, dispose() {
@@ -52514,7 +52514,7 @@ var soc = (value2) => number(value2, 1, "%", (n6) => n6 >= 0 && n6 <= 100);
 var escapeText2 = (value2) => String(value2 ?? "Unknown").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
 function renderPlan(windows, assumptions = {}, stale = false, formatters, totals) {
   if (!formatters || typeof formatters.time !== "function" || typeof formatters.day !== "function") throw new TypeError("Plan time and day formatters are required");
-  const time = (value2) => Number.isFinite(value2) ? escapeText2(formatters.time(value2)) : "Unknown";
+  const time2 = (value2) => Number.isFinite(value2) ? escapeText2(formatters.time(value2)) : "Unknown";
   const day = (value2) => Number.isFinite(value2) ? escapeText2(formatters.day(value2)) : "Unknown";
   const summary = totals === void 0 ? total(windows) : totals || {};
   const currency = formatters.currency;
@@ -52524,7 +52524,7 @@ function renderPlan(windows, assumptions = {}, stale = false, formatters, totals
     return Number.isFinite(actual) && typeof priceCurrency === "string" && /^[A-Z]{3}$/.test(priceCurrency) ? `${summaryPriceText(actual)} ${priceUnit(priceCurrency)}` : "Unknown";
   };
   const validAssumptions = assumptions.projectionSupported === true || validSocAssumptions(assumptions);
-  const rows = windows.map((w2, i7) => `<div class="plan-row ${i7 === 0 ? "next-window" : ""}"><span><b>${time(w2.start)}\u2013${time(w2.end)}</b><small>${day(w2.start)}${i7 === 0 ? " \xB7 NEXT" : ""}${w2.control === "minimum-exception" ? " \xB7 ABOVE-CAP MINIMUM" : ""}</small></span><span><b>${displayPrice2(w2.pricePerKwh, w2.centsPerKwh)}</b><small>weighted price</small></span><span><b>${energy(w2.energy)}</b><small>wall energy</small></span><span><b>${money(w2.cost, currency)}</b><small>cost</small></span><span><b>${soc(validAssumptions ? w2.projectedSoc : null)}</b><small>projected SOC</small></span></div>`).join("");
+  const rows = windows.map((w2, i7) => `<div class="plan-row ${i7 === 0 ? "next-window" : ""}"><span><b>${time2(w2.start)}\u2013${time2(w2.end)}</b><small>${day(w2.start)}${i7 === 0 ? " \xB7 NEXT" : ""}${w2.control === "minimum-exception" ? " \xB7 ABOVE-CAP MINIMUM" : ""}</small></span><span><b>${displayPrice2(w2.pricePerKwh, w2.centsPerKwh)}</b><small>weighted price</small></span><span><b>${energy(w2.energy)}</b><small>wall energy</small></span><span><b>${money(w2.cost, currency)}</b><small>cost</small></span><span><b>${soc(validAssumptions ? w2.projectedSoc : null)}</b><small>projected SOC</small></span></div>`).join("");
   const start2 = soc(assumptions.startingSoc);
   const capacity = number(assumptions.capacityKwh, 0, " kWh", (n6) => n6 > 0);
   const efficiency = number(Number.isFinite(assumptions.efficiency) ? assumptions.efficiency * 100 : null, 0, "%", (n6) => n6 > 0 && n6 <= 100);
@@ -52676,7 +52676,7 @@ function mountDashboard(root, adapter) {
     const assumptions = m4.assumptions || {};
     const plan = knownPlan ? renderPlan(windows, assumptions, !!(state.planStale ?? state.stale), f3, m4.totals) : '<p class="projection-note">Proposed plan unavailable.</p>';
     const summary = m4.totals === void 0 ? total(windows) : m4.totals || {}, next = m4.nextWindow === void 0 ? windows[0] : m4.nextWindow;
-    const time = (x2) => Number.isFinite(x2) ? f3.time(x2) : "Unknown";
+    const time2 = (x2) => Number.isFinite(x2) ? f3.time(x2) : "Unknown";
     const day = (x2) => Number.isFinite(x2) ? f3.day(x2) : "Unknown";
     const sample = m4.sample === true;
     const tag = sample ? "SAMPLE" : "";
@@ -52694,7 +52694,7 @@ function mountDashboard(root, adapter) {
     const priceCard = (mode) => {
       const title = mode === "bar" ? "Bars" : "Stepped area";
       if (!chartReady) return card(`Prices & plan \xB7 ${title}`, labels.chartEyebrow || "PRICES & PLAN", `<p>Price chart unavailable.</p><p class="subtext">${escapeText(labels.chartIntro)} ${escapeText(labels.chartNote)}</p>${plan}`, `prices prices-${mode}`, tag);
-      const extremum = (p4) => p4 ? `${priceNumber(p4.cents)} ${escapeText(unit)} \xB7 ${escapeText(day(p4.start))} ${escapeText(time(p4.start))}` : "Unknown";
+      const extremum = (p4) => p4 ? `${priceNumber(p4.cents)} ${escapeText(unit)} \xB7 ${escapeText(day(p4.start))} ${escapeText(time2(p4.start))}` : "Unknown";
       return card(`Prices & plan \xB7 ${title}`, labels.chartEyebrow || "PRICES & PLAN", `<div class="chart-intro"><div><strong>${icon} ${mode === "bar" ? "A \xB7 Interval bars" : (chart?.comparison ? "B \xB7 " : "") + "Stepped area"}</strong><p>${escapeText(labels.chartIntro)}</p></div><div class="chart-actions"><wa-button data-zoom="${mode}" size="small" aria-label="Zoom in ${title}">Zoom +</wa-button><wa-button data-reset="${mode}" size="small" aria-label="Reset ${title} overview">Full horizon</wa-button><span>Wheel zooms \xB7 scroll outside chart</span></div></div><div class="price-context"><span>Now <b>${priceNumber(priceAt(chart.now))} ${escapeText(unit)}</b></span><span>Next window starts at <b>${priceNumber(m4.nextPriceUnavailable ? null : priceAt(next?.start))} ${escapeText(unit)}</b></span><span>Horizon low <b>${extremum(extremes[0])}</b></span><span>Horizon high <b>${extremum(extremes[1])}</b></span></div><div id="price-${mode}" class="chart price-chart" role="img" aria-label="Price intervals and proposed windows"></div><p class="legend">${escapeText(labels.bands)} ${validBands ? `<span class="band-green">\u25CF</span> \u2264${chart.bands[0]} <span class="band-amber">\u25CF</span> &gt;${chart.bands[0]}\u2013${chart.bands[1]} <span class="band-orange">\u25CF</span> &gt;${chart.bands[1]}\u2013${chart.bands[2]} <span class="band-red">\u25CF</span> &gt;${chart.bands[2]} ${escapeText(unit)}` : "Neutral price color."} <span class="shade"></span> Proposed charging \xB7 gradient + pale track ${Number.isFinite(chart.cap) ? `<span class="cap-key"></span> Soft cap ${priceText(chart.cap)} ${escapeText(unit)}` : ""} <span class="now-key">\u2502</span> Now</p><p class="subtext">${escapeText(labels.chartNote)}</p>${plan}`, `prices prices-${mode}`, tag);
     };
     const scenario = m4.scenarios;
@@ -52710,7 +52710,7 @@ function mountDashboard(root, adapter) {
     const html = `<div class="shell"><header class="masthead"><div><div class="brand">SPOTNAV <span>ENHANCED</span></div><h1>Charging, in focus.</h1><p>A single view of your vehicle, plan and charger.</p></div>${labels.banner ? `<div class="sample-banner">${escapeText(labels.banner)}<br><span>${escapeText(labels.bannerDetail)}</span></div>` : ""}</header>
       ${scenario ? `<div class="scenario-picker"><label for="sample-state">${escapeText(scenario.label)}</label><select id="sample-state">${(scenario.options || []).map(option).join("")}</select><span>${escapeText(scenario.note)}</span></div>` : ""}
       <div id="critical-live" role="status" aria-live="polite">${m4.warning ? `<div class="alert"><div><strong>${escapeText(m4.warning.title)}</strong><p>${escapeText(m4.warning.detail)}</p></div><a href="#details">View details \u2193</a></div>` : ""}</div><div class="dashboard">
-      ${card("Your vehicle", "OVERVIEW", `<div class="status-line"><span class="dot ${!Number.isFinite(state.soc) || state.soc < 0 || state.soc > 100 || state.stale ? "dot-unknown" : ""}"></span> ${escapeText(state.status)}</div>${renderBattery({ soc: state.soc, target: settings.target, minimum: settings.minimum, deadline: settings.readyBy, capacityKwh: assumptions.capacityKwh, efficiency: assumptions.efficiency, stale: !!state.stale, planStale: !!(state.planStale ?? state.stale), lowSocWarning: state.lowSocWarning, windows, sample, minutesPerTimeUnit: f3.minutesPerTimeUnit, socDetail: state.socDetail, socEstimated: state.socEstimated })}<p class="waiting">${escapeText(state.detail)}</p><div class="metrics">${metric("Measured now", state.power, labels.powerNote)}<div class="metric next-metric"><div class="muted">${state.planStale ?? state.stale ? "Next window \xB7 stale proposal" : "Next proposed window"}</div><button type="button" id="open-plan" aria-haspopup="dialog">${next ? `${escapeText(time(next.start))}\u2013${escapeText(time(next.end))}` : "Unknown"} <span aria-hidden="true">\u2197</span></button><div class="muted">${escapeText(next ? day(next.start) : "Unknown")} \xB7 view complete plan</div></div>${metric(state.planStale ?? state.stale ? "Last plan cost \xB7 stale" : "Estimated charge cost", money(summary.cost, f3.currency), `${number(summary.energy, 2, " kWh", (n6) => n6 >= 0)} wall energy`)}${metric("Until deadline", m4.untilDeadline, labels.deadlineNote)}</div><div class="hint"><b>${escapeText(labels.planLabel)}</b> ${escapeText(state.policy)} ${escapeText(m4.targetNote)}</div>`, "overview", tag)}
+      ${card("Your vehicle", "OVERVIEW", `<div class="status-line"><span class="dot ${!Number.isFinite(state.soc) || state.soc < 0 || state.soc > 100 || state.stale ? "dot-unknown" : ""}"></span> ${escapeText(state.status)}</div>${renderBattery({ soc: state.soc, target: settings.target, minimum: settings.minimum, deadline: settings.readyBy, capacityKwh: assumptions.capacityKwh, efficiency: assumptions.efficiency, stale: !!state.stale, planStale: !!(state.planStale ?? state.stale), lowSocWarning: state.lowSocWarning, windows, sample, minutesPerTimeUnit: f3.minutesPerTimeUnit, socDetail: state.socDetail, socEstimated: state.socEstimated })}<p class="waiting">${escapeText(state.detail)}</p><div class="metrics">${metric("Measured now", state.power, labels.powerNote)}<div class="metric next-metric"><div class="muted">${state.planStale ?? state.stale ? "Next window \xB7 stale proposal" : "Next proposed window"}</div><button type="button" id="open-plan" aria-haspopup="dialog">${next ? `${escapeText(time2(next.start))}\u2013${escapeText(time2(next.end))}` : "Unknown"} <span aria-hidden="true">\u2197</span></button><div class="muted">${escapeText(next ? day(next.start) : "Unknown")} \xB7 view complete plan</div></div>${metric(state.planStale ?? state.stale ? "Last plan cost \xB7 stale" : "Estimated charge cost", money(summary.cost, f3.currency), `${number(summary.energy, 2, " kWh", (n6) => n6 >= 0)} wall energy`)}${metric("Until deadline", m4.untilDeadline, labels.deadlineNote)}</div><div class="hint"><b>${escapeText(labels.planLabel)}</b> ${escapeText(state.policy)} ${escapeText(m4.targetNote)}</div>`, "overview", tag)}
       ${card("Plan controls", labels.settingsEyebrow || "SETTINGS", `<p class="subtext">${escapeText(labels.settingsNote)}</p><div class="fields">${modeFields}${fields}${policyFields}</div>${policyHelp}<p id="settings-notice" role="status">${escapeText(m4.settingsNotice || "")}</p><wa-button id="save-plan" variant="brand" ${typeof actions2.save !== "function" || m4.canSave !== true ? "disabled" : ""}>${escapeText(labels.saveLabel || "Save plan \xB7 unavailable")}</wa-button>${m4.settingsEditor ? '<button type="button" id="reload-settings">Reload settings</button>' : ""}<div class="controls-plan">${plan}<button type="button" id="open-plan-details" aria-haspopup="dialog">View full window details \u2197</button></div>`, "controls", tag)}
       ${card("Price insights", labels.insightEyebrow || "PRICE DATA", renderInsights(m4.insights), "insights", tag)}
       ${modes.map(priceCard).join("")}
@@ -57710,9 +57710,9 @@ function replacementFor(kind, record3, values, range = null, opened = null, days
   if (amps !== null && !amps.ok) {
     return amps;
   }
-  const time = kind === "deadline" || kind === "plan" ? checkDeadlineTime(values.deadlineTime) : null;
-  if (time !== null && !time.ok) {
-    return time;
+  const time2 = kind === "deadline" || kind === "plan" ? checkDeadlineTime(values.deadlineTime) : null;
+  if (time2 !== null && !time2.ok) {
+    return time2;
   }
   const dateBase = opened === null ? record3 : opened;
   const dateMoved = values.departureDate !== (dateBase.departure_date ?? "");
@@ -57790,19 +57790,19 @@ function replacementFor(kind, record3, values, range = null, opened = null, days
     next.amps = amps.value;
     changed = changed || amps.value !== record3.amps;
   }
-  const deadlineMoved = opened === null || time !== null && time.ok && (values.deadlineEnabled !== opened.departure_enabled || time.value !== opened.departure_time || date2 !== null && date2.ok && date2.value !== opened.departure_date);
+  const deadlineMoved = opened === null || time2 !== null && time2.ok && (values.deadlineEnabled !== opened.departure_enabled || time2.value !== opened.departure_time || date2 !== null && date2.ok && date2.value !== opened.departure_date);
   const weekdaysMoved = dayList !== null && (opened === null ? dayList.join("") !== record3.departure_weekdays.join("") : dayList.join("") !== opened.departure_weekdays.join(""));
   if (weekdaysMoved && dayList !== null) {
     next.departure_weekdays = dayList;
     changed = changed || dayList.join("") !== record3.departure_weekdays.join("");
   }
-  if (time !== null && time.ok && deadlineMoved) {
+  if (time2 !== null && time2.ok && deadlineMoved) {
     next.departure_enabled = values.deadlineEnabled;
-    next.departure_time = time.value;
+    next.departure_time = time2.value;
     if (date2 !== null && date2.ok) {
       next.departure_date = date2.value;
     }
-    changed = changed || values.deadlineEnabled !== record3.departure_enabled || time.value !== record3.departure_time || date2 !== null && date2.ok && date2.value !== record3.departure_date;
+    changed = changed || values.deadlineEnabled !== record3.departure_enabled || time2.value !== record3.departure_time || date2 !== null && date2.ok && date2.value !== record3.departure_date;
   }
   if (kind === "plan" && record3.if_not_ready !== void 0 && IF_NOT_READY.includes(values.ifNotReady ?? "")) {
     const shown = opened === null ? record3.if_not_ready : opened.if_not_ready;
@@ -59550,7 +59550,7 @@ function localTime(value2) {
   return Number.isNaN(date2.getTime()) ? "unknown" : date2.toLocaleString();
 }
 function morekEvidence(state, observedAt, failed, now = Date.now()) {
-  const time = (value2) => value2 ? localTime(value2) : "Unavailable";
+  const time2 = (value2) => value2 ? localTime(value2) : "Unavailable";
   const fresh2 = (value2) => observationFreshness(value2, now) === "fresh";
   const statusFresh = !failed && observedAt != null && fresh2(observedAt);
   const readAt = Date.parse(state?.effective?.fetched_at ?? "");
@@ -59558,7 +59558,7 @@ function morekEvidence(state, observedAt, failed, now = Date.now()) {
   const start2 = Date.parse(state?.effective?.schedule_start ?? "");
   const duration = state?.effective?.duration_s;
   const end2 = Number.isFinite(start2) && typeof duration === "number" && Number.isFinite(duration) && duration > 0 ? start2 + duration * 1e3 : NaN;
-  const coverage = Number.isFinite(end2) ? `${time(state?.effective?.schedule_start)} \u2013 ${localTime(new Date(end2).toISOString())}` : "coverage unavailable";
+  const coverage = Number.isFinite(end2) ? `${time2(state?.effective?.schedule_start)} \u2013 ${localTime(new Date(end2).toISOString())}` : "coverage unavailable";
   const validCoverage = Number.isFinite(start2) && Number.isFinite(end2) && start2 <= now && now < end2;
   const outcomeUnknown = state?.outcomes?.uncertain === true;
   const reason = state?.verification?.reason;
@@ -59578,9 +59578,9 @@ function morekEvidence(state, observedAt, failed, now = Date.now()) {
   else if (!readFresh || !validCoverage) summary = "Current plan is not confirmed; the readback is stale or its current coverage is unavailable.";
   else if (state.verified && associated && state.verification_target === "current_plan") summary = "The remaining plan matched effective limits at the last read, within reported coverage.";
   else summary = "Current plan is not confirmed; the last readback has not verified this plan.";
-  const proposal = state?.preview?.profile ? `Calculated ${time(state.preview.calculated_at)}${statusFresh ? "" : " \xB7 status stale"}` : "Unavailable";
-  const sent = state?.sent ? `${time(state.sent_at)} \xB7 ACK ${state.ack ?? "unknown"} (response time unavailable)` : "No sent schedule recorded";
-  const readback = state?.effective ? `${state.effective.status} \xB7 read ${time(state.effective.fetched_at)} \xB7 ${readFresh && validCoverage ? "recent observation" : "stale or coverage unknown"} \xB7 ${coverage}` : "Unavailable";
+  const proposal = state?.preview?.profile ? `Calculated ${time2(state.preview.calculated_at)}${statusFresh ? "" : " \xB7 status stale"}` : "Unavailable";
+  const sent = state?.sent ? `${time2(state.sent_at)} \xB7 ACK ${state.ack ?? "unknown"} (response time unavailable)` : "No sent schedule recorded";
+  const readback = state?.effective ? `${state.effective.status} \xB7 read ${time2(state.effective.fetched_at)} \xB7 ${readFresh && validCoverage ? "recent observation" : "stale or coverage unknown"} \xB7 ${coverage}` : "Unavailable";
   return { summary, proposal, sent, readback, measurement: "Measured power unavailable; physical charging unknown." };
 }
 function transitions(doc, profile) {
@@ -59648,7 +59648,7 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
     identity_unresolved: "Charger identity is unresolved or ambiguous; automatic sending is blocked.",
     ownership_conflict: "Another SpotNav binding conflicts with ownership; resolve the binding before activation.",
     retained_profile_exit_held: "Exit is held until retained-profile resolution is reviewed.",
-    resume_requires_confirmation: "Confirm Resume again after restart; the retained limit may remain.",
+    resume_requires_confirmation: "Resume could not be continued automatically; confirm Resume again. The retained limit may remain.",
     schedule_mode_unarmed: "Automatic schedule sending is not enabled.",
     upload_uncertain: "The previous write outcome is unknown; automatic retry is blocked.",
     upload_rejected: "Morek rejected the schedule; it was not confirmed.",
@@ -59884,12 +59884,12 @@ function healthKey(state, observedAt, failed, busy, now) {
   if (!state.supported) return "daily.health.unsupported";
   if (state.verification?.reason === "verification_superseded") return "daily.health.superseded";
   if (state.operator?.state === "verified" && state.verified === true) {
-    const read = Date.parse(state.effective?.fetched_at ?? "");
+    const read2 = Date.parse(state.effective?.fetched_at ?? "");
     const end2 = Date.parse(state.verification?.coverage_end ?? "");
     const start2 = Date.parse(state.verification?.coverage_start ?? "");
     const preview = Date.parse(state.preview?.calculated_at ?? "");
     const reason = state.verification?.reason;
-    if ((reason === "matched" || reason === "matched_with_drift") && state.verification?.readback_at === state.effective?.fetched_at && !!state.verification?.readback_at && state.ack === "Accepted" && state.sent !== null && Number.isFinite(Date.parse(state.sent_at ?? "")) && state.effective?.status === "Accepted" && Array.isArray(state.effective.periods) && state.effective.periods.length >= 2 && state.effective.periods.every((period) => period !== null && typeof period === "object" && typeof period.at === "string" && Number.isFinite(Date.parse(period.at)) && Number.isFinite(period.amps)) && observationFreshness(preview, now, false, STATUS_MAX_AGE) === "fresh" && observationFreshness(read, now, false, READBACK_MAX_AGE) === "fresh" && Number.isFinite(start2) && start2 <= now && Number.isFinite(end2) && end2 > now) return "daily.health.matched";
+    if ((reason === "matched" || reason === "matched_with_drift") && state.verification?.readback_at === state.effective?.fetched_at && !!state.verification?.readback_at && state.ack === "Accepted" && state.sent !== null && Number.isFinite(Date.parse(state.sent_at ?? "")) && state.effective?.status === "Accepted" && Array.isArray(state.effective.periods) && state.effective.periods.length >= 2 && state.effective.periods.every((period) => period !== null && typeof period === "object" && typeof period.at === "string" && Number.isFinite(Date.parse(period.at)) && Number.isFinite(period.amps)) && observationFreshness(preview, now, false, STATUS_MAX_AGE) === "fresh" && observationFreshness(read2, now, false, READBACK_MAX_AGE) === "fresh" && Number.isFinite(start2) && start2 <= now && Number.isFinite(end2) && end2 > now) return "daily.health.matched";
     return "daily.health.stale";
   }
   if (state.operator?.state === "checking") return "daily.health.checking";
@@ -59930,7 +59930,7 @@ function publishedChart(raw, market, now, stale) {
     }
     return [start2, end2];
   };
-  const time = (ms) => new Intl.DateTimeFormat("en-GB", { timeZone: zone, hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "shortOffset" }).format(ms);
+  const time2 = (ms) => new Intl.DateTimeFormat("en-GB", { timeZone: zone, hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "shortOffset" }).format(ms);
   const date2 = (ms) => new Intl.DateTimeFormat("en-GB", { timeZone: zone, year: "numeric", month: "short", day: "numeric" }).format(ms);
   const days = (start2, end2) => {
     const result = [];
@@ -59963,7 +59963,71 @@ function publishedChart(raw, market, now, stale) {
     for (let t6 = Math.ceil(start2 / step) * step; t6 < end2; t6 += step) out2.push(t6);
     return out2;
   };
-  return { chart: { prices, now, horizon, cap: null, bands: null, unit: priceUnit(currency) }, format: { chartTime: time, date: date2, tooltipDate: date2, days, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks } };
+  return { chart: { prices, now, horizon, cap: null, bands: null, unit: priceUnit(currency) }, format: { chartTime: time2, date: date2, tooltipDate: date2, days, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks } };
+}
+
+// sidebar/live-charging.js
+var LIVE_MAX_AGE_MS = 18e4;
+var CLOCK_SKEW_MS = 5e3;
+var NOT_CHARGING = /* @__PURE__ */ new Set(["disconnected", "connected", "paused", "finished"]);
+var POWER_FLOW_W = 100;
+var CURRENT_FLOW_A = 1;
+function read(reading, now, unitCheck) {
+  if (!reading || typeof reading !== "object") return null;
+  const at = Date.parse(reading.observed_at || "");
+  if (!Number.isFinite(at) || !Number.isFinite(now)) return null;
+  const value2 = reading.value;
+  if (unitCheck ? !unitCheck(reading) : !(typeof value2 === "number" && Number.isFinite(value2))) return null;
+  const age = now - at;
+  if (age < -CLOCK_SKEW_MS) return null;
+  return { value: value2, at, age: Math.max(0, age), fresh: age <= LIVE_MAX_AGE_MS && reading.fresh !== false };
+}
+var ago = (ms) => ms < 6e4 ? `${Math.floor(ms / 1e3)} s ago` : ms < 36e5 ? `${Math.floor(ms / 6e4)} min ago` : `${Math.floor(ms / 36e5)} h ago`;
+var num = (value2, digits) => Number(value2.toFixed(digits)).toString();
+function liveCharging(status, observedAt, failed, now = Date.now()) {
+  const fresh2 = observationFreshness(observedAt, now, failed) === "fresh";
+  const ready = fresh2 ? status?.readiness : null;
+  const unknown = (reason) => ({ power: "Unknown", summary: `${reason} Measured power and charging are unknown.`, mismatch: false, reported: null, measured: null });
+  if (!fresh2) return unknown("Morek status is unavailable or stale.");
+  if (ready?.control === "unavailable") return unknown("The charger is offline or its control is unavailable.");
+  const live = ready?.live;
+  if (!live || typeof live !== "object") return unknown("No live charger observation is available.");
+  const own = Number.isInteger(live.connector_id) ? live.connector_id : null;
+  const expected = Number.isInteger(status?.connector_id) ? status.connector_id : null;
+  if (own === null || expected === null || own !== expected) return unknown("The live readings are not confirmed to belong to this connector.");
+  const reported = read(live.status, now, (r7) => typeof r7.value === "string" && r7.value !== "");
+  const reportedFresh = reported?.fresh ? reported : null;
+  const power = read(live.power_w, now);
+  const current = read(live.current_a, now);
+  const energy2 = read(live.energy_register_kwh, now, (r7) => typeof r7.value === "number" && Number.isFinite(r7.value) && r7.value >= 0);
+  const flow = [power && { kind: "power", ...power }, current && { kind: "current", ...current }].filter(Boolean).find((item) => item.fresh) || null;
+  const normalized = reportedFresh && typeof live.status.normalized === "string" ? live.status.normalized : null;
+  const parts = [];
+  parts.push(reportedFresh ? `Charger reports \u201C${reportedFresh.value}\u201D for connector ${own}, ${ago(reportedFresh.age)}; a reported state is not measured power.` : reported ? `Last reported connector state \u201C${reported.value}\u201D is stale (${ago(reported.age)}); current state unknown.` : `Connector ${own} reported state unknown.`);
+  let powerText = "Unknown";
+  if (power?.fresh) {
+    powerText = power.value === 0 ? "0 W measured" : `${power.value >= 1e3 ? num(power.value / 1e3, 2) + " kW" : num(power.value, 0) + " W"} measured`;
+    parts.push(`Measured power ${powerText}, ${ago(power.age)}.`);
+  } else if (current?.fresh) {
+    powerText = `${num(current.value, 1)} A measured (power unknown)`;
+    parts.push(`Measured current ${num(current.value, 1)} A, ${ago(current.age)}; power is not derived from it.`);
+  } else if (power || current) {
+    const old = power || current;
+    powerText = "Unknown";
+    parts.push(`Last measured ${power ? "power" : "current"} is stale (${ago(old.age)}); not shown as current.`);
+  } else parts.push("No measured power or current source is available for this connector.");
+  if (energy2) parts.push(`Cumulative energy register ${num(energy2.value, 2)} kWh${energy2.fresh ? "" : " (stale)"}, ${ago(energy2.age)}; this is not this session\u2019s energy.`);
+  else parts.push("Energy register unavailable.");
+  let mismatch = false;
+  if (flow && reportedFresh && normalized) {
+    const flowing = flow.kind === "power" ? flow.value > POWER_FLOW_W : flow.value > CURRENT_FLOW_A;
+    const stopped = flow.value === 0;
+    if (normalized === "charging" && stopped) mismatch = true;
+    else if (NOT_CHARGING.has(normalized) && flowing) mismatch = true;
+  }
+  if (mismatch) parts.push("Reported state and measured flow disagree; neither is verified.");
+  parts.push("A sent schedule, ACK or effective limit is not measured charging.");
+  return { power: powerText, summary: parts.join(" "), mismatch, reported: reportedFresh?.value ?? null, measured: flow ? flow.kind : null };
 }
 
 // sidebar/adapter.js
@@ -60043,7 +60107,8 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
   const vehicleFresh = Number.isFinite(vehicleAt) && vehicleAt <= now && now - vehicleAt <= 18e4;
   const vehicle = vehicleFresh && ready?.vehicle === "connected" ? "connected" : vehicleFresh && ready?.vehicle === "disconnected" ? "disconnected" : "unknown";
   const sessionStart = ready?.session_start?.state === "offline" ? "Automatic session start is offline." : ready?.session_start?.reason === "authorization_path_unimplemented" ? "Automatic session start is not implemented; OCPP command, transaction and safe scheduling evidence require verification." : ready?.session_start?.state ? `Session start ${ready.session_start.state} (${ready.session_start.reason || "reason unavailable"}). ON may allow immediate charging if the schedule is unconfirmed; ACK is not charging.` : "Automatic session start status unavailable.";
-  const readiness = `Control ${control} \xB7 vehicle ${vehicle} \xB7 transaction / authorization unknown \xB7 measured charging unknown. ${sessionStart} No active transaction is not a schedule prohibition.`;
+  const live = liveCharging(status, observedAt, failed, now);
+  const readiness = `Control ${control} \xB7 vehicle ${vehicle} \xB7 transaction / authorization unknown \xB7 ${live.measured ? `measured ${live.measured} observed` : "measured charging unknown"}. ${sessionStart} No active transaction is not a schedule prohibition.`;
   const proposal = d3.plan.proposal;
   const planStale = stale || d3.planning?.historical === true || !!(proposal?.periods.length && proposal.periods.every((p4) => p4.endMs <= now));
   const rawProposal = raw?.plan?.proposal;
@@ -60085,7 +60150,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
   }).join(" ") || U) + (uncapped ? blockNote : "");
   const unresolved = raw?.plan?.price_policy?.target_shortfall_kwh;
   const policyText = !planStale && raw?.plan?.price_policy?.provisional === true ? `${policyBase} Provisional: contiguous published prices end ${date(raw.plan.price_policy.price_coverage_end, zone)}. ${Number.isFinite(unresolved) && unresolved > 0 ? `${unresolved.toFixed(1)} kWh of target energy remains unresolved. ` : ""}Future prices and readiness are unknown; this is not necessarily the cheapest complete plan.` : policyBase;
-  const warning = status?.outcomes?.uncertain || status?.operator?.state === "mismatch" || status?.verification?.reason === "limits_or_transitions_differ";
+  const warning = live.mismatch || status?.outcomes?.uncertain || status?.operator?.state === "mismatch" || status?.verification?.reason === "limits_or_transitions_differ";
   const published = publishedChart(raw, d3.market, now, stale || dashboardFailed);
   const priceFreshness = priceProvenance(raw?.prices, d3.market, zone, stale || dashboardFailed, now);
   return {
@@ -60104,15 +60169,15 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
       nextWindow,
       chart: published?.chart,
       totals: !planStale && proposal ? { energy: proposal.planned_kwh, cost: proposal.unpriced ? null : proposal.cost?.value, pricePerKwh: avg } : null,
-      vehicle: { status: stale ? "Connection unavailable \xB7 stale dashboard" : d3.charger.available ? d3.connection?.state || U : "Charger unavailable", detail: `Dashboard observed ${date(d3.generated_at, zone)}${stale ? ` \xB7 stale: ${staleReason}` : ""}`, power: "Unavailable", soc: validPercent(soc2) ? soc2 : null, stale: socStale, planStale, socDetail, socEstimated: !useRaw && d3.soc?.estimated === true, policy: policyText },
+      vehicle: { status: stale ? "Connection unavailable \xB7 stale dashboard" : d3.charger.available ? d3.connection?.state || U : "Charger unavailable", detail: `Dashboard observed ${date(d3.generated_at, zone)}${stale ? ` \xB7 stale: ${staleReason}` : ""}`, power: live.power, live: live.summary, liveMismatch: live.mismatch, soc: validPercent(soc2) ? soc2 : null, stale: socStale, planStale, socDetail, socEstimated: !useRaw && d3.soc?.estimated === true, policy: policyText },
       assumptions: { startingSoc: projectionValid ? rawProjection.starting_soc : null, capacityKwh: d3.soc?.capacity_kwh, efficiency: d3.soc?.efficiency, projectionSupported: projectionValid, projectionKwhPerPercent: rawProjection?.kwh_per_percent, projectionNote },
       settings: { target: d3.soc?.target_percent, minimum: d3.settings?.minimum_ready_by_soc, cap: d3.settings?.soft_price_cap, readyBy: d3.settings?.departure_time },
       canSave: false,
       untilDeadline,
       targetNote: d3.settings?.driver === "target_soc" && d3.soc?.value != null ? `Plan energy, projected SOC and cost are estimates based on the last-known SOC${d3.soc.estimated ? " and an energy-derived SOC estimate" : ""}; an old reading may not reflect driving since then.` : "",
-      warning: warning ? { title: "Morek health requires attention", detail: `${health}${status?.outcomes?.uncertain && (status?.operator?.state === "mismatch" || status?.verification?.reason === "limits_or_transitions_differ") ? " \xB7 Effective limits mismatch the sent schedule." : ""}` } : null,
-      evidence: { status: evidence.summary, context: `Morek status observed ${date(observedAt, zone)}${statusFresh ? "" : " \xB7 stale or unavailable"}`, readiness, proposal: evidence.proposal, sent: evidence.sent, readback: evidence.readback, measurement: evidence.measurement, dispatch: `${statusFresh && status?.reconciliation?.reason === "plan_input_provenance_unavailable" ? "Plan input provenance unavailable: review mode, target, vehicle, SOC and capacity. The checked schedule path requires a cheapest-price target-SOC plan; switching does not guarantee Resume or charging. " : ""}${status?.outcomes?.uncertain && status?.outcomes?.state !== "storage_unavailable" ? "A recorded uncertain action may have applied; do not retry blindly. " : ""}A final 0 A limit may remain. Readback is not profile inventory; ACK or readback does not prove physical charging. Preserve person Stop and household protection.` },
-      labels: { settingsNote: "Read-only preview. Plan controls are unavailable in this slice.", saveLabel: "Save plan \xB7 unavailable", powerNote: "No verified general Morek power source", deadlineNote: d3.settings?.departure_enabled === false ? "Ready-by is off" : deadlineCurrent && Number.isFinite(deadline) ? `Ready by ${date(deadline, zone)}; not a predicted finish` : "Ready-by time or current plan unavailable", planLabel: "Backend policy:", chartIntro: "Published source price before configured fiscal additions; source-included charges may apply.", chartNote: `Held published intervals only. ${priceFreshness} Unpublished future and history are unavailable. Cap is omitted if its basis differs or is unknown.`, bands: "", dialogNote: "Proposal only; not necessarily sent.", footer: "Dashboard and Morek status are separate observations." }
+      warning: warning ? { title: "Morek health requires attention", detail: `${health}${status?.outcomes?.uncertain && (status?.operator?.state === "mismatch" || status?.verification?.reason === "limits_or_transitions_differ") ? " \xB7 Effective limits mismatch the sent schedule." : ""}${live.mismatch ? " \xB7 Reported charger state and measured flow disagree." : ""}` } : null,
+      evidence: { status: evidence.summary, context: `Morek status observed ${date(observedAt, zone)}${statusFresh ? "" : " \xB7 stale or unavailable"}`, readiness, proposal: evidence.proposal, sent: evidence.sent, readback: evidence.readback, measurement: live.summary, dispatch: `${statusFresh && status?.reconciliation?.reason === "plan_input_provenance_unavailable" ? "Plan input provenance unavailable: review mode, target, vehicle, SOC and capacity. The checked schedule path requires a cheapest-price target-SOC plan; switching does not guarantee Resume or charging. " : ""}${status?.outcomes?.uncertain && status?.outcomes?.state !== "storage_unavailable" ? "A recorded uncertain action may have applied; do not retry blindly. " : ""}A final 0 A limit may remain. Readback is not profile inventory; ACK or readback does not prove physical charging. Preserve person Stop and household protection.` },
+      labels: { settingsNote: "Read-only preview. Plan controls are unavailable in this slice.", saveLabel: "Save plan \xB7 unavailable", powerNote: live.reported ? `Charger reports \u201C${live.reported}\u201D${live.mismatch ? " \xB7 mismatch with measurement" : ""}` : "Reported state unknown; not measured power", deadlineNote: d3.settings?.departure_enabled === false ? "Ready-by is off" : deadlineCurrent && Number.isFinite(deadline) ? `Ready by ${date(deadline, zone)}; not a predicted finish` : "Ready-by time or current plan unavailable", planLabel: "Backend policy:", chartIntro: "Published source price before configured fiscal additions; source-included charges may apply.", chartNote: `Held published intervals only. ${priceFreshness} Unpublished future and history are unavailable. Cap is omitted if its basis differs or is unknown.`, bands: "", dialogNote: "Proposal only; not necessarily sent.", footer: "Dashboard and Morek status are separate observations." }
     },
     actions: {}
   };
@@ -60149,8 +60214,8 @@ function decodeLogs(raw) {
 }
 function formatLine(e9) {
   const when = Date.parse(e9.time);
-  const time = Number.isFinite(when) ? new Date(when).toLocaleString() : "-";
-  return `${time} ${e9.level} ${e9.logger}: ${e9.message}${e9.exception ? `
+  const time2 = Number.isFinite(when) ? new Date(when).toLocaleString() : "-";
+  return `${time2} ${e9.level} ${e9.logger}: ${e9.message}${e9.exception ? `
 ${e9.exception}` : ""}`;
 }
 var MARKUP = `<summary>SpotNav logs</summary>
@@ -60247,8 +60312,61 @@ function createLogViewer(getHass, { fetchLogs = getLogs, intervalMs = 5e3, timer
   return root;
 }
 
+// sidebar/recovery-banner.js
+var WHAT = {
+  wait_for_charger_connection: "The charger is not connected to Home Assistant, so no schedule was sent.",
+  check_charger_identity: "The charger identity could not be confirmed, so no schedule was sent.",
+  retry_after_stop_or_change: "A Stop or a connector change interrupted the update; nothing more was sent.",
+  confirm_ownership: "Schedule ownership needs confirmation before anything is sent.",
+  resolve_protection_conflict: "Another controller or site protection may also limit this charger; sending is blocked.",
+  resume_schedule: "Auto is paused until you press Resume.",
+  confirm_resume: "Resume cannot be continued automatically; confirm Resume again.",
+  wait_for_charge_now_end: "Charge Now is active; Auto follows when it ends or you return to Auto.",
+  check_charger_outcome: "The last schedule write has an unknown outcome. It is not retried automatically.",
+  check_charger_response: "The charger refused the schedule.",
+  wait_for_planner: "The plan is being recalculated.",
+  check_logs: "The schedule check failed unexpectedly; see SpotNav logs.",
+  wait_for_fresh_inputs: "Waiting for a fresh vehicle reading.",
+  adjust_planning_settings: "The plan cannot be sent as saved; adjust the planning settings.",
+  wait_for_prices: "Prices are unavailable or incomplete for the planned window.",
+  see_reason: "The schedule is not being updated."
+};
+var AUTOMATIC = /* @__PURE__ */ new Set(["wait_for_charger_connection", "check_charger_identity", "retry_after_stop_or_change", "wait_for_planner", "wait_for_fresh_inputs", "wait_for_prices", "check_logs"]);
+var time = (iso) => {
+  const at = Date.parse(iso || "");
+  return Number.isFinite(at) ? new Date(at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : null;
+};
+function recoveryBanner(state, now = Date.now()) {
+  if (!state || state.supported === false) return null;
+  const reconciliation = state.reconciliation || {};
+  const blocker = reconciliation.blocker;
+  const recovery = reconciliation.recovery || {};
+  if (state.outcomes?.uncertain === true || blocker?.code === "upload_uncertain") {
+    return { level: "error", code: "upload_uncertain", text: `${WHAT.check_charger_outcome} Charging is not confirmed; check Morek and the SpotNav logs before acting. Nothing was cleared.` };
+  }
+  if (!blocker) return null;
+  const what = WHAT[blocker.action] || WHAT.see_reason;
+  const suffix = ` (${blocker.code})`;
+  if (blocker.code === "upload_rejected") {
+    const next = time(recovery.next_retry_at);
+    if (next && Date.parse(recovery.next_retry_at) > now) {
+      return { level: "warning", code: blocker.code, text: `${what} Retrying automatically at ${next}; ${recovery.retries_left ?? 0} attempt${recovery.retries_left === 1 ? "" : "s"} left.${suffix}` };
+    }
+    if (recovery.exhausted) return { level: "error", code: blocker.code, text: `${what} Automatic retries are used up; the schedule was not confirmed. Check the charger, then use Recalculate/sync.${suffix}` };
+    return { level: "warning", code: blocker.code, text: `${what} Retrying shortly.${suffix}` };
+  }
+  const retry = recovery.blocker_retry;
+  if (AUTOMATIC.has(blocker.action)) {
+    const next = retry && !retry.exhausted ? time(retry.next_retry_at) : null;
+    const when = next ? ` SpotNav re-checks automatically at ${next}, and as soon as something changes.` : retry?.exhausted ? " Timed re-checks stopped; SpotNav re-checks when something changes. Use Recalculate/sync to check now." : " SpotNav re-checks when something changes.";
+    return { level: "warning", code: blocker.code, text: `${what}${when}${suffix}` };
+  }
+  const paused = blocker.action === "resume_schedule" || blocker.action === "wait_for_charge_now_end";
+  return { level: paused ? "info" : "error", code: blocker.code, text: `${what}${paused ? "" : " Needs your attention; it does not clear by itself."}${suffix}` };
+}
+
 // src/generated/version.ts
-var CARD_VERSION = "2.5.113";
+var CARD_VERSION = "2.5.119";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {
@@ -60382,7 +60500,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
   connectedCallback() {
     this.connected = true;
     this.classList.add("wa-dark");
-    this.shadowRoot.innerHTML = `<link rel="stylesheet" href="/spotnav-sidebar/panel.css?v=${CARD_VERSION}"><style>:host{display:block;min-height:100%;padding-bottom:env(safe-area-inset-bottom)}.hostbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top));background:#11151d;color:white}.hostbar label{flex:1 1 180px}.hostbar select{max-width:100%}.hostbar button,.hostbar select{font:inherit;padding:8px}.message{padding:16px;color:white;background:#11151d}</style><div class="hostbar"><button id="menu" aria-label="Open navigation">\u2630</button><strong>SpotNav Enhanced</strong><label>Charger <select id="charger"><option value="">Select charger</option></select></label><button id="refresh">Refresh observations</button><div id="automatic-controls"><span id="pause-state">Auto state unknown.</span> <button id="pause-auto" disabled>Pause Auto until resumed</button> <button id="resume-auto" disabled>Resume Auto</button><span id="pause-notice" role="status"></span></div><section id="charge-controls" aria-label="Charge Now"><button id="charge-now" disabled>Charge Now</button><details id="charge-options"><summary>Duration / change end</summary><label>Duration <select id="charge-duration"><option value="30">30 minutes</option><option value="60" selected>1 hour</option><option value="120">2 hours</option><option value="180">3 hours</option><option value="custom">Custom end time</option></select></label><label id="custom-label" hidden>End time <input id="charge-end" type="datetime-local"></label><button id="charge-replace" type="button" hidden>Replace Charge Now end</button></details><span id="charge-state" role="status">Charge Now status unavailable.</span><span id="charge-notice" role="status"></span></section></div><div class="message" role="status">Select a charger.</div><main></main>`;
+    this.shadowRoot.innerHTML = `<link rel="stylesheet" href="/spotnav-sidebar/panel.css?v=${CARD_VERSION}"><style>:host{display:block;min-height:100%;padding-bottom:env(safe-area-inset-bottom)}.hostbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top));background:#11151d;color:white}.hostbar label{flex:1 1 180px}.hostbar select{max-width:100%}.hostbar button,.hostbar select{font:inherit;padding:8px}.message{padding:16px;color:white;background:#11151d}</style><div class="hostbar"><button id="menu" aria-label="Open navigation">\u2630</button><strong>SpotNav Enhanced</strong><label>Charger <select id="charger"><option value="">Select charger</option></select></label><button id="refresh">Refresh observations</button><div id="automatic-controls"><span id="pause-state">Auto state unknown.</span> <button id="pause-auto" disabled>Pause Auto until resumed</button> <button id="resume-auto" disabled>Resume Auto</button><span id="pause-notice" role="status"></span></div><section id="charge-controls" aria-label="Charge Now"><button id="charge-now" disabled>Charge Now</button><details id="charge-options"><summary>Duration / change end</summary><label>Duration <select id="charge-duration"><option value="30">30 minutes</option><option value="60" selected>1 hour</option><option value="120">2 hours</option><option value="180">3 hours</option><option value="custom">Custom end time</option></select></label><label id="custom-label" hidden>End time <input id="charge-end" type="datetime-local"></label><button id="charge-replace" type="button" hidden>Replace Charge Now end</button></details><span id="charge-state" role="status">Charge Now status unavailable.</span><span id="charge-notice" role="status"></span></section></div><div id="recovery-banner" role="alert" hidden></div><div class="message" role="status">Select a charger.</div><main></main>`;
     const hostStyle = document.createElement("style");
     hostStyle.textContent = ".hostbar label{color:#f0f3f8}.hostbar select,.hostbar input{color:#f0f3f8;background:#202b39;border:1px solid #8191a4;border-radius:8px;min-height:42px} #automatic-controls,#charge-controls{display:flex;flex-wrap:wrap;gap:6px;min-width:0;max-width:100%} #automatic-controls button,#charge-controls button{max-width:100%;white-space:normal} #charge-controls{flex:1 1 100%;align-items:center} #charge-state,#charge-notice{flex:1 1 100%} #charge-options label{display:inline-block;margin:6px}";
     this.shadowRoot.append(hostStyle);
@@ -60539,6 +60657,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     const dashboard = decoded.ok ? decoded.value : null;
     this.paintAutomatic(dashboard);
     this.paintChargeNow(dashboard);
+    this.paintRecovery();
     if (this.settingsRecord && dashboard?.settings?.revision > this.settingsRecord.revision) {
       this.settingsConflict = true;
       this.settingsNotice = "Settings changed elsewhere. Reload the charger before editing again.";
@@ -60584,6 +60703,16 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     else this.view = mountDashboard(this.shadowRoot.querySelector("main"), adapter);
     this.shadowRoot.querySelector("main").hidden = false;
     this.paintMorek();
+  }
+  paintRecovery() {
+    const el = this.shadowRoot.querySelector("#recovery-banner");
+    if (!el) return;
+    const banner = fresh(this.statusAt, this.statusFailed) ? recoveryBanner(decodeMorekState(this.rawStatus), Date.now()) : null;
+    el.hidden = !banner;
+    el.textContent = banner?.text || "";
+    el.dataset.level = banner?.level || "";
+    el.dataset.code = banner?.code || "";
+    if (banner) Object.assign(el.style, { padding: "12px 16px", color: "#fff", fontWeight: "600", background: banner.level === "error" ? "#8f1d1d" : banner.level === "warning" ? "#8a5a00" : "#1f4f7a" });
   }
   paintAutomatic(dashboard) {
     const control = dashboard?.control, active = control?.pause?.choice;
