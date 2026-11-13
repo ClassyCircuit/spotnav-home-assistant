@@ -26,6 +26,7 @@ from ..const import DOMAIN, MOREK_CONNECTOR_ID, MOREK_STATION_ID
 from ..execution.execution_ownership import ownership_store
 from ..execution.command_admission import command_admission
 from ..execution.morek_outcomes import OutcomeUnavailable, outcomes_for
+from ..planning.planner import MOREK_MAX_BLOCKS
 from ..runtime import domain_data, preview_for, controller_for
 from .common import is_admin, lookup_charger, send_unsupported_version
 
@@ -79,7 +80,7 @@ def profile_for(periods: tuple[tuple[datetime, datetime], ...], amps: int, now: 
         normalized = [(start, end) for start, end in normalized if end > requested_at]
         if not normalized:
             raise ScheduleRefused("plan_expired")
-    if len(normalized) > 3:
+    if len(normalized) > MOREK_MAX_BLOCKS:
         raise ScheduleRefused("too_many_blocks")
     active = allow_active and normalized[0][0] <= requested_at
     transitions: list[dict[str, int]] = [{"startPeriod": 0, "limit": amps if active else 0}]

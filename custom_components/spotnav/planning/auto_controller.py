@@ -110,12 +110,14 @@ from .planner import (
     FiscalChoice,
     local_instant,
     MAX_DEPARTURE_DAYS_AHEAD,
+    MOREK_MAX_BLOCKS,
     plan_unpriced,
     PlannerInputError,
     PlanRequest,
     PlanResult,
     power_kw,
     price_gap,
+    PriceGap,
     resolve_departure,
 )
 
@@ -729,6 +731,10 @@ class AutoSnapshot:
             proposal.exception_kwh,
             proposal.exception_periods,
             proposal.price_coverage_end,
+            proposal.lead_kwh,
+            proposal.block_limit,
+            proposal.unrestricted_blocks,
+            proposal.block_limit_extra_cost,
             tuple((start.isoformat(), end.isoformat()) for start, end in proposal.periods),
             tuple(
                 (slot.start.isoformat(), slot.end.isoformat(), slot.unpriced, slot.source)
@@ -756,6 +762,21 @@ class SettingsReconcileError(HomeAssistantError):
             "The settings were saved, but applying them failed. Check the charger and retry."
         )
         self.settings = settings
+
+
+def _known_intervals(gap: PriceGap) -> tuple[price_wait.KnownInterval, ...]:
+    """The published intervals a wait decision may buy from: the rest of the current interval, when a plan
+    starting now uses it, then every whole published slot up to the gap. Nothing is priced that is not published."""
+    known = tuple(
+        price_wait.KnownInterval(start=slot.start, end=slot.start + timedelta(minutes=15),
+                                 price=slot.local_major_per_kwh)
+        for slot in gap.known
+    )
+    if gap.current is None:
+        return known
+    current = price_wait.KnownInterval(
+        start=gap.current.start, end=gap.current.end, price=gap.current.local_major_per_kwh)
+    return (current, *known)
 
 
 class AutoPlannerController:
@@ -1666,6 +1687,15 @@ class AutoPlannerController:
                     entry=entry, price_snapshot=area_snapshot,
                 )
 
+        # A Morek schedule-owned cheapest target-SOC plan starts now (the rest of the current price interval)
+        # and never needs more windows than the stored profile can carry. Other chargers are unchanged.
+        morek_planning = False
+        if (settings.driver == DRIVER_TARGET_SOC and settings.strategy == STRATEGY_CHEAPEST
+                and self._schedule_owned is not None):
+            try:
+                morek_planning = await self._schedule_owned()
+            except Exception:  # noqa: BLE001 - unavailable ownership never changes a legacy plan
+                morek_planning = False
         plan_request = PlanRequest(
             area_id=entry.id,
             timezone=entry.tz,
@@ -1687,6 +1717,8 @@ class AutoPlannerController:
             soft_price_cap=settings.soft_price_cap,
             cap_price_basis=settings.cap_price_basis,
             minimum_energy_kwh=resolved.minimum_energy_kwh,
+            include_current_interval=morek_planning,
+            max_blocks=MOREK_MAX_BLOCKS if morek_planning else None,
             # A guest car with no departure is charged within `GUEST_WITHIN`, not the whole horizon.
             window_end=(
                 calculated_at + GUEST_WITHIN if is_guest(settings) and not settings.departure_enabled else None
@@ -1705,6 +1737,14 @@ class AutoPlannerController:
                         next_check = min(next_check, publication)
                     self._arm_wake(next_check)
             result = calculate_plan(plan_request)
+            if (gap is not None and result.has_plan and plan_request.include_current_interval
+                    and plan_request.soft_price_cap is None):
+                # What is left of the current interval can cover the need alone, with no later price, but the
+                # request itself needs prices nobody has published. That is the wait policy's question (wait,
+                # buy what cannot wait, or charge), not a reason to charge now: judge the unrestricted request.
+                unrestricted = calculate_plan(replace(plan_request, include_current_interval=False))
+                if unrestricted.reason == "insufficient_price_horizon":
+                    result = unrestricted
             if result.reason == "insufficient_price_horizon" and plan_request.soft_price_cap is None:
                 waited = None
                 if plan_request.departure is not None:
@@ -1761,13 +1801,7 @@ class AutoPlannerController:
                 settings, "planning_unavailable", self._map_planner_code(result.reason or ""), calculated_at,
                 entry=entry, price_snapshot=area_snapshot, proposal=result,
             )
-        owned_target = False
-        if (settings.driver == DRIVER_TARGET_SOC and settings.strategy == STRATEGY_CHEAPEST
-                and settings.soft_price_cap is None and self._schedule_owned is not None):
-            try:
-                owned_target = await self._schedule_owned()
-            except Exception:  # noqa: BLE001 - unavailable ownership never changes a legacy plan
-                owned_target = False
+        owned_target = morek_planning and settings.soft_price_cap is None
         if owned_target or self._stops_at_need(settings, resolved, result, energy_kwh):
             # The count ends the charge at the need: the plan says the need and its share of the last slot.
             result = ending_at_need(result)
@@ -1860,14 +1894,7 @@ class AutoPlannerController:
             deadline=gap.deadline,
             need_kwh=request.requested_kwh,
             max_charge_kw=max_kw,
-            known=tuple(
-                price_wait.KnownInterval(
-                    start=slot.start,
-                    end=slot.start + timedelta(minutes=15),
-                    price=slot.local_major_per_kwh,
-                )
-                for slot in gap.known
-            ),
+            known=_known_intervals(gap),
             publication_at=publication_at,
         )
         # A replan is also owed when the guarantee falls due (the latest safe start less one slot).
@@ -1941,14 +1968,7 @@ class AutoPlannerController:
             deadline=gap.deadline,
             need_kwh=request.requested_kwh,
             max_charge_kw=request.planned_kw,
-            known=tuple(
-                price_wait.KnownInterval(
-                    start=slot.start,
-                    end=slot.start + timedelta(minutes=15),
-                    price=slot.local_major_per_kwh,
-                )
-                for slot in gap.known
-            ),
+            known=_known_intervals(gap),
             publication_at=expected_publication(entry, gap.missing_from),
         )
         if waited.action == "guarantee":
@@ -3588,7 +3608,8 @@ class AutoPlannerController:
             reason=snapshot.reason,
             settings_revision=settings.revision,
             area_id=snapshot.area_id or "",
-            slots_needed=proposal.slots_needed,
+            # Every selected slot, including the part of the current interval a plan starting now begins with.
+            slots_needed=proposal.priced_slots + proposal.unpriced_slots,
             priced_slots=proposal.priced_slots,
             unpriced_slots=proposal.unpriced_slots,
             delivered_kwh=proposal.delivered_kwh,

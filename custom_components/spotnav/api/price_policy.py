@@ -45,6 +45,9 @@ def encode_price_policy(settings: AutoSettings, snapshot: AutoSnapshot | None) -
             explanations.append({"code": "target_shortfall"})
         if not explanations:
             explanations.append({"code": "uncapped" if settings.soft_price_cap is None else "within_cap"})
+        if proposal.block_limit_compromise:
+            # The stored Morek profile carries a few windows only: the plan was chosen within that limit.
+            explanations.append({"code": "block_limit"})
     if current is not None and current.last_error_code is not None:
         explanations.append({"code": "error", "reason": current.last_error_code})
     return {
@@ -66,6 +69,12 @@ def encode_price_policy(settings: AutoSettings, snapshot: AutoSnapshot | None) -
         "minimum_shortfall_kwh": None if proposal is None else finite_number(proposal.minimum_shortfall_kwh),
         "target_shortfall_kwh": None if proposal is None else finite_number(proposal.policy_shortfall_kwh),
         "exception_kwh": None if proposal is None else finite_number(proposal.exception_kwh),
+        "block_limit": None if proposal is None else proposal.block_limit,
+        "unrestricted_blocks": None if proposal is None else proposal.unrestricted_blocks,
+        "block_limit_extra_cost": None if proposal is None or currency is None
+        else finite_number(proposal.block_limit_extra_cost),
+        "block_limit_shortfall_kwh": None if proposal is None or not proposal.block_limit_compromise
+        else finite_number(proposal.block_limit_shortfall_kwh),
         "exception_periods": [] if proposal is None else [
             {"start": aware_iso(start), "end": aware_iso(end)} for start, end in proposal.exception_periods
         ],

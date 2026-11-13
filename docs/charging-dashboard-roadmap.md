@@ -99,7 +99,7 @@ Detailed requirements and acceptance cases follow outside this checklist.
 | 11 | Adaptive charging estimates for Morek | Later work; reuse existing learning and genuine measurement sources |
 | 12 | Fix real sidebar usability, price presentation and evidence | Prioritize before 5.8; implement bounded 12.1–12.8 separately alongside remaining 5.7b work |
 | 13 | Migrate useful old-card configuration into the sidebar | Follow the related Stage 12 work; 13.1–13.4 are separate, bounded tasks |
-| 14 | Predictable planning and stable Morek schedule updates | 14.1–14.6 in order; coordinates with 9.4/9.5 and 11 without duplicating them |
+| 14 | Predictable planning and stable Morek schedule updates | 14.1–14.6 in order; 14.1 locally implemented (2.5.101, mocked; review corrections applied); coordinates with 9.4/9.5 and 11 without duplicating them |
 
 ### Stage 0 — Completed baseline: preserve and reuse
 
@@ -1882,7 +1882,28 @@ handoff and checklist truthfully; follow AGENTS.md version/build requirements.
   valid schedule with a speculative one. A plan, ACK or limit is never measured flow.
   The BMW's own limit remains separate; no new live SOC-stop or household load control.
 
-- [ ] **14.1 Partial current price interval and Morek block limit**
+- [x] **14.1 Partial current price interval and Morek block limit** (2.5.101 local, mocked; reviewed and corrected twice)
+  - Local implementation applies only to a schedule-owned Morek cheapest target-SOC plan
+    (`include_current_interval`, `max_blocks`); other chargers keep the next-boundary,
+    configured-period behavior. The rest of the current published interval is a candidate
+    starting now at proportional energy and cost, in the cap-aware exact planner (any
+    position, shared run budget, deadline inside the interval, minimum exceptions) and in
+    the whole-slot planner (a seeded first window in the run-limit search: continued into
+    the next slot, a window of its own, or alone when it covers the need; compared with the
+    plan without it by energy first, then cost, plus the start cost in automatic mode).
+    It is also used by a best-effort plan short of its deadline, and alone when a deadline
+    falls inside the interval, and, at planner level, when later prices are missing; the controller still sends such a
+    fragment-only plan through the existing price-wait policy (wait, buy what cannot wait,
+    or guarantee) rather than charging now, counting the published fragment as known
+    capacity for a purchase. There is no
+    minimum length (seconds left are a candidate); only an unpublished current interval is
+    never priced from a neighbour. A daily departure inside the current interval now means
+    today's, not tomorrow's, for these plans. Morek plans use at most three
+    windows, also in automatic-period mode; the plan reports `block_limit`,
+    `unrestricted_blocks`, extra cost and shortfall when the limit forced a compromise,
+    surfaced as a `block_limit` price-policy explanation in the sidebar. Not done: the
+    unpriced fallback, history-wait estimates and the display chart rows are unchanged.
+    Mocked tests only; deployed behavior and physical charging are unverified.
   - Include the remainder of the current known price interval as a candidate starting
     now, with proportional energy and cost, alongside future periods. Respect price
     cap, minimum, ready-by, existing window constraints and missing prices. Update

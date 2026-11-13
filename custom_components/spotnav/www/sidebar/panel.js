@@ -55842,6 +55842,7 @@ var en_default2 = {
   "daily.unpriced": "Some proposal prices are unavailable; cost estimates may be incomplete.",
   "daily.openPlan": "Open complete proposed plan",
   "daily.close": "Close",
+  "daily.policy.blockLimit": "The charger schedule holds at most three charging windows, so this plan is a compromise: it may cost more or deliver less than an unrestricted plan.",
   "daily.policy.exception": "Above-cap energy is proposed for the minimum ready-by SOC.",
   "daily.policy.minimumShortfall": "The minimum ready-by SOC has an estimated shortfall.",
   "daily.policy.targetShortfall": "The target SOC has an estimated shortfall.",
@@ -60070,10 +60071,11 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
   const untilDeadline = d3.settings?.departure_enabled === false ? "Not enabled" : deadlineCurrent && Number.isFinite(deadline) ? deadline > now ? `${Math.ceil((deadline - now) / 6e4)} min` : "Deadline passed" : "Unavailable";
   const policy = d3.plan.price_policy?.explanations || [];
   const uncapped = !planStale && !!proposal && d3.settings?.soft_price_cap === null && d3.planning?.settings_revision != null && d3.planning.settings_revision === d3.settings?.revision && proposal.settings_revision === d3.settings.revision && policy.includes("uncapped");
-  const policyBase = uncapped ? "No soft price cap is applied to this current plan." : policy.map((code) => {
-    const keys2 = { minimum_exception: "exception", minimum_shortfall: "minimumShortfall", target_shortfall: "targetShortfall", recalculating: "recalculating", unavailable: "unavailable", minimum_covered: "covered", within_cap: "within", target_met: "targetMet", error: "error" };
+  const blockNote = policy.includes("block_limit") ? ` ${translate2("en", "daily.policy.blockLimit")}` : "";
+  const policyBase = (uncapped ? "No soft price cap is applied to this current plan." : policy.map((code) => {
+    const keys2 = { block_limit: "blockLimit", minimum_exception: "exception", minimum_shortfall: "minimumShortfall", target_shortfall: "targetShortfall", recalculating: "recalculating", unavailable: "unavailable", minimum_covered: "covered", within_cap: "within", target_met: "targetMet", error: "error" };
     return keys2[code] ? translate2("en", `daily.policy.${keys2[code]}`) : U;
-  }).join(" ") || U;
+  }).join(" ") || U) + (uncapped ? blockNote : "");
   const unresolved = raw?.plan?.price_policy?.target_shortfall_kwh;
   const policyText = !planStale && raw?.plan?.price_policy?.provisional === true ? `${policyBase} Provisional: contiguous published prices end ${date(raw.plan.price_policy.price_coverage_end, zone)}. ${Number.isFinite(unresolved) && unresolved > 0 ? `${unresolved.toFixed(1)} kWh of target energy remains unresolved. ` : ""}Future prices and readiness are unknown; this is not necessarily the cheapest complete plan.` : policyBase;
   const warning = status?.outcomes?.uncertain || status?.operator?.state === "mismatch" || status?.verification?.reason === "limits_or_transitions_differ";
@@ -60110,7 +60112,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.98";
+var CARD_VERSION = "2.5.101";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {

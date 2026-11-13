@@ -55,6 +55,9 @@ START_COST_KWH: Final = 0.25
 #: The shortest run under automatic periods, in quarter-hours (30 minutes); a need smaller than that is one run.
 SHORTEST_BLOCK_SLOTS: Final = 2
 
+#: Most separate charging windows the Morek fixed-time profile can carry (`api/morek_schedule.profile_for`).
+MOREK_MAX_BLOCKS: Final = 3
+
 #: Target-SoC slider bounds and its starting value.
 DEFAULT_TARGET_SOC_PERCENT: Final = 80
 ENERGY_SLIDER_MIN_KWH: Final = 1
@@ -553,6 +556,12 @@ class PlanRequest:
     minimum_energy_kwh: float | None = None
     #: Partial-horizon policy: earliest meaningful next price re-evaluation.
     partial_recheck_at: datetime | None = None
+    #: Also consider the rest of the current published 15-minute interval, starting at `now` (a schedule-owned
+    #: charger can start between grid boundaries). Off keeps the whole-slot behaviour from the next boundary.
+    include_current_interval: bool = False
+    #: A hard limit on separate windows the executor can carry, applied on top of `max_periods`, in
+    #: automatic-period mode too. `None` for no executor limit.
+    max_blocks: int | None = None
 
     @property
     def planned_kw(self) -> float:
@@ -569,6 +578,10 @@ class PlanRequest:
             _refuse("invalid_voltage", "the voltage between phases must be 230 or 400")
         if self.max_periods is not AUTO_PERIODS and not MIN_PERIODS <= _as_int(self.max_periods) <= MAX_PERIODS:
             _refuse("invalid_periods", f"max_periods must be between {MIN_PERIODS} and {MAX_PERIODS}")
+        if self.max_blocks is not None and not MIN_PERIODS <= _as_int(self.max_blocks) <= MAX_PERIODS:
+            _refuse("invalid_periods", f"max_blocks must be between {MIN_PERIODS} and {MAX_PERIODS}")
+        if not isinstance(self.include_current_interval, bool):
+            _refuse("invalid_number", "include_current_interval must be a boolean")
         _positive(self.requested_kwh, "invalid_energy", "requested_kwh")
         if self.minimum_energy_kwh is not None:
             minimum = _finite(self.minimum_energy_kwh, "invalid_energy", "minimum_energy_kwh")
@@ -638,6 +651,8 @@ class PlanRequest:
             cap_price_basis=self.cap_price_basis,
             minimum_energy_kwh=None if self.minimum_energy_kwh is None else float(self.minimum_energy_kwh),
             partial_recheck_at=self.partial_recheck_at,
+            include_current_interval=self.include_current_interval,
+            max_blocks=self.max_blocks,
         )
 
 
@@ -697,6 +712,21 @@ class PlanResult:
     exception_kwh: float = 0.0
     #: First missing interval, not a claim that later intervals are priced.
     price_coverage_end: datetime | None = None
+    #: Energy of the leading fragment (the rest of the current price interval, `slots[0]`), on top of the
+    #: `slots_needed` whole slots; zero for a plan that starts at a grid boundary.
+    lead_kwh: float = 0.0
+    #: The executor's window limit applied to this plan (`PlanRequest.max_blocks`).
+    block_limit: int | None = None
+    #: Windows the same request would use without that limit, only when that is more than the limit.
+    unrestricted_blocks: int | None = None
+    #: Extra estimated cost (major unit) and energy the limit costs against that unrestricted plan; `None` unknown.
+    block_limit_extra_cost: float | None = None
+    block_limit_shortfall_kwh: float | None = None
+
+    @property
+    def block_limit_compromise(self) -> bool:
+        """The limit forced a different plan than the request would otherwise choose."""
+        return self.unrestricted_blocks is not None
 
     @property
     def has_plan(self) -> bool:
@@ -708,7 +738,8 @@ class PlanResult:
         of that slot the need takes. `None` for a plan that runs its whole slots, or one whose need fills them."""
         if not self.ends_at_need or not self.periods or self.power_kw <= 0:
             return None
-        extra = self.slots_needed * self.power_kw * SLOT_HOURS - self.delivered_kwh
+        # The whole slots, plus the rest of the current interval when the plan starts in it.
+        extra = self.slots_needed * self.power_kw * SLOT_HOURS + self.lead_kwh - self.delivered_kwh
         if extra <= _WHOLE_SLOTS_KWH:
             return None
         return self.periods[-1][1] - timedelta(hours=extra / self.power_kw)
@@ -885,6 +916,9 @@ class _Window:
     per_slot: float
     #: The need does not fit before the departure: `needed` is every whole slot that does (best effort).
     short: bool = False
+    #: The rest of the current price interval, used as the start of the plan (`_window(current=True)`);
+    #: `needed` then counts only the whole slots on top of it, and may be zero.
+    lead: SelectedSlot | None = None
 
     @property
     def end(self) -> datetime:
@@ -892,10 +926,13 @@ class _Window:
         return self.deadline if self.deadline is not None else self.horizon
 
 
-def _window(request: PlanRequest) -> _Window | PlannerReason:
+def _window(request: PlanRequest, *, current: bool = False) -> _Window | PlannerReason:
     """Normalize the prices and lay out the window, or name why there is none.
 
     Shared by `calculate_plan` and `price_gap` so both agree on which prices a request needs.
+    With `current` the rest of the current price interval (see `_lead_interval`) is part of the plan and
+    delivers its share of the need first: the whole slots needed, the deadline test and the prices required
+    are those of the remainder, and a deadline inside the current interval is a window of that interval alone.
     """
     zone = time_zones.require_zone(request.timezone)
     try:
@@ -925,10 +962,6 @@ def _window(request: PlanRequest) -> _Window | PlannerReason:
     per_slot = energy_per_slot_kwh(
         request.amps, request.phases, request.voltage_between_phases_v, request.power_cap_kw
     )
-    needed = slots_needed(
-        request.requested_kwh, request.amps, request.phases, request.voltage_between_phases_v, request.power_cap_kw
-    )
-    duration = timedelta(minutes=STEP_MINUTES * needed)
 
     deadline: datetime | None = None
     if request.departure is not None:
@@ -937,10 +970,28 @@ def _window(request: PlanRequest) -> _Window | PlannerReason:
             # A dated departure reaches as far as its deadline, past the 24 hours of a daily one.
             horizon = max(horizon, deadline)
         else:
-            deadline = resolve_departure(request.now, request.timezone, request.departure, first_start)
+            # A departure inside the current interval is still ahead when that interval is planned from `now`
+            # (the first whole slot would otherwise push it to tomorrow).
+            reference = request.now if request.include_current_interval else first_start
+            deadline = resolve_departure(request.now, request.timezone, request.departure, reference)
     departure_deadline = deadline
     if request.window_end is not None:
         deadline = request.window_end if deadline is None else min(deadline, request.window_end)
+
+    lead = _lead_interval(request, slots, first_start, deadline) if current else None
+    need_kwh = request.requested_kwh
+    if lead is not None:
+        need_kwh -= (lead.end - lead.start).total_seconds() / 3600 * request.planned_kw
+        if need_kwh <= _WHOLE_SLOTS_KWH:
+            # The rest of this interval alone delivers the need: no whole slot is required.
+            return _Window(
+                slots=slots, zone=zone, first_start=first_start, horizon=horizon, deadline=deadline,
+                required_end=first_start, needed=0, per_slot=per_slot, lead=lead,
+            )
+    needed = slots_needed(
+        need_kwh, request.amps, request.phases, request.voltage_between_phases_v, request.power_cap_kw
+    )
+    duration = timedelta(minutes=STEP_MINUTES * needed)
     short = False
 
     if deadline is None:
@@ -970,8 +1021,14 @@ def _window(request: PlanRequest) -> _Window | PlannerReason:
             # here; were it ever to, delivering the most energy wins over the limit.
             fit = (min(last_end, horizon) - first_start) // step
             if fit < 1:
-                # Not one whole slot before the departure: nothing can be planned.
-                return "deadline_too_short"
+                if lead is None:
+                    # Not one whole slot before the departure: nothing can be planned.
+                    return "deadline_too_short"
+                # Only the rest of the current interval fits before the departure: use all of it.
+                return _Window(
+                    slots=slots, zone=zone, first_start=first_start, horizon=horizon, deadline=deadline,
+                    required_end=first_start, needed=0, per_slot=per_slot, short=True, lead=lead,
+                )
             needed = fit
             duration = step * fit
             latest_start_exclusive = first_start + step
@@ -989,6 +1046,7 @@ def _window(request: PlanRequest) -> _Window | PlannerReason:
         needed=needed,
         per_slot=per_slot,
         short=short,
+        lead=lead,
     )
 
 
@@ -1007,6 +1065,9 @@ class PriceGap:
     known: tuple[PlanningSlot, ...]
     #: The need does not fit before the departure at all (best effort, `_Window.short`).
     short: bool = False
+    #: The published rest of the current price interval (`include_current_interval` only): known capacity from
+    #: now to the next boundary that `known` (from that boundary) does not list. Never priced from a neighbour.
+    current: SelectedSlot | None = None
 
 
 def price_gap(request: PlanRequest) -> PriceGap | None:
@@ -1033,6 +1094,7 @@ def price_gap(request: PlanRequest) -> PriceGap | None:
                 deadline=window.end,
                 known=tuple(known),
                 short=window.short,
+                current=_lead_interval(request, window.slots, window.first_start, window.deadline),
             )
         known.append(slot)
         cursor += timedelta(minutes=STEP_MINUTES)
@@ -1102,50 +1164,186 @@ def calculate_plan(request: PlanRequest) -> PlanResult:
 
     Each step can end with a named reason rather than a partial answer. What to do about
     `insufficient_price_horizon` is `price_wait`'s decision, not this function's.
+
+    With `max_blocks` the plan never uses more windows than the executor can carry; when the same request
+    would otherwise have used more, the result says what the limit cost.
     """
     request = request.validated()
+    result = _calculate(request)
+    limit = request.max_blocks
+    if limit is None or not result.has_plan:
+        return result
+    free = _calculate(replace(request, max_blocks=None))
+    if not free.has_plan or len(free.periods) <= limit:
+        return replace(result, block_limit=limit)
+    priced = not (result.unpriced or free.unpriced)
+    return replace(
+        result,
+        block_limit=limit,
+        unrestricted_blocks=len(free.periods),
+        block_limit_extra_cost=max(0.0, result.estimated_cost - free.estimated_cost) if priced else None,
+        block_limit_shortfall_kwh=max(0.0, free.delivered_kwh - result.delivered_kwh),
+    )
+
+
+def _effective_limit(request: PlanRequest) -> int | None:
+    """The hard run limit: the configured one and the executor's, whichever is tighter; `None` for neither."""
+    if request.max_blocks is None:
+        return request.max_periods
+    if request.max_periods is None:
+        return request.max_blocks
+    return min(request.max_periods, request.max_blocks)
+
+
+def _lead_interval(
+    request: PlanRequest, slots: tuple[PlanningSlot, ...], first_start: datetime, limit: datetime | None
+) -> SelectedSlot | None:
+    """What is left of the current published interval, from now to the next grid boundary, or `None`.
+
+    Only when asked for, only inside a published interval (an unpublished current interval is never priced
+    from a neighbour) and only up to `limit` (a deadline inside the interval). No minimum length: any time
+    that is available is a candidate, and the planner decides whether it is worth using. Elapsed time is not
+    counted: the interval starts at `now`. The energy it delivers is proportional to its duration, at the
+    price of the whole interval.
+    """
+    if not request.include_current_interval or first_start <= request.now:
+        return None
+    end = first_start if limit is None else min(first_start, limit)
+    start = request.now.astimezone(timezone.utc)
+    end = end.astimezone(timezone.utc)
+    if end <= start:
+        return None
+    current_start = first_start - timedelta(minutes=STEP_MINUTES)
+    current = next((slot for slot in slots if slot.start == current_start), None)
+    if current is None:
+        return None
+    return SelectedSlot(
+        start=start,
+        end=end,
+        local_major_per_kwh=current.local_major_per_kwh,
+        effective_minor_per_kwh=effective_minor_per_kwh(current.local_major_per_kwh, request.fiscal, current.start),
+        unpriced=False,
+        source=current.source,
+    )
+
+
+def _calculate(request: PlanRequest) -> PlanResult:
+    """One calculation of a validated request, without the comparison against an unrestricted plan.
+
+    With `include_current_interval` the whole-slot plan is also calculated with the rest of the current price
+    interval as its start, and whichever plan delivers more of the need, or the same for less, is the result.
+    """
     if request.soft_price_cap is not None:
         return _calculate_capped(request)
-    window = _window(request)
+    plain = _whole_slot_plan(request, current=False)
+    if not request.include_current_interval:
+        return plain
+    started = _whole_slot_plan(request, current=True)
+    if not started.has_plan or started.lead_kwh <= 0:
+        return plain
+    if not plain.has_plan:
+        # The current interval made a plan possible (a deadline too close, or prices missing further out).
+        return started
+    rows = plain.horizon or started.horizon
+    start_cost = START_COST_KWH * sum(abs(row.effective_minor_per_kwh) for row in rows) / len(rows) if rows else 0.0
+
+    def rank(result: PlanResult) -> tuple[float, float]:
+        # As the charge that stops at its need would be: energy first (a best-effort plan may be short of it),
+        # then cost, and under automatic periods what each window's start costs.
+        trimmed = ending_at_need(result)
+        starts = start_cost * len(result.periods) if request.max_periods is AUTO_PERIODS else 0.0
+        return -round(min(trimmed.delivered_kwh, request.requested_kwh), _SLOT_DIGITS), round(
+            trimmed.estimated_cost + starts / 100, _SLOT_DIGITS
+        )
+
+    return started if rank(started) < rank(plain) else plain
+
+
+def _whole_slot_plan(request: PlanRequest, *, current: bool) -> PlanResult:
+    """The whole-slot plan, with the rest of the current price interval as its start when `current`.
+
+    The current interval is one more candidate piece, starting now: the plan may continue it into the next
+    slots as one window or stop after it, and when the whole slots are not contiguous with it, it is a window
+    of its own, counted in the window limits and the start cost like any other. When a deadline leaves no
+    whole slot (or too few for the need) it is used as far as the deadline allows.
+    """
+    window = _window(request, current=current)
     if isinstance(window, str):
         return _no_plan(request, window)
-    zone = window.zone
-    slots = window.slots
-    first_start = window.first_start
-    horizon = window.horizon
-    deadline = window.deadline
-    needed = window.needed
-    per_slot = window.per_slot
-
-    candidates, refusal = _candidates(slots, first_start=first_start, required_end=window.required_end)
+    if window.needed == 0:
+        return _uncapped_result(request, window, _known_slots(window), ())
+    candidates, refusal = _candidates(window.slots, first_start=window.first_start, required_end=window.required_end)
     if refusal is not None:
         return _no_plan(request, refusal)
-    if len(candidates) < needed:
+    if len(candidates) < window.needed:
         return _no_plan(request, "insufficient_price_horizon")
-
     chosen = _choose(
         candidates,
-        needed,
-        per_slot,
+        window.needed,
+        window.per_slot,
         request.max_periods,
         request.fiscal,
-        latest_end_inclusive=deadline if deadline is not None else horizon,
+        latest_end_inclusive=window.end,
+        max_runs=request.max_blocks,
+        seeded=window.lead is not None,
     )
     if chosen is None:
         return _no_plan(request, "insufficient_price_horizon")
+    return _uncapped_result(request, window, candidates, tuple(candidates[index] for index in chosen))
 
-    selected = tuple(candidates[index] for index in chosen)
-    periods = _periods(selected)
-    delivered = needed * per_slot
-    cost_minor = sum(
+
+def _known_slots(window: _Window) -> list[PlanningSlot]:
+    """The published slots from the first usable one, up to the first gap or the end of the window."""
+    published = {slot.start: slot for slot in window.slots}
+    known: list[PlanningSlot] = []
+    cursor = window.first_start
+    while cursor < min(window.horizon, window.end) and cursor in published:
+        known.append(published[cursor])
+        cursor += timedelta(minutes=STEP_MINUTES)
+    return known
+
+
+def _uncapped_result(
+    request: PlanRequest,
+    window: _Window,
+    candidates: list[PlanningSlot],
+    selected: tuple[PlanningSlot, ...],
+) -> PlanResult:
+    """The whole-slot plan for chosen slots, preceded by the window's lead (the rest of the current interval)."""
+    per_slot = window.per_slot
+    count = len(selected)
+    lead = window.lead
+    delivered_kwh: float | None = None
+    if lead is not None and window.needed == 0 and not window.short:
+        # The rest of this interval alone delivers the need: stop where the need is met.
+        hours = request.requested_kwh / request.planned_kw
+        lead = replace(lead, end=min(lead.end, lead.start + timedelta(hours=hours)))
+        delivered_kwh = request.requested_kwh
+    lead_kwh = 0.0 if lead is None else (lead.end - lead.start).total_seconds() / 3600 * request.planned_kw
+    lead_price = 0.0 if lead is None else lead.effective_minor_per_kwh
+    delivered = count * per_slot + lead_kwh if delivered_kwh is None else delivered_kwh
+    cost_minor = lead_kwh * lead_price + sum(
         per_slot * effective_minor_per_kwh(slot.local_major_per_kwh, request.fiscal, slot.start)
         for slot in selected
     )
-    # The same number of slots straight from the first usable one: charging now, at the same power.
-    now_minor = sum(
+    # The same energy straight from the first usable slot (now, when the current interval counts), same power.
+    now_minor = lead_kwh * lead_price + sum(
         per_slot * effective_minor_per_kwh(slot.local_major_per_kwh, request.fiscal, slot.start)
-        for slot in candidates[:needed]
+        for slot in candidates[:count]
     )
+    slots = tuple(
+        SelectedSlot(
+            start=slot.start,
+            end=slot.end,
+            local_major_per_kwh=slot.local_major_per_kwh,
+            effective_minor_per_kwh=effective_minor_per_kwh(slot.local_major_per_kwh, request.fiscal, slot.start),
+            unpriced=False,
+            source=slot.source,
+        )
+        for slot in selected
+    )
+    if lead is not None:
+        slots = (lead, *slots)
     return PlanResult(
         version=CONTRACT_VERSION,
         area_id=request.area_id,
@@ -1160,25 +1358,16 @@ def calculate_plan(request: PlanRequest) -> PlanResult:
         delivered_kwh=delivered,
         distance_mil=delivered / request.consumption_kwh_per_10km,
         estimated_cost=cost_minor / 100,
-        periods=periods,
-        slots=tuple(
-            SelectedSlot(
-                start=slot.start,
-                end=slot.end,
-                local_major_per_kwh=slot.local_major_per_kwh,
-                effective_minor_per_kwh=effective_minor_per_kwh(slot.local_major_per_kwh, request.fiscal, slot.start),
-                unpriced=False,
-                source=slot.source,
-            )
-            for slot in selected
-        ),
+        periods=_periods(slots),
+        slots=slots,
         unpriced_slots=0,
-        priced_slots=needed,
+        priced_slots=len(slots),
         unpriced=False,
-        slots_needed=needed,
-        horizon=_horizon(candidates, selected, zone=zone, fiscal=request.fiscal),
+        slots_needed=count,
+        horizon=_horizon(candidates, selected, zone=window.zone, fiscal=request.fiscal),
         short_of_deadline=window.short,
         now_cost=now_minor / 100,
+        lead_kwh=lead_kwh,
     )
 
 
@@ -1189,8 +1378,11 @@ def _calculate_capped(request: PlanRequest) -> PlanResult:
     slot may touch either neighbour; it must not make an excluded gap disappear.
     First maximize delivered energy. When a minimum exception is necessary,
     minimize exception energy, then configured variable cost. Automatic periods
-    have no hard run limit in this branch.
+    have no hard run limit in this branch, except the executor's (`max_blocks`). With
+    `include_current_interval` the rest of the current published interval is one more
+    candidate, starting now, at proportional energy and cost.
     """
+    request = replace(request, max_periods=_effective_limit(request))
     try:
         published = planning_slots(request.documents, currency=request.currency, timezone=request.timezone)
     except PlannerInputError as err:
@@ -1214,11 +1406,13 @@ def _calculate_capped(request: PlanRequest) -> PlanResult:
             departure = local_instant(request.departure_date, request.departure, zone)
             end = departure.astimezone(timezone.utc)
         else:
-            end = min(end, resolve_departure(request.now, request.timezone, request.departure, first).astimezone(timezone.utc))
+            reference = request.now if request.include_current_interval else first
+            end = min(end, resolve_departure(request.now, request.timezone, request.departure, reference).astimezone(timezone.utc))
     if request.window_end is not None:
         end = min(end, request.window_end.astimezone(timezone.utc))
     candidates = [slot for slot in published if slot.start >= first and slot.start < end]
-    if not candidates:
+    lead = _lead_interval(request, published, first, end)
+    if not candidates and lead is None:
         return replace(
             _no_plan(request, "insufficient_price_horizon"), policy_shortfall_kwh=request.requested_kwh,
             minimum_shortfall_kwh=request.minimum_energy_kwh,
@@ -1232,7 +1426,8 @@ def _calculate_capped(request: PlanRequest) -> PlanResult:
         )
     ]
     minimum = request.minimum_energy_kwh
-    if not eligible and not minimum:
+    lead_eligible = lead if lead is not None and _slot_within_cap(request, lead) else None
+    if not eligible and lead_eligible is None and not minimum:
         return replace(
             _no_plan(request, "no_eligible_energy"), policy_shortfall_kwh=request.requested_kwh,
             minimum_shortfall_kwh=minimum,
@@ -1242,11 +1437,11 @@ def _calculate_capped(request: PlanRequest) -> PlanResult:
     # the minimum. If it cannot reach the minimum, rerun over *all* known
     # candidates together with one shared period budget and an energy ceiling
     # of the minimum, never the higher target.
-    cost, selected = _select_policy_slots(request, eligible, end, request.requested_kwh)
+    cost, selected = _select_policy_slots(request, eligible, end, request.requested_kwh, lead=lead_eligible)
     cheap_energy = _selected_energy(request, selected)
     if minimum is not None and cheap_energy + 1e-9 < minimum:
         if request.partial_recheck_at is None:
-            cost, selected = _select_policy_slots(request, candidates, end, minimum, prefer_cheap=True)
+            cost, selected = _select_policy_slots(request, candidates, end, minimum, prefer_cheap=True, lead=lead)
         else:
             from .price_wait import FEASIBILITY_MARGIN, START_LAG
 
@@ -1260,7 +1455,10 @@ def _calculate_capped(request: PlanRequest) -> PlanResult:
             urgent = min(minimum - cheap_energy, max(0.0, minimum - cheap_before - capacity_after))
             if urgent > 1e-9:
                 allowed = [slot for slot in candidates if _slot_within_cap(request, slot) or slot.end <= recheck]
-                alternative = _select_policy_slots(request, allowed, end, cheap_energy + urgent, prefer_cheap=True)
+                allowed_lead = lead if lead is not None and (
+                    _slot_within_cap(request, lead) or lead.end <= recheck) else None
+                alternative = _select_policy_slots(
+                    request, allowed, end, cheap_energy + urgent, prefer_cheap=True, lead=allowed_lead)
                 exceptions = _selected_energy(request, tuple(slot for slot in alternative[1] if not _slot_within_cap(request, slot)))
                 if exceptions <= urgent + 1e-6:
                     cost, selected = alternative
@@ -1311,33 +1509,68 @@ def _selection_rank(
 
 
 def _select_policy_slots(
-    request: PlanRequest, eligible: list[PlanningSlot], end: datetime, need_kwh: float, *, prefer_cheap: bool = False,
+    request: PlanRequest, eligible: list[PlanningSlot], end: datetime, need_kwh: float, *,
+    prefer_cheap: bool = False, lead: SelectedSlot | None = None,
 ) -> tuple[float, tuple[SelectedSlot, ...]]:
-    """Search full slots and optional deadline fragment with a shared run limit."""
+    """Search full slots and optional deadline fragment with a shared run limit.
+
+    `lead` is the rest of the current interval, an optional first piece starting now: either used (from its
+    start, up to what the need takes) or not, whichever plan is better.
+    """
     tail = eligible[-1] if eligible and eligible[-1].end > end else None
     full_slots = eligible[:-1] if tail is not None else eligible
     options = [_select_cheap_slots(request, full_slots, need_kwh, prefer_cheap=prefer_cheap)]
-    if tail is not None:
-        tail_capacity = (end - tail.start).total_seconds() / 3600 * request.planned_kw
-        tail_amounts = {min(need_kwh, tail_capacity)}
-        remainder = need_kwh % (request.planned_kw * SLOT_HOURS)
-        if 1e-9 < remainder < tail_capacity:
-            tail_amounts.add(remainder)
-        for tail_energy in tail_amounts:
-            if tail_energy > 0:
-                options.append(_select_cheap_slots(
-                    request, full_slots, need_kwh - tail_energy, tail, tail_energy, prefer_cheap=prefer_cheap,
-                ))
+    variants: list[tuple[SelectedSlot | None, float]] = [(None, need_kwh)]
+    if lead is not None:
+        lead_kwh = (lead.end - lead.start).total_seconds() / 3600 * request.planned_kw
+        used = min(lead_kwh, need_kwh)
+        if used > 1e-9:
+            piece = lead if used >= lead_kwh - 1e-9 else replace(
+                lead, end=lead.start + timedelta(hours=used / request.planned_kw))
+            variants.append((piece, need_kwh - used))
+            if need_kwh - used <= _WHOLE_SLOTS_KWH:
+                # The rest of this interval alone delivers the need.
+                options.append((_energy_cost(request, piece), (piece,)))
+    for piece, remaining in variants:
+        if piece is None:
+            if tail is None:
+                continue
+        elif remaining <= _WHOLE_SLOTS_KWH:
+            continue
+        else:
+            options.append(_select_cheap_slots(
+                request, full_slots, remaining, prefer_cheap=prefer_cheap, seed=piece))
+        if tail is not None:
+            tail_capacity = (end - tail.start).total_seconds() / 3600 * request.planned_kw
+            tail_amounts = {min(remaining, tail_capacity)}
+            remainder = remaining % (request.planned_kw * SLOT_HOURS)
+            if 1e-9 < remainder < tail_capacity:
+                tail_amounts.add(remainder)
+            for tail_energy in tail_amounts:
+                if tail_energy > 0:
+                    options.append(_select_cheap_slots(
+                        request, full_slots, remaining - tail_energy, tail, tail_energy,
+                        prefer_cheap=prefer_cheap, seed=piece,
+                    ))
     possible = [option for option in options if option is not None]
     return min(possible, key=lambda option: _selection_rank(request, option, prefer_cheap=prefer_cheap))
+
+
+def _energy_cost(request: PlanRequest, slot: SelectedSlot) -> float:
+    """Minor-unit cost of charging through one selected piece at the planned power."""
+    return (slot.end - slot.start).total_seconds() / 3600 * request.planned_kw * slot.effective_minor_per_kwh
 
 
 def _select_cheap_slots(
     request: PlanRequest, eligible: list[PlanningSlot], need_kwh: float,
     tail: PlanningSlot | None = None, tail_kwh: float = 0.0,
-    *, prefer_cheap: bool = False,
+    *, prefer_cheap: bool = False, seed: SelectedSlot | None = None,
 ) -> tuple[float, tuple[SelectedSlot, ...]] | None:
-    """Search whole-grid slots and optionally append the available deadline fragment."""
+    """Search whole-grid slots and optionally append the available deadline fragment.
+
+    A `seed` is a piece already chosen before the first slot (the rest of the current interval): it counts as
+    the first run, and the slot it touches continues that run instead of starting another.
+    """
     per_slot = request.planned_kw * SLOT_HOURS
     quotient = round(need_kwh / per_slot, _SLOT_DIGITS)
     full_target = math.floor(quotient)
@@ -1347,6 +1580,14 @@ def _select_cheap_slots(
     states: dict[tuple[int, bool, int, bool], tuple[float, tuple[SelectedSlot, ...], int, float]] = {
         (0, False, 0, False): (0.0, (), 0, 0.0)
     }
+    if seed is not None:
+        seed_energy = (seed.end - seed.start).total_seconds() / 3600 * request.planned_kw
+        seed_exception = seed_energy if prefer_cheap and not _slot_within_cap(request, seed) else 0.0
+        states = {
+            (0, False, 1 if request.max_periods is not None else 0, True): (
+                _energy_cost(request, seed), (seed,), 1, seed_exception,
+            )
+        }
     for slot in eligible:
         next_states: dict[tuple[int, bool, int, bool], tuple[float, tuple[SelectedSlot, ...], int, float]] = {}
         price = effective_minor_per_kwh(slot.local_major_per_kwh, request.fiscal, slot.start)
@@ -1425,7 +1666,7 @@ def ending_at_need(result: PlanResult) -> PlanResult:
         return replace(result, ends_at_need=True)
     last = max(result.slots, key=lambda slot: slot.start)
     now_cost = result.now_cost
-    if now_cost is not None and len(result.horizon) >= result.slots_needed:
+    if now_cost is not None and 0 < result.slots_needed <= len(result.horizon):
         now_cost -= extra * result.horizon[result.slots_needed - 1].effective_minor_per_kwh / 100
     return replace(
         result,
@@ -1488,11 +1729,20 @@ def _choose(
     period_cap: int | None,
     fiscal: FiscalChoice,
     latest_end_inclusive: datetime | None,
+    *,
+    max_runs: int | None = None,
+    seeded: bool = False,
 ) -> tuple[int, ...] | None:
-    """Which slots to charge in: exactly `needed` of them, at most `period_cap` runs, or automatic periods."""
+    """Which slots to charge in: exactly `needed` of them, at most `period_cap` runs, or automatic periods.
+
+    `max_runs` is the executor's own limit on runs, on top of `period_cap` and also under automatic periods.
+    `seeded` means a run is already open when the first candidate starts (the rest of the current interval
+    ends where it starts): it counts as a run, and the first candidate may continue it or end it.
+    """
     if period_cap is AUTO_PERIODS:
-        return _choose_auto(candidates, needed, per_slot, fiscal, latest_end_inclusive)
-    return _choose_capped(candidates, needed, per_slot, period_cap, fiscal, latest_end_inclusive)
+        return _choose_auto(candidates, needed, per_slot, fiscal, latest_end_inclusive, max_runs, seeded)
+    cap = period_cap if max_runs is None else min(period_cap, max_runs)
+    return _choose_capped(candidates, needed, per_slot, cap, fiscal, latest_end_inclusive, seeded)
 
 
 def start_cost_minor(candidates: list[PlanningSlot], fiscal: FiscalChoice) -> float:
@@ -1524,6 +1774,8 @@ def _choose_auto(
     per_slot: float,
     fiscal: FiscalChoice,
     latest_end_inclusive: datetime | None,
+    max_runs: int | None = None,
+    seeded: bool = False,
 ) -> tuple[int, ...] | None:
     """Automatic periods: exactly `needed` slots for the lowest cost plus `start_cost_minor` per run, every
     run at least `SHORTEST_BLOCK_SLOTS` long (or the whole need, when that is smaller).
@@ -1539,13 +1791,18 @@ def _choose_auto(
     def rank(state: _AutoState) -> tuple[float, tuple[int, ...]]:
         return round(state.cost + start_cost * state.runs, 6), tuple(-index for index in reversed(state.slots))
 
-    states: dict[tuple[int, int], _AutoState] = {(0, 0): _AutoState(0, 0, 0, 0.0, ())}
+    # `max_runs` makes the runs started part of the state, so a limit never discards the cheaper plan within it.
+    # A seeded run is open and long enough to end (it is not a start of its own that needs a minimum length).
+    initial = _AutoState(0, shortest, 1, 0.0, ()) if seeded else _AutoState(0, 0, 0, 0.0, ())
+    states: dict[tuple[int, int, int], _AutoState] = {
+        (0, initial.length, initial.runs if max_runs is not None else 0): initial
+    }
     for index, slot in enumerate(candidates):
-        next_states: dict[tuple[int, int], _AutoState] = {}
+        next_states: dict[tuple[int, int, int], _AutoState] = {}
         slot_cost = per_slot * effective_minor_per_kwh(slot.local_major_per_kwh, fiscal, slot.start)
 
         def keep(state: _AutoState) -> None:
-            key = (state.selected, state.length)
+            key = (state.selected, state.length, state.runs if max_runs is not None else 0)
             existing = next_states.get(key)  # noqa: B023 - only called within this iteration
             if existing is None or rank(state) < rank(existing):
                 next_states[key] = state  # noqa: B023
@@ -1555,12 +1812,13 @@ def _choose_auto(
             if state.length == 0 or state.length >= shortest:
                 # A run may end only once it is long enough.
                 keep(_AutoState(state.selected, 0, state.runs, state.cost, state.slots))
-            if ends_inside_the_window and state.selected < needed:
+            runs = state.runs + (1 if state.length == 0 else 0)
+            if ends_inside_the_window and state.selected < needed and (max_runs is None or runs <= max_runs):
                 keep(
                     _AutoState(
                         selected=state.selected + 1,
                         length=min(state.length + 1, shortest),
-                        runs=state.runs + (1 if state.length == 0 else 0),
+                        runs=runs,
                         cost=state.cost + slot_cost,
                         slots=state.slots + (index,),
                     )
@@ -1583,6 +1841,7 @@ def _choose_capped(
     period_cap: int,
     fiscal: FiscalChoice,
     latest_end_inclusive: datetime | None,
+    seeded: bool = False,
 ) -> tuple[int, ...] | None:
     """Which slots to charge in: exactly `needed` of them, for the lowest total cost.
 
@@ -1593,8 +1852,9 @@ def _choose_capped(
     chronological candidates, so equal costs pick the latest slots (the car sits plugged in, charges
     last and leaves with the freshest charge); no epsilon.
     """
-    initial = _State(selected=0, runs=0, active=False, cost=0.0, slots=())
-    states: dict[tuple[int, int, bool], _State] = {(0, 0, False): initial}
+    initial = _State(selected=0, runs=1, active=True, cost=0.0, slots=()) if seeded else _State(
+        selected=0, runs=0, active=False, cost=0.0, slots=())
+    states: dict[tuple[int, int, bool], _State] = {(initial.selected, initial.runs, initial.active): initial}
 
     for index, slot in enumerate(candidates):
         next_states: dict[tuple[int, int, bool], _State] = {}

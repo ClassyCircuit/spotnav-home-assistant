@@ -128,7 +128,7 @@ export function dailyOverview(doc: Document, dashboard: Dashboard, language: Lan
     total.textContent = `${t("daily.energy")}: ${proposal?.planned_kwh == null ? unknown : `${formatNumber(language, proposal.planned_kwh, 2)} kWh`} · ${t("daily.cost")}: ${cost == null || cost.currency == null ? unknown : `${formatNumber(language, cost.value, 2)} ${cost.currency}`} · ${t("daily.average")}: ${unknown}`;
     content.append(total);
     const policyKeys: Record<string, TranslationKey> = {
-      minimum_exception: "daily.policy.exception", minimum_shortfall: "daily.policy.minimumShortfall",
+      block_limit: "daily.policy.blockLimit", minimum_exception: "daily.policy.exception", minimum_shortfall: "daily.policy.minimumShortfall",
       target_shortfall: "daily.policy.targetShortfall", recalculating: "daily.policy.recalculating",
       unavailable: "daily.policy.unavailable", minimum_covered: "daily.policy.covered", within_cap: "daily.policy.within", target_met: "daily.policy.targetMet", error: "daily.policy.error",
     };

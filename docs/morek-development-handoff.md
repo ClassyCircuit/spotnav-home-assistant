@@ -10,7 +10,8 @@ Re-check the live system and Git state before acting; observations below may bec
 10.3 partial-price-horizon planning are checked in the roadmap. The user says Stage
 10 is done; do not reassign it as incomplete. Local mocked tests do not establish
 installed version, physical charging or future runtime success. At this handoff,
-the source manifest was 2.5.98 and the latest commit was `ebee12b5`; recheck Git
+the source manifest was 2.5.98 and the latest commit was `ebee12b5`; Stage 14.1 later
+raised the working-tree manifest to 2.5.99, then 2.5.100 after review and 2.5.101 after a price-wait correction (uncommitted at that time). Recheck Git
 and deployed version on arrival. The current coordinator initialization is
 `prompts/coordinator-handoff.md`.
 
@@ -381,6 +382,75 @@ requirements, not features claimed implemented in the manual baseline below.
   Do not assume `GetCompositeSchedule` lists stored profiles.
 
 ## Tests, build, and next steps
+
+### 2026-11-13 — Stage 14.1 current interval and three-window limit (2.5.101; local mocked)
+
+- `PlanRequest.include_current_interval` and `max_blocks` are set by the auto controller only
+  for a schedule-owned (Morek) cheapest target-SOC plan (`_schedule_owned()`, now awaited before
+  planning; failure or non-ownership is a legacy plan). The rest of the current published
+  interval (`now` to the next grid boundary, proportional energy/cost at that interval's price)
+  is a candidate in both planners. Cap-aware exact planner: a seeded optional first piece in the
+  shared run budget, usable by minimum exceptions and truncated by a deadline inside the
+  interval. Whole-slot planner (corrected in review): `_window(current=True)` subtracts the
+  fragment's energy from the need and the run-limit searches (`_choose_auto/_capped`, `seeded`)
+  start with it as an open run, so it may continue into the next slot, be a window of its own
+  (counted in `max_periods`, `max_blocks` and, in automatic mode, the start cost) or alone cover
+  the need. The plan with and without it are compared by energy (capped at the need) first, then
+  trimmed (`ending_at_need`) cost, ties to the plain plan. It also applies to a best-effort plan
+  short of its deadline (fragment plus every whole slot), to a deadline inside the current
+  interval (the fragment up to the deadline, short unless it covers the need) and when later
+  prices are missing at the planner level (a fragment that alone covers the need makes a plan
+  without any later price), but the controller no longer installs such a plan: see the
+  price-wait paragraph below. No minimum length: the old 60 s cutoff is removed.
+  Not used: an unpublished current interval. A daily departure inside the current interval now
+  resolves to today for these requests (`resolve_departure` referenced to `now`), both planners.
+  `PlanResult.lead_kwh` carries the fragment's energy for `need_met_at`; the stored proposal
+  summary counts the fragment as a slot (it failed its own consistency check before).
+  Limitations: `plan_unpriced` ignores the fragment (a guarantee charges unpriced from the next
+  boundary, as before); a tiny fragment can occupy one
+  of the three Morek windows and may already be over when the profile is sent (`profile_for`
+  drops elapsed windows); the fragment's price is assumed to apply proportionally.
+- Morek plans use at most `MOREK_MAX_BLOCKS` (3, also what `profile_for` enforces) windows, including
+  automatic-period mode (the whole-slot automatic search now carries runs in its state when
+  limited). When an unrestricted calculation would have used more windows, the plan carries
+  `block_limit`, `unrestricted_blocks`, `block_limit_extra_cost` and `block_limit_shortfall_kwh`;
+  `price_policy` exposes a `block_limit` explanation shown by the sidebar. Unchanged: other chargers,
+  `plan_unpriced`, history-wait estimates, and the chart's quarter-hour horizon rows (the fragment
+  appears in `periods`/`slots`/`window_details`, which the chart overlays by instant).
+- Price-wait with the fragment (2.5.101, review correction): `price_gap` still describes the request
+  without the fragment (the unrestricted window), so a missing future price is a gap exactly as
+  before. In the auto controller, an uncapped Morek request with a gap whose plan is made only of
+  the current fragment (it covers the need and so requires no later price) is replaced by the
+  unrestricted refusal (`include_current_interval=False`, `insufficient_price_horizon`), and then the
+  existing `_plan_departure_by_history` / `_plan_while_prices_are_missing` decide as for any charger:
+  `wait` (nothing charged now), `buy_now` (only what cannot wait), or `guarantee`. Urgency
+  (`latest_safe_start`, `act_by`, wake-up) is unchanged. The one addition: `PriceGap.current` is the
+  published rest of the current interval (`_lead_interval`, never priced from a neighbour), and
+  `_known_intervals` lists it first among the intervals a `buy_now` may use, because the purchase
+  plan itself (`include_current_interval` is kept) starts with it. That can turn a `guarantee`
+  into a `buy_now` of a few seconds of the fragment when the publication is overdue and the part
+  that cannot wait is smaller than the fragment; the remainder waits for the publication, exactly
+  as for any `buy_now`. Capped plans are untouched (they never used `price_wait`; Stage 10.3's
+  `partial_recheck_at` handles them). Tests: three controller cases in
+  `tests/test_stage_141_current_interval.py` (wait, buy-now through the fragment, guarantee) and a
+  `price_gap(...).current` case in `tests/test_planner_current_interval.py`. After this correction
+  the isolated planning runner passed 674 with the same 4 failures, Ruff is clean, and `npm run build`
+  and `check-dist` pass (no frontend source changed; the frontend suite was not rerun). Without the
+  controller guard the wait and buy-now cases fail.
+- A plan's first window now starts at the calculation instant rather than a grid boundary; the
+  existing active-window path of `profile_for` treats it as already running, and the fingerprint
+  excludes that moving start. Stability of repeated replans (14.2/14.3) is not addressed here.
+- Tests: `tests/test_planner_current_interval.py`, `tests/test_stage_141_current_interval.py`
+  (real controller with mocked ownership), `frontend/test/block-limit-policy.test.ts`. Isolated
+  runners (after the review fix: planning 670 passed, the same 4 failures; frontend 2511 passed;
+  check-dist and Ruff pass): earlier 656 passed with 4 failures that also fail on an unmodified HEAD export
+  (`test_admission_is_reused_at_shared_boundaries_not_profile_writer`,
+  `test_empty_missing_and_unavailable_are_not_measured_energy`,
+  `test_saved_capped_settings_reach_real_calculation_and_preview`,
+  `test_manual_api_routes_owned_pause_without_legacy_executor`); lifecycle 237 and notifier 14
+  passed. Ruff on the integration is clean; frontend 2511 tests, build and check-dist pass. The
+  full HA-plugin suite cannot start on Windows (`fcntl`). No HA, charger, deployment or restart
+  was involved; deployed behavior and physical charging are unverified.
 
 ### 2026-11-13 — settled Resume recovery (local only)
 
