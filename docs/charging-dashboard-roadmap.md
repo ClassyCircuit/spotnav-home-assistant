@@ -679,7 +679,7 @@ tests are documented there; full HA collection is still blocked on Windows.
   - Include the combined actual-module crash/race and regression tests for 5.5 in
     this slice; do not add a separate test-only substage unless a real defect requires it.
 - [ ] **5.6 Authorization and safe schedule-only operation**
-  - Umbrella only: assign 5.6a–5.6c individually. Preserve protection and person Stop;
+  - Umbrella only: assign 5.6a–5.6d individually. Preserve protection and person Stop;
     Morek's reported native load protection is not a SpotNav load-management task.
   - Resolve how a new charging transaction is authorized, how person Stop and
     competing writers are respected, and how retained 0 A, invalid/no-price plans
@@ -700,15 +700,62 @@ tests are documented there; full HA collection is still blocked on Windows.
     measured flow remain unknown: existing integration paths do not establish a
     trustworthy active transaction or Morek power measurement. No new active-session
     requirement was added to future schedule admission; dispatch stays unarmed.
-  - Determine the installation's new-session authorization behavior and reliable
-    transaction/measurement evidence in user-directed 5.8. Profile ACK, limits and
-    plug-in do not prove authorization or flow. No live validation is claimed.
+  - The 2.5.48 work is read-only groundwork, not a completed new-session solution.
+    The user subsequently requested automatic session authorization; implement the
+    bounded continuation in 5.6d rather than deferring its design to 5.8. Profile
+    ACK, limits and plug-in do not prove authorization or flow. Live validation
+    remains user-directed and is not claimed.
   - The 2.5.48 local implementation and mocked checks were reported; coordinator
     review remains pending. They do not establish live authorization or flow.
   - Reuse observed charger/transaction facts to report and gate what can actually
     be known about a new charging session. Do not change authorization settings or
     infer that a stored schedule authorizes charging. Test unknown/offline/refused
     cases with mocked boundaries; surface installation-specific decisions for the user.
+- [ ] **5.6d Automatic Morek session authorization and recovery**
+  - **Priority:** implement and review after inspecting the actual installed OCPP
+    integration's charge-control semantics and existing guarded executor paths,
+    before calling schedule-only daily operation complete. A user-reported overnight
+    failure showed the OCPP charge-control switch off during a scheduled window;
+    a manually initiated switch-on later changed charger state. The observed
+    `Preparing` status and schedule ACK suggest missing session authorization as a
+    possible cause, but do not prove it. User-directed read-only inspection is not a
+    command or proof of charger behavior; never embed household data in the repo.
+  - The user's desired behavior is for SpotNav to request the appropriate OCPP
+    session start/authorization automatically when a car plugs in, so the stored
+    Morek schedule can control when current flows. Verify whether the installed HA
+    OCPP switch actually sends a remote start, represents transaction state, or has
+    other semantics. Reuse the existing OCPP integration, connector identity and
+    command admission, rather than adding a second OCPP server or reviving the
+    competing legacy window-by-window start/stop/current loop.
+  - A session-start request is a physical control operation, not a harmless UI
+    toggle. Design a single schedule-owned, connector-bound authorization path that
+    respects a person's Stop/Pause and retained 0 A, current limits and native
+    protection. Before any request, require an eligible active Auto intent and the
+    verified scheduling/electrical conditions needed to avoid accidentally allowing
+    immediate or unrestricted charging. An upload ACK alone and an old composite
+    readback cannot establish those conditions; define fresh evidence and block
+    honestly when it is insufficient. Do not clear or weaken existing profiles.
+  - Monitor genuine connector, transaction and charger availability observations
+    without assuming the switch is a reliable session inventory. Distinguish a
+    successful request/ACK, an authorized session, reported charging and measured
+    flow. Handle unplug/replug, a normal car-completed charge, session termination,
+    HA/OCPP reconnect and an autonomous charger restart: detect whether a session
+    actually needs reauthorization and safely reconcile only when permitted, rather
+    than continuously forcing the switch on. No unsolicited restart after a person
+    Stop, explicit pause, fault, disconnected vehicle or ambiguous/unknown outcome.
+  - Define bounded attempts, deduplication and recovery; a timeout or uncertain
+    remote-start outcome must not cause rapid or blind retries. Preserve lifecycle
+    generation and Stop ordering through disconnect/reconnect, even when the previous
+    request may still complete. Keep the BMW's own charge limit separate. Explain
+    pending/offline/refused/unknown states and any retained limit in the sidebar;
+    coordinate with 5.7b2 and 12.4/12.7 rather than duplicating status machinery.
+  - Use focused actual-module tests with mocked HA/OCPP/storage for plug-in,
+    valid/invalid schedule evidence, no plan, successful/rejected/unknown start,
+    duplicate events, unplug, car completion, person Stop/Pause, power/charger restart,
+    HA restart/reconnect, race/late response and non-Morek regression. Test that
+    opening the UI does not start charging. Implement local development only: no
+    live switch action, profile send/clear, restart or deployment without separate
+    approval. The user determines any physical test; ACK is not measured charging.
 - [x] **5.6b Person Stop and retained-schedule policy** (2.5.52 local, unarmed, mocked; quick coordinator review)
   - Quick review found no blocker to proceeding to 5.6c; the isolated planning and
     lifecycle suites were independently rerun (522 passed, 1 deselected; 256 passed).
@@ -940,6 +987,8 @@ tests are documented there; full HA collection is still blocked on Windows.
     ambiguity, external writers and installation protection; do not treat the removal
     of a mode switch as evidence that the charger is in a safe state.
 - [ ] **5.7b End-to-end local regression and release handoff**
+  - Include the 5.6d schedule-owned new-session authorization path before claiming
+    automatic plug-in operation is complete; schedule ACK alone cannot start a session.
   - 2.5.67 is a partial local continuation, not a reviewed release candidate.
     Failed dashboard refreshes now withdraw cached connection, SOC and proposal
     observations immediately. The practical reported-charging and measured-power
