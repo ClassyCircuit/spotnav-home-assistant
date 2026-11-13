@@ -99,6 +99,7 @@ Detailed requirements and acceptance cases follow outside this checklist.
 | 11 | Adaptive charging estimates for Morek | Later work; reuse existing learning and genuine measurement sources |
 | 12 | Fix real sidebar usability, price presentation and evidence | Prioritize before 5.8; implement bounded 12.1–12.8 separately alongside remaining 5.7b work |
 | 13 | Migrate useful old-card configuration into the sidebar | Follow the related Stage 12 work; 13.1–13.4 are separate, bounded tasks |
+| 14 | Predictable planning and stable Morek schedule updates | 14.1–14.6 in order; coordinates with 9.4/9.5 and 11 without duplicating them |
 
 ### Stage 0 — Completed baseline: preserve and reuse
 
@@ -1833,6 +1834,123 @@ backend validation and settings-to-plan behavior where applicable. Preserve draf
 permissions, conflict handling and user settings. Follow `AGENTS.md` for manifest
 version, frontend build and check-dist; mock tests are not proof of installed HA or
 physical behavior. Any deployment or hardware action requires separate approval.
+
+### Stage 14 — Predictable planning and stable charging
+
+**User direction:** recalculate when inputs warrant it, but send only when the
+remaining effective schedule needs a meaningful change. Plug-in must cause a fresh
+calculation and a guarded comparison with the last accepted schedule, even if that
+comparison decides not to send. Routine sensor updates must not interrupt an active
+charging window. A reported charger state is not proof of measured power: distinguish
+charging, plugged-in/waiting, unplugged and unknown using existing trustworthy,
+fresh evidence; ambiguous or stale state is unknown, never silently assumed idle.
+This stage refines the existing planner and Morek owner, not a second controller.
+
+Implement one substage per session, in order, including production wiring, focused
+tests and documentation. Each is a comparable reviewable unit, not an equal line
+count. Reuse 9.4 logging, 9.5 recovery and existing observation/learning code where
+available; do not require those broad stages to be completed first. Preserve Pause,
+Stop, Charge Now, protection, identity, ownership and uncertain-write guards. No
+live commands, deployment or HA restart are authorized by this roadmap. Update the
+handoff and checklist truthfully; follow AGENTS.md version/build requirements.
+
+**Decisions for this stage:**
+
+- For an active window, routine changes preserve permission through its existing
+  end. An explicit Pause/Stop or protection action takes precedence immediately;
+  Charge Now and Return to Auto retain their existing semantics. User planning edits
+  recalculate immediately: a lowered cap may end the window if its price exceeds the
+  cap and the minimum can still be met by ready-by; continue above cap only for energy
+  needed for that minimum. Raising the cap or a cap still covering now does not stop it.
+- A newly published or materially changed price may interrupt an active window only
+  when the proposed alternative saves at least EUR 0.50 **and** 10% of the comparable
+  remaining estimated variable cost, yields a gap of at least 30 minutes, and leaves
+  at least 15 minutes of extra time beyond the estimated minimum-SOC requirement before
+  ready-by. Compare the same remaining energy using known prices and configured fees;
+  if cost, currency conversion, state or feasibility is uncertain, preserve the active
+  window. Negative or zero baseline cost cannot satisfy the percentage test. These are
+  conservative internal defaults, not new settings or promises of actual savings.
+- For routine SOC-driven updates, ignore end-time differences under five minutes if
+  all other future transitions and current permission match. Settings edits, plug-in,
+  price changes, safety and recovery are not suppressed by this tolerance. Coalesce
+  bursts for two seconds; explicit controls and protection must not wait for it. Compare
+  absolute future limits, not a moving profile creation timestamp; elapsed transitions
+  and equivalent representations must not generate writes. Never suppress a required
+  recovery sync merely because the prior ACK matches.
+- A fresh SOC report can trigger calculation; use existing freshness, source and
+  vehicle association rules. Missing, stale or ambiguous inputs must not replace a
+  valid schedule with a speculative one. A plan, ACK or limit is never measured flow.
+  The BMW's own limit remains separate; no new live SOC-stop or household load control.
+
+- [ ] **14.1 Partial current price interval and Morek block limit**
+  - Include the remainder of the current known price interval as a candidate starting
+    now, with proportional energy and cost, alongside future periods. Respect price
+    cap, minimum, ready-by, existing window constraints and missing prices. Update
+    shared horizon/deadline helpers and displayed periods consistently; do not count
+    elapsed time. Ensure Morek planning selects at most three executable blocks even
+    in automatic-period mode; report any resulting shortfall or compromise. Preserve
+    other chargers' existing limits and behavior.
+  - Test mid-interval and exact-boundary starts, partial deadline, cap exceptions,
+    negative prices, missing horizon, midnight/DST and fragmented cheap periods;
+    verify displayed windows, energy, cost and generated Morek profile agree.
+
+- [ ] **14.2 State-aware active-window continuity**
+  - Wire existing charger/session evidence into Morek reconciliation, with explicit
+    freshness and unknown state. Preserve the acknowledged currently allowed window
+    through its end across routine replans, including when updating future periods.
+    If state is unknown, avoid an automatic interruption and expose the reason; retain
+    immediate controls, protection and uncertainty guards. Do not infer actual power
+    from the allowed window or replace the existing session coordinator.
+  - Test charging, waiting, unplugged, stale/unknown, active-to-idle transitions,
+    SOC updates during charging, pause/protection races and future-window changes.
+    Verify the production-generated profile has no unintended 0 A gap.
+
+- [ ] **14.3 Recalculation triggers and guarded send deduplication**
+  - Wire plug-in, meaningful fresh SOC progress, price publication/change, planning
+    settings, deadline rollover, charger reconnect and important sensor loss/return
+    to re-evaluation. Plug-in always recalculates and compares the result even if no
+    upload follows. Coalesce routine bursts as specified above; do not wake the car
+    solely for a routine update. Implement the stated semantic comparison and SOC
+    end-time tolerance against the last acknowledged intent, without defeating a
+    required guarded sync or suppressing explicit actions.
+  - Test plug-in with equal and changed schedules, repeated SOC and price events,
+    elapsed transitions, tolerance boundaries, changed settings, reconnect, unknown
+    outcomes and controls racing a queued update. Assert actual send counts.
+
+- [ ] **14.4 Meaningful active-window interruption policy**
+  - Implement the explicit cap-edit and price-improvement decisions above using the
+    existing cost, deadline and minimum-SOC calculation. Keep the current window for
+    routine changes or uncertain evidence; allow guarded interruption only when the
+    stated conditions hold. Apply the same owner and safety boundaries, explain the
+    decision, and avoid interrupt/restart loops. Do not introduce extra user settings.
+  - Test cap raised, lowered above/below current price and minimum exception; price
+    improvement below/at thresholds, short gaps, negative prices, insufficient slack,
+    missing data and repeated events. Check that controls and protection remain immediate.
+
+- [ ] **14.5 Fresh progress inputs and bounded recovery**
+  - Review and fix the existing Morek planning path's SOC freshness, vehicle identity,
+    timestamp ordering and genuinely measured energy handling. Prevent stale inputs
+    from replacing a good plan and prevent energy already reflected in a new SOC from
+    being counted twice. If trustworthy measurements are unavailable, use existing
+    conservative estimates and label uncertainty; do not build adaptive learning here.
+  - Reuse 9.5 recovery: re-evaluate on restored inputs/reconnect, bound retries of
+    definite failures, and preserve pending/unknown writes without blind retries or
+    clearing profiles. Show the last known accepted intent, its age and current blocker;
+    it is not proof of physical charging or of installed-profile inventory.
+  - Test stale/out-of-order SOC, fresh SOC after measured energy, unavailable meters,
+    restart, reconnect, definite rejection, timeout/unknown outcome and Stop races.
+
+- [ ] **14.6 Decision evidence and end-to-end regression**
+  - Extend existing diagnostics with concise, bounded events: trigger, state/evidence
+    freshness, material plan change, preserve/interrupt reason, send/skip and outcome.
+    Reuse native SpotNav logging and existing status surfaces; no separate log store,
+    sensitive household payloads or duplicate 9.4 log viewer. Show actionable reasons
+    when the new plan cannot be applied and distinguish intent, ACK and readback.
+  - Add focused production-wiring tests spanning plug-in through calculation and
+    guarded send, repeated sensor updates while charging, price-driven interruption,
+    recovery and unchanged-plan skips. Include bounded event volume and permissions.
+    Document thresholds, known limitations and local test results; do not claim live
+    or physical verification from mocked tests.
 
 ### Execution boundaries — avoid another prerequisite spiral
 
