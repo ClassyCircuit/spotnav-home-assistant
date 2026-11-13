@@ -23,7 +23,7 @@ _LOGGER = logging.getLogger(__name__)
 _COALESCE_SECONDS = 0.1  # explicit controls, plug-in, settings: do not wait
 _ROUTINE_COALESCE_SECONDS = 2.0  # routine SOC/price bursts
 _SOC_END_TOLERANCE = timedelta(minutes=5)  # SOC-only: an end instant that moves less is not news
-_TRIGGER_RANK = ("plug_in", "sync", "settings", "control", "sensor", "recalc", "price", "routine")
+_TRIGGER_RANK = ("plug_in", "sync", "settings", "control", "sensor", "recovery", "recalc", "price", "routine")
 _SETTLED = ("upload_accepted_unverified", "unchanged")  # outcomes that end a pending price decision
 _SOC_CAUSE = "soc"  # the only planner cause that is routine and may use the SOC tolerance
 
@@ -52,6 +52,7 @@ class MorekScheduleWorker:
         self._sync_serial = None
         self.continuity: dict[str, Any] | None = None
         self._continuity_timer = None
+        self._retry_timer = None
         self._continuity_end: datetime | None = None
         self._deadline: float | None = None
         self._wake = asyncio.Event()
@@ -182,6 +183,9 @@ class MorekScheduleWorker:
         if self._continuity_timer is not None:
             self._continuity_timer.cancel()
             self._continuity_timer = None
+        if self._retry_timer is not None:
+            self._retry_timer.cancel()
+            self._retry_timer = None
         if self._remove is not None:
             self._remove()
             self._remove = None
@@ -227,6 +231,28 @@ class MorekScheduleWorker:
         self.continuity = {"evidence": evidence, "preserved": True, "until": until,
                            "reason": "active_window_state_unknown" if evidence == "unknown" else reason}
         return profile
+
+    async def _arm_retry_timer(self, data: dict[str, Any]) -> None:
+        """After a definite rejection, one bounded later attempt (`morek_schedule.rejection_retry_at`).
+
+        Re-evaluates the newest plan through the normal guarded path; it never retries an uncertain write and
+        never clears a profile. Cancelled by any later run that no longer ends in a rejection."""
+        if self._retry_timer is not None:
+            self._retry_timer.cancel()
+            self._retry_timer = None
+        if self._closed:
+            return
+        try:
+            record = await morek_schedule._outcome_record(self._hass, self._entry_id, data)
+        except Exception:  # noqa: BLE001 - no evidence, no retry
+            return
+        at = morek_schedule.rejection_retry_at(record)
+        if at is None:
+            return
+        delay = (at - datetime.now(timezone.utc)).total_seconds() + 1
+        if delay <= 1:
+            return  # already due: this very run is the retry; never a tight re-arm loop
+        self._retry_timer = asyncio.get_running_loop().call_later(delay, lambda: self.trigger(kind="recovery"))
 
     def _arm_continuity_timer(self) -> None:
         """Replan again just after a preserved window ends; planner events may not."""
@@ -330,6 +356,8 @@ class MorekScheduleWorker:
             delay = (datetime.fromisoformat(override["end"]) - datetime.now(timezone.utc)).total_seconds()
             if delay > 0:
                 self._expiry = asyncio.get_running_loop().call_later(delay, self.trigger)
+        # After a restart the durable rejection record alone re-arms the bounded retry, whatever this run does.
+        await self._arm_retry_timer(data)
         if self._suspended or not self._available():
             self.reason = "charger_unavailable"
             return
@@ -420,6 +448,11 @@ class MorekScheduleWorker:
             return
         outcome, sent_at, attempt_id = result.value
         self.reason = outcome
+        if outcome == "upload_rejected":
+            await self._arm_retry_timer(data)
+        elif self._retry_timer is not None and outcome != "upload_uncertain":
+            self._retry_timer.cancel()
+            self._retry_timer = None
         if (outcome == "upload_accepted_unverified" and sent_at and attempt_id
                 and not self._closed):
             # Admission has been released. The read-only path reacquires it itself.

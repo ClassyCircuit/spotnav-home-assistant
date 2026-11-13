@@ -383,6 +383,47 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-13 — Stage 14.5 fresh inputs and bounded recovery (2.5.109; local mocked)
+
+- Planner (`auto_controller._capped_input_problem`, `soc_reading_order_problem`): on the capped Morek
+  path a level for another/unknown car, dated >120 s in the future, or >5 s older than the newest one
+  planned from (per vehicle and plug-in; memory only) gives `planning_unavailable`/`target_soc_stale`;
+  no proposal replaces the accepted schedule. `live_vehicle_facts` drops a reading whose vehicle differs
+  from the resolved one. `_vehicle_update_wait` (existing; measured register/integrated sessions only)
+  now also guards this path: measured energy since the reading that covers the need holds the plan with
+  `waiting_for_vehicle_update` (it also asks the car for a new level once per charge, as everywhere).
+  Partial measured energy is subtracted from 2.5.109 (see corrections below); no adaptive learning added.
+- Recovery (`morek_schedule.rejection_retry_at`, worker `_arm_retry_timer`): a definitely rejected
+  automatic intent is retried at most 2 more times (300 s, 900 s) with `attempt.rejections` persisted;
+  uncertain writes are never retried; `trigger(kind="recovery")` ranks below sensor. Status:
+  `reconciliation.recovery` (accepted intent age, rejections, next retry, exhausted) and
+  `reconciliation.inputs` (SOC source/age/estimated/uncertain); an acknowledgement is not proof of physical
+  charging or of installed profiles.
+- **2.5.109 corrections.** (1) Identity/ordering guards and progress accounting now also cover the uncapped
+  Morek-owned target-SOC path (`_morek_owned`); non-Morek chargers are unchanged. (2) Partial measured energy:
+  `vehicle_update_wait.measured_progress` / `AutoPlannerController._progress_adjusted` subtract measured
+  session energy that began after the reading once from the need (and minimum); a newer reading rebases (the
+  earlier session starts before it and no longer counts); energy covering the need gives
+  `waiting_for_vehicle_update`; unattributable measured energy (session for no car, or a session that began
+  before a reading older than 300 s and continues) keeps the accepted plan with
+  `planning_unavailable`/`target_progress_uncertain`. Estimated-source sessions, no known plug-in and no
+  charger controller change nothing (plan from the reading, as before). This replaces the earlier "partial
+  measured energy is not subtracted" limit. An open session's `energy_kwh` is taken as the store reports it;
+  its freshness was not verified. (3) The retry timer is armed from the durable rejection record at the start
+  of every reconcile (restart-safe, even when the run sends nothing), never for uncertain/exhausted records,
+  not re-armed when already due; sends still pass Stop/ownership validation. (4) Two existing
+  `test_morek_worker` tests that swap in an older report as the plug-in's first level now clear the in-memory
+  order memory. `_charger_controller()` is a small seam so tests drive the real wait/progress code.
+- Tests: `tests/test_stage_145_fresh_inputs_recovery.py` (11) and `tests/test_stage_145_progress_recovery.py`
+  (13: real controller path capped/uncapped with partial, covering, unattributable, no-meter, unknown plug-in,
+  fresh rebase, wrong vehicle, future/out-of-order, non-Morek unchanged; restart timer, uncertain, exhausted,
+  Stop). The earlier 11 include a stub of `_vehicle_update_wait`; the new file does not.
+  (original list follows.) The controller tests need the fixture zone
+  resolved (`time_zones._remember`), done by an autouse fixture; the measured-energy test stubs
+  `_vehicle_update_wait` (its own logic is covered by `test_vehicle_update_wait.py`), so the capped-path
+  wiring, not session accounting, is what it proves. Limits: out-of-order memory resets on restart; reading
+  age has no cutoff; no sidebar text; no live/physical verification.
+
 ### 2026-11-13 — Stage 14.4 active-window interruption policy (2.5.107; local mocked)
 
 **Review corrections (2.5.107):**

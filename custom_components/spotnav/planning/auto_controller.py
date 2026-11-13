@@ -377,6 +377,8 @@ AutoReason = Literal[
     #: A target needs the car's state of charge and no source provides or can estimate one.
     "target_soc_unknown",
     "target_soc_stale",
+    #: Measured energy since the car's level cannot be attributed reliably: the accepted plan stands.
+    "target_progress_uncertain",
     "minimum_above_target",
     "no_prices_yet",
     "price_data_stale",
@@ -458,6 +460,9 @@ def live_vehicle_facts(
     vehicle_id, _ = resolve_target_vehicle(hass, stored_vehicle_id or None, allowed)
     soc_source.ensure_watch(vehicle_id)
     reading = soc_source.read(vehicle_id)
+    if (reading is not None and reading.vehicle_id and vehicle_id and reading.vehicle_id != vehicle_id):
+        # A level read for another car is never this car's (Stage 14.5): no level, so nothing is planned from it.
+        reading = None
     if reading is None or reading.soc_percent is None:
         # Planned without a level: the first one that arrives plans again (`SocReader.await_reading`).
         soc_source.await_reading(stored_vehicle_id or None)
@@ -578,6 +583,44 @@ def capped_vehicle_energy(
         delta = max(0.0, target - soc)
         minimum_kwh = 0.0 if delta == 0 else target_kwh * max(0.0, minimum_percent - soc) / delta
     return ("ok", target_kwh, minimum_kwh)
+
+
+#: How far ahead of this process's clock a car's own report time may be before it is not believed (clock skew).
+SOC_FUTURE_TOLERANCE_S: Final = 120.0
+#: A report this much older than the newest one already used for this car is out of order (rounding of ages).
+SOC_ORDER_TOLERANCE_S: Final = 5.0
+
+
+def soc_reading_instant(facts: LiveVehicleFacts, now: datetime) -> datetime | None:
+    """When the car's level was read: its own report time, else `now` minus the reading's age; `None` if unknown."""
+    if facts.soc_report_at is not None:
+        return facts.soc_report_at
+    age = facts.soc_age_s
+    if age is None or isinstance(age, bool) or not isinstance(age, (int, float)) or not math.isfinite(age):
+        return None
+    return now - timedelta(seconds=max(0.0, age))
+
+
+def soc_reading_order_problem(
+    facts: LiveVehicleFacts, now: datetime, newest: datetime | None
+) -> str | None:
+    """`future` or `out_of_order` when a reading must not be planned from, else `None`.
+
+    `newest` is the latest reading instant already accepted for this car and plug-in. A reading dated after
+    this process's clock (beyond skew) or before that one is not the car's current state; the plan already
+    made stands.
+    """
+    instant = soc_reading_instant(facts, now)
+    if instant is None:
+        return None
+    try:
+        if (instant - now).total_seconds() > SOC_FUTURE_TOLERANCE_S:
+            return "future"
+        if newest is not None and (newest - instant).total_seconds() > SOC_ORDER_TOLERANCE_S:
+            return "out_of_order"
+    except (TypeError, ValueError, OverflowError):
+        return "future"
+    return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -821,6 +864,8 @@ class AutoPlannerController:
         self._vehicle_update = vehicle_update
         # The last charge the car was asked about, so it is asked once.
         self._update_asked_for: str | None = None
+        # Newest reading instant planned from, per (vehicle, plug-in): older readings are out of order (14.5).
+        self._soc_newest: dict[tuple[str, datetime | None], datetime] = {}
         self._now: Callable[[], datetime] = now if now is not None else dt_util.utcnow
         # The one appointment kept with the clock: the latest safe start of a plan waiting for prices,
         # made through the manager's scheduler so tests can drive time.
@@ -1699,13 +1744,7 @@ class AutoPlannerController:
 
         # A Morek schedule-owned cheapest target-SOC plan starts now (the rest of the current price interval)
         # and never needs more windows than the stored profile can carry. Other chargers are unchanged.
-        morek_planning = False
-        if (settings.driver == DRIVER_TARGET_SOC and settings.strategy == STRATEGY_CHEAPEST
-                and self._schedule_owned is not None):
-            try:
-                morek_planning = await self._schedule_owned()
-            except Exception:  # noqa: BLE001 - unavailable ownership never changes a legacy plan
-                morek_planning = False
+        morek_planning = await self._morek_owned(settings)
         plan_request = PlanRequest(
             area_id=entry.id,
             timezone=entry.tz,
@@ -2603,6 +2642,28 @@ class AutoPlannerController:
                     settings, "planning_unavailable", policy_reason, calculated_at,
                     entry=entry, price_snapshot=price_snapshot,
                 )
+            stale = self._capped_input_problem(facts, calculated_at, preview=preview)
+            if stale is not None:
+                # Stage 14.5: a level that is not this car's, is dated after now, or is older than one already
+                # planned from is not a basis for a plan. No proposal replaces the accepted one.
+                return self._fresh_snapshot(
+                    settings, "planning_unavailable", stale, calculated_at,
+                    entry=entry, price_snapshot=price_snapshot,
+                )
+            if facts is not None:
+                # The energy the charger measured since this level was read may already be what the level
+                # would ask for again: wait for the car's new level (the same guard as every target plan).
+                waiting = self._vehicle_update_wait(
+                    settings, facts, target_kwh, calculated_at, entry, price_snapshot, preview=preview
+                )
+                if waiting is not None:
+                    return waiting
+            adjusted = self._progress_adjusted(
+                settings, facts, calculated_at, entry, price_snapshot, target_kwh, minimum_kwh
+            )
+            if isinstance(adjusted, AutoSnapshot):
+                return adjusted
+            target_kwh, minimum_kwh = adjusted
             return _EnergyResolution(
                 kwh=target_kwh, delivered_energy_trustworthy=True, soc_percent=live_soc,
                 capacity_kwh=capacity, kwh_per_percent=learned.use_kwh_per_percent,
@@ -2636,12 +2697,28 @@ class AutoPlannerController:
                 settings, "nothing_to_charge", "already_at_target", calculated_at,
                 entry=entry, price_snapshot=price_snapshot,
             )
+        owned = facts is not None and await self._morek_owned(settings)
+        if owned:
+            stale = self._capped_input_problem(facts, calculated_at, preview=preview)
+            if stale is not None:
+                # Stage 14.5 on the uncapped Morek-owned path too: no proposal replaces the accepted one.
+                return self._fresh_snapshot(
+                    settings, "planning_unavailable", stale, calculated_at,
+                    entry=entry, price_snapshot=price_snapshot,
+                )
         if wall_kwh is not None and facts is not None:
             waiting = self._vehicle_update_wait(
                 settings, facts, wall_kwh, calculated_at, entry, price_snapshot, preview=preview
             )
             if waiting is not None:
                 return waiting
+        if owned and wall_kwh is not None:
+            adjusted = self._progress_adjusted(
+                settings, facts, calculated_at, entry, price_snapshot, wall_kwh, None
+            )
+            if isinstance(adjusted, AutoSnapshot):
+                return adjusted
+            wall_kwh = adjusted[0]
         kwh = wall_kwh if wall_kwh is not None else settings.requested_kwh
         # Always trustworthy: live state of charge already reflects everything delivered.
         return _EnergyResolution(
@@ -2652,6 +2729,100 @@ class AutoPlannerController:
             soc_estimated=bool(facts is not None and facts.soc_estimated),
             soc_time_basis=None if facts is None else facts.soc_time_basis,
         )
+
+    def _charger_controller(self) -> Any:
+        """The charging controller the executor drives, or `None` when there is no executor (a seam for tests)."""
+        return None if self._executor is None else self._executor.controller
+
+    async def _morek_owned(self, settings: AutoSettings) -> bool:
+        """Whether this is a Morek schedule-owned cheapest target-SOC plan (other chargers are unchanged)."""
+        if (settings.driver != DRIVER_TARGET_SOC or settings.strategy != STRATEGY_CHEAPEST
+                or self._schedule_owned is None):
+            return False
+        try:
+            return bool(await self._schedule_owned())
+        except Exception:  # noqa: BLE001 - unavailable ownership never changes a legacy plan
+            return False
+
+    def _progress_adjusted(
+        self,
+        settings: AutoSettings,
+        facts: LiveVehicleFacts,
+        calculated_at: datetime,
+        entry: AreaEntry,
+        price_snapshot: Any,
+        need_kwh: float,
+        minimum_kwh: float | None,
+    ) -> AutoSnapshot | tuple[float, float | None]:
+        """The need less measured energy delivered since the reading, counted once (14.5).
+
+        Existing accounting is reused (`vehicle_update_wait.measured_progress`): only measured (register or
+        integrated) sessions of this plug-in and car that began after the reading, so a newer reading rebases
+        at once. Unmeasured sessions are not evidence (the plan is made from the reading, as before). When
+        some measured energy since the reading cannot be attributed, the accepted plan is kept:
+        `planning_unavailable`/`target_progress_uncertain`. Energy that covers the need holds the plan."""
+        unchanged = (need_kwh, minimum_kwh)
+        controller = self._charger_controller()
+        if controller is None or facts.soc_estimated:  # an estimate already counts the energy
+            return unchanged
+        store = domain_data(self._hass).session_store
+        if store is None:
+            return unchanged
+        plugged_in_at = controller.plugged_in_for_count
+        instant = soc_reading_instant(facts, calculated_at)
+        if plugged_in_at is None or instant is None:
+            return unchanged
+        sessions = [*store.closed_raw(self._entry_id)]
+        open_session = store.open_raw(self._entry_id)
+        if open_session is not None:
+            sessions.append(open_session)
+        progress = vehicle_update_wait.measured_progress(
+            sessions, read_at=instant, plugged_in_at=plugged_in_at, vehicle_id=facts.vehicle_id or None,
+            now=calculated_at,
+        )
+        if progress.uncertain:
+            return self._fresh_snapshot(
+                settings, "planning_unavailable", "target_progress_uncertain", calculated_at,
+                entry=entry, price_snapshot=price_snapshot,
+            )
+        if progress.kwh <= 0:
+            return unchanged
+        remaining = need_kwh - progress.kwh
+        if remaining <= vehicle_update_wait.NEED_TOLERANCE_KWH:
+            return self._fresh_snapshot(
+                settings, "nothing_to_charge", "waiting_for_vehicle_update", calculated_at,
+                entry=entry, price_snapshot=price_snapshot,
+            )
+        return remaining, None if minimum_kwh is None else max(0.0, minimum_kwh - progress.kwh)
+
+    def _capped_input_problem(
+        self, facts: LiveVehicleFacts | None, calculated_at: datetime, *, preview: bool
+    ) -> str | None:
+        """`target_soc_stale` when the level must not be planned from (14.5), else `None`.
+
+        Association: it must be for the car the charger identified, when that is known. Order: a report time
+        in the future, or older than the newest already planned from in this plug-in. Records the newest one
+        for a real (not preview) calculation.
+        """
+        if facts is None:
+            return None
+        if not facts.vehicle_id:
+            return "target_soc_stale"
+        checked, identified = self._notification_vehicle()
+        if checked and identified and facts.vehicle_id != identified:
+            return "target_soc_stale"
+        controller = None if self._executor is None else self._executor.controller
+        epoch = None if controller is None else controller.plugged_in_for_count
+        key = (facts.vehicle_id, epoch)
+        problem = soc_reading_order_problem(facts, calculated_at, self._soc_newest.get(key))
+        if problem is not None:
+            return "target_soc_stale"
+        instant = soc_reading_instant(facts, calculated_at)
+        if instant is not None and not preview:
+            if len(self._soc_newest) > 8:
+                self._soc_newest.clear()
+            self._soc_newest[key] = max(instant, self._soc_newest.get(key, instant))
+        return None
 
     def _planned_from_floor(
         self, settings: AutoSettings, facts: LiveVehicleFacts | None, live_soc: float, calculated_at: datetime
@@ -2691,7 +2862,8 @@ class AutoPlannerController:
         `None` (plan as before). While it waits the car is asked for a reading once per charge, a newer
         reading plans again at once, and with a departure the plan is made again when the need would only
         just still fit."""
-        if self._executor is None:
+        controller = self._charger_controller()
+        if controller is None:
             return None
         store = domain_data(self._hass).session_store
         if store is None:
@@ -2700,7 +2872,6 @@ class AutoPlannerController:
         open_session = store.open_raw(self._entry_id)
         if open_session is not None:
             sessions.append(open_session)
-        controller = self._executor.controller
         plan = controller.plan
         try:
             window_ahead = plan is not None and any(end > calculated_at for _start, end in plan.windows)

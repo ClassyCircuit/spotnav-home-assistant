@@ -1997,6 +1997,7 @@ async def test_last_known_soc_reconciles_and_new_report_invalidates_then_replans
     w, world, _ = await real_admission_planner_worker(monkeypatch, tmp_path)
     old = world.request.now - timedelta(days=4)
     world.facts[0] = replace(world.facts[0], soc_age_s=4 * 86400, soc_report_at=old, soc_entity_id="sensor.soc")
+    world.controller._soc_newest.clear()  # the car's first level of this plug-in (Stage 14.5 order memory)
     await world.controller.async_recalculate()
     assert world.controller.morek_plan_blocker(world.controller.snapshot(), world.request.now) is None
     w.worker.start()
@@ -2019,6 +2020,7 @@ async def test_preplug_last_known_soc_and_uncapped_estimates_remain_admissible(m
     w, world = await real_planner_worker(monkeypatch)
     facts = replace(world.facts[0], soc_age_s=86400 * 3, soc_estimated=False)
     world.facts[0] = facts
+    world.controller._soc_newest.clear()  # the car's first level of this plug-in (Stage 14.5 order memory)
     await world.controller.async_recalculate()
     old_executor = world.controller._executor
     world.controller._executor = SimpleNamespace(controller=SimpleNamespace(

@@ -35,6 +35,7 @@ PROFILE_ID = 42001
 MAX_PERIODS = 8
 MAX_HORIZON = timedelta(hours=48)
 VERIFY_TOLERANCE_S = 90
+REJECTION_RETRY_DELAYS = (300, 900)  # seconds before the 2nd and 3rd attempt at a definitely rejected intent
 VERIFY_DELAYS = (30, 45, 45)  # Follow-up reads at approximately 30, 75 and 120 seconds.
 _DATA_KEY = "spotnav_morek_schedule"
 _VERIFY_KEY = "spotnav_morek_verification"
@@ -989,6 +990,52 @@ def _proposed_profile(hass: HomeAssistant, entry_id: str, now: datetime, *,
     return profile_for(periods, settings.amps, now, allow_active=True)
 
 
+def rejection_count(attempt: dict[str, Any] | None) -> int:
+    """How many times the intent of this (rejected) attempt was definitely refused in a row; 0 when not."""
+    if not isinstance(attempt, dict) or attempt.get("state") != "rejected":
+        return 0
+    count = attempt.get("rejections", 1)
+    return count if type(count) is int and count >= 1 else 1
+
+
+def rejection_retry_at(record: dict[str, Any] | None) -> datetime | None:
+    """When a definitely rejected automatic intent may be sent again, or `None` when retries are used up
+    (or the record is not a definite rejection). Bounded by `REJECTION_RETRY_DELAYS`; only ever a
+    re-send of the same intent, never a profile clear."""
+    if not isinstance(record, dict) or record.get("uncertain"):
+        return None
+    attempt = record.get("attempt")
+    count = rejection_count(attempt)
+    if count < 1 or count > len(REJECTION_RETRY_DELAYS) or attempt.get("source") != "worker":
+        return None
+    try:
+        return _utc(datetime.fromisoformat(attempt["at"])) + timedelta(seconds=REJECTION_RETRY_DELAYS[count - 1])
+    except (KeyError, TypeError, ValueError, AttributeError, ScheduleRefused):
+        return None
+
+
+def recovery_status(record: dict[str, Any] | None, now: datetime) -> dict[str, Any]:
+    """Non-sensitive account of the last accepted intent and of bounded rejection recovery.
+
+    The accepted intent is what the charger acknowledged, not proof of physical charging or of the profiles
+    installed on it."""
+    record = record if isinstance(record, dict) else {}
+    ack = record.get("acknowledged") if isinstance(record.get("acknowledged"), dict) else {}
+    accepted_at = age_s = None
+    try:
+        at = _utc(datetime.fromisoformat(ack["at"]))
+        accepted_at, age_s = at.isoformat(), max(0, int((now - at).total_seconds()))
+    except (KeyError, TypeError, ValueError, AttributeError, ScheduleRefused):
+        pass
+    attempt = record.get("attempt") if isinstance(record.get("attempt"), dict) else {}
+    count = rejection_count(attempt)
+    retry_at = rejection_retry_at(record)
+    return {"accepted_at": accepted_at, "accepted_age_s": age_s, "accepted_is": "acknowledged_not_measured",
+            "rejections": count, "retries_left": max(0, len(REJECTION_RETRY_DELAYS) + 1 - count) if count else None,
+            "next_retry_at": None if retry_at is None else retry_at.isoformat(),
+            "exhausted": bool(count and retry_at is None and not record.get("uncertain"))}
+
+
 def _preview_id(profile: dict[str, Any], revision: Any) -> str:
     """Commit to wire attributes and absolute changes, excluding the moving initial timestamp."""
     schedule = profile["chargingSchedule"]
@@ -1338,8 +1385,15 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
         # The accepted routine schedule already says this from now on (a settings edit, an explicit
         # control, a pause or a needed sync is never suppressed here); a profile creation time is not a change.
         return "unchanged"
+    rejections = 0
     if automatic and attempt.get("state") == "rejected" and attempt.get("fingerprint") == fingerprint:
-        return "upload_rejected"
+        # A definite refusal of this very intent: tried again only a bounded number of times, each after a
+        # longer pause (Stage 14.5). Never after an uncertain write (handled above), and a forced
+        # sync is the person's own request.
+        rejections = rejection_count(attempt)
+        retry_at = rejection_retry_at(record)
+        if not force_sync and (retry_at is None or datetime.now(timezone.utc) < retry_at):
+            return "upload_rejected"
     now = datetime.now(timezone.utc).isoformat()
     attempt_id = uuid4().hex
     settings_now = domain_data(hass).auto_store.settings(entry_id)
@@ -1348,7 +1402,8 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
     record.update({"desired": {"fingerprint": fingerprint, "profile": profile},
                    "attempt": {"fingerprint": fingerprint, "profile": profile, "at": now, "id": attempt_id,
                                "revision": revision,
-                               "source": "worker" if automatic else "manual", "state": "uncertain"},
+                               "source": "worker" if automatic else "manual", "state": "uncertain",
+                               **({"rejections": rejections} if rejections else {})},
                    "uncertain": True, "verified": None})
     if pause_id is not None:
         record["attempt"]["pause_id"] = pause_id
@@ -1418,6 +1473,7 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
         record["attempt"]["state"] = "accepted"
     elif state in ("rejected", "notsupported"):
         record["attempt"]["state"] = "rejected"
+        record["attempt"]["rejections"] = rejections + 1
         record["uncertain"] = False
     if automatic and migration_id and state in ("accepted", "rejected", "notsupported"):
         # Written only after a real ticket-checked wire call returned a response.
@@ -1432,6 +1488,20 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
     await store.async_save(data)
     return "upload_accepted_unverified" if state == "accepted" else (
         "upload_rejected" if state in ("rejected", "notsupported") else "upload_uncertain")
+
+
+def _planning_inputs(hass: HomeAssistant, entry_id: str) -> dict[str, Any]:
+    """The state of charge the current plan was made from, labelled; never an entity id or raw payload."""
+    try:
+        snapshot = preview_for(hass, entry_id).snapshot()
+        age = snapshot.projection_age_s
+        return {"plan_state": snapshot.state, "plan_reason": snapshot.reason,
+                "soc_source": snapshot.projection_source, "soc_estimated": bool(snapshot.projection_estimated),
+                "soc_age_s": None if age is None else int(age),
+                "uncertain": bool(snapshot.projection_estimated or snapshot.projection_age_s is None
+                                  or snapshot.state in ("planning_unavailable", "incomplete_settings"))}
+    except Exception:  # noqa: BLE001 - diagnostics only
+        return {"plan_state": "unknown", "uncertain": True}
 
 
 def _preview(hass: HomeAssistant, entry_id: str, target: Any) -> dict[str, Any]:
@@ -1941,6 +2011,8 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
                       "reconciliation": {"reason": worker.reason if worker is not None and
                                          getattr(worker, "reason_serial", -1) == worker._serial else "pending",
                                          "continuity": getattr(worker, "continuity", None),
+                                         "recovery": recovery_status(outcomes, datetime.now(timezone.utc)),
+                                         "inputs": _planning_inputs(hass, entry.entry_id),
                                          "last_trigger": getattr(worker, "last_trigger", None)},
                       "ownership": ownership,
                       "outcomes": outcomes,

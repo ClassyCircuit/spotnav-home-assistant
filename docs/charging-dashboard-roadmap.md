@@ -99,7 +99,7 @@ Detailed requirements and acceptance cases follow outside this checklist.
 | 11 | Adaptive charging estimates for Morek | Later work; reuse existing learning and genuine measurement sources |
 | 12 | Fix real sidebar usability, price presentation and evidence | Prioritize before 5.8; implement bounded 12.1–12.8 separately alongside remaining 5.7b work |
 | 13 | Migrate useful old-card configuration into the sidebar | Follow the related Stage 12 work; 13.1–13.4 are separate, bounded tasks |
-| 14 | Predictable planning and stable Morek schedule updates | 14.1–14.6 in order; 14.1 locally implemented (2.5.101, mocked; review corrections applied); coordinates with 9.4/9.5 and 11 without duplicating them |
+| 14 | Predictable planning and stable Morek schedule updates | 14.1–14.6 in order; 14.1–14.5 locally implemented (14.5: 2.5.109); 14.1 locally implemented (2.5.101, mocked; review corrections applied); coordinates with 9.4/9.5 and 11 without duplicating them |
 
 ### Stage 0 — Completed baseline: preserve and reuse
 
@@ -2009,7 +2009,40 @@ handoff and checklist truthfully; follow AGENTS.md version/build requirements.
     improvement below/at thresholds, short gaps, negative prices, insufficient slack,
     missing data and repeated events. Check that controls and protection remain immediate.
 
-- [ ] **14.5 Fresh progress inputs and bounded recovery**
+- [x] **14.5 Fresh progress inputs and bounded recovery** (2.5.109 local, mocked)
+  - 2.5.109 corrections: the identity/order guards and the progress accounting below now also run on the
+    **uncapped** Morek-owned target-SOC path (`_morek_owned`: cheapest strategy and schedule ownership;
+    other chargers unchanged), not only the capped one. Measured partial progress is counted once
+    (`vehicle_update_wait.measured_progress`, via `_progress_adjusted`): only measured (register/integrated)
+    sessions of this plug-in and car that began after the reading are subtracted from the need (and the
+    minimum), so a newer reading rebases at once; energy covering the need holds the plan
+    (`waiting_for_vehicle_update`); measured energy that cannot be attributed (a session recorded for no car,
+    or one that began before the reading and carries on while the reading is older than 300 s) keeps the
+    accepted plan with `planning_unavailable`/`target_progress_uncertain`. Unmeasured (estimated-source)
+    sessions are not evidence: no meter, no known plug-in, or no charger controller plans from the reading
+    unchanged, as before. The rejection-retry timer is now armed from the durable record at the start of
+    every reconcile (so it survives a restart even when that run sends nothing), never for an uncertain write
+    or exhausted retries, and a due retry does not re-arm in a loop; Stop/ownership guards still gate the
+    send.
+  - Implemented (capped Morek target-SOC path, `AutoPlannerController._energy_for`): a reading is refused
+    as `planning_unavailable`/`target_soc_stale` (no proposal, so the accepted schedule stands and nothing
+    is sent) when it is for another car than the charger identified, has no vehicle id, is dated more than
+    120 s ahead of the clock, or is older (>5 s) than the newest one already planned from for that car and
+    plug-in (in memory; reset by a new plug-in or restart). `live_vehicle_facts` drops a reading whose own
+    vehicle differs from the resolved one. Estimated readings were already refused. The existing
+    `vehicle_update_wait` guard now also runs on the capped path: measured (register/integrated) session
+    energy since the reading that already covers the need holds the plan (`waiting_for_vehicle_update`)
+    instead of planning it again; without trustworthy measurement the plan is made from the reading as
+    before (conservative, nothing is subtracted, no learner). Reading age still has no cutoff (existing
+    decision); the age/source are exposed.
+  - Recovery: a definitely rejected automatic intent is re-sent at most twice more (after 5 and 15
+    minutes, `REJECTION_RETRY_DELAYS`; count kept in the durable attempt) by a worker timer or any later
+    trigger; an uncertain write is never retried, a forced sync/person action behaves as before, Stop and
+    ownership guards run first, a changed plan starts fresh. Status `reconciliation.recovery` shows the last
+    accepted intent (`accepted_at`, `accepted_age_s`, "acknowledged, not measured"), rejections, retries
+    left, next retry, exhausted; `reconciliation.inputs` labels the SOC basis/uncertainty. Restored inputs
+    and reconnect use the existing triggers (reading arrival, sensor, availability resume). No sidebar
+    text yet; mocked tests only.
   - Review and fix the existing Morek planning path's SOC freshness, vehicle identity,
     timestamp ordering and genuinely measured energy handling. Prevent stale inputs
     from replacing a good plan and prevent energy already reflected in a new SOC from

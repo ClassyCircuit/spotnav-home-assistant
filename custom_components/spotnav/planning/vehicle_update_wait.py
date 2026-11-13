@@ -124,6 +124,52 @@ def measured_delivery_since(
     )
 
 
+#: A charge that began before the reading, ongoing, is only ignored while the reading is this fresh
+#: (the energy since is then small); an older reading with such a charge is not accounted for.
+PROGRESS_FRESH_S: Final = 300.0
+
+
+@dataclass(frozen=True, slots=True)
+class Progress:
+    """Measured energy since a reading: `kwh` counted once; `uncertain` when some energy since the reading
+    cannot be attributed reliably (a charge that straddles it, or one recorded for no car)."""
+
+    kwh: float = 0.0
+    uncertain: bool = False
+
+
+def measured_progress(
+    sessions: Iterable[ChargeSession],
+    *,
+    read_at: datetime,
+    plugged_in_at: datetime,
+    vehicle_id: str | None,
+    now: datetime,
+) -> Progress:
+    """The measured energy delivered since `read_at` that the reading cannot include, counted once.
+
+    Only sessions that began at or after the reading count (`measured_delivery_since`), so a fresh reading
+    rebases at once: a charge that began before it is already in it. A measured charge for another car is
+    ignored. Estimated sessions are not evidence. A measured charge for no car, or one that began before the
+    reading and carries on while the reading is older than `PROGRESS_FRESH_S`, makes the sum `uncertain`."""
+    sessions = list(sessions)
+    since = max(read_at, plugged_in_at)
+    delivery = measured_delivery_since(sessions, read_at=read_at, plugged_in_at=plugged_in_at, vehicle_id=vehicle_id)
+    uncertain = False
+    stale = (now - read_at).total_seconds() > PROGRESS_FRESH_S
+    for session in sessions:
+        if (session.energy_source not in MEASURED_SOURCES or session.source is not None
+                or not session.energy_kwh > 0 or (session.end is not None and session.end <= since)):
+            continue
+        if session.vehicle_id is not None and session.vehicle_id != vehicle_id:
+            continue
+        if session.vehicle_id is None:
+            uncertain = True
+        elif session.start < since and stale:
+            uncertain = True
+    return Progress(0.0 if delivery is None else delivery.kwh, uncertain)
+
+
 def decide_vehicle_update_wait(
     *,
     need_kwh: float,
