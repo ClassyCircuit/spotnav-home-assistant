@@ -17,7 +17,7 @@ for(const [size,width,height] of [['desktop',1440,1000],['mobile',390,844]]) for
   assert.ok(ready,`${mode} rendered`);
   const data=await evaluate(`(()=>{const root=${mode==='panel' ? "document.querySelector('spotnav-enhanced-panel').shadowRoot" : 'document.body'};return {text:root.textContent,width:document.documentElement.scrollWidth}})()`);
   assert.match(data.text,/Price chart unavailable/); assert.match(data.text,/60 min/); assert.doesNotMatch(data.text,/216000000/); assert.doesNotMatch(data.text,/SAMPLE DATA/); assert.ok(data.width<=width);
-  assert.match(data.text,/Control available · vehicle disconnected · transaction \/ authorization unknown · measured charging unknown/);
+  assert.match(data.text,/Control available · vehicle disconnected · measured charging unknown/);
   const metrics=await cmd('Page.getLayoutMetrics');const screenshot=await cmd('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:{x:0,y:0,width:metrics.cssContentSize.width,height:metrics.cssContentSize.height,scale:1}});
   await writeFile(path.join(output,`${size}-${mode}.png`),Buffer.from(screenshot.data,'base64'));
   if(mode==='panel') {

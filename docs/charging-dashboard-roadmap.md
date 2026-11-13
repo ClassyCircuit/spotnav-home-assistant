@@ -1490,6 +1490,25 @@ when identified, rather than remaining indefinite roadmap tasks.
   the handoff entry "Plug-in session activation fix". 2.5.126 review: a flap-created connection now yields exactly
   one plug-in recalculation, and the start no longer calls `worker._intent` (side effects, swallowed refusals).
 
+### Stage 9.7 — Charge-session status and plugged-in warning (2.5.127, local mocked; not deployed or live-verified)
+
+- The existing sidebar now says whether a plugged-in car will charge: a `#charge-session` card above the recovery
+  banner (`frontend/sidebar/charge-session.js`, pure) and the same wording in the dashboard readiness evidence (the old
+  "transaction / authorization unknown" text is replaced). States: unknown/stale, offline, fault, unplugged, pending
+  (grace), accepted-awaiting-charger, observed transaction, normal scheduled wait, Pause/Stop, suspended, reported
+  charging, measured charging, finished, and prominent warnings (accepted without a transaction, rejected, start not sent,
+  start blocked, outcome unknown). Off switch / no transaction in Preparing before authorization is shown as normal;
+  an ACK is never shown as a transaction or as charging; only fresh measured power or current says "Charging".
+- Backend evidence added (read-only, additive): `readiness.session_start_at` (when the request state last changed, memory
+  only), `readiness.live.control_state` (charge-control switch on/off) and `readiness.live.transaction` (present/absent
+  only, never the id, with `changed_at`). `readiness.transaction` stays `unknown`. Details and limits are in the handoff
+  entry "Charge-session status and warning".
+
+- 2.5.128 hardening: scheduled-wait and "Authorized" wording needs fresh transaction evidence; the hold needs a fresh
+  readback or an accepted, unexpired sent plan (shown as planned, not proof); no text promises power; an unmatched
+  transaction never suppresses an accepted-no-transaction, rejected or blocked warning; protection conflicts are to be
+  resolved, not bypassed. Still local mocked and unverified on hardware.
+
 ### Stage 10 — Optional Charge Now (after initial installation)
 
 This is a user-requested **nice-to-have after 5.8**, not a prerequisite for the

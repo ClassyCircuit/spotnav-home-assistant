@@ -143,6 +143,40 @@ def test_live_missing_timestamp_and_offline_are_unknown(monkeypatch):
     assert result["live"] is None and result["measurement"] == "unknown"
 
 
+# ------------------------------------------------------------------ charge-control and transaction evidence
+def _txn(state, changed=NOW - timedelta(seconds=30), ts=NOW):
+    return SimpleNamespace(state=state, last_updated=ts, last_reported=ts, last_changed=changed, attributes={})
+
+
+@pytest.mark.parametrize(("raw", "present"), [("0", False), ("0.0", False), ("1234", True), ("7", True),
+                                              ("unknown", None), ("unavailable", None), ("", None), ("-1", None),
+                                              ("nan", None), ("1.5", None), ("abc", None)])
+def test_transaction_is_present_absent_or_unknown_and_never_exposes_the_id(monkeypatch, raw, present):
+    states = {"switch.control": _sensor("off"), "sensor.status_connector": _sensor("Preparing"),
+              "sensor.transaction_id": _txn(raw)}
+    live = _readiness(_live_hass(monkeypatch, states))["live"]
+    if present is None:
+        assert live["transaction"] is None
+    else:
+        assert live["transaction"]["value"] is present and live["transaction"]["fresh"] is True
+        assert live["transaction"]["changed_at"] == (NOW - timedelta(seconds=30)).isoformat()
+    assert raw not in str(live["transaction"]) or raw in ("0", "")  # the raw number is never in the payload
+    assert live["control_state"]["value"] == "off"            # off in Preparing is reported, not judged
+
+
+def test_transaction_and_control_are_stamped_and_stale_ones_are_not_fresh(monkeypatch):
+    old = NOW - timedelta(seconds=500)
+    states = {"switch.control": _sensor("on", old), "sensor.transaction_id": _txn("9", ts=old)}
+    live = _readiness(_live_hass(monkeypatch, states))["live"]
+    assert live["transaction"]["fresh"] is False and live["control_state"]["fresh"] is False
+    states = {"switch.control": _sensor("on", None), "sensor.transaction_id": _txn("5", changed=None, ts=None)}
+    live = _readiness(_live_hass(monkeypatch, states))["live"]
+    assert live["control_state"] is None and live["transaction"] is None   # no timestamp / no on-off: unknown
+    # a missing sensor leaves the default None; readiness keeps its unchanged conservative transaction field
+    result = _readiness(_live_hass(monkeypatch, {"switch.control": _sensor("on")}))
+    assert result["live"]["transaction"] is None and result["transaction"] == "unknown"
+
+
 # ------------------------------------------------------------------ strict connector measurand binding
 class _Registry:
     """A registry boundary holding real `RegistryEntry` objects (no HA runtime needed)."""

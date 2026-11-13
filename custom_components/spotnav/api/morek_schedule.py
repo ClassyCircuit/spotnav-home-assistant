@@ -981,12 +981,13 @@ def _live_measurements(hass: HomeAssistant, controller: Any, now: datetime,
     from ..execution.charger_connection import normalise_ocpp
     from ..execution.power_energy import power_w_of
     from ..vehicles.ocpp_identity import (CURRENT_IMPORT_KEY, ENERGY_REGISTER_KEY, POWER_ACTIVE_IMPORT_KEY,
-                                          STATUS_CONNECTOR_KEY, _classes_allow_register, connector_measurand_entity,
-                                          connector_sensor_entity_id)
+                                          STATUS_CONNECTOR_KEY, TRANSACTION_ID_KEY, _classes_allow_register,
+                                          connector_measurand_entity, connector_sensor_entity_id)
 
     target = getattr(controller, "ocpp_target", None)
     live: dict[str, Any] = {"connector_id": getattr(target, "connector_id", None), "status": None,
                             "current_a": None, "power_w": None, "energy_register_kwh": None,
+                            "control_state": None, "transaction": None,
                             "sources": {"power": "none", "energy": "none"}}
     if target is None:
         return live
@@ -1039,6 +1040,29 @@ def _live_measurements(hass: HomeAssistant, controller: Any, now: datetime,
         return _live_reading(sensor, now, value * factor, "kWh")
 
     live["energy_register_kwh"] = attempt(energy)
+
+    # What the charge-control switch and the transaction-id sensor report. Both are observations of the
+    # charger's own state: the switch is expected to be off in Preparing before authorization, and a
+    # transaction id is reduced to present/absent here (the raw id never leaves the backend).
+    switch = attempt(lambda: read(getattr(controller, "charge_control", None)))
+    on_off = None if switch is None else str(switch.state).lower()
+    live["control_state"] = attempt(lambda: _live_reading(switch, now, on_off if on_off in ("on", "off") else None, ""))
+    transaction = attempt(lambda: read(connector_sensor_entity_id(hass, target, TRANSACTION_ID_KEY)))
+
+    def present() -> bool | None:
+        if transaction is None:
+            return None
+        try:
+            number = float(str(transaction.state))
+        except ValueError:
+            return None
+        return None if number != number or number < 0 or number != int(number) else number > 0
+
+    reading = attempt(lambda: _live_reading(transaction, now, present(), ""))
+    if reading is not None:
+        changed = getattr(transaction, "last_changed", None)
+        reading["changed_at"] = changed.isoformat() if isinstance(changed, datetime) and changed.tzinfo else None
+        live["transaction"] = reading
     return live
 
 
@@ -1056,6 +1080,7 @@ def _session_readiness(hass: HomeAssistant, controller: Any, identity: dict[str,
         # Keep it separate from schedule upload readiness and never infer a session
         # from the control switch or a connector status.
         "session_start": {"state": "blocked", "reason": "authorization_path_unimplemented"},
+        "session_start_at": None,
         "activation_blockers": ["production_dispatch_unarmed", "activation_path_incomplete",
                                 "first_use_or_lost_state_unverified", "retained_profile_unresolved",
                                 "transaction_authorization_unverified", "held_exit_has_no_release",
@@ -2332,6 +2357,8 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
             session = getattr(worker, "session", None)
             if session is not None and online:
                 readiness["session_start"] = dict(session.state)
+                changed = getattr(session, "state_at", None)
+                readiness["session_start_at"] = changed.isoformat() if isinstance(changed, datetime) else None
             # Diagnostic only: the preview is not a checked dispatch intent and
             # even a matching readback cannot itself authorize a session start.
             readiness["session_schedule_evidence"] = session_start_schedule_evidence(

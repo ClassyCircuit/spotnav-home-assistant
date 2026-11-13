@@ -15,6 +15,8 @@ raised the working-tree manifest to 2.5.99, then 2.5.100 after review and 2.5.10
 and deployed version on arrival. The current coordinator initialization is
 `prompts/coordinator-handoff.md`.
 
+**Charge-session card (2.5.127, evidence hardening 2.5.128):** the sidebar now shows whether a plugged-in car is authorized/has a transaction and warns when it may not charge (see its entry below); local mocked only.
+
 **Open priorities:** Stage 9.5 (automatic recovery and visible blockers) and 9.4 (SpotNav log
 view) are implemented locally with mocked tests (2.5.117 / 2.5.113); neither is deployed or live-verified. 9.5 is
 only partly met: a never-dispatched Resume after restart needs a fresh explicit Resume (see its entry below).
@@ -383,6 +385,52 @@ requirements, not features claimed implemented in the manual baseline below.
   Do not assume `GetCompositeSchedule` lists stored profiles.
 
 ## Tests, build, and next steps
+
+### 2026-11-13 — Charge-session status and warning (2.5.127; local mocked; no live HA/charger action)
+
+- **What the user sees:** a `#charge-session` card in the existing sidebar host (above `#recovery-banner`, painted by
+  `paintSession`, which only reads decoded status) and the same text in the dashboard `readiness` evidence. Plain
+  language, one action line, a collapsed "What SpotNav sees" list; no raw codes or IDs. Warnings use `role="alert"` and
+  a large amber/red card; everything else is `role="status"`.
+- **Classifier:** `frontend/sidebar/charge-session.js` (`chargeSession`, `scheduleLimit`). Order: unsupported (hidden) ->
+  stale/failed/missing status = unknown -> offline -> connector unknown -> unplugged -> fault -> uncertain outcome ->
+  measured flow (the only "Charging") -> finished -> reported charging (power unmeasured) -> Pause/Stop (info) ->
+  suspended or scheduled wait -> in Preparing: observed transaction (ok), unmatched transaction (info), then by request
+  state: starting/pending (info), accepted (info within 120 s, **warning after** or when the backend says
+  `no_transaction_observed`), rejected, blocked (transient reasons are info for 120 s then warn; protection/logging/unknown
+  reasons warn at once; completed session is info), waiting (info 120 s then warn). No timestamp (older backend) means no
+  time-based alarm. A scheduled 0 A hold never excuses a missing transaction, but a *present* transaction plus a hold is the
+  calm "Authorized - waiting for the schedule" state. The hold comes from the readback limit, else an ACKed sent profile.
+- **Backend evidence (additive):** `MorekSessionCoordinator.state` is now a property that stamps `state_at` only when the
+  state changes (memory only: after a restart it is the restart time, so a long-accepted request is judged from the restart
+  moment). `readiness.session_start_at`, `readiness.live.control_state` (`on`/`off` + freshness) and `readiness.live.transaction`
+  (`True`/`False` from the connector transaction-id sensor, id never exposed, plus `changed_at`). In Preparing a present
+  transaction counts as observed only if it changed after the current request-state change; otherwise it is "not tied to this
+  plug-in" (a leftover id from an earlier session must not confirm this one). `readiness.transaction` is unchanged `unknown`.
+- **Limits:** the transaction-id sensor's real lifecycle (sentinel, retention after a session ends, update timing) is still not
+  verified on hardware; the logic only trusts a *fresh* reading and treats everything else as unknown. The switch state is
+  displayed, never used as a verdict. The 120 s grace equals the backend's own bound and is judged on the browser clock against
+  the backend timestamp (clock skew can shift it by seconds). `session_start_at` is not persisted. The warning does not itself
+  start, repeat or clear anything and offers no new control; the advice (use the Morek app or re-plug) is generic and
+  unverified on the installed system. `session_start_at` assembly in the full status path has no dedicated test (the
+  card logic and the coordinator timestamp do).
+- **2.5.128 evidence hardening (local mocked):** a schedule wait ("Plugged in - waiting for the schedule") is claimed only with a
+  *fresh* transaction report (Preparing: matched transaction; suspended connector: fresh `true`). A suspended connector
+  without it is plain "Charging suspended" and says whether the transaction is reported absent or merely unknown. The hold
+  itself (`scheduleLimit`) needs a readback with a fresh `fetched_at`; otherwise only an *accepted* sent plan with a send time
+  and a known, unexpired duration counts, is worded "plan sent to the charger ... not confirmed by a readback", and is dropped
+  when verification says the limits differ or were superseded. No text promises power starts ("may begin ... not guaranteed").
+  An unmatched transaction number no longer returns early: it only replaces the calm pending/accepted-waiting states, and is
+  appended as a note to accepted-no-transaction, rejected, blocked and start-not-sent warnings. An unknown transaction sensor
+  is "no transaction is confirmed", never "none". Action text follows the retry state (`request_rejected` = one retry pending;
+  otherwise "will not repeat"; not-yet-sent says unplug/re-plug). `protection_conflict_unresolved` says to resolve the
+  protection conflict and does not suggest starting the charge elsewhere. New tests: "evidence required before claiming a
+  scheduled wait or readiness" in `charge-session.test.ts`.
+- **Tests:** `frontend/test/charge-session.test.ts` (13: every state, grace, stale, leftover transaction, scheduled hold,
+  measured vs reported), `frontend/test/charge-session-panel.test.ts` (card wiring, role, hide/unknown, no writes),
+  `tests/test_morek_readiness.py` (transaction/control evidence), `tests/test_morek_session_activation.py` (state stamp);
+  updated readiness wording in `sidebar.test.ts` and `browser-check.mjs` (browser check not run). No browser, live HA, charger,
+  restart, commit or push.
 
 ### 2026-11-13 — Plug-in session activation fix (2.5.126, review of 2.5.125; local mocked; no live HA/charger action)
 

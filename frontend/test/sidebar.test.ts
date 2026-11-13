@@ -272,7 +272,7 @@ describe('actual sidebar read-only host', () => {
     expect(text(current,now,true)).toMatch(/Control unknown · vehicle unknown/);
     current.schedule.readiness.vehicle_observed_at=new Date(now-180001).toISOString();
     expect(text(current)).toMatch(/vehicle unknown/);
-    expect(text(current)).toMatch(/authorization unknown · measured charging unknown/);
+    expect(text(current)).toMatch(/measured charging unknown · Charging status unknown/);
     const dispatch=dashboardAdapter(raw,current,now).model.evidence.dispatch;
     expect(dispatch).toMatch(/0 A limit may remain/);
     expect(dispatch).toMatch(/not profile inventory/);
@@ -320,10 +320,10 @@ describe('actual sidebar read-only host', () => {
     const now=Date.now(), raw=fixture(); raw.generated_at=new Date(now).toISOString();
     const current={api_version:1,schedule:{...status.schedule,supported:true,readiness:{control:'available',vehicle:'connected',vehicle_observed_at:new Date(now).toISOString(),session_start:{state:'blocked',reason:'authorization_path_unimplemented'}}}};
     const text=(failed=false)=>dashboardAdapter(raw,current,now,now,failed).model.evidence.readiness;
-    expect(text()).toMatch(/authorization unknown.*Automatic session start is not implemented/);
-    expect(text(true)).toMatch(/Automatic session start status unavailable/);
+    expect(text()).toMatch(/Charging status unknown.*not a transaction or charging/);
+    expect(text(true)).toMatch(/Charging status unknown.*out of date/);
     current.schedule.readiness.session_start={state:'offline',reason:'charger_offline'};
-    expect(text()).toMatch(/Automatic session start is offline/);
+    expect(text()).toMatch(/Charger offline/);
   });
   it('blocks cached Resume immediately after an actual failed dashboard refresh', async () => {
     const raw=fixture();raw.generated_at=new Date(Date.now()+100).toISOString();raw.charger.charger_id='a';let fail=false;const calls=[];

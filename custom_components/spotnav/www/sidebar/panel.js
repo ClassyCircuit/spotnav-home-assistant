@@ -82,12 +82,12 @@ var init_chunk_7VGCIHDG = __esm({
       throw TypeError(msg);
     };
     __decorateClass = (decorators, target, key3, kind) => {
-      var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc(target, key3) : target;
+      var result2 = kind > 1 ? void 0 : kind ? __getOwnPropDesc(target, key3) : target;
       for (var i7 = decorators.length - 1, decorator; i7 >= 0; i7--)
         if (decorator = decorators[i7])
-          result = (kind ? decorator(target, key3, result) : decorator(result)) || result;
-      if (kind && result) __defProp2(target, key3, result);
-      return result;
+          result2 = (kind ? decorator(target, key3, result2) : decorator(result2)) || result2;
+      if (kind && result2) __defProp2(target, key3, result2);
+      return result2;
     };
     __accessCheck = (obj, member, msg) => member.has(obj) || __typeError("Cannot " + msg);
     __privateGet = (obj, member, getter) => (__accessCheck(obj, member, "read from private field"), getter ? getter.call(obj) : member.get(obj));
@@ -2183,26 +2183,26 @@ var init_chunk_M45NRQFW = __esm({
       noResults: "No matching results",
       notCompleted: "Not completed",
       now: "Now",
-      numCharacters: (num2) => {
-        if (num2 === 1) return "1 character";
-        return `${num2} characters`;
+      numCharacters: (num3) => {
+        if (num3 === 1) return "1 character";
+        return `${num3} characters`;
       },
-      numCharactersRemaining: (num2) => {
-        if (num2 === 1) return "1 character remaining";
-        return `${num2} characters remaining`;
+      numCharactersRemaining: (num3) => {
+        if (num3 === 1) return "1 character remaining";
+        return `${num3} characters remaining`;
       },
-      numOptionsAvailable: (num2) => {
-        if (num2 === 0) return "No options available";
-        if (num2 === 1) return "1 option available";
-        return `${num2} options available`;
+      numOptionsAvailable: (num3) => {
+        if (num3 === 0) return "No options available";
+        if (num3 === 1) return "1 option available";
+        return `${num3} options available`;
       },
-      numOptionsSelected: (num2) => {
-        if (num2 === 0) return "No options selected";
-        if (num2 === 1) return "1 option selected";
-        return `${num2} options selected`;
+      numOptionsSelected: (num3) => {
+        if (num3 === 0) return "No options selected";
+        if (num3 === 1) return "1 option selected";
+        return `${num3} options selected`;
       },
-      numRowsCopied: (num2) => num2 === 1 ? "1 row copied" : `${num2} rows copied`,
-      numRowsSelected: (num2) => num2 === 1 ? "1 row selected" : `${num2} rows selected`,
+      numRowsCopied: (num3) => num3 === 1 ? "1 row copied" : `${num3} rows copied`,
+      numRowsSelected: (num3) => num3 === 1 ? "1 row selected" : `${num3} rows selected`,
       optionPosition: (label, position, total2) => `${label}, ${position} of ${total2}`,
       optionsLoadError: "Options could not be loaded",
       pageXOfY: (page, total2) => `Page ${page} of ${total2}`,
@@ -6314,36 +6314,36 @@ function clone(source) {
   if (source == null || typeof source !== "object") {
     return source;
   }
-  var result = source;
+  var result2 = source;
   var typeStr = objToString.call(source);
   if (typeStr === "[object Array]") {
     if (!isPrimitive(source)) {
-      result = [];
+      result2 = [];
       for (var i7 = 0, len2 = source.length; i7 < len2; i7++) {
-        result[i7] = clone(source[i7]);
+        result2[i7] = clone(source[i7]);
       }
     }
   } else if (TYPED_ARRAY[typeStr]) {
     if (!isPrimitive(source)) {
       var Ctor = source.constructor;
       if (Ctor.from) {
-        result = Ctor.from(source);
+        result2 = Ctor.from(source);
       } else {
-        result = new Ctor(source.length);
+        result2 = new Ctor(source.length);
         for (var i7 = 0, len2 = source.length; i7 < len2; i7++) {
-          result[i7] = source[i7];
+          result2[i7] = source[i7];
         }
       }
     }
   } else if (!BUILTIN_OBJECT[typeStr] && !isPrimitive(source) && !isDom(source)) {
-    result = {};
+    result2 = {};
     for (var key3 in source) {
       if (source.hasOwnProperty(key3) && key3 !== protoKey) {
-        result[key3] = clone(source[key3]);
+        result2[key3] = clone(source[key3]);
       }
     }
   }
-  return result;
+  return result2;
 }
 function merge(target, source, overwrite) {
   if (!isObject(source) || !isObject(target)) {
@@ -6363,11 +6363,11 @@ function merge(target, source, overwrite) {
   return target;
 }
 function mergeAll(targetAndSources, overwrite) {
-  var result = targetAndSources[0];
+  var result2 = targetAndSources[0];
   for (var i7 = 1, len2 = targetAndSources.length; i7 < len2; i7++) {
-    result = merge(result, targetAndSources[i7], overwrite);
+    result2 = merge(result2, targetAndSources[i7], overwrite);
   }
-  return result;
+  return result2;
 }
 function extend(target, source) {
   if (Object.assign) {
@@ -6481,11 +6481,11 @@ function map(arr, cb, context) {
   if (arr.map && arr.map === nativeMap) {
     return arr.map(cb, context);
   } else {
-    var result = [];
+    var result2 = [];
     for (var i7 = 0, len2 = arr.length; i7 < len2; i7++) {
-      result.push(cb.call(context, arr[i7], i7, arr));
+      result2.push(cb.call(context, arr[i7], i7, arr));
     }
-    return result;
+    return result2;
   }
 }
 function reduce(arr, cb, memo, context) {
@@ -6507,13 +6507,13 @@ function filter(arr, cb, context) {
   if (arr.filter && arr.filter === nativeFilter) {
     return arr.filter(cb, context);
   } else {
-    var result = [];
+    var result2 = [];
     for (var i7 = 0, len2 = arr.length; i7 < len2; i7++) {
       if (cb.call(context, arr[i7], i7, arr)) {
-        result.push(arr[i7]);
+        result2.push(arr[i7]);
       }
     }
-    return result;
+    return result2;
   }
 }
 function find(arr, cb, context) {
@@ -13574,41 +13574,41 @@ function mappingToExists(existings, newCmptOptions, mode) {
       }
     }
   });
-  var result = prepareResult(existings, existingIdIdxMap, mode);
+  var result2 = prepareResult(existings, existingIdIdxMap, mode);
   if (isNormalMergeMode || isReplaceMergeMode) {
-    mappingById(result, existings, existingIdIdxMap, newCmptOptions);
+    mappingById(result2, existings, existingIdIdxMap, newCmptOptions);
   }
   if (isNormalMergeMode) {
-    mappingByName(result, newCmptOptions);
+    mappingByName(result2, newCmptOptions);
   }
   if (isNormalMergeMode || isReplaceMergeMode) {
-    mappingByIndex(result, newCmptOptions, isReplaceMergeMode);
+    mappingByIndex(result2, newCmptOptions, isReplaceMergeMode);
   } else if (isReplaceAllMode) {
-    mappingInReplaceAllMode(result, newCmptOptions);
+    mappingInReplaceAllMode(result2, newCmptOptions);
   }
-  makeIdAndName(result);
-  return result;
+  makeIdAndName(result2);
+  return result2;
 }
 function prepareResult(existings, existingIdIdxMap, mode) {
-  var result = [];
+  var result2 = [];
   if (mode === "replaceAll") {
-    return result;
+    return result2;
   }
   for (var index = 0; index < existings.length; index++) {
     var existing = existings[index];
     if (existing && existing.id != null) {
       existingIdIdxMap.set(existing.id, index);
     }
-    result.push({
+    result2.push({
       existing: mode === "replaceMerge" || isComponentIdInternal(existing) ? null : existing,
       newOption: null,
       keyInfo: null,
       brandNew: null
     });
   }
-  return result;
+  return result2;
 }
-function mappingById(result, existings, existingIdIdxMap, newCmptOptions) {
+function mappingById(result2, existings, existingIdIdxMap, newCmptOptions) {
   each(newCmptOptions, function(cmptOption, index) {
     if (!cmptOption || cmptOption.id == null) {
       return;
@@ -13616,7 +13616,7 @@ function mappingById(result, existings, existingIdIdxMap, newCmptOptions) {
     var optionId = makeComparableKey(cmptOption.id);
     var existingIdx = existingIdIdxMap.get(optionId);
     if (existingIdx != null) {
-      var resultItem = result[existingIdx];
+      var resultItem = result2[existingIdx];
       assert(!resultItem.newOption, 'Duplicated option on id "' + optionId + '".');
       resultItem.newOption = cmptOption;
       resultItem.existing = existings[existingIdx];
@@ -13624,22 +13624,22 @@ function mappingById(result, existings, existingIdIdxMap, newCmptOptions) {
     }
   });
 }
-function mappingByName(result, newCmptOptions) {
+function mappingByName(result2, newCmptOptions) {
   each(newCmptOptions, function(cmptOption, index) {
     if (!cmptOption || cmptOption.name == null) {
       return;
     }
-    for (var i7 = 0; i7 < result.length; i7++) {
-      var existing = result[i7].existing;
-      if (!result[i7].newOption && existing && (existing.id == null || cmptOption.id == null) && !isComponentIdInternal(cmptOption) && !isComponentIdInternal(existing) && keyExistAndEqual("name", existing, cmptOption)) {
-        result[i7].newOption = cmptOption;
+    for (var i7 = 0; i7 < result2.length; i7++) {
+      var existing = result2[i7].existing;
+      if (!result2[i7].newOption && existing && (existing.id == null || cmptOption.id == null) && !isComponentIdInternal(cmptOption) && !isComponentIdInternal(existing) && keyExistAndEqual("name", existing, cmptOption)) {
+        result2[i7].newOption = cmptOption;
         newCmptOptions[index] = null;
         return;
       }
     }
   });
 }
-function mappingByIndex(result, newCmptOptions, brandNew) {
+function mappingByIndex(result2, newCmptOptions, brandNew) {
   each(newCmptOptions, function(cmptOption) {
     if (!cmptOption) {
       return;
@@ -13648,7 +13648,7 @@ function mappingByIndex(result, newCmptOptions, brandNew) {
     var nextIdx = 0;
     while (
       // Be `!resultItem` only when `nextIdx >= result.length`.
-      (resultItem = result[nextIdx]) && (resultItem.newOption || isComponentIdInternal(resultItem.existing) || // In mode "replaceMerge", here no not-mapped-non-internal-existing.
+      (resultItem = result2[nextIdx]) && (resultItem.newOption || isComponentIdInternal(resultItem.existing) || // In mode "replaceMerge", here no not-mapped-non-internal-existing.
       resultItem.existing && cmptOption.id != null && !keyExistAndEqual("id", cmptOption, resultItem.existing))
     ) {
       nextIdx++;
@@ -13657,7 +13657,7 @@ function mappingByIndex(result, newCmptOptions, brandNew) {
       resultItem.newOption = cmptOption;
       resultItem.brandNew = brandNew;
     } else {
-      result.push({
+      result2.push({
         newOption: cmptOption,
         brandNew,
         existing: null,
@@ -13667,9 +13667,9 @@ function mappingByIndex(result, newCmptOptions, brandNew) {
     nextIdx++;
   });
 }
-function mappingInReplaceAllMode(result, newCmptOptions) {
+function mappingInReplaceAllMode(result2, newCmptOptions) {
   each(newCmptOptions, function(cmptOption) {
-    result.push({
+    result2.push({
       newOption: cmptOption,
       brandNew: true,
       existing: null,
@@ -13782,21 +13782,21 @@ function compressBatches(batchA, batchB) {
     }
   }
   function mapToArray(map3, isData) {
-    var result = [];
+    var result2 = [];
     for (var i7 in map3) {
       if (map3.hasOwnProperty(i7) && map3[i7] != null) {
         if (isData) {
-          result.push(+i7);
+          result2.push(+i7);
         } else {
           var dataIndices = mapToArray(map3[i7], true);
-          dataIndices.length && result.push({
+          dataIndices.length && result2.push({
             seriesId: i7,
             dataIndex: dataIndices
           });
         }
       }
     }
-    return result;
+    return result2;
   }
 }
 function queryDataIndex(data, payload) {
@@ -13821,7 +13821,7 @@ function makeInner() {
 var innerUniqueIndex = getRandomIdBase();
 function parseFinder(ecModel, finderInput, opt) {
   var _a2 = preParseFinder(finderInput, opt), mainTypeSpecified = _a2.mainTypeSpecified, queryOptionMap = _a2.queryOptionMap, others = _a2.others;
-  var result = others;
+  var result2 = others;
   var defaultMainType = opt ? opt.defaultMainType : null;
   if (!mainTypeSpecified && defaultMainType) {
     queryOptionMap.set(defaultMainType, {});
@@ -13832,10 +13832,10 @@ function parseFinder(ecModel, finderInput, opt) {
       enableAll: opt && opt.enableAll != null ? opt.enableAll : true,
       enableNone: opt && opt.enableNone != null ? opt.enableNone : true
     });
-    result[mainType + "Models"] = queryResult.models;
-    result[mainType + "Model"] = queryResult.models[0];
+    result2[mainType + "Models"] = queryResult.models;
+    result2[mainType + "Model"] = queryResult.models[0];
   });
-  return result;
+  return result2;
 }
 function preParseFinder(finderInput, opt) {
   var finder;
@@ -13885,19 +13885,19 @@ function queryReferringComponents(ecModel, mainType, userOption, opt) {
   var indexOption = userOption.index;
   var idOption = userOption.id;
   var nameOption = userOption.name;
-  var result = {
+  var result2 = {
     models: null,
     specified: indexOption != null || idOption != null || nameOption != null
   };
-  if (!result.specified) {
+  if (!result2.specified) {
     var firstCmpt = void 0;
-    result.models = opt.useDefault && (firstCmpt = ecModel.getComponent(mainType)) ? [firstCmpt] : [];
-    return result;
+    result2.models = opt.useDefault && (firstCmpt = ecModel.getComponent(mainType)) ? [firstCmpt] : [];
+    return result2;
   }
   if (indexOption === "none" || indexOption === false) {
     if (opt.enableNone) {
-      result.models = [];
-      return result;
+      result2.models = [];
+      return result2;
     } else {
       if (true) {
         error('`"none"` or `false` is not a valid value on index option.');
@@ -13915,13 +13915,13 @@ function queryReferringComponents(ecModel, mainType, userOption, opt) {
       indexOption = -1;
     }
   }
-  result.models = ecModel.queryComponents({
+  result2.models = ecModel.queryComponents({
     mainType,
     index: indexOption,
     id: idOption,
     name: nameOption
   });
-  return result;
+  return result2;
 }
 function makeQueryConditionKindA(payload, mainType, subType) {
   if (true) {
@@ -14229,16 +14229,16 @@ function enableClassManagement(target) {
   };
   target.getClassesByMainType = function(componentType) {
     var componentTypeInfo = parseClassType(componentType);
-    var result = [];
+    var result2 = [];
     var obj = storage[componentTypeInfo.main];
     if (obj && obj[IS_CONTAINER]) {
       each(obj, function(o9, type) {
-        type !== IS_CONTAINER && result.push(o9);
+        type !== IS_CONTAINER && result2.push(o9);
       });
     } else {
-      result.push(obj);
+      result2.push(obj);
     }
-    return result;
+    return result2;
   };
   target.hasClass = function(componentType) {
     var componentTypeInfo = parseClassType(componentType);
@@ -14567,13 +14567,13 @@ function parseRichText(rawText, style, defaultOuterWidth, defaultOuterHeight, to
   var overflow = style.overflow;
   var wrapInfo = (overflow === "break" || overflow === "breakAll") && topWidth != null ? { width: topWidth, accumWidth: 0, breakAll: overflow === "breakAll" } : null;
   var lastIndex = STYLE_REG.lastIndex = 0;
-  var result;
-  while ((result = STYLE_REG.exec(text3)) != null) {
-    var matchedIndex = result.index;
+  var result2;
+  while ((result2 = STYLE_REG.exec(text3)) != null) {
+    var matchedIndex = result2.index;
     if (matchedIndex > lastIndex) {
       pushTokens(contentBlock, text3.substring(lastIndex, matchedIndex), style, wrapInfo);
     }
-    pushTokens(contentBlock, result[2], style, wrapInfo, result[1]);
+    pushTokens(contentBlock, result2[2], style, wrapInfo, result2[1]);
     lastIndex = STYLE_REG.lastIndex;
   }
   if (lastIndex < text3.length) {
@@ -20833,9 +20833,9 @@ function enableTopologicalTravel(entity, dependencyGetter) {
     if (!targetNameList.length) {
       return;
     }
-    var result = makeDepndencyGraph(fullNameList);
-    var graph = result.graph;
-    var noEntryList = result.noEntryList;
+    var result2 = makeDepndencyGraph(fullNameList);
+    var graph = result2.graph;
+    var noEntryList = result2.noEntryList;
     var targetNameSet = {};
     each(targetNameList, function(name) {
       targetNameSet[name] = true;
@@ -21471,8 +21471,8 @@ function makeValueReadable(value2, valueType, useUTC) {
   function stringToUserReadable(str) {
     return str && trim(str) ? str : "-";
   }
-  function isNumberUserReadable(num2) {
-    return isNullableNumberFinite(num2);
+  function isNumberUserReadable(num3) {
+    return isNullableNumberFinite(num3);
   }
   var isTypeTime = valueType === "time";
   var isValueDate = value2 instanceof Date;
@@ -21847,8 +21847,8 @@ function createBoxLayoutReference(model, api, opt) {
     if (boxCoordSys.dataToLayout) {
       layoutRefType = BoxLayoutReferenceType.rect;
       boxCoordFrom = from;
-      var result = boxCoordSys.dataToLayout(coord);
-      refContainer = result.contentRect || result.rect;
+      var result2 = boxCoordSys.dataToLayout(coord);
+      refContainer = result2.contentRect || result2.rect;
     } else if (opt && opt.enableLayoutOnlyByCenter && boxCoordSys.dataToPoint) {
       layoutRefType = BoxLayoutReferenceType.point;
       boxCoordFrom = from;
@@ -22383,7 +22383,7 @@ function guessOrdinal(source, dimIndex) {
   return doGuessOrdinal(source.data, source.sourceFormat, source.seriesLayoutBy, source.dimensionsDefine, source.startIndex, dimIndex);
 }
 function doGuessOrdinal(data, sourceFormat, seriesLayoutBy, dimensionsDefine, startIndex, dimIndex) {
-  var result;
+  var result2;
   var maxLoop = 5;
   if (isTypedArray(data)) {
     return BE_ORDINAL.Not;
@@ -22407,15 +22407,15 @@ function doGuessOrdinal(data, sourceFormat, seriesLayoutBy, dimensionsDefine, st
     if (seriesLayoutBy === SERIES_LAYOUT_BY_ROW) {
       var sample = dataArrayRows[dimIndex];
       for (var i7 = 0; i7 < (sample || []).length && i7 < maxLoop; i7++) {
-        if ((result = detectValue(sample[startIndex + i7])) != null) {
-          return result;
+        if ((result2 = detectValue(sample[startIndex + i7])) != null) {
+          return result2;
         }
       }
     } else {
       for (var i7 = 0; i7 < dataArrayRows.length && i7 < maxLoop; i7++) {
         var row = dataArrayRows[startIndex + i7];
-        if (row && (result = detectValue(row[dimIndex])) != null) {
-          return result;
+        if (row && (result2 = detectValue(row[dimIndex])) != null) {
+          return result2;
         }
       }
     }
@@ -22426,8 +22426,8 @@ function doGuessOrdinal(data, sourceFormat, seriesLayoutBy, dimensionsDefine, st
     }
     for (var i7 = 0; i7 < dataObjectRows.length && i7 < maxLoop; i7++) {
       var item = dataObjectRows[i7];
-      if (item && (result = detectValue(item[dimName])) != null) {
-        return result;
+      if (item && (result2 = detectValue(item[dimName])) != null) {
+        return result2;
       }
     }
   } else if (sourceFormat === SOURCE_FORMAT_KEYED_COLUMNS) {
@@ -22440,8 +22440,8 @@ function doGuessOrdinal(data, sourceFormat, seriesLayoutBy, dimensionsDefine, st
       return BE_ORDINAL.Not;
     }
     for (var i7 = 0; i7 < sample.length && i7 < maxLoop; i7++) {
-      if ((result = detectValue(sample[i7])) != null) {
-        return result;
+      if ((result2 = detectValue(sample[i7])) != null) {
+        return result2;
       }
     }
   } else if (sourceFormat === SOURCE_FORMAT_ORIGINAL) {
@@ -22452,8 +22452,8 @@ function doGuessOrdinal(data, sourceFormat, seriesLayoutBy, dimensionsDefine, st
       if (!isArray(val)) {
         return BE_ORDINAL.Not;
       }
-      if ((result = detectValue(val[dimIndex])) != null) {
-        return result;
+      if ((result2 = detectValue(val[dimIndex])) != null) {
+        return result2;
       }
     }
   }
@@ -22868,31 +22868,31 @@ var GlobalModel = (
       if (!cmpts || !cmpts.length) {
         return [];
       }
-      var result;
+      var result2;
       if (index != null) {
-        result = [];
+        result2 = [];
         each(normalizeToArray(index), function(idx) {
-          cmpts[idx] && result.push(cmpts[idx]);
+          cmpts[idx] && result2.push(cmpts[idx]);
         });
       } else if (id != null) {
-        result = queryByIdOrName("id", id, cmpts);
+        result2 = queryByIdOrName("id", id, cmpts);
       } else if (name != null) {
-        result = queryByIdOrName("name", name, cmpts);
+        result2 = queryByIdOrName("name", name, cmpts);
       } else {
-        result = filter(cmpts, function(cmpt) {
+        result2 = filter(cmpts, function(cmpt) {
           return !!cmpt;
         });
       }
-      return filterBySubType(result, condition);
+      return filterBySubType(result2, condition);
     };
     GlobalModel2.prototype.findComponents = function(condition) {
       var query = condition.query;
       var mainType = condition.mainType;
       var queryCond = getQueryCond(query);
-      var result = queryCond ? this.queryComponents(queryCond) : filter(this._componentsMap.get(mainType), function(cmpt) {
+      var result2 = queryCond ? this.queryComponents(queryCond) : filter(this._componentsMap.get(mainType), function(cmpt) {
         return !!cmpt;
       });
-      return doFilter(filterBySubType(result, condition));
+      return doFilter(filterBySubType(result2, condition));
       function getQueryCond(q) {
         var indexAttr = mainType + "Index";
         var idAttr = mainType + "Id";
@@ -23172,9 +23172,9 @@ var OptionManager = (
       var mediaList = this._mediaList;
       var mediaDefault = this._mediaDefault;
       var indices = [];
-      var result = [];
+      var result2 = [];
       if (!mediaList.length && !mediaDefault) {
-        return result;
+        return result2;
       }
       for (var i7 = 0, len2 = mediaList.length; i7 < len2; i7++) {
         if (applyMediaQuery(mediaList[i7].query, ecWidth, ecHeight)) {
@@ -23185,12 +23185,12 @@ var OptionManager = (
         indices = [-1];
       }
       if (indices.length && !indicesEquals(indices, this._currentMediaIndices)) {
-        result = map(indices, function(index) {
+        result2 = map(indices, function(index) {
           return clone(index === -1 ? mediaDefault.option : mediaList[index].option);
         });
       }
       this._currentMediaIndices = indices;
-      return result;
+      return result2;
     };
     return OptionManager2;
   })()
@@ -24302,11 +24302,11 @@ function retrieveRawValue(data, dataIndex, dim) {
     var property = store.getDimensionProperty(dimIndex);
     return getRawSourceValueGetter(sourceFormat)(dataItem, dimIndex, property);
   } else {
-    var result = dataItem;
+    var result2 = dataItem;
     if (sourceFormat === SOURCE_FORMAT_ORIGINAL) {
-      result = getDataItemValue(dataItem);
+      result2 = getDataItemValue(dataItem);
     }
-    return result;
+    return result2;
   }
 }
 
@@ -24401,19 +24401,19 @@ var DataFormatMixin = (
     return DataFormatMixin2;
   })()
 );
-function normalizeTooltipFormatResult(result) {
+function normalizeTooltipFormatResult(result2) {
   var markupText;
   var markupFragment;
-  if (isObject(result)) {
-    if (result.type) {
-      markupFragment = result;
+  if (isObject(result2)) {
+    if (result2.type) {
+      markupFragment = result2;
     } else {
       if (true) {
-        console.warn("The return type of `formatTooltip` is not supported: " + makePrintable(result));
+        console.warn("The return type of `formatTooltip` is not supported: " + makePrintable(result2));
       }
     }
   } else {
-    markupText = result;
+    markupText = result2;
   }
   return {
     text: markupText,
@@ -24596,9 +24596,9 @@ var iterator = /* @__PURE__ */ (function() {
   }
   function modNext() {
     var dataIndex = current % winCount * modBy + Math.ceil(current / winCount);
-    var result = current >= end2 ? null : dataIndex < modDataCount ? dataIndex : current;
+    var result2 = current >= end2 ? null : dataIndex < modDataCount ? dataIndex : current;
     current++;
-    return result;
+    return result2;
   }
 })();
 
@@ -24881,17 +24881,17 @@ function cloneRawData(upstream) {
     throwError(errMsg);
   }
   if (sourceFormat === SOURCE_FORMAT_ARRAY_ROWS) {
-    var result = [];
+    var result2 = [];
     for (var i7 = 0, len2 = data.length; i7 < len2; i7++) {
-      result.push(data[i7].slice());
+      result2.push(data[i7].slice());
     }
-    return result;
+    return result2;
   } else if (sourceFormat === SOURCE_FORMAT_OBJECT_ROWS) {
-    var result = [];
+    var result2 = [];
     for (var i7 = 0, len2 = data.length; i7 < len2; i7++) {
-      result.push(extend({}, data[i7]));
+      result2.push(extend({}, data[i7]));
     }
-    return result;
+    return result2;
   }
 }
 function getDimensionInfo(dimensions, dimsByName, dim) {
@@ -24991,21 +24991,21 @@ function applySingleDataTransform(transOption, upSourceList, infoForPrint, pipeI
       log(printStrArr);
     }
   }
-  return map(resultList, function(result, resultIndex) {
+  return map(resultList, function(result2, resultIndex) {
     var errMsg2 = "";
-    if (!isObject(result)) {
+    if (!isObject(result2)) {
       if (true) {
         errMsg2 = "A transform should not return some empty results.";
       }
       throwError(errMsg2);
     }
-    if (!result.data) {
+    if (!result2.data) {
       if (true) {
         errMsg2 = "Transform result data should be not be null or undefined";
       }
       throwError(errMsg2);
     }
-    var sourceFormat = detectSourceFormat(result.data);
+    var sourceFormat = detectSourceFormat(result2.data);
     if (!isSupportedSourceFormat(sourceFormat)) {
       if (true) {
         errMsg2 = "Transform result data should be array rows or object rows.";
@@ -25014,10 +25014,10 @@ function applySingleDataTransform(transOption, upSourceList, infoForPrint, pipeI
     }
     var resultMetaRawOption;
     var firstUpSource = upSourceList[0];
-    if (firstUpSource && resultIndex === 0 && !result.dimensions) {
+    if (firstUpSource && resultIndex === 0 && !result2.dimensions) {
       var startIndex = firstUpSource.startIndex;
       if (startIndex) {
-        result.data = firstUpSource.data.slice(0, startIndex).concat(result.data);
+        result2.data = firstUpSource.data.slice(0, startIndex).concat(result2.data);
       }
       resultMetaRawOption = {
         seriesLayoutBy: SERIES_LAYOUT_BY_COLUMN,
@@ -25028,10 +25028,10 @@ function applySingleDataTransform(transOption, upSourceList, infoForPrint, pipeI
       resultMetaRawOption = {
         seriesLayoutBy: SERIES_LAYOUT_BY_COLUMN,
         sourceHeader: 0,
-        dimensions: result.dimensions
+        dimensions: result2.dimensions
       };
     }
-    return createSource(result.data, resultMetaRawOption, null);
+    return createSource(result2.data, resultMetaRawOption, null);
   });
 }
 function isSupportedSourceFormat(sourceFormat) {
@@ -25903,9 +25903,9 @@ var SourceManager = (
       } else {
         var datasetModel = sourceHost;
         if (hasUpstream) {
-          var result = this._applyTransform(upSourceMgrList);
-          resultSourceList = result.sourceList;
-          upstreamSignList = result.upstreamSignList;
+          var result2 = this._applyTransform(upSourceMgrList);
+          resultSourceList = result2.sourceList;
+          upstreamSignList = result2.upstreamSignList;
         } else {
           var sourceData = datasetModel.get("source", true);
           resultSourceList = [createSource(sourceData, this._getSourceMetaRawOption(), null)];
@@ -28548,8 +28548,8 @@ function normalizeSymbolOffset(symbolOffset, symbolSize) {
 }
 
 // node_modules/zrender/lib/canvas/helper.js
-function isSafeNum(num2) {
-  return isFinite(num2);
+function isSafeNum(num3) {
+  return isFinite(num3);
 }
 function createLinearGradient(ctx, obj, rect) {
   var x2 = obj.x == null ? 0 : obj.x;
@@ -29376,15 +29376,15 @@ function normalizeSymbolArray(symbol) {
   if (isAllString) {
     return normalizeSymbolArray([symbol]);
   }
-  var result = [];
+  var result2 = [];
   for (var i7 = 0; i7 < symbol.length; ++i7) {
     if (isString(symbol[i7])) {
-      result.push([symbol[i7]]);
+      result2.push([symbol[i7]]);
     } else {
-      result.push(symbol[i7]);
+      result2.push(symbol[i7]);
     }
   }
-  return result;
+  return result2;
 }
 function normalizeDashArrayX(dash) {
   if (!dash || dash.length === 0) {
@@ -29404,23 +29404,23 @@ function normalizeDashArrayX(dash) {
   if (isAllNumber) {
     return normalizeDashArrayX([dash]);
   }
-  var result = [];
+  var result2 = [];
   for (var i7 = 0; i7 < dash.length; ++i7) {
     if (isNumber(dash[i7])) {
       var dashValue = Math.ceil(dash[i7]);
-      result.push([dashValue, dashValue]);
+      result2.push([dashValue, dashValue]);
     } else {
       var dashValue = map(dash[i7], function(n6) {
         return Math.ceil(n6);
       });
       if (dashValue.length % 2 === 1) {
-        result.push(dashValue.concat(dashValue));
+        result2.push(dashValue.concat(dashValue));
       } else {
-        result.push(dashValue);
+        result2.push(dashValue);
       }
     }
   }
-  return result;
+  return result2;
 }
 function normalizeDashArrayY(dash) {
   if (!dash || typeof dash === "object" && dash.length === 0) {
@@ -30010,17 +30010,17 @@ var ECharts = (
         return;
       }
       var ecModel = this._model;
-      var result;
+      var result2;
       var findResult = parseFinder(ecModel, finder);
       each(findResult, function(models, key3) {
         key3.indexOf("Models") >= 0 && each(models, function(model) {
           var coordSys = model.coordinateSystem;
           if (coordSys && coordSys.containPoint) {
-            result = result || !!coordSys.containPoint(value2);
+            result2 = result2 || !!coordSys.containPoint(value2);
           } else if (key3 === "seriesModels") {
             var view = this._chartsMap[model.__viewId];
             if (view && view.containPoint) {
-              result = result || view.containPoint(value2, model);
+              result2 = result2 || view.containPoint(value2, model);
             } else {
               if (true) {
                 warn(key3 + ": " + (view ? "The found component do not support containPoint." : "No view mapping to the found component."));
@@ -30033,7 +30033,7 @@ var ECharts = (
           }
         }, this);
       }, this);
-      return !!result;
+      return !!result2;
     };
     ECharts2.prototype.getVisual = function(finder, visualType) {
       var ecModel = this._model;
@@ -30474,8 +30474,8 @@ var ECharts = (
             var componentView = ecIns.getViewOfComponentModel(componentModel);
             if (componentView && componentView.__alive) {
               if (componentView.updateTransform) {
-                var result = componentView.updateTransform(componentModel, ecModel, api, payload);
-                result && result.update && componentDirtyList.push(componentView);
+                var result2 = componentView.updateTransform(componentModel, ecModel, api, payload);
+                result2 && result2.update && componentDirtyList.push(componentView);
               } else {
                 componentDirtyList.push(componentView);
               }
@@ -30486,8 +30486,8 @@ var ECharts = (
             var chartView = ecIns._chartsMap[seriesModel.__viewId];
             var pipelineContext = seriesModel.pipelineContext;
             if (chartView.updateTransform && !pipelineContext.progressiveRender) {
-              var result = chartView.updateTransform(seriesModel, ecModel, api, payload);
-              result && result.update && seriesDirtyMap.set(seriesModel.uid, 1);
+              var result2 = chartView.updateTransform(seriesModel, ecModel, api, payload);
+              result2 && result2.update && seriesDirtyMap.set(seriesModel.uid, 1);
             } else {
               seriesDirtyMap.set(seriesModel.uid, 1);
             }
@@ -30555,12 +30555,12 @@ var ECharts = (
         }
         var ecModel = ecIns._model;
         var coordSysList = ecIns._coordSysMgr.getCoordinateSystems();
-        var result;
+        var result2;
         var parsedFinder = parseFinder(ecModel, finder);
         for (var i7 = 0; i7 < coordSysList.length; i7++) {
           var coordSys = coordSysList[i7];
-          if (coordSys[methodName] && (result = coordSys[methodName](ecModel, parsedFinder, value2, opt)) != null) {
-            return result;
+          if (coordSys[methodName] && (result2 = coordSys[methodName](ecModel, parsedFinder, value2, opt)) != null) {
+            return result2;
           }
         }
         if (true) {
@@ -31687,7 +31687,7 @@ var SeriesDataSchema = (
       };
     };
     SeriesDataSchema2.prototype.makeOutputDimensionNames = function() {
-      var result = [];
+      var result2 = [];
       for (var fullDimIdx = 0, seriesDimIdx = 0; fullDimIdx < this._fullDimCount; fullDimIdx++) {
         var name_1 = void 0;
         var seriesDimDef = this.dimensions[seriesDimIdx];
@@ -31702,9 +31702,9 @@ var SeriesDataSchema = (
             name_1 = sourceDimDef.name;
           }
         }
-        result.push(name_1);
+        result2.push(name_1);
       }
-      return result;
+      return result2;
     };
     SeriesDataSchema2.prototype.appendCalculationDimension = function(dimDef) {
       this.dimensions.push(dimDef);
@@ -32152,11 +32152,11 @@ var SeriesData = (
         dims = [];
       }
       ctx = ctx || this;
-      var result = [];
+      var result2 = [];
       this.each(dims, function() {
-        result.push(cb && cb.apply(this, arguments));
+        result2.push(cb && cb.apply(this, arguments));
       }, ctx);
-      return result;
+      return result2;
     };
     SeriesData2.prototype.map = function(dims, cb, ctx, ctxCompat) {
       "use strict";
@@ -32608,15 +32608,15 @@ var SeriesModelCoordSysInfo = (
 );
 function getCoordSysInfoBySeries(seriesModel) {
   var coordSysName = seriesModel.get("coordinateSystem");
-  var result = new SeriesModelCoordSysInfo(coordSysName);
+  var result2 = new SeriesModelCoordSysInfo(coordSysName);
   var fetch2 = fetchers[coordSysName];
   if (fetch2) {
-    fetch2(seriesModel, result, result.axisMap, result.categoryAxisMap);
-    return result;
+    fetch2(seriesModel, result2, result2.axisMap, result2.categoryAxisMap);
+    return result2;
   }
 }
 var fetchers = {
-  cartesian2d: function(seriesModel, result, axisMap, categoryAxisMap) {
+  cartesian2d: function(seriesModel, result2, axisMap, categoryAxisMap) {
     var xAxisModel = seriesModel.getReferringComponents("xAxis", SINGLE_REFERRING).models[0];
     var yAxisModel = seriesModel.getReferringComponents("yAxis", SINGLE_REFERRING).models[0];
     if (true) {
@@ -32627,33 +32627,33 @@ var fetchers = {
         throw new Error('yAxis "' + retrieve(seriesModel.get("xAxisIndex"), seriesModel.get("yAxisId"), 0) + '" not found');
       }
     }
-    result.coordSysDims = ["x", "y"];
+    result2.coordSysDims = ["x", "y"];
     axisMap.set("x", xAxisModel);
     axisMap.set("y", yAxisModel);
     if (isCategory(xAxisModel)) {
       categoryAxisMap.set("x", xAxisModel);
-      result.firstCategoryDimIndex = 0;
+      result2.firstCategoryDimIndex = 0;
     }
     if (isCategory(yAxisModel)) {
       categoryAxisMap.set("y", yAxisModel);
-      result.firstCategoryDimIndex == null && (result.firstCategoryDimIndex = 1);
+      result2.firstCategoryDimIndex == null && (result2.firstCategoryDimIndex = 1);
     }
   },
-  singleAxis: function(seriesModel, result, axisMap, categoryAxisMap) {
+  singleAxis: function(seriesModel, result2, axisMap, categoryAxisMap) {
     var singleAxisModel = seriesModel.getReferringComponents("singleAxis", SINGLE_REFERRING).models[0];
     if (true) {
       if (!singleAxisModel) {
         throw new Error("singleAxis should be specified.");
       }
     }
-    result.coordSysDims = ["single"];
+    result2.coordSysDims = ["single"];
     axisMap.set("single", singleAxisModel);
     if (isCategory(singleAxisModel)) {
       categoryAxisMap.set("single", singleAxisModel);
-      result.firstCategoryDimIndex = 0;
+      result2.firstCategoryDimIndex = 0;
     }
   },
-  polar: function(seriesModel, result, axisMap, categoryAxisMap) {
+  polar: function(seriesModel, result2, axisMap, categoryAxisMap) {
     var polarModel = seriesModel.getReferringComponents("polar", SINGLE_REFERRING).models[0];
     var radiusAxisModel = polarModel.findAxisModel("radiusAxis");
     var angleAxisModel = polarModel.findAxisModel("angleAxis");
@@ -32665,45 +32665,45 @@ var fetchers = {
         throw new Error("radiusAxis option not found");
       }
     }
-    result.coordSysDims = ["radius", "angle"];
+    result2.coordSysDims = ["radius", "angle"];
     axisMap.set("radius", radiusAxisModel);
     axisMap.set("angle", angleAxisModel);
     if (isCategory(radiusAxisModel)) {
       categoryAxisMap.set("radius", radiusAxisModel);
-      result.firstCategoryDimIndex = 0;
+      result2.firstCategoryDimIndex = 0;
     }
     if (isCategory(angleAxisModel)) {
       categoryAxisMap.set("angle", angleAxisModel);
-      result.firstCategoryDimIndex == null && (result.firstCategoryDimIndex = 1);
+      result2.firstCategoryDimIndex == null && (result2.firstCategoryDimIndex = 1);
     }
   },
-  geo: function(seriesModel, result, axisMap, categoryAxisMap) {
-    result.coordSysDims = ["lng", "lat"];
+  geo: function(seriesModel, result2, axisMap, categoryAxisMap) {
+    result2.coordSysDims = ["lng", "lat"];
   },
-  parallel: function(seriesModel, result, axisMap, categoryAxisMap) {
+  parallel: function(seriesModel, result2, axisMap, categoryAxisMap) {
     var ecModel = seriesModel.ecModel;
     var parallelModel = ecModel.getComponent("parallel", seriesModel.get("parallelIndex"));
-    var coordSysDims = result.coordSysDims = parallelModel.dimensions.slice();
+    var coordSysDims = result2.coordSysDims = parallelModel.dimensions.slice();
     each(parallelModel.parallelAxisIndex, function(axisIndex, index) {
       var axisModel = ecModel.getComponent("parallelAxis", axisIndex);
       var axisDim = coordSysDims[index];
       axisMap.set(axisDim, axisModel);
       if (isCategory(axisModel)) {
         categoryAxisMap.set(axisDim, axisModel);
-        if (result.firstCategoryDimIndex == null) {
-          result.firstCategoryDimIndex = index;
+        if (result2.firstCategoryDimIndex == null) {
+          result2.firstCategoryDimIndex = index;
         }
       }
     });
   },
-  matrix: function(seriesModel, result, axisMap, categoryAxisMap) {
+  matrix: function(seriesModel, result2, axisMap, categoryAxisMap) {
     var matrixModel = seriesModel.getReferringComponents("matrix", SINGLE_REFERRING).models[0];
     if (true) {
       if (!matrixModel) {
         throw new Error("matrix coordinate system should be specified.");
       }
     }
-    result.coordSysDims = ["x", "y"];
+    result2.coordSysDims = ["x", "y"];
     var xModel = matrixModel.getDimensionModel("x");
     var yModel = matrixModel.getDimensionModel("y");
     axisMap.set("x", xModel);
@@ -34387,15 +34387,15 @@ function getAxisStatBySeries(axis2, seriesList) {
   if (true) {
     validateInputAxis(axis2);
   }
-  var result = [];
+  var result2 = [];
   eachKeyEachAxis(axis2.model.ecModel, function(perKeyPerAxis) {
     for (var idx = 0; idx < seriesList.length; idx++) {
       if (seriesList[idx] && perKeyPerAxis.serByIdx[seriesList[idx].seriesIndex]) {
-        result.push(wrapStatResult(perKeyPerAxis));
+        result2.push(wrapStatResult(perKeyPerAxis));
       }
     }
   });
-  return result;
+  return result2;
 }
 function eachKeyEachAxis(ecModel, cb) {
   var keyed = ecModelCacheFullUpdateInner(getCachePerECFullUpdate(ecModel)).keyed;
@@ -34610,7 +34610,7 @@ var ScaleRawExtentInfo = (
       var noZoomEffMM = internal.noZoomEffMM;
       var zoomFixMM = internal.zoomFixMM;
       var fixMM = internal.fixMM;
-      var result = {
+      var result2 = {
         fixMM,
         zoomFixMM,
         isBlank: internal.isBlank,
@@ -34619,7 +34619,7 @@ var ScaleRawExtentInfo = (
         ctnShp: internal.ctnShp,
         effMM: noZoomEffMM.slice()
       };
-      var effMM = result.effMM;
+      var effMM = result2.effMM;
       if (zoomMM[0] != null) {
         effMM[0] = zoomMM[0];
         fixMM[0] = zoomFixMM[0] = true;
@@ -34629,7 +34629,7 @@ var ScaleRawExtentInfo = (
         fixMM[1] = zoomFixMM[1] = true;
       }
       sanitizeExtent(internal, effMM);
-      return result;
+      return result2;
     };
     ScaleRawExtentInfo2.prototype.makeRenderInfo = function() {
       return {
@@ -35094,10 +35094,10 @@ function parseTickLabelCustomValues(customValues, scale3) {
 }
 function makeCategoryLabels(axis2, ctx) {
   var labelModel = axis2.getLabelModel();
-  var result = makeCategoryLabelsActually(axis2, labelModel, ctx);
+  var result2 = makeCategoryLabelsActually(axis2, labelModel, ctx);
   return !labelModel.get("show") || axis2.scale.isBlank() ? {
     labels: []
-  } : result;
+  } : result2;
 }
 function makeCategoryLabelsActually(axis2, labelModel, ctx) {
   var labelsCache = ensureCategoryLabelCache(axis2);
@@ -35117,26 +35117,26 @@ function makeCategoryLabelsActually(axis2, labelModel, ctx) {
     numericLabelInterval = optionLabelInterval === "auto" ? makeAutoCategoryInterval(axis2, ctx) : optionLabelInterval;
     labels = makeTicksLabelsByCategoryIntervalNumOrCb(axis2, numericLabelInterval, false);
   }
-  var result = {
+  var result2 = {
     labels,
     labelCategoryInterval: numericLabelInterval
   };
   if (!isEstimate) {
-    axisCacheSet(labelsCache, optionLabelInterval, result);
+    axisCacheSet(labelsCache, optionLabelInterval, result2);
   } else {
     ctx.out.noPxChangeTryDetermine.push(function() {
-      axisCacheSet(labelsCache, optionLabelInterval, result);
+      axisCacheSet(labelsCache, optionLabelInterval, result2);
       return true;
     });
   }
-  return result;
+  return result2;
 }
 function makeCategoryTicks(axis2, tickModel) {
   var ticksCache = ensureCategoryTickCache(axis2);
   var optionTickInterval = getOptionCategoryInterval(tickModel);
-  var result = axisCacheGet(ticksCache, optionTickInterval);
-  if (result) {
-    return result;
+  var result2 = axisCacheGet(ticksCache, optionTickInterval);
+  if (result2) {
+    return result2;
   }
   var ticks;
   var tickCategoryInterval;
@@ -35205,8 +35205,8 @@ function makeAutoCategoryInterval(axis2, ctx) {
     });
     return result_2;
   }
-  var result = axisInner2(axis2).autoInterval;
-  return result != null ? result : axisInner2(axis2).autoInterval = axis2.calculateCategoryInterval(ctx);
+  var result2 = axisInner2(axis2).autoInterval;
+  return result2 != null ? result2 : axisInner2(axis2).autoInterval = axis2.calculateCategoryInterval(ctx);
 }
 function calculateCategoryInterval(axis2, ctx) {
   var kind = ctx.kind;
@@ -35281,7 +35281,7 @@ function fetchAutoCategoryIntervalCalculationParams(axis2) {
 function makeTicksLabelsByCategoryIntervalNumOrCb(axis2, categoryInterval, onlyTick) {
   var labelFormatter = makeLabelFormatter(axis2);
   var ordinalScale = axis2.scale;
-  var result = [];
+  var result2 = [];
   var categoryIntervalIsCb = isFunction(categoryInterval);
   ordinalScaleCreateTicks(ordinalScale, categoryIntervalIsCb ? 0 : categoryInterval, function(tickObj, isExtentBoundary) {
     var tickLabel = ordinalScale.getLabel(tickObj);
@@ -35292,13 +35292,13 @@ function makeTicksLabelsByCategoryIntervalNumOrCb(axis2, categoryInterval, onlyT
         return;
       }
     }
-    result.push(onlyTick ? tickObj : {
+    result2.push(onlyTick ? tickObj : {
       formattedLabel: labelFormatter(tickObj),
       rawLabel: tickLabel,
       tick: tickObj
     });
   });
-  return result;
+  return result2;
 }
 
 // node_modules/echarts/lib/coord/axisBand.js
@@ -35413,11 +35413,11 @@ var Axis = (
     Axis2.prototype.getTicksCoords = function(opt) {
       opt = opt || {};
       var tickModel = opt.tickModel || this.getTickModel();
-      var result = createAxisTicks(this, tickModel, {
+      var result2 = createAxisTicks(this, tickModel, {
         breakTicks: opt.breakTicks,
         pruneByBreak: opt.pruneByBreak
       });
-      var preTicksCoords = map(result.ticks, function(tick) {
+      var preTicksCoords = map(result2.ticks, function(tick) {
         return {
           coord: this.dataToCoord(getTickValueOutermost(this.scale, tick)),
           tick
@@ -39204,13 +39204,13 @@ function computeBarLayoutForCustomSeries(opt) {
     bandWidthResult,
     seriesInfo: params
   });
-  var result = [];
+  var result2 = [];
   for (var i7 = 0; i7 < opt.count; i7++) {
     var item = widthAndOffsets[STACK_PREFIX + i7];
     item.offsetCenter = item.offset + item.width / 2;
-    result.push(item);
+    result2.push(item);
   }
-  return result;
+  return result2;
 }
 function calcBarWidthAndOffset(seriesInfoOnAxis) {
   var bandWidth = seriesInfoOnAxis.bandWidthResult.w;
@@ -39303,18 +39303,18 @@ function calcBarWidthAndOffset(seriesInfoOnAxis) {
   if (lastColumn) {
     widthSum -= lastColumn.width * barGapPercent;
   }
-  var result = {};
+  var result2 = {};
   var offset = -widthSum / 2;
   each(stackIdList, function(stackId) {
     var column = stackMap[stackId];
-    result[stackId] = result[stackId] || {
+    result2[stackId] = result2[stackId] || {
       bandWidth,
       offset,
       width: column.width
     };
     offset += column.width * (1 + barGapPercent);
   });
-  return result;
+  return result2;
 }
 
 // node_modules/echarts/lib/coord/cartesian/AxisModel.js
@@ -40470,7 +40470,7 @@ var Grid_default = Grid;
 
 // node_modules/echarts/lib/component/axisPointer/modelHelper.js
 function collect(ecModel, api) {
-  var result = {
+  var result2 = {
     /**
      * key: makeKey(axis.model)
      * value: {
@@ -40494,11 +40494,11 @@ function collect(ecModel, api) {
     coordSysAxesInfo: {},
     coordSysMap: {}
   };
-  collectAxesInfo(result, ecModel, api);
-  result.seriesInvolved && collectSeriesInfo(result, ecModel);
-  return result;
+  collectAxesInfo(result2, ecModel, api);
+  result2.seriesInvolved && collectSeriesInfo(result2, ecModel);
+  return result2;
 }
-function collectAxesInfo(result, ecModel, api) {
+function collectAxesInfo(result2, ecModel, api) {
   var globalTooltipModel = ecModel.getComponent("tooltip");
   var globalAxisPointerModel = ecModel.getComponent("axisPointer");
   var linksOption = globalAxisPointerModel.get("link", true) || [];
@@ -40508,8 +40508,8 @@ function collectAxesInfo(result, ecModel, api) {
       return;
     }
     var coordSysKey = makeKey(coordSys.model);
-    var axesInfoInCoordSys = result.coordSysAxesInfo[coordSysKey] = {};
-    result.coordSysMap[coordSysKey] = coordSys;
+    var axesInfoInCoordSys = result2.coordSysAxesInfo[coordSysKey] = {};
+    result2.coordSysMap[coordSysKey] = coordSys;
     var coordSysModel = coordSys.model;
     var baseTooltipModel = coordSysModel.getModel("tooltip", globalTooltipModel);
     each(coordSys.getAxes(), curry(saveTooltipAxisInfo, false, null));
@@ -40538,7 +40538,7 @@ function collectAxesInfo(result, ecModel, api) {
       var triggerEmphasis = axisPointerModel.get("triggerEmphasis");
       var axisKey = makeKey(axis2.model);
       var involveSeries = triggerTooltip || snap || axis2.type === "category";
-      var axisInfo = result.axesInfo[axisKey] = {
+      var axisInfo = result2.axesInfo[axisKey] = {
         key: axisKey,
         axis: axis2,
         coordSys,
@@ -40552,7 +40552,7 @@ function collectAxesInfo(result, ecModel, api) {
         linkGroup: null
       };
       axesInfoInCoordSys[axisKey] = axisInfo;
-      result.seriesInvolved = result.seriesInvolved || involveSeries;
+      result2.seriesInvolved = result2.seriesInvolved || involveSeries;
       var groupIndex = getLinkGroupIndex(linksOption, axis2);
       if (groupIndex != null) {
         var linkGroup = linkGroups[groupIndex] || (linkGroups[groupIndex] = {
@@ -40588,7 +40588,7 @@ function makeAxisPointerModel(axis2, baseTooltipModel, globalAxisPointerModel, e
   }
   return axis2.model.getModel("axisPointer", new Model_default(volatileOption, globalAxisPointerModel, ecModel));
 }
-function collectSeriesInfo(result, ecModel) {
+function collectSeriesInfo(result2, ecModel) {
   ecModel.eachSeries(function(seriesModel) {
     var coordSys = seriesModel.coordinateSystem;
     var seriesTooltipTrigger = seriesModel.get(["tooltip", "trigger"], true);
@@ -40596,7 +40596,7 @@ function collectSeriesInfo(result, ecModel) {
     if (!coordSys || !coordSys.model || seriesTooltipTrigger === "none" || seriesTooltipTrigger === false || seriesTooltipTrigger === "item" || seriesTooltipShow === false || seriesModel.get(["axisPointer", "show"], true) === false) {
       return;
     }
-    each(result.coordSysAxesInfo[makeKey(coordSys.model)], function(axisInfo) {
+    each(result2.coordSysAxesInfo[makeKey(coordSys.model)], function(axisInfo) {
       var axis2 = axisInfo.axis;
       if (coordSys.getAxis(axis2.dim) === axis2) {
         axisInfo.seriesModels.push(seriesModel);
@@ -41602,11 +41602,11 @@ var VisualMapping = (
           },
           category: doMapCategory,
           piecewise: function(normalized, value2) {
-            var result = getSpecifiedVisual.call(this, value2);
-            if (result == null) {
-              result = stringify(fastLerp(normalized, this.option.parsedVisual), "rgba");
+            var result2 = getSpecifiedVisual.call(this, value2);
+            if (result2 == null) {
+              result2 = stringify(fastLerp(normalized, this.option.parsedVisual), "rgba");
             }
-            return result;
+            return result2;
           },
           fixed: doMapFixed
         }
@@ -41654,11 +41654,11 @@ var VisualMapping = (
           linear: doMapToArray,
           category: doMapCategory,
           piecewise: function(normalized, value2) {
-            var result = getSpecifiedVisual.call(this, value2);
-            if (result == null) {
-              result = doMapToArray.call(this, normalized);
+            var result2 = getSpecifiedVisual.call(this, value2);
+            if (result2 == null) {
+              result2 = doMapToArray.call(this, normalized);
             }
-            return result;
+            return result2;
           },
           fixed: doMapFixed
         }
@@ -41758,11 +41758,11 @@ function createNormalizedToNumericVisual(sourceExtent) {
     },
     category: doMapCategory,
     piecewise: function(normalized, value2) {
-      var result = getSpecifiedVisual.call(this, value2);
-      if (result == null) {
-        result = linearMap(normalized, sourceExtent, this.option.visual, true);
+      var result2 = getSpecifiedVisual.call(this, value2);
+      if (result2 == null) {
+        result2 = linearMap(normalized, sourceExtent, this.option.visual, true);
       }
-      return result;
+      return result2;
     },
     fixed: doMapFixed
   };
@@ -42564,11 +42564,11 @@ function dataToCoordSize4(dataSize, dataItem) {
     var axis2 = this[getterName]();
     var val = dataItem[dimIdx];
     var halfSize = dataSize[dimIdx] / 2;
-    var result = axis2.type === "category" ? calcBandWidth(axis2).w : Math.abs(axis2.dataToCoord(val - halfSize) - axis2.dataToCoord(val + halfSize));
+    var result2 = axis2.type === "category" ? calcBandWidth(axis2).w : Math.abs(axis2.dataToCoord(val - halfSize) - axis2.dataToCoord(val + halfSize));
     if (dim === "Angle") {
-      result = result * Math.PI / 180;
+      result2 = result2 * Math.PI / 180;
     }
-    return result;
+    return result2;
   }, this);
 }
 function polarPrepareCustom(coordSys) {
@@ -44680,9 +44680,9 @@ function buildPayloadsBySeries(value2, axisInfo) {
     var seriesNestestValue;
     var dataIndices;
     if (series.getAxisTooltipData) {
-      var result = series.getAxisTooltipData(dataDim, value2, axis2);
-      dataIndices = result.dataIndices;
-      seriesNestestValue = result.nestestValue;
+      var result2 = series.getAxisTooltipData(dataDim, value2, axis2);
+      dataIndices = result2.dataIndices;
+      seriesNestestValue = result2.nestestValue;
     } else {
       dataIndices = series.indicesOfNearest(
         dim,
@@ -47909,13 +47909,13 @@ var markAreaTransform = function(seriesModel, coordSys, maModel, item) {
   ltCoord[1] = retrieve(ltCoord[1], -Infinity);
   rbCoord[0] = retrieve(rbCoord[0], Infinity);
   rbCoord[1] = retrieve(rbCoord[1], Infinity);
-  var result = mergeAll([{}, lt2, rb2]);
-  result.coord = [lt2.coord, rb2.coord];
-  result.x0 = lt2.x;
-  result.y0 = lt2.y;
-  result.x1 = rb2.x;
-  result.y1 = rb2.y;
-  return result;
+  var result2 = mergeAll([{}, lt2, rb2]);
+  result2.coord = [lt2.coord, rb2.coord];
+  result2.x0 = lt2.x;
+  result2.y0 = lt2.y;
+  result2.x1 = rb2.x;
+  result2.y1 = rb2.y;
+  return result2;
 };
 function isInfinity2(val) {
   return !isNaN(val) && !isFinite(val);
@@ -48900,12 +48900,12 @@ var SliderZoomView = (
       if (showDataShadow === false) {
         return;
       }
-      var result;
+      var result2;
       var ecModel = this.ecModel;
       dataZoomModel.eachTargetAxis(function(axisDim, axisIndex) {
         var seriesModels = dataZoomModel.getAxisProxy(axisDim, axisIndex).getTargetSeriesModels();
         each(seriesModels, function(seriesModel) {
-          if (result) {
+          if (result2) {
             return;
           }
           if (showDataShadow !== true && indexOf(SHOW_DATA_SHADOW_SERIES_TYPE, seriesModel.get("type")) < 0) {
@@ -48920,7 +48920,7 @@ var SliderZoomView = (
           }
           otherDim = seriesModel.getData().mapDimension(otherDim);
           var thisDim = seriesModel.getData().mapDimension(axisDim);
-          result = {
+          result2 = {
             thisAxis,
             series: seriesModel,
             thisDim,
@@ -48929,7 +48929,7 @@ var SliderZoomView = (
           };
         }, this);
       }, this);
-      return result;
+      return result2;
     };
     SliderZoomView2.prototype._renderHandle = function() {
       var thisGroup = this.group;
@@ -49787,19 +49787,19 @@ var ContinuousModel = (
       return (unboundedRange && range[0] <= dataExtent[0] || range[0] <= value2) && (unboundedRange && range[1] >= dataExtent[1] || value2 <= range[1]) ? "inRange" : "outOfRange";
     };
     ContinuousModel2.prototype.findTargetDataIndices = function(range) {
-      var result = [];
+      var result2 = [];
       this.eachTargetSeries(function(seriesModel) {
         var dataIndices = [];
         var data = seriesModel.getData();
         data.each(this.getDataDimensionIndex(data), function(value2, dataIndex) {
           range[0] <= value2 && value2 <= range[1] && dataIndices.push(dataIndex);
         }, this);
-        result.push({
+        result2.push({
           seriesId: seriesModel.id,
           dataIndex: dataIndices
         });
       }, this);
-      return result;
+      return result2;
     };
     ContinuousModel2.prototype.getVisualMeta = function(getColorVisual2) {
       var oVals = getColorStopValues(this, "outOfRange", this.getExtent());
@@ -50846,7 +50846,7 @@ var PiecewiseModel = (
       return index != null ? this.option.selected[this.getSelectedMapKey(this._pieceList[index])] ? "inRange" : "outOfRange" : "outOfRange";
     };
     PiecewiseModel2.prototype.findTargetDataIndices = function(pieceIndex) {
-      var result = [];
+      var result2 = [];
       var pieceList = this._pieceList;
       this.eachTargetSeries(function(seriesModel) {
         var dataIndices = [];
@@ -50855,12 +50855,12 @@ var PiecewiseModel = (
           var pIdx = VisualMapping_default.findPieceIndex(value2, pieceList);
           pIdx === pieceIndex && dataIndices.push(dataIndex);
         }, this);
-        result.push({
+        result2.push({
           seriesId: seriesModel.id,
           dataIndex: dataIndices
         });
       }, this);
-      return result;
+      return result2;
     };
     PiecewiseModel2.prototype.getRepresentValue = function(piece) {
       var representValue;
@@ -52627,8 +52627,8 @@ function reconcile(oldNode, newNode, preserveValue = () => false) {
       cursor = cursor.nextSibling;
       obsolete.remove();
     }
-    const result = reconcile(found, next, preserveValue);
-    cursor = result.nextSibling;
+    const result2 = reconcile(found, next, preserveValue);
+    cursor = result2.nextSibling;
   }
   while (cursor) {
     const next = cursor.nextSibling;
@@ -52813,7 +52813,7 @@ function mountDashboard(root, adapter) {
     }
     pendingUpdate = null;
     current = next;
-    const result = render2();
+    const result2 = render2();
     if (sameDraft) {
       for (const [node, top, left] of scrolls) if (node.isConnected) {
         node.scrollTop = top;
@@ -52821,7 +52821,7 @@ function mountDashboard(root, adapter) {
       }
       if (viewport && (viewport.scrollX !== x2 || viewport.scrollY !== y3)) viewport.scrollTo(x2, y3);
     }
-    return result;
+    return result2;
   }, resetDrafts() {
     drafts.clear();
   }, get charts() {
@@ -55783,7 +55783,7 @@ function zoneClock(timeZone) {
     timeZoneName: "shortOffset",
     hour: "2-digit"
   });
-  const clock2 = {
+  const clock3 = {
     timeZone: requested,
     msOfDay(instantMs2) {
       const parts = partsOf(instantMs2);
@@ -55798,19 +55798,19 @@ function zoneClock(timeZone) {
       return parts.find((part2) => part2.type === "timeZoneName")?.value ?? "";
     }
   };
-  clocks.set(requested, clock2);
-  return clock2;
+  clocks.set(requested, clock3);
+  return clock3;
 }
 function localDayKey(instantMs2, timeZone) {
   return zoneClock(timeZone).dayKey(instantMs2);
 }
 function localMidnightAt(instantMs2, timeZone) {
-  const clock2 = zoneClock(timeZone);
-  const estimate = instantMs2 - clock2.msOfDay(instantMs2);
+  const clock3 = zoneClock(timeZone);
+  const estimate = instantMs2 - clock3.msOfDay(instantMs2);
   let best = estimate;
   let bestDistance = Number.POSITIVE_INFINITY;
   for (const candidate of [estimate - HOUR_MS, estimate, estimate + HOUR_MS]) {
-    const reading = clock2.msOfDay(candidate);
+    const reading = clock3.msOfDay(candidate);
     const distance2 = Math.min(reading, 24 * HOUR_MS - reading);
     if (distance2 < bestDistance) {
       best = candidate;
@@ -59933,15 +59933,15 @@ function publishedChart(raw, market, now, stale) {
   const time2 = (ms) => new Intl.DateTimeFormat("en-GB", { timeZone: zone, hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "shortOffset" }).format(ms);
   const date2 = (ms) => new Intl.DateTimeFormat("en-GB", { timeZone: zone, year: "numeric", month: "short", day: "numeric" }).format(ms);
   const days = (start2, end2) => {
-    const result = [];
+    const result2 = [];
     let mid = localMidnightAt(start2, zone);
     for (let i7 = 0; i7 < 5 && mid < end2; i7++) {
       const next = localMidnightAt(mid + 36 * 36e5, zone);
       if (next <= mid) break;
-      result.push({ start: Math.max(start2, mid), end: Math.min(end2, next), midnight: mid, label: date2(mid) });
+      result2.push({ start: Math.max(start2, mid), end: Math.min(end2, next), midnight: mid, label: date2(mid) });
       mid = next;
     }
-    return result;
+    return result2;
   };
   const priceGaps = (start2, end2, items) => {
     const gaps = [];
@@ -60030,6 +60030,238 @@ function liveCharging(status, observedAt, failed, now = Date.now()) {
   return { power: powerText, summary: parts.join(" "), mismatch, reported: reportedFresh?.value ?? null, measured: flow ? flow.kind : null };
 }
 
+// sidebar/charge-session.js
+var GRACE_MS = 12e4;
+var LIVE_MAX_AGE_MS2 = 18e4;
+var CLOCK_SKEW_MS2 = 5e3;
+var POWER_FLOW_W2 = 100;
+var CURRENT_FLOW_A2 = 1;
+var TRANSIENT = /* @__PURE__ */ new Set([
+  "worker_suspended",
+  "charger_unavailable",
+  "stale_generation",
+  "ownership_not_current",
+  "identity_changed",
+  "connector_quiescing",
+  "lifecycle_initializing",
+  "retry_cooldown",
+  "planner_changed",
+  "ownership_recheck_failed",
+  "waiting_for_new_connection",
+  "connection_changed",
+  "connector_not_preparing",
+  "newer_stop_or_connection_change",
+  "charger_connection_changed",
+  "vehicle_event_recorded"
+]);
+var PAUSED = /* @__PURE__ */ new Set(["paused_until_resume", "legacy_pause_active"]);
+var FINISHED = /* @__PURE__ */ new Set(["session_completed", "car_completion_reported", "session_ended_or_completion_ambiguous"]);
+var DISAGREES = /* @__PURE__ */ new Set(["limits_or_transitions_differ", "verification_superseded"]);
+var LOGGING = /* @__PURE__ */ new Set(["ocpp_sensitive_logging_enabled", "unsupported_ocpp_logging_or_interface"]);
+var ago2 = (ms) => ms < 6e4 ? `${Math.max(0, Math.floor(ms / 1e3))} s ago` : ms < 36e5 ? `${Math.floor(ms / 6e4)} min ago` : `${Math.floor(ms / 36e5)} h ago`;
+var clock2 = (ms) => new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+var num2 = (value2, digits) => Number(value2.toFixed(digits)).toString();
+function stamped(reading, now, accept) {
+  if (!reading || typeof reading !== "object") return null;
+  const at = Date.parse(reading.observed_at || "");
+  if (!Number.isFinite(at) || !Number.isFinite(now) || !accept(reading.value)) return null;
+  const age = now - at;
+  if (age < -CLOCK_SKEW_MS2) return null;
+  return { value: reading.value, age: Math.max(0, age), fresh: age <= LIVE_MAX_AGE_MS2 && reading.fresh !== false, reading };
+}
+var isNumber2 = (v2) => typeof v2 === "number" && Number.isFinite(v2);
+function scheduleLimit(status, now) {
+  const points2 = [];
+  let source = null;
+  const eff = status?.effective;
+  const readbackFresh = !!eff && observationFreshness(Date.parse(eff.fetched_at || ""), now, false) === "fresh";
+  if (readbackFresh && Array.isArray(eff.periods) && eff.periods.length) {
+    for (const p4 of eff.periods) {
+      const at = Date.parse(p4?.at || "");
+      if (Number.isFinite(at) && isNumber2(p4?.amps)) points2.push({ at, amps: p4.amps });
+    }
+    const start2 = Date.parse(eff.schedule_start || ""), span = eff.duration_s;
+    if (points2.length && Number.isFinite(start2) && isNumber2(span) && now > start2 + span * 1e3) return null;
+    source = "readback";
+  } else if (status?.sent && /^accepted$/i.test(String(status.ack || "").trim()) && !DISAGREES.has(status.verification?.reason)) {
+    const schedule = status.sent.chargingSchedule, start2 = Date.parse(schedule?.startSchedule || "");
+    const sentAt = Date.parse(status.sent_at || "");
+    if (Number.isFinite(start2) && Number.isFinite(sentAt) && sentAt <= now + CLOCK_SKEW_MS2 && isNumber2(schedule?.duration) && now <= start2 + schedule.duration * 1e3 && Array.isArray(schedule?.chargingSchedulePeriod)) {
+      for (const p4 of schedule.chargingSchedulePeriod) if (isNumber2(p4?.startPeriod) && isNumber2(p4?.limit)) points2.push({ at: start2 + p4.startPeriod * 1e3, amps: p4.limit });
+      source = "sent";
+    }
+  }
+  points2.sort((a4, b3) => a4.at - b3.at);
+  const current = [...points2].reverse().find((p4) => p4.at <= now);
+  if (!current) return null;
+  const next = points2.find((p4) => p4.at > now && p4.amps > 0);
+  return { amps: current.amps, nextStart: next ? next.at : null, source };
+}
+function transactionEvidence(live, now, norm, startAt) {
+  const r7 = stamped(live?.transaction, now, (v2) => typeof v2 === "boolean");
+  if (!r7 || !r7.fresh) return { kind: "unknown" };
+  if (r7.value === false) return { kind: "none", age: r7.age };
+  if (norm === "charging" || norm === "paused") return { kind: "observed", age: r7.age };
+  const changed = Date.parse(r7.reading.changed_at || "");
+  if (Number.isFinite(startAt) && Number.isFinite(changed) && changed >= startAt - CLOCK_SKEW_MS2) return { kind: "observed", age: r7.age };
+  return { kind: "unmatched", age: r7.age };
+}
+var result = (kind, level, title, detail, extra = {}) => ({ kind, level, warning: level === "warning" || level === "error", title, detail, action: "", facts: [], summary: `${title}. ${detail}`, ...extra });
+function chargeSession(status, observedAt, failed, now = Date.now()) {
+  if (status && status.supported === false) return null;
+  const fresh2 = observationFreshness(observedAt, now, failed) === "fresh";
+  if (!status || !fresh2) {
+    return result("unknown", "unknown", "Charging status unknown", "Morek status is unavailable or out of date, so whether the car will charge is not known. Refresh to check.");
+  }
+  const ready = status.readiness || {};
+  const live = ready.live && typeof ready.live === "object" ? ready.live : null;
+  const ss = ready.session_start || {};
+  const startAt = Date.parse(ready.session_start_at || "");
+  const age = Number.isFinite(startAt) ? Math.max(0, now - startAt) : null;
+  const reported = stamped(live?.status, now, (v2) => typeof v2 === "string" && v2 !== "");
+  const reportedFresh = reported && reported.fresh ? reported : null;
+  const normRaw = reportedFresh && typeof reportedFresh.reading.normalized === "string" ? reportedFresh.reading.normalized : null;
+  const norm = normRaw === "unknown" ? null : normRaw;
+  const raw = reportedFresh ? reportedFresh.value : null;
+  const power = stamped(live?.power_w, now, isNumber2), current = stamped(live?.current_a, now, isNumber2);
+  const flow = [power && { kind: "power", ...power }, current && { kind: "current", ...current }].filter(Boolean).find((item) => item.fresh) || null;
+  const flowing = !!flow && (flow.kind === "power" ? flow.value > POWER_FLOW_W2 : flow.value > CURRENT_FLOW_A2);
+  const txn = transactionEvidence(live, now, norm, startAt);
+  const control = stamped(live?.control_state, now, (v2) => v2 === "on" || v2 === "off");
+  const paused = status.schedule_pause?.intent === "pause_until_resumed" || PAUSED.has(ss.reason);
+  const hold = scheduleLimit(status, now);
+  const facts = [];
+  if (raw) facts.push(`Connector: ${raw}${reportedFresh ? ` (${ago2(reportedFresh.age)})` : ""}`);
+  if (ss.state && ss.reason !== "authorization_path_unimplemented") {
+    const when = age !== null ? `, ${ago2(age)}` : "";
+    facts.push(`Start request: ${ss.state === "accepted" ? "accepted by the charger" : ss.state === "starting" ? "being sent" : ss.state === "waiting" ? "not sent yet" : ss.state === "rejected" ? "rejected" : ss.state === "uncertain" ? "outcome unknown" : ss.state}${when}`);
+  }
+  facts.push(txn.kind === "observed" ? "Transaction: reported by the charger" : txn.kind === "none" ? "Transaction: none reported" : txn.kind === "unmatched" ? "Transaction: a number is reported but is not tied to this plug-in" : "Transaction: unknown");
+  if (control?.fresh) facts.push(`Charge-control switch: ${control.value}${control.value === "off" && txn.kind !== "observed" ? " (normal before authorization)" : ""}`);
+  if (flow?.fresh) facts.push(`Measured ${flow.kind === "power" ? flow.value >= 1e3 ? `${num2(flow.value / 1e3, 2)} kW` : `${num2(flow.value, 0)} W` : `${num2(flow.value, 1)} A`} (${ago2(flow.age)})`);
+  else facts.push("Measured power: unknown");
+  const done = (r7) => {
+    r7.facts = facts;
+    return r7;
+  };
+  if (ready.control === "unavailable" || ss.state === "offline") {
+    return done(result(
+      "offline",
+      "warning",
+      "Charger offline",
+      "Home Assistant cannot reach the charger or its control, so it cannot start or follow a charge.",
+      { action: "Check the charger\u2019s power and network connection. SpotNav re-checks automatically." }
+    ));
+  }
+  if (!norm) {
+    return done(result("unknown", "unknown", "Charging status unknown", "The charger\u2019s connector state is not currently known, so whether the car will charge cannot be told."));
+  }
+  if (norm === "disconnected") return done(result("unplugged", "info", "Not plugged in", "No car is connected. SpotNav requests charging authorization when a car is plugged in."));
+  if (norm === "error") {
+    return done(result("fault", "error", "Charger reports a fault", "The connector is in a fault state and will not charge.", { action: "Check the charger and the Morek app; unplug and re-plug once it clears." }));
+  }
+  if (status.outcomes?.uncertain === true || ss.state === "uncertain") {
+    return done(result(
+      "uncertain",
+      "error",
+      "Start request outcome unknown",
+      "A request to the charger may or may not have applied. SpotNav does not repeat it on its own, so the car may not charge.",
+      { action: "Check the Morek app and the SpotNav logs before acting." }
+    ));
+  }
+  if (flowing) {
+    const agrees = norm === "charging";
+    return done(result("charging", "ok", "Charging", `${flow.kind === "power" ? "Measured power" : "Measured current"} confirms the car is drawing energy${agrees ? "" : `, although the charger reports \u201C${raw}\u201D`}.`));
+  }
+  if (norm === "finished") return done(result("finished", "info", "Charge finished", "The car reports the session as finished; plug in again to start a new one."));
+  if (norm === "charging") {
+    return done(result("reported_charging", "info", "Charger reports charging", flow ? "The charger reports charging but measures no power at the moment. This is normal while it ramps up or between windows." : "The charger reports charging; power is not measured, so the actual flow is not confirmed."));
+  }
+  const waitNote = hold && hold.amps === 0 ? hold.source === "readback" ? `The charger\u2019s schedule holds charging back${hold.nextStart ? ` until about ${clock2(hold.nextStart)}` : ""}.` : `The plan sent to the charger holds charging back${hold.nextStart ? ` until about ${clock2(hold.nextStart)}` : ""} (acknowledged by the charger, not confirmed by a readback).` : "";
+  const notPromised = "Charging may begin then if the car and charger allow it; that is not guaranteed.";
+  if (paused) {
+    return done(result("paused", "info", "Plugged in \u2014 Auto is paused", "Charging will not start until you Resume Auto. This is your pause, not a fault."));
+  }
+  if (norm === "paused") {
+    if (waitNote && txn.kind === "observed") {
+      return done(result("scheduled_wait", "info", "Plugged in \u2014 waiting for the schedule", `${waitNote} ${notPromised}`));
+    }
+    const known = txn.kind === "none" ? " The charger reports no transaction, so a schedule hold is not shown as the reason." : txn.kind === "unknown" ? " Whether a charging transaction exists is not currently known." : "";
+    return done(result("suspended", "info", "Charging suspended", `The car or charger has paused charging (suspended). It resumes when either side allows it.${known}`));
+  }
+  if (txn.kind === "observed") {
+    return done(result(
+      waitNote ? "scheduled_wait" : "transaction_observed",
+      "ok",
+      waitNote ? "Authorized \u2014 waiting for the schedule" : "Authorized \u2014 waiting for power",
+      waitNote ? `The charger reports a charging transaction. ${waitNote} Power flow is not yet measured; ${notPromised.charAt(0).toLowerCase()}${notPromised.slice(1)}` : "The charger reports a charging transaction; the car has not started drawing measured power yet."
+    ));
+  }
+  const guidance = "The car may not charge. Start the charge from the Morek app, or unplug and plug in again so SpotNav can retry. SpotNav will not repeat the request on its own.";
+  const retryPending = "SpotNav will retry once by itself. If it is rejected again, start the charge from the Morek app, or unplug and plug in again.";
+  const young = age !== null && age < GRACE_MS;
+  const reason = ss.reason || "";
+  if (!ss.state || reason === "authorization_path_unimplemented") {
+    return done(result("unknown", "unknown", "Plugged in \u2014 start status unknown", "SpotNav does not report whether a charge request was made, so whether the car will charge is not known."));
+  }
+  const outcome = startOutcome(ss.state, reason, { age, young, raw, waitNote, txn, guidance, retryPending });
+  if (txn.kind !== "unmatched") return done(outcome);
+  const note = " The charger also shows a transaction number that cannot be tied to this plug-in, so it is not counted as confirmation.";
+  if (outcome.warning) {
+    outcome.detail += note;
+    outcome.summary += note;
+    return done(outcome);
+  }
+  if (outcome.kind === "pending" || outcome.kind === "accepted_waiting") {
+    return done(result("transaction_unmatched", "info", "Plugged in \u2014 transaction unconfirmed", "The charger shows a transaction number that cannot be tied to this plug-in. Charging is not confirmed; this clears once the car draws power."));
+  }
+  return done(outcome);
+}
+function startOutcome(state, reason, { age, young, raw, waitNote, txn, guidance, retryPending }) {
+  switch (state) {
+    case "starting":
+      return result("pending", "info", "Starting charge\u2026", "SpotNav is sending the charge request to the charger. Nothing is confirmed yet.");
+    case "accepted":
+      if (reason === "no_transaction_observed" || age !== null && !young) {
+        const seen = txn.kind === "none" ? "the charger reports no charging transaction" : "no charging transaction has been confirmed";
+        return result(
+          "accepted_no_transaction",
+          "warning",
+          "Charger accepted the request, but no transaction is confirmed",
+          `The charger said yes${age !== null ? ` ${ago2(age)}` : ""}, yet ${seen}${raw ? ` (still \u201C${raw}\u201D)` : ""}. ${waitNote ? "The schedule alone does not explain this. " : ""}A request being accepted is not charging.`,
+          { action: guidance }
+        );
+      }
+      return result("accepted_waiting", "info", "Request accepted \u2014 waiting for the charger", "The charger accepted the start request. Waiting for it to open a transaction; this usually takes a few seconds. Charging is not confirmed yet.");
+    case "rejected": {
+      const retrying = reason === "request_rejected";
+      return result(
+        "rejected",
+        "warning",
+        "Charger rejected the start request",
+        retrying ? "The charger refused the request. SpotNav retries once after about a minute." : "The charger refused the request and SpotNav has stopped trying, so the car will not start charging by itself.",
+        { action: retrying ? `The car may not charge yet. ${retryPending}` : guidance }
+      );
+    }
+    case "blocked": {
+      if (FINISHED.has(reason)) return result("session_ended", "info", "Previous session ended", "The car reported its last session as finished. Unplug and plug in again to start a new one.");
+      if (reason === "person_stop_active") return result("paused", "info", "Plugged in \u2014 stopped", "A Stop is in progress, so charging is not being started. Resume Auto when you want charging again.");
+      if (TRANSIENT.has(reason)) {
+        if (young || age === null) return result("pending", "info", "Preparing to start charging", "SpotNav is waiting briefly before it asks the charger to start. It re-checks automatically.");
+        return result("start_not_sent", "warning", "Charging has not been started", "SpotNav has not been able to ask the charger to start for a while, so the car may not charge.", { action: "SpotNav keeps re-checking. If this stays, check the charger connection and the SpotNav logs, or start the charge from the Morek app." });
+      }
+      if (reason === "protection_conflict_unresolved") return result("start_blocked", "warning", "Charging start is blocked", "Another controller or site protection may also limit this charger, so SpotNav does not start it. The car may not charge.", { action: "Resolve the protection conflict first; SpotNav will not start the charge while it is unresolved. Do not work around it by starting the charge elsewhere." });
+      if (LOGGING.has(reason)) return result("start_blocked", "warning", "Charging start is blocked", "Automatic start is turned off by the charger-logging setup, so the car may not charge.", { action: "See the SpotNav logs, or start the charge from the Morek app." });
+      return result("start_blocked", "warning", "Charging has not been started", "SpotNav did not start the charge and it will not clear by itself, so the car may not charge.", { action: "Check the SpotNav logs, or start the charge from the Morek app." });
+    }
+    case "waiting":
+    case "session_observed":
+    default:
+      if (young || age === null) return result("pending", "info", "Plugged in \u2014 checking", "SpotNav has just seen the car and is deciding whether to request charging. Nothing is confirmed yet.");
+      return result("start_not_sent", "warning", "Plugged in, but charging has not been requested", "The car is connected and no charge request has been sent for a while, so it may not charge.", { action: "Unplug and plug in again so SpotNav can retry, or check the SpotNav logs." });
+  }
+}
+
 // sidebar/adapter.js
 var U = "Unknown";
 var date = (value2, zone) => {
@@ -60106,9 +60338,9 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
   const vehicleAt = Date.parse(ready?.vehicle_observed_at || "");
   const vehicleFresh = Number.isFinite(vehicleAt) && vehicleAt <= now && now - vehicleAt <= 18e4;
   const vehicle = vehicleFresh && ready?.vehicle === "connected" ? "connected" : vehicleFresh && ready?.vehicle === "disconnected" ? "disconnected" : "unknown";
-  const sessionStart = ready?.session_start?.state === "offline" ? "Automatic session start is offline." : ready?.session_start?.reason === "authorization_path_unimplemented" ? "Automatic session start is not implemented; OCPP command, transaction and safe scheduling evidence require verification." : ready?.session_start?.state ? `Session start ${ready.session_start.state} (${ready.session_start.reason || "reason unavailable"}). ON may allow immediate charging if the schedule is unconfirmed; ACK is not charging.` : "Automatic session start status unavailable.";
   const live = liveCharging(status, observedAt, failed, now);
-  const readiness = `Control ${control} \xB7 vehicle ${vehicle} \xB7 transaction / authorization unknown \xB7 ${live.measured ? `measured ${live.measured} observed` : "measured charging unknown"}. ${sessionStart} No active transaction is not a schedule prohibition.`;
+  const session = chargeSession(status, observedAt, failed, now);
+  const readiness = `Control ${control} \xB7 vehicle ${vehicle} \xB7 ${live.measured ? `measured ${live.measured} observed` : "measured charging unknown"} \xB7 ${session ? `${session.summary} ${session.action} Evidence: ${session.facts.join("; ")}.` : "Charge session not applicable."} A start request ACK is not a transaction or charging; no active transaction is not a schedule prohibition.`;
   const proposal = d3.plan.proposal;
   const planStale = stale || d3.planning?.historical === true || !!(proposal?.periods.length && proposal.periods.every((p4) => p4.endMs <= now));
   const rawProposal = raw?.plan?.proposal;
@@ -60366,7 +60598,7 @@ function recoveryBanner(state, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.126";
+var CARD_VERSION = "2.5.128";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {
@@ -60500,7 +60732,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
   connectedCallback() {
     this.connected = true;
     this.classList.add("wa-dark");
-    this.shadowRoot.innerHTML = `<link rel="stylesheet" href="/spotnav-sidebar/panel.css?v=${CARD_VERSION}"><style>:host{display:block;min-height:100%;padding-bottom:env(safe-area-inset-bottom)}.hostbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top));background:#11151d;color:white}.hostbar label{flex:1 1 180px}.hostbar select{max-width:100%}.hostbar button,.hostbar select{font:inherit;padding:8px}.message{padding:16px;color:white;background:#11151d}</style><div class="hostbar"><button id="menu" aria-label="Open navigation">\u2630</button><strong>SpotNav Enhanced</strong><label>Charger <select id="charger"><option value="">Select charger</option></select></label><button id="refresh">Refresh observations</button><div id="automatic-controls"><span id="pause-state">Auto state unknown.</span> <button id="pause-auto" disabled>Pause Auto until resumed</button> <button id="resume-auto" disabled>Resume Auto</button><span id="pause-notice" role="status"></span></div><section id="charge-controls" aria-label="Charge Now"><button id="charge-now" disabled>Charge Now</button><details id="charge-options"><summary>Duration / change end</summary><label>Duration <select id="charge-duration"><option value="30">30 minutes</option><option value="60" selected>1 hour</option><option value="120">2 hours</option><option value="180">3 hours</option><option value="custom">Custom end time</option></select></label><label id="custom-label" hidden>End time <input id="charge-end" type="datetime-local"></label><button id="charge-replace" type="button" hidden>Replace Charge Now end</button></details><span id="charge-state" role="status">Charge Now status unavailable.</span><span id="charge-notice" role="status"></span></section></div><div id="recovery-banner" role="alert" hidden></div><div class="message" role="status">Select a charger.</div><main></main>`;
+    this.shadowRoot.innerHTML = `<link rel="stylesheet" href="/spotnav-sidebar/panel.css?v=${CARD_VERSION}"><style>:host{display:block;min-height:100%;padding-bottom:env(safe-area-inset-bottom)}.hostbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top));background:#11151d;color:white}.hostbar label{flex:1 1 180px}.hostbar select{max-width:100%}.hostbar button,.hostbar select{font:inherit;padding:8px}.message{padding:16px;color:white;background:#11151d}</style><div class="hostbar"><button id="menu" aria-label="Open navigation">\u2630</button><strong>SpotNav Enhanced</strong><label>Charger <select id="charger"><option value="">Select charger</option></select></label><button id="refresh">Refresh observations</button><div id="automatic-controls"><span id="pause-state">Auto state unknown.</span> <button id="pause-auto" disabled>Pause Auto until resumed</button> <button id="resume-auto" disabled>Resume Auto</button><span id="pause-notice" role="status"></span></div><section id="charge-controls" aria-label="Charge Now"><button id="charge-now" disabled>Charge Now</button><details id="charge-options"><summary>Duration / change end</summary><label>Duration <select id="charge-duration"><option value="30">30 minutes</option><option value="60" selected>1 hour</option><option value="120">2 hours</option><option value="180">3 hours</option><option value="custom">Custom end time</option></select></label><label id="custom-label" hidden>End time <input id="charge-end" type="datetime-local"></label><button id="charge-replace" type="button" hidden>Replace Charge Now end</button></details><span id="charge-state" role="status">Charge Now status unavailable.</span><span id="charge-notice" role="status"></span></section></div><section id="charge-session" hidden></section><div id="recovery-banner" role="alert" hidden></div><div class="message" role="status">Select a charger.</div><main></main>`;
     const hostStyle = document.createElement("style");
     hostStyle.textContent = ".hostbar label{color:#f0f3f8}.hostbar select,.hostbar input{color:#f0f3f8;background:#202b39;border:1px solid #8191a4;border-radius:8px;min-height:42px} #automatic-controls,#charge-controls{display:flex;flex-wrap:wrap;gap:6px;min-width:0;max-width:100%} #automatic-controls button,#charge-controls button{max-width:100%;white-space:normal} #charge-controls{flex:1 1 100%;align-items:center} #charge-state,#charge-notice{flex:1 1 100%} #charge-options label{display:inline-block;margin:6px}";
     this.shadowRoot.append(hostStyle);
@@ -60657,6 +60889,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     const dashboard = decoded.ok ? decoded.value : null;
     this.paintAutomatic(dashboard);
     this.paintChargeNow(dashboard);
+    this.paintSession();
     this.paintRecovery();
     if (this.settingsRecord && dashboard?.settings?.revision > this.settingsRecord.revision) {
       this.settingsConflict = true;
@@ -60703,6 +60936,49 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     else this.view = mountDashboard(this.shadowRoot.querySelector("main"), adapter);
     this.shadowRoot.querySelector("main").hidden = false;
     this.paintMorek();
+  }
+  paintSession() {
+    const el = this.shadowRoot.querySelector("#charge-session");
+    if (!el) return;
+    const info = this.rawStatus ? chargeSession(decodeMorekState(this.rawStatus) || { supported: false }, this.statusAt, this.statusFailed, Date.now()) : null;
+    el.hidden = !info;
+    if (!info) {
+      el.replaceChildren();
+      return;
+    }
+    const colors = { ok: ["#12391f", "#7ee2a0"], info: ["#1c2a3b", "#8db8e6"], unknown: ["#2a2f38", "#a9b4c2"], warning: ["#4a3200", "#ffb938"], error: ["#5a1717", "#ff8a8a"] }[info.level] || ["#2a2f38", "#a9b4c2"];
+    el.dataset.kind = info.kind;
+    el.dataset.level = info.level;
+    el.setAttribute("role", info.warning ? "alert" : "status");
+    el.setAttribute("aria-label", "Charging status");
+    el.style.cssText = `padding:${info.warning ? "16px 18px" : "10px 16px"};background:${colors[0]};color:#f4f7fb;border-left:${info.warning ? 10 : 5}px solid ${colors[1]};line-height:1.4`;
+    const title = document.createElement("div");
+    title.style.cssText = `font-weight:700;font-size:${info.warning ? "1.25em" : "1.05em"};color:${colors[1]}`;
+    title.textContent = (info.warning ? "\u26A0 " : "") + info.title;
+    const detail = document.createElement("div");
+    detail.textContent = info.detail;
+    const nodes = [title, detail];
+    if (info.action) {
+      const action = document.createElement("div");
+      action.style.cssText = "margin-top:6px;font-weight:600";
+      action.textContent = info.action;
+      nodes.push(action);
+    }
+    const facts = document.createElement("details");
+    facts.style.cssText = "margin-top:6px;opacity:.85";
+    const summary = document.createElement("summary");
+    summary.textContent = "What SpotNav sees";
+    facts.append(summary);
+    const list2 = document.createElement("ul");
+    list2.style.margin = "4px 0 0";
+    for (const fact of info.facts) {
+      const li = document.createElement("li");
+      li.textContent = fact;
+      list2.append(li);
+    }
+    facts.append(list2);
+    nodes.push(facts);
+    el.replaceChildren(...nodes);
   }
   paintRecovery() {
     const el = this.shadowRoot.querySelector("#recovery-banner");
@@ -60811,14 +61087,14 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
         this.chargeUnknown?.add(charger);
         return;
       }
-      const result = response?.api_version === 1 ? response.schedule : null;
-      if (!result || !["pending", "worker_unavailable"].includes(result.reconciliation) || !["uncertain", "not_yet_confirmed"].includes(result.outcome) || action === "charge_now" && !result.intent?.id || action === "return_to_auto" && result.intent !== null) {
+      const result2 = response?.api_version === 1 ? response.schedule : null;
+      if (!result2 || !["pending", "worker_unavailable"].includes(result2.reconciliation) || !["uncertain", "not_yet_confirmed"].includes(result2.outcome) || action === "charge_now" && !result2.intent?.id || action === "return_to_auto" && result2.intent !== null) {
         this.chargeUnknown?.add(charger);
         this.chargeNotice = "Response unavailable; outcome unknown. Do not retry blindly.";
       } else {
-        if (result.outcome === "uncertain") this.chargeUnknown?.add(charger);
-        this.chargeExpected?.set(charger, action === "charge_now" ? result.intent.id : null);
-        this.chargeNotice = `Intent recorded; ${result.reconciliation === "pending" ? "waiting for schedule reconciliation" : "schedule worker unavailable"}. ${result.outcome === "uncertain" ? "A prior profile outcome is uncertain; do not retry blindly." : "This does not confirm charging."}`;
+        if (result2.outcome === "uncertain") this.chargeUnknown?.add(charger);
+        this.chargeExpected?.set(charger, action === "charge_now" ? result2.intent.id : null);
+        this.chargeNotice = `Intent recorded; ${result2.reconciliation === "pending" ? "waiting for schedule reconciliation" : "schedule worker unavailable"}. ${result2.outcome === "uncertain" ? "A prior profile outcome is uncertain; do not retry blindly." : "This does not confirm charging."}`;
       }
     } catch (error2) {
       if (this.connected && generation === this.generation && charger === this.charger) {
@@ -60853,12 +61129,12 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this.statusAt = null;
     this.paint();
     try {
-      const result = await this.bounded(performAction(hass, charger, action, choice));
+      const result2 = await this.bounded(performAction(hass, charger, action, choice));
       if (!this.connected || generation !== this.generation || permissionEpoch !== this.permissionEpoch || charger !== this.charger) return;
-      this.autoExpected = result.ok ? { action, choice, dispatchedAt } : null;
-      if (!result.ok && (result.error === "spotnav_action_failed" || result.error === "spotnav_action_outcome_unknown" || !result.error || !["spotnav_action_unavailable", "spotnav_action_reconcile_failed", "schedule_owner_unavailable", "identity_unresolved", "identity_changed", "resume_unavailable", "resume_interrupted", "ownership_blocked", "legacy_execution_ownership_blocked", "invalid_pause", "no_settings", "pause_unsettled", "action_pending"].includes(result.error))) this.autoUncertain = true;
-      this.autoNotice = result.ok ? "Accepted; waiting for a fresh confirmed state." : actionFailure(result.error, action);
-      if (!result.ok && result.error === "legacy_execution_ownership_blocked") this.autoRefusalAt = dispatchedAt;
+      this.autoExpected = result2.ok ? { action, choice, dispatchedAt } : null;
+      if (!result2.ok && (result2.error === "spotnav_action_failed" || result2.error === "spotnav_action_outcome_unknown" || !result2.error || !["spotnav_action_unavailable", "spotnav_action_reconcile_failed", "schedule_owner_unavailable", "identity_unresolved", "identity_changed", "resume_unavailable", "resume_interrupted", "ownership_blocked", "legacy_execution_ownership_blocked", "invalid_pause", "no_settings", "pause_unsettled", "action_pending"].includes(result2.error))) this.autoUncertain = true;
+      this.autoNotice = result2.ok ? "Accepted; waiting for a fresh confirmed state." : actionFailure(result2.error, action);
+      if (!result2.ok && result2.error === "legacy_execution_ownership_blocked") this.autoRefusalAt = dispatchedAt;
     } catch {
       if (this.connected && generation === this.generation && charger === this.charger) {
         this.autoUncertain = true;
@@ -60955,13 +61231,13 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
         this.syncNotice = raw?.schedule?.reconciliation === "requested" ? "Recalculated; sync requested, not yet confirmed. The schedule sync status above shows the latest worker result." : "Sync response unavailable; check schedule sync status before trying again.";
         return;
       }
-      const result = decodeMorekState(raw);
+      const result2 = decodeMorekState(raw);
       if (!this.connected || generation !== this.generation || permissionEpoch !== this.permissionEpoch || charger !== this.charger) return;
-      if (!result) {
+      if (!result2) {
         if (action === "send") this.morekUncertain = true;
         this.morekError = "Response unavailable; operation outcome may be unknown.";
       } else {
-        this.rawStatus = { api_version: 1, schedule: result };
+        this.rawStatus = { api_version: 1, schedule: result2 };
         this.statusAt = action === "status" ? Date.now() : null;
         this.statusFailed = action !== "status";
       }
@@ -61106,10 +61382,10 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     const generation = ++this.generation;
     this.loaded = true;
     try {
-      const result = await listChargers(this._hass);
+      const result2 = await listChargers(this._hass);
       if (!this.connected || this._hass?.connected === false || generation !== this.generation) return;
-      if (result?.api_version !== 1 || !Array.isArray(result.chargers)) throw new Error("Invalid charger list");
-      const chargers = result.chargers.filter((c5) => typeof c5?.charger_id === "string" && c5.charger_id && typeof c5?.charger_name === "string");
+      if (result2?.api_version !== 1 || !Array.isArray(result2.chargers)) throw new Error("Invalid charger list");
+      const chargers = result2.chargers.filter((c5) => typeof c5?.charger_id === "string" && c5.charger_id && typeof c5?.charger_name === "string");
       const select = this.shadowRoot.querySelector("#charger");
       select.replaceChildren(new Option("Select charger", ""));
       for (const charger of chargers) select.add(new Option(charger.charger_name, charger.charger_id));

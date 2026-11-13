@@ -109,7 +109,21 @@ class MorekSessionCoordinator:
         self._recheck = None
         self._recheck_runs = 0
         self._no_transaction = None
+        self.state_at = None
         self.state = {"state": "waiting", "reason": "waiting_for_vehicle"}
+
+    @property
+    def state(self):
+        """The session-start request state (a request outcome, never measured charging)."""
+        return self._state
+
+    @state.setter
+    def state(self, value):
+        # When the state last *changed*, so the status can tell a transient moment from a lasting one.
+        # Memory only: after a restart it is the restart time, never an older request's time.
+        if value != getattr(self, "_state", None):
+            self.state_at = datetime.now(timezone.utc)
+        self._state = value
 
     def observe(self, old, new):
         """Record a connector status change. Never raises into the event bus.

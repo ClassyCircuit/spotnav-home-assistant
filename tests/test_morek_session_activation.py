@@ -438,3 +438,18 @@ async def test_pending_request_blocks_a_duplicate(monkeypatch):
     coordinator.observe("Available", "Preparing")
     await settle(coordinator)
     assert point.calls == 0 and coordinator.state["reason"] == "previous_start_may_have_applied"
+
+
+@pytest.mark.asyncio
+async def test_state_timestamp_records_when_the_state_last_changed_not_every_write(monkeypatch):
+    """The status shows how long a state has lasted; rewriting the same state must not reset the clock."""
+    coordinator = setup(monkeypatch)[0]
+    first = coordinator.state_at
+    assert isinstance(first, datetime) and first.tzinfo is not None
+    coordinator.state = {"state": "waiting", "reason": "waiting_for_vehicle"}
+    assert coordinator.state_at is first
+    coordinator.state = {"state": "accepted", "reason": "request_accepted"}
+    assert coordinator.state_at >= first and coordinator.state_at is not first
+    again = coordinator.state_at
+    coordinator.state = {"state": "accepted", "reason": "request_accepted"}
+    assert coordinator.state_at is again
