@@ -65,6 +65,27 @@ def _logged_action(name: str):
     return wrap
 
 
+def _evidence_call(hass: HomeAssistant, entry_id: str, method: str, *args: Any, **kwargs: Any) -> None:
+    """Stage 6.2: keep command evidence in the bounded evidence store. Never raises and never delays a send:
+    a missing store or any failure keeps nothing, and the send path is unaffected."""
+    try:
+        from ..sessions.evidence import evidence_for
+
+        store = evidence_for(hass)
+        if store is not None:
+            getattr(store, method)(entry_id, *args, **kwargs)
+    except Exception:  # noqa: BLE001 - history must never alter the outcome of a charger operation
+        _LOGGER.debug("Charging evidence was not recorded", exc_info=True)
+
+
+def _evidence_plan(hass: HomeAssistant, entry_id: str, attempt: dict[str, Any], profile: dict[str, Any]) -> None:
+    intent = "charge_now" if attempt.get("override_id") else "pause_resume" if attempt.get("pause_id") else "schedule"
+    _evidence_call(hass, entry_id, "record_plan", plan_id=attempt.get("id"), fingerprint=attempt.get("fingerprint"),
+                   profile=profile, intent_at=attempt.get("at"), source=attempt.get("source"), intent=intent,
+                   revision=attempt.get("revision"),
+                   context={"time_zone": getattr(getattr(hass, "config", None), "time_zone", None)})
+
+
 class ScheduleRefused(Exception):
     def __init__(self, code: str):
         self.code = code
@@ -925,7 +946,8 @@ def _live_reading(state: Any, now: datetime, value: Any, unit: str) -> dict[str,
             "fresh": 0 <= age <= LIVE_MAX_AGE_S}
 
 
-def _live_measurements(hass: HomeAssistant, controller: Any, now: datetime) -> dict[str, Any]:
+def _live_measurements(hass: HomeAssistant, controller: Any, now: datetime,
+                       entities: dict[str, str | None] | None = None) -> dict[str, Any]:
     """Read-only, connector-bound charger observations; nothing is inferred or written.
 
     `status` is the connector's *reported* state, `current_a` and `power_w` are measured flow,
@@ -937,6 +959,9 @@ def _live_measurements(hass: HomeAssistant, controller: Any, now: datetime) -> d
     charger, else (2) the one enabled OCPP sensor whose registry identity names `Power.Active.Import` of
     exactly this connector (`connector_measurand_entity`); two candidates or none read as None. The energy
     register uses the same strict identity match. `sources` says which rule produced each, or why not.
+    When `entities` is given, the entity id each reading was taken from is stored in it (keys `status`,
+    `current_a`, `power_w`, `energy_register_kwh`; evidence capture keeps it as provenance, the status
+    payload never carries it).
     """
     from ..execution.charge_progress import connector_current
     from ..execution.charger_connection import normalise_ocpp
@@ -961,7 +986,9 @@ def _live_measurements(hass: HomeAssistant, controller: Any, now: datetime) -> d
         except Exception:  # noqa: BLE001 - an unreadable source is unknown, not an API failure
             return None
 
-    status_state = attempt(lambda: read(connector_sensor_entity_id(hass, target, STATUS_CONNECTOR_KEY)))
+    sink = entities if entities is not None else {}
+    sink["status"] = attempt(lambda: connector_sensor_entity_id(hass, target, STATUS_CONNECTOR_KEY))
+    status_state = attempt(lambda: read(sink["status"]))
     raw = None if status_state is None or str(status_state.state).lower() in ("unknown", "unavailable", "") \
         else str(status_state.state)
     if raw is not None:
@@ -969,7 +996,8 @@ def _live_measurements(hass: HomeAssistant, controller: Any, now: datetime) -> d
         if reading is not None:
             reading["normalized"] = attempt(lambda: normalise_ocpp(raw))
             live["status"] = {k: v for k, v in reading.items() if k != "unit"}
-    state = attempt(lambda: read(connector_sensor_entity_id(hass, target, CURRENT_IMPORT_KEY)))
+    sink["current_a"] = attempt(lambda: connector_sensor_entity_id(hass, target, CURRENT_IMPORT_KEY))
+    state = attempt(lambda: read(sink["current_a"]))
     live["current_a"] = attempt(lambda: _live_reading(state, now, connector_current(state), "A"))
     configured = getattr(controller, "power_entity_id", None)
     if isinstance(configured, str) and configured:
@@ -978,12 +1006,14 @@ def _live_measurements(hass: HomeAssistant, controller: Any, now: datetime) -> d
         found = attempt(lambda: connector_measurand_entity(hass, target, POWER_ACTIVE_IMPORT_KEY))
         power_id = found.entity_id if found is not None else None
         live["sources"]["power"] = "ocpp_registry" if power_id else found.status if found is not None else "none"
+    sink["power_w"] = power_id
     state = attempt(lambda: read(power_id))
     live["power_w"] = attempt(lambda: _live_reading(state, now, power_w_of(state), "W"))
 
     def energy() -> Any:
         found = connector_measurand_entity(hass, target, ENERGY_REGISTER_KEY)
         live["sources"]["energy"] = "ocpp_registry" if found.entity_id else found.status
+        sink["energy_register_kwh"] = found.entity_id
         sensor = read(found.entity_id) if found.entity_id and _classes_allow_register(hass, found.entity_id) else None
         if sensor is None or str(sensor.state).lower() in ("unknown", "unavailable", ""):
             return None
@@ -1674,6 +1704,8 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
     if override_id is not None:
         record["attempt"]["override_id"] = override_id
     await ledger.write(record)
+    # Evidence of the intent (the exact wire profile), kept after the durable attempt record and before dispatch.
+    _evidence_plan(hass, entry_id, record["attempt"], wire_profile)
     # Recheck after persistence: a settings edit, new calculation, identity or
     # pause change while the disk was busy must never become an obsolete send.
     try:
@@ -1682,6 +1714,8 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
         record["attempt"]["state"] = "aborted_before_dispatch"
         record["uncertain"] = False
         await ledger.write(record)
+        _evidence_call(hass, entry_id, "record_event", "dispatch_aborted", plan_id=attempt_id,
+                       reason="validation_after_persistence")
         raise
     _cancel_verification(hass, entry_id)
     prior_data = dict(data)
@@ -1697,17 +1731,25 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
         try:
             durable_ok = await validate_durable()
             if await ledger.read() != record:
+                _evidence_call(hass, entry_id, "record_event", "dispatch_aborted", plan_id=attempt_id,
+                               reason="ledger_changed")
                 return "upload_uncertain"
         except Exception:  # noqa: BLE001 - leave the attempted outcome uncertain
+            _evidence_call(hass, entry_id, "record_event", "dispatch_aborted", plan_id=attempt_id,
+                           reason="durable_check_failed")
             return "upload_uncertain"
     try:
         profile, point, target = validate()
         if not durable_ok:
+            _evidence_call(hass, entry_id, "record_event", "dispatch_aborted", plan_id=attempt_id,
+                           reason="durable_check_refused")
             return "upload_uncertain"
     except Exception:
         record["attempt"]["state"] = "aborted_before_dispatch"
         record["uncertain"] = False
         await ledger.write(record)
+        _evidence_call(hass, entry_id, "record_event", "dispatch_aborted", plan_id=attempt_id,
+                       reason="validation_before_dispatch")
         data.clear()
         data.update(prior_data)
         await store.async_save(data)
@@ -1717,6 +1759,9 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
     sending[entry_id] = attempt_id
     # Diagnostic only (Stage 14.6): this attempt reached the wire call; a cooldown or early return never does.
     hass.data.setdefault("spotnav_morek_dispatched", {})[entry_id] = attempt_id
+    # Synchronous, in-memory and failure-swallowing. It is written BEFORE the call, so it is not proof of sending
+    # (a crash or cancellation right after it, or an unsaved write, leaves nothing on the wire); only an ACK is.
+    _evidence_call(hass, entry_id, "record_event", "dispatch_started", plan_id=attempt_id)
     try:
         async with asyncio.timeout(30):
             response = await point.call(ocpp_call.SetChargingProfile(
@@ -1751,6 +1796,8 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
     # Unknown, cancellation, or interrupted ACK persistence stays uncertain on disk.
     record["attempt"]["ack"] = ack
     await ledger.write(record)
+    # The charger's answer to the command, nothing more: not installed-profile inventory and not charging.
+    _evidence_call(hass, entry_id, "record_event", "ack", plan_id=attempt_id, status=state[:32] or "unknown")
     await store.async_save(data)
     return "upload_accepted_unverified" if state == "accepted" else (
         "upload_rejected" if state in ("rejected", "notsupported") else "upload_uncertain")
@@ -2019,6 +2066,8 @@ async def _async_schedule_action_locked(hass: HomeAssistant, entry_id: str, acti
                 record["removal"]["state"] = status
             record["removal"]["ack"] = data["cleanup"]["status"]
             await ledger.write(record)
+            _evidence_call(hass, entry_id, "record_event", "removal", plan_id=None,
+                           status=str(data["cleanup"]["status"]).lower()[:32])
             await store.async_save(data)
         query_at = datetime.now(timezone.utc)
         duration = 43200
@@ -2129,6 +2178,11 @@ async def _async_schedule_action_locked(hass: HomeAssistant, entry_id: str, acti
             record["verified"] = None
             await outcomes_for(hass).write(record)
             await store.async_save(data)
+        # The effective limits the charger reported (not profile inventory, not flow), after every freshness
+        # recheck: tied to a plan version only when it was published as that version's current readback.
+        _evidence_call(hass, entry_id, "record_readback", effective,
+                       plan_id=data.get("attempt_id") if data.get("effective") is effective and current
+                       and action != "clear" else None)
         return {"supported": True, "sent_at": data.get("sent_at"), "ack": data.get("ack"), "verified": data.get("verified", False),
                 "sent": profile, "effective": data.get("effective"), "cleanup": data.get("cleanup"),
                 "cleanup_supported": True, "outcomes": record,

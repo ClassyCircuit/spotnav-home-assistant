@@ -21,7 +21,7 @@ from homeassistant.helpers.start import async_at_started
 from homeassistant.util import dt as dt_util
 
 from .api.dashboard import async_setup_dashboard_api
-from .api.morek_schedule import async_setup_morek_schedule_api, _identity_status, async_maybe_owned_action, ScheduleRefused
+from .api.morek_schedule import async_setup_morek_schedule_api, _identity_status, _intent_identity_status, async_maybe_owned_action, ScheduleRefused
 from .api.blueprints import async_setup_blueprints_api
 from .api.debug import async_setup_debug_api
 from .api.logs import async_setup_logs_api
@@ -807,6 +807,22 @@ def _async_schedule_history_import(
     entry.async_on_unload(importer.schedule_daily())
 
 
+async def _async_start_charging_evidence(hass: HomeAssistant, entry: ChargerConfigEntry, data: ChargerData) -> None:
+    """Stage 6.2: keep genuine connector measurements (and gaps) for the Morek connector only. Read-only."""
+    from .sessions.evidence import MeasurementCapture, async_get_evidence
+
+    target = getattr(data.controller, "ocpp_target", None)
+    if target is None or not _intent_identity_status(hass, target).get("supported"):
+        return
+    try:
+        capture = MeasurementCapture(hass, entry.entry_id, data.controller, await async_get_evidence(hass))
+        capture.start()
+    except Exception:  # noqa: BLE001 - history must never stop the charger entry from loading
+        _LOGGER.warning("Charging evidence capture could not start")
+        return
+    entry.async_on_unload(capture.stop)
+
+
 def _setup_morek_session_observation(hass, entry, session, target):
     """Wire connector events and seed the coordinator without issuing a command."""
     from .vehicles.ocpp_identity import STATUS_CONNECTOR_KEY, connector_sensor_entity_id
@@ -915,6 +931,7 @@ async def _async_setup_auto_preview(
     entry.async_on_unload(session.close)
     worker.start()
     entry.async_on_unload(worker.close)
+    await _async_start_charging_evidence(hass, entry, data)
 
     def _soc_moved() -> None:
         # New session or real progress: plan again from the current state of charge.
@@ -1146,6 +1163,10 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     await ChargerDay.async_remove_stored(hass, entry.entry_id)
     await LearnedPowerStore.async_remove_stored(hass, entry.entry_id)
     await LearnedEnergyStore.async_remove_stored(hass, entry.entry_id)
+    from .sessions.evidence import evidence_for
+
+    if (evidence := evidence_for(hass)) is not None:
+        await evidence.async_remove_charger(entry.entry_id)
     session_store = domain_data(hass).session_store
     if session_store is not None:
         await session_store.async_remove_charger(entry.entry_id)

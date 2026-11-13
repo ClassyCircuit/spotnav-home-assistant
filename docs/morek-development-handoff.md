@@ -384,6 +384,34 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-13 — Stage 6.2 capture and provenance (2.5.121; local mocked; coordinator review pending)
+
+- New `sessions/evidence.py` (`ChargingEvidenceStore`, `MeasurementCapture`, `derive_energy`); store key
+  `spotnav_charging_evidence`. Wired in `__init__.py` (`_async_start_charging_evidence`, Morek connector only,
+  read-only, removal on entry delete) and in `api/morek_schedule.py` (`_evidence_plan` / `_evidence_call` hooks in
+  `_send_profile_shared`, the clear action and the readback publish). Every hook swallows failures: evidence can never
+  change a send, ACK, ownership or uncertainty outcome. `_live_measurements` gained an optional `entities` sink for
+  provenance; the status payload is unchanged.
+- Sent-plan versions are immutable and keyed by attempt id; ACK/readback/removal are separate events; measurements are
+  a separate list. See the roadmap's 6.2 entry for the data model, bounds and 6.3 seam (`plan_versions`, `events`,
+  `samples`, `gaps`, `capture_starts`, `derive_energy`).
+- Review corrections (2.5.121): `derive_energy` no longer drops gap rows or ignores restart marks; callers must use
+  `ChargingEvidenceStore.energy_segments` (or pass gap rows and `restarts`) to get that coverage. Recorded gaps,
+  restarts and stale endpoints make power segments `unknown` and register deltas `coverage: "unobserved"`;
+  source/unit change, conflicts, future and out-of-order endpoints are `unknown`. New `dispatch_started` event (written
+  synchronously BEFORE the wire call, so it is only "possibly dispatched", not proof of sending) and reasoned
+  `dispatch_aborted` events (including the pre-wire `upload_uncertain` returns); `dispatch_state` reads them together
+  with `ack`. 2.5.122 corrected an earlier `dispatched`/`on_wire` naming that overclaimed: states are now
+  `ack_received`, `dispatch_started`, `aborted_before_dispatch`, `conflicting`, `unknown`; only a received ACK shows the
+  command reached the charger. Tests cover a crash before the call, unknown outcome, conflicts and a real
+  fetch/readback association with the acked version. Retention is now 7 days / 4320 rows per kind (3.0 days at full 60 s rate).
+- Tests: `python tools/run_isolated_logs_tests.py tests/test_stage_62_evidence.py tests/test_morek_worker.py
+  tests/test_stage_95_recovery.py` -> all pass (1 skipped); ruff clean; `npm run build` and `check-dist` current at 2.5.122.
+  No browser, full suite, live HA, charger, BMW, deployment, commit or push.
+- Unverified: which entities the installation exposes and their cadence; that the capture tick yields useful data;
+  the readback hook against the real fetch path; storage size on a real system. Not implemented: queries,
+  observed-flow intervals, tariff snapshot per plan, per-session association, BMW cross-check.
+
 ### 2026-11-13 — Stage 6.1 source inventory (docs only; no version change)
 
 - Repository inspection only; no live HA, Recorder, charger or BMW access and no code change (manifest stays 2.5.119;

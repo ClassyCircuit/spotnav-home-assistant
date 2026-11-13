@@ -1196,7 +1196,39 @@ historical analytics.
     battery versus wall energy, coverage and gaps before use. Repository/mock inspection
     can start locally; installed HA/Recorder or hardware checks require the user's
     specific approval and remain user-directed, not a separate hardware-testing stage.
-- [ ] **6.2 Capture and provenance**
+- [x] **6.2 Capture and provenance** (2.5.121, local mocked; no live HA/charger/BMW check; coordinator review pending)
+  - Implemented in `sessions/evidence.py` (new bounded store `spotnav_charging_evidence`, separate from the session
+    store, which it does not change): immutable sent-plan versions written from the real `_send_profile_shared`
+    path (the exact profile of the attempt, id, fingerprint, source, intent kind, settings revision, time zone).
+    A version is recorded before dispatch, so it is **not** proof of sending, and neither is the `dispatch_started`
+    marker written synchronously just before the OCPP call (a crash, cancellation or lost write between marker and
+    call sends nothing): it means "possibly dispatched". A received `ack` (status other than `unknown`) is separate
+    evidence that the charger answered; `dispatch_aborted` (with a reason) means nothing was sent. `dispatch_state`
+    returns `ack_received`, `dispatch_started`, `aborted_before_dispatch`, `conflicting` or `unknown` (no events or
+    only an unanswered ACK); absent or conflicting events are never read as sent. `readback` and `removal` are further events. Readbacks are tied to
+    a version only when published as its current readback. Measurements are captured for the Morek connector
+    only, once a minute, through the existing `_live_measurements` reader: `power_w`, `current_a`,
+    `energy_register_kwh` and, as status-only evidence, connector `status`, each with source entity, HA state time
+    (`t`), receipt time (`r`), unit, source rule and quality flags. Unreadable sources are explicit gap rows,
+    capture restarts are marked, duplicates are dropped, conflicting duplicates, out-of-order arrivals, counter
+    decreases, future timestamps and stale sources are kept and flagged. `derive_energy` / `energy_segments` is the
+    6.3 seam. It reads gap rows and restart marks and never bridges them: power is integrated only across an
+    observed, trustworthy pair (no recorded gap or capture restart between, no stale/future/out-of-order/
+    conflicting endpoint, source and unit unchanged, <= 660 s); otherwise the segment is `unknown` with `kwh: null`
+    and `reasons`. A meter-register difference across a gap, restart or stale endpoint stays a `meter_counter`
+    amount but is labelled `coverage: "unobserved"`, `placement: "unknown"` (how much, not when); a counter
+    decrease, source change or conflicting duplicate is `unknown`. Plans, limits, ACKs and status never create samples.
+  - Bounds (whichever is hit first, oldest dropped): age 7 days; 4320 rows per measurement kind per charger (exactly
+    3.0 days at one row per 60 s tick, so at full rate the count binds, and slower-reporting entities last up to
+    7 days); 120 plan versions, 600 events, 100 restart marks. Worst case about 2.6 MB of JSON for the four kinds
+    (estimate from a ~150 B row, not measured on an installation). The earlier "60 days / 4000 rows" claim was wrong:
+    4000 rows is 2.8 days at full rate. Coverage between ticks is only known through recorded gaps and restarts.
+  - **Not done / limits:** no query API, no observed-charging-interval or noise-threshold definition, no per-session
+    link, no tariff snapshot (6.3); settings/mode changes are only captured as the plan versions they cause;
+    the 60 s tick keeps the latest state, so changes between ticks are lost and a down HA leaves a gap; the shared
+    power reader reads exported (negative) power as 0; the entity set, cadence and Recorder coverage of the
+    installation, and Bavarian CarData, remain unverified and unused; the readback hook has no actual-boundary
+    test (store-level only).
   - Extend/reuse verified existing stores as appropriate to retain immutable sent-plan
     versions and genuine measured power/energy or validated source events. Existing
     aggregate/session/debug records must not be assumed to contain a complete trace.
