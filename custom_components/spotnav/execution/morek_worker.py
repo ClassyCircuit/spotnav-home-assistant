@@ -8,6 +8,7 @@ transition; production admission requires completed ownership and a current tick
 from __future__ import annotations
 
 import asyncio
+from collections import deque
 from datetime import datetime, timedelta, timezone
 import logging
 from collections.abc import Callable
@@ -25,6 +26,7 @@ _ROUTINE_COALESCE_SECONDS = 2.0  # routine SOC/price bursts
 _SOC_END_TOLERANCE = timedelta(minutes=5)  # SOC-only: an end instant that moves less is not news
 _TRIGGER_RANK = ("plug_in", "sync", "settings", "control", "sensor", "recovery", "recalc", "price", "routine")
 _SETTLED = ("upload_accepted_unverified", "unchanged")  # outcomes that end a pending price decision
+_DECISION_HISTORY = 10
 _SOC_CAUSE = "soc"  # the only planner cause that is routine and may use the SOC tolerance
 
 
@@ -67,6 +69,18 @@ class MorekScheduleWorker:
         self.last_trigger: str | None = None
         self._evidence: set[str] = set()
         self._evidence_task: asyncio.Task | None = None
+        # Stage 14.6: the last finished run's decision and a few before it (memory only, bounded; the durable
+        # record is the outcome ledger and the history is SpotNav's own log buffer).
+        self.decision: dict[str, Any] | None = None
+        self.decisions: deque[dict[str, Any]] = deque(maxlen=_DECISION_HISTORY)
+        self._decision_key: tuple[Any, ...] | None = None
+        # Per-run evidence so a decision never reports an earlier run's continuity, dispatch or attempt.
+        self._continuity_fresh = False
+        self._dispatch_before: str | None = None
+        self._run_attempt_id: str | None = None
+
+    def _dispatched_id(self) -> str | None:
+        return self._hass.data.get("spotnav_morek_dispatched", {}).get(self._entry_id)
 
     def start(self) -> None:
         """The listener delivers the current snapshot immediately, including on startup."""
@@ -207,6 +221,7 @@ class MorekScheduleWorker:
         """
         self.continuity = None
         self._continuity_end = None
+        self._continuity_fresh = True  # this run evaluated continuity (a later early exit is not this)
         profile = morek_schedule.acknowledged_profile(record)
         active = morek_schedule.active_window(profile, now)
         if active is None or active[1] != settings.amps:
@@ -326,6 +341,9 @@ class MorekScheduleWorker:
                 serial = self._serial
                 kinds = set(self._kinds)
                 self._price_evaluated = False
+                self._continuity_fresh = False
+                self._run_attempt_id = None
+                self._dispatch_before = self._dispatched_id()
                 try:
                     await self._reconcile(serial, None if self._strict else _SOC_END_TOLERANCE)
                 except morek_schedule.ScheduleRefused as error:
@@ -340,9 +358,48 @@ class MorekScheduleWorker:
                     self._strict = False
                     self._kinds -= kinds
                     self.last_trigger = next((k for k in _TRIGGER_RANK if k in kinds), None)
+                    self._record_decision(kinds)
                     return
         finally:
             self._task = None
+
+    def _record_decision(self, kinds: set[str]) -> None:
+        """Describe the finished run: trigger, input/state freshness, changed or not, preserved or interrupted,
+        sent or skipped and the result. A repeat of the same decision only counts (no new log line), so a burst of
+        sensor updates while charging stays one line. Never raises: diagnostics must not affect charging."""
+        try:
+            now = datetime.now(timezone.utc)
+            controller = controller_for(self._hass, self._entry_id)
+            event = morek_schedule.decision_event(
+                now=now, kinds=kinds, last_trigger=self.last_trigger, reason=self.reason,
+                inputs=morek_schedule._planning_inputs(self._hass, self._entry_id),
+                evidence=morek_schedule.connector_evidence(self._hass, controller, now),
+                continuity=self.continuity if self._continuity_fresh else None,
+                dispatched=self._dispatched_id() not in (None, self._dispatch_before),
+                attempt_id=self._run_attempt_id)
+            key = (event["action"], event["result"], event["evidence"], event["changed"], event["attempt_id"],
+                   None if event["continuity"] is None else tuple(event["continuity"].values()),
+                   event["inputs"].get("plan_state"), event["inputs"].get("uncertain"))
+            if key == self._decision_key and self.decision is not None:
+                self.decision["repeat"] += 1
+                self.decision["last_at"] = event["at"]
+                self.decision["triggers"] = sorted(set(self.decision["triggers"]) | set(event["triggers"]))[:9]
+                return
+            self._decision_key = key
+            self.decision = event
+            self.decisions.append(event)
+            inputs, cont = event["inputs"], event["continuity"] or {}
+            level = (logging.WARNING if event["result"] in ("upload_rejected", "upload_uncertain", "worker_unavailable")
+                     and event["action"] != "held" else logging.INFO)
+            _LOGGER.log(
+                level,
+                "Morek schedule decision: trigger=%s action=%s result=%s changed=%s evidence=%s preserved=%s "
+                "reason=%s soc_source=%s soc_age_s=%s plan=%s/%s ack=%s (not measured charging)",
+                event["trigger"], event["action"], event["result"], event["changed"], event["evidence"],
+                cont.get("preserved"), cont.get("reason"), inputs.get("soc_source"), inputs.get("soc_age_s"),
+                inputs.get("plan_state"), inputs.get("plan_reason"), event["stages"]["ack"])
+        except Exception:  # noqa: BLE001 - never let a diagnostic change the outcome
+            _LOGGER.debug("Morek decision evidence unavailable", exc_info=True)
 
     async def _reconcile(self, serial: int, end_tolerance: timedelta | None = None) -> None:
         # Restore the fixed expiry even when the charger is offline.
@@ -448,6 +505,7 @@ class MorekScheduleWorker:
             return
         outcome, sent_at, attempt_id = result.value
         self.reason = outcome
+        self._run_attempt_id = attempt_id
         if outcome == "upload_rejected":
             await self._arm_retry_timer(data)
         elif self._retry_timer is not None and outcome != "upload_uncertain":

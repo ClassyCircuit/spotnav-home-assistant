@@ -383,6 +383,28 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-13 — Stage 14.6 decision evidence (2.5.111; local mocked)
+
+- Worker `_record_decision` (called when a run completes, never raises) + `morek_schedule.decision_event`,
+  `decision_blocker`, `decision_status`; see the roadmap entry for fields and bounds. Logging goes through
+  `_LOGGER` (INFO per new decision, WARNING for `upload_rejected`/`upload_uncertain`/`worker_unavailable`), so the
+  existing SpotNav log buffer and debug bundle carry it; status `reconciliation.decision` / `.blocker`.
+  Thresholds are unchanged (14.1-14.5); intent/ACK/readback/physical are separate stages and `physical` is
+  always `not_measured`.
+- Tests: `tests/test_stage_146_decision_evidence.py` (12): pure event/blocker whitelist, plug-in equal skip,
+  changed send with readback states, 12 repeated SOC updates (1 send, 2 log lines), price interruption,
+  unknown state preserve, unavailable charger and recovery, rejection/uncertain ACK, Stop race, event volume
+  (40 alternating decisions: 10 kept, <= 42 lines) and privacy. The file zeroes the 2 s routine coalescing
+  delay (fixture) so it runs in ~10 s. With the 14.3-14.5 and Morek worker files: 237 passed, 1 failed
+  (`test_morek_worker::manual_api_routes_owned_pause...`, known harness failure listed above).
+- 2.5.112 accuracy correction: `held` action for a blocked retry without a wire call (marker
+  `spotnav_morek_dispatched`), continuity only when evaluated in that run, readback bound to the decision's
+  attempt id (`superseded` otherwise); 3 production-path tests added to the file above (rejection then cooldown,
+  early unavailable after prior continuation, matching/other-attempt readback). Safety behavior untouched.
+  Run with the `--noconftest` recipe above; the same one known `test_morek_worker` failure remains.
+- Limits: the status route itself (`reconciliation` assembly) is not exercised end to end, only the helpers and
+  the worker; mocked boundaries only; no HA access, charger command, deployment or browser run.
+
 ### 2026-11-13 — Stage 14.5 fresh inputs and bounded recovery (2.5.109; local mocked)
 
 - Planner (`auto_controller._capped_input_problem`, `soc_reading_order_problem`): on the capped Morek

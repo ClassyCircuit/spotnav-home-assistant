@@ -99,7 +99,7 @@ Detailed requirements and acceptance cases follow outside this checklist.
 | 11 | Adaptive charging estimates for Morek | Later work; reuse existing learning and genuine measurement sources |
 | 12 | Fix real sidebar usability, price presentation and evidence | Prioritize before 5.8; implement bounded 12.1–12.8 separately alongside remaining 5.7b work |
 | 13 | Migrate useful old-card configuration into the sidebar | Follow the related Stage 12 work; 13.1–13.4 are separate, bounded tasks |
-| 14 | Predictable planning and stable Morek schedule updates | 14.1–14.6 in order; 14.1–14.5 locally implemented (14.5: 2.5.109); 14.1 locally implemented (2.5.101, mocked; review corrections applied); coordinates with 9.4/9.5 and 11 without duplicating them |
+| 14 | Predictable planning and stable Morek schedule updates | 14.1–14.6 in order; 14.1–14.6 locally implemented (14.6: 2.5.111); 14.1 locally implemented (2.5.101, mocked; review corrections applied); coordinates with 9.4/9.5 and 11 without duplicating them |
 
 ### Stage 0 — Completed baseline: preserve and reuse
 
@@ -2055,7 +2055,33 @@ handoff and checklist truthfully; follow AGENTS.md version/build requirements.
   - Test stale/out-of-order SOC, fresh SOC after measured energy, unavailable meters,
     restart, reconnect, definite rejection, timeout/unknown outcome and Stop races.
 
-- [ ] **14.6 Decision evidence and end-to-end regression**
+- [x] **14.6 Decision evidence and end-to-end regression** (2.5.111 local, mocked)
+  - Implemented: after each finished worker run `MorekScheduleWorker._record_decision` builds one
+    non-sensitive event (`morek_schedule.decision_event`): trigger (+ coalesced kinds), planner input state
+    (plan state/reason, SOC source, age, estimated, uncertain), connector evidence (fresh 180 s status or
+    `unknown`), changed (`unchanged` skip = false, a send = true, blocked = unknown), continuity
+    (preserved/interrupted + reason), action (`sent`/`skipped`/`blocked`), result code and a `blocker`
+    (`decision_blocker`: code + stable action key such as `wait_for_charger_connection`). The stages are
+    separate: `intent` (a profile was handed to the charger), `ack` (accepted/rejected/unknown, or
+    `accepted_earlier` for a skip), `readback` (filled live by status from the existing verification, never
+    stored) and `physical` (always `not_measured`). Reuse: one INFO line per *new* decision through the
+    native logger (WARNING for rejected/uncertain/worker failure), so it lands in the existing 9.4
+    log buffer/debug bundle; a repeat of the same decision only increments `repeat`/`last_at` (a burst of
+    sensor updates while charging is one line). Status: `reconciliation.decision` (`latest` + last 5) and
+    `reconciliation.blocker` (current worker reason) on the existing Morek status; same permissions as that
+    status. No new store, log viewer, setting or sidebar text.
+  - Bounds: 10 events in memory on the worker (lost on restart), one log line per changed decision, lines
+    capped by the log buffer (1000 chars; 300 INFO records). Excluded: profiles, prices, entity/station ids,
+    payloads. Not done: no per-run history across restarts beyond the log buffer, no sidebar rendering, no
+    live/physical verification.
+  - Accuracy correction (2.5.112 local, mocked): a sent-type result (`upload_rejected`/`upload_uncertain`) with no
+    wire call in that run (cooldown, exhausted retries, unresolved earlier outcome) is now action `held`,
+    intent `none`, ack `rejected_earlier`/`unknown_earlier`, logged at INFO (the earlier attempt already warned);
+    only a run that reached the wire call is `sent`. The dispatch is read from a diagnostic marker
+    (`hass.data["spotnav_morek_dispatched"]`) set just before the call, not inferred from the result.
+    `continuity` is reported only when the run itself evaluated it (early exits such as `charger_unavailable`
+    report none instead of an earlier run's preserve/interrupt). Events carry the attempt id; the status readback
+    is `superseded` when the current verification belongs to another attempt. No safety/send behavior changed.
   - Extend existing diagnostics with concise, bounded events: trigger, state/evidence
     freshness, material plan change, preserve/interrupt reason, send/skip and outcome.
     Reuse native SpotNav logging and existing status surfaces; no separate log store,

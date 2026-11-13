@@ -1036,6 +1036,97 @@ def recovery_status(record: dict[str, Any] | None, now: datetime) -> dict[str, A
             "exhausted": bool(count and retry_at is None and not record.get("uncertain"))}
 
 
+#: Stage 14.6: reason code -> what the person (or time) can do about it. Codes only, no household data.
+DECISION_BLOCKERS: dict[str, str] = {
+    "charger_unavailable": "wait_for_charger_connection",
+    "identity_unresolved": "check_charger_identity",
+    "identity_changed": "check_charger_identity",
+    "stale_generation": "retry_after_stop_or_change",
+    "migration_confirmation_required": "confirm_ownership",
+    "protection_conflict_unresolved": "resolve_protection_conflict",
+    "paused_until_resume": "resume_schedule",
+    "legacy_pause_active": "resume_schedule",
+    "resume_requires_confirmation": "confirm_resume",
+    "charge_now_active": "wait_for_charge_now_end",
+    "upload_uncertain": "check_charger_outcome",
+    "upload_rejected": "check_charger_response",
+    "planner_changed": "wait_for_planner",
+    "worker_unavailable": "check_logs",
+    "planning_unavailable": "wait_for_fresh_inputs",
+    "target_soc_stale": "wait_for_fresh_inputs",
+    "target_progress_uncertain": "wait_for_fresh_inputs",
+    "waiting_for_vehicle_update": "wait_for_fresh_inputs",
+    "active_window_block_limit": "adjust_planning_settings",
+    "too_many_blocks": "adjust_planning_settings",
+    "invalid_plan": "adjust_planning_settings",
+}
+_DECISION_OK = ("upload_accepted_unverified", "unchanged")
+_DECISION_SENT = ("upload_accepted_unverified", "upload_rejected", "upload_uncertain")
+_DECISION_ACK = {"upload_accepted_unverified": "accepted", "upload_rejected": "rejected",
+                 "upload_uncertain": "unknown", "unchanged": "accepted_earlier"}
+
+
+def decision_blocker(reason: str | None) -> dict[str, str] | None:
+    """The current obstacle to applying a new plan, or None. `stale_work` is a superseded run, not a blocker."""
+    if not reason or reason in _DECISION_OK or reason in ("pending", "stale_work", "not_started"):
+        return None
+    return {"code": str(reason)[:60], "action": DECISION_BLOCKERS.get(reason, "see_reason")}
+
+
+def decision_event(*, now: datetime, kinds: Any, last_trigger: str | None, reason: str | None,
+                   inputs: dict[str, Any], evidence: str, continuity: dict[str, Any] | None,
+                   dispatched: bool | None = None, attempt_id: str | None = None) -> dict[str, Any]:
+    """One bounded, non-sensitive account of a finished reconcile run (Stage 14.6).
+
+    Separates the stages: `intent` (a profile was handed to the charger), `ack` (what it answered),
+    `readback` (filled live by `decision_status`) and `physical` (never measured here). No profile,
+    price, entity id, payload or identity is included. `dispatched` says this run really made the wire call
+    (None: infer from the result, for callers without that evidence). A sent-type result without a dispatch
+    is an earlier attempt still blocking (cooldown, exhausted retries, unresolved outcome): no new command."""
+    reason = reason or "unknown"
+    sent = reason in _DECISION_SENT
+    held = sent and dispatched is False
+    sent = sent and not held
+    action = "sent" if sent else "held" if held else "skipped" if reason == "unchanged" else "blocked"
+    cont = continuity if isinstance(continuity, dict) else None
+    ack = _DECISION_ACK.get(reason)
+    if held:
+        ack = {"upload_rejected": "rejected_earlier", "upload_uncertain": "unknown_earlier"}.get(reason, ack)
+    return {
+        "at": _utc(now).isoformat(), "trigger": last_trigger, "triggers": sorted(str(k) for k in kinds)[:9],
+        "inputs": {key: inputs.get(key) for key in ("plan_state", "plan_reason", "soc_source", "soc_estimated",
+                                                    "soc_age_s", "uncertain")},
+        "evidence": evidence,
+        "changed": True if sent else False if reason == "unchanged" else None,
+        "continuity": None if cont is None else {key: cont.get(key) for key in ("evidence", "preserved", "reason")},
+        "action": action, "result": reason[:60], "attempt_id": attempt_id,
+        "stages": {"intent": "sent" if sent else "none", "ack": ack,
+                   "readback": None, "physical": "not_measured"},
+        "blocker": decision_blocker(reason), "repeat": 1,
+    }
+
+
+def decision_status(worker: Any, verification: dict[str, Any], verified: bool,
+                    current_attempt_id: str | None = None) -> dict[str, Any] | None:
+    """The latest decision plus the few before it, with the current readback state filled in.
+
+    The readback belongs to the decision's own attempt: when the decision names one and the current
+    verification is for another, it is `superseded`, never borrowed."""
+    last = getattr(worker, "decision", None)
+    if not isinstance(last, dict):
+        return None
+    last = {**last, "stages": dict(last["stages"])}
+    if last["action"] in ("sent", "skipped") and last["stages"]["ack"] in ("accepted", "accepted_earlier"):
+        mine = last.get("attempt_id")
+        if mine is not None and current_attempt_id is not None and mine != current_attempt_id:
+            last["stages"]["readback"] = "superseded"
+        else:
+            last["stages"]["readback"] = ("verified" if verified else "pending" if verification.get("pending")
+                                          else "mismatch" if verification.get("reason") == "limits_or_transitions_differ"
+                                          else "unconfirmed")
+    return {"latest": last, "recent": list(getattr(worker, "decisions", ()))[-5:]}
+
+
 def _preview_id(profile: dict[str, Any], revision: Any) -> str:
     """Commit to wire attributes and absolute changes, excluding the moving initial timestamp."""
     schedule = profile["chargingSchedule"]
@@ -1451,6 +1542,8 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
     from ocpp.v16 import call as ocpp_call
     sending = hass.data.setdefault("spotnav_morek_sending", {})
     sending[entry_id] = attempt_id
+    # Diagnostic only (Stage 14.6): this attempt reached the wire call; a cooldown or early return never does.
+    hass.data.setdefault("spotnav_morek_dispatched", {})[entry_id] = attempt_id
     try:
         async with asyncio.timeout(30):
             response = await point.call(ocpp_call.SetChargingProfile(
@@ -2013,7 +2106,11 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
                                          "continuity": getattr(worker, "continuity", None),
                                          "recovery": recovery_status(outcomes, datetime.now(timezone.utc)),
                                          "inputs": _planning_inputs(hass, entry.entry_id),
-                                         "last_trigger": getattr(worker, "last_trigger", None)},
+                                         "last_trigger": getattr(worker, "last_trigger", None),
+                                         "blocker": decision_blocker(worker.reason if worker is not None and
+                                                                     getattr(worker, "reason_serial", -1) == worker._serial
+                                                                     else None),
+                                         "decision": decision_status(worker, verification, verified, data.get("attempt_id"))},
                       "ownership": ownership,
                       "outcomes": outcomes,
                       "operator": operator,
