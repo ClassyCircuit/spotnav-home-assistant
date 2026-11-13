@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import functools
 import logging
 import math
 from datetime import datetime, timedelta, timezone
@@ -41,6 +42,27 @@ _DATA_KEY = "spotnav_morek_schedule"
 _VERIFY_KEY = "spotnav_morek_verification"
 _LIFECYCLE_KEY = "spotnav_morek_verification_lifecycle"
 _LOGGER = logging.getLogger(__name__)
+
+
+def _logged_action(name: str):
+    """Log one line for an explicit person action: recorded (an intent, not a charge) or refused with its code.
+
+    No ids, entities or payloads; the stable refusal code is what makes the line actionable.
+    """
+    def wrap(func):
+        @functools.wraps(func)
+        async def run(*args, **kwargs):
+            label = ("Resume" if kwargs.get("resume") else "Pause") if name == "pause/resume" else (
+                "Return to Auto" if kwargs.get("return_to_auto") else name)
+            try:
+                result = await func(*args, **kwargs)
+            except ScheduleRefused as err:
+                _LOGGER.info("Morek %s refused: %s", label, getattr(err, "code", None) or str(err))
+                raise
+            _LOGGER.info("Morek %s recorded as an intent; the schedule follows by reconciliation and charging is not confirmed", label)
+            return result
+        return run
+    return wrap
 
 
 class ScheduleRefused(Exception):
@@ -1185,6 +1207,7 @@ async def _outcome_record(hass: HomeAssistant, entry_id: str, data: dict[str, An
     return record
 
 
+@_logged_action("pause/resume")
 async def async_record_owned_pause(hass: HomeAssistant, entry_id: str, *, resume: bool = False) -> dict[str, Any]:
     """Persist an explicit connector-bound pause; no charger operation is performed.
 
@@ -1257,6 +1280,7 @@ async def async_record_owned_pause(hass: HomeAssistant, entry_id: str, *, resume
     return dict(intent)
 
 
+@_logged_action("Charge Now")
 async def async_charge_now_action(hass: HomeAssistant, entry_id: str, *, return_to_auto: bool = False,
                                   duration_minutes: int | None = None, end_time: str | None = None) -> dict[str, Any]:
     """Persist an explicit request under the owner's connector lock, then trigger reconciliation."""

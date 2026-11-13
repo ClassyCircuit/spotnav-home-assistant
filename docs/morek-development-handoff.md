@@ -383,6 +383,19 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-13 — Stage 9.4 SpotNav log viewer (2.5.113; local mocked)
+
+- Backend `api/logs.py` (`spotnav/get_logs`, admin only) over the existing `log_buffer.SpotNavLogBuffer`
+  (added `seq`, `boot_id`, `query()`); sidebar `frontend/sidebar/log-viewer.js` mounted in `panel.js` for
+  administrators. New INFO/WARNING lines: `_logged_action` on `async_record_owned_pause` /
+  `async_charge_now_action`, `MorekSessionCoordinator._log_state`. Details, API findings and limitations are in the
+  roadmap's 9.4 entry. Polling only; no stream; no live HA access.
+- Tests: `tests/test_stage_94_logs.py` (20, run with `python tools/run_isolated_logs_tests.py`, which also
+  accepts other test paths) and `frontend/test/log-viewer.test.ts` (7). No individual tests were removed. With the
+  isolated runner `tests/test_morek_session.py` has 6 pre-existing harness failures (its fixtures patch
+  `custom_components.spotnav.async_track_state_change_event`, absent from the runner's stub package); not caused by this
+  change and not run with the real plugin because of the Windows `fcntl` limitation.
+
 ### 2026-11-13 — Stage 14.6 decision evidence (2.5.111; local mocked)
 
 - Worker `_record_decision` (called when a run completes, never raises) + `morek_schedule.decision_event`,

@@ -12,6 +12,8 @@ from ..api import morek_schedule
 from ..runtime import controller_for, domain_data
 from .command_admission import classify_morek_identity, command_admission, physical_connector
 
+_LOGGER = logging.getLogger(__name__)
+
 _REDACT_REQUEST = contextvars.ContextVar("spotnav_morek_remote_start", default=False)
 
 
@@ -249,7 +251,21 @@ class MorekSessionCoordinator:
     async def _run(self):
         while self.dirty and not self.closed:
             self.dirty = False
+            before = dict(self.state)
             await self._reconcile()
+            self._log_state(before)
+
+    def _log_state(self, before):
+        """One line per changed session-start state: the request (intent), never a measured charge.
+
+        Codes only: no station, connector or OCPP payload. A repeat of the same state is silent.
+        """
+        state = self.state
+        if state == before or state.get("reason") == "waiting_for_vehicle":
+            return
+        code, reason = state.get("state"), state.get("reason")
+        level = logging.WARNING if code in ("rejected", "uncertain") else logging.INFO
+        _LOGGER.log(level, "Morek session start %s (%s); a request outcome is not measured charging", code, reason)
 
     async def _reconcile(self):
         if self.observation not in ("preparing", "finishing") and not self.vehicle_events:

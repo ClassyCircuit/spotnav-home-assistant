@@ -7,6 +7,7 @@ import { translate } from '../src/i18n/index.ts';
 import { decodeMorekState, morekPanel } from '../src/morek-view.ts';
 import { reconcile } from '../shared-dashboard/reconcile.js';
 import { dashboardAdapter } from './adapter.js';
+import { createLogViewer } from './log-viewer.js';
 import { CARD_VERSION } from '../src/generated/version.ts';
 import { capInput, capForSave, displayPrice } from '../shared-dashboard/price-format.js';
 import { observationFreshness } from '../src/observation-freshness.ts';
@@ -110,9 +111,10 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     this.shadowRoot.querySelector('#charge-now').onclick = () => void this.chargeAction(this.rawStatus?.schedule?.charge_now?.state==='active' ? 'return_to_auto' : 'charge_now');
     this.shadowRoot.querySelector('#charge-replace').onclick = () => void this.chargeAction('charge_now');
     this.shadowRoot.querySelector('#charge-duration').onchange = e => {this.shadowRoot.querySelector('#custom-label').hidden=e.target.value!=='custom';};
+    this.logViewer=createLogViewer(()=>this._hass);this.logViewer.hidden=this._hass?.user?.is_admin!==true;this.shadowRoot.append(this.logViewer);
     if (this._hass) this.loadChargers();
   }
-  disconnectedCallback() { this.connected=false; this.stopObservations(); }
+  disconnectedCallback() { this.connected=false; this.stopObservations(); this.logViewer?.destroy(); }
   set hass(value) {
     if (!this.settingsWriteContext && value) {
       const key=value.connection || value;
@@ -130,6 +132,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     const was = this._hass?.connected !== false;
     const wasAdmin = this._hass?.user?.is_admin === true;
     this._hass=value;
+    if (this.logViewer) this.logViewer.hidden=value?.user?.is_admin!==true;
     if (!this.connected) return;
     if (value?.connected === false) { if (was) this.stopObservations(true); this.message('Home Assistant disconnected.'); }
     else if (!this.loaded || !was) this.loadChargers();

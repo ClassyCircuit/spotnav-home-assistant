@@ -57151,6 +57151,13 @@ async function updateSettings(hass, chargerId, expectedRevision, body) {
     settings: body
   });
 }
+async function getLogs(hass, options = {}) {
+  const message = { type: "spotnav/get_logs", api_version: 1 };
+  for (const [key3, value2] of Object.entries(options)) {
+    if (value2 !== void 0 && value2 !== null && value2 !== "") message[key3] = value2;
+  }
+  return await call(hass, message);
+}
 
 // src/price-provider.ts
 function addIntegrationPath(domain) {
@@ -60111,8 +60118,137 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
   };
 }
 
+// sidebar/log-viewer.js
+var MAX_SHOWN = 300;
+var ERRORS = {
+  spotnav_not_admin: "Administrator permission is required to view logs.",
+  spotnav_logs_unavailable: "The SpotNav log buffer is not available.",
+  spotnav_logs_invalid_filter: "The filter was not accepted."
+};
+function decodeLogs(raw) {
+  if (!raw || typeof raw !== "object" || raw.api_version !== 1 || typeof raw.ok !== "boolean") return null;
+  if (!raw.ok) return { ok: false, error: typeof raw.error === "string" ? raw.error : "unknown", entries: [] };
+  if (!Array.isArray(raw.entries) || !Number.isInteger(raw.latest_seq) || typeof raw.boot_id !== "string") return null;
+  const entries = raw.entries.filter((e9) => e9 && typeof e9.message === "string" && typeof e9.level === "string").map((e9) => ({
+    seq: Number.isInteger(e9.seq) ? e9.seq : 0,
+    time: typeof e9.time === "string" ? e9.time : "",
+    level: e9.level,
+    logger: typeof e9.logger === "string" ? e9.logger.replace(/^custom_components\.spotnav\.?/, "") || "spotnav" : "",
+    message: e9.message,
+    exception: typeof e9.exception === "string" ? e9.exception : ""
+  }));
+  return {
+    ok: true,
+    entries,
+    latestSeq: raw.latest_seq,
+    bootId: raw.boot_id,
+    matched: Number(raw.matched) || 0,
+    truncated: raw.truncated === true,
+    restarted: raw.restarted === true
+  };
+}
+function formatLine(e9) {
+  const when = Date.parse(e9.time);
+  const time = Number.isFinite(when) ? new Date(when).toLocaleString() : "-";
+  return `${time} ${e9.level} ${e9.logger}: ${e9.message}${e9.exception ? `
+${e9.exception}` : ""}`;
+}
+var MARKUP = `<summary>SpotNav logs</summary>
+<div class="log-controls">
+  <label>Severity <select class="log-level"><option value="INFO">Info and above</option><option value="WARNING">Warnings and errors</option><option value="ERROR">Errors only</option><option value="DEBUG">Everything kept (incl. debug)</option></select></label>
+  <label>Text <input class="log-text" type="search" maxlength="100" placeholder="e.g. Morek, refused"></label>
+  <button type="button" class="log-refresh">Refresh</button>
+  <label><input type="checkbox" class="log-live"> Live (polls every 5 s)</label>
+</div>
+<div class="log-status" role="status"></div>
+<pre class="log-lines" tabindex="0"></pre>
+<p class="log-note">Source: SpotNav records kept in memory by this Home Assistant Core integration (recent records only; not a separate log and not a stream). Older records and other integrations: Settings, System, Logs.</p>`;
+function createLogViewer(getHass, { fetchLogs = getLogs, intervalMs = 5e3, timers = { set: setInterval, clear: clearInterval } } = {}) {
+  const root = document.createElement("details");
+  root.id = "log-viewer";
+  root.innerHTML = MARKUP;
+  const q = (s4) => root.querySelector(s4);
+  const state = { lines: [], after: 0, boot: null, timer: null, busy: false, epoch: 0 };
+  const status = (text3) => {
+    q(".log-status").textContent = text3;
+  };
+  const paint = () => {
+    q(".log-lines").textContent = state.lines.map((l6) => l6.text).join("\n");
+  };
+  const stop2 = () => {
+    if (state.timer !== null) {
+      timers.clear(state.timer);
+      state.timer = null;
+    }
+  };
+  async function load(reset) {
+    const hass = getHass();
+    if (!hass || hass.connected === false) {
+      status("Home Assistant is disconnected; showing what was already loaded.");
+      return;
+    }
+    if (hass.user?.is_admin !== true) {
+      status(ERRORS.spotnav_not_admin);
+      return;
+    }
+    if (state.busy && !reset) return;
+    if (reset) {
+      state.after = 0;
+      state.lines = [];
+      state.epoch++;
+    }
+    state.busy = true;
+    const epoch = state.epoch;
+    let decoded = null;
+    let failed = false;
+    try {
+      decoded = decodeLogs(await fetchLogs(hass, { level: q(".log-level").value, text: q(".log-text").value.trim(), after_seq: state.after, boot_id: state.boot }));
+    } catch (err) {
+      failed = err?.code || true;
+    }
+    if (epoch !== state.epoch) return;
+    state.busy = false;
+    if (failed || !decoded) {
+      status(typeof failed === "string" && ERRORS[failed] ? ERRORS[failed] : "Logs unavailable; showing what was already loaded. Retrying while Live is on.");
+      return;
+    }
+    if (!decoded.ok) {
+      status(ERRORS[decoded.error] || "Logs unavailable.");
+      if (decoded.error === "spotnav_not_admin") stop2();
+      return;
+    }
+    if (state.boot !== null && decoded.bootId !== state.boot) state.lines = [];
+    state.boot = decoded.bootId;
+    state.after = decoded.latestSeq;
+    const seen = new Set(state.lines.map((l6) => l6.seq).filter(Boolean));
+    for (const e9 of decoded.entries) if (!e9.seq || !seen.has(e9.seq)) state.lines.push({ seq: e9.seq, text: formatLine(e9) });
+    if (state.lines.length > MAX_SHOWN) state.lines = state.lines.slice(-MAX_SHOWN);
+    paint();
+    status(`${state.lines.length ? `${state.lines.length} record(s) shown` : "No matching records in the kept window"}${decoded.truncated ? "; older matches are not shown" : ""}${decoded.restarted ? "; Home Assistant restarted, reloaded" : ""}.`);
+  }
+  const restartTimer = () => {
+    stop2();
+    if (root.open && q(".log-live").checked) state.timer = timers.set(() => void load(false), intervalMs);
+  };
+  q(".log-refresh").onclick = () => void load(true);
+  q(".log-level").onchange = () => void load(true);
+  q(".log-text").onchange = () => void load(true);
+  q(".log-live").onchange = () => {
+    restartTimer();
+    if (q(".log-live").checked) void load(false);
+  };
+  root.addEventListener("toggle", () => {
+    restartTimer();
+    if (root.open && !state.lines.length) void load(true);
+  });
+  root.destroy = stop2;
+  root.refresh = () => load(true);
+  root.state = state;
+  return root;
+}
+
 // src/generated/version.ts
-var CARD_VERSION = "2.5.112";
+var CARD_VERSION = "2.5.113";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {
@@ -60266,11 +60402,15 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this.shadowRoot.querySelector("#charge-duration").onchange = (e9) => {
       this.shadowRoot.querySelector("#custom-label").hidden = e9.target.value !== "custom";
     };
+    this.logViewer = createLogViewer(() => this._hass);
+    this.logViewer.hidden = this._hass?.user?.is_admin !== true;
+    this.shadowRoot.append(this.logViewer);
     if (this._hass) this.loadChargers();
   }
   disconnectedCallback() {
     this.connected = false;
     this.stopObservations();
+    this.logViewer?.destroy();
   }
   set hass(value2) {
     if (!this.settingsWriteContext && value2) {
@@ -60291,6 +60431,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     const was = this._hass?.connected !== false;
     const wasAdmin = this._hass?.user?.is_admin === true;
     this._hass = value2;
+    if (this.logViewer) this.logViewer.hidden = value2?.user?.is_admin !== true;
     if (!this.connected) return;
     if (value2?.connected === false) {
       if (was) this.stopObservations(true);

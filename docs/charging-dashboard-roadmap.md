@@ -94,7 +94,7 @@ Detailed requirements and acceptance cases follow outside this checklist.
 | 6 | Genuine charging history | Later; not a prerequisite for initial installation |
 | 7 | Extended charts, tracks and price insights | After initial real-data chart; actual track uses Stage 6 |
 | 8 | Yesterday, costs and savings | Later; depends on genuine data |
-| 9 | Recovery and diagnostics | 9.4 logging and 9.5 automatic recovery remain open |
+| 9 | Recovery and diagnostics | 9.4 logging implemented locally (2.5.113, mocked); 9.5 automatic recovery remains open |
 | 10 | Charge Now and partial-price planning | 10.1–10.3 locally complete; deployed behavior unverified |
 | 11 | Adaptive charging estimates for Morek | Later work; reuse existing learning and genuine measurement sources |
 | 12 | Fix real sidebar usability, price presentation and evidence | Prioritize before 5.8; implement bounded 12.1–12.8 separately alongside remaining 5.7b work |
@@ -1258,7 +1258,7 @@ user-directed testing belong to 5.8; this stage is not another prerequisite.
 Substages 9.1–9.3 were removed as open-ended catch-all work; 9.4 retains its
 number to avoid changing existing references. Specific defects can be assigned
 when identified, rather than remaining indefinite roadmap tasks.
-- [ ] **9.4 SpotNav activity and diagnostic logs:** use native Home Assistant Core
+- [x] **9.4 SpotNav activity and diagnostic logs (2.5.113 local, mocked; see "Implemented" below):** use native Home Assistant Core
   logging and add useful SpotNav log messages for investigating planning, price
   availability, SOC/inputs, schedule reconciliation and outcomes, session starts,
   charger availability, Pause/Resume and Charge Now. Include actionable refusal and
@@ -1276,6 +1276,30 @@ when identified, rather than remaining indefinite roadmap tasks.
     reconnect/history behavior with mocks. Avoid excessive repeated messages, and
     document the normal HA Core logs fallback. No live HA access is authorized by
     this roadmap item.
+  - Implemented (2.5.113, local, mocked only; not deployed, not verified in a live HA):
+    - API check from the installed HA 2026.9.2 source: Core's `system_log` offers an admin-only
+      `system_log/list` websocket command (50 deduplicated warning/error entries by default, no text/namespace
+      filter, no history of INFO lines) and an optional `system_log_event` bus event; there is no per-integration
+      log, no subscription stream for ordinary records, and the full file (`/api/error_log`) is an unfiltered admin
+      download. None of these is a SpotNav-filtered view, so they were not used. The viewer reads SpotNav's
+      existing `SpotNavLogBuffer` (a handler on the `custom_components.spotnav` logger tree, already kept for the
+      debug bundle: INFO+ 300, DEBUG 200 only if enabled, WARNING+ 24 h/500 across restarts); no new store.
+    - `spotnav/get_logs` (`api/logs.py`, administrators only, stable `spotnav_not_admin`): severity and text
+      filters, newest-N limit, `after_seq`/`boot_id` incremental polling (a restart is detected and reloaded),
+      records scrubbed with the debug bundle's `Scrubber`. Sidebar panel: a "SpotNav logs" section
+      (`frontend/sidebar/log-viewer.js`) visible to administrators, filters, Refresh and a Live switch that polls
+      every 5 s only while the section is open, keeps what was shown when a poll fails and stops when closed;
+      text is rendered with `textContent`.
+    - New lines (each INFO unless noted, codes only, no ids or payloads): a person's Pause/Resume/Return to Auto
+      and Charge Now recorded as an *intent* or refused with its code; Morek session-start state changes (WARNING
+      for rejected/uncertain), logged once per change and worded as a request outcome, not measured charging.
+      Earlier lines already cover schedule decisions (14.6), planning refusals, readback and Auto/charger events.
+    - Limitations: polling, not streaming; history is only what the buffer holds (lost INFO lines before a
+      restart; older or other-integration records need HA's own log: Settings > System > Logs); the DEBUG filter
+      shows records only if DEBUG is enabled for SpotNav (the viewer never changes a level); price-availability
+      and charger-availability changes are covered by the existing 14.6 decision line (blocker codes), not by
+      separate new lines; the viewer has no browser test. A stored warning from before a restart has no sequence
+      number, so it appears only on a fresh (non-incremental) load.
 - [ ] **9.5 Automatic Morek recovery and visible failures:** make the existing Auto
   schedule and session paths recover from ordinary failures without requiring repeated
   manual Resume or sync. This is a focused reliability task, not a new controller.

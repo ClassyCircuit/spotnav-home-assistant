@@ -385,6 +385,21 @@ export async function getDebugBundle(hass: HomeAssistantLike): Promise<unknown> 
 }
 
 /**
+ * Recent SpotNav log records (administrators only): filtered by severity and text, redacted by the backend.
+ * `after_seq` and `boot_id` make a poll incremental; there is no push stream. `unknown` until decoded.
+ */
+export async function getLogs(
+  hass: HomeAssistantLike,
+  options: { level?: string; text?: string; after_seq?: number; boot_id?: string | null; limit?: number } = {},
+): Promise<unknown> {
+  const message: Record<string, unknown> = { type: "spotnav/get_logs", api_version: 1 };
+  for (const [key, value] of Object.entries(options)) {
+    if (value !== undefined && value !== null && value !== "") message[key] = value;
+  }
+  return await call<unknown>(hass, message);
+}
+
+/**
  * Send the redacted debug bundle, with the administrator's message and optional e-mail address, to SpotNav's
  * developer (administrators only); `client` is the card's own block, as the download adds it. `unknown` until decoded.
  */

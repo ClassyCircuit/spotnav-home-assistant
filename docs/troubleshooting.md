@@ -79,6 +79,17 @@ downloaded in the evening still shows the afternoon. Nothing is read from the re
   balancing decided for this charger). Each log keeps its last 300 entries (commands and load
   balancing 150), and `dropped` counts the older ones it let go. A new plug-in starts a new entry;
   what happens while no car is plugged in goes with the plug-in before.
+- **SpotNav logs in the sidebar** (administrators only): the SpotNav sidebar panel has a "SpotNav logs" section with
+  a severity filter, a text filter and a Live switch. It shows SpotNav's own records, kept in memory by this
+  integration inside Home Assistant Core's logging (the same ones as in the debug bundle). Limits: INFO and above since
+  the last Home Assistant start (last 300), DEBUG only if you enabled DEBUG for `custom_components.spotnav` (last 200),
+  WARNING and above of the last 24 hours also from before a restart (at most 500). Live means the panel asks again
+  every 5 seconds while the section is open; Home Assistant offers no per-integration log stream, so nothing is pushed
+  and an interrupted connection simply keeps what was shown until the next successful poll. SpotNav is an integration,
+  not a separate app, so there is no app log; for older records, other integrations (OCPP, your charger) or the full
+  history use **Settings > System > Logs** (Home Assistant Core log, `home-assistant.log`). Records are scrubbed of
+  secrets, e-mail addresses, user names and the home location; raw OCPP payloads and credentials are never logged.
+  Viewing logs changes no log level and does not enable OCPP/websocket logging.
 - `log.warnings_24h`: SpotNav's warnings and errors of the last 24 hours (at most 500), also from
   before a restart. `log.records` stays as it was: the last records at INFO and above since the start.
 - `client`, added by the card to the file it saves: the card version and bundle hash this browser runs

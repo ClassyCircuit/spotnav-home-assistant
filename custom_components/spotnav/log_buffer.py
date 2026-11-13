@@ -13,8 +13,10 @@ warning that explains a field report is often from before the update's restart t
 
 from __future__ import annotations
 
+import itertools
 import logging
 import threading
+import uuid
 import traceback
 from collections import deque
 from datetime import UTC, datetime, timedelta
@@ -42,6 +44,13 @@ MAX_TRACEBACK_CHARS: Final = 3000
 MAX_MESSAGE_CHARS: Final = 1000
 
 
+#: Severity names the viewer filters by, lowest first.
+LEVELS: Final = {"DEBUG": logging.DEBUG, "INFO": logging.INFO, "WARNING": logging.WARNING, "ERROR": logging.ERROR}
+#: Most records one query returns, and the longest search text it accepts.
+MAX_QUERY_RECORDS: Final = 300
+MAX_QUERY_TEXT: Final = 100
+
+
 class SpotNavLogBuffer(logging.Handler):
     """Keeps the newest SpotNav records in two bounded deques, oldest dropped first."""
 
@@ -52,6 +61,10 @@ class SpotNavLogBuffer(logging.Handler):
         self._warnings: deque[dict[str, Any]] = deque(maxlen=MAX_WARNINGS)
         self._hass: HomeAssistant | None = None
         self._store: DayStore | None = None
+        #: Identifies this process's numbering: a viewer holding an older `boot_id` starts over (a restart).
+        self.boot_id = uuid.uuid4().hex[:12]
+        self._seq = itertools.count(1)
+        self._latest = 0
 
     def emit(self, record: logging.LogRecord) -> None:
         # Never raise out of a logging call: a failure to format is a lost line, not a lost charge.
@@ -59,6 +72,7 @@ class SpotNavLogBuffer(logging.Handler):
             entry = _entry(record)
         except Exception:  # noqa: BLE001
             return
+        entry["seq"] = self._latest = next(self._seq)
         (self._records if record.levelno >= logging.INFO else self._debug).append(entry)
         if record.levelno >= logging.WARNING:
             self._warnings.append(entry)
@@ -108,6 +122,39 @@ class SpotNavLogBuffer(logging.Handler):
     def debug_records(self) -> list[dict[str, Any]]:
         """The DEBUG records, oldest first (empty unless DEBUG is enabled for SpotNav)."""
         return list(self._debug)
+
+    def query(self, *, level: str = "INFO", text: str = "", after_seq: int = 0, limit: int = 200) -> dict[str, Any]:
+        """The kept records for the viewer: at `level` or above, all words of `text` in the message, logger or
+        exception (any case), newer than `after_seq`, the newest `limit` of them, oldest first.
+
+        Reads only this bounded buffer (INFO and above since the start, DEBUG only when enabled, WARNING and
+        above of the last 24 hours also from before a restart); the records before the buffer's reach are gone.
+        `after_seq` is a per-start counter, so a record restored after a restart has none and is only returned
+        for `after_seq` 0.
+        """
+        floor = LEVELS.get(level, logging.INFO)
+        words = [word for word in text.lower().split() if word][:10]
+        merged: dict[int, dict[str, Any]] = {}
+        for entry in (*self._warnings, *self._records, *self._debug):
+            merged[id(entry)] = entry
+        ordered = sorted(
+            merged.values(),
+            key=lambda e: (e.get("seq", 0) > 0, e.get("seq", 0), e.get("time", "")),
+        )
+        found: list[dict[str, Any]] = []
+        for entry in ordered:
+            if LEVELS.get(entry.get("level"), logging.CRITICAL) < floor or (after_seq and entry.get("seq", 0) <= after_seq):
+                continue
+            haystack = f"{entry.get('message', '')} {entry.get('logger', '')} {entry.get('exception', '')}".lower()
+            if all(word in haystack for word in words):
+                found.append(entry)
+        limit = max(1, min(limit, MAX_QUERY_RECORDS))
+        return {
+            "entries": found[-limit:],
+            "matched": len(found),
+            "truncated": len(found) > limit,
+            "latest_seq": self._latest,
+        }
 
     def clear(self) -> None:
         self._records.clear()
