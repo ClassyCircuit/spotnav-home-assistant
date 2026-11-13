@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -125,6 +126,71 @@ async def test_initial_preparing_recovery_is_deduplicated_after_restart(monkeypa
     await restarted.task
     assert point.calls == 1
     assert restarted.state["reason"] == "already_requested"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("outcome", ["accepted", "pending", "unknown"])
+async def test_normal_plugin_record_deduplicates_initial_preparing_after_restart(monkeypatch, outcome):
+    coordinator, point, ledger, _ = setup(monkeypatch)
+    coordinator.observe("Available", "Preparing")
+    await coordinator.task
+    assert point.calls == 1
+    ledger.value["session_start"]["state"] = outcome
+    restarted = morek_session.MorekSessionCoordinator(coordinator.worker)
+    restarted.observe(None, "Preparing")
+    await restarted.task
+    assert point.calls == 1
+    assert restarted.state["state"] == ("uncertain" if outcome != "accepted" else "accepted")
+
+
+@pytest.mark.asyncio
+async def test_old_ha_preparing_is_corroborated_through_production_setup(monkeypatch):
+    import custom_components.spotnav as integration
+    from custom_components.spotnav.vehicles import ocpp_identity
+
+    coordinator, point, _, _ = setup(monkeypatch)
+    point._metrics = {(1, "Status.Connector"): SimpleNamespace(value="Preparing")}
+    state = SimpleNamespace(state="Preparing", attributes={}, last_updated=datetime.now(timezone.utc) - timedelta(days=1))
+    coordinator.hass.states = SimpleNamespace(get=lambda _: state)
+    callbacks = []
+    entry = SimpleNamespace(async_on_unload=lambda _: None)
+    monkeypatch.setattr(ocpp_identity, "connector_sensor_entity_id", lambda *_: "sensor.connector")
+    monkeypatch.setattr(integration, "async_track_state_change_event", lambda _h, _ids, cb: callbacks.append(cb) or (lambda: None))
+    target = SimpleNamespace(connector_id=1)
+    integration._setup_morek_session_observation(coordinator.hass, entry, coordinator, target)
+    await coordinator.task
+    assert point.calls == 1
+    assert len(callbacks) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("case", ["restored", "offline", "unsupported", "metric_missing", "different_status"])
+async def test_old_status_setup_refuses_unreliable_corroboration(monkeypatch, case):
+    import custom_components.spotnav as integration
+    from custom_components.spotnav.vehicles import ocpp_identity
+
+    coordinator, point, _, _ = setup(monkeypatch)
+    point._metrics = {(1, "Status.Connector"): SimpleNamespace(value="Preparing")}
+    state = SimpleNamespace(state="Preparing", attributes={"restored": case == "restored"},
+                            last_updated=datetime.now(timezone.utc) - timedelta(days=1))
+    coordinator.hass.states = SimpleNamespace(get=lambda _: state)
+    entry = SimpleNamespace(async_on_unload=lambda _: None)
+    monkeypatch.setattr(ocpp_identity, "connector_sensor_entity_id", lambda *_: "sensor.connector")
+    monkeypatch.setattr(integration, "async_track_state_change_event", lambda *_: lambda: None)
+    if case == "offline":
+        def offline(*_):
+            raise morek_schedule.ScheduleRefused("morek_offline")
+        monkeypatch.setattr(morek_schedule, "_charge_point", offline)
+    elif case == "unsupported":
+        coordinator.worker._identity = lambda: {**IDENTITY, "ocpp_version": "2.0.1"}
+    elif case == "metric_missing":
+        point._metrics.clear()
+    elif case == "different_status":
+        point._metrics[(1, "Status.Connector")].value = "Available"
+    integration._setup_morek_session_observation(coordinator.hass, entry, coordinator, SimpleNamespace(connector_id=1))
+    assert coordinator.task is None
+    assert point.calls == 0
+    assert coordinator.state["state"] == "waiting"
 
 
 @pytest.mark.asyncio
@@ -261,6 +327,8 @@ async def test_initial_event_through_real_admission(monkeypatch):
 @pytest.mark.asyncio
 async def test_actual_resume_action_notifies_coordinator(monkeypatch):
     coordinator, point, ledger, admission = setup(monkeypatch)
+    ledger.value["session_start"] = {"version": 1, "connection": "old-plug", "state": "accepted",
+                                     "at": datetime.now(timezone.utc).isoformat(), "attempts": 1}
     ledger.value["schedule_pause"] = {"version": 1, "type": "pause_until_resumed", "id": "old",
                                       "station_id": morek_schedule.MOREK_STATION_ID, "connector_id": 1}
     coordinator.observation = "preparing"
@@ -371,6 +439,82 @@ async def test_completion_event_is_not_lost_to_immediate_preparing(monkeypatch):
     await coordinator.task
     assert point.calls == 0
     assert ledger.value["session_completed"] is True
+
+
+@pytest.mark.asyncio
+async def test_unplug_after_completion_survives_restart_and_allows_new_car(monkeypatch):
+    coordinator, point, ledger, _ = setup(monkeypatch)
+    coordinator.observe("Charging", "Finishing")
+    coordinator.observe("Finishing", "Available")
+    await coordinator.task
+    assert ledger.value.get("session_completed") is None
+    assert ledger.value.get("session_unplugged")
+    restarted = morek_session.MorekSessionCoordinator(coordinator.worker)
+    restarted.observe(None, "Preparing")
+    await restarted.task
+    assert point.calls == 1
+    assert ledger.value["session_start"]["connection"].startswith("unplug:")
+    again = morek_session.MorekSessionCoordinator(coordinator.worker)
+    again.observe(None, "Preparing")
+    await again.task
+    assert point.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_rapid_completion_unplug_replug_keeps_unknown_attempt(monkeypatch):
+    coordinator, point, ledger, _ = setup(monkeypatch)
+    ledger.value["session_start"] = {"version": 1, "connection": "old", "state": "unknown",
+                                     "at": datetime.now(timezone.utc).isoformat(), "attempts": 1}
+    original = ledger.write
+    entered, release = asyncio.Event(), asyncio.Event()
+    async def delayed_write(value):
+        if not entered.is_set():
+            entered.set()
+            await release.wait()
+        await original(value)
+    monkeypatch.setattr(ledger, "write", delayed_write)
+    coordinator.observe("Charging", "Finishing")
+    await entered.wait()
+    coordinator.observe("Finishing", "Available")
+    coordinator.observe("Available", "Preparing")
+    release.set()
+    await coordinator.task
+    assert point.calls == 0
+    assert ledger.value["session_start"]["state"] == "unknown"
+    assert ledger.value.get("session_completed") is None
+    assert ledger.value.get("session_unplugged")
+    assert coordinator.state["state"] == "uncertain"
+
+
+@pytest.mark.asyncio
+async def test_unplug_queue_survives_stop_reservation_during_persistence(monkeypatch):
+    coordinator, point, ledger, admission = setup(monkeypatch)
+    ledger.value["session_start"] = {"version": 1, "connection": "old", "state": "unknown",
+                                     "at": datetime.now(timezone.utc).isoformat(), "attempts": 1}
+    original = ledger.write
+    entered, release = asyncio.Event(), asyncio.Event()
+    async def delayed_write(value):
+        if not entered.is_set():
+            entered.set()
+            await release.wait()
+        await original(value)
+    monkeypatch.setattr(ledger, "write", delayed_write)
+    coordinator.observe("Charging", "Finishing")
+    await entered.wait()
+    coordinator.observe("Finishing", "Available")
+    coordinator.observe("Available", "Preparing")
+    admission._person_stops[physical_connector(IDENTITY)] = 1
+    release.set()
+    await coordinator.task
+    assert point.calls == 0
+    assert ledger.value["session_start"]["state"] == "unknown"
+    admission._person_stops.clear()
+    coordinator.trigger()
+    await coordinator.task
+    assert ledger.value.get("session_completed") is None
+    assert ledger.value.get("session_unplugged")
+    assert ledger.value["session_start"]["state"] == "unknown"
+    assert point.calls == 0
 
 
 @pytest.mark.asyncio

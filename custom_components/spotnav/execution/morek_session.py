@@ -89,7 +89,7 @@ class MorekSessionCoordinator:
         self.closed = False
         self.retry = None
         self.completed = False
-        self.completion_pending = False
+        self.vehicle_events = []
         self.boot_generation = None
         self.offline_observed = False
         self.state = {"state": "waiting", "reason": "waiting_for_vehicle"}
@@ -105,13 +105,16 @@ class MorekSessionCoordinator:
             self.completed = False
             self.offline_observed = False
             self.state = {"state": "waiting", "reason": "waiting_for_vehicle"}
+            if old in ("preparing", "charging", "suspendedev", "suspendedevse", "finishing"):
+                self.vehicle_events.append(("unplugged", uuid4().hex))
+                self.trigger()
         elif new in ("charging", "suspendedev", "suspendedevse"):
             self.offline_observed = False
             self.state = {"state": "session_observed", "reason": "charger_reports_active"}
         elif new in ("finishing", "faulted", "unavailable", "unknown"):
             if new == "finishing":
                 self.completed = True
-                self.completion_pending = True
+                self.vehicle_events.append(("completed", None))
                 self.trigger()
             self.state = {"state": "blocked", "reason": "connector_" + new}
         elif new == "preparing" and old == "available":
@@ -183,6 +186,36 @@ class MorekSessionCoordinator:
         except Exception:  # noqa: BLE001 - unsupported or offline is not boot evidence
             return None
 
+    def observe_initial(self, state, now):
+        """Use a fresh HA state, or a corroborating in-process OCPP Preparing value.
+
+        OCPP 0.12's connector metric has no report timestamp; it is last-known,
+        not proof of a live vehicle or transaction. The user permits one bounded
+        ambiguous Preparing recovery, never an active-session assertion.
+        """
+        if state is None or getattr(state, "attributes", {}).get("restored", False):
+            return
+        stamp = getattr(state, "last_reported", None) or getattr(state, "last_updated", None)
+        if (isinstance(stamp, datetime) and stamp.tzinfo is not None
+                and 0 <= (now - stamp).total_seconds() <= 180):
+            self.observe(None, state.state)
+            return
+        if str(state.state).lower() != "preparing":
+            return
+        try:
+            identity = self.worker._identity()
+            if classify_morek_identity(identity) != "supported_morek":
+                return
+            target = controller_for(self.hass, self.entry_id).ocpp_target
+            point = morek_schedule._charge_point(self.hass, target)
+            if type(point).__module__ != "custom_components.ocpp.ocppv16":
+                return
+            metric = getattr(point, "_metrics", {}).get((target.connector_id, "Status.Connector"))
+            if str(getattr(metric, "value", "")).lower() == "preparing":
+                self.observe(None, "Preparing")
+        except Exception:  # noqa: BLE001 - an unavailable metric is not an observation
+            return
+
     def trigger(self):
         self.dirty = True
         if not self.closed and (self.task is None or self.task.done()):
@@ -201,7 +234,7 @@ class MorekSessionCoordinator:
             await self._reconcile()
 
     async def _reconcile(self):
-        if self.observation not in ("preparing", "finishing") and not self.completion_pending:
+        if self.observation not in ("preparing", "finishing") and not self.vehicle_events:
             return
         worker = self.worker
         identity = worker._identity()
@@ -214,18 +247,31 @@ class MorekSessionCoordinator:
         connection = self.connection
 
         async def run():
+            nonlocal connection
             data, _ = await morek_schedule._state(self.hass, self.entry_id)
             async with self.hass.data[morek_schedule._DATA_KEY][self.entry_id][2]:
                 ledger = morek_schedule.outcomes_for(self.hass)
                 record = await morek_schedule._outcome_record(self.hass, self.entry_id, data)
-                if self.completion_pending:
-                    if record.get("session_completed") is not True:
+                if self.vehicle_events:
+                    event, marker = self.vehicle_events[0]
+                    if event == "completed":
                         record["session_completed"] = True
-                        await ledger.write(record)
-                    self.completion_pending = False
-                    if self.observation == "preparing":
+                        record.pop("session_unplugged", None)
+                    else:
+                        record.pop("session_completed", None)
+                        record["session_unplugged"] = marker
+                    await ledger.write(record)
+                    self.vehicle_events.pop(0)
+                    if self.vehicle_events or self.observation == "preparing":
                         self.dirty = True
-                    return "blocked", "car_completion_reported"
+                    return "waiting", "vehicle_event_recorded"
+
+                unplugged = record.get("session_unplugged")
+                if unplugged is not None and (not isinstance(unplugged, str) or len(unplugged) != 32
+                                              or any(c not in "0123456789abcdef" for c in unplugged)):
+                    return "uncertain", "session_record_invalid"
+                if connection == "recovery" and unplugged and self.connection == connection:
+                    connection = self.connection = "unplug:" + unplugged
 
                 def validate():
                     if (self.closed or worker._closed or worker._suspended or not worker._available()
@@ -268,8 +314,7 @@ class MorekSessionCoordinator:
                         return "uncertain", "session_record_invalid"
                     if prior.get("state") in ("unknown", "pending"):
                         return "uncertain", "previous_start_may_have_applied"
-                    if (connection == "recovery" and prior.get("connection", "").startswith(
-                            ("resume:", "offline:", "boot:"))):
+                    if connection == "recovery" and prior.get("connection") != "recovery":
                         return prior.get("state", "blocked"), "already_requested"
                     if prior.get("connection") == connection:
                         attempts = prior.get("attempts", 1)
@@ -291,6 +336,7 @@ class MorekSessionCoordinator:
                 attempt = {"version": 1, "connection": connection, "state": "pending",
                            "at": datetime.now(timezone.utc).isoformat(), "attempts": attempts + 1}
                 record.pop("session_completed", None)
+                record.pop("session_unplugged", None)
                 record["session_start"] = attempt
                 await ledger.write(record)
                 if not await admission.async_owned_boundary_current(self.entry_id, connector):

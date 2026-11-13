@@ -6,13 +6,13 @@ Re-check the live system and Git state before acting; observations below may bec
 
 ## Approved next direction (planning, not implemented)
 
-**5.7b continuation:** 2.5.67 withdraws stale dashboard data after failed refresh,
-but charging/power binding and full local acceptance remain open. Roadmap 5.7b1–b3
-track the installed 2.5.66 `wa-icon` blank-sidebar collision (preserve the in-progress
-fix), truthful live monitoring, and the failing Pause browser assertion/worker-test
-timezone setup plus end-to-end checks. The HA-plugin suite could not start on Windows
-because `fcntl` is unavailable; it remains unrun. These are local development tasks,
-not permission to deploy or operate the user's charger.
+**5.7b continuation:** The user reports the sidebar is no longer blank; 5.7b1 is
+complete, with the local collision fix and browser checks recorded below. The exact
+deployed version and cause of the improvement were not independently checked. 2.5.67
+withdraws stale dashboard data after failed refresh, but charging/power binding and
+full local acceptance remain open in 5.7b2–b3. The HA-plugin suite could not start on
+Windows because `fcntl` is unavailable; it remains unrun. These are local development
+tasks, not permission to deploy or operate the user's charger.
 
 **Automatic restart recovery requested:** the user does not want to press a
 reconfirmation button after ordinary HA restarts. The current process-ticket design
@@ -354,6 +354,27 @@ requirements, not features claimed implemented in the manual baseline below.
   Do not assume `GetCompositeSchedule` lists stored profiles.
 
 ## Tests, build, and next steps
+
+### 2026-11-13 — session review corrections (2.5.90; local mocked)
+
+- A previously accepted random plug-in generation now blocks an initial Preparing
+  recovery after HA restart, just like prior recovery/Resume generations. Pending
+  and unknown records still block across unplug, reconnect and Resume. A genuinely
+  observed unplug creates a durable, connector-owned marker; Finishing and unplug
+  writes are ordered so rapid state changes do not resurrect an obsolete completion
+  hold or discard a prior uncertain attempt. A new connection consumes the marker
+  only when its start intent is durably recorded.
+- An old, non-restored HA Preparing state can be corroborated by the uniquely
+  resolved online OCPP 1.6 point's connector-scoped in-process Preparing metric.
+  The tagged OCPP source exposes no timestamp for this metric, so it is last-known,
+  not evidence of a fresh physical report or authorized transaction. The user
+  accepted one bounded ambiguous request. Absent/conflicting metrics, restored HA
+  state, an unsupported point or offline OCPP do not use this fallback. Events not
+  durably recorded before a crash cannot be reconstructed; unobservable reboots and
+  the 2.5.89 logging-level/interface blockers remain. No live charger was contacted.
+- Focused actual-module lifecycle/session/readiness tests: 289 passed; four targeted
+  worker reconnect regressions and Ruff passed. Build and check-dist were run. These
+  mocks do not prove live session authorization, charging or installed compatibility.
 
 ### 2026-11-13 — observed reconnect recovery (2.5.89; local mocked)
 

@@ -712,6 +712,19 @@ tests are documented there; full HA collection is still blocked on Windows.
     infer that a stored schedule authorizes charging. Test unknown/offline/refused
     cases with mocked boundaries; surface installation-specific decisions for the user.
 - [x] **5.6d Automatic Morek session authorization and recovery** (2.5.89 local mocked; review and live validation pending)
+  - **2.5.90 review fixes, local mocked:** an accepted normal plug-in record now
+    deduplicates initial Preparing after HA restart, including existing records;
+    pending/unknown remains blocked. Finishing and observed unplug are durably
+    recorded in event order, and an unconsumed unplug enables a later new connection
+    without deleting an uncertain outcome. For an old non-restored HA Preparing
+    state, setup can use the matching resolved online OCPP 1.6 connector's in-process
+    last-known Preparing metric for bounded ambiguous recovery. That metric has no
+    report timestamp and is not proof of a live vehicle or active transaction;
+    missing, conflicting, offline, restored or unsupported evidence is not promoted.
+    This remains dependent on the OCPP version's internal metric shape and is not
+    proof of physical charging. Completion/unplug event persistence interrupted by
+    a crash before its write cannot be reconstructed. Focused actual-module mocked
+    checks, Ruff, build and check-dist passed; live validation remains user-directed.
   - The user accepts a possible immediate start if the retained schedule is absent
     or ineffective, and one bounded request for ambiguous Preparing. The earlier
     pre-start composite-confirmation requirement below is superseded by this decision;
@@ -1082,7 +1095,10 @@ tests are documented there; full HA collection is still blocked on Windows.
   **Focused continuations:** preserve all in-progress work and assign these in order;
   5.7b is complete only when their applicable local checks and review are complete.
 
-- [ ] **5.7b1 Sidebar custom-element collision**
+- [x] **5.7b1 Sidebar custom-element collision**
+  - The user reports the sidebar is no longer blank. The local 2.5.68 fix and
+    registry/coexistence browser checks are recorded in the handoff; the exact
+    deployed version and cause of the improvement were not independently checked.
   - The user observed installed 2.5.66's sidebar blank with a duplicate `wa-icon`
     registration exception; the sampled HA Core log also contained the error. Top-level
     Web Awesome registration guards do not necessarily cover transitive dependencies.

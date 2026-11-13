@@ -805,6 +805,22 @@ def _async_schedule_history_import(
     entry.async_on_unload(importer.schedule_daily())
 
 
+def _setup_morek_session_observation(hass, entry, session, target):
+    """Wire connector events and seed the coordinator without issuing a command."""
+    from .vehicles.ocpp_identity import STATUS_CONNECTOR_KEY, connector_sensor_entity_id
+
+    if target is None:
+        return
+    sensor = connector_sensor_entity_id(hass, target, STATUS_CONNECTOR_KEY)
+
+    def session_status_changed(event):
+        old, new = event.data.get("old_state"), event.data.get("new_state")
+        session.observe(getattr(old, "state", None), getattr(new, "state", None))
+
+    entry.async_on_unload(async_track_state_change_event(hass, [sensor], session_status_changed))
+    session.observe_initial(hass.states.get(sensor), datetime.now(timezone.utc))
+
+
 async def _async_setup_auto_preview(
     hass: HomeAssistant,
     entry: ChargerConfigEntry,
@@ -890,25 +906,12 @@ async def _async_setup_auto_preview(
 
     worker = data.morek_worker = MorekScheduleWorker(hass, entry_id, preview, charger_available)
     from .execution.morek_session import MorekSessionCoordinator
-    from .vehicles.ocpp_identity import STATUS_CONNECTOR_KEY, connector_sensor_entity_id
 
     session = worker.session = MorekSessionCoordinator(worker)
     target = getattr(data.controller, "ocpp_target", None)
-    if target is not None:
-        sensor = connector_sensor_entity_id(hass, target, STATUS_CONNECTOR_KEY)
-        def session_status_changed(event):
-            old, new = event.data.get("old_state"), event.data.get("new_state")
-            session.observe(getattr(old, "state", None), getattr(new, "state", None))
-        entry.async_on_unload(async_track_state_change_event(hass, [sensor], session_status_changed))
+    _setup_morek_session_observation(hass, entry, session, target)
     entry.async_on_unload(session.close)
     worker.start()
-    if target is not None:
-        current_status = hass.states.get(sensor)
-        if current_status is not None and not current_status.attributes.get("restored", False):
-            stamp = getattr(current_status, "last_reported", None) or getattr(current_status, "last_updated", None)
-            now = datetime.now(timezone.utc)
-            if stamp is not None and stamp.tzinfo is not None and 0 <= (now - stamp).total_seconds() <= 180:
-                session.observe(None, current_status.state)
     entry.async_on_unload(worker.close)
 
     def _soc_moved() -> None:

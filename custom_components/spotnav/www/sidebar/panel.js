@@ -60085,7 +60085,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.89";
+var CARD_VERSION = "2.5.90";
 
 // sidebar/panel.js
 var fresh = (timestamp, failed = false) => observationFreshness(timestamp, Date.now(), failed) === "fresh";
