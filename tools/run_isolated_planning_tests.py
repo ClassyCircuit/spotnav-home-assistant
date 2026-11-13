@@ -49,6 +49,8 @@ tests = [
     "tests/test_planner_minimum_energy.py",
     "tests/test_planner_current_interval.py",
     "tests/test_stage_141_current_interval.py",
+    "tests/test_stage_142_active_continuity.py",
+    "tests/test_stage_143_recalculation_triggers.py",
     "tests/test_price_policy_settings.py",
 ]
 os.chdir(ROOT)

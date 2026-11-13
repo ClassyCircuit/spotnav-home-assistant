@@ -917,7 +917,7 @@ async def _async_setup_auto_preview(
     def _soc_moved() -> None:
         # New session or real progress: plan again from the current state of charge.
         if settings_store.settings(entry_id).driver == DRIVER_TARGET_SOC:
-            entry.async_create_task(hass, preview.async_recalculate(), f"{entry_id} recalculate")
+            entry.async_create_task(hass, preview.async_recalculate("soc"), f"{entry_id} recalculate")
 
     data.soc_reader.set_on_reading(_soc_moved)
     entry.async_on_unload(lambda: data.soc_reader.set_on_reading(None))

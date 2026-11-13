@@ -856,6 +856,7 @@ class AutoPlannerController:
 
         self._listeners: list[Callable[[AutoSnapshot], None]] = []
         self._publication_listeners: list[Callable[[AutoSnapshot], None]] = []
+        self.publication_cause: str | None = None
         self._unsubscribe: Callable[[], None] | None = None
         self._subscribed_area: str | None = None
         # The price source (`pricing/price_source.py`) the subscription and observation were last matched to, as
@@ -1331,15 +1332,24 @@ class AutoPlannerController:
         await self._reconcile(self._store.settings(self._entry_id))
         return self.snapshot()
 
-    async def async_recalculate(self) -> AutoSnapshot:
+    async def async_recalculate(self, cause: str | None = None) -> AutoSnapshot:
         """Recalculate from the settings and prices on hand.
+
+        `cause` names why, for publication listeners (`publication_cause`, valid only while they are
+        called; delivery is synchronous). Callers that do not know pass nothing: listeners must treat
+        an absent cause as unknown, never as routine.
 
         A shut-down preview returns its final snapshot instead of a proposal nobody can act on.
         """
         if self._shutdown:
             return self.snapshot()
         settings = self._store.settings(self._entry_id)
-        self._publish(await self._calculate(settings))
+        snapshot = await self._calculate(settings)
+        self.publication_cause = cause
+        try:
+            self._publish(snapshot)
+        finally:
+            self.publication_cause = None
         return self.snapshot()
 
     async def async_note_execution_change(self) -> AutoSnapshot:

@@ -100,6 +100,7 @@ class MorekSessionCoordinator:
         if self.boot_generation is None:
             self.boot_generation = self._charger_boot_generation()
         self.observation = new
+        self._note_schedule_evidence(old, new)
         if new == "available":
             self.connection = None
             self.completed = False
@@ -133,6 +134,23 @@ class MorekSessionCoordinator:
                 self.connection = "recovery"
                 self.state = {"state": "waiting", "reason": "ambiguous_recovery"}
                 self.trigger()
+
+    def _note_schedule_evidence(self, old, new):
+        """Plug-in, and the connector sensor going missing or returning, re-evaluate the schedule.
+
+        A plug-in is only Available to connected. A return from unknown/unavailable is ambiguous (the
+        vehicle may have been there all along), so it is a sensor event, never a plug-in.
+        This never sends by itself: the worker recalculates and compares with the accepted schedule.
+        """
+        lost = ("unknown", "unavailable")
+        if old == "available" and new in ("preparing", "charging", "suspendedev", "suspendedevse"):
+            note = getattr(self.worker, "note_plug_in", None)
+            if callable(note):
+                note()
+        elif old and (old in lost) != (new in lost):
+            note = getattr(self.worker, "note_sensor", None)
+            if callable(note):
+                note()
 
     def resume(self, intent_id):
         """An explicit person Resume may authorize one new ambiguous request."""

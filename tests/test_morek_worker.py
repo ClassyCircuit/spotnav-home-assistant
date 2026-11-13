@@ -55,6 +55,8 @@ class Planner:
     def __init__(self, snapshot):
         self.current = snapshot
         self.listeners = []
+        self.publication_cause = None
+        self.async_recalculate = AsyncMock()
 
     def snapshot(self):
         return self.current
@@ -70,9 +72,13 @@ class Planner:
         listener(self.current)
         return lambda: self.listeners.remove(listener)
 
-    def publish(self):
-        for listener in list(self.listeners):
-            listener(self.current)
+    def publish(self, cause=None):
+        self.publication_cause = cause
+        try:
+            for listener in list(self.listeners):
+                listener(self.current)
+        finally:
+            self.publication_cause = None
 
 
 def setup(monkeypatch, *, active=False, admission=None):
@@ -824,7 +830,12 @@ async def test_coalesce_deduplicate_and_changed_active_intent(monkeypatch):
     await drain(w.worker)
     assert w.point.call.await_count == 1 and w.worker.reason == "unchanged"
     start, end = w.planner.current.proposal.shown_periods[0]
+    # A routine shortening is preserved through the acknowledged end (Stage 14.2); a later end is a real change.
     w.planner.current.proposal.shown_periods = ((start, end - timedelta(minutes=1)),)
+    w.planner.publish()
+    await drain(w.worker)
+    assert w.point.call.await_count == 1 and w.worker.reason == "unchanged"
+    w.planner.current.proposal.shown_periods = ((start, end + timedelta(minutes=10)),)
     w.planner.publish()
     await drain(w.worker)
     assert w.point.call.await_count == 2

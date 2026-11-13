@@ -153,6 +153,170 @@ def held_off_profile(now: datetime) -> dict[str, Any]:
                                      {"startPeriod": 0, "limit": 0, "numberPhases": 3}]}}
 
 
+def acknowledged_profile(record: dict[str, Any] | None, revision: Any = None) -> dict[str, Any] | None:
+    """The last reliably accepted routine (no pause or Charge Now) profile, if still settled.
+
+    `acknowledged` is only replaced by a later accepted write, so a settings revision or a
+    definitely rejected newer attempt does not hide it; an uncertain write, or an accepted
+    pause or Charge Now (which replaces `acknowledged`), means no continuation. `revision`
+    is accepted for compatibility and deliberately ignored: until Stage 14.4 implements
+    material-edit interruption, planning edits conservatively keep the active window. This
+    is a sent intent, never proof of charging.
+    """
+    if not isinstance(record, dict) or record.get("uncertain") is not False:
+        return None
+    ack, attempt = record.get("acknowledged"), record.get("attempt")
+    if not isinstance(ack, dict) or not ack.get("id") or not ack.get("fingerprint"):
+        return None
+    if "profile" in ack:  # durable evidence written at acceptance
+        if ack.get("routine") is not True:
+            return None
+        profile = ack.get("profile")
+    elif (isinstance(attempt, dict) and attempt.get("state") == "accepted"  # pre-2.5.103 record
+            and attempt.get("id") == ack.get("id") and attempt.get("fingerprint") == ack.get("fingerprint")
+            and attempt.get("pause_id") is None and attempt.get("override_id") is None):
+        profile = attempt.get("profile")
+    else:
+        return None
+    return profile if isinstance(profile, dict) else None
+
+
+def active_window(profile: dict[str, Any] | None, now: datetime) -> tuple[datetime, int | float] | None:
+    """End and limit of the window a fixed-time profile allows at `now`; None if idle or open-ended."""
+    try:
+        schedule = profile["chargingSchedule"]
+        start = _utc(datetime.fromisoformat(schedule["startSchedule"].replace("Z", "+00:00")))
+        changes = sorted((start + timedelta(seconds=p["startPeriod"]), p["limit"])
+                         for p in schedule["chargingSchedulePeriod"])
+        now = _utc(now)
+        current = [limit for at, limit in changes if at <= now]
+        if not current or not current[-1] or current[-1] <= 0:
+            return None
+        end = next((at for at, limit in changes if at > now and limit == 0), None)
+        return None if end is None else (end, current[-1])
+    except (KeyError, TypeError, ValueError, AttributeError, ScheduleRefused):
+        return None
+
+
+def continue_active_window(periods: tuple[tuple[datetime, datetime], ...], amps: int, now: datetime,
+                           active_profile: dict[str, Any] | None) -> tuple[tuple[tuple[datetime, datetime], ...], datetime | None]:
+    """Union the acknowledged, currently allowed window with a replanned schedule.
+
+    Returns the windows and the preserved end (None when no continuation applies). The
+    window is kept from now to its existing end whatever the new plan says; every later
+    planned window is retained and overlapping or adjacent ones are merged.
+    """
+    active = active_window(active_profile, now)
+    if active is None or active[1] != amps:
+        return periods, None
+    now = _utc(now)
+    end = active[0]
+    windows = sorted([(now, end)] + [(_utc(s), _utc(e)) for s, e in periods if _utc(e) > now])
+    merged = [windows[0]]
+    for start, stop in windows[1:]:
+        if start <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], stop))
+        else:
+            merged.append((start, stop))
+    return tuple(merged), end
+
+
+def connector_evidence(hass: Any, controller: Any, now: datetime) -> str:
+    """`charging`, `waiting` (plugged in, not charging), `unplugged` or `unknown`.
+
+    Only a fresh connector status counts. A reported status is not measured power, and a
+    missing, stale, unmapped or faulted observation is unknown, never assumed idle.
+    """
+    try:
+        from ..execution.charger_connection import normalise_ocpp
+        from ..vehicles.ocpp_identity import STATUS_CONNECTOR_KEY, connector_sensor_entity_id
+
+        source = connector_sensor_entity_id(hass, controller.ocpp_target, STATUS_CONNECTOR_KEY)
+        observation = hass.states.get(source)
+        if observation is None or str(observation.state).lower() in ("unknown", "unavailable"):
+            return "unknown"
+        timestamp = getattr(observation, "last_reported", None) or getattr(observation, "last_updated", None)
+        if not isinstance(timestamp, datetime) or timestamp.tzinfo is None:
+            return "unknown"
+        age = (_utc(now) - timestamp).total_seconds()
+        if age < 0 or age > 180:
+            return "unknown"
+        state = normalise_ocpp(str(observation.state))
+    except Exception:  # noqa: BLE001 - unavailable evidence is unknown
+        return "unknown"
+    if state == "disconnected":
+        return "unplugged"
+    if state == "charging":
+        return "charging"
+    if state in ("connected", "paused", "finished"):
+        return "waiting"
+    return "unknown"
+
+
+def _effective_schedule(profile: dict[str, Any], now: datetime) -> tuple[Any, ...]:
+    """What a fixed-time profile still says from `now`: attributes, current permission, future changes.
+
+    Absolute instants only (the moving `startSchedule`, elapsed transitions and repeated
+    equal limits are not part of it), so equivalent representations compare equal.
+    """
+    schedule = profile["chargingSchedule"]
+    start = _utc(datetime.fromisoformat(schedule["startSchedule"].replace("Z", "+00:00")))
+    now = _utc(now)
+    changes = sorted(((start + timedelta(seconds=p["startPeriod"]),
+                       {k: v for k, v in p.items() if k != "startPeriod"})
+                      for p in schedule["chargingSchedulePeriod"]), key=lambda c: c[0])
+    state = None
+    future: list[tuple[datetime, dict[str, Any]]] = []
+    for at, rest in changes:
+        if at <= now:
+            state = rest
+        elif rest != (future[-1][1] if future else state):
+            future.append((at, rest))
+    if state is None:
+        raise ValueError("no current period")
+    attributes = ({k: v for k, v in profile.items() if k != "chargingSchedule"},
+                  {k: v for k, v in schedule.items() if k not in ("startSchedule", "chargingSchedulePeriod")})
+    return attributes, state, future
+
+
+def same_effective_schedule(accepted: dict[str, Any] | None, candidate: dict[str, Any],
+                            tolerance: timedelta | None = None) -> bool:
+    """Whether `candidate` would leave the same effective future schedule as `accepted`.
+
+    With `tolerance`, only a switch-off (0 A) instant may differ, and by less than it; every
+    other future transition and the current permission must match exactly. Anything that
+    cannot be parsed is different, so a doubtful comparison never suppresses a send. "From
+    now" is the candidate's own start instant, which is when it was calculated.
+    """
+    if not isinstance(accepted, dict):
+        return False
+    try:
+        now = datetime.fromisoformat(candidate["chargingSchedule"]["startSchedule"].replace("Z", "+00:00"))
+        old_attrs, old_state, old_future = _effective_schedule(accepted, now)
+        new_attrs, new_state, new_future = _effective_schedule(candidate, now)
+    except (KeyError, TypeError, ValueError, AttributeError, OverflowError, ScheduleRefused):
+        return False
+    if old_attrs != new_attrs or old_state != new_state or len(old_future) != len(new_future):
+        return False
+    for (old_at, old_rest), (new_at, new_rest) in zip(old_future, new_future):
+        if old_rest != new_rest:
+            return False
+        if old_at != new_at and not (tolerance is not None and old_rest.get("limit") == 0
+                                     and abs(new_at - old_at) < tolerance):
+            return False
+    return True
+
+
+def acknowledged_revision(record: dict[str, Any] | None) -> Any:
+    """The settings revision the accepted profile was planned under, or None if unknown."""
+    if not isinstance(record, dict):
+        return None
+    ack, attempt = record.get("acknowledged") or {}, record.get("attempt") or {}
+    if "revision" in ack:
+        return ack["revision"]
+    return attempt.get("revision") if attempt.get("id") and attempt.get("id") == ack.get("id") else None
+
+
 def _schedule(response: Any) -> dict[str, Any] | None:
     schedule = getattr(response, "charging_schedule", None)
     return schedule if isinstance(schedule, dict) else None
@@ -644,7 +808,8 @@ async def _state(hass: HomeAssistant, entry_id: str) -> tuple[dict[str, Any], St
     return data, store
 
 
-def _proposed_profile(hass: HomeAssistant, entry_id: str, now: datetime) -> dict[str, Any]:
+def _proposed_profile(hass: HomeAssistant, entry_id: str, now: datetime, *,
+                      active_profile: dict[str, Any] | None = None) -> dict[str, Any]:
     """Current fixed-time intent for preview, manual Send and future backend callers.
 
     Refusal means no proposed action, never permission to clear or release a limit.
@@ -671,7 +836,13 @@ def _proposed_profile(hass: HomeAssistant, entry_id: str, now: datetime) -> dict
         raise ScheduleRefused("no_current_plan")
     # The stored profile is a fixed-time snapshot of exactly what the card shows,
     # including the estimated shorter final block. It does not implement feedback-based energy stopping.
-    return profile_for(tuple(proposal.shown_periods), settings.amps, now, allow_active=True)
+    periods = tuple(proposal.shown_periods)
+    if active_profile is not None:
+        periods, preserved = continue_active_window(periods, settings.amps, now, active_profile)
+        if preserved is not None and len(periods) > MOREK_MAX_BLOCKS:
+            # The old window is not dropped to fit the new plan; leave the accepted schedule alone.
+            raise ScheduleRefused("active_window_block_limit")
+    return profile_for(periods, settings.amps, now, allow_active=True)
 
 
 def _preview_id(profile: dict[str, Any], revision: Any) -> str:
@@ -966,7 +1137,13 @@ def _verification_current(hass: HomeAssistant, entry_id: str, entry: Any, data: 
                     and (pause is None or pause.get("type") != "pause_until_resumed")):
                 return False
             fingerprint_revision = [settings.revision, pause_id] if pause_id is not None else settings.revision
-            current = held_off_profile(now) if pause_id is not None and pause.get("type") == "pause_until_resumed" else _proposed_profile(hass, entry_id, now)
+            if pause_id is not None and pause.get("type") == "pause_until_resumed":
+                current = held_off_profile(now)
+            elif attempt.get("source") == "worker":
+                # The worker may have continued an allowed window (Stage 14.2).
+                current = _proposed_profile(hass, entry_id, now, active_profile=sent)
+            else:
+                current = _proposed_profile(hass, entry_id, now)
         if _preview_id(sent, fingerprint_revision) != fingerprint or sent != data.get("profile"):
             return False
         if ({k: v for k, v in sent.items() if k != "chargingSchedule"}
@@ -996,7 +1173,8 @@ def _verification_current(hass: HomeAssistant, entry_id: str, entry: Any, data: 
 async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[str, Any], store: Any,
                                fingerprint: str, validate: Any, *, automatic: bool, pause_id: str | None = None,
                                validate_durable: Any = None, migration_id: str | None = None,
-                               override_id: str | None = None, force_sync: bool = False) -> str:
+                               override_id: str | None = None, force_sync: bool = False,
+                               end_tolerance: timedelta | None = None) -> str:
     """Connector lock held. Record first, revalidate after every pre-dispatch await."""
     ledger = outcomes_for(hass)
     record = await _outcome_record(hass, entry_id, data)
@@ -1009,6 +1187,12 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
     acknowledged = record.get("acknowledged") or {}
     attempt = record.get("attempt") or {}
     if automatic and not force_sync and acknowledged.get("fingerprint") == fingerprint:
+        return "unchanged"
+    if (automatic and not force_sync and pause_id is None and override_id is None
+            and acknowledged_revision(record) == domain_data(hass).auto_store.settings(entry_id).revision
+            and same_effective_schedule(acknowledged_profile(record), profile, end_tolerance)):
+        # The accepted routine schedule already says this from now on (a settings edit, an explicit
+        # control, a pause or a needed sync is never suppressed here); a profile creation time is not a change.
         return "unchanged"
     if automatic and attempt.get("state") == "rejected" and attempt.get("fingerprint") == fingerprint:
         return "upload_rejected"
@@ -1081,7 +1265,9 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
     data["ack"] = ack
     state = ack.lower()
     if state == "accepted":
-        record.update({"acknowledged": {"fingerprint": fingerprint, "at": now, "id": attempt_id}, "uncertain": False})
+        record.update({"acknowledged": {
+            "fingerprint": fingerprint, "at": now, "id": attempt_id, "profile": wire_profile,
+            "revision": revision, "routine": pause_id is None and override_id is None}, "uncertain": False})
         record["attempt"]["state"] = "accepted"
     elif state in ("rejected", "notsupported"):
         record["attempt"]["state"] = "rejected"
@@ -1606,7 +1792,9 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
                       "readiness": readiness,
                       "schedule_pause": _owned_pause_status(outcomes, verification, verified, worker, stop_pending=stop_pending),
                       "reconciliation": {"reason": worker.reason if worker is not None and
-                                         getattr(worker, "reason_serial", -1) == worker._serial else "pending"},
+                                         getattr(worker, "reason_serial", -1) == worker._serial else "pending",
+                                         "continuity": getattr(worker, "continuity", None),
+                                         "last_trigger": getattr(worker, "last_trigger", None)},
                       "ownership": ownership,
                       "outcomes": outcomes,
                       "operator": operator,

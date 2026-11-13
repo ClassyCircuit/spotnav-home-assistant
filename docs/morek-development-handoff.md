@@ -383,6 +383,84 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-13 — Stage 14.3 recalculation triggers and send deduplication (2.5.105; local mocked)
+
+- Cause tracking (review fix, 2.5.105): unchanged revisions alone no longer mean "SOC-only".
+  `AutoPreviewController.async_recalculate(cause=None)` exposes `publication_cause` for the synchronous
+  duration of the publish; only `_soc_moved` (`__init__.py`) passes `"soc"`. The worker treats a
+  publication as routine (2 s burst, SOC end tolerance allowed) only when the revisions are unchanged
+  AND the cause is exactly `"soc"`. Any other same-revision publication (deadline rollover, plan watch,
+  unread notice, execution change, an unlabeled caller) is kind `recalc`: coalesced for 2 s but strict.
+  A run that mixes causes is strict (`_strict` is sticky until a run completes unsuperseded, one run per
+  burst). A price change coalesces the same way but is strict; a settings change, the first
+  publication and every direct call (controls, Pause/Charge Now, sync, availability/reconnect,
+  stale-work retry) use `_COALESCE_SECONDS` (0.1 s) and are strict. The wait is a shared earliest
+  deadline (an urgent trigger shortens it, routine events never extend it).
+- Evidence: `MorekSessionCoordinator.observe` calls `worker.note_plug_in()` only for Available to
+  Preparing/Charging/Suspended. A connector sensor moving to or from unknown/unavailable calls
+  `worker.note_sensor()`; a return to Preparing/Charging from unknown/unavailable is deliberately
+  not a plug-in (the vehicle may have been connected all along) and initial seeding is neither. Both go
+  through one coalesced `_evidence_run`: `planner.async_recalculate(kind)`, then a strict
+  `trigger(kind=...)` comparison. Evidence noted during an in-flight recalculation gets another round
+  (never lost, never concurrent). A failed recalculation still compares with what the planner has;
+  the reconcile guards then decide (an unavailable charger or blocked plan sends nothing,
+  `close()` cancels pending evidence). Nothing is sent by the evidence path itself.
+- Deduplication: `morek_schedule.same_effective_schedule` (via `_send_profile_shared`, routine
+  candidates only, never `force_sync`, pause or Charge Now) compares the last accepted routine
+  profile (`acknowledged_profile`, planned under the same settings revision, now stored as
+  `acknowledged.revision`) with the candidate from the candidate's own start: current permission,
+  future absolute transitions with equal repeated limits collapsed, and attributes. Only for
+  routine SOC-only runs may a 0 A instant differ, by strictly under five minutes (`_SOC_END_TOLERANCE`).
+  Equal schedules return `unchanged`. The existing fingerprint dedup, `upload_uncertain` and
+  rejected-attempt rules remain. A settings edit with an equal schedule is deliberately still sent once.
+- Tests: `tests/test_stage_143_recalculation_triggers.py` (comparison/tolerance boundaries, actual send
+  counts for repeated routine events, tolerated vs larger SOC change, same-revision deadline/unlabeled
+  publications strict, mixed-cause burst strict, plug-in equal/changed, sensor loss/recovery through the
+  real session with send counts, sensor loss while unavailable, failed recalculation, no plug-in inferred
+  from unknown/unavailable returns, evidence coalescing, close, price, settings, sync, uncertain outcome,
+  coalescing vs explicit control, Pause racing a queued routine update); the fake planner in
+  `tests/test_morek_worker.py` has `publication_cause`. Isolated runner: 718 passed with the same 4
+  pre-existing failures as before; the
+  `test_morek_session.py` production-setup tests fail identically on HEAD in this isolated environment
+  (missing HA import), 35 others pass. Ruff, `npm run build` and `check-dist` pass (frontend source
+  unchanged). No HA, charger, deployment or restart was involved; deployed behavior and physical
+  charging are unverified. 14.4/14.5/14.6 are not done.
+
+### 2026-11-13 — Stage 14.2 active-window continuity (2.5.103; local mocked)
+
+- `MorekScheduleWorker._continued_profile` (routine branch of `_intent`, not pause or Charge Now)
+  takes `morek_schedule.acknowledged_profile(record)` (the durable `acknowledged` entry, which now
+  stores `profile` and `routine` at acceptance; routine means no pause/Charge Now; record not
+  uncertain; older records fall back to the matching accepted attempt), and `_proposed_profile(..., active_profile=)` unions its currently allowed window
+  (`active_window`: now to the next 0 A change) with the planned windows via
+  `continue_active_window`, then `profile_for`. A routine replan therefore cannot shorten or drop
+  the allowed window, and the profile starts at 16 A with no 0 A gap. The fingerprint excludes the
+  moving start as before; an unchanged merged intent is skipped as `unchanged`.
+- Evidence: `connector_evidence` reads the existing OCPP connector status sensor, fresh within 180 s
+  (same rule as `_session_readiness`) and returns `charging`, `waiting`, `unplugged` or `unknown`.
+  Status is not measured power and nothing is inferred from the window or ACK. Only `unplugged`
+  releases the window; `unknown` preserves it and the worker exposes
+  `reconciliation.continuity` (`evidence`, `preserved`, `until`, `reason`) in the Morek status.
+- `_verification_current` applies the same continuation for worker attempts, so a continued profile
+  still verifies. Preserving would exceed three windows: refused as `active_window_block_limit`,
+  nothing sent. A one-shot timer (`_continuity_timer`) retriggers 1 s after the preserved end.
+- Review fix: the last accepted routine profile survives settings revisions (e.g. a raised price cap)
+  and definitely rejected newer attempts, and a restart (it is in the persisted ledger), because
+  `acknowledged` is only replaced by a later accepted write. Until 14.4 implements material-edit
+  interruption, planning edits conservatively keep the active window. Uncertain/pending writes,
+  an accepted pause or Charge Now (replaces `acknowledged`, non-routine), different current and
+  unplugged evidence mean no continuation. The deployed ledger shape changed (additive). Unchanged: the immediate controls, protection, ownership,
+  admission and uncertain-write guards. 14.3 (trigger/deduplication) and 14.4 (cap/price
+  interruption) are not done; the sidebar does not display `continuity` yet.
+- Tests: `tests/test_stage_142_active_continuity.py` (real worker with the usual mocked boundaries:
+  charging/waiting/unknown preserve, unplugged release, shortening not sent, adjacent merge,
+  settings edit, block limit, pause race, acknowledged-profile rules, timer, evidence freshness)
+  and the changed assertion in `test_coalesce_deduplicate_and_changed_active_intent`. The isolated
+  planning runner (now including the new file) passed 694 with the same 4 pre-existing failures as
+  an unmodified HEAD; Ruff, `npm run build` and `check-dist` pass (frontend source unchanged,
+  frontend suite not rerun). No HA, charger, deployment or restart was involved; deployed behavior
+  and physical charging are unverified.
+
 ### 2026-11-13 — Stage 14.1 current interval and three-window limit (2.5.101; local mocked)
 
 - `PlanRequest.include_current_interval` and `max_blocks` are set by the auto controller only

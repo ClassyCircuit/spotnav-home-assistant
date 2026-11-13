@@ -1915,7 +1915,24 @@ handoff and checklist truthfully; follow AGENTS.md version/build requirements.
     negative prices, missing horizon, midnight/DST and fragmented cheap periods;
     verify displayed windows, energy, cost and generated Morek profile agree.
 
-- [ ] **14.2 State-aware active-window continuity**
+- [x] **14.2 State-aware active-window continuity** (2.5.103 local, mocked)
+  - Implemented in the Morek worker's routine intent path only. The last accepted,
+    routine (no pause, no Charge Now) profile, stored durably in the ledger's
+    `acknowledged` entry and surviving settings revisions, definitely rejected newer
+    attempts and restarts (uncertain writes never continue), defines the acknowledged window allowed now; it is unioned with the replanned
+    windows from now to its existing end (`continue_active_window`), so a SOC/price replan
+    cannot drop or shorten it and the generated profile has no 0 A gap. Evidence is the
+    fresh (180 s) connector status only (`connector_evidence`): charging, waiting
+    (connected/paused/finished), unplugged, or unknown (missing, stale, faulted, unmapped).
+    Only fresh unplugged releases the window; unknown keeps it and is exposed as
+    `reconciliation.continuity.reason = active_window_state_unknown`. Pause/Stop, Charge Now,
+    protection, identity/ownership/generation and uncertain-write guards run as before and
+    win; a settings edit (e.g. a raised price cap) conservatively keeps the window until 14.4
+    implements material-edit interruption. If keeping
+    the window would exceed three windows the update is refused (`active_window_block_limit`)
+    and the accepted schedule stays. A timer replans just after a preserved window ends.
+    Not done: no sidebar text for `continuity` yet, no measured-power evidence, manual
+    Send/preview do not continue (only the worker and its verification).
   - Wire existing charger/session evidence into Morek reconciliation, with explicit
     freshness and unknown state. Preserve the acknowledged currently allowed window
     through its end across routine replans, including when updating future periods.
@@ -1926,7 +1943,32 @@ handoff and checklist truthfully; follow AGENTS.md version/build requirements.
     SOC updates during charging, pause/protection races and future-window changes.
     Verify the production-generated profile has no unintended 0 A gap.
 
-- [ ] **14.3 Recalculation triggers and guarded send deduplication**
+- [x] **14.3 Recalculation triggers and guarded send deduplication** (2.5.105 local, mocked)
+  - Implemented in the existing Morek worker, no new controller. Planner publications already
+    carry SOC, price, settings, deadline/departure and wake recalculations. The worker now
+    classifies each: unchanged settings and price revision AND a planner cause of exactly
+    `soc` = routine (2 s coalescing, SOC end-time tolerance allowed); any other same-revision
+    publication (deadline rollover, unlabeled) = `recalc`, coalesced but strict, and mixed causes
+    are strict; price change = coalesced, no tolerance; settings change,
+    first sighting, direct calls (controls, recovery sync, availability/reconnect, stale-work
+    retry) = no wait, no tolerance. A plug-in observed by the session coordinator
+    (Available to Preparing/Charging) always runs a planner recalculation and then a compared
+    reconcile (`note_plug_in`); an equal schedule is skipped as `unchanged`. A connector
+    sensor going unknown/unavailable or returning (`note_sensor`) also recalculates and compares;
+    it is never treated as a plug-in.
+    `reconciliation.last_trigger` exposes the last consumed trigger.
+  - Send deduplication (`same_effective_schedule` in `_send_profile_shared`): a routine
+    candidate is skipped when the last accepted routine profile, planned under the same settings
+    revision, says the same from now on: same current permission, same future absolute
+    transitions and attributes (profile creation time, elapsed transitions and repeated equal
+    limits ignored). For routine SOC-only runs a switch-off instant may differ by under five
+    minutes; starts, plug-in, price, settings and sync runs never use that tolerance. Never
+    suppressed: pause/Stop, Charge Now (non-routine candidates), forced sync, uncertain
+    records (still `upload_uncertain`), identity/ownership/generation guards.
+  - Not done / limits: a settings edit with an equal schedule is still sent once (keeps the
+    readback/verification association); the 14.2 settings-edit conservatism and 14.4
+    interruption policy are unchanged; no measured-power evidence; no sidebar text for
+    `last_trigger`. Mocked tests only; deployed behavior and physical charging are unverified.
   - Wire plug-in, meaningful fresh SOC progress, price publication/change, planning
     settings, deadline rollover, charger reconnect and important sensor loss/return
     to re-evaluation. Plug-in always recalculates and compares the result even if no
