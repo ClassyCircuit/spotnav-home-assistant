@@ -728,6 +728,7 @@ class AutoSnapshot:
             proposal.minimum_shortfall_kwh,
             proposal.exception_kwh,
             proposal.exception_periods,
+            proposal.price_coverage_end,
             tuple((start.isoformat(), end.isoformat()) for start, end in proposal.periods),
             tuple(
                 (slot.start.isoformat(), slot.end.isoformat(), slot.unpriced, slot.source)
@@ -1693,6 +1694,16 @@ class AutoPlannerController:
         )
         wait_facts: dict[str, Any] = {}
         try:
+            gap = price_gap(plan_request)
+            if gap is not None and plan_request.soft_price_cap is not None and plan_request.departure is not None:
+                publication = expected_publication(entry, gap.missing_from)
+                plan_request = replace(plan_request, partial_recheck_at=publication)
+                # Recheck even when publication is late: urgency changes with time.
+                if not preview:
+                    next_check = calculated_at + timedelta(minutes=15)
+                    if publication > calculated_at:
+                        next_check = min(next_check, publication)
+                    self._arm_wake(next_check)
             result = calculate_plan(plan_request)
             if result.reason == "insufficient_price_horizon" and plan_request.soft_price_cap is None:
                 waited = None
@@ -1707,10 +1718,14 @@ class AutoPlannerController:
                 if waited is not None:
                     result, wait_facts, early = waited
                     if early is not None:
+                        if gap is not None:
+                            result = replace(result, price_coverage_end=gap.missing_from)
                         return self._fresh_snapshot(
                             settings, early[0], early[1], calculated_at,
                             entry=entry, price_snapshot=area_snapshot, proposal=result, **wait_facts,
                         )
+            if gap is not None:
+                result = replace(result, price_coverage_end=gap.missing_from)
         except PlannerInputError as err:
             # Validated inputs: anything the planner still refuses is a named state, never a crash.
             return self._fresh_snapshot(
@@ -1731,6 +1746,12 @@ class AutoPlannerController:
             self._last_failure = None
 
         if result.reason == "no_eligible_energy" and settings.soft_price_cap is not None:
+            if gap is not None:
+                return self._fresh_snapshot(
+                    settings, "waiting_for_publication", "publication_pending", calculated_at,
+                    entry=entry, price_snapshot=area_snapshot, proposal=result, attempt=attempt,
+                    price_wait_action="waiting",
+                )
             return self._fresh_snapshot(
                 settings, "nothing_to_charge", "no_eligible_energy", calculated_at,
                 entry=entry, price_snapshot=area_snapshot, proposal=result, attempt=attempt,
@@ -1742,8 +1763,7 @@ class AutoPlannerController:
             )
         owned_target = False
         if (settings.driver == DRIVER_TARGET_SOC and settings.strategy == STRATEGY_CHEAPEST
-                and settings.soft_price_cap is None and self._schedule_owned is not None
-                and abs(result.requested_kwh - energy_kwh) <= price_wait.EPSILON_KWH):
+                and settings.soft_price_cap is None and self._schedule_owned is not None):
             try:
                 owned_target = await self._schedule_owned()
             except Exception:  # noqa: BLE001 - unavailable ownership never changes a legacy plan
@@ -1751,6 +1771,8 @@ class AutoPlannerController:
         if owned_target or self._stops_at_need(settings, resolved, result, energy_kwh):
             # The count ends the charge at the need: the plan says the need and its share of the last slot.
             result = ending_at_need(result)
+        if gap is not None and plan_request.soft_price_cap is None:
+            result = replace(result, policy_shortfall_kwh=max(0.0, energy_kwh - result.delivered_kwh))
         state: AutoState = "proposal_unpriced" if result.unpriced else "proposal_ready"
         reason: AutoReason = "unpriced" if result.unpriced else "ready"
         if wait_facts.get("price_wait_action") == "buy_now":

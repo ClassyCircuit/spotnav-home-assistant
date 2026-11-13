@@ -284,8 +284,7 @@ class MorekSessionCoordinator:
                             or self.observation != "preparing" or self.completed):
                         return "stale_or_ambiguous_session"
                     pause = record.get("schedule_pause")
-                    if pause and (pause.get("type") != "resume_requested" or
-                                  worker.resume_ticket != (pause.get("id"), generation)):
+                    if pause and not morek_schedule._resume_authorized(record, worker, generation):
                         return "paused_until_resume"
                     settings = domain_data(self.hass).auto_store.settings(self.entry_id)
                     if getattr(getattr(settings, "pause", None), "admitted", False):

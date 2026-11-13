@@ -221,8 +221,12 @@ class MorekScheduleWorker:
                         and pause.get("type") == "pause_until_resumed"
                         and self.hold_ticket != (pause.get("id"), generation)):
                     return "paused_until_resume", None, None
-                if pause is not None and pause["type"] == "resume_requested" and self.resume_ticket != (pause["id"], generation):
+                if pause is not None and pause["type"] == "resume_requested" and not morek_schedule._resume_authorized(record, self, generation):
                     return "resume_requires_confirmation", None, None
+                if pause is not None and pause["type"] == "resume_requested":
+                    # Carry recovered authority across the next write's pending record;
+                    # connector generation and person-Stop checks still invalidate it.
+                    self.resume_ticket = (pause["id"], generation)
                 _, fingerprint = self._intent(pause, record.get("charge_now"))
                 ticket = admission._completion_tickets.get(self._entry_id)
                 outcome = await morek_schedule._send_profile_shared(

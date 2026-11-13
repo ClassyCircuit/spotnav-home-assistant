@@ -379,7 +379,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     try {
       const raw=await this.bounded(morekSchedule(hass,charger,action,previewId));
       if (action==='reconfirm_migration') {this.morekError=null;return;}
-      if (action==='recalculate_sync') {this.syncNotice=raw?.schedule?.reconciliation==='requested' ? 'Recalculated; schedule sync requested. Check reconciliation status for the result.' : 'Sync response unavailable; check status before trying again.';return;}
+      if (action==='recalculate_sync') {this.syncNotice=raw?.schedule?.reconciliation==='requested' ? 'Recalculated; sync requested, not yet confirmed. The schedule sync status above shows the latest worker result.' : 'Sync response unavailable; check schedule sync status before trying again.';return;}
       const result=decodeMorekState(raw);
       if (!this.connected || generation!==this.generation || permissionEpoch!==this.permissionEpoch || charger!==this.charger) return;
       if (!result) {if(action==='send')this.morekUncertain=true;this.morekError='Response unavailable; operation outcome may be unknown.';}

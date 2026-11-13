@@ -340,6 +340,41 @@ async def test_owned_pause_then_resume_uses_fresh_plan_and_keeps_request(monkeyp
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("charge_now", [False, True])
+async def test_settled_resume_recovers_after_restart_and_sends_new_plan(monkeypatch, charge_now):
+    w = setup(monkeypatch)
+    entry = SimpleNamespace(entry_id="charger", runtime_data=SimpleNamespace(morek_worker=w.worker))
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=w.target))
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda *_: w.admission)
+    status = {"record_state": "valid", "recorded_owner": "morek_schedule", "armed": False,
+              "transition_state": None, "station_id": IDENTITY["resolved_id"], "connector_id": 1}
+    monkeypatch.setattr(morek_schedule, "ownership_store", lambda *_: SimpleNamespace(async_status=AsyncMock(return_value=status)))
+    await morek_schedule.async_record_owned_pause(w.hass, "charger")
+    await drain(w.worker)
+    await morek_schedule.async_record_owned_pause(w.hass, "charger", resume=True)
+    await drain(w.worker)
+    assert w.point.call.await_count == 2
+    w.worker.close()
+    w.settings.revision = 5
+    w.planner.current.settings_revision = 5
+    if charge_now:
+        class Clock:
+            now = staticmethod(lambda _: NOW)
+            fromisoformat = staticmethod(datetime.fromisoformat)
+        monkeypatch.setattr(morek_worker, "datetime", Clock)
+        w.ledger.value["charge_now"] = {"version": 1, "id": "a" * 32,
+            "station_id": IDENTITY["resolved_id"], "connector_id": 1,
+            "start": NOW.isoformat(), "end": (NOW + timedelta(hours=1)).isoformat()}
+    worker = morek_worker.MorekScheduleWorker(w.hass, "charger", w.planner)
+    worker.start()
+    await drain(worker)
+    assert worker.reason == "upload_accepted_unverified"
+    assert w.point.call.await_count == 3
+    worker.close()
+
+
+@pytest.mark.asyncio
 async def test_resume_request_survives_restart_without_automatic_dispatch(monkeypatch):
     w = setup(monkeypatch)
     entry = SimpleNamespace(entry_id="charger", runtime_data=SimpleNamespace(morek_worker=w.worker))
@@ -2006,7 +2041,7 @@ async def test_utc_interval_coverage_across_dst_and_midnight_with_negative_price
     doc = replace(world.area.today_snapshot.document, intervals=rows)
     world.area.today_snapshot.document = doc
     snapshot = world.controller.snapshot()
-    proposal = SimpleNamespace(shown_periods=((start, start + timedelta(hours=1)),))
+    proposal = replace(snapshot.proposal, periods=((start, start + timedelta(hours=1)),), exact_periods=True)
     snapshot = replace(snapshot, proposal=proposal,
                        morek_price_evidence=world.controller._morek_price_evidence(world.area))
     assert world.controller.morek_plan_blocker(snapshot, start) is None
@@ -2029,7 +2064,8 @@ async def test_tomorrow_window_requires_its_own_authoritative_intervals(monkeypa
     doc = world.area.today_snapshot.document
     world.area.today_snapshot.document = replace(doc, intervals=(first,))
     world.area.tomorrow_snapshot.document = replace(doc, intervals=(second,))
-    snapshot = replace(world.controller.snapshot(), proposal=SimpleNamespace(shown_periods=((start, second.utc_end),)))
+    original = world.controller.snapshot()
+    snapshot = replace(original, proposal=replace(original.proposal, periods=((start, second.utc_end),), exact_periods=True))
     snapshot = replace(snapshot, morek_price_evidence=world.controller._morek_price_evidence(world.area))
     assert world.controller.morek_plan_blocker(snapshot, start) == "price_coverage_unavailable"
     world.area.state = "ready"

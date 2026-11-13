@@ -461,6 +461,21 @@ def _verification_coverage_current(verification: dict[str, Any], now: datetime) 
         return False
 
 
+def _resume_authorized(record: dict[str, Any], worker: Any, generation: int) -> bool:
+    """Recover a completed Resume from its settled, matching durable dispatch."""
+    pause = record.get("schedule_pause") or {}
+    if pause.get("type") != "resume_requested":
+        return False
+    if getattr(worker, "resume_ticket", None) == (pause.get("id"), generation):
+        return True
+    attempt = record.get("attempt") or {}
+    ack = record.get("acknowledged") or {}
+    return (record.get("uncertain") is False and attempt.get("state") == "accepted"
+            and attempt.get("source") == "worker" and attempt.get("pause_id") == pause.get("id")
+            and bool(attempt.get("id")) and attempt.get("id") == ack.get("id")
+            and bool(attempt.get("fingerprint")) and attempt.get("fingerprint") == ack.get("fingerprint"))
+
+
 def _owned_pause_status(outcomes: dict[str, Any], verification: dict[str, Any], verified: bool,
                         worker: Any, *, stop_pending: bool = False) -> dict[str, Any]:
     """Separate durable intent from request and bounded observation, not physical flow."""
@@ -938,8 +953,7 @@ def _verification_current(hass: HomeAssistant, entry_id: str, entry: Any, data: 
                     or override.get("connector_id") != connector.connector_id
                     or _utc(datetime.fromisoformat(override["start"])) > now
                     or _utc(datetime.fromisoformat(override["end"])) <= now
-                    or (pause is not None and (pause.get("type") != "resume_requested"
-                        or worker.resume_ticket != (pause_id, admission.generation(connector))))):
+                    or (pause is not None and not _resume_authorized(record, worker, admission.generation(connector)))):
                 return False
             fingerprint_revision = [settings.revision, override_id]
             current, current_fingerprint = worker._intent(pause, override)

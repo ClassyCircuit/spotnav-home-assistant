@@ -196,13 +196,19 @@ export function morekPanel(
     upload_accepted_unverified: "Morek accepted the schedule; readback and charging are not yet confirmed.",
     unchanged: "The current schedule was already acknowledged; charging is not confirmed.",
     charge_now_active: "Return to Auto before syncing the automatic schedule.",
+    pending: "Waiting for the schedule worker to finish checking the current plan.",
+    charger_unavailable: "Morek is unavailable; the schedule was not sent.",
+    migration_confirmation_required: "Schedule ownership needs reconfirmation before sending.",
+    worker_unavailable: "The schedule worker could not complete its check; see Home Assistant logs.",
     protection_conflict_unresolved: "A linked site regulator may also control this charger; schedule dispatch is blocked until the conflict is reviewed.",
     paused_until_resume: "Auto remains paused until you explicitly Resume.",
     legacy_pause_active: "The saved manual pause remains active; the Resume follow-up has not completed.",
   };
-  if (reconciliation && reconciliationMessages[reconciliation]) {
+  let reconciliationDetail: HTMLElement | null = null;
+  if (reconciliation) {
     const detail = doc.createElement("p");
-    detail.textContent = reconciliationMessages[reconciliation];
+    detail.textContent = `Schedule sync status: ${reconciliationMessages[reconciliation] ?? "The schedule worker reported a status that needs review."} (${reconciliation})`;
+    reconciliationDetail = detail;
     section.append(detail);
   }
   const availability = doc.createElement("p");
@@ -425,7 +431,7 @@ export function morekPanel(
   details.append(summary);
   const actions = section.querySelector<HTMLElement>("[data-morek-actions]");
   for (const child of Array.from(section.children)) {
-    if (child !== heading && child !== health && child !== actions) details.append(child);
+    if (child !== heading && child !== health && child !== reconciliationDetail && child !== actions) details.append(child);
   }
   const safety = doc.createElement("p");
   safety.textContent = "A final 0 A limit may remain. Readback is not profile inventory; ACK and readback do not prove physical charging. Preserve person Stop and household protection.";

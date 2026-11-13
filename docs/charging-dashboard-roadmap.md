@@ -1249,7 +1249,7 @@ rather than implementing the same feature twice.
     assumptions, and report unknown when evidence is insufficient, not zero.
   - Keep totals consistent across dashboard cards and reuse 7.5 monthly insights.
 
-### Stage 9 — Diagnostics and logging
+### Stage 9 — Recovery and diagnostics
 
 No separate themes, light/dark modes or extra accessibility-polish project is
 needed for this single-user dashboard. Keep the interface usable on desktop and
@@ -1277,6 +1277,33 @@ when identified, rather than remaining indefinite roadmap tasks.
     reconnect/history behavior with mocks. Avoid excessive repeated messages, and
     document the normal HA Core logs fallback. No live HA access is authorized by
     this roadmap item.
+- [ ] **9.5 Automatic Morek recovery and visible failures:** make the existing Auto
+  schedule and session paths recover from ordinary failures without requiring repeated
+  manual Resume or sync. This is a focused reliability task, not a new controller.
+  - Audit and fix restart/reconnect, offline charger, unavailable prices and other
+    transient blockers: re-evaluate automatically when the condition clears, including
+    after HA restart, and use a bounded backoff where no suitable event exists. Avoid
+    rapid loops and duplicate commands. The 2.5.98 local settled-Resume recovery is
+    partial groundwork, not proof that all restart and Resume cases recover.
+  - Apply the user's approved one-time clean-start policy to missing historical
+    evidence, while preserving genuinely recorded pending/unknown operations. Handle
+    definite rejections with bounded cooldown retries; do not blindly repeat a
+    timeout or possibly applied write. Read-only checks can inform recovery but an
+    effective composite schedule is not an inventory of profiles and cannot alone
+    establish whether an uncertain upload applied.
+  - Automatically re-evaluate schedule mismatches and reconcile the latest intended
+    plan where permitted; retain a clear, actionable recovery path when evidence
+    remains genuinely uncertain. Do not clear profiles or remove an uncertainty
+    record merely to unblock dispatch.
+  - Surface current blockers, retry timing and outcomes prominently in the sidebar;
+    never silently show a queued sync as a successful upload or treat ACK/readback
+    as measured charging. Coordinate diagnostic details with 9.4, without making
+    log-viewer implementation a prerequisite for clear status.
+  - Preserve explicit Pause/Stop, electrical protection, unique connector identity,
+    ownership and existing generation/race guards. Test real mocked production wiring
+    for reconnect/restart, delayed prices, settled versus interrupted Resume, rejected
+    and unknown uploads, mismatch, Stop races, session start and Charge Now, including
+    bounded retries and visible failure states. No live operation is authorized.
 
 ### Stage 10 — Optional Charge Now (after initial installation)
 
@@ -1369,13 +1396,18 @@ pause; a later Resume returns to normal Auto, not the canceled override.
     unknown schedule updates as unconfirmed, not as proof that charging stopped.
     Any later deployment, restart, profile operation or physical test requires the
     user's specific approval; do not claim mocked checks verify live behavior.
-- [ ] **10.3 Plan with a partial published price horizon**
-  - Investigation only: capped planning already permits published slots with a
-    partial horizon, but its minimum exception can treat missing future cheap prices
-    as a reason to buy above cap. The normal `waiting_for_tomorrow` state is already
-    accepted by the Morek proposal and evidence gates; degraded/incomplete states are
-    not. The actual reported blocker has not been reproduced. No end-to-end fix or
-    Stage 10.3 acceptance tests have been completed; see the handoff.
+- [x] **10.3 Plan with a partial published price horizon** (local mocked verification)
+  - Ready-by capped plans retain known cheap windows and add above-cap minimum energy
+    only when the derated remaining time and selected cheap energy make it urgent.
+    The controller rechecks partial capped plans at least every 15 minutes and on
+    publication, SOC and settings events. Partial results show the first missing
+    interval, unresolved energy and uncertainty. Uncapped waiting policy is retained;
+    Morek-owned urgent purchases use the exact estimated stop time.
+  - Actual planner/controller, real admission and mocked OCPP tests cover a provisional
+    plan and later price publication, bounded profile and deduplication; existing focused
+    guard, read-only status and deadline regressions also run. The original installed
+    system's cause, deployed operation and physical charging remain unverified. See the
+    handoff for limitations; these results are not permission for live operations.
   - When the ready-by time extends beyond published prices, do not discard useful
     known-price charging opportunities merely because the rest of the horizon is
     unpublished. For example, plan a suitable cheap window today even if prices for

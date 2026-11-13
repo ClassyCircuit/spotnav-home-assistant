@@ -61,7 +61,13 @@ describe("Morek manual test panel", () => {
     const panel = morekPanel(document, { ...state, reconciliation: { reason: "price_coverage_unavailable" } }, true, false, null, act);
     expect(panel.textContent).toContain("Published prices do not cover the proposed windows");
     expect(panel.textContent).toContain("retained limit may remain");
+    expect(panel.querySelector("details")?.textContent).not.toContain("Published prices do not cover the proposed windows");
     expect(act).not.toHaveBeenCalled();
+  });
+  it("shows an unknown worker reason outside the collapsed diagnostics", () => {
+    const panel = morekPanel(document, { ...state, reconciliation: { reason: "new_blocker" } }, true, false, null, vi.fn());
+    expect(panel.textContent).toContain("(new_blocker)");
+    expect(panel.querySelector("details")?.textContent).not.toContain("(new_blocker)");
   });
   it.each([
     ["waiting", "Waiting for a usable plan"], ["offline", "Offline"],

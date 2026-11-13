@@ -285,6 +285,19 @@ async def test_reported_surviving_session_never_restarts(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_session_start_recovers_previously_accepted_resume(monkeypatch):
+    coordinator, point, ledger, _ = setup(monkeypatch)
+    ledger.value["schedule_pause"] = {"version": 1, "type": "resume_requested", "id": "p",
+                                      "station_id": IDENTITY["resolved_id"], "connector_id": 1}
+    ledger.value["attempt"] = {"state": "accepted", "source": "worker", "pause_id": "p",
+                               "id": "attempt", "fingerprint": "plan"}
+    ledger.value["acknowledged"] = {"id": "attempt", "fingerprint": "plan"}
+    coordinator.observe(None, "Preparing")
+    await coordinator.task
+    assert point.calls == 1
+
+
+@pytest.mark.asyncio
 async def test_resume_uses_distinct_durable_generation(monkeypatch):
     coordinator, point, ledger, admission = setup(monkeypatch)
     connector = physical_connector(IDENTITY)

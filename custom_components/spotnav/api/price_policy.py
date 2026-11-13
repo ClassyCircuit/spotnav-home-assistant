@@ -59,6 +59,8 @@ def encode_price_policy(settings: AutoSettings, snapshot: AutoSnapshot | None) -
         "ready_by": None if current is None else aware_iso(current.departure_at),
         "state": None if current is None else current.state,
         "reason": None if current is None else current.reason,
+        "provisional": proposal is not None and proposal.price_coverage_end is not None,
+        "price_coverage_end": None if proposal is None else aware_iso(proposal.price_coverage_end),
         "error": None if current is None else current.last_error_code,
         "explanations": explanations,
         "minimum_shortfall_kwh": None if proposal is None else finite_number(proposal.minimum_shortfall_kwh),

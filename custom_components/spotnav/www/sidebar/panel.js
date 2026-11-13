@@ -58269,11 +58269,15 @@ function decodePlan(source) {
   const policy = source["price_policy"];
   const explanations = typeof policy === "object" && policy !== null && !Array.isArray(policy) ? policy["explanations"] : null;
   return {
-    ...Array.isArray(explanations) ? { price_policy: { explanations: explanations.flatMap((item) => {
-      if (typeof item !== "object" || item === null || Array.isArray(item)) return [];
-      const code = item["code"];
-      return typeof code === "string" ? [code] : [];
-    }) } } : {},
+    ...Array.isArray(explanations) ? { price_policy: {
+      provisional: policy["provisional"] === true,
+      price_coverage_end: typeof policy["price_coverage_end"] === "string" ? policy["price_coverage_end"] : null,
+      explanations: explanations.flatMap((item) => {
+        if (typeof item !== "object" || item === null || Array.isArray(item)) return [];
+        const code = item["code"];
+        return typeof code === "string" ? [code] : [];
+      })
+    } } : {},
     proposal: proposal === null ? null : decodeProposal(record2(proposal)),
     installed: installed2 === null ? null : decodeInstalled(record2(installed2)),
     relation: decodeRelation(record2(required(source, "relation"))),
@@ -59643,13 +59647,19 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
     upload_accepted_unverified: "Morek accepted the schedule; readback and charging are not yet confirmed.",
     unchanged: "The current schedule was already acknowledged; charging is not confirmed.",
     charge_now_active: "Return to Auto before syncing the automatic schedule.",
+    pending: "Waiting for the schedule worker to finish checking the current plan.",
+    charger_unavailable: "Morek is unavailable; the schedule was not sent.",
+    migration_confirmation_required: "Schedule ownership needs reconfirmation before sending.",
+    worker_unavailable: "The schedule worker could not complete its check; see Home Assistant logs.",
     protection_conflict_unresolved: "A linked site regulator may also control this charger; schedule dispatch is blocked until the conflict is reviewed.",
     paused_until_resume: "Auto remains paused until you explicitly Resume.",
     legacy_pause_active: "The saved manual pause remains active; the Resume follow-up has not completed."
   };
-  if (reconciliation && reconciliationMessages[reconciliation]) {
+  let reconciliationDetail = null;
+  if (reconciliation) {
     const detail = doc.createElement("p");
-    detail.textContent = reconciliationMessages[reconciliation];
+    detail.textContent = `Schedule sync status: ${reconciliationMessages[reconciliation] ?? "The schedule worker reported a status that needs review."} (${reconciliation})`;
+    reconciliationDetail = detail;
     section.append(detail);
   }
   const availability = doc.createElement("p");
@@ -59844,7 +59854,7 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
   details.append(summary);
   const actions2 = section.querySelector("[data-morek-actions]");
   for (const child of Array.from(section.children)) {
-    if (child !== heading && child !== health && child !== actions2) details.append(child);
+    if (child !== heading && child !== health && child !== reconciliationDetail && child !== actions2) details.append(child);
   }
   const safety = doc.createElement("p");
   safety.textContent = "A final 0 A limit may remain. Readback is not profile inventory; ACK and readback do not prove physical charging. Preserve person Stop and household protection.";
@@ -60060,10 +60070,12 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
   const untilDeadline = d3.settings?.departure_enabled === false ? "Not enabled" : deadlineCurrent && Number.isFinite(deadline) ? deadline > now ? `${Math.ceil((deadline - now) / 6e4)} min` : "Deadline passed" : "Unavailable";
   const policy = d3.plan.price_policy?.explanations || [];
   const uncapped = !planStale && !!proposal && d3.settings?.soft_price_cap === null && d3.planning?.settings_revision != null && d3.planning.settings_revision === d3.settings?.revision && proposal.settings_revision === d3.settings.revision && policy.includes("uncapped");
-  const policyText = uncapped ? "No soft price cap is applied to this current plan." : policy.map((code) => {
+  const policyBase = uncapped ? "No soft price cap is applied to this current plan." : policy.map((code) => {
     const keys2 = { minimum_exception: "exception", minimum_shortfall: "minimumShortfall", target_shortfall: "targetShortfall", recalculating: "recalculating", unavailable: "unavailable", minimum_covered: "covered", within_cap: "within", target_met: "targetMet", error: "error" };
     return keys2[code] ? translate2("en", `daily.policy.${keys2[code]}`) : U;
   }).join(" ") || U;
+  const unresolved = raw?.plan?.price_policy?.target_shortfall_kwh;
+  const policyText = !planStale && raw?.plan?.price_policy?.provisional === true ? `${policyBase} Provisional: contiguous published prices end ${date(raw.plan.price_policy.price_coverage_end, zone)}. ${Number.isFinite(unresolved) && unresolved > 0 ? `${unresolved.toFixed(1)} kWh of target energy remains unresolved. ` : ""}Future prices and readiness are unknown; this is not necessarily the cheapest complete plan.` : policyBase;
   const warning = status?.outcomes?.uncertain || status?.operator?.state === "mismatch" || status?.verification?.reason === "limits_or_transitions_differ";
   const published = publishedChart(raw, d3.market, now, stale || dashboardFailed);
   const priceFreshness = priceProvenance(raw?.prices, d3.market, zone, stale || dashboardFailed, now);
@@ -60098,7 +60110,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.95";
+var CARD_VERSION = "2.5.98";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {
@@ -60668,7 +60680,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
         return;
       }
       if (action === "recalculate_sync") {
-        this.syncNotice = raw?.schedule?.reconciliation === "requested" ? "Recalculated; schedule sync requested. Check reconciliation status for the result." : "Sync response unavailable; check status before trying again.";
+        this.syncNotice = raw?.schedule?.reconciliation === "requested" ? "Recalculated; sync requested, not yet confirmed. The schedule sync status above shows the latest worker result." : "Sync response unavailable; check schedule sync status before trying again.";
         return;
       }
       const result = decodeMorekState(raw);

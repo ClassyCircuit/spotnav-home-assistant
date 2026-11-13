@@ -518,7 +518,7 @@ describe('actual sidebar read-only host', () => {
     const button=[...panel.shadowRoot.querySelectorAll('#morek-debug button')].find(b=>b.textContent==='Recalculate & sync schedule');
     expect(button.disabled).toBe(false);button.click();await tick();
     expect(calls.filter(m=>m.action==='recalculate_sync')).toHaveLength(1);
-    expect(panel.shadowRoot.textContent).toContain('schedule sync requested');panel.remove();
+    expect(panel.shadowRoot.textContent).toContain('sync requested, not yet confirmed');panel.remove();
   });
   it('requires admin, current preview and confirmation before mocked send or selective clear', async () => {
     const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';const calls=[];

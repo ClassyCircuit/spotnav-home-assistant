@@ -59,7 +59,7 @@ savings and monthly insights, extending existing session/savings APIs and Stage 
 evidence rather than duplicating them. Existing costs are not proof of preserved
 historical tariffs. The user does not need separate themes or extra accessibility
 polish; keep practical desktop/mobile usability and readable warnings. Stage 9
-tracks the specified HA Core logging work, not another installation prerequisite; 5.8 remains the initial
+tracks HA Core logging and focused automatic recovery; 5.8 remains the initial
 installation and user-directed testing path.
 
 **Stage 6 wording review:** genuine charging history remains later work. Existing
@@ -367,6 +367,54 @@ requirements, not features claimed implemented in the manual baseline below.
   Do not assume `GetCompositeSchedule` lists stored profiles.
 
 ## Tests, build, and next steps
+
+### 2026-11-13 — settled Resume recovery (local only)
+
+- Read-only live status showed `resume_requires_confirmation` despite a settled
+  Resume-associated worker attempt, blocking both Auto and Charge Now. The local
+  worker and session coordinator can now recover that Resume from matching durable
+  accepted attempt/acknowledgement evidence, subject to current ownership, identity,
+  generation and person-Stop guards. Override verification uses the same evidence.
+  An interrupted Resume without a settled matching dispatch still requires explicit
+  confirmation; unknown outcomes remain blocked. This is a limited local fix, not
+  proof every restart case is solved or that an old charger profile is absent.
+- Focused mocked Resume/restart, Charge Now, session and Stop/late-ACK checks passed;
+  Ruff, frontend build and check-dist passed. No profile or charger action, deployment
+  or HA restart was performed. Live behavior after deployment remains unverified.
+
+### 2026-11-13 — Stage 10.3 partial price horizon (local mocked)
+
+- For a configured ready-by deadline, the capped planner retains eligible published
+  cheap energy toward the target while future prices are missing. It computes a
+  bounded urgent minimum exception from selected cheap energy before the next price
+  re-evaluation and the existing derated charging capacity afterward; only known
+  above-cap intervals ending by that re-evaluation may be selected. It does not use
+  unknown prices. A shared period limit can prevent fitting the exception; in that
+  case the existing cheap selection and explicit shortfall are retained rather than
+  broadening a window. Full-horizon optimization is unchanged.
+- Partial plans and empty waiting results expose the first contiguous coverage gap,
+  and sidebar/card text warns that readiness and whole-horizon optimality are unknown.
+  Target/minimum shortfalls are estimates, not measured energy or guarantees. The
+  capped controller schedules a recheck every 15 minutes or the earlier expected
+  publication; delayed publication therefore cannot leave the urgency calculation
+  indefinitely unchanged. Normal price, settings and SOC events also replan.
+- Uncapped price-wait remains unchanged. Its necessary known-price purchases now use
+  the existing exact-end conversion for schedule-owned target-SOC plans, so the real
+  Morek provenance check does not refuse a whole-slot overbuy. The worker retains its
+  current-price coverage, identity, ownership, Stop, protection and uncertain-write
+  gates; its bounded final 0 A is not proof of physical charging or installed profiles.
+- Focused actual-module tests exercise capped and uncapped provisional proposals through
+  real connector admission and mocked OCPP, publication replan, unchanged-intent
+  deduplication, delayed-publication timer, minimum urgency, empty windows, price gaps,
+  DST and existing guards/status/profile limits. No live HA, charger or deployment was
+  accessed. The exact cause of the original installed-system report remains unknown.
+- The focused selection passed 147 tests; 26 targeted frontend tests, Ruff,
+  TypeScript checking, the frontend build and check-dist passed. This is not the
+  full HA-plugin suite or a browser/hardware test.
+- Scope: the new minimum urgency calculation applies when ready-by is configured;
+  the existing no-departure 24-hour cap/minimum behavior is unchanged. Estimates assume
+  planned power and the existing 0.8 feasibility margin; actual vehicle acceptance,
+  electrical protection and physical charging are not established by mocks.
 
 ### 2026-11-13 — Stage 10.3 investigation (incomplete)
 

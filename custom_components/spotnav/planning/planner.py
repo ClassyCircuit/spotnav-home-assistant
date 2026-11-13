@@ -551,6 +551,8 @@ class PlanRequest:
     cap_price_basis: str | None = None
     #: Resolved wall-energy deficit to the minimum, or None to forbid exceptions.
     minimum_energy_kwh: float | None = None
+    #: Partial-horizon policy: earliest meaningful next price re-evaluation.
+    partial_recheck_at: datetime | None = None
 
     @property
     def planned_kw(self) -> float:
@@ -576,6 +578,8 @@ class PlanRequest:
         _aware(self.now, "now")
         if self.window_end is not None:
             _aware(self.window_end, "window_end")
+        if self.partial_recheck_at is not None:
+            _aware(self.partial_recheck_at, "partial_recheck_at")
         if self.power_cap_kw is not None:
             _positive(self.power_cap_kw, "invalid_number", "power_cap_kw")
         if self.soft_price_cap is not None:
@@ -633,6 +637,7 @@ class PlanRequest:
             soft_price_cap=None if self.soft_price_cap is None else float(self.soft_price_cap),
             cap_price_basis=self.cap_price_basis,
             minimum_energy_kwh=None if self.minimum_energy_kwh is None else float(self.minimum_energy_kwh),
+            partial_recheck_at=self.partial_recheck_at,
         )
 
 
@@ -690,6 +695,8 @@ class PlanResult:
     #: Actual above-cap portions of the selected windows and their wall energy.
     exception_periods: tuple[tuple[datetime, datetime], ...] = ()
     exception_kwh: float = 0.0
+    #: First missing interval, not a claim that later intervals are priced.
+    price_coverage_end: datetime | None = None
 
     @property
     def has_plan(self) -> bool:
@@ -1014,7 +1021,10 @@ def price_gap(request: PlanRequest) -> PriceGap | None:
     published = {slot.start: slot for slot in window.slots}
     known: list[PlanningSlot] = []
     cursor = window.first_start
-    while cursor < window.required_end:
+    # Capped plans can use the fractional interval before a non-grid deadline;
+    # uncapped plans use only whole slots and retain their existing wait policy.
+    end = window.end if request.soft_price_cap is not None else window.required_end
+    while cursor < end:
         slot = published.get(cursor)
         if slot is None:
             return PriceGap(
@@ -1235,7 +1245,28 @@ def _calculate_capped(request: PlanRequest) -> PlanResult:
     cost, selected = _select_policy_slots(request, eligible, end, request.requested_kwh)
     cheap_energy = _selected_energy(request, selected)
     if minimum is not None and cheap_energy + 1e-9 < minimum:
-        cost, selected = _select_policy_slots(request, candidates, end, minimum, prefer_cheap=True)
+        if request.partial_recheck_at is None:
+            cost, selected = _select_policy_slots(request, candidates, end, minimum, prefer_cheap=True)
+        else:
+            from .price_wait import FEASIBILITY_MARGIN, START_LAG
+
+            recheck = min(end, max(request.partial_recheck_at.astimezone(timezone.utc),
+                                   request.now.astimezone(timezone.utc) + START_LAG))
+            cheap_before = sum(
+                max(0.0, (min(slot.end, recheck) - slot.start).total_seconds()) / 3600 * request.planned_kw
+                for slot in selected if slot.start < recheck
+            )
+            capacity_after = max(0.0, (end - recheck).total_seconds()) / 3600 * request.planned_kw * FEASIBILITY_MARGIN
+            urgent = min(minimum - cheap_energy, max(0.0, minimum - cheap_before - capacity_after))
+            if urgent > 1e-9:
+                allowed = [slot for slot in candidates if _slot_within_cap(request, slot) or slot.end <= recheck]
+                alternative = _select_policy_slots(request, allowed, end, cheap_energy + urgent, prefer_cheap=True)
+                exceptions = _selected_energy(request, tuple(slot for slot in alternative[1] if not _slot_within_cap(request, slot)))
+                if exceptions <= urgent + 1e-6:
+                    cost, selected = alternative
+    if not selected:
+        return replace(_no_plan(request, "no_eligible_energy"), policy_shortfall_kwh=request.requested_kwh,
+                       minimum_shortfall_kwh=minimum)
     delivered = sum((slot.end - slot.start).total_seconds() / 3600 * request.planned_kw for slot in selected)
     shortfall = max(0.0, request.requested_kwh - delivered)
     exceptions = tuple(slot for slot in selected if not _slot_within_cap(request, slot))
