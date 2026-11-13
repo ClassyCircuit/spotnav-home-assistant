@@ -1995,7 +1995,7 @@ def serialize_plan(capture: CapturedDashboard) -> dict[str, Any]:
         # toward it, null where nothing tracks it (a target, or nothing delivered is known).
         **_need_progress(capture.snapshot),
     }
-    if capture.settings is not None and capture.settings.soft_price_cap is not None:
+    if capture.settings is not None:
         from .price_policy import encode_price_policy
 
         result["price_policy"] = encode_price_policy(capture.settings, capture.snapshot)

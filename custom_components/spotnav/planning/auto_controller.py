@@ -17,7 +17,7 @@ import logging
 import math
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta, timezone
-from typing import Any, Callable, Final, Literal
+from typing import Any, Awaitable, Callable, Final, Literal
 
 from homeassistant.core import callback, HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -780,11 +780,13 @@ class AutoPlannerController:
         vehicle_update: Callable[[str, bool], None] | None = None,
         learned: LearnedPowerStore | None = None,
         learned_energy: LearnedEnergyStore | None = None,
+        schedule_owned: Callable[[], Awaitable[bool]] | None = None,
     ) -> None:
         self._hass = hass
         self._entry_id = entry_id
         self._store = store
         self._manager = manager
+        self._schedule_owned = schedule_owned
         # The charger's display subscription, if any: it follows the area whatever the mode, and a
         # settings change is reconciled here. `None` for a controller used on its own (tests).
         self._observation = observation
@@ -1014,6 +1016,10 @@ class AutoPlannerController:
         try:
             settings = self._effective(self._store.settings(self._entry_id))
             if settings.driver != DRIVER_TARGET_SOC or settings.strategy in (STRATEGY_SOLAR, STRATEGY_HYBRID):
+                return "plan_input_provenance_unavailable"
+            if (snapshot.proposal is not None and not snapshot.proposal.exact_periods
+                    and not snapshot.proposal.short_of_deadline
+                    and snapshot.proposal.delivered_kwh > snapshot.proposal.requested_kwh + price_wait.EPSILON_KWH):
                 return "plan_input_provenance_unavailable"
             if snapshot.morek_input_evidence is None or snapshot.morek_input_evidence != self._morek_input_evidence(self._store.settings(self._entry_id)):
                 return "plan_inputs_changed"
@@ -1734,7 +1740,15 @@ class AutoPlannerController:
                 settings, "planning_unavailable", self._map_planner_code(result.reason or ""), calculated_at,
                 entry=entry, price_snapshot=area_snapshot, proposal=result,
             )
-        if self._stops_at_need(settings, resolved, result, energy_kwh):
+        owned_target = False
+        if (settings.driver == DRIVER_TARGET_SOC and settings.strategy == STRATEGY_CHEAPEST
+                and settings.soft_price_cap is None and self._schedule_owned is not None
+                and abs(result.requested_kwh - energy_kwh) <= price_wait.EPSILON_KWH):
+            try:
+                owned_target = await self._schedule_owned()
+            except Exception:  # noqa: BLE001 - unavailable ownership never changes a legacy plan
+                owned_target = False
+        if owned_target or self._stops_at_need(settings, resolved, result, energy_kwh):
             # The count ends the charge at the need: the plan says the need and its share of the last slot.
             result = ending_at_need(result)
         state: AutoState = "proposal_unpriced" if result.unpriced else "proposal_ready"

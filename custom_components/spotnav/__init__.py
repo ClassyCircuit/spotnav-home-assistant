@@ -853,6 +853,13 @@ async def _async_setup_auto_preview(
     # The wall energy one percent of the car's battery takes, learned the same way (`planning/learned_energy.py`).
     learned_energy = LearnedEnergyStore(hass, entry_id)
     await learned_energy.async_load()
+    async def _schedule_owned() -> bool:
+        identity = _identity_status(hass, data.controller.ocpp_target)
+        status = await command_admission(hass)._store.async_status(entry_id, identity)
+        return (identity.get("supported") is True and status.get("record_state") == "valid"
+                and status.get("recorded_owner") == "morek_schedule"
+                and status.get("handover_evidence") == "completed")
+
     preview = data.preview = AutoPlannerController(
         hass,
         entry_id,
@@ -865,6 +872,7 @@ async def _async_setup_auto_preview(
         vehicle_update=_vehicle_update,
         learned=learned,
         learned_energy=learned_energy,
+        schedule_owned=_schedule_owned,
     )
     entry.async_on_unload(preview.async_shutdown)
     await preview.async_start()

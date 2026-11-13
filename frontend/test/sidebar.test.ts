@@ -25,6 +25,26 @@ const tick = async () => { for(let i=0;i<20;i++) await Promise.resolve(); };
 beforeEach(()=>sessionStorage.clear());
 
 describe('actual sidebar read-only host', () => {
+  it('estimates from old or restored SOC without presenting it as fresh', () => {
+    const now=Date.now(),raw=fixture();raw.generated_at=new Date(now).toISOString();raw.soc={...raw.soc,value:36,age_s:7200,capacity_kwh:72.46,efficiency:.9,target_percent:80,source:'vehicle',estimated:false};raw.soc_observation={time_basis:'vehicle_timestamp',integration:'vehicle',restored:true};
+    const m=dashboardAdapter(raw,status,now,now).model;expect(m.vehicle.stale).toBe(true);expect(m.vehicle.socDetail).toMatch(/2 h ago.*Restored/);
+    const html=renderBattery({soc:m.vehicle.soc,target:80,capacityKwh:m.assumptions.capacityKwh,efficiency:.9,stale:true,socDetail:m.vehicle.socDetail});expect(html).toContain('26.1 kWh');expect(html).toContain('31.9 kWh');expect(html).toContain('35.4 kWh');expect(html).toContain('last-known SOC');
+    expect(renderBattery({soc:null,target:80,capacityKwh:72,efficiency:.9,stale:true})).not.toContain('35.4 kWh');
+    expect(renderBattery({soc:36,target:80,capacityKwh:null,efficiency:.9,stale:true})).toContain('Unknown');
+    expect(renderBattery({soc:36,target:80,capacityKwh:72,efficiency:.9,stale:true,socEstimated:true})).toContain('Estimated SOC - not a measurement');
+  });
+  it('shows uncapped policy only for matching current backend evidence', () => {
+    const now=Date.now(),raw=fixture();raw.generated_at=new Date(now).toISOString();raw.settings.soft_price_cap=null;raw.planning.historical=false;raw.planning.settings_revision=raw.settings.revision;raw.plan.proposal.settings_revision=raw.settings.revision;raw.plan.proposal.periods=[{start:new Date(now+3600000).toISOString(),end:new Date(now+7200000).toISOString()}];raw.plan.price_policy={explanations:[{code:'uncapped'}]};
+    expect(dashboardAdapter(raw,status,now,now).model.vehicle.policy).toMatch(/No soft price cap/);
+    raw.planning.settings_revision++;expect(dashboardAdapter(raw,status,now,now).model.vehicle.policy).not.toMatch(/No soft price cap/);
+    raw.planning.settings_revision--;raw.plan.price_policy=null;expect(dashboardAdapter(raw,status,now,now).model.vehicle.policy).toBe('Unknown');
+  });
+  it('rounds weighted prices for plan display without rounding stored values', () => {
+    const format={currency:'EUR',time:()=>'',day:()=>''};
+    const windows=[{start:1,end:2,energy:1,cost:-.123456,pricePerKwh:-12.3456}];
+    const html=renderPlan(windows,{},false,format,{energy:1,cost:-.123456,pricePerKwh:-12.3456});
+    expect(html).toContain('-12.35 c/kWh');expect(windows[0].pricePerKwh).toBe(-12.3456);
+  });
   it.each([['manual_kwh','target_soc'],['target_soc','manual_kwh']])('saves explicit %s to %s through canonical settings', async (from,to) => {
     const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';raw.soc.age_s=86400;raw.soc_observation={time_basis:'vehicle_timestamp',integration:'vehicle',restored:false};
     let saved={...record(),driver:from,target:{vehicle_id:'vehicle_ev6',target_percent:80},requested_kwh:20};const calls=[], planner=[];

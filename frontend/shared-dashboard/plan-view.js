@@ -1,5 +1,5 @@
 import { total, money, validSocAssumptions } from './plan-data.js';
-import { priceText, priceUnit as unitFor } from './price-format.js';
+import { summaryPriceText, priceUnit as unitFor } from './price-format.js';
 
 export const number = (value, digits, unit = '', valid = () => true) =>
   Number.isFinite(value) && valid(value) ? `${value.toFixed(digits)}${unit}` : 'Unknown';
@@ -17,7 +17,7 @@ export function renderPlan(windows, assumptions = {}, stale = false, formatters,
   const priceCurrency = currency === undefined ? 'EUR' : currency;
   const displayPrice = (value, legacy) => {
     const actual = value === undefined && priceCurrency === 'EUR' ? legacy : value;
-    return Number.isFinite(actual) && typeof priceCurrency==='string' && /^[A-Z]{3}$/.test(priceCurrency) ? `${priceText(actual)} ${unitFor(priceCurrency)}` : 'Unknown';
+    return Number.isFinite(actual) && typeof priceCurrency==='string' && /^[A-Z]{3}$/.test(priceCurrency) ? `${summaryPriceText(actual)} ${unitFor(priceCurrency)}` : 'Unknown';
   };
   const validAssumptions = assumptions.projectionSupported === true || validSocAssumptions(assumptions);
   const rows = windows.map((w, i) => `<div class="plan-row ${i === 0 ? 'next-window' : ''}"><span><b>${time(w.start)}–${time(w.end)}</b><small>${day(w.start)}${i === 0 ? ' · NEXT' : ''}${w.control === 'minimum-exception' ? ' · ABOVE-CAP MINIMUM' : ''}</small></span><span><b>${displayPrice(w.pricePerKwh,w.centsPerKwh)}</b><small>weighted price</small></span><span><b>${energy(w.energy)}</b><small>wall energy</small></span><span><b>${money(w.cost, currency)}</b><small>cost</small></span><span><b>${soc(validAssumptions ? w.projectedSoc : null)}</b><small>projected SOC</small></span></div>`).join('');

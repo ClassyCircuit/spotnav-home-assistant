@@ -337,6 +337,7 @@ def _schedule_verification(hass: HomeAssistant, entry_id: str, sent_at: str, att
                 verification = data.setdefault("verification", {})
                 verification.update({"reason": "readback_unavailable", "attempts": attempt + 2,
                                      "checked_at": datetime.now(timezone.utc).isoformat(),
+                                     "readback_at": data["effective"]["fetched_at"], "coverage_start": None, "coverage_end": None,
                                      "pending": False, "next_check_at": None})
                 if attempt + 1 < len(VERIFY_DELAYS):
                     _schedule_verification(hass, entry_id, sent_at, attempt + 1, attempt_id)
@@ -361,6 +362,12 @@ def _verification_state(hass: HomeAssistant, entry_id: str, data: dict[str, Any]
     if verification.get("pending") and entry_id not in hass.data.get(_VERIFY_KEY, {}):
         verification.update({"pending": False, "reason": "verification_interrupted", "next_check_at": None})
     return verification
+
+
+def _readback_associated(verification: dict[str, Any], effective: Any) -> bool:
+    """A comparison's coverage refers only to the readback it actually compared."""
+    return bool(isinstance(effective, dict) and verification.get("readback_at")
+                and verification["readback_at"] == effective.get("fetched_at"))
 
 
 def _verification_coverage_current(verification: dict[str, Any], now: datetime) -> bool:
@@ -1164,9 +1171,12 @@ async def _async_schedule_action_locked(hass: HomeAssistant, entry_id: str, acti
         # Publish only after the persistence await and its freshness recheck.
         if current or action == "clear" or profile is None:
             data["effective"] = effective
+        else:
+            comparison.update({"coverage_start": None, "coverage_end": None})
         data["verified"] = comparison["matched"]
         verification = data.setdefault("verification", {})
         verification.update(comparison)
+        verification["readback_at"] = effective.get("fetched_at") if data.get("effective") is effective else None
         verification["checked_at"] = datetime.now(timezone.utc).isoformat()
         if data["verified"] or action == "clear" or comparison["reason"] == "verification_superseded":
             _cancel_verification(hass, entry_id)
@@ -1194,6 +1204,7 @@ async def _async_schedule_action_locked(hass: HomeAssistant, entry_id: str, acti
             data["verified"] = False
             data["effective"] = previous_effective
             verification.update({"matched": False, "exact": False, "reason": "verification_superseded",
+                                 "readback_at": None, "coverage_start": None, "coverage_end": None,
                                  "pending": False, "next_check_at": None})
             record["verified"] = None
             await outcomes_for(hass).write(record)
@@ -1291,13 +1302,19 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
             verified_evidence = outcomes.get("verified") or {}
             worker = getattr(getattr(entry, "runtime_data", None), "morek_worker", None)
             verification = _verification_state(hass, entry.entry_id, data)
+            effective = data.get("effective")
+            readback_associated = _readback_associated(verification, effective)
+            if not readback_associated:
+                verification.update({"matched": False, "exact": False, "coverage_start": None, "coverage_end": None})
             associated = bool(data.get("verified") and verified_evidence.get("attempt_id") == data.get("attempt_id")
                             and verified_evidence.get("attempt_at") == data.get("sent_at")
                             and verified_evidence.get("fingerprint") == (outcomes.get("acknowledged") or {}).get("fingerprint")
                             and (worker is None or verified_evidence.get("planner_serial") == worker._serial)
                             and _verification_current(hass, entry.entry_id, entry, data, outcomes, data.get("sent_at")))
-            verified = associated and _verification_coverage_current(verification, datetime.now(timezone.utc))
-            if associated and not verified:
+            verified = associated and readback_associated and _verification_coverage_current(verification, datetime.now(timezone.utc))
+            if associated and not readback_associated:
+                verification.update({"matched": False, "exact": False, "reason": "verification_superseded"})
+            elif associated and not verified:
                 verification.update({"matched": False, "exact": False, "reason": "coverage_stale"})
             elif data.get("verified") and not verified:
                 verification.update({"matched": False, "exact": False, "reason": "verification_superseded"})

@@ -50,6 +50,28 @@ def test_uncapped_shortened_final_slot_and_unpriced_plan():
     assert all(row["cost"] is None and "projected_soc" not in row for row in data["window_details"])
 
 
+def test_uncapped_negative_price_partial_window_reconciles():
+    base = cap_request(request(), [-.1, -.2, -.04, -.3], need=2)
+    plan = ending_at_need(calculate_plan(replace(base, soft_price_cap=None, cap_price_basis=None)))
+    assert plan.has_plan and plan.need_met_at is not None
+    rows = section(plan)["window_details"]
+    assert sum(row["energy_kwh"] for row in rows) == pytest.approx(plan.delivered_kwh)
+    assert sum(row["cost"] for row in rows) == pytest.approx(plan.estimated_cost)
+    assert plan.estimated_cost < 0
+
+
+def test_shortened_target_across_dst_and_short_deadline():
+    from .test_planner_deadline_dst import SPRING, SPRING_NOW, request as dst_request
+    plan = ending_at_need(calculate_plan(dst_request(SPRING_NOW, "06:00", 10, SPRING)))
+    assert plan.need_met_at is not None
+    rows = section(plan)["window_details"]
+    assert sum(row["energy_kwh"] for row in rows) == pytest.approx(plan.delivered_kwh)
+    assert sum(row["cost"] for row in rows) == pytest.approx(plan.estimated_cost)
+    short = calculate_plan(dst_request(SPRING_NOW, "06:00", 16, SPRING))
+    assert short.short_of_deadline
+    assert ending_at_need(short) == short
+
+
 def test_inconsistent_or_missing_slots_do_not_invent_details():
     plan = calculate_plan(cap_request(request(), [0.05, 0.2, 0.04, 0.3]))
     assert section(replace(plan, slots=()))["window_details"] is None

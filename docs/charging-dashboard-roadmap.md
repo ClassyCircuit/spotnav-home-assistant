@@ -1296,6 +1296,9 @@ action, weaken admission/safety checks, or claim physical behavior is verified.
     shared chart/sidebar rendering and backend contract compatibility.
 
 - [x] **12.3 Useful plan details and honest missing data** (local implementation; review pending)
+  - **2.5.83 local follow-up:** battery estimates can use labelled last-known SOC,
+    including old/restored values; Morek schedule-owned uncapped target plans use an
+    estimated shortened final window. It is not a measurement or a physical stop.
   - 2.5.73 exposes the calculation's ready-by instant and reconciled per-window
     estimates from selected planner slots, with configured-variable cost basis and
     unrounded weighted totals. Calculation-time SOC inputs support explicitly
@@ -1331,6 +1334,9 @@ action, weaken admission/safety checks, or claim physical behavior is verified.
     do not infer measured charging from planned windows or duplicate those stages.
 
 - [x] **12.4 Clear Morek status and evidence** (2.5.75 local; review pending)
+  - **2.5.83 local follow-up:** comparison coverage is bound to its readback timestamp;
+    older records without this association are unverified. Uncapped policy and summary
+    price formatting are explicit. Local mocks do not validate deployed behavior.
   - The daily view separates proposal, sent/ACK, effective readback and measured
     charging, with freshness and reported coverage; diagnostics and transitions
     remain expandable. Missing or historical evidence is not confirmation.

@@ -36,7 +36,7 @@ export function healthKey(state: MorekState | null, observedAt: number | null, f
     const start = Date.parse(state.verification?.coverage_start ?? "");
     const preview = Date.parse(state.preview?.calculated_at ?? "");
     const reason = state.verification?.reason;
-    if ((reason === "matched" || reason === "matched_with_drift") && state.ack === "Accepted" &&
+    if ((reason === "matched" || reason === "matched_with_drift") && state.verification?.readback_at === state.effective?.fetched_at && !!state.verification?.readback_at && state.ack === "Accepted" &&
       state.sent !== null && Number.isFinite(Date.parse(state.sent_at ?? "")) &&
       state.effective?.status === "Accepted" && Array.isArray(state.effective.periods) && state.effective.periods.length >= 2 &&
       state.effective.periods.every((period) => period !== null && typeof period === "object" &&

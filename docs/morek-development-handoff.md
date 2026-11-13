@@ -355,6 +355,27 @@ requirements, not features claimed implemented in the manual baseline below.
 
 ## Tests, build, and next steps
 
+### 2026-11-13 — estimates, Morek target window and evidence (2.5.83; local)
+
+- Battery energy estimates use valid last-known SOC even when old, restored or
+  derived, while retaining provenance and stale/estimated labels. Missing inputs
+  remain unavailable; estimates do not establish current SOC or the car's limit.
+- A completed, identity-matched Morek schedule owner uses the existing partial-final-
+  slot calculation for uncapped cheapest target-SOC plans. Other owners and capped
+  plans retain their paths. A whole-slot target proposal with excess energy is refused
+  by the Morek provenance check until replanned. Window, estimated energy/cost and
+  Morek profile use the same boundaries (OCPP rounds inward to whole seconds).
+  This assumes planned power and last-known SOC; neither physical charging nor an
+  exact target/stop is established. Guarded reconciliation is unchanged otherwise.
+- Uncapped current policy is explicitly serialized. Morek comparison coverage is
+  tied to the actual readback timestamp; old records without that binding are
+  unverified. Superseded and mismatched comparisons remain visible without claiming
+  they describe another read. Missing errors no longer print undefined; weighted
+  summary prices use two decimal places without rounding price inputs or tooltips.
+- Focused mocked frontend and isolated actual-module planner/API tests plus build
+  checks only. Browser, full HA-plugin suite, live HA, BMW and physical behavior are
+  unverified. No HA contact, deployment, vehicle wake or charger action occurred.
+
 ### 2026-11-13 — single-car plan defaults (2.5.82)
 
 - When no planning vehicle is saved and exactly one eligible non-guest vehicle is

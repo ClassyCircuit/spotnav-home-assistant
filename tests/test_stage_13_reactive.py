@@ -6,7 +6,7 @@ charger is used. These tests can also run in the isolated actual-module harness.
 
 import asyncio
 from dataclasses import replace
-from datetime import timedelta
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -113,6 +113,50 @@ def test_mode_settings_round_trip_replans_with_last_known_soc(monkeypatch):
         assert restored.proposal is not None
 
     asyncio.run(run())
+
+
+def test_owned_target_partial_window_reconciles_dashboard_and_profile(monkeypatch):
+    async def run():
+        w = await _world(monkeypatch)
+        w.facts[0] = replace(w.facts[0], soc_percent=25, soc_age_s=86400, reported_capacity_kwh=60)
+        w.controller._schedule_owned = AsyncMock(return_value=True)
+        monkeypatch.setattr(w.controller, "_plan_while_prices_are_missing",
+                            lambda request, *_args, **_kwargs: (calculate_plan(replace(request, window_end=request.now + timedelta(hours=2))), {}, None))
+        snap = await _save(w, soft_price_cap=None, minimum_ready_by_soc=None,
+                           target={"vehicle_id": "veh-1", "target_percent": 30})
+        proposal = snap.proposal
+        assert proposal and proposal.ends_at_need and not proposal.short_of_deadline
+        assert proposal.delivered_kwh == pytest.approx(proposal.requested_kwh)
+        assert proposal.shown_periods[-1][1] < proposal.periods[-1][1]
+        rows = dashboard._proposal_window_details(proposal, snap)
+        assert rows is not None
+        assert sum(row["energy_kwh"] for row in rows) == pytest.approx(proposal.delivered_kwh)
+        assert sum(row["cost"] for row in rows) == pytest.approx(proposal.estimated_cost)
+        assert rows[-1]["projected_soc"] == pytest.approx(30)
+        from custom_components.spotnav.api.price_policy import encode_price_policy
+        assert encode_price_policy(w.store.settings("test"), snap)["explanations"] == [{"code": "uncapped"}]
+        monkeypatch.setattr(morek_schedule, "domain_data", lambda _: SimpleNamespace(auto_store=w.store))
+        monkeypatch.setattr(morek_schedule, "preview_for", lambda *_: w.controller)
+        profile = morek_schedule._proposed_profile(w.hass, "test", w.request.now)
+        schedule = profile["chargingSchedule"]
+        start = datetime.fromisoformat(schedule["startSchedule"])
+        end = start + timedelta(seconds=schedule["chargingSchedulePeriod"][-1]["startPeriod"])
+        assert abs((end - proposal.shown_periods[-1][1]).total_seconds()) <= 1
+        w.controller._schedule_owned = AsyncMock(return_value=False)
+        legacy = await w.controller.async_preview(w.store.settings("test"))
+        assert legacy.proposal and not legacy.proposal.ends_at_need
+        w.controller._schedule_owned = AsyncMock(return_value=True)
+        capped = await _save(w, soft_price_cap=.3)
+        assert capped.proposal and capped.proposal.exact_periods
+
+    asyncio.run(run())
+
+
+def test_readback_comparison_requires_matching_timestamp():
+    read = {"fetched_at": "old"}
+    assert not morek_schedule._readback_associated({"readback_at": "new"}, read)
+    assert not morek_schedule._readback_associated({}, read)
+    assert morek_schedule._readback_associated({"readback_at": "old"}, read)
 
 
 def test_settings_api_replans_and_preview_policy_matches_dashboard(monkeypatch):

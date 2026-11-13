@@ -14,7 +14,7 @@ const status = (extra: Record<string, unknown> = {}) => ({ api_version: 1, sched
   supported: true, sent_at: "2026-11-06T20:00:00Z", ack: "Accepted", sent: profile, verified: true,
   operator: { state: "verified", reason: "matched" }, outcomes: { uncertain: false },
   preview: { calculated_at: "2026-11-06T20:01:59Z", profile, reason: null, preview_id: "fingerprint" },
-  verification: { reason: "matched", coverage_start: "2026-11-06T20:01:00Z", coverage_end: "2026-11-07T08:00:00Z" },
+  verification: { reason: "matched", readback_at: "2026-11-06T20:01:00Z", coverage_start: "2026-11-06T20:01:00Z", coverage_end: "2026-11-07T08:00:00Z" },
   effective: { status: "Accepted", fetched_at: "2026-11-06T20:01:00Z", periods: [{ at: "2026-11-06T20:01:00Z", amps: 0 }, { at: "2026-11-06T21:00:00Z", amps: 16 }] }, ...extra,
 } });
 const state = (extra: Record<string, unknown> = {}) => decodeMorekState(status(extra))!;

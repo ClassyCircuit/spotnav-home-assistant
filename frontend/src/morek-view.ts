@@ -23,7 +23,7 @@ export interface MorekState {
   verification_target?: "current_plan" | "held_pause" | null;
   verification?: {
     pending?: boolean; reason?: string; exact?: boolean; tolerance_s?: number;
-    max_delta_s?: number | null; coverage_start?: string | null; coverage_end?: string | null; next_check_at?: string | null;
+    max_delta_s?: number | null; coverage_start?: string | null; coverage_end?: string | null; next_check_at?: string | null; readback_at?: string | null;
   };
   sent: MorekProfile | null;
   effective: { status: string; fetched_at: string; periods: { at: string; amps: number }[];
@@ -96,6 +96,7 @@ export function morekEvidence(state: MorekState | null, observedAt: number | nul
   const validCoverage = Number.isFinite(start) && Number.isFinite(end) && start <= now && now < end;
   const outcomeUnknown = state?.outcomes?.uncertain === true;
   const reason = state?.verification?.reason;
+  const associated = !!state?.verification?.readback_at && state.verification.readback_at === state.effective?.fetched_at;
   let summary = "Current plan is not confirmed on the charger; the reason is unknown.";
   if (!statusFresh) summary = "Current plan is not confirmed on the charger; Morek status is unavailable or stale.";
   else if (state?.outcomes?.state === "storage_unavailable") summary = "Current plan is not confirmed; outcome evidence is unavailable.";
@@ -103,13 +104,13 @@ export function morekEvidence(state: MorekState | null, observedAt: number | nul
   else if (state && !state.supported) summary = "Current plan is not confirmed; Morek identity unsupported or unresolved.";
   else if (state?.operator?.state === "offline") summary = "Current plan is not confirmed; Morek is offline.";
   else if (!state?.preview?.profile) summary = "Current plan is not confirmed; a current proposal is unavailable.";
-  else if (state.verification_target === "held_pause" && state.verified) summary = "Current plan is not confirmed; the readback comparison concerns a held pause, not the plan.";
+  else if (state.verification_target === "held_pause" && state.verified && associated) summary = "Current plan is not confirmed; the readback comparison concerns a held pause, not the plan.";
   else if (reason === "verification_superseded") summary = "Current plan is not confirmed; the readback belongs to an older or unavailable attempt or plan.";
-  else if (reason === "limits_or_transitions_differ") summary = "Current plan is not confirmed; limits at the last read differed from the last sent schedule.";
+  else if (reason === "limits_or_transitions_differ") summary = associated ? "Current plan is not confirmed; limits at the last read differed from the last sent schedule." : "Current plan is not confirmed; a prior comparison reported a mismatch but is not associated with the displayed readback.";
   else if (!state.sent) summary = "Current plan is not confirmed; no sent schedule is recorded.";
   else if (!state.effective) summary = "Current plan is not confirmed; effective readback is unavailable.";
   else if (!readFresh || !validCoverage) summary = "Current plan is not confirmed; the readback is stale or its current coverage is unavailable.";
-  else if (state.verified && state.verification_target === "current_plan") summary = "The remaining plan matched effective limits at the last read, within reported coverage.";
+  else if (state.verified && associated && state.verification_target === "current_plan") summary = "The remaining plan matched effective limits at the last read, within reported coverage.";
   else summary = "Current plan is not confirmed; the last readback has not verified this plan.";
   const proposal = state?.preview?.profile ? `Calculated ${time(state.preview.calculated_at)}${statusFresh ? "" : " · status stale"}` : "Unavailable";
   const sent = state?.sent ? `${time(state.sent_at)} · ACK ${state.ack ?? "unknown"} (response time unavailable)` : "No sent schedule recorded";
@@ -290,7 +291,8 @@ export function morekPanel(
   }
   const status = doc.createElement("p");
   const ack = state.ack === null ? "No plan sent from this card" : `Last upload: ${state.ack} at ${localTime(state.sent_at)}`;
-  const verification = state.sent === null ? "" : state.verified && !state.outcomes?.uncertain
+  const comparisonAssociated = !!state.verification?.readback_at && state.verification.readback_at === state.effective?.fetched_at;
+  const verification = state.sent === null ? "" : state.verified && comparisonAssociated && !state.outcomes?.uncertain
      ? state.verification?.reason === "matched_with_drift" ? " · Remaining schedule matched within tolerance, NOT exact" : " · Remaining schedule matched at last read"
     : state.verification?.pending ? " · Awaiting follow-up readback — NOT verified" : " · NOT verified";
   status.textContent = ack + verification;
@@ -318,12 +320,17 @@ export function morekPanel(
       matched: "Remaining effective limits and transitions match at the last read; past intervals and physical charging are not verified.",
       matched_with_drift: "Remaining limits match within the time tolerance; past intervals and physical charging are not verified.",
     };
-    detail.textContent = reasons[state.verification.reason ?? ""] ?? "";
+    detail.textContent = !comparisonAssociated && state.verification.reason === "limits_or_transitions_differ"
+      ? "A prior comparison reported a mismatch; it is not associated with the displayed readback."
+      : !comparisonAssociated && (state.verification.reason === "matched" || state.verification.reason === "matched_with_drift")
+        ? "A prior comparison reported a match; it cannot verify the displayed readback."
+        : reasons[state.verification.reason ?? ""] ?? "";
     if (state.verification.max_delta_s != null) {
       detail.textContent += ` Maximum transition drift: ${Math.round(state.verification.max_delta_s)} s; tolerance: ${state.verification.tolerance_s ?? 90} s.`;
     }
-    if (state.verification.coverage_start) detail.textContent += ` Compared from ${localTime(state.verification.coverage_start)}.`;
-    if (state.verification.coverage_end) detail.textContent += ` Readback covers through ${localTime(state.verification.coverage_end)}.`;
+    if (comparisonAssociated && state.verification.coverage_start) detail.textContent += ` Compared from ${localTime(state.verification.coverage_start)}.`;
+    if (comparisonAssociated && state.verification.coverage_end) detail.textContent += ` Readback covers through ${localTime(state.verification.coverage_end)}.`;
+    if (!comparisonAssociated) detail.textContent += " Comparison is not associated with the displayed readback; unverified.";
     if (state.verification.pending) detail.textContent += ` Automatic read-only check ${localTime(state.verification.next_check_at ?? null)}. No profile will be resent or cleared. Do not assume the sent limits are active yet.`;
     section.append(detail);
   }
@@ -366,7 +373,7 @@ export function morekPanel(
     }
     section.append(list);
   }
-  if (error !== null) {
+  if (typeof error === "string" && error.trim() !== "") {
     const message = doc.createElement("p");
     message.textContent = `Morek request failed: ${error}`;
     section.append(message);

@@ -7,6 +7,7 @@ export const priceText = value => {
   if (value !== 0 && Math.abs(value) < 0.0001) return value.toExponential(3);
   return new Intl.NumberFormat('en', {maximumFractionDigits: 4, useGrouping: false}).format(Object.is(value, -0) ? 0 : value);
 };
+export const summaryPriceText = value => Number.isFinite(value) ? new Intl.NumberFormat('en', {maximumFractionDigits: 2, useGrouping: false}).format(Object.is(value, -0) ? 0 : value) : 'Unknown';
 // Do not round a saved cap merely by opening or saving another field.
 export const capInput = (price, currency) => Number.isFinite(price) ? String(Number(displayPrice(price,currency).toPrecision(15))) : '';
 export const capForSave = (text, currency, saved) => {

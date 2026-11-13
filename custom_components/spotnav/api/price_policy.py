@@ -44,7 +44,7 @@ def encode_price_policy(settings: AutoSettings, snapshot: AutoSnapshot | None) -
         if proposal.policy_shortfall_kwh is not None and proposal.policy_shortfall_kwh > _EPSILON:
             explanations.append({"code": "target_shortfall"})
         if not explanations:
-            explanations.append({"code": "within_cap"})
+            explanations.append({"code": "uncapped" if settings.soft_price_cap is None else "within_cap"})
     if current is not None and current.last_error_code is not None:
         explanations.append({"code": "error", "reason": current.last_error_code})
     return {

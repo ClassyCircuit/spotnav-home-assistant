@@ -52237,6 +52237,7 @@ var priceText = (value2) => {
   if (value2 !== 0 && Math.abs(value2) < 1e-4) return value2.toExponential(3);
   return new Intl.NumberFormat("en", { maximumFractionDigits: 4, useGrouping: false }).format(Object.is(value2, -0) ? 0 : value2);
 };
+var summaryPriceText = (value2) => Number.isFinite(value2) ? new Intl.NumberFormat("en", { maximumFractionDigits: 2, useGrouping: false }).format(Object.is(value2, -0) ? 0 : value2) : "Unknown";
 var capInput = (price, currency) => Number.isFinite(price) ? String(Number(displayPrice(price, currency).toPrecision(15))) : "";
 var capForSave = (text3, currency, saved) => {
   if (text3 === capInput(saved, currency)) return saved == null ? "" : String(saved);
@@ -52520,7 +52521,7 @@ function renderPlan(windows, assumptions = {}, stale = false, formatters, totals
   const priceCurrency = currency === void 0 ? "EUR" : currency;
   const displayPrice2 = (value2, legacy) => {
     const actual = value2 === void 0 && priceCurrency === "EUR" ? legacy : value2;
-    return Number.isFinite(actual) && typeof priceCurrency === "string" && /^[A-Z]{3}$/.test(priceCurrency) ? `${priceText(actual)} ${priceUnit(priceCurrency)}` : "Unknown";
+    return Number.isFinite(actual) && typeof priceCurrency === "string" && /^[A-Z]{3}$/.test(priceCurrency) ? `${summaryPriceText(actual)} ${priceUnit(priceCurrency)}` : "Unknown";
   };
   const validAssumptions = assumptions.projectionSupported === true || validSocAssumptions(assumptions);
   const rows = windows.map((w2, i7) => `<div class="plan-row ${i7 === 0 ? "next-window" : ""}"><span><b>${time(w2.start)}\u2013${time(w2.end)}</b><small>${day(w2.start)}${i7 === 0 ? " \xB7 NEXT" : ""}${w2.control === "minimum-exception" ? " \xB7 ABOVE-CAP MINIMUM" : ""}</small></span><span><b>${displayPrice2(w2.pricePerKwh, w2.centsPerKwh)}</b><small>weighted price</small></span><span><b>${energy(w2.energy)}</b><small>wall energy</small></span><span><b>${money(w2.cost, currency)}</b><small>cost</small></span><span><b>${soc(validAssumptions ? w2.projectedSoc : null)}</b><small>projected SOC</small></span></div>`).join("");
@@ -52536,7 +52537,7 @@ var percent = (n6) => Number.isFinite(n6) && n6 >= 0 && n6 <= 100;
 var positive = (n6) => Number.isFinite(n6) && n6 > 0;
 var showKwh = (n6) => number(n6, 1, " kWh", (x2) => x2 >= 0);
 function batteryEstimates({ soc: soc2, target, capacityKwh, efficiency, stale = false, planStale = stale, windows = [], minutesPerTimeUnit = 60 }) {
-  const validSoc = !stale && percent(soc2), validTarget = percent(target), validCapacity = positive(capacityKwh);
+  const validSoc = percent(soc2), validTarget = percent(target), validCapacity = positive(capacityKwh);
   const battery = validSoc && validCapacity ? soc2 / 100 * capacityKwh : null;
   const needed = validSoc && validTarget && validCapacity ? Math.max(0, target - soc2) / 100 * capacityKwh : null;
   const wall = needed != null && positive(efficiency) && efficiency <= 1 ? needed / efficiency : null;
@@ -52555,7 +52556,7 @@ function renderBattery({ soc: soc2, target, capacityKwh, efficiency, stale = fal
   const socText = s4 == null ? "Unknown" : `${s4}%`;
   const caption = s4 == null ? "SOC unavailable" : socEstimated ? "Estimated SOC - not a measurement" : stale ? `Last ${sample ? "sample " : ""}SOC - stale or freshness unknown` : `${sample ? "Sample b" : "B"}attery SOC`;
   const activeText = values.active == null ? "Unknown" : `${Math.round(values.active)} min`;
-  return `<div class="battery-card ${stale ? "battery-stale" : ""}"><div class="battery-title"><div><span class="battery-caption">${escapeText(caption)}</span><strong>${socText}</strong></div><div class="battery-target">Target <b>${t6 == null ? "Unknown" : `${t6}%`}</b><small>Minimum ${number(minimum, 0, "%", percent)} \xB7 by ${escapeText(deadline)}</small></div></div>${socDetail ? `<p class="battery-note">${escapeText(socDetail)}</p>` : ""}<div class="battery-track" role="img" aria-label="${stale ? "Stale " : ""}SOC ${socText}; target ${t6 == null ? "unknown" : `${t6}%`}${low == null ? "" : `; separate low SOC warning ${low}%`}">${s4 == null ? "" : `<span class="battery-fill" style="width:${s4}%"></span>`}${t6 == null ? "" : `<span class="battery-marker target-marker" style="left:${t6}%"></span>`}${low == null ? "" : `<span class="battery-marker low-marker" style="left:${low}%"></span>`}</div><div class="battery-legend"><span>\u25CF ${stale ? "Stale SOC" : "SOC"}</span><span>\u2502 Target${t6 == null ? " unknown" : ` ${t6}%`}</span>${low == null ? "" : `<span class="battery-low">\u250A Low-SOC warning ${low}%${s4 != null && !stale && s4 <= low ? " \xB7 below warning" : ""}</span>`}</div>${low == null ? "" : '<p class="battery-note">Low-SOC warning is a separate illustrative value, not the ready-by minimum or a protection floor.</p>'}<div class="battery-facts"><div><small>In usable battery \xB7 est.</small><b>${showKwh(values.battery)}</b></div><div><small>To target \xB7 battery est.</small><b>${showKwh(values.needed)}</b></div><div><small>To target \xB7 wall est.</small><b>${showKwh(values.wall)}</b></div><div><small>Plan active time \xB7 est.</small><b>${activeText}</b></div></div><p class="battery-note">Assumptions: ${number(capacityKwh, 0, " kWh", positive)} usable; ${number(Number.isFinite(efficiency) ? efficiency * 100 : null, 0, "%", (n6) => n6 > 0 && n6 <= 100)} charging efficiency. Battery energy = wall energy \xD7 efficiency. Estimates, not measurements or a guaranteed finish.${stale ? " The battery summary excludes stale or uncertain SOC; plan projections may use the labelled last-known reading." : ""}${!positive(capacityKwh) ? " Configure usable battery capacity in vehicle settings." : ""}${!positive(efficiency) || efficiency > 1 ? " Charging efficiency is unavailable." : ""}</p></div>`;
+  return `<div class="battery-card ${stale ? "battery-stale" : ""}"><div class="battery-title"><div><span class="battery-caption">${escapeText(caption)}</span><strong>${socText}</strong></div><div class="battery-target">Target <b>${t6 == null ? "Unknown" : `${t6}%`}</b><small>Minimum ${number(minimum, 0, "%", percent)} \xB7 by ${escapeText(deadline)}</small></div></div>${socDetail ? `<p class="battery-note">${escapeText(socDetail)}</p>` : ""}<div class="battery-track" role="img" aria-label="${stale ? "Stale " : ""}SOC ${socText}; target ${t6 == null ? "unknown" : `${t6}%`}${low == null ? "" : `; separate low SOC warning ${low}%`}">${s4 == null ? "" : `<span class="battery-fill" style="width:${s4}%"></span>`}${t6 == null ? "" : `<span class="battery-marker target-marker" style="left:${t6}%"></span>`}${low == null ? "" : `<span class="battery-marker low-marker" style="left:${low}%"></span>`}</div><div class="battery-legend"><span>\u25CF ${stale ? "Stale SOC" : "SOC"}</span><span>\u2502 Target${t6 == null ? " unknown" : ` ${t6}%`}</span>${low == null ? "" : `<span class="battery-low">\u250A Low-SOC warning ${low}%${s4 != null && !stale && s4 <= low ? " \xB7 below warning" : ""}</span>`}</div>${low == null ? "" : '<p class="battery-note">Low-SOC warning is a separate illustrative value, not the ready-by minimum or a protection floor.</p>'}<div class="battery-facts"><div><small>In usable battery \xB7 est.</small><b>${showKwh(values.battery)}</b></div><div><small>To target \xB7 battery est.</small><b>${showKwh(values.needed)}</b></div><div><small>To target \xB7 wall est.</small><b>${showKwh(values.wall)}</b></div><div><small>Plan active time \xB7 est.</small><b>${activeText}</b></div></div><p class="battery-note">Assumptions: ${number(capacityKwh, 0, " kWh", positive)} usable; ${number(Number.isFinite(efficiency) ? efficiency * 100 : null, 0, "%", (n6) => n6 > 0 && n6 <= 100)} charging efficiency. Battery energy = wall energy \xD7 efficiency. Estimates based on last-known SOC, not measurements or a guaranteed finish. The car limit is separate.${stale ? " Battery estimates use the last-known SOC and may be inaccurate after driving. The car limit is separate." : ""}${!positive(capacityKwh) ? " Configure usable battery capacity in vehicle settings." : ""}${!positive(efficiency) || efficiency > 1 ? " Charging efficiency is unavailable." : ""}</p></div>`;
 }
 
 // shared-dashboard/evidence-view.js
@@ -59540,6 +59541,7 @@ function morekEvidence(state, observedAt, failed, now = Date.now()) {
   const validCoverage = Number.isFinite(start2) && Number.isFinite(end2) && start2 <= now && now < end2;
   const outcomeUnknown = state?.outcomes?.uncertain === true;
   const reason = state?.verification?.reason;
+  const associated = !!state?.verification?.readback_at && state.verification.readback_at === state.effective?.fetched_at;
   let summary = "Current plan is not confirmed on the charger; the reason is unknown.";
   if (!statusFresh) summary = "Current plan is not confirmed on the charger; Morek status is unavailable or stale.";
   else if (state?.outcomes?.state === "storage_unavailable") summary = "Current plan is not confirmed; outcome evidence is unavailable.";
@@ -59547,13 +59549,13 @@ function morekEvidence(state, observedAt, failed, now = Date.now()) {
   else if (state && !state.supported) summary = "Current plan is not confirmed; Morek identity unsupported or unresolved.";
   else if (state?.operator?.state === "offline") summary = "Current plan is not confirmed; Morek is offline.";
   else if (!state?.preview?.profile) summary = "Current plan is not confirmed; a current proposal is unavailable.";
-  else if (state.verification_target === "held_pause" && state.verified) summary = "Current plan is not confirmed; the readback comparison concerns a held pause, not the plan.";
+  else if (state.verification_target === "held_pause" && state.verified && associated) summary = "Current plan is not confirmed; the readback comparison concerns a held pause, not the plan.";
   else if (reason === "verification_superseded") summary = "Current plan is not confirmed; the readback belongs to an older or unavailable attempt or plan.";
-  else if (reason === "limits_or_transitions_differ") summary = "Current plan is not confirmed; limits at the last read differed from the last sent schedule.";
+  else if (reason === "limits_or_transitions_differ") summary = associated ? "Current plan is not confirmed; limits at the last read differed from the last sent schedule." : "Current plan is not confirmed; a prior comparison reported a mismatch but is not associated with the displayed readback.";
   else if (!state.sent) summary = "Current plan is not confirmed; no sent schedule is recorded.";
   else if (!state.effective) summary = "Current plan is not confirmed; effective readback is unavailable.";
   else if (!readFresh || !validCoverage) summary = "Current plan is not confirmed; the readback is stale or its current coverage is unavailable.";
-  else if (state.verified && state.verification_target === "current_plan") summary = "The remaining plan matched effective limits at the last read, within reported coverage.";
+  else if (state.verified && associated && state.verification_target === "current_plan") summary = "The remaining plan matched effective limits at the last read, within reported coverage.";
   else summary = "Current plan is not confirmed; the last readback has not verified this plan.";
   const proposal = state?.preview?.profile ? `Calculated ${time(state.preview.calculated_at)}${statusFresh ? "" : " \xB7 status stale"}` : "Unavailable";
   const sent = state?.sent ? `${time(state.sent_at)} \xB7 ACK ${state.ack ?? "unknown"} (response time unavailable)` : "No sent schedule recorded";
@@ -59713,7 +59715,8 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
   }
   const status = doc.createElement("p");
   const ack = state.ack === null ? "No plan sent from this card" : `Last upload: ${state.ack} at ${localTime(state.sent_at)}`;
-  const verification = state.sent === null ? "" : state.verified && !state.outcomes?.uncertain ? state.verification?.reason === "matched_with_drift" ? " \xB7 Remaining schedule matched within tolerance, NOT exact" : " \xB7 Remaining schedule matched at last read" : state.verification?.pending ? " \xB7 Awaiting follow-up readback \u2014 NOT verified" : " \xB7 NOT verified";
+  const comparisonAssociated = !!state.verification?.readback_at && state.verification.readback_at === state.effective?.fetched_at;
+  const verification = state.sent === null ? "" : state.verified && comparisonAssociated && !state.outcomes?.uncertain ? state.verification?.reason === "matched_with_drift" ? " \xB7 Remaining schedule matched within tolerance, NOT exact" : " \xB7 Remaining schedule matched at last read" : state.verification?.pending ? " \xB7 Awaiting follow-up readback \u2014 NOT verified" : " \xB7 NOT verified";
   status.textContent = ack + verification;
   section.append(status);
   if (state.outcomes?.uncertain && state.outcomes.state !== "storage_unavailable") {
@@ -59739,12 +59742,13 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
       matched: "Remaining effective limits and transitions match at the last read; past intervals and physical charging are not verified.",
       matched_with_drift: "Remaining limits match within the time tolerance; past intervals and physical charging are not verified."
     };
-    detail.textContent = reasons[state.verification.reason ?? ""] ?? "";
+    detail.textContent = !comparisonAssociated && state.verification.reason === "limits_or_transitions_differ" ? "A prior comparison reported a mismatch; it is not associated with the displayed readback." : !comparisonAssociated && (state.verification.reason === "matched" || state.verification.reason === "matched_with_drift") ? "A prior comparison reported a match; it cannot verify the displayed readback." : reasons[state.verification.reason ?? ""] ?? "";
     if (state.verification.max_delta_s != null) {
       detail.textContent += ` Maximum transition drift: ${Math.round(state.verification.max_delta_s)} s; tolerance: ${state.verification.tolerance_s ?? 90} s.`;
     }
-    if (state.verification.coverage_start) detail.textContent += ` Compared from ${localTime(state.verification.coverage_start)}.`;
-    if (state.verification.coverage_end) detail.textContent += ` Readback covers through ${localTime(state.verification.coverage_end)}.`;
+    if (comparisonAssociated && state.verification.coverage_start) detail.textContent += ` Compared from ${localTime(state.verification.coverage_start)}.`;
+    if (comparisonAssociated && state.verification.coverage_end) detail.textContent += ` Readback covers through ${localTime(state.verification.coverage_end)}.`;
+    if (!comparisonAssociated) detail.textContent += " Comparison is not associated with the displayed readback; unverified.";
     if (state.verification.pending) detail.textContent += ` Automatic read-only check ${localTime(state.verification.next_check_at ?? null)}. No profile will be resent or cleared. Do not assume the sent limits are active yet.`;
     section.append(detail);
   }
@@ -59781,7 +59785,7 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
     }
     section.append(list2);
   }
-  if (error2 !== null) {
+  if (typeof error2 === "string" && error2.trim() !== "") {
     const message = doc.createElement("p");
     message.textContent = `Morek request failed: ${error2}`;
     section.append(message);
@@ -59854,7 +59858,7 @@ function healthKey(state, observedAt, failed, busy, now) {
     const start2 = Date.parse(state.verification?.coverage_start ?? "");
     const preview = Date.parse(state.preview?.calculated_at ?? "");
     const reason = state.verification?.reason;
-    if ((reason === "matched" || reason === "matched_with_drift") && state.ack === "Accepted" && state.sent !== null && Number.isFinite(Date.parse(state.sent_at ?? "")) && state.effective?.status === "Accepted" && Array.isArray(state.effective.periods) && state.effective.periods.length >= 2 && state.effective.periods.every((period) => period !== null && typeof period === "object" && typeof period.at === "string" && Number.isFinite(Date.parse(period.at)) && Number.isFinite(period.amps)) && observationFreshness(preview, now, false, STATUS_MAX_AGE) === "fresh" && observationFreshness(read, now, false, READBACK_MAX_AGE) === "fresh" && Number.isFinite(start2) && start2 <= now && Number.isFinite(end2) && end2 > now) return "daily.health.matched";
+    if ((reason === "matched" || reason === "matched_with_drift") && state.verification?.readback_at === state.effective?.fetched_at && !!state.verification?.readback_at && state.ack === "Accepted" && state.sent !== null && Number.isFinite(Date.parse(state.sent_at ?? "")) && state.effective?.status === "Accepted" && Array.isArray(state.effective.periods) && state.effective.periods.length >= 2 && state.effective.periods.every((period) => period !== null && typeof period === "object" && typeof period.at === "string" && Number.isFinite(Date.parse(period.at)) && Number.isFinite(period.amps)) && observationFreshness(preview, now, false, STATUS_MAX_AGE) === "fresh" && observationFreshness(read, now, false, READBACK_MAX_AGE) === "fresh" && Number.isFinite(start2) && start2 <= now && Number.isFinite(end2) && end2 > now) return "daily.health.matched";
     return "daily.health.stale";
   }
   if (state.operator?.state === "checking") return "daily.health.checking";
@@ -60035,11 +60039,17 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
   const projectionAge = Number.isFinite(rawProjection?.age_s) && rawProjection.age_s >= 0 && Number.isFinite(computed) && computed <= now ? Math.floor((rawProjection.age_s + (now - computed) / 1e3) / 60) : null;
   const ageText = projectionAge == null ? "age unavailable" : `${projectionAge} min old`;
   const projectionTime = rawProjection?.time_basis === "vehicle_timestamp" ? `vehicle report ${ageText}` : rawProjection?.time_basis === "last_updated" ? `HA state ${ageText}${rawProjection?.source === "vehicle" ? "; vehicle report time unavailable" : ""}` : `anchor/time basis unknown, ${ageText}; vehicle report time unavailable`;
-  const projectionNote = projectionValid ? `Based on the plan's last-known ${rawProjection?.source === "charger" ? "charger" : rawProjection?.source === "vehicle" ? "vehicle" : "unknown-source"} SOC${rawProjection?.estimated ? " estimate" : ""} (${projectionTime}); it may be inaccurate after driving. Car charge limit is separate from the planning target.` : "SOC projection unavailable: target-SOC planning, a valid SOC and usable capacity or a trusted energy-per-percent estimate are required.";
+  const projectionNote = projectionValid ? `Estimated end and SOC use assumed charging power and the plan's last-known ${rawProjection?.source === "charger" ? "charger" : rawProjection?.source === "vehicle" ? "vehicle" : "unknown-source"} SOC${rawProjection?.estimated ? " estimate" : ""} (${projectionTime}), capacity/efficiency or learned energy; it may be inaccurate after driving. Actual delivered energy and the car's separate charge limit are unverified; no exact SOC or physical stop is guaranteed.` : "SOC projection unavailable: target-SOC planning, a valid SOC and usable capacity or a trusted energy-per-percent estimate are required.";
   const deadlineText = raw?.planning?.departure_at;
   const deadline = typeof deadlineText === "string" && /(?:Z|[+-]\d\d:\d\d)$/i.test(deadlineText) ? Date.parse(deadlineText) : NaN;
   const deadlineCurrent = !stale && !d3.planning?.historical;
   const untilDeadline = d3.settings?.departure_enabled === false ? "Not enabled" : deadlineCurrent && Number.isFinite(deadline) ? deadline > now ? `${Math.ceil((deadline - now) / 6e4)} min` : "Deadline passed" : "Unavailable";
+  const policy = d3.plan.price_policy?.explanations || [];
+  const uncapped = !planStale && !!proposal && d3.settings?.soft_price_cap === null && d3.planning?.settings_revision != null && d3.planning.settings_revision === d3.settings?.revision && proposal.settings_revision === d3.settings.revision && policy.includes("uncapped");
+  const policyText = uncapped ? "No soft price cap is applied to this current plan." : policy.map((code) => {
+    const keys2 = { minimum_exception: "exception", minimum_shortfall: "minimumShortfall", target_shortfall: "targetShortfall", recalculating: "recalculating", unavailable: "unavailable", minimum_covered: "covered", within_cap: "within", target_met: "targetMet", error: "error" };
+    return keys2[code] ? translate2("en", `daily.policy.${keys2[code]}`) : U;
+  }).join(" ") || U;
   const warning = status?.outcomes?.uncertain || status?.operator?.state === "mismatch" || status?.verification?.reason === "limits_or_transitions_differ";
   const published = publishedChart(raw, d3.market, now, stale || dashboardFailed);
   const priceFreshness = priceProvenance(raw?.prices, d3.market, zone, stale || dashboardFailed, now);
@@ -60059,10 +60069,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
       nextWindow,
       chart: published?.chart,
       totals: !planStale && proposal ? { energy: proposal.planned_kwh, cost: proposal.unpriced ? null : proposal.cost?.value, pricePerKwh: avg } : null,
-      vehicle: { status: stale ? "Connection unavailable \xB7 stale dashboard" : d3.charger.available ? d3.connection?.state || U : "Charger unavailable", detail: `Dashboard observed ${date(d3.generated_at, zone)}${stale ? ` \xB7 stale: ${staleReason}` : ""}`, power: "Unavailable", soc: validPercent(soc2) ? soc2 : null, stale: socStale, planStale, socDetail, socEstimated: !useRaw && d3.soc?.estimated === true, policy: (d3.plan.price_policy?.explanations || []).map((code) => {
-        const keys2 = { minimum_exception: "exception", minimum_shortfall: "minimumShortfall", target_shortfall: "targetShortfall", recalculating: "recalculating", unavailable: "unavailable", minimum_covered: "covered", within_cap: "within", target_met: "targetMet", error: "error" };
-        return keys2[code] ? translate2("en", `daily.policy.${keys2[code]}`) : U;
-      }).join(" ") || U },
+      vehicle: { status: stale ? "Connection unavailable \xB7 stale dashboard" : d3.charger.available ? d3.connection?.state || U : "Charger unavailable", detail: `Dashboard observed ${date(d3.generated_at, zone)}${stale ? ` \xB7 stale: ${staleReason}` : ""}`, power: "Unavailable", soc: validPercent(soc2) ? soc2 : null, stale: socStale, planStale, socDetail, socEstimated: !useRaw && d3.soc?.estimated === true, policy: policyText },
       assumptions: { startingSoc: projectionValid ? rawProjection.starting_soc : null, capacityKwh: d3.soc?.capacity_kwh, efficiency: d3.soc?.efficiency, projectionSupported: projectionValid, projectionKwhPerPercent: rawProjection?.kwh_per_percent, projectionNote },
       settings: { target: d3.soc?.target_percent, minimum: d3.settings?.minimum_ready_by_soc, cap: d3.settings?.soft_price_cap, readyBy: d3.settings?.departure_time },
       canSave: false,
@@ -60077,7 +60084,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.82";
+var CARD_VERSION = "2.5.83";
 
 // sidebar/panel.js
 var fresh = (timestamp, failed = false) => observationFreshness(timestamp, Date.now(), failed) === "fresh";

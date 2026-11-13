@@ -25,12 +25,13 @@ const state = {
 describe("daily Morek evidence", () => {
   const now = Date.parse("2026-11-06T20:02:00Z");
   const current = { ...state, verified: true, verification_target: "current_plan" as const,
+    verification: {readback_at: state.effective.fetched_at},
     effective: { ...state.effective, schedule_start: "2026-11-06T20:01:00Z", duration_s: 3600 } };
   it.each([
     [current, now, false, /remaining plan matched/i],
     [current, now-100000, false, /status.*stale/i],
     [{...current, verification:{reason:"verification_superseded"}}, now, false, /older or unavailable/i],
-    [{...current, verified:false, verification:{reason:"limits_or_transitions_differ"}}, now, false, /limits at the last read differed/i],
+    [{...current, verified:false, verification:{reason:"limits_or_transitions_differ",readback_at:state.effective.fetched_at}}, now, false, /limits at the last read differed/i],
     [{...current, effective:null}, now, false, /readback is unavailable/i],
     [{...current, operator:{state:"offline"}}, now, false, /offline/i],
     [{...current, outcomes:{uncertain:true}}, now, false, /may have applied/i],
@@ -48,6 +49,13 @@ describe("daily Morek evidence", () => {
 });
 
 describe("Morek manual test panel", () => {
+  it("keeps unmatched comparison coverage separate and shows only real errors", () => {
+    const act=vi.fn();
+    const mismatch={...state,verified:true,verification:{reason:'matched',readback_at:'2026-11-06T20:02:00Z',coverage_end:'2026-11-07T08:00:00Z'}};
+    const panel=morekPanel(document,mismatch,true,false,undefined as unknown as null,act);
+    expect(panel.textContent).not.toContain('Morek request failed');expect(panel.textContent).not.toContain('Readback covers through');expect(panel.textContent).toContain('not associated');expect(panel.textContent).toContain('NOT verified');
+    expect(morekPanel(document,mismatch,true,false,'offline',act).textContent).toContain('Morek request failed: offline');expect(act).not.toHaveBeenCalled();
+  });
   it("shows an automatic reconciliation blocker without issuing any action", () => {
     const act = vi.fn();
     const panel = morekPanel(document, { ...state, reconciliation: { reason: "price_coverage_unavailable" } }, true, false, null, act);
@@ -103,6 +111,7 @@ describe("Morek manual test panel", () => {
   it("discloses the timing tolerance and coverage rather than calling drift an exact match", () => {
     const panel = morekPanel(document, { ...state, verified: true, verification: {
       pending: false, reason: "matched_with_drift", max_delta_s: 57, tolerance_s: 90,
+      readback_at: state.effective.fetched_at,
       coverage_end: "2026-11-07T08:00:00Z",
     } }, true, false, null, vi.fn());
     expect(panel.textContent).toContain("Remaining schedule matched within tolerance, NOT exact");
