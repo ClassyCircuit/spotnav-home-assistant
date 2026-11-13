@@ -293,7 +293,7 @@ class MorekSessionCoordinator:
                     controller = controller_for(self.hass, self.entry_id)
                     if callable(getattr(controller, "_start_cap", None)):
                         return "protection_conflict_unresolved"
-                    worker._intent(pause)
+                    worker._intent(pause, record.get("charge_now"))
                     return None
 
                 blocker = validate()

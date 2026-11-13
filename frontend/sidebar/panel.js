@@ -1,5 +1,5 @@
 import { mountDashboard } from '../shared-dashboard/dashboard.js';
-import { listChargers, getDashboard, morekSchedule, getSettings, updateSettings, performAction } from '../src/api.ts';
+import { listChargers, getDashboard, morekSchedule, getSettings, updateSettings, performAction, chargeNowAction } from '../src/api.ts';
 import { admittedAction, chargerCarsOf } from '../src/model.ts';
 import { decodeSettingsAnswer, formFromRecord, replacementFor } from '../src/settings.ts';
 import { decodeDashboard } from '../src/validate.ts';
@@ -10,12 +10,14 @@ import { dashboardAdapter } from './adapter.js';
 import { CARD_VERSION } from '../src/generated/version.ts';
 import { capInput, capForSave, displayPrice } from '../shared-dashboard/price-format.js';
 import { observationFreshness } from '../src/observation-freshness.ts';
+import { chargeNowBlocker, chargeNowPrice, chargeNowSelection, chargeNowStatus } from './charge-now.js';
 
 const fresh = (timestamp, failed = false) => observationFreshness(timestamp, Date.now(), failed) === 'fresh';
 const dashboardFresh = (dashboard, failed) => fresh(Date.parse(dashboard?.generated_at || ''), failed);
 
 // A dispatched write outlives its host element, including a newly mounted panel.
 const settingsWritesByConnection = new WeakMap();
+const chargeWritesByConnection = new WeakMap();
 
 function actionFailure(code, action) {
   const reasons={
@@ -96,15 +98,18 @@ export class SpotnavEnhancedPanel extends HTMLElement {
   connectedCallback() {
     this.connected = true;
     this.classList.add('wa-dark');
-    this.shadowRoot.innerHTML = `<link rel="stylesheet" href="/spotnav-sidebar/panel.css?v=${CARD_VERSION}"><style>:host{display:block;min-height:100%;padding-bottom:env(safe-area-inset-bottom)}.hostbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top));background:#11151d;color:white}.hostbar label{flex:1 1 180px}.hostbar select{max-width:100%}.hostbar button,.hostbar select{font:inherit;padding:8px}.message{padding:16px;color:white;background:#11151d}</style><div class="hostbar"><button id="menu" aria-label="Open navigation">☰</button><strong>SpotNav Enhanced</strong><label>Charger <select id="charger"><option value="">Select charger</option></select></label><button id="refresh">Refresh observations</button><div id="automatic-controls"><span id="pause-state">Auto state unknown.</span> <button id="pause-auto" disabled>Pause Auto until resumed</button> <button id="resume-auto" disabled>Resume Auto</button><span id="pause-notice" role="status"></span></div></div><div class="message" role="status">Select a charger.</div><main></main>`;
+    this.shadowRoot.innerHTML = `<link rel="stylesheet" href="/spotnav-sidebar/panel.css?v=${CARD_VERSION}"><style>:host{display:block;min-height:100%;padding-bottom:env(safe-area-inset-bottom)}.hostbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top));background:#11151d;color:white}.hostbar label{flex:1 1 180px}.hostbar select{max-width:100%}.hostbar button,.hostbar select{font:inherit;padding:8px}.message{padding:16px;color:white;background:#11151d}</style><div class="hostbar"><button id="menu" aria-label="Open navigation">☰</button><strong>SpotNav Enhanced</strong><label>Charger <select id="charger"><option value="">Select charger</option></select></label><button id="refresh">Refresh observations</button><div id="automatic-controls"><span id="pause-state">Auto state unknown.</span> <button id="pause-auto" disabled>Pause Auto until resumed</button> <button id="resume-auto" disabled>Resume Auto</button><span id="pause-notice" role="status"></span></div><section id="charge-controls" aria-label="Charge Now"><button id="charge-now" disabled>Charge Now</button><details id="charge-options"><summary>Duration / change end</summary><label>Duration <select id="charge-duration"><option value="30">30 minutes</option><option value="60" selected>1 hour</option><option value="120">2 hours</option><option value="180">3 hours</option><option value="custom">Custom end time</option></select></label><label id="custom-label" hidden>End time <input id="charge-end" type="datetime-local"></label><button id="charge-replace" type="button" hidden>Replace Charge Now end</button></details><span id="charge-state" role="status">Charge Now status unavailable.</span><span id="charge-notice" role="status"></span></section></div><div class="message" role="status">Select a charger.</div><main></main>`;
     const hostStyle=document.createElement('style');
-    hostStyle.textContent='.hostbar label{color:#f0f3f8}.hostbar select{color:#f0f3f8;background:#202b39;border:1px solid #8191a4;border-radius:8px;min-height:42px} #automatic-controls{display:flex;flex-wrap:wrap;gap:6px;min-width:0;max-width:100%} #automatic-controls button{max-width:100%;white-space:normal}';
+    hostStyle.textContent='.hostbar label{color:#f0f3f8}.hostbar select,.hostbar input{color:#f0f3f8;background:#202b39;border:1px solid #8191a4;border-radius:8px;min-height:42px} #automatic-controls,#charge-controls{display:flex;flex-wrap:wrap;gap:6px;min-width:0;max-width:100%} #automatic-controls button,#charge-controls button{max-width:100%;white-space:normal} #charge-controls{flex:1 1 100%;align-items:center} #charge-state,#charge-notice{flex:1 1 100%} #charge-options label{display:inline-block;margin:6px}';
     this.shadowRoot.append(hostStyle);
     this.shadowRoot.querySelector('#menu').onclick = () => this.dispatchEvent(new CustomEvent('hass-toggle-menu',{bubbles:true,composed:true}));
     this.shadowRoot.querySelector('#charger').onchange = e => {if (e.target.value===this.charger) return; this.stopObservations(); this.charger = e.target.value; this.rememberCharger(); this.refresh();};
     this.shadowRoot.querySelector('#refresh').onclick = () => this.loaded ? this.refresh() : this.loadChargers();
     this.shadowRoot.querySelector('#pause-auto').onclick = () => void this.automaticAction('stop','until_resumed');
     this.shadowRoot.querySelector('#resume-auto').onclick = () => void this.automaticAction('resume',null);
+    this.shadowRoot.querySelector('#charge-now').onclick = () => void this.chargeAction(this.rawStatus?.schedule?.charge_now?.state==='active' ? 'return_to_auto' : 'charge_now');
+    this.shadowRoot.querySelector('#charge-replace').onclick = () => void this.chargeAction('charge_now');
+    this.shadowRoot.querySelector('#charge-duration').onchange = e => {this.shadowRoot.querySelector('#custom-label').hidden=e.target.value!=='custom';};
     if (this._hass) this.loadChargers();
   }
   disconnectedCallback() { this.connected=false; this.stopObservations(); }
@@ -115,6 +120,12 @@ export class SpotnavEnhancedPanel extends HTMLElement {
       this.settingsWriteContext=settingsWritesByConnection.get(key);
       this.pendingSettingsWrites=this.settingsWriteContext.pending;
       this.unknownSettingsWrites=this.settingsWriteContext.unknown;
+    }
+    if (!this.chargeWriteContext && value) {
+      const key=value.connection || value;
+      if (!chargeWritesByConnection.has(key)) chargeWritesByConnection.set(key,{pending:new Map(),unknown:new Set(),expected:new Map()});
+      this.chargeWriteContext=chargeWritesByConnection.get(key);
+      this.chargePending=this.chargeWriteContext.pending;this.chargeUnknown=this.chargeWriteContext.unknown;this.chargeExpected=this.chargeWriteContext.expected;
     }
     const was = this._hass?.connected !== false;
     const wasAdmin = this._hass?.user?.is_admin === true;
@@ -127,6 +138,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
       if (this.settingsBusy) {this.settingsConflict=true;this.settingsNotice='Permission changed during save; its outcome must be checked by reloading settings.';}
       if (this.morekBusy) {if(this.morekActiveAction==='send')this.morekUncertain=true;this.morekError='Permission changed during the operation; its outcome may be unknown.';}
       if (this.autoBusy) {this.autoUncertain=true;this.autoNotice='Permission changed during the operation; its outcome may be unknown.';}
+      if (this.chargeBusy && this.charger) {this.chargeUnknown?.add(this.charger);this.chargeNotice='Permission changed during the request; outcome unknown. Do not retry blindly.';}
       this.paint();this.refresh();
     }
   }
@@ -137,6 +149,8 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     if (dirty && this.settingsRecord) this.draftRevision=this.settingsRecord.revision;
     else if (!preserveDraft) {this.draftRevision=null;this.draftCurrency=undefined;}
     if (this.settingsBusy && this.charger) this.unknownSettingsWrites.add(this.charger);
+    if (this.chargeBusy && this.charger) this.chargeUnknown?.add(this.charger);
+    this.chargeBusy=false;this.chargeNotice='';
     this.generation++;
     clearInterval(this.ageTimer); this.ageTimer=null;
     for (const cancel of this.cancellations || []) cancel();
@@ -146,6 +160,8 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     this.settingsRecord=null; this.settingsLoading=false; this.settingsBusy=false; this.settingsConflict=false; this.settingsDirty=!!dirty; this.settingsNotice='';
     this.morekBusy=false; this.morekError=null; this.morekUncertain=false; this.statusEpoch=(this.statusEpoch || 0)+1; this.dashboardEpoch=(this.dashboardEpoch || 0)+1;this.autoBusy=false;this.autoUncertain=false;this.autoNotice='';this.autoRefusalAt=null;this.autoExpected=null;this.controlPermissionPending=false;
     const pause=this.shadowRoot.querySelector('#pause-state');if(pause) pause.textContent='Auto state unknown.';
+    const charge=this.shadowRoot.querySelector('#charge-state');if(charge)charge.textContent='Charge Now status unavailable.';
+    for(const id of ['charge-now','charge-replace']) {const button=this.shadowRoot.querySelector(`#${id}`);if(button)button.disabled=true;}
     for(const id of ['pause-auto','resume-auto']) {const button=this.shadowRoot.querySelector(`#${id}`);if(button)button.disabled=true;}
     if (!preserveDraft) {this.view?.dispose(); this.view=null;}
     const main=this.shadowRoot.querySelector('main');if(main)main.hidden=preserveDraft;
@@ -157,6 +173,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     const decoded=decodeDashboard(this.rawDashboard);
     const dashboard=decoded.ok ? decoded.value : null;
     this.paintAutomatic(dashboard);
+    this.paintChargeNow(dashboard);
     if (this.settingsRecord && dashboard?.settings?.revision > this.settingsRecord.revision) {this.settingsConflict=true;this.settingsNotice='Settings changed elsewhere. Reload the charger before editing again.';}
     const allowed=this._hass?.user?.is_admin===true || dashboard?.settings?.users_change_plan===true;
     if (this.settingsRecord) {
@@ -211,7 +228,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
       const coverage=Number.isFinite(from) && Number.isFinite(to) && to>from ? ` (${new Date(from).toLocaleString()} – ${new Date(to).toLocaleString()})` : ' (coverage unavailable)';
       const readback=pause?.readback==='bounded_match' ? `bounded effective readback match${coverage}` : 'readback unconfirmed';
       const canPause=isFresh && statusFresh && !!control?.can_act && !this.controlPermissionPending && !this.autoBusy && !this.autoUncertain && !this.morekBusy && !this.morekUncertain && !this.settingsBusy && this._hass?.connected!==false;
-      const can=canPause && status?.ownership?.completion_authorized===true;
+      const can=canPause && !this.chargeBusy && status?.ownership?.completion_authorized===true;
       const resumeOffered=ownedResumeOffered(status);
       const blocker = !isFresh ? 'Dashboard observation unavailable or stale.' : !statusFresh ? 'Morek status unavailable or stale.' : !control?.can_act ? 'Control permission or charger availability is unavailable.' : this.controlPermissionPending ? 'Waiting for a fresh permission check.' : this.autoUncertain || this.morekUncertain ? 'A previous action outcome is unknown; do not retry blindly.' : this.autoBusy || this.morekBusy || this.settingsBusy ? 'Another request is in progress.' : status?.schedule_pause?.request==='stop_pending' ? 'A person Stop is pending.' : status?.outcomes?.uncertain===true ? 'A profile outcome is uncertain; do not retry blindly.' : status?.ownership?.completion_authorized!==true ? `Schedule ownership is not currently authorized; reported recovery status: ${status?.ownership?.recovery?.automatic_recovery || status?.ownership?.recovery?.state || status?.ownership?.blockers?.[0] || 'unknown'}.` : !resumeOffered ? ownedResumeReason(status) : '';
       this.shadowRoot.querySelector('#pause-state').textContent=`${intent}; request ${request}; ACK ${ack}; ${readback}; physical charging unknown.${control?.execution_error==='pause_stop_failed' ? ' Stop request failed.' : ''}${blocker ? ` Resume unavailable: ${blocker}` : ''}`;
@@ -224,8 +241,65 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     this.shadowRoot.querySelector('#pause-state').textContent=control && isFresh ? (active ? `Pause intent: ${active}; physical stop not confirmed.${stopFailed}` : `No pause reported.${stopFailed}`) : 'Auto state unavailable or stale.';
     const can=isFresh && !!control?.can_act && !this.controlPermissionPending && !this.autoBusy && !this.autoUncertain && !this.morekBusy && !this.morekUncertain && !this.settingsBusy && this._hass?.connected!==false;
     this.shadowRoot.querySelector('#pause-auto').disabled=!(can && admittedAction(control,'stop','until_resumed'));
-    this.shadowRoot.querySelector('#resume-auto').disabled=!(can && admittedAction(control,'resume',null));
+    this.shadowRoot.querySelector('#resume-auto').disabled=!(can && !this.chargeBusy && admittedAction(control,'resume',null));
     this.shadowRoot.querySelector('#pause-notice').textContent=notice || '';
+  }
+  chargeDashboardFresh(dashboard) { return dashboardFresh(dashboard,this.dashboardFailed); }
+  chargeStatusFresh() { return fresh(this.statusAt,this.statusFailed); }
+  paintChargeNow(dashboard) {
+    const state=decodeMorekState(this.rawStatus), info=state?.charge_now;
+    const active=info?.state==='active';
+    const button=this.shadowRoot.querySelector('#charge-now'), replace=this.shadowRoot.querySelector('#charge-replace');
+    const blocker=chargeNowBlocker(this,dashboard,state);
+    button.textContent=active ? 'Return to Auto' : 'Charge Now';
+    button.disabled=!!blocker;
+    replace.hidden=!active;replace.disabled=!!blocker;
+    this.shadowRoot.querySelector('#charge-state').textContent=chargeNowStatus(state,this.chargeStatusFresh()) + (blocker ? ` ${blocker}` : '');
+    this.shadowRoot.querySelector('#charge-notice').textContent=this.chargeNotice || '';
+  }
+  async chargeAction(action) {
+    const hass=this._hass, charger=this.charger, generation=this.generation, permissionEpoch=this.permissionEpoch;
+    const snapshot=this.rawStatus, observedAt=this.statusAt, state=decodeMorekState(snapshot), decoded=decodeDashboard(this.rawDashboard);
+    const dashboard=decoded.ok ? decoded.value : null;
+    const blocker=chargeNowBlocker(this,dashboard,state);
+    if (blocker || !charger || !['charge_now','return_to_auto'].includes(action) || (action==='return_to_auto' && state?.charge_now?.state!=='active')) {
+      this.chargeNotice=blocker || 'Charge Now is unavailable.';this.paint();return;
+    }
+    let selection;
+    if (action==='charge_now') {
+      selection=chargeNowSelection(this.shadowRoot.querySelector('#charge-duration').value,this.shadowRoot.querySelector('#charge-end').value);
+      if (selection.error) {this.chargeNotice=selection.error;this.paint();return;}
+      const replacement=state.charge_now.state==='active' ? 'This replaces the existing end, calculated from now. ' : '';
+      if (!window.confirm(`${replacement}Charge Now overrides the price-based Auto plan until ${new Date(selection.end).toLocaleString()}. ${chargeNowPrice(state.charge_now)} The end is fixed; plugging in later does not extend it. Continue?`)) return;
+    } else if (!window.confirm('Return to Auto? Charging may continue if the Auto plan selects the current time. This is not a persistent Pause.')) return;
+    const latest=decodeMorekState(this.rawStatus), latestDashboard=decodeDashboard(this.rawDashboard);
+    if (!this.connected || this.generation!==generation || this.permissionEpoch!==permissionEpoch || this.charger!==charger || this.rawStatus!==snapshot || this.statusAt!==observedAt || !latestDashboard.ok || chargeNowBlocker(this,latestDashboard.value,latest) || (action==='return_to_auto' && latest?.charge_now?.state!=='active')) {this.chargeNotice='State changed; refresh and review before trying again.';this.paint();return;}
+    if (selection?.options?.end_time && Date.parse(selection.options.end_time)<=Date.now()) {this.chargeNotice='Choose a future end time.';this.paint();return;}
+    this.chargeBusy=true;this.chargeNotice='Request in progress; schedule and charging are not confirmed.';this.statusEpoch++;this.paint();
+    const request=chargeNowAction(hass,charger,action,selection?.options);
+    this.chargePending?.set(charger,request);
+    request.finally(()=>{if(this.chargePending?.get(charger)===request)this.chargePending.delete(charger);}).catch(()=>{});
+    try {
+      const response=await this.bounded(request);
+      if (!this.connected || generation!==this.generation || permissionEpoch!==this.permissionEpoch || charger!==this.charger) {this.chargeUnknown?.add(charger);return;}
+      const result=response?.api_version===1 ? response.schedule : null;
+      if (!result || !['pending','worker_unavailable'].includes(result.reconciliation) || !['uncertain','not_yet_confirmed'].includes(result.outcome) || (action==='charge_now' && !result.intent?.id) || (action==='return_to_auto' && result.intent!==null)) {
+        this.chargeUnknown?.add(charger);this.chargeNotice='Response unavailable; outcome unknown. Do not retry blindly.';
+      } else {
+        if(result.outcome==='uncertain')this.chargeUnknown?.add(charger);
+        this.chargeExpected?.set(charger,action==='charge_now' ? result.intent.id : null);
+        this.chargeNotice=`Intent recorded; ${result.reconciliation==='pending' ? 'waiting for schedule reconciliation' : 'schedule worker unavailable'}. ${result.outcome==='uncertain' ? 'A prior profile outcome is uncertain; do not retry blindly.' : 'This does not confirm charging.'}`;
+      }
+    } catch (error) {
+      if(this.connected && generation===this.generation && charger===this.charger) {
+        const code=error?.code;
+        const reasons={spotnav_morek_resume_auto_first:'Charging is paused. Resume Auto first.',spotnav_morek_charge_now_invalid_time:'Choose a valid future end time within 48 hours.',spotnav_morek_charge_now_invalid_duration:'Choose a supported duration.',spotnav_morek_identity_unresolved:'The connector identity is unresolved.',spotnav_morek_identity_changed:'The connector identity changed.',spotnav_morek_schedule_owner_unavailable:'Schedule ownership is unavailable.',spotnav_not_admin:'Administrator permission is required.'};
+        if (!reasons[code]) this.chargeUnknown?.add(charger);
+        this.chargeNotice=reasons[code] ? `${reasons[code]} (${code})` : `Request outcome unknown${code ? ` (${code})` : ''}; do not retry blindly.`;
+      } else this.chargeUnknown?.add(charger);
+    } finally {
+      if(this.connected && generation===this.generation && charger===this.charger) {this.chargeBusy=false;this.statusAt=null;this.paint();this.refresh();}
+    }
   }
   async automaticAction(action,choice) {
     const generation=this.generation, permissionEpoch=this.permissionEpoch, charger=this.charger, hass=this._hass, decoded=decodeDashboard(this.rawDashboard);
@@ -236,7 +310,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     const offered=decoded.ok && (owner?.recorded_owner==='morek_schedule' && action==='resume'
       ? choice===null && statusFresh && ownedResumeOffered(morek)
       : admittedAction(decoded.value.control,action,choice));
-    if (!this.connected || !charger || !hass || hass.connected===false || !decoded.ok || !dashboardFresh(decoded.value,this.dashboardFailed) || this.controlPermissionPending || this.autoBusy || this.autoUncertain || this.morekBusy || this.morekUncertain || this.settingsBusy || !decoded.value.control.can_act || !offered) return;
+    if (!this.connected || !charger || !hass || hass.connected===false || !decoded.ok || !dashboardFresh(decoded.value,this.dashboardFailed) || this.controlPermissionPending || this.autoBusy || this.autoUncertain || this.morekBusy || this.morekUncertain || this.settingsBusy || (action!=='stop' && this.chargeBusy) || !decoded.value.control.can_act || !offered) return;
     const dispatchedAt=Date.now();this.autoRefusalAt=null;this.autoBusy=true;this.autoNotice='Request in progress; state not yet confirmed.';this.dashboardEpoch++;this.statusEpoch++;this.statusAt=null;this.paint();
     try {
       const result=await this.bounded(performAction(hass,charger,action,choice));
@@ -270,16 +344,25 @@ export class SpotnavEnhancedPanel extends HTMLElement {
       button.addEventListener('click',()=>void this.morekAction('reconfirm_migration'));
       target.firstChild.append(button);
     }
+    if (state.supported && this._hass?.user?.is_admin===true) {
+      const button=document.createElement('button');
+      button.type='button';button.textContent='Recalculate & sync schedule';
+      button.disabled=this.morekBusy || this.settingsBusy || this.settingsDirty || this.autoBusy || this.chargeBusy || this.morekUncertain || this.autoUncertain || state.outcomes?.uncertain===true || !fresh(this.statusAt,this.statusFailed);
+      button.addEventListener('click',()=>void this.morekAction('recalculate_sync'));
+      target.firstChild.append(button);
+      if (this.syncNotice) {const notice=document.createElement('p');notice.textContent=this.syncNotice;target.firstChild.append(notice);}
+    }
     const dashboard=decodeDashboard(this.rawDashboard);
     const send=target.querySelector('[data-morek-action="send"]');if(send && (this.morekUncertain || this.autoUncertain || !fresh(this.statusAt,this.statusFailed) || !dashboard.ok || !dashboardFresh(dashboard.value,this.dashboardFailed) || dashboard.value.control.pause?.choice!=='until_resumed' || !dashboard.value.control.pause_blocks_execution))send.disabled=true;
   }
   async morekAction(action) {
     const hass=this._hass, charger=this.charger, generation=this.generation, permissionEpoch=this.permissionEpoch, statusSnapshot=this.rawStatus, observedAt=this.statusAt, state=decodeMorekState(statusSnapshot);
-    if (!this.connected || hass?.connected===false || hass?.user?.is_admin!==true || !charger || !state || this.morekBusy || this.autoBusy || !['status','send','fetch','clear','reconfirm_migration'].includes(action)) return;
+    if (!this.connected || hass?.connected===false || hass?.user?.is_admin!==true || !charger || !state || this.morekBusy || this.autoBusy || this.chargeBusy || !['status','send','fetch','clear','reconfirm_migration','recalculate_sync'].includes(action)) return;
     if (action==='reconfirm_migration' && state.ownership?.reconfirmation_required!==true) return;
     if (action!=='status' && !state.supported) return;
     if (action==='clear' && state.cleanup_supported!==true) return;
     if (this.settingsBusy || (action==='send' && this.settingsDirty)) return;
+    if (action==='recalculate_sync' && (this.settingsDirty || this.morekUncertain || this.autoUncertain || state.outcomes?.uncertain || !fresh(this.statusAt,this.statusFailed))) return;
     if (action==='send' && (this.morekUncertain || this.autoUncertain || state.outcomes?.uncertain || !state.preview?.profile || state.preview.reason!==null || !state.preview.preview_id || !fresh(this.statusAt,this.statusFailed))) return;
     const previewId=state.preview?.preview_id, configured=state.configured_id, resolved=state.resolved_id, dashboardSnapshot=this.rawDashboard;
     // Recheck at the dispatch boundary, independently of the diagnostic view's
@@ -296,11 +379,12 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     try {
       const raw=await this.bounded(morekSchedule(hass,charger,action,previewId));
       if (action==='reconfirm_migration') {this.morekError=null;return;}
+      if (action==='recalculate_sync') {this.syncNotice=raw?.schedule?.reconciliation==='requested' ? 'Recalculated; schedule sync requested. Check reconciliation status for the result.' : 'Sync response unavailable; check status before trying again.';return;}
       const result=decodeMorekState(raw);
       if (!this.connected || generation!==this.generation || permissionEpoch!==this.permissionEpoch || charger!==this.charger) return;
       if (!result) {if(action==='send')this.morekUncertain=true;this.morekError='Response unavailable; operation outcome may be unknown.';}
       else {this.rawStatus={api_version:1,schedule:result};this.statusAt=action==='status' ? Date.now() : null;this.statusFailed=action!=='status';}
-    } catch {if(this.connected && generation===this.generation && charger===this.charger) {if(action==='send')this.morekUncertain=true;this.morekError='Request failed or outcome unknown; do not assume the operation did not apply.';}}
+    } catch (error) {if(this.connected && generation===this.generation && charger===this.charger) {if(action==='send')this.morekUncertain=true;if(action==='recalculate_sync')this.syncNotice=`Sync not confirmed${error?.code ? ` (${error.code})` : ''}; check reconciliation status before retrying.`;else this.morekError='Request failed or outcome unknown; do not assume the operation did not apply.';}}
     finally {
       if (this.connected && generation===this.generation && charger===this.charger) {
         this.morekBusy=false;this.morekActiveAction=null;this.paint();
@@ -327,7 +411,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     const generation=this.generation, permissionEpoch=this.permissionEpoch, charger=this.charger, hass=this._hass, record=this.settingsRecord;
     const decoded=decodeDashboard(this.rawDashboard);
     const allowed=hass?.user?.is_admin===true || (decoded.ok && decoded.value.settings?.users_change_plan===true);
-    if (!this.connected || hass?.connected===false || !charger || !record || this.settingsBusy || this.pendingSettingsWrites.has(charger) || this.morekBusy || this.autoBusy || this.settingsConflict || !allowed) {this.settingsNotice='Save unavailable or permission denied.';this.paint();return;}
+    if (!this.connected || hass?.connected===false || !charger || !record || this.settingsBusy || this.pendingSettingsWrites.has(charger) || this.morekBusy || this.autoBusy || this.chargeBusy || this.settingsConflict || !allowed) {this.settingsNotice='Save unavailable or permission denied.';this.paint();return;}
     const base=formFromRecord(record), driver=values.driver ?? base.driver, vehicleId=values.vehicleId ?? base.vehicleId;
     if (vehicleId!==base.vehicleId && (!decoded.ok || !chargerCarsOf(decoded.value).some(v=>v.id===vehicleId && v.id!=='guest'))) {this.settingsNotice='Choose an available discovered vehicle.';this.paint();return;}
     const form={...base,driver,energy:values.energy ?? base.energy,vehicleId,targetPercent:values.target ?? base.targetPercent,minimumReadySoc:values.minimum,capValue:capForSave(values.cap,decoded.ok ? decoded.value.market?.currency : null,record.soft_price_cap),capEnabled:values.capEnabled,capBasis:values.capBasis,deadlineEnabled:values.deadlineEnabled,deadlineTime:values.readyBy};
@@ -410,7 +494,12 @@ export class SpotnavEnhancedPanel extends HTMLElement {
       const pending=morekSchedule(hass,charger,'status'); this.statusRead=pending;
       pending.finally(()=>{if(this.statusRead===pending){this.statusRead=null;if(valid() && epoch!==this.statusEpoch)this.refresh();}}).catch(()=>{});
       this.bounded(pending).then(raw=>{
-        if (!valid() || epoch!==this.statusEpoch) return; this.rawStatus=raw;this.statusAt=Date.now();this.statusFailed=false;this.paint();
+        if (!valid() || epoch!==this.statusEpoch) return; this.rawStatus=raw;this.statusAt=Date.now();this.statusFailed=false;
+        if (this.chargeExpected?.has(charger)) {
+          const expected=this.chargeExpected.get(charger), observed=raw?.schedule?.charge_now, pause=raw?.schedule?.schedule_pause;
+          if ((expected===null && observed?.state==='inactive') || (expected!==null && observed?.state==='active' && observed?.intent?.id===expected) || (pause?.intent==='pause_until_resumed' && observed?.state==='inactive')) this.chargeExpected.delete(charger);
+        }
+        this.paint();
       }).catch(()=>{if(valid() && epoch===this.statusEpoch) {this.statusFailed=true;this.paint();}});
     }
   }

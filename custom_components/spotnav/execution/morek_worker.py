@@ -42,18 +42,23 @@ class MorekScheduleWorker:
         self.reason_serial = -1
         self.resume_ticket = None
         self.hold_ticket = None
+        self._expiry = None
+        self.override_degraded = None
+        self._sync_serial = None
 
     def start(self) -> None:
         """The listener delivers the current snapshot immediately, including on startup."""
         self._remove = self._planner.add_publication_listener(self.trigger)
 
-    def trigger(self, _snapshot: Any = None) -> None:
+    def trigger(self, _snapshot: Any = None, *, sync: bool = False) -> None:
         if self._closed:
             return
         session = getattr(self, "session", None)
         if session is not None:
             session.trigger()
         self._serial += 1
+        if sync:
+            self._sync_serial = self._serial
         if self._task is None or self._task.done():
             self._task = self._hass.async_create_task(self._run())
 
@@ -77,6 +82,9 @@ class MorekScheduleWorker:
         self._closed = True
         morek_schedule._cancel_verification(self._hass, self._entry_id)
         self._serial += 1
+        if self._expiry is not None:
+            self._expiry.cancel()
+            self._expiry = None
         if self._remove is not None:
             self._remove()
             self._remove = None
@@ -87,13 +95,33 @@ class MorekScheduleWorker:
         controller = controller_for(self._hass, self._entry_id)
         return morek_schedule._identity_status(self._hass, getattr(controller, "ocpp_target", None))
 
-    def _intent(self, pause: dict[str, Any] | None = None) -> tuple[dict[str, Any], str]:
+    def _intent(self, pause: dict[str, Any] | None = None, override: dict[str, Any] | None = None) -> tuple[dict[str, Any], str]:
         settings = domain_data(self._hass).auto_store.settings(self._entry_id)
         if pause is not None and pause["type"] == "pause_until_resumed":
             profile = morek_schedule.held_off_profile(datetime.now(timezone.utc))
             return profile, morek_schedule._preview_id(profile, [settings.revision, pause["id"]])
         if preview_for(self._hass, self._entry_id) is not self._planner:
             raise morek_schedule.ScheduleRefused("planner_changed")
+        now = datetime.now(timezone.utc)
+        if override is not None and datetime.fromisoformat(override["end"]) > now:
+            if settings.amps != 16:
+                raise morek_schedule.ScheduleRefused("current_must_be_16")
+            auto = ()
+            self.override_degraded = None
+            try:
+                morek_schedule._proposed_profile(self._hass, self._entry_id, now)
+                blocker = self._planner.morek_plan_blocker(self._planner.snapshot(), now)
+                if blocker:
+                    raise morek_schedule.ScheduleRefused(blocker)
+                auto = tuple(self._planner.snapshot().proposal.shown_periods)
+            except morek_schedule.ScheduleRefused as error:
+                if error.code in ("too_many_blocks", "invalid_plan"):
+                    raise
+                self.override_degraded = error.code
+            profile = morek_schedule.charge_now_profile(datetime.fromisoformat(override["start"]),
+                datetime.fromisoformat(override["end"]), auto, settings.amps, now)
+            return profile, morek_schedule._preview_id(profile, [settings.revision, override["id"]])
+        self.override_degraded = None
         profile = morek_schedule._proposed_profile(self._hass, self._entry_id, datetime.now(timezone.utc))
         blocker = self._planner.morek_plan_blocker(self._planner.snapshot(), datetime.now(timezone.utc))
         if blocker is not None:
@@ -121,6 +149,17 @@ class MorekScheduleWorker:
             self._task = None
 
     async def _reconcile(self, serial: int) -> None:
+        # Restore the fixed expiry even when the charger is offline.
+        data, store = await morek_schedule._state(self._hass, self._entry_id)
+        record = await morek_schedule._outcome_record(self._hass, self._entry_id, data)
+        override = record.get("charge_now")
+        if self._expiry is not None:
+            self._expiry.cancel()
+            self._expiry = None
+        if override is not None:
+            delay = (datetime.fromisoformat(override["end"]) - datetime.now(timezone.utc)).total_seconds()
+            if delay > 0:
+                self._expiry = asyncio.get_running_loop().call_later(delay, self.trigger)
         if self._suspended or not self._available():
             self.reason = "charger_unavailable"
             return
@@ -131,7 +170,6 @@ class MorekScheduleWorker:
             return
         admission = command_admission(self._hass)
         generation = admission.generation(connector)
-        data, store = await morek_schedule._state(self._hass, self._entry_id)
 
         async def dispatch() -> tuple[str, str | None, str | None]:
             # Admission has checked identity, ownership and generation under the
@@ -140,6 +178,9 @@ class MorekScheduleWorker:
                 return "stale_work", None, None
             pause: dict[str, Any] | None = None
             fingerprint = ""
+            def active_override():
+                override = record.get("charge_now")
+                return bool(override and datetime.fromisoformat(override["end"]) > datetime.now(timezone.utc))
             def validate():
                 if self._closed or serial != self._serial:
                     raise morek_schedule.ScheduleRefused("stale_work")
@@ -152,12 +193,12 @@ class MorekScheduleWorker:
                 identity_now = self._identity()
                 if classify_morek_identity(identity_now) != "supported_morek" or physical_connector(identity_now) != connector:
                     raise morek_schedule.ScheduleRefused("identity_changed")
-                profile, current = self._intent(pause)
+                profile, current = self._intent(pause, record.get("charge_now"))
                 if current != fingerprint:
                     self.trigger()
                     raise morek_schedule.ScheduleRefused("stale_work")
                 controller = controller_for(self._hass, self._entry_id)
-                if record.get("clean_start") and callable(getattr(controller, "_start_cap", None)):
+                if (record.get("clean_start") or active_override()) and callable(getattr(controller, "_start_cap", None)):
                     raise morek_schedule.ScheduleRefused("protection_conflict_unresolved")
                 settings = domain_data(self._hass).auto_store.settings(self._entry_id)
                 if (record.get("clean_start") and pause is not None and pause.get("type") == "resume_requested"
@@ -169,7 +210,12 @@ class MorekScheduleWorker:
             async with self._hass.data[morek_schedule._DATA_KEY][self._entry_id][2]:
                 record = await morek_schedule._outcome_record(self._hass, self._entry_id, data)
                 pause = record.get("schedule_pause")
-                if record.get("clean_start") and callable(getattr(controller_for(self._hass, self._entry_id), "_start_cap", None)):
+                sync = self._sync_serial == serial
+                if sync and pause is not None and pause.get("type") == "pause_until_resumed":
+                    return "paused_until_resume", None, None
+                if sync and active_override():
+                    return "charge_now_active", None, None
+                if (record.get("clean_start") or active_override()) and callable(getattr(controller_for(self._hass, self._entry_id), "_start_cap", None)):
                     return "protection_conflict_unresolved", None, None
                 if (record.get("clean_start") and record.get("attempt") is None and pause
                         and pause.get("type") == "pause_until_resumed"
@@ -177,11 +223,14 @@ class MorekScheduleWorker:
                     return "paused_until_resume", None, None
                 if pause is not None and pause["type"] == "resume_requested" and self.resume_ticket != (pause["id"], generation):
                     return "resume_requires_confirmation", None, None
-                _, fingerprint = self._intent(pause)
+                _, fingerprint = self._intent(pause, record.get("charge_now"))
                 ticket = admission._completion_tickets.get(self._entry_id)
                 outcome = await morek_schedule._send_profile_shared(
                     self._hass, self._entry_id, data, store, fingerprint, validate, automatic=True,
                     pause_id=None if pause is None else pause["id"],
+                    override_id=(record.get("charge_now") or {}).get("id") if record.get("charge_now")
+                        and datetime.fromisoformat(record["charge_now"]["end"]) > datetime.now(timezone.utc) else None,
+                    force_sync=sync,
                     validate_durable=lambda: admission.async_owned_boundary_current(self._entry_id, connector),
                     migration_id=None if ticket is None else ticket[1])
                 return outcome, data.get("sent_at"), data.get("attempt_id")

@@ -58,8 +58,8 @@ unverified until observed, and preserve all safety and uncertainty interlocks.
 savings and monthly insights, extending existing session/savings APIs and Stage 6
 evidence rather than duplicating them. Existing costs are not proof of preserved
 historical tariffs. The user does not need separate themes or extra accessibility
-polish; keep practical desktop/mobile usability and readable warnings. Stage 9 is
-targeted fixes only, not another installation prerequisite; 5.8 remains the initial
+polish; keep practical desktop/mobile usability and readable warnings. Stage 9
+tracks the specified HA Core logging work, not another installation prerequisite; 5.8 remains the initial
 installation and user-directed testing path.
 
 **Stage 6 wording review:** genuine charging history remains later work. Existing
@@ -81,8 +81,8 @@ design: **Pause / Resume Auto** and **Charge Now / Return to Auto**. Pause reque
 that charging remain held until explicit Resume; Return to Auto cancels only the
 temporary Charge Now override, so charging may continue when Auto selects now.
 Pause/Resume under schedule ownership remains 5.6b; Charge Now remains optional
-Stage 10 after 5.8. Whether Charge Now can override an existing explicit pause
-still requires the user's decision. Neither a request nor ACK proves physical stop.
+Stage 10 after 5.8. Charge Now does not override an existing explicit pause: the
+user must Resume first. Neither a request nor ACK proves physical stop.
 
 **Current task status:** 5.5a–5.5f and 5.6a are completed as unarmed local
 mocked groundwork, pending coordinator review, not active operation. The 5.6b–5.8
@@ -105,6 +105,19 @@ actions or a new hardware-testing stage. Assign **5.5d only** next. The full 5.5
 5.6 and 5.7 umbrellas remain open; dispatch remains unarmed and the deferred 5.4c
 HA-plugin suite remains unrun. Follow the numbered checklist rather than historical
 handoff entries; do not repeat completed groundwork or bundle future substages.
+
+**Charge Now refinement:** The user chose a fixed end with 30-minute, 1-hour,
+2-hour, 3-hour and custom-end choices (1 hour default). It may be set before
+plug-in; plugging in later uses the remaining time. A new request replaces the
+end time from now. Show the price and whether it exceeds the cap in one
+confirmation; unknown price or missing Auto-planning SOC does not block this
+explicit request. An existing Pause/Stop requires Resume first. Expiry or
+Return to Auto follows the latest valid plan, potentially without interrupting
+charging; if no plan can be applied, end the override at its scheduled time and
+resume Auto when possible. Pause/Stop during Charge Now cancels the override and
+applies the pause; Resume later returns to normal Auto. These decisions do not
+authorize live operations, weaken execution/protection guards or establish
+implementation.
 
 **2026-11-12 Charge Now decision:** the user wants this as an optional feature
 after initial installation and user-directed testing in 5.8, not a release
@@ -354,6 +367,118 @@ requirements, not features claimed implemented in the manual baseline below.
   Do not assume `GetCompositeSchedule` lists stored profiles.
 
 ## Tests, build, and next steps
+
+### 2026-11-13 — Stage 10.3 investigation (incomplete)
+
+- No implementation was made. The capped planner already selects published slots
+  without requiring a complete horizon, but if known cheap energy falls short of
+  the minimum it can select above-cap slots merely because the remaining prices are
+  missing. This is not the requested urgency policy. The uncapped controller has
+  separate publication/history and deadline rules and must retain those semantics.
+- `waiting_for_tomorrow` is already accepted by both `_proposed_profile` and
+  `morek_plan_blocker`; the latter rechecks current inputs and actual listed price
+  coverage of every selected window. The worker then uses connector admission,
+  ownership, pause, protection and durable-outcome checks. Impaired `degraded` or
+  `incomplete` combined price states are refused. This inspection does not establish
+  which condition caused any particular user's missing proposal; actual end-to-end
+  reproduction and the full partial-horizon implementation remain necessary.
+- Focused existing mocked tests: 3 passed (known-price shortfall, minimum selection,
+  and clean-start pause); 635 deselected. These characterize existing behavior,
+  not Stage 10.3 acceptance. No HA, charger, deployment or physical testing occurred.
+
+### 2026-11-13 — manual schedule sync (local only)
+
+- The sidebar Morek panel offers **Recalculate & sync schedule** to administrators.
+  It recalculates and asks the existing owned worker to send the current Auto schedule,
+  including when that fingerprint was previously acknowledged. Pause, an active
+  Charge Now override, uncertain outcomes, rejected identical attempts, admission
+  and protection checks remain in effect. The request response is not an upload ACK;
+  reconciliation status reports the later outcome. A newer planner event may
+  supersede the explicit sync. No live charger action or deployment was performed.
+- Focused mocked websocket/worker tests and a sidebar click test passed, as did Ruff,
+  frontend type-check, build and check-dist. Physical behavior remains unverified.
+
+### 2026-11-13 — Stage 10.2 sidebar control (2.5.95; local mocked)
+
+- The existing sidebar presents Charge Now / Return to Auto as one daily control;
+  its duration disclosure offers 30 minutes, one hour (default), two hours, three
+  hours and a validated local custom end. An active override offers replacement
+  inside the disclosure. The one activation confirmation gives the exact fixed end,
+  price and cap comparison when available, and explains the price-plan override;
+  the sent `end_time` is the same instant confirmed. Return warns that Auto may
+  continue charging. Opening, rendering and refreshing issue only read requests.
+- Backend status drives the displayed intent, outcome and reason; ACK, effective
+  readback, session-start request and measured charging remain distinct. Existing
+  Pause/Resume stays separate. Stale status, unsupported/unauthorized connectors,
+  person Pause, offline state and unknown outcomes are explained and guarded. An
+  in-flight or unknown request is not blindly retried. No backend defect was found
+  in the contract review; no live system or charger was contacted.
+- Focused mocked Charge Now sidebar tests (18), eight existing sidebar regressions,
+  TypeScript checking, frontend build and check-dist passed. jsdom reported CSS
+  parser warnings. Width-specific DOM checks do not establish rendered desktop or
+  mobile layout, actual touch/keyboard interaction, HA compatibility or physical
+  charging. No browser/Playwright or large suite was run.
+- User-directed procedure after separately approved installation: inspect current
+  status, choose a duration or end, review the single confirmation, then inspect the
+  separate intent, ACK/readback and genuine charging observations. Return to Auto
+  can continue charging, while Pause remains until Resume. This note grants no
+  permission to deploy, restart or operate a charger.
+
+### 2026-11-13 — Stage 10.1 verification and focused review (2.5.93)
+
+- `_verification_current` now binds an accepted Charge Now attempt to the same
+  connector-bound active override ID, owner ticket, lifecycle, fingerprint and
+  reconstructed current intent. An old Auto attempt cannot verify a newer active
+  override. Replaced, canceled, expired or paused intent cannot inherit old evidence;
+  status labels a matching comparison `charge_now`. Effective readback remains a
+  bounded observation, not profile inventory or proof of a session or power flow.
+- Focused isolated selection: **70 passed**, including real-admission mocked OCPP
+  request/readback and Stop at ledger, entry-store, admission and dispatch boundaries;
+  late readback, default/selected/custom durations, restart/reconnect, offline expiry,
+  missing SOC/prices, explicit pause, uncertain/rejected writes, available Auto now,
+  unrelated identity, limits, and Auto/held-pause verification regressions. The
+  previously failing real-admission late-ACK test now initializes its timezone and
+  runs its assertions. A targeted jsdom sidebar open/no-write test passed (CSS parser
+  warnings); Ruff, frontend build and check-dist passed. No browser/Playwright run.
+- Stage 10.1 is locally complete for coordinator review; Stage 10.2 remains open.
+  Mocks do not establish live OCPP compatibility, protection, transaction behavior,
+  installed profiles or physical charging. No live HA or charger operation occurred.
+
+### 2026-11-13 — Stage 10.1 production-path draft (2.5.92; incomplete)
+
+- `spotnav/morek_schedule` accepts administrator `charge_now` and `return_to_auto`
+  actions. Connector-bound intent is persisted in the existing ledger; the schedule
+  worker uses it, sets an expiry timer even while offline, and triggers normal Auto
+  reconciliation after expiry. Pause removes it; session authorization uses the
+  existing coordinator. Price comparison is a read-only calculation and unavailable
+  price or SOC does not itself block the bounded override. No UI was added.
+- Actual-module mocked tests include real admission and durable storage through an
+  OCPP mock, early return, replacement, missing plan, Pause/Resume, offline expiry,
+  uncertain-upload reconnect, price comparisons and session coordinator integration.
+  The focused selection passed 16 tests; Ruff, frontend build and check-dist passed.
+  Existing session and ownership protections remain prerequisites, not proof of flow.
+- **Remaining blocker:** `_verification_current` in `api/morek_schedule.py` still
+  recomputes only ordinary Auto/held-pause fingerprints; an override attempt's distinct
+  fingerprint cannot establish current readback verification and is superseded. Its
+  ACK and uncertain outcome remain separately reported. Override-specific Stop/late-ACK,
+  custom-end, status-read side-effect, changed-plan/restart and failure race coverage
+  is also incomplete. Do not mark 10.1 complete or rely on this draft for operation
+  before completing and reviewing those cases. Stage 10.2 remains open. No live HA,
+  deployment or charger operation occurred; mocks do not prove physical charging.
+
+### 2026-11-13 — Stage 10.1 partial schedule groundwork (2.5.91)
+
+- `charge_now_profile` is an unwired builder using the existing fixed-current profile
+  limits. It combines an active fixed-end interval with subsequent Auto windows,
+  merging only continuous windows and refusing excess blocks or horizon. The caller
+  must validate Auto provenance and all execution authority. It neither records an
+  override nor sends a profile. Stage 10.1 remains incomplete: durable connector-bound
+  intent, action and status API, lifecycle/restart/expiry, Stop and late-ACK races,
+  session coordination, price reporting and the full focused test matrix are outstanding.
+  Stage 10.2 remains open. No override is available for use.
+- Two isolated actual-module builder tests passed, as did Ruff, frontend build and
+  check-dist. Direct pytest could not load the HA plugin on Windows (`fcntl` missing).
+  No live HA or charger operation occurred; mocks do not prove physical charging.
 
 ### 2026-11-13 — session review corrections (2.5.90; local mocked)
 

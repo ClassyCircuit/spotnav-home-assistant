@@ -22,6 +22,51 @@ from custom_components.spotnav.api.morek_schedule import (
 NOW = datetime(2026, 11, 6, 20, 0, tzinfo=timezone.utc)
 
 
+def test_charge_now_profile_continues_auto_without_pulse_and_keeps_later_windows():
+    end = NOW + timedelta(hours=1)
+    auto = ((NOW + timedelta(minutes=30), NOW + timedelta(hours=2)),
+            (NOW + timedelta(hours=3), NOW + timedelta(hours=4)))
+    profile = morek_schedule.charge_now_profile(NOW, end, auto, 16, NOW)
+    periods = profile["chargingSchedule"]["chargingSchedulePeriod"]
+    assert [(p["startPeriod"], p["limit"]) for p in periods] == [
+        (0, 16), (7200, 0), (10800, 16), (14400, 0)]
+
+
+def test_charge_now_profile_enforces_fixed_end_and_representation_limits():
+    end = NOW + timedelta(hours=1)
+    periods = morek_schedule.charge_now_profile(NOW, end, (), 16, NOW)["chargingSchedule"]["chargingSchedulePeriod"]
+    assert [(p["startPeriod"], p["limit"]) for p in periods] == [(0, 16), (3600, 0)]
+    auto = tuple((NOW + timedelta(hours=n), NOW + timedelta(hours=n, minutes=30)) for n in (2, 4, 6))
+    with pytest.raises(ScheduleRefused, match="too_many_blocks"):
+        morek_schedule.charge_now_profile(NOW, end, auto, 16, NOW)
+    with pytest.raises(ScheduleRefused, match="invalid_plan"):
+        morek_schedule.charge_now_profile(NOW, end, ((NOW + timedelta(hours=49), NOW + timedelta(hours=50)),), 16, NOW)
+    with pytest.raises(ScheduleRefused, match="charge_now_invalid_time"):
+        morek_schedule.charge_now_profile(NOW, NOW, (), 16, NOW)
+
+
+@pytest.mark.parametrize(("price", "above"), [(0.09, False), (0.11, True)])
+def test_charge_now_price_comparison_uses_published_price_without_soc(monkeypatch, price, above):
+    from custom_components.spotnav.planning import planner as planner_module
+    day = SimpleNamespace(document=object())
+    area = SimpleNamespace(state="ready", today_state="ready", today_authority="listed", today_snapshot=day,
+                           tomorrow_state="unavailable", tomorrow_authority=None, tomorrow_snapshot=day)
+    entry = SimpleNamespace(currency="EUR", tz="UTC")
+    manager = SimpleNamespace(area_snapshot=lambda _: area,
+        catalogue_snapshot=lambda: SimpleNamespace(area=lambda _: entry))
+    planner = SimpleNamespace(_manager=manager, _fiscal_for=lambda *_: None)
+    settings = SimpleNamespace(area_id="x", soft_price_cap=0.1, cap_price_basis="nord_pool")
+    monkeypatch.setattr(morek_schedule, "preview_for", lambda *_: planner)
+    monkeypatch.setattr(morek_schedule, "domain_data", lambda *_: SimpleNamespace(
+        auto_store=SimpleNamespace(settings=lambda _: settings)))
+    monkeypatch.setattr(planner_module, "planning_slots", lambda *a, **k: (
+        SimpleNamespace(start=NOW, local_major_per_kwh=price),))
+    result = morek_schedule._charge_now_price(None, "charger", NOW)
+    assert result["current_price"] == price and result["above_cap"] is above
+    area.state = "unavailable"
+    assert morek_schedule._charge_now_price(None, "charger", NOW)["current_price"] is None
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(("error", "code"), [
     ("refused", "resume_unavailable"),
@@ -244,8 +289,8 @@ async def test_status_expires_or_supersedes_verification(monkeypatch, end_offset
         record["schedule_pause"] = {"version": 1, "type": pause_type, "id": "pause",
                                     "station_id": morek_schedule.MOREK_STATION_ID, "connector_id": 1}
     ledger = SimpleNamespace(read=AsyncMock(return_value=record), write=AsyncMock())
-    data = {"verified": True, "attempt_id": "id", "sent_at": "t", "verification": {
-        "reason": "matched", "coverage_start": (now - timedelta(hours=1)).isoformat(),
+    data = {"verified": True, "attempt_id": "id", "sent_at": "t", "effective": {"fetched_at": "read"}, "verification": {
+        "reason": "matched", "readback_at": "read", "coverage_start": (now - timedelta(hours=1)).isoformat(),
         "coverage_end": (now + timedelta(seconds=end_offset)).isoformat()}}
     monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
     monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=None))

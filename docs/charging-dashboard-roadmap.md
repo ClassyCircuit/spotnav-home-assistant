@@ -1249,37 +1249,80 @@ rather than implementing the same feature twice.
     assumptions, and report unknown when evidence is insufficient, not zero.
   - Keep totals consistent across dashboard cards and reuse 7.5 monthly insights.
 
-### Stage 9 — Targeted dashboard fixes (old C2)
+### Stage 9 — Diagnostics and logging
 
 No separate themes, light/dark modes or extra accessibility-polish project is
 needed for this single-user dashboard. Keep the interface usable on desktop and
 mobile, with readable warnings and working essential controls. Installation and
 user-directed testing belong to 5.8; this stage is not another prerequisite.
 
-- [ ] **9.1 Fix real integration gaps when needed:** check the combined dashboard,
-  empty/error states and repeated updates; fix practical layout or interaction
-  problems and duplicate daily controls rather than performing a general redesign.
-- [ ] **9.2 Documentation only where needed:** correct installation, migration or
-  diagnostics guidance when a real gap is found; never overwrite user views or
-  claim unperformed hardware tests. Reuse the existing 5.4–5.8 guidance.
-- [ ] **9.3 Optional additional execution-health notifications:** consider bounded
-  Morek mismatch/uncertainty phone events beyond the existing 5.3a notices if useful.
-  Reuse the existing notifier, opt-in and deduplication; never equate ACK/readback
-  with measured charging. Not required for 5.8.
+Substages 9.1–9.3 were removed as open-ended catch-all work; 9.4 retains its
+number to avoid changing existing references. Specific defects can be assigned
+when identified, rather than remaining indefinite roadmap tasks.
+- [ ] **9.4 SpotNav activity and diagnostic logs:** use native Home Assistant Core
+  logging and add useful SpotNav log messages for investigating planning, price
+  availability, SOC/inputs, schedule reconciliation and outcomes, session starts,
+  charger availability, Pause/Resume and Charge Now. Include actionable refusal and
+  error reasons and distinguish intent, ACK, reported session and measured charging.
+  Do not log credentials, authentication identifiers or raw OCPP payloads.
+  - Provide a SpotNav menu view of recent and live Core logs filtered to the SpotNav
+    namespace, with practical text/severity filters, reusing HA's existing log
+    facilities rather than creating a separate log store. First verify stream/API
+    availability, authorization, retained history and compatibility for the installed
+    HA environment; report unsupported access or history limitations rather than
+    claiming a native per-integration app log exists. SpotNav is an integration, not
+    a separate HA app/container. Do not expose unrelated Core logs to unauthorized
+    users or enable verbose OCPP/websocket logging.
+  - Test normal events, errors, filtering, permissions, unavailable streams and
+    reconnect/history behavior with mocks. Avoid excessive repeated messages, and
+    document the normal HA Core logs fallback. No live HA access is authorized by
+    this roadmap item.
 
 ### Stage 10 — Optional Charge Now (after initial installation)
 
 This is a user-requested **nice-to-have after 5.8**, not a prerequisite for the
 initial working release, its installation or live validation. It can be prioritized
-after 5.8 independently of Stages 6–9. It is not implemented today. Implementation
-and subsequent deployment or hardware actions require their own assignments and
-specific approvals; this roadmap grants none.
+after 5.8 independently of Stages 6–9. The backend and sidebar control are locally
+implemented with mocked tests, pending review. Deployment or hardware actions
+require specific approvals; this roadmap grants none.
 
-- [ ] **10.1 Bounded override and return to Auto**
+**User decisions for Stage 10:** Charge Now defaults to one hour; offer 30 minutes,
+1 hour, 2 hours, 3 hours and a custom end time. A new request replaces the existing
+end time, calculated from now. It may be set before the car is plugged in: the end
+time stays fixed, and an eligible later plug-in uses the remaining time. Show the
+current price and whether it exceeds the user's cap in a single confirmation; an
+unknown price is shown as unavailable and does not block Charge Now. Missing SOC or
+other Auto-planning data does not by itself block this explicit request. An existing
+person Pause/Stop does block it: ask the user to Resume Auto first. Charge Now's
+price-cap override does not override electrical protection or execution interlocks.
+On expiry or Return to Auto, follow the latest valid Auto plan; if Auto selects now,
+charging may continue. The override has a fixed scheduled end; when no valid Auto
+plan can be applied, end its charging window at that time and let Auto resume when
+it can. Pause/Stop during an active override cancels Charge Now and applies the
+pause; a later Resume returns to normal Auto, not the canceled override.
+
+- [x] **10.1 Bounded override and return to Auto** (2.5.93 local mocked implementation; review pending)
+  - Accepted override attempts now bind verification to the connector, lifecycle,
+    exact override ID and current intended schedule. Replacement, cancellation,
+    expiry and Stop invalidate old verification; a match is only effective-limit
+    evidence, not installed-profile inventory or proof of physical charging. The
+    focused actual-module and mocked-OCPP checks and their limits are in the handoff.
+  - **Historical 2.5.92 production-path draft:** connector-bound persisted
+    requests and early return now trigger the existing worker; the worker restores a
+    fixed expiry and uses the existing admission/outcome and session coordinator paths.
+    Status includes price/cap where available and separate intended/attempt evidence.
+    Focused mocked action-to-real-admission dispatch and several lifecycle cases pass.
+    At that point override verification and additional race tests remained open;
+    2.5.93 addresses the local checks listed above. Stage 10.2 remains open.
+  - **Partial groundwork only (2.5.91):** an unwired profile-construction helper
+    combines a fixed override window with valid subsequent Auto windows and refuses
+    existing block/horizon limits. It does not validate plan provenance or authorize
+    or dispatch anything. Durable intent, action/status API, worker/session integration,
+    expiry, restart, Stop races and the requested end-to-end tests remain open.
   - Implement a deliberate temporary **Charge Now** override, defaulting to one
     hour and accepting other user-selected durations/end times. Make any price-cap
     override explicit and show the current price or honestly report it unavailable;
-    decide how unknown prices are handled with the user rather than inventing a rule.
+    an unknown price does not block the explicit request.
   - Reuse the same Morek schedule owner, fixed-current on/off schedule builder and
     durable execution evidence as Auto. Do not use a competing legacy start/stop
     loop, household load management or dynamic amp regulation.
@@ -1303,20 +1346,56 @@ specific approvals; this roadmap grants none.
     automatic window, changed plans, offline/reconnect, unknown outcomes, price/cap
     basis, selected durations, charger limits and concurrent Stop/pause. No live
     operation is authorized by these tests.
-- [ ] **10.2 Dashboard controls and post-install review**
+- [x] **10.2 Dashboard controls** (2.5.95 local mocked implementation; review pending)
+  - The existing sidebar has one Charge Now / Return to Auto control and a duration
+    disclosure for custom ends and replacement. The activation confirmation includes
+    the exact requested fixed end, known price/cap comparison and price-plan override.
+    Intent, upload ACK, effective limits, session-start request and measured charging
+    remain distinct. Stale, paused, unauthorized and uncertain cases are blocked or
+    explained. No charger action occurs when opening or refreshing the panel.
+  - Focused mocked sidebar checks passed; jsdom cannot validate actual layout or
+    touch. HA installation, mobile/desktop interaction and physical charging remain
+    unverified. The user-directed live review remains subject to separate approval.
   - Add one **Charge Now** control with duration choices to the existing sidebar;
     while active, the same control becomes **Return to Auto**. The other daily
     control is **Pause / Resume Auto** from 5.6b, not an extra cancellation button.
     Show override status/end, cap implications,
     proposal versus sent/readback versus measured state, and explicitly explain that
     cancelling may leave charging active if the automatic plan selects now.
-    The exact interaction of pressing Charge Now while explicitly paused still
-    needs the user's decision; do not silently override a person Stop/pause.
+    While explicitly paused, ask the user to Resume Auto before Charge Now;
+    do not silently override a person Stop/pause.
   - Test desktop/mobile interaction, confirmation, permission, race, stale and
     unavailable states, and document the user-directed procedure. Show failed or
     unknown schedule updates as unconfirmed, not as proof that charging stopped.
     Any later deployment, restart, profile operation or physical test requires the
     user's specific approval; do not claim mocked checks verify live behavior.
+- [ ] **10.3 Plan with a partial published price horizon**
+  - Investigation only: capped planning already permits published slots with a
+    partial horizon, but its minimum exception can treat missing future cheap prices
+    as a reason to buy above cap. The normal `waiting_for_tomorrow` state is already
+    accepted by the Morek proposal and evidence gates; degraded/incomplete states are
+    not. The actual reported blocker has not been reproduced. No end-to-end fix or
+    Stage 10.3 acceptance tests have been completed; see the handoff.
+  - When the ready-by time extends beyond published prices, do not discard useful
+    known-price charging opportunities merely because the rest of the horizon is
+    unpublished. For example, plan a suitable cheap window today even if prices for
+    tomorrow morning have not yet arrived. This is an Auto planning fix, independent
+    of the optional Charge Now override; its placement here does not make it depend
+    on 10.1 or 10.2.
+  - Inspect the existing partial-horizon, price-wait and soft-cap paths first. Use
+    actual published prices only, mark the result provisional and show where price
+    coverage ends; never invent future prices or claim global optimality. Respect the
+    target SOC, soft cap and minimum-SOC policy, and explain any above-cap minimum
+    exception and unresolved energy shortfall honestly.
+  - Recalculate when the missing prices are published or relevant SOC, settings or
+    ready-by inputs change. Keep plans bounded to valid evidence and the supported
+    charger schedule horizon; do not create unlimited charging in unpriced periods.
+    Preserve connector, ownership, protection and uncertain-outcome guards.
+  - Test both planning and the actual guarded Morek worker path with mocked inputs:
+    today's cheap period with tomorrow unpublished, publication-triggered replanning,
+    no qualifying known-price window, minimum-SOC/cap behavior, price gaps or stale
+    data, and deadline and schedule boundaries. Distinguish a displayed proposal
+    from a sent schedule and measured charging. No live operation is authorized.
 
 ### Stage 11 — Adaptive charging estimates for Morek
 

@@ -60,7 +60,7 @@ def setup(monkeypatch, result=True):
     controller = SimpleNamespace(ocpp_target=SimpleNamespace(connector_id=1))
     worker = SimpleNamespace(_hass=hass, _entry_id="charger", _identity=lambda: IDENTITY,
                              _closed=False, _suspended=False, _available=lambda: True,
-                             _intent=lambda pause: ({}, "plan"), resume_ticket=None)
+                             _intent=lambda pause, override=None: ({}, "plan"), resume_ticket=None)
     async def state(h, entry):
         return h.data.setdefault(morek_schedule._DATA_KEY, {}).setdefault(entry, ({}, None, asyncio.Lock()))[:2]
     monkeypatch.setattr(morek_schedule, "_state", state)
@@ -89,6 +89,23 @@ async def test_plugin_one_request_and_no_secret_logs(monkeypatch, caplog, answer
     coordinator.trigger()
     await coordinator.task
     assert point.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_charge_now_plugin_uses_existing_session_coordinator(monkeypatch):
+    coordinator, point, ledger, _ = setup(monkeypatch)
+    now = datetime.now(timezone.utc)
+    intent = {"version": 1, "id": "b" * 32, "station_id": IDENTITY["resolved_id"], "connector_id": 1,
+              "start": now.isoformat(), "end": (now + timedelta(minutes=50)).isoformat()}
+    ledger.value["charge_now"] = intent
+    seen = []
+    coordinator.worker._intent = lambda pause, override: (seen.append(override) or ({}, "plan"))
+    coordinator.observe("Available", "Preparing")
+    await coordinator.task
+    assert point.calls == 1
+    assert seen and all(value == intent for value in seen)
+    assert ledger.value["charge_now"]["end"] == intent["end"]
+    assert ledger.value["session_start"]["state"] == "accepted"
 
 
 @pytest.mark.asyncio

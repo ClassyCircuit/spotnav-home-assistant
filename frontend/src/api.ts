@@ -91,7 +91,7 @@ export async function getDashboard(
 export async function morekSchedule(
   hass: HomeAssistantLike,
   chargerId: string,
-  action: "status" | "send" | "fetch" | "clear",
+  action: "status" | "send" | "fetch" | "clear" | "recalculate_sync",
   previewId?: string,
 ): Promise<unknown> {
   return await call<unknown>(hass, {
@@ -101,6 +101,17 @@ export async function morekSchedule(
     action,
     ...(action === "send" && previewId ? { preview_id: previewId } : {}),
     ...(action === "clear" ? { confirm_profile_id: 42001 } : {}),
+  });
+}
+
+/** Explicit schedule-owned override; its response is intent, not proof of charging. */
+export async function chargeNowAction(
+  hass: HomeAssistantLike, chargerId: string, action: "charge_now" | "return_to_auto",
+  options: { duration_minutes?: number; end_time?: string } = {},
+): Promise<unknown> {
+  return await call<unknown>(hass, {
+    type: "spotnav/morek_schedule", api_version: 1, charger_id: chargerId, action,
+    ...(action === "charge_now" ? options : {}),
   });
 }
 

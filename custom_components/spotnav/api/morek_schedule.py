@@ -109,6 +109,39 @@ def profile_for(periods: tuple[tuple[datetime, datetime], ...], amps: int, now: 
     }
 
 
+def charge_now_profile(start: datetime, end: datetime, auto_periods: tuple, amps: int,
+                       now: datetime) -> dict[str, Any]:
+    """Build a bounded override and all subsequent Auto windows; never dispatch it.
+
+    The caller must independently validate Auto provenance and execution authority.
+    Overlapping or adjacent Auto windows are merged with the override only where
+    their union is continuously on; subsequent disjoint windows are retained.
+    """
+    try:
+        start, end, now = _utc(start), _utc(end), _utc(now)
+        if end <= start or end <= now or start > now:
+            raise ScheduleRefused("charge_now_invalid_time")
+        previous_end = None
+        normalized = []
+        for window_start, window_end in auto_periods:
+            window_start, window_end = _utc(window_start), _utc(window_end)
+            if window_end <= window_start or (previous_end is not None and window_start <= previous_end):
+                raise ScheduleRefused("invalid_plan")
+            normalized.append((window_start, window_end))
+            previous_end = window_end
+    except (TypeError, ValueError, AttributeError):
+        raise ScheduleRefused("invalid_plan") from None
+    windows = [(start, end)]
+    for window_start, window_end in normalized:
+        if window_end <= end:
+            continue
+        if window_start <= windows[-1][1]:
+            windows[-1] = (windows[-1][0], window_end)
+        else:
+            windows.append((window_start, window_end))
+    return profile_for(tuple(windows), amps, now, allow_active=True)
+
+
 def held_off_profile(now: datetime) -> dict[str, Any]:
     """The existing profile identity, with one immediate, open-ended 0 A limit."""
     start = _utc(now).replace(microsecond=0)
@@ -664,6 +697,22 @@ async def _outcome_record(hass: HomeAssistant, entry_id: str, data: dict[str, An
                                or type(intent.get("connector_id")) is not int
                                or intent["connector_id"] != MOREK_CONNECTOR_ID):
         raise ScheduleRefused("schedule_pause_invalid")
+    override = record.get("charge_now")
+    if override is not None:
+        try:
+            if (not isinstance(override, dict) or set(override) != {"version", "id", "station_id", "connector_id", "start", "end"}
+                    or type(override["version"]) is not int or override["version"] != 1
+                    or not isinstance(override["id"], str) or len(override["id"]) != 32
+                    or any(c not in "0123456789abcdef" for c in override["id"])
+                    or override["station_id"] != MOREK_STATION_ID
+                    or type(override["connector_id"]) is not int or override["connector_id"] != MOREK_CONNECTOR_ID):
+                raise ValueError
+            start = _utc(datetime.fromisoformat(override["start"]))
+            end = _utc(datetime.fromisoformat(override["end"]))
+            if end <= start or end - start > MAX_HORIZON:
+                raise ValueError
+        except (TypeError, ValueError, KeyError, ScheduleRefused):
+            raise ScheduleRefused("charge_now_intent_invalid") from None
     return record
 
 
@@ -712,10 +761,12 @@ async def async_record_owned_pause(hass: HomeAssistant, entry_id: str, *, resume
                 raise ScheduleRefused("resume_unavailable")
             desired = "resume_requested" if resume else "pause_until_resumed"
             committed = False
-            if intent is None or intent["type"] != desired:
+            if intent is None or intent["type"] != desired or (not resume and record.get("charge_now") is not None):
                 intent = {"version": 1, "type": desired, "id": uuid4().hex,
                           "station_id": connector.station_id, "connector_id": connector.connector_id}
                 record["schedule_pause"] = intent
+                if not resume:
+                    record.pop("charge_now", None)
                 await outcomes_for(hass).write(record)
                 committed = True
             if resume and (generation != admission.generation(connector) or admission._person_stops.get(connector)):
@@ -735,6 +786,73 @@ async def async_record_owned_pause(hass: HomeAssistant, entry_id: str, *, resume
             worker.hold_ticket = (intent["id"], generation)
         worker.trigger()
     return dict(intent)
+
+
+async def async_charge_now_action(hass: HomeAssistant, entry_id: str, *, return_to_auto: bool = False,
+                                  duration_minutes: int | None = None, end_time: str | None = None) -> dict[str, Any]:
+    """Persist an explicit request under the owner's connector lock, then trigger reconciliation."""
+    from ..execution.command_admission import physical_connector
+
+    now = datetime.now(timezone.utc)
+    if return_to_auto:
+        if duration_minutes is not None or end_time is not None:
+            raise ScheduleRefused("charge_now_invalid_time")
+        end = None
+    elif end_time is not None:
+        if duration_minutes is not None:
+            raise ScheduleRefused("charge_now_invalid_time")
+        try:
+            end = _utc(datetime.fromisoformat(end_time.replace("Z", "+00:00")))
+        except (ValueError, AttributeError, TypeError, ScheduleRefused):
+            raise ScheduleRefused("charge_now_invalid_time") from None
+    else:
+        duration = 60 if duration_minutes is None else duration_minutes
+        if type(duration) is not int or duration not in (30, 60, 120, 180):
+            raise ScheduleRefused("charge_now_invalid_duration")
+        end = now + timedelta(minutes=duration)
+    if end is not None and (end <= now or end - now > MAX_HORIZON):
+        raise ScheduleRefused("charge_now_invalid_time")
+    entry, failure = lookup_charger(hass, entry_id)
+    if failure or entry is None:
+        raise ScheduleRefused(failure or "unknown_charger")
+    admission = command_admission(hass)
+    def identity():
+        return _intent_identity_status(hass, getattr(controller_for(hass, entry_id), "ocpp_target", None))
+    original = identity()
+    connector = physical_connector(original)
+    if not _owned_intent_identity_ok(original) or connector is None:
+        raise ScheduleRefused("identity_unresolved")
+    generation = admission.generation(connector)
+    async with admission._lock_for(connector):
+        current = identity()
+        owner = await ownership_store(hass).async_status(entry_id, current)
+        if (not _owned_intent_identity_ok(current) or physical_connector(current) != connector
+                or owner.get("record_state") != "valid" or owner.get("recorded_owner") != "morek_schedule"
+                or owner.get("transition_state") is not None or owner.get("armed") is not False
+                or (owner.get("station_id"), owner.get("connector_id")) != (connector.station_id, connector.connector_id)):
+            raise ScheduleRefused("schedule_owner_unavailable")
+        data, _ = await _state(hass, entry_id)
+        record = await _outcome_record(hass, entry_id, data)
+        if physical_connector(identity()) != connector:
+            raise ScheduleRefused("identity_changed")
+        if not return_to_auto:
+            pause = record.get("schedule_pause") or {}
+            settings = domain_data(hass).auto_store.settings(entry_id)
+            if (pause.get("type") == "pause_until_resumed" or getattr(getattr(settings, "pause", None), "admitted", False)
+                    or admission._person_stops.get(connector) or generation != admission.generation(connector)):
+                raise ScheduleRefused("resume_auto_first")
+            if end <= datetime.now(timezone.utc):
+                raise ScheduleRefused("charge_now_invalid_time")
+            record["charge_now"] = {"version": 1, "id": uuid4().hex, "station_id": connector.station_id,
+                                    "connector_id": connector.connector_id, "start": now.isoformat(), "end": end.isoformat()}
+        else:
+            record.pop("charge_now", None)
+        await outcomes_for(hass).write(record)
+    worker = getattr(getattr(entry, "runtime_data", None), "morek_worker", None)
+    if worker is not None:
+        worker.trigger()
+    return {"intent": record.get("charge_now"), "reconciliation": "pending" if worker else "worker_unavailable",
+            "outcome": "uncertain" if record["uncertain"] else "not_yet_confirmed"}
 
 
 async def async_maybe_owned_action(hass: HomeAssistant, entry_id: str, action: str) -> bool:
@@ -801,15 +919,41 @@ def _verification_current(hass: HomeAssistant, entry_id: str, entry: Any, data: 
         sent = attempt.get("profile")
         pause_id = attempt.get("pause_id")
         pause = record.get("schedule_pause")
+        override_id = attempt.get("override_id")
+        override = record.get("charge_now")
         if pause_id is not None and (not isinstance(pause, dict) or pause.get("id") != pause_id):
             return False
         if pause_id is None and attempt.get("source") == "worker" and pause is not None:
             return False
-        fingerprint_revision = [settings.revision, pause_id] if pause_id is not None else settings.revision
+        now = datetime.now(timezone.utc)
+        if override_id is not None:
+            if (attempt.get("source") != "worker" or worker is None or admission is None or connector is None
+                    or not isinstance(override, dict)
+                    or set(override) != {"version", "id", "station_id", "connector_id", "start", "end"}
+                    or not isinstance(override_id, str) or len(override_id) != 32
+                    or any(c not in "0123456789abcdef" for c in override_id) or override.get("id") != override_id
+                    or type(override.get("version")) is not int or override.get("version") != 1
+                    or override.get("station_id") != connector.station_id
+                    or type(override.get("connector_id")) is not int
+                    or override.get("connector_id") != connector.connector_id
+                    or _utc(datetime.fromisoformat(override["start"])) > now
+                    or _utc(datetime.fromisoformat(override["end"])) <= now
+                    or (pause is not None and (pause.get("type") != "resume_requested"
+                        or worker.resume_ticket != (pause_id, admission.generation(connector))))):
+                return False
+            fingerprint_revision = [settings.revision, override_id]
+            current, current_fingerprint = worker._intent(pause, override)
+            if current_fingerprint != fingerprint:
+                return False
+        else:
+            if (attempt.get("source") == "worker" and override is not None
+                    and _utc(datetime.fromisoformat(override["end"])) > now
+                    and (pause is None or pause.get("type") != "pause_until_resumed")):
+                return False
+            fingerprint_revision = [settings.revision, pause_id] if pause_id is not None else settings.revision
+            current = held_off_profile(now) if pause_id is not None and pause.get("type") == "pause_until_resumed" else _proposed_profile(hass, entry_id, now)
         if _preview_id(sent, fingerprint_revision) != fingerprint or sent != data.get("profile"):
             return False
-        now = datetime.now(timezone.utc)
-        current = held_off_profile(now) if pause_id is not None and pause.get("type") == "pause_until_resumed" else _proposed_profile(hass, entry_id, now)
         if ({k: v for k, v in sent.items() if k != "chargingSchedule"}
                 != {k: v for k, v in current.items() if k != "chargingSchedule"}):
             return False
@@ -836,7 +980,8 @@ def _verification_current(hass: HomeAssistant, entry_id: str, entry: Any, data: 
 
 async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[str, Any], store: Any,
                                fingerprint: str, validate: Any, *, automatic: bool, pause_id: str | None = None,
-                               validate_durable: Any = None, migration_id: str | None = None) -> str:
+                               validate_durable: Any = None, migration_id: str | None = None,
+                               override_id: str | None = None, force_sync: bool = False) -> str:
     """Connector lock held. Record first, revalidate after every pre-dispatch await."""
     ledger = outcomes_for(hass)
     record = await _outcome_record(hass, entry_id, data)
@@ -848,7 +993,7 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
         return "upload_uncertain"
     acknowledged = record.get("acknowledged") or {}
     attempt = record.get("attempt") or {}
-    if automatic and acknowledged.get("fingerprint") == fingerprint:
+    if automatic and not force_sync and acknowledged.get("fingerprint") == fingerprint:
         return "unchanged"
     if automatic and attempt.get("state") == "rejected" and attempt.get("fingerprint") == fingerprint:
         return "upload_rejected"
@@ -862,6 +1007,8 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
                    "uncertain": True, "verified": None})
     if pause_id is not None:
         record["attempt"]["pause_id"] = pause_id
+    if override_id is not None:
+        record["attempt"]["override_id"] = override_id
     await ledger.write(record)
     # Recheck after persistence: a settings edit, new calculation, identity or
     # pause change while the disk was busy must never become an obsolete send.
@@ -967,6 +1114,39 @@ def _preview(hass: HomeAssistant, entry_id: str, target: Any) -> dict[str, Any]:
         reason = "preview_unavailable"
     return {"calculated_at": now.isoformat(), "profile": profile, "reason": reason,
             "preview_id": preview_id}
+
+
+def _charge_now_price(hass: HomeAssistant, entry_id: str, now: datetime) -> dict[str, Any]:
+    """Read published current price independently of the SOC-dependent plan."""
+    result = {"current_price": None, "above_cap": None, "price_reason": "price_unavailable"}
+    try:
+        from ..planning.planner import planning_slots, price_within_cap, effective_minor_per_kwh
+        planner = preview_for(hass, entry_id)
+        settings = domain_data(hass).auto_store.settings(entry_id)
+        manager = planner._manager
+        area = manager.area_snapshot(settings.area_id)
+        entry = manager.catalogue_snapshot().area(settings.area_id)
+        if area is None or entry is None or area.state not in ("ready", "waiting_for_tomorrow"):
+            return result
+        documents = tuple(day.document for state, authority, day in (
+            (area.today_state, area.today_authority, area.today_snapshot),
+            (area.tomorrow_state, area.tomorrow_authority, area.tomorrow_snapshot))
+            if state == "ready" and authority == "listed" and day.document is not None)
+        slots = planning_slots(documents, currency=entry.currency, timezone=entry.tz)
+        slot = next((slot for slot in slots if slot.start <= now < slot.start + timedelta(minutes=15)), None)
+        if slot is None or not math.isfinite(slot.local_major_per_kwh):
+            return result
+        cap = settings.soft_price_cap
+        basis = settings.cap_price_basis or "nord_pool"
+        fiscal = planner._fiscal_for(settings, entry) if cap is not None or basis == "configured_variable_cost" else None
+        price = (effective_minor_per_kwh(slot.local_major_per_kwh, fiscal, slot.start) / 100
+                 if basis == "configured_variable_cost" else slot.local_major_per_kwh)
+        above = None if cap is None else not price_within_cap(slot.local_major_per_kwh,
+            cap_major_per_kwh=cap, basis=basis, fiscal=fiscal, start=slot.start)
+        return {"current_price": price, "above_cap": above, "price_reason": None,
+                "price_basis": basis, "currency": entry.currency, "cap": cap}
+    except Exception:  # noqa: BLE001 - unavailable price never authorizes or blocks a request
+        return result
 
 
 def _operator_state(identity: dict[str, Any], online: bool, outcomes: dict[str, Any],
@@ -1272,8 +1452,9 @@ async def _async_schedule_action_locked(hass: HomeAssistant, entry_id: str, acti
 
 
 @websocket_api.websocket_command({vol.Required("type"): "spotnav/morek_schedule", vol.Required("api_version"): int,
-                                   vol.Required("charger_id"): str, vol.Required("action"): vol.In(("status", "send", "fetch", "clear", "request_enable", "disable_uploads", "reconfirm_migration")),
-                                   vol.Optional("preview_id"): str, vol.Optional("confirm_profile_id"): int})
+                                   vol.Required("charger_id"): str, vol.Required("action"): vol.In(("status", "send", "fetch", "clear", "request_enable", "disable_uploads", "reconfirm_migration", "charge_now", "return_to_auto", "recalculate_sync")),
+                                   vol.Optional("preview_id"): str, vol.Optional("confirm_profile_id"): int,
+                                   vol.Optional("duration_minutes"): int, vol.Optional("end_time"): str})
 @websocket_api.async_response
 async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
     if msg["api_version"] != API_VERSION:
@@ -1416,13 +1597,54 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
                       "operator": operator,
                       "sent_at": None if aborted_display else data.get("sent_at"),
                       "ack": None if aborted_display else data.get("ack"), "verified": verified,
-                      "verification_target": ("held_pause" if (attempt or {}).get("pause_id")
+                      "verification_target": ("charge_now" if (attempt or {}).get("override_id")
+                                              else "held_pause" if (attempt or {}).get("pause_id")
                                               and (outcomes.get("schedule_pause") or {}).get("type") == "pause_until_resumed"
                                               else "current_plan") if verified else None,
                       "sent": None if aborted_display else data.get("profile"), "effective": data.get("effective"),
                       "preview": preview,
                       "cleanup": data.get("cleanup"), "cleanup_supported": True,
                       "verification": verification}
+            override = outcomes.get("charge_now")
+            active = bool(override and datetime.fromisoformat(override["end"]) > datetime.now(timezone.utc))
+            intended = None
+            intent_reason = None
+            if active and worker is not None:
+                try:
+                    intended, _ = worker._intent(outcomes.get("schedule_pause"), override)
+                except ScheduleRefused as error:
+                    intent_reason = error.code
+            result["charge_now"] = {"state": "active" if active else "inactive", "intent": override,
+                                    "intended": intended, "reason": intent_reason,
+                                    "degraded": getattr(worker, "override_degraded", None),
+                                    "outcome": attempt if active and (attempt or {}).get("override_id") == override["id"] else None,
+                                    "previous_attempt": attempt, "uncertain": outcomes.get("uncertain"),
+                                    "measured_charging": "unknown",
+                                    **_charge_now_price(hass, entry.entry_id, datetime.now(timezone.utc))}
+        elif msg["action"] == "recalculate_sync":
+            entry, failure = lookup_charger(hass, msg["charger_id"])
+            if failure or entry is None:
+                raise ScheduleRefused(failure or "unknown_charger")
+            worker = getattr(getattr(entry, "runtime_data", None), "morek_worker", None)
+            planner = preview_for(hass, entry.entry_id)
+            if worker is None or planner is None or worker._closed:
+                raise ScheduleRefused("worker_unavailable")
+            data, _ = await _state(hass, entry.entry_id)
+            record = await _outcome_record(hass, entry.entry_id, data)
+            if record.get("uncertain"):
+                raise ScheduleRefused("upload_uncertain")
+            if (record.get("schedule_pause") or {}).get("type") == "pause_until_resumed":
+                raise ScheduleRefused("paused_until_resume")
+            override = record.get("charge_now")
+            if override and datetime.fromisoformat(override["end"]) > datetime.now(timezone.utc):
+                raise ScheduleRefused("charge_now_active")
+            await planner.async_recalculate()
+            worker.trigger(sync=True)
+            result = {"reconciliation": "requested"}
+        elif msg["action"] in ("charge_now", "return_to_auto"):
+            result = await async_charge_now_action(hass, msg["charger_id"],
+                return_to_auto=msg["action"] == "return_to_auto",
+                duration_minutes=msg.get("duration_minutes"), end_time=msg.get("end_time"))
         elif msg["action"] == "reconfirm_migration":
             entry, failure = lookup_charger(hass, msg["charger_id"])
             if failure or entry is None:

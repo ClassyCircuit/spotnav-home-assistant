@@ -20,7 +20,7 @@ export interface MorekState {
   sent_at: string | null;
   ack: string | null;
   verified: boolean;
-  verification_target?: "current_plan" | "held_pause" | null;
+  verification_target?: "current_plan" | "held_pause" | "charge_now" | null;
   verification?: {
     pending?: boolean; reason?: string; exact?: boolean; tolerance_s?: number;
     max_delta_s?: number | null; coverage_start?: string | null; coverage_end?: string | null; next_check_at?: string | null; readback_at?: string | null;
@@ -192,6 +192,10 @@ export function morekPanel(
     resume_requires_confirmation: "Confirm Resume again after restart; the retained limit may remain.",
     schedule_mode_unarmed: "Automatic schedule sending is not enabled.",
     upload_uncertain: "The previous write outcome is unknown; automatic retry is blocked.",
+    upload_rejected: "Morek rejected the schedule; it was not confirmed.",
+    upload_accepted_unverified: "Morek accepted the schedule; readback and charging are not yet confirmed.",
+    unchanged: "The current schedule was already acknowledged; charging is not confirmed.",
+    charge_now_active: "Return to Auto before syncing the automatic schedule.",
     protection_conflict_unresolved: "A linked site regulator may also control this charger; schedule dispatch is blocked until the conflict is reviewed.",
     paused_until_resume: "Auto remains paused until you explicitly Resume.",
     legacy_pause_active: "The saved manual pause remains active; the Resume follow-up has not completed.",

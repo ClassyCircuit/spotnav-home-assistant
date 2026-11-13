@@ -509,6 +509,17 @@ describe('actual sidebar read-only host', () => {
     panel.hass={...hass,user:{is_admin:false}};finish(envelope({...record(),revision:8}));await pending;await tick();
     expect(panel.settingsConflict).toBe(true);expect(panel.settingsRecord.revision).toBe(7);expect(panel.shadowRoot.textContent).not.toContain('Saved and confirmed.');panel.remove();
   });
+  it('requests schedule sync only after the sync button is clicked', async () => {
+    const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';const calls=[];
+    const morek={api_version:1,schedule:{...status.schedule,supported:true}};
+    const hass={connected:true,user:{is_admin:true},callWS:msg=>{calls.push(msg);if(msg.type==='spotnav/list_chargers')return Promise.resolve({api_version:1,chargers:[{charger_id:'a',charger_name:'A'}]});if(msg.type==='spotnav/get_dashboard')return Promise.resolve(raw);if(msg.type==='spotnav/get_settings')return Promise.resolve(envelope(record()));if(msg.action==='recalculate_sync')return Promise.resolve({api_version:1,schedule:{reconciliation:'requested'}});return Promise.resolve(morek);}};
+    const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();const select=panel.shadowRoot.querySelector('#charger');select.value='a';select.dispatchEvent(new Event('change'));await tick();
+    expect(calls.filter(m=>m.action==='recalculate_sync')).toHaveLength(0);
+    const button=[...panel.shadowRoot.querySelectorAll('#morek-debug button')].find(b=>b.textContent==='Recalculate & sync schedule');
+    expect(button.disabled).toBe(false);button.click();await tick();
+    expect(calls.filter(m=>m.action==='recalculate_sync')).toHaveLength(1);
+    expect(panel.shadowRoot.textContent).toContain('schedule sync requested');panel.remove();
+  });
   it('requires admin, current preview and confirmation before mocked send or selective clear', async () => {
     const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';const calls=[];
     raw.control.automatic_action='resume';raw.control.pause_choices=[];raw.control.pause_blocks_execution=true;raw.control.pause={choice:'until_resumed',admitted_at:new Date().toISOString(),expires_at:null};

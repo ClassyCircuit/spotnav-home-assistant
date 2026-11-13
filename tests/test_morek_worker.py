@@ -194,6 +194,56 @@ async def test_clean_start_explicit_pause_can_request_held_schedule(monkeypatch)
 
 
 @pytest.mark.asyncio
+async def test_sync_websocket_recalculates_and_requests_guarded_send(monkeypatch):
+    w = setup(monkeypatch)
+    w.worker.start()
+    await drain(w.worker)
+    w.planner.async_recalculate = AsyncMock()
+    entry = SimpleNamespace(entry_id="charger", runtime_data=SimpleNamespace(morek_worker=w.worker))
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "is_admin", lambda _: True)
+    connection = SimpleNamespace(send_result=Mock(), send_error=Mock())
+    await morek_schedule.websocket_morek_schedule.__wrapped__(w.hass, connection,
+        {"id": 1, "api_version": 1, "charger_id": "charger", "action": "recalculate_sync"})
+    await drain(w.worker)
+    w.planner.async_recalculate.assert_awaited_once()
+    connection.send_error.assert_not_called()
+    assert connection.send_result.call_args.args[1]["schedule"]["reconciliation"] == "requested"
+    assert w.point.call.await_count == 2
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_explicit_sync_resends_acknowledged_plan_but_not_unknown(monkeypatch):
+    w = setup(monkeypatch)
+    w.worker.start()
+    await drain(w.worker)
+    assert w.point.call.await_count == 1
+    w.worker.trigger(sync=True)
+    await drain(w.worker)
+    assert w.point.call.await_count == 2
+    w.ledger.value["uncertain"] = True
+    w.worker.trigger(sync=True)
+    await drain(w.worker)
+    assert w.point.call.await_count == 2
+    assert w.worker.reason == "upload_uncertain"
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_explicit_sync_does_not_override_pause(monkeypatch):
+    w = setup(monkeypatch)
+    w.ledger.value = {"schema": 1, "entry_id": "charger", "uncertain": False, "attempt": None,
+                      "schedule_pause": {"version": 1, "type": "pause_until_resumed", "id": "p",
+                                         "station_id": IDENTITY["resolved_id"], "connector_id": 1}}
+    w.worker.trigger(sync=True)
+    await drain(w.worker)
+    assert w.point.call.await_count == 0
+    assert w.worker.reason == "paused_until_resume"
+    w.worker.close()
+
+
+@pytest.mark.asyncio
 async def test_explicit_owned_pause_is_durable_and_worker_requests_held_off(monkeypatch):
     w = setup(monkeypatch)
     entry = SimpleNamespace(entry_id="charger")
@@ -992,6 +1042,9 @@ async def real_admission_planner_worker(monkeypatch, tmp_path):
     import json
     from .test_execution_ownership import FakeHass, FakeStore
     from custom_components.spotnav.execution import command_admission, execution_ownership, morek_outcomes
+    from custom_components.spotnav import time_zones
+
+    await time_zones.async_resolve(("Europe/Stockholm",))
 
     actual_state = morek_schedule._state
     w, world = await real_planner_worker(monkeypatch)
@@ -1018,6 +1071,490 @@ async def real_admission_planner_worker(monkeypatch, tmp_path):
     hass.data[morek_schedule._DATA_KEY] = {"test": ({}, disk, asyncio.Lock())}
     w.worker = morek_worker.MorekScheduleWorker(hass, "test", world.controller)
     return w, world, disk
+
+
+@pytest.mark.asyncio
+async def test_charge_now_real_admission_action_dispatch_and_return(monkeypatch, tmp_path):
+    import sys
+    from copy import deepcopy
+    from custom_components.spotnav import time_zones
+    await time_zones.async_resolve(("Europe/Stockholm",))
+    w, world, _ = await real_admission_planner_worker(monkeypatch, tmp_path)
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls.value
+    Clock.value = world.request.now
+    monkeypatch.setattr(morek_worker, "datetime", Clock)
+    monkeypatch.setattr(morek_schedule, "datetime", Clock)
+    entry = SimpleNamespace(entry_id="test", runtime_data=SimpleNamespace(morek_worker=w.worker),
+                            async_on_unload=lambda _: None)
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=w.target))
+    monkeypatch.setattr(morek_schedule, "_intent_identity_status", lambda *_: w.identity)
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda _: w.admission)
+    monkeypatch.setattr(morek_schedule, "ownership_store", lambda _: w.admission._store)
+    result = await morek_schedule.async_charge_now_action(w.hass, "test")
+    await drain(w.worker)
+    assert datetime.fromisoformat(result["intent"]["end"]) == world.request.now + timedelta(hours=1)
+    assert w.point.call.await_count == 1, w.worker.reason
+    assert (await w.ledger.read())["charge_now"] == result["intent"]
+    assert (await w.ledger.read())["attempt"]["state"] == "accepted"
+    morek_schedule._verification_lifecycle(w.hass, "test", entry)
+    data = w.hass.data[morek_schedule._DATA_KEY]["test"][0]
+    record = await w.ledger.read()
+    assert morek_schedule._verification_current(w.hass, "test", entry, data, record, data["sent_at"])
+    for alteration in ("replaced", "canceled", "pause", "connector", "uncertain"):
+        stale = deepcopy(record)
+        if alteration == "replaced":
+            stale["charge_now"]["id"] = "b" * 32
+        elif alteration == "canceled":
+            stale.pop("charge_now")
+        elif alteration == "pause":
+            stale["schedule_pause"] = {"id": "new", "type": "pause_until_resumed"}
+        elif alteration == "connector":
+            stale["charge_now"]["connector_id"] = 2
+        else:
+            stale["uncertain"] = True
+        assert not morek_schedule._verification_current(w.hass, "test", entry, data, stale, data["sent_at"]), alteration
+    Clock.value = datetime.fromisoformat(record["charge_now"]["end"])
+    assert not morek_schedule._verification_current(w.hass, "test", entry, data, record, data["sent_at"])
+    Clock.value = world.request.now
+    profile = data["profile"]["chargingSchedule"]
+    w.point.call.return_value = SimpleNamespace(status="Accepted", connector_id=1,
+        schedule_start=profile["startSchedule"], charging_schedule={**profile, "duration": 172800})
+    monkeypatch.setitem(sys.modules, "ocpp.v16", SimpleNamespace(call=SimpleNamespace(
+        GetCompositeSchedule=lambda **kw: SimpleNamespace(payload=kw),
+        SetChargingProfile=lambda **kw: SimpleNamespace(payload=kw))))
+    readback = await morek_schedule.async_schedule_action(w.hass, "test", "fetch")
+    assert readback["verified"] is True
+    connection = SimpleNamespace(send_result=Mock(), send_error=Mock())
+    previous = await w.ledger.read()
+    await morek_schedule.websocket_morek_schedule.__wrapped__(w.hass, connection,
+        {"id": 1, "api_version": 1, "charger_id": "test", "action": "status"})
+    connection.send_error.assert_not_called()
+    status = connection.send_result.call_args.args[1]["schedule"]
+    assert status["verification_target"] == "charge_now"
+    assert status["charge_now"]["intent"]["id"] == result["intent"]["id"]
+    assert await w.ledger.read() == previous
+    assert w.point.call.await_count == 2
+    w.point.call.return_value = SimpleNamespace(status="Accepted")
+    result = await morek_schedule.async_charge_now_action(w.hass, "test", return_to_auto=True)
+    assert not morek_schedule._verification_current(w.hass, "test", entry, data, await w.ledger.read(), data["sent_at"])
+    await drain(w.worker)
+    assert result["intent"] is None
+    assert w.point.call.await_count == 3, w.worker.reason
+    assert (await w.ledger.read()).get("charge_now") is None
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("boundary", ["ledger", "entry_store", "admission", "dispatch"])
+async def test_charge_now_real_admission_stop_races(monkeypatch, tmp_path, boundary):
+    w, world, disk = await real_admission_planner_worker(monkeypatch, tmp_path)
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return world.request.now
+    monkeypatch.setattr(morek_worker, "datetime", Clock)
+    monkeypatch.setattr(morek_schedule, "datetime", Clock)
+    entry = SimpleNamespace(entry_id="test", runtime_data=SimpleNamespace(morek_worker=w.worker),
+                            async_on_unload=lambda _: None)
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=w.target))
+    monkeypatch.setattr(morek_schedule, "_intent_identity_status", lambda *_: w.identity)
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda _: w.admission)
+    monkeypatch.setattr(morek_schedule, "ownership_store", lambda _: w.admission._store)
+    reached, proceed = asyncio.Event(), asyncio.Event()
+    accepted = []
+    write = w.ledger.write
+    save = disk.async_save
+    owned_boundary = w.admission.async_owned_boundary_current
+    async def persist(value):
+        attempt = value.get("attempt") or {}
+        if attempt.get("override_id") and attempt.get("state") == "accepted":
+            accepted.append(attempt["id"])
+        if boundary == "ledger" and attempt.get("override_id") and attempt.get("state") == "uncertain" and not reached.is_set():
+            reached.set()
+            await proceed.wait()
+        await write(value)
+    async def save_entry(value):
+        if boundary == "entry_store" and value.get("profile") and not reached.is_set():
+            reached.set()
+            await proceed.wait()
+        await save(value)
+    async def call(request):
+        if boundary == "dispatch" and not reached.is_set():
+            reached.set()
+            await proceed.wait()
+        return SimpleNamespace(status="Accepted")
+    async def check_boundary(*args):
+        if boundary == "admission" and not reached.is_set():
+            reached.set()
+            await proceed.wait()
+        return await owned_boundary(*args)
+    monkeypatch.setattr(w.ledger, "write", persist)
+    monkeypatch.setattr(disk, "async_save", save_entry)
+    monkeypatch.setattr(w.admission, "async_owned_boundary_current", check_boundary)
+    w.point.call.side_effect = call
+    await morek_schedule.async_charge_now_action(w.hass, "test")
+    await asyncio.wait_for(reached.wait(), 2)
+    stop = asyncio.create_task(morek_schedule.async_record_owned_pause(w.hass, "test"))
+    await asyncio.sleep(0)
+    proceed.set()
+    await asyncio.wait_for(stop, 2)
+    await drain(w.worker)
+    assert (await w.ledger.read()).get("charge_now") is None
+    assert (await w.ledger.read())["schedule_pause"]["type"] == "pause_until_resumed"
+    on_calls = [c for c in w.point.call.await_args_list if
+                c.args[0].payload["cs_charging_profiles"]["chargingSchedule"]["chargingSchedulePeriod"][0]["limit"] == 16]
+    assert len(on_calls) == (1 if boundary == "dispatch" else 0)
+    assert bool(accepted) == (boundary == "dispatch")
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_charge_now_late_readback_after_stop_is_not_verified(monkeypatch, tmp_path):
+    import sys
+    w, world, _ = await real_admission_planner_worker(monkeypatch, tmp_path)
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return world.request.now
+    monkeypatch.setattr(morek_worker, "datetime", Clock)
+    monkeypatch.setattr(morek_schedule, "datetime", Clock)
+    entry = SimpleNamespace(entry_id="test", runtime_data=SimpleNamespace(morek_worker=w.worker),
+                            async_on_unload=lambda _: None)
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=w.target))
+    monkeypatch.setattr(morek_schedule, "_intent_identity_status", lambda *_: w.identity)
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda _: w.admission)
+    monkeypatch.setattr(morek_schedule, "ownership_store", lambda _: w.admission._store)
+    morek_schedule._verification_lifecycle(w.hass, "test", entry)
+    await morek_schedule.async_charge_now_action(w.hass, "test")
+    await drain(w.worker)
+    data = w.hass.data[morek_schedule._DATA_KEY]["test"][0]
+    assert morek_schedule._verification_current(w.hass, "test", entry, data, await w.ledger.read(), data["sent_at"])
+    reached, proceed = asyncio.Event(), asyncio.Event()
+    async def delayed_read(_):
+        reached.set()
+        await proceed.wait()
+        profile = data["profile"]["chargingSchedule"]
+        return SimpleNamespace(status="Accepted", connector_id=1, schedule_start=profile["startSchedule"],
+                               charging_schedule={**profile, "duration": 172800})
+    w.point.call.side_effect = delayed_read
+    monkeypatch.setitem(sys.modules, "ocpp.v16", SimpleNamespace(call=SimpleNamespace(
+        GetCompositeSchedule=lambda **kw: SimpleNamespace(payload=kw))))
+    fetch = asyncio.create_task(morek_schedule.async_schedule_action(w.hass, "test", "fetch"))
+    await asyncio.wait_for(reached.wait(), 2)
+    with w.admission.person_stop_reservation("test", lambda: w.identity):
+        proceed.set()
+        result = await fetch
+        assert result["verified"] is False
+    assert (await w.ledger.read()).get("verified") is None
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_charge_now_real_admission_missing_soc_and_price(monkeypatch, tmp_path):
+    w, world, _ = await real_admission_planner_worker(monkeypatch, tmp_path)
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return world.request.now
+    monkeypatch.setattr(morek_worker, "datetime", Clock)
+    monkeypatch.setattr(morek_schedule, "datetime", Clock)
+    entry = SimpleNamespace(entry_id="test", runtime_data=SimpleNamespace(morek_worker=w.worker))
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=w.target))
+    monkeypatch.setattr(morek_schedule, "_intent_identity_status", lambda *_: w.identity)
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda _: w.admission)
+    monkeypatch.setattr(morek_schedule, "ownership_store", lambda _: w.admission._store)
+    world.facts[0] = replace(world.facts[0], soc_percent=None)
+    world.area.state = "unavailable"
+    await morek_schedule.async_charge_now_action(w.hass, "test")
+    await drain(w.worker)
+    assert w.point.call.await_count == 1, w.worker.reason
+    assert w.worker.override_degraded is not None
+    periods = w.point.call.await_args.args[0].payload["cs_charging_profiles"]["chargingSchedule"]["chargingSchedulePeriod"]
+    assert [period["limit"] for period in periods] == [16, 0]
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_held_pause_verification_remains_current_with_real_admission(monkeypatch, tmp_path):
+    w, world, _ = await real_admission_planner_worker(monkeypatch, tmp_path)
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return world.request.now
+    monkeypatch.setattr(morek_worker, "datetime", Clock)
+    monkeypatch.setattr(morek_schedule, "datetime", Clock)
+    entry = SimpleNamespace(entry_id="test", runtime_data=SimpleNamespace(morek_worker=w.worker),
+                            async_on_unload=lambda _: None)
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=w.target))
+    monkeypatch.setattr(morek_schedule, "_intent_identity_status", lambda *_: w.identity)
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda _: w.admission)
+    monkeypatch.setattr(morek_schedule, "ownership_store", lambda _: w.admission._store)
+    await morek_schedule.async_record_owned_pause(w.hass, "test")
+    await drain(w.worker)
+    morek_schedule._verification_lifecycle(w.hass, "test", entry)
+    data = w.hass.data[morek_schedule._DATA_KEY]["test"][0]
+    assert morek_schedule._verification_current(w.hass, "test", entry, data, await w.ledger.read(), data["sent_at"])
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_charge_now_replacement_missing_plan_pause_and_resume(monkeypatch):
+    w = setup(monkeypatch)
+    now = datetime.now(timezone.utc)
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls.value
+    Clock.value = now
+    monkeypatch.setattr(morek_worker, "datetime", Clock)
+    monkeypatch.setattr(morek_schedule, "datetime", Clock)
+    entry = SimpleNamespace(entry_id="charger", runtime_data=SimpleNamespace(morek_worker=w.worker))
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=w.target))
+    monkeypatch.setattr(morek_schedule, "_intent_identity_status", lambda *_: w.identity)
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda _: w.admission)
+    owner = {"record_state": "valid", "recorded_owner": "morek_schedule", "armed": False,
+             "transition_state": None, "station_id": IDENTITY["resolved_id"], "connector_id": 1}
+    monkeypatch.setattr(morek_schedule, "ownership_store", lambda _: SimpleNamespace(async_status=AsyncMock(return_value=owner)))
+    w.planner.current.in_process = False
+    w.settings.pause = SimpleNamespace(admitted=False)
+    first = await morek_schedule.async_charge_now_action(w.hass, "charger")
+    await drain(w.worker)
+    assert w.point.call.await_count == 1
+    assert w.worker.override_degraded == "no_current_plan"
+    sent = w.point.call.await_args.args[0].payload["cs_charging_profiles"]
+    assert [p["limit"] for p in sent["chargingSchedule"]["chargingSchedulePeriod"]] == [16, 0]
+    Clock.value += timedelta(minutes=10)
+    second = await morek_schedule.async_charge_now_action(w.hass, "charger", duration_minutes=30)
+    await drain(w.worker)
+    assert second["intent"]["id"] != first["intent"]["id"]
+    assert datetime.fromisoformat(second["intent"]["end"]) == Clock.value + timedelta(minutes=30)
+    await morek_schedule.async_record_owned_pause(w.hass, "charger")
+    await drain(w.worker)
+    assert w.ledger.value.get("charge_now") is None
+    with pytest.raises(morek_schedule.ScheduleRefused, match="resume_auto_first"):
+        await morek_schedule.async_charge_now_action(w.hass, "charger")
+    await morek_schedule.async_record_owned_pause(w.hass, "charger", resume=True)
+    await drain(w.worker)
+    assert w.ledger.value.get("charge_now") is None
+    assert w.worker.reason == "no_current_plan"
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_charge_now_rejects_invalid_time_without_writes(monkeypatch):
+    w = setup(monkeypatch)
+    for kwargs in ({"duration_minutes": 15}, {"duration_minutes": True},
+                   {"end_time": "not-a-time"}, {"end_time": "2020-01-01T00:00:00+00:00"},
+                   {"duration_minutes": 60, "end_time": "2026-01-01T00:00:00+00:00"}):
+        with pytest.raises(morek_schedule.ScheduleRefused):
+            await morek_schedule.async_charge_now_action(w.hass, "charger", **kwargs)
+    assert not w.ledger.writes
+    w.point.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_charge_now_refuses_unrelated_charger(monkeypatch):
+    w = setup(monkeypatch)
+    entry = SimpleNamespace(entry_id="other")
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=w.target))
+    monkeypatch.setattr(morek_schedule, "_intent_identity_status", lambda *_: {**IDENTITY, "resolved_id": "other"})
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda _: w.admission)
+    with pytest.raises(morek_schedule.ScheduleRefused, match="identity_unresolved"):
+        await morek_schedule.async_charge_now_action(w.hass, "other")
+    assert not w.ledger.writes
+    w.point.call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("minutes", [30, 60, 120, 180])
+async def test_charge_now_duration_and_custom_end(monkeypatch, minutes):
+    w = setup(monkeypatch)
+    now = datetime.now(timezone.utc)
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls.value
+    Clock.value = now
+    monkeypatch.setattr(morek_worker, "datetime", Clock)
+    monkeypatch.setattr(morek_schedule, "datetime", Clock)
+    w.worker._available = lambda: False
+    entry = SimpleNamespace(entry_id="charger", runtime_data=SimpleNamespace(morek_worker=w.worker))
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=w.target))
+    monkeypatch.setattr(morek_schedule, "_intent_identity_status", lambda *_: w.identity)
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda _: w.admission)
+    owner = {"record_state": "valid", "recorded_owner": "morek_schedule", "armed": False,
+             "transition_state": None, "station_id": IDENTITY["resolved_id"], "connector_id": 1}
+    monkeypatch.setattr(morek_schedule, "ownership_store", lambda _: SimpleNamespace(async_status=AsyncMock(return_value=owner)))
+    result = await morek_schedule.async_charge_now_action(w.hass, "charger", duration_minutes=minutes)
+    assert datetime.fromisoformat(result["intent"]["end"]) == now + timedelta(minutes=minutes)
+    Clock.value += timedelta(minutes=5)
+    custom = Clock.value + timedelta(minutes=47)
+    result = await morek_schedule.async_charge_now_action(w.hass, "charger", end_time=custom.isoformat())
+    assert datetime.fromisoformat(result["intent"]["end"]) == custom
+    await drain(w.worker)
+    w.point.call.assert_not_awaited()
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("outcome", ["unknown", "rejected"])
+async def test_charge_now_unknown_or_rejected_not_retried_after_reconnect(monkeypatch, outcome):
+    w = setup(monkeypatch)
+    now = datetime.now(timezone.utc)
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return now
+    monkeypatch.setattr(morek_worker, "datetime", Clock)
+    monkeypatch.setattr(morek_schedule, "datetime", Clock)
+    w.planner.current.in_process = False
+    w.ledger.value = {"schema": 1, "entry_id": "charger", "uncertain": False, "attempt": None,
+        "charge_now": {"version": 1, "id": "a" * 32, "station_id": IDENTITY["resolved_id"], "connector_id": 1,
+                       "start": now.isoformat(), "end": (now + timedelta(hours=1)).isoformat()}}
+    if outcome == "unknown":
+        w.point.call.side_effect = TimeoutError()
+    else:
+        w.point.call.return_value = SimpleNamespace(status="Rejected")
+    w.worker.start()
+    await drain(w.worker)
+    assert w.worker.reason == ("upload_uncertain" if outcome == "unknown" else "upload_rejected")
+    assert w.ledger.value["uncertain"] is (outcome == "unknown")
+    w.worker.suspend_for_availability_change()
+    w.worker.resume_after_availability_change(w.worker._availability_generation)
+    await drain(w.worker)
+    assert w.point.call.await_count == 1
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_charge_now_expiry_while_offline_does_not_replay_override(monkeypatch):
+    w = setup(monkeypatch)
+    now = datetime.now(timezone.utc)
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls.value
+    Clock.value = now
+    monkeypatch.setattr(morek_worker, "datetime", Clock)
+    monkeypatch.setattr(morek_schedule, "datetime", Clock)
+    w.planner.current.in_process = False
+    w.ledger.value = {"schema": 1, "entry_id": "charger", "uncertain": False, "attempt": None,
+        "charge_now": {"version": 1, "id": "a" * 32, "station_id": IDENTITY["resolved_id"], "connector_id": 1,
+                       "start": now.isoformat(), "end": (now + timedelta(minutes=30)).isoformat()}}
+    available = [False]
+    w.worker._available = lambda: available[0]
+    w.worker.start()
+    await drain(w.worker)
+    assert w.worker.reason == "charger_unavailable" and w.worker._expiry is not None
+    w.worker.close()
+    Clock.value += timedelta(minutes=31)
+    available[0] = True
+    w.worker = morek_worker.MorekScheduleWorker(w.hass, "charger", w.planner, lambda: available[0])
+    w.worker.start()
+    await drain(w.worker)
+    assert w.worker.reason == "no_current_plan"
+    w.point.call.assert_not_awaited()
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_charge_now_missing_plan_ends_then_auto_can_resume_now(monkeypatch):
+    w = setup(monkeypatch)
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls.value
+    Clock.value = now
+    monkeypatch.setattr(morek_worker, "datetime", Clock)
+    monkeypatch.setattr(morek_schedule, "datetime", Clock)
+    w.planner.current.in_process = False
+    w.ledger.value = {"schema": 1, "entry_id": "charger", "uncertain": False, "attempt": None,
+        "charge_now": {"version": 1, "id": "a" * 32, "station_id": IDENTITY["resolved_id"], "connector_id": 1,
+                       "start": now.isoformat(), "end": (now + timedelta(hours=1)).isoformat()}}
+    w.worker.start()
+    await drain(w.worker)
+    sent = w.point.call.await_args.args[0].payload["cs_charging_profiles"]["chargingSchedule"]["chargingSchedulePeriod"]
+    assert [(row["startPeriod"], row["limit"]) for row in sent] == [(0, 16), (3600, 0)]
+    Clock.value += timedelta(hours=1, minutes=1)
+    w.planner.current.in_process = True
+    w.planner.current.proposal.shown_periods = ((Clock.value - timedelta(minutes=1), Clock.value + timedelta(minutes=30)),)
+    w.worker.trigger()
+    await drain(w.worker)
+    sent = w.point.call.await_args.args[0].payload["cs_charging_profiles"]["chargingSchedule"]["chargingSchedulePeriod"]
+    assert w.point.call.await_count == 2
+    assert sent[0]["startPeriod"] == 0 and sent[0]["limit"] == 16
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_charge_now_restart_and_reconnect_preserve_fixed_end_without_duplicate(monkeypatch):
+    w = setup(monkeypatch)
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return now
+    monkeypatch.setattr(morek_worker, "datetime", Clock)
+    monkeypatch.setattr(morek_schedule, "datetime", Clock)
+    w.planner.current.in_process = False
+    end = (now + timedelta(hours=1)).isoformat()
+    w.ledger.value = {"schema": 1, "entry_id": "charger", "uncertain": False, "attempt": None,
+        "charge_now": {"version": 1, "id": "a" * 32, "station_id": IDENTITY["resolved_id"], "connector_id": 1,
+                       "start": now.isoformat(), "end": end}}
+    w.worker.start()
+    await drain(w.worker)
+    assert w.point.call.await_count == 1
+    w.worker.close()
+    w.worker = morek_worker.MorekScheduleWorker(w.hass, "charger", w.planner)
+    w.worker.start()
+    await drain(w.worker)
+    assert w.worker.reason == "unchanged"
+    generation = w.worker.suspend_for_availability_change()
+    w.worker.resume_after_availability_change(generation)
+    await drain(w.worker)
+    assert w.point.call.await_count == 1 and w.ledger.value["charge_now"]["end"] == end
+    w.worker.close()
+
+
+@pytest.mark.asyncio
+async def test_charge_now_early_return_to_active_auto_has_no_zero_pulse(monkeypatch):
+    w = setup(monkeypatch)
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return now
+    monkeypatch.setattr(morek_worker, "datetime", Clock)
+    monkeypatch.setattr(morek_schedule, "datetime", Clock)
+    entry = SimpleNamespace(entry_id="charger", runtime_data=SimpleNamespace(morek_worker=w.worker))
+    monkeypatch.setattr(morek_schedule, "lookup_charger", lambda *_: (entry, None))
+    monkeypatch.setattr(morek_schedule, "controller_for", lambda *_: SimpleNamespace(ocpp_target=w.target))
+    monkeypatch.setattr(morek_schedule, "_intent_identity_status", lambda *_: w.identity)
+    monkeypatch.setattr(morek_schedule, "command_admission", lambda _: w.admission)
+    owner = {"record_state": "valid", "recorded_owner": "morek_schedule", "armed": False,
+             "transition_state": None, "station_id": IDENTITY["resolved_id"], "connector_id": 1}
+    monkeypatch.setattr(morek_schedule, "ownership_store", lambda _: SimpleNamespace(async_status=AsyncMock(return_value=owner)))
+    w.planner.current.proposal.shown_periods = ((now - timedelta(minutes=1), now + timedelta(hours=2)),)
+    await morek_schedule.async_charge_now_action(w.hass, "charger")
+    await drain(w.worker)
+    await morek_schedule.async_charge_now_action(w.hass, "charger", return_to_auto=True)
+    await drain(w.worker)
+    assert w.point.call.await_count == 2
+    sent = w.point.call.await_args.args[0].payload["cs_charging_profiles"]["chargingSchedule"]["chargingSchedulePeriod"]
+    assert sent[0]["startPeriod"] == 0 and sent[0]["limit"] == 16
+    w.worker.close()
 
 
 @pytest.mark.asyncio
