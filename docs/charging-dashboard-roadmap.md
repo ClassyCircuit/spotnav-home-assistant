@@ -94,7 +94,7 @@ Detailed requirements and acceptance cases follow outside this checklist.
 | 6 | Genuine charging history | Later; not a prerequisite for initial installation |
 | 7 | Extended charts, tracks and price insights | After initial real-data chart; actual track uses Stage 6 |
 | 8 | Yesterday, costs and savings | Later; depends on genuine data |
-| 9 | Recovery and diagnostics | 9.4 logging implemented locally (2.5.113, mocked); 9.5 blocker re-evaluation and visible blockers implemented locally (2.5.117, mocked; automatic recovery of a never-dispatched Resume deliberately not provided; not deployed or live-verified) |
+| 9 | Recovery and diagnostics | 9.4 and 9.5 locally complete with mocked checks; the user accepts a fresh Resume after an ambiguous interrupted Resume; deployed behavior unverified |
 | 10 | Charge Now and partial-price planning | 10.1–10.3 locally complete; deployed behavior unverified |
 | 11 | Adaptive charging estimates for Morek | Later work; reuse existing learning and genuine measurement sources |
 | 12 | Fix real sidebar usability, price presentation and evidence | Prioritize before 5.8; implement bounded 12.1–12.8 separately alongside remaining 5.7b work |
@@ -1321,7 +1321,7 @@ when identified, rather than remaining indefinite roadmap tasks.
       and charger-availability changes are covered by the existing 14.6 decision line (blocker codes), not by
       separate new lines; the viewer has no browser test. A stored warning from before a restart has no sequence
       number, so it appears only on a fresh (non-incremental) load.
-- [~] **9.5 Automatic Morek recovery and visible failures (2.5.117 local, mocked; PARTIALLY met: transient-blocker re-evaluation and the banner are done, automatic recovery of a never-dispatched Resume after restart is NOT; see "Implemented" below):** make the existing Auto
+- [x] **9.5 Automatic Morek recovery and visible failures (2.5.117 local, mocked; user accepted the interrupted-Resume exception):** make the existing Auto
   schedule and session paths recover from ordinary failures without requiring repeated
   manual Resume or sync. This is a focused reliability task, not a new controller.
   - Audit and fix restart/reconnect, offline charger, unavailable prices and other
@@ -1373,8 +1373,8 @@ when identified, rather than remaining indefinite roadmap tasks.
       durably (ledger `resume_interrupted` id, written under the connector lock when a Stop pre-empts a committed Resume;
       a new person Resume uses a fresh id), an unknown outcome, and a recorded Stop (it replaces the Resume record).
       Applies to the session-start coordinator's use of `_resume_authorized` too.
-      **This item therefore falls short of the "no reconfirmation after ordinary restart" goal for a never-dispatched
-      Resume; do not claim the Stop race is eliminated.**
+      **User decision:** the fresh Resume required in this ambiguous case is acceptable; this completes 9.5 with
+      that explicit exception. Do not claim the Stop race is eliminated or that deployed behavior is verified.
     - **Sidebar:** a prominent `#recovery-banner` (`frontend/sidebar/recovery-banner.js`, shown only from a fresh
       status) states the blocker, what SpotNav does next (next automatic check time, remaining rejection retries,
       timed checks stopped) or that a person is needed; an unknown write is shown as an error that is not retried and
