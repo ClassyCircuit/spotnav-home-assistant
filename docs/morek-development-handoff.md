@@ -1,10 +1,25 @@
 # SpotNav Enhanced / Morek development handoff
 
-Last updated: 2026-11-10. This file is a **public-repository handoff**, not a place for
+Last updated: 2026-11-13. This file is a **public-repository handoff**, not a place for
 passwords, access tokens, HA configuration exports, logs, or private household information.
 Re-check the live system and Git state before acting; observations below may become stale.
 
-## Approved next direction (planning, not implemented)
+## Current handoff and approved direction
+
+**Stage 10 is done locally:** 10.1 Charge Now backend, 10.2 sidebar controls and
+10.3 partial-price-horizon planning are checked in the roadmap. The user says Stage
+10 is done; do not reassign it as incomplete. Local mocked tests do not establish
+installed version, physical charging or future runtime success. At this handoff,
+the source manifest was 2.5.98 and the latest commit was `ebee12b5`; recheck Git
+and deployed version on arrival. The current coordinator initialization is
+`prompts/coordinator-handoff.md`.
+
+**Open priorities:** Stage 9.5 is the requested practical automatic-recovery and
+visible-failure work; 9.4 is native HA Core logging with a SpotNav-filtered view.
+5.7b2 measured charging/health binding and 5.7b3 local acceptance remain open.
+Follow the current roadmap and user's selected priority rather than stale historical
+directions. Preserve the user's approved one-time clean-start risk, explicit Stop,
+electrical protection and actually recorded uncertain dispatched operations.
 
 **5.7b continuation:** The user reports the sidebar is no longer blank; 5.7b1 is
 complete, with the local collision fix and browser checks recorded below. The exact
@@ -15,11 +30,10 @@ Windows because `fcntl` is unavailable; it remains unrun. These are local develo
 tasks, not permission to deploy or operate the user's charger.
 
 **Automatic restart recovery requested:** the user does not want to press a
-reconfirmation button after ordinary HA restarts. The current process-ticket design
-still requires it, so normal automatic restart recovery remains open. Implement and
-test safe automatic recovery rather than calling the admin action automatically or
-assuming an unrecorded Stop can be reconstructed. Unknown/interrupted outcomes must
-remain blocked and visible; no live action is authorized by this request.
+reconfirmation button after ordinary HA restarts. Local 2.5.98 recovers a settled
+Resume from matching durable evidence, but interrupted Resume and other recovery
+cases remain for Stage 9.5. Unknown/interrupted outcomes must remain visible and
+must not be blindly retried; no live action is authorized by this note.
 
 **Single Morek execution path:** the user no longer wants a runtime switch back to
 the legacy controller or a separate dynamic handback protocol. Replace Morek's old
@@ -81,12 +95,12 @@ design: **Pause / Resume Auto** and **Charge Now / Return to Auto**. Pause reque
 that charging remain held until explicit Resume; Return to Auto cancels only the
 temporary Charge Now override, so charging may continue when Auto selects now.
 Pause/Resume under schedule ownership remains 5.6b; Charge Now remains optional
-Stage 10 after 5.8. Charge Now does not override an existing explicit pause: the
+Stage 10, now locally implemented. Charge Now does not override an existing explicit pause: the
 user must Resume first. Neither a request nor ACK proves physical stop.
 
-**Current task status:** 5.5a–5.5f and 5.6a are completed as unarmed local
-mocked groundwork, pending coordinator review, not active operation. The 5.6b–5.8
-tasks remain open; no live access or activation is authorized by this note.
+**Historical task status:** earlier 5.5–5.8 notes below describe prior versions;
+refer to the current roadmap and source for present status. No live access or
+activation is authorized by this note.
 
 **Historical 2026-11-12 roadmap consistency review (superseded by 5.5d–5.5f):** the next assigned work remained 5.5d,
 not completed. The current uncommitted tree includes the 2.5.44 manual-owner

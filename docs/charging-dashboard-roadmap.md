@@ -1,7 +1,8 @@
 # Morek autonomous charging and dashboard roadmap
 
-Status: **in progress; manual baseline and ownership groundwork complete; autonomous mode not active**.
-Updated 2026-11-12. The checklist below is the authoritative work queue.
+Status: **in progress; Stage 10 locally complete; automatic recovery and live validation remain open**.
+Updated 2026-11-13. The checklist and detailed substages are the authoritative work queue;
+historical status notes below describe their versions, not necessarily current behavior.
 
 This is the forward-looking plan for SpotNav Enhanced. Implement **one work block
 at a time**, not a dashboard rewrite and controller rewrite in one release.
@@ -16,8 +17,8 @@ unarmed demo. Complete Stage 5 with the core daily frontend and backend connecte
 real data, reactive planning and a safely migrated Morek schedule executor.
 Historical charging comparisons, monthly analytics, savings and other later features
 may remain explicitly unavailable; they are not prerequisites for this initial release.
-The optional **Charge Now** override in Stage 10 is also post-installation work,
-not a prerequisite for the initial release or its 5.8 live validation.
+The optional **Charge Now** override in Stage 10 is locally implemented and is not a
+prerequisite for the initial release or its 5.8 live validation.
 
 **Frontend decision:** the user chose an integration-provided HA custom sidebar panel,
 using the same UI components, styling and stepped-area ECharts chart as the local sample
@@ -27,13 +28,10 @@ and working backend/card compatibility without requiring the old card as a secon
 interface. Comparable viewport/fixture parity is required; actual HA/mobile rendering
 and its sidebar/header remain subject to integration testing, not assumed pixel-identical.
 
-Current production dispatch is **unarmed**, not because that is the desired final
-behavior, but because safe ownership transitions, lost-state/uncertainty recovery,
-the existing site-regulator conflict, transaction authorization and retained-profile exit are unresolved.
-The Stage 5.5–5.7 work must resolve these blockers rather than merely display them.
-Do not remove the fail-closed gate before the complete reviewed activation path is safe.
-If a required hardware capability or installation-specific decision prevents safe
-operation, surface it and get a decision; do not label the initial release complete.
+The current source contains guarded automatic Morek dispatch and session-start paths;
+their deployed behavior is not established by local mocks. Recovery and visibility
+gaps remain, particularly Stage 9.5. Preserve existing ownership, identity, Stop,
+uncertainty and protection boundaries, and do not treat a profile ACK as charging.
 
 **2026-11-12 clarification:** the user says Morek handles household load protection
 natively. SpotNav's requested role is scheduling fixed on/off charging windows, not
@@ -51,8 +49,8 @@ while its temporary override is active. Pause requests charging be held until
 the person explicitly resumes; Resume returns to a fresh valid automatic plan.
 Charge Now defaults to one hour with other durations. Return to Auto ends that
 override early; charging may continue if the automatic plan selects the current
-time. These are target semantics, not a claim that schedule-owned Pause/Resume
-or Charge Now works today. Charge Now is deferred to Stage 10 after 5.8.
+time. These controls are locally implemented; installed and physical behavior must
+be verified separately.
 
 **BMW target and monitoring:** the user intends the BMW's own configured charge
 limit to stop the car at its target (for example 80%). Morek's schedule controls
@@ -92,12 +90,12 @@ Detailed requirements and acceptance cases follow outside this checklist.
 | 2 | Isolate Morek from legacy control | Unarmed lifecycle groundwork complete; activation blocked |
 | 3 | Automatically send changed schedules | Stages 1 and 2 before activation |
 | 4 | Recover and report execution health | Stage 3 |
-| 5 | Installable real-data daily dashboard and safe route to charging | Priority after prototype; automatic Morek dispatch remains unarmed |
+| 5 | Installable real-data daily dashboard and safe route to charging | Guarded automatic dispatch implemented; monitoring and acceptance remain open |
 | 6 | Genuine charging history | Later; not a prerequisite for initial installation |
 | 7 | Extended charts, tracks and price insights | After initial real-data chart; actual track uses Stage 6 |
 | 8 | Yesterday, costs and savings | Later; depends on genuine data |
-| 9 | Targeted dashboard fixes | Only where needed; initial installation is in Stage 5 |
-| 10 | Optional Charge Now override | After the initial 5.8 installation and user-directed validation; independent of Stages 6–9 |
+| 9 | Recovery and diagnostics | 9.4 logging and 9.5 automatic recovery remain open |
+| 10 | Charge Now and partial-price planning | 10.1–10.3 locally complete; deployed behavior unverified |
 | 11 | Adaptive charging estimates for Morek | Later work; reuse existing learning and genuine measurement sources |
 | 12 | Fix real sidebar usability, price presentation and evidence | Prioritize before 5.8; implement bounded 12.1–12.8 separately alongside remaining 5.7b work |
 | 13 | Migrate useful old-card configuration into the sidebar | Follow the related Stage 12 work; 13.1–13.4 are separate, bounded tasks |

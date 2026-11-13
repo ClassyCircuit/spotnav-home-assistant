@@ -8,7 +8,8 @@ and the verified (and unverified) local access paths. The user-facing test proce
 For the approved future direction and prioritized LLM work blocks, read
 [docs/charging-dashboard-roadmap.md](docs/charging-dashboard-roadmap.md): one HA
 charging sidebar panel sharing its UI with the local preview, ECharts, and autonomous
-Morek schedule-only execution. This is a roadmap, not a claim that automatic uploads exist today.
+Morek schedule-only execution. Guarded automatic upload code exists; consult the latest
+handoff and roadmap for open recovery work and do not assume deployed behavior is verified.
 It also specifies soft-cap/minimum-SOC planning and genuine measured charging
 history. Hardware testing is user-directed, not a separate roadmap stage.
 
