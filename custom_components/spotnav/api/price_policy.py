@@ -64,6 +64,10 @@ def encode_price_policy(settings: AutoSettings, snapshot: AutoSnapshot | None) -
         "reason": None if current is None else current.reason,
         "provisional": proposal is not None and proposal.price_coverage_end is not None,
         "price_coverage_end": None if proposal is None else aware_iso(proposal.price_coverage_end),
+        # Stage 16.2: tomorrow's prices are not (yet) usable. A plan made meanwhile is from published data only.
+        "price_state": None if current is None else current.price_state,
+        "tomorrow_pending": bool(proposal is not None and proposal.price_coverage_end is not None
+                                 and current is not None and current.price_state in ("waiting_for_tomorrow", "degraded")),
         "error": None if current is None else current.last_error_code,
         "explanations": explanations,
         "minimum_shortfall_kwh": None if proposal is None else finite_number(proposal.minimum_shortfall_kwh),

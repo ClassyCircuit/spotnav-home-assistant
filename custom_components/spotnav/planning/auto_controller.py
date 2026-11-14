@@ -1172,12 +1172,30 @@ class AutoPlannerController:
                                      or not math.isfinite(age) or age < 0)
             ):
                 return "vehicle_input_stale"
+            return self.morek_price_blocker(snapshot, now)
+        except Exception:  # noqa: BLE001 - unknown evidence cannot authorize a write
+            return "plan_input_provenance_unavailable"
+
+    def morek_price_blocker(self, snapshot: AutoSnapshot, now: datetime) -> str | None:
+        """The one judgement of whether the plan's own prices may be dispatched (Stage 16.2), or why not.
+
+        Used by the automatic worker and by manual Send/preview alike. The aggregate state must be `ready` or
+        `waiting_for_tomorrow`, or `degraded` **only** because of tomorrow (today ready and listed); the price
+        evidence must be the one this plan was calculated from; and every remaining scheduled minute (reserve
+        included, `shown_periods`) must lie inside contiguous finite intervals of a day that is `ready` and
+        `listed`. A missing or failed tomorrow therefore never invalidates valid today coverage, while a
+        stale, unlisted, invalid or gapped used price still blocks. Never changes the plan.
+        """
+        try:
+            settings = self._effective(self._store.settings(self._entry_id))
             area = self._manager.area_snapshot(settings.area_id)
-            if area is None or snapshot.morek_price_evidence is None:
+            if area is None or snapshot.morek_price_evidence is None or snapshot.proposal is None:
                 return "price_evidence_unavailable"
             if self._morek_price_evidence(area) != snapshot.morek_price_evidence:
                 return "price_inputs_changed"
-            if area.state not in ("ready", "waiting_for_tomorrow"):
+            today_ok = (area.today_state == "ready" and area.today_authority == "listed"
+                        and area.today_snapshot.document is not None)
+            if not (area.state in ("ready", "waiting_for_tomorrow") or (area.state == "degraded" and today_ok)):
                 return "prices_stale_or_unavailable"
             intervals = []
             for state, authority, day in ((area.today_state, area.today_authority, area.today_snapshot),
@@ -1813,6 +1831,23 @@ class AutoPlannerController:
         # A Morek schedule-owned cheapest target-SOC plan starts now (the rest of the current price interval)
         # and never needs more windows than the stored profile can carry. Other chargers are unchanged.
         morek_planning = await self._morek_owned(settings)
+        if morek_planning and settings.soft_price_cap is None:
+            # Stage 16.2: only ready+listed days are prices the schedule may be bought from (`morek_price_blocker`
+            # would refuse any minute placed on another), so plan from those instead of a plan that can never be
+            # sent. With none usable there is no proposal: never fall back to the unusable documents.
+            documents = tuple(
+                snapshot.document
+                for snapshot, state, authority in (
+                    (area_snapshot.today_snapshot, area_snapshot.today_state, area_snapshot.today_authority),
+                    (area_snapshot.tomorrow_snapshot, area_snapshot.tomorrow_state, area_snapshot.tomorrow_authority),
+                )
+                if snapshot.document is not None and state == "ready" and authority == "listed"
+            )
+            if not documents:
+                return self._fresh_snapshot(
+                    settings, "waiting_for_prices", "no_prices_yet", calculated_at,
+                    entry=entry, price_snapshot=area_snapshot,
+                )
         plan_request = PlanRequest(
             area_id=entry.id,
             timezone=entry.tz,

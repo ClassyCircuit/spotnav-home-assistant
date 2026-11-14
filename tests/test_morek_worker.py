@@ -67,6 +67,10 @@ class Planner:
     def morek_plan_blocker(self, snapshot, now):
         return None
 
+    def morek_price_blocker(self, snapshot, now):
+        # The shared manual/automatic price judgement (the real one is covered in test_stage_162_safe_dispatch.py).
+        return getattr(snapshot, "price_blocker", None)
+
     def add_publication_listener(self, listener):
         self.listeners.append(listener)
         listener(self.current)

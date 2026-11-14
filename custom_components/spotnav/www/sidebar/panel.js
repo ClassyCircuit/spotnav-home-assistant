@@ -58338,6 +58338,7 @@ function decodePlan(source) {
   return {
     ...Array.isArray(explanations) ? { price_policy: {
       provisional: policy["provisional"] === true,
+      tomorrow_pending: policy["tomorrow_pending"] === true,
       price_coverage_end: typeof policy["price_coverage_end"] === "string" ? policy["price_coverage_end"] : null,
       explanations: explanations.flatMap((item) => {
         if (typeof item !== "object" || item === null || Array.isArray(item)) return [];
@@ -60591,7 +60592,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
     return keys2[code] ? translate2("en", `daily.policy.${keys2[code]}`) : U;
   }).join(" ") || U) + (uncapped ? blockNote : "");
   const unresolved = raw?.plan?.price_policy?.target_shortfall_kwh;
-  const policyText = !planStale && raw?.plan?.price_policy?.provisional === true ? `${policyBase} Provisional: contiguous published prices end ${date(raw.plan.price_policy.price_coverage_end, zone)}. ${Number.isFinite(unresolved) && unresolved > 0 ? `${unresolved.toFixed(1)} kWh of target energy remains unresolved. ` : ""}Future prices and readiness are unknown; this is not necessarily the cheapest complete plan.` : policyBase;
+  const policyText = !planStale && raw?.plan?.price_policy?.provisional === true ? `${policyBase}${raw.plan.price_policy.tomorrow_pending === true ? " Planned using available published prices; tomorrow\u2019s prices are pending or unusable, so this plan may change when they arrive." : ""} Provisional: contiguous published prices end ${date(raw.plan.price_policy.price_coverage_end, zone)}. ${Number.isFinite(unresolved) && unresolved > 0 ? `${unresolved.toFixed(1)} kWh of target energy remains unresolved. ` : ""}Future prices and readiness are unknown; this is not necessarily the cheapest complete plan.` : policyBase;
   const warning = live.mismatch || status?.outcomes?.uncertain || status?.operator?.state === "mismatch" || status?.verification?.reason === "limits_or_transitions_differ";
   const published = publishedChart(raw, d3.market, now, stale || dashboardFailed);
   const priceFreshness = priceProvenance(raw?.prices, d3.market, zone, stale || dashboardFailed, now);
@@ -60942,7 +60943,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.147";
+var CARD_VERSION = "2.5.148";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {

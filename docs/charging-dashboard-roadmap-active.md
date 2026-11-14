@@ -556,7 +556,7 @@ input-evidence → recalculation → worker-compare path.
 | Uncapped path works from a trusted learned wall kWh/% with no capacity (`with_learned`); capped path refuses first (`capped_vehicle_energy` → `target_capacity_unknown`) | Done / gap | 17.3 |
 | Price refresh/retry/backoff, ECB retry/backoff, `wants_again` rebuild when a rate arrives, ECB table ≤ 7 days before the day | Done | reused; 17.5 only labels/guards |
 | `SessionStore.add_listener`/`_notify` (close at `store.py:365`, second notify at `:443`) and recorder `_reconcile_late` | Done | 17.4 reuses; today `_on_sessions_changed` ignores target plans |
-| Degraded aggregate price state blocks automatic and manual dispatch (`morek_plan_blocker` area states; `_validated_proposal`) and the partial-plan indicator | **Pending: Stage 16.2** (unchanged scope) | **16.2, queued second** |
+| Degraded aggregate price state blocks automatic and manual dispatch (`morek_plan_blocker` area states; `_validated_proposal`) and the partial-plan indicator | **Done locally (2.5.148), commit pending** | 17.5/17.6 consume |
 
 ### Queue (strict order; one at a time)
 
@@ -599,7 +599,7 @@ input-evidence → recalculation → worker-compare path.
   as such, not “fixed” here. Mark `[x]` only after review; a docs-only outcome needs no manifest bump.
   *Exclusions:* no behaviour change to attribution rules, identity guards, admission, dispatch or Stage 14
   thresholds; no new retry; no session-finalization trigger (17.4).
-- [ ] **16.2 Safe dispatch, publication continuity and clear partial-plan UI ◆.** Unchanged scope and acceptance
+- [x] **16.2 Safe dispatch, publication continuity and clear partial-plan UI ◆.** *Locally implemented with mocked checks (2.5.148; coordinator review/commit pending); not installed or live-verified. One judgement `AutoPlannerController.morek_price_blocker` serves the automatic worker and the manual path for a `degraded` aggregate; an uncapped Morek plan ignores a non-`ready`/`listed` tomorrow; `price_policy.tomorrow_pending` drives the sidebar/overview sentence. Tests `tests/test_stage_162_safe_dispatch.py`, `partial-policy.test.ts`. Review correction: manual Send/preview now use the same `morek_price_blocker` for every price state (`ready`, `waiting_for_tomorrow`, `degraded`); an uncapped Morek plan is built only from `ready`+`listed` days and waits (`no_prices_yet`) when none exists (no `or documents` fallback). Details and pre-existing failures in the handoff.* Unchanged scope and acceptance
   (Stage 16 above). It is the single owner of: degraded-only-by-tomorrow admission with one coverage judgement,
   and “tomorrow missing/fetch failure must not invalidate valid today coverage”. Stage 17 adds no second
   coverage rule and no price-admission change; 17.5 and 17.6 consume it.

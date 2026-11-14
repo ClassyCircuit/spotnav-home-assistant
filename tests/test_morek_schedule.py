@@ -433,6 +433,12 @@ def test_operator_state_prioritizes_current_evidence(online, outcomes, verificat
     assert result["state"] == expected
 
 
+def _price_judgement(snapshot, _now):
+    """Stand-in for `AutoPlannerController.morek_price_blocker` (the real one is exercised in
+    `test_stage_162_safe_dispatch.py`): the snapshot declares what the shared judgement would answer."""
+    return getattr(snapshot, "price_blocker", None)
+
+
 def test_preview_reuses_send_calculation_without_contacting_station(monkeypatch):
     periods = ((NOW + timedelta(hours=1), NOW + timedelta(hours=2)),)
     proposal = SimpleNamespace(has_plan=True, unpriced=False, periods=periods, shown_periods=periods)
@@ -441,7 +447,7 @@ def test_preview_reuses_send_calculation_without_contacting_station(monkeypatch)
     monkeypatch.setattr(morek_schedule, "domain_data", lambda hass: SimpleNamespace(
         auto_store=SimpleNamespace(settings=lambda entry: settings)))
     monkeypatch.setattr(morek_schedule, "preview_for", lambda hass, entry: SimpleNamespace(
-        snapshot=lambda: snapshot, snapshot_is_current=lambda _: True))
+        snapshot=lambda: snapshot, snapshot_is_current=lambda _: True, morek_price_blocker=_price_judgement))
     point = SimpleNamespace(_ocpp_version="1.6", status="ok")
     hass = SimpleNamespace(data={"ocpp": {"entry": SimpleNamespace(
         cpids={"garage": "3020002509120029"}, charge_points={"3020002509120029": point})}})
@@ -528,11 +534,12 @@ def test_expired_invalid_and_subsecond_remaining_windows_are_refused():
 def test_intent_refuses_missing_or_stale_prices(monkeypatch, state, unpriced, reason):
     proposal = SimpleNamespace(has_plan=True, unpriced=unpriced,
                                shown_periods=((NOW + timedelta(hours=1), NOW + timedelta(hours=2)),))
-    snapshot = SimpleNamespace(in_process=True, proposal=proposal, settings_revision=4, price_state=state)
+    snapshot = SimpleNamespace(in_process=True, proposal=proposal, settings_revision=4, price_state=state,
+                               price_blocker="prices_stale_or_unavailable" if state == "degraded" else None)
     monkeypatch.setattr(morek_schedule, "domain_data", lambda h: SimpleNamespace(
         auto_store=SimpleNamespace(settings=lambda e: SimpleNamespace(amps=16, revision=4))))
     monkeypatch.setattr(morek_schedule, "preview_for", lambda h, e: SimpleNamespace(
-        snapshot=lambda: snapshot, snapshot_is_current=lambda _: True))
+        snapshot=lambda: snapshot, snapshot_is_current=lambda _: True, morek_price_blocker=_price_judgement))
     with pytest.raises(ScheduleRefused, match=reason):
         morek_schedule._proposed_profile(None, "charger", NOW)
 
@@ -544,7 +551,7 @@ def test_intent_reports_no_plan_and_expiration_without_profile(monkeypatch):
     monkeypatch.setattr(morek_schedule, "domain_data", lambda h: SimpleNamespace(
         auto_store=SimpleNamespace(settings=lambda e: SimpleNamespace(amps=16, revision=4))))
     monkeypatch.setattr(morek_schedule, "preview_for", lambda h, e: SimpleNamespace(
-        snapshot=lambda: snapshot, snapshot_is_current=lambda _: True))
+        snapshot=lambda: snapshot, snapshot_is_current=lambda _: True, morek_price_blocker=_price_judgement))
     with pytest.raises(ScheduleRefused, match="plan_expired"):
         morek_schedule._proposed_profile(None, "charger", NOW)
     snapshot.proposal = None
@@ -565,7 +572,7 @@ async def test_manual_active_preview_and_crossing_boundary_refuses_stale_preview
     settings = SimpleNamespace(amps=16, revision=4, pause=SimpleNamespace(choice="until_resumed"))
     monkeypatch.setattr(morek_schedule, "_proposed_profile", real)
     monkeypatch.setattr(morek_schedule, "preview_for", lambda h, e: SimpleNamespace(
-        snapshot=lambda: snapshot, snapshot_is_current=lambda _: True))
+        snapshot=lambda: snapshot, snapshot_is_current=lambda _: True, morek_price_blocker=_price_judgement))
     monkeypatch.setattr(morek_schedule, "domain_data", lambda h: SimpleNamespace(
         auto_store=SimpleNamespace(settings=lambda e: settings)))
     future = morek_schedule._preview(h.hass, "charger", None)
@@ -941,7 +948,7 @@ async def test_send_uses_displayed_shortened_blocks_not_whole_slot_ends(monkeypa
     settings = SimpleNamespace(amps=16, revision=4, pause=SimpleNamespace(choice="until_resumed"))
     monkeypatch.setattr(morek_schedule, "_proposed_profile", real_proposed_profile)
     monkeypatch.setattr(morek_schedule, "preview_for", lambda hass, entry: SimpleNamespace(
-        snapshot=lambda: snapshot, snapshot_is_current=lambda _: True))
+        snapshot=lambda: snapshot, snapshot_is_current=lambda _: True, morek_price_blocker=_price_judgement))
     monkeypatch.setattr(morek_schedule, "domain_data", lambda hass: SimpleNamespace(
         auto_store=SimpleNamespace(settings=lambda entry: settings)))
     preview = morek_schedule._preview(h.hass, "charger", None)
@@ -976,7 +983,7 @@ def test_shortened_windows_keep_existing_eligibility_guards(monkeypatch, case):
     monkeypatch.setattr(morek_schedule, "domain_data", lambda h: SimpleNamespace(
         auto_store=SimpleNamespace(settings=lambda e: SimpleNamespace(amps=16, revision=4))))
     monkeypatch.setattr(morek_schedule, "preview_for", lambda h, e: SimpleNamespace(
-        snapshot=lambda: snapshot, snapshot_is_current=lambda _: True))
+        snapshot=lambda: snapshot, snapshot_is_current=lambda _: True, morek_price_blocker=_price_judgement))
     with pytest.raises(ScheduleRefused):
         morek_schedule._proposed_profile(None, "charger", NOW)
 

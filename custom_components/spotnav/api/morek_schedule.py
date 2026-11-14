@@ -1610,7 +1610,7 @@ def _proposed_profile(hass: HomeAssistant, entry_id: str, now: datetime, *,
 
     Refusal means no proposed action, never permission to clear or release a limit.
     """
-    settings, proposal = _validated_proposal(hass, entry_id)
+    settings, proposal = _validated_proposal(hass, entry_id, now)
     # The stored profile is a fixed-time snapshot of exactly what the card shows,
     # including the estimated shorter final block. It does not implement feedback-based energy stopping.
     periods = tuple(proposal.shown_periods)
@@ -1632,7 +1632,7 @@ def _proposed_baseline(hass: HomeAssistant, entry_id: str, now: datetime, *,
     comparison, never a send or a skipped send of its own.
     """
     try:
-        settings, proposal = _validated_proposal(hass, entry_id)
+        settings, proposal = _validated_proposal(hass, entry_id, now)
         if not getattr(proposal, "reserve_pieces", ()):
             return None
         periods = tuple(proposal.baseline_shown_periods)
@@ -1645,8 +1645,14 @@ def _proposed_baseline(hass: HomeAssistant, entry_id: str, now: datetime, *,
         return None
 
 
-def _validated_proposal(hass: HomeAssistant, entry_id: str) -> tuple[Any, Any]:
-    """The current settings and the planner's current, priced proposal, or the reason there is none."""
+def _validated_proposal(hass: HomeAssistant, entry_id: str, now: datetime | None = None) -> tuple[Any, Any]:
+    """The current settings and the planner's current, priced proposal, or the reason there is none.
+
+    Price admission is the planner's single judgement (`morek_price_blocker`, Stage 16.2) for manual and
+    automatic callers alike and for every price state (`ready`, `waiting_for_tomorrow`, `degraded`): unchanged
+    price evidence, and every scheduled minute covered by valid listed data (a degraded aggregate passes only
+    when degraded by tomorrow alone).
+    """
     settings = domain_data(hass).auto_store.settings(entry_id)
     if settings.amps != 16:
         raise ScheduleRefused("current_must_be_16")
@@ -1654,15 +1660,23 @@ def _validated_proposal(hass: HomeAssistant, entry_id: str) -> tuple[Any, Any]:
     snapshot = planner.snapshot() if planner is not None else None
     proposal = snapshot.proposal if snapshot is not None and snapshot.in_process else None
     if proposal is None:
-        if snapshot is not None and getattr(snapshot, "price_state", None) in ("stale", "unavailable", "invalid", "loading", "degraded"):
+        if snapshot is not None and getattr(snapshot, "price_state", None) in ("stale", "unavailable", "invalid", "loading"):
             raise ScheduleRefused("prices_stale_or_unavailable")
         raise ScheduleRefused("no_current_plan")
     if (not planner.snapshot_is_current(snapshot) or snapshot.settings_revision != settings.revision
             or getattr(snapshot, "last_error_code", None) is not None):
         raise ScheduleRefused("no_current_plan")
     price_state = getattr(snapshot, "price_state", None)
-    if price_state not in ("ready", "waiting_for_tomorrow"):
-        raise ScheduleRefused("prices_unavailable" if price_state is None else "prices_stale_or_unavailable")
+    if price_state is None:
+        raise ScheduleRefused("prices_unavailable")
+    if price_state not in ("ready", "waiting_for_tomorrow", "degraded"):
+        raise ScheduleRefused("prices_stale_or_unavailable")
+    # One judgement for every admitted state: evidence unchanged since the calculation and every scheduled minute
+    # covered by valid listed prices. A planner that cannot judge never authorizes a send.
+    judge = getattr(planner, "morek_price_blocker", None)
+    blocker = None if judge is None else judge(snapshot, now or datetime.now(timezone.utc))
+    if judge is None or blocker is not None:
+        raise ScheduleRefused(blocker or "prices_stale_or_unavailable")
     if proposal.unpriced:
         raise ScheduleRefused("prices_unavailable")
     if not proposal.has_plan or not proposal.shown_periods:
