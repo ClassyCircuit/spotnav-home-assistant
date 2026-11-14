@@ -284,7 +284,7 @@ while offline”.
   classes, ledger acknowledged/uncertain fields, or the `verified` fields of a newer attempt (assert with a
   pending upload); uses the existing `compare_schedule`, not a new comparator; zero sends throughout.
   *Exclusions:* no resend, no start, no setting, no `clear_profile`, `get_configuration` or `TriggerMessage`.
-- [ ] **15.4a Guarded schedule repair — trigger, confirmation, budget ◆.** *Scope:* worker trigger kind
+- [x] **15.4a Guarded schedule repair — trigger, confirmation, budget ◆.** *Locally implemented with mocked checks (2.5.134); coordinator reviewed (disabled dispatcher); not installed or live-verified. `REPAIR_DISPATCH_ENABLED` is `False` and stays so until 15.4b: a confirmed mismatch is classified (`differs_confirmed`), recorded and shown, and makes **zero writes**.* Landed as `morek_schedule.confirm_mismatch`/`repair_budget`/`repair_status`, checker confirmation (`MorekScheduleChecker._confirm`, `repair_current`), `MorekScheduleWorker.request_repair` and the `repair=` flag of `_send_profile_shared`; tests `tests/test_stage_154a_repair.py`. *Scope:* worker trigger kind
   `repair` raised by the checker when a mismatch is **confirmed**: (a) the **latest** readback is fresh
   (fetched ≤ 30 s before the decision, as `session_start_schedule_evidence` requires) and an **earlier** valid
   observation from the same connection and intent attempt exists **≥ 30 s before it** (the earlier one need not
@@ -314,7 +314,7 @@ while offline”.
   the 14.5 retry count; the run is a normal bounded decision event (`trigger=repair`). *Exclusions:* no change
   to Stage 14 triggers or 14.4 rules; no `clear_profile`; no repair from age, SOC delta or a replayed update;
   no start request; **no automatic wire repair in a shipped build** (gate stays off).
-- [ ] **15.4b Repair deferral for a correct charge and post-repair escalation ◆.** *Scope:* when fresh measured
+- [ ] **15.4b Repair deferral for a correct charge and post-repair escalation ◆.** *Scope:* Before enabling dispatch, revalidate confirmation age at the final pre-wire boundary (latest readback at most 30 s old on wall and monotonic clocks); storage/lock delays must not reuse stale evidence.  when fresh measured
   power shows the car charging, the readback’s *current* limit equals the intended current and the difference is
   only a future transition more than **10 minutes** away (constant), defer the repair and recheck every
   5 minutes; proceed when the gap reaches 10 minutes, when charging or the current limit no longer matches, or

@@ -10,7 +10,10 @@ Classes, one per check: `healthy` (fresh clean match), `unknown` (readback unava
 unproven, uncertain or pending record, clock doubt: nothing sent, says what was not checked) and
 `differs_unconfirmed` (one fresh clean `limits_or_transitions_differ`). A mismatch is rechecked at 30, 60, 120 s and
 then every 300 s, at most `CHECK_RECHECK_LIMIT` per episode; a link edge, a new attempt or unload ends the episode.
-Whether a mismatch is *confirmed* material is decided later (15.4a), not here. There is no periodic readback: a
+Whether a mismatch is *confirmed* material is decided by `morek_schedule.confirm_mismatch` (Stage 15.4a): two clean
+covering mismatches of the same acknowledged attempt on one continuously-up connection, at least 30 s apart, the
+latest fresh. A confirmation is only a *request* to the worker (`worker.request_repair`), which owns the single
+guarded send path and the feature gate; the checker still sends nothing. There is no periodic readback: a
 check starts only from one of the triggers above and a flapping link coalesces to at most one check per
 `CHECK_MIN_INTERVAL_S`.
 
@@ -63,6 +66,8 @@ class MorekScheduleChecker:
         self._last_start: float | None = None
         self._trigger: str | None = None
         self._episode_attempt: str | None = None
+        self._observations: list[dict[str, Any]] = []  # clean covering mismatches of this episode (15.4a)
+        self._confirmation: dict[str, Any] | None = None  # the token the worker's repair revalidates against
         self._rechecks = 0
         self._class: str | None = None
         self._status: dict[str, Any] = {"class": None, "at": None, "readback_at": None, "reason": None}
@@ -78,24 +83,35 @@ class MorekScheduleChecker:
         self._cancel_timer()
         self._rechecks = 0
         self._episode_attempt = None
+        self._forget_observations()
         self._trigger = trigger
         self._arm_first()
 
-    def note_new_attempt(self) -> None:
-        """A newer upload attempt exists: the episode and any in-flight read describe a superseded intent."""
-        self._end_episode("newer_attempt", "new_attempt")
+    def note_new_attempt(self, repair: str | None = None) -> None:
+        """A newer upload attempt exists: the episode and any in-flight read describe a superseded intent.
+
+        The attempt a confirmed repair itself persists (`repair` = the confirmed attempt id) keeps its own
+        confirmation token, so the repair can still revalidate it at its final pre-dispatch boundary; any other new
+        attempt invalidates it."""
+        keep = self._confirmation if repair and self._confirmation and self._confirmation["attempt_id"] == repair else None
+        self._end_episode("newer_attempt", "new_attempt", keep=keep)
 
     def note_link_down(self) -> None:
         """A link-down edge ends the episode; the next link-up edge requests the next check."""
         self._end_episode("link_down", "link_down")
 
-    def _end_episode(self, reason: str, trigger: str) -> None:
+    def _forget_observations(self, keep: dict[str, Any] | None = None) -> None:
+        self._observations = []
+        self._confirmation = keep
+
+    def _end_episode(self, reason: str, trigger: str, keep: dict[str, Any] | None = None) -> None:
         if self._closed:
             return
         self._epoch += 1
         self._cancel_timer()
         self._rechecks = 0
         self._episode_attempt = None
+        self._forget_observations(keep)
         self._rerun = False
         if self._class is not None and not (self._class == morek_schedule.CHECK_UNKNOWN
                                             and self._status.get("reason") == reason):
@@ -107,6 +123,7 @@ class MorekScheduleChecker:
         self._epoch += 1
         self._cancel_timer()
         self._rerun = False
+        self._forget_observations()
         if self._task is not None:
             self._task.cancel()
             self._task = None
@@ -155,6 +172,7 @@ class MorekScheduleChecker:
             if monitor is not None and monitor.state == "up":
                 conn, binding = monitor.connection_id, self._binding()
             result = await self._check(epoch, recheck, conn, binding)
+            read_mono = self._mono()
             if epoch != self._epoch or self._closed:
                 pass  # an edge, a new attempt or unload happened during the read: the result is stale, discarded
             elif result is None:
@@ -162,7 +180,7 @@ class MorekScheduleChecker:
                     self._episode_attempt = None
                     self._record(morek_schedule.CHECK_UNKNOWN, "superseded", None, trigger)
             elif binding is None or self._is_current(epoch, conn, binding):
-                self._apply(result, trigger)
+                self._apply(result, trigger, conn=conn, read_mono=read_mono)
         except Exception as err:  # noqa: BLE001 - a failed check is Unknown, never a reason to act
             _LOGGER.debug("Morek schedule check failed: %s", type(err).__name__)
             if epoch == self._epoch and not self._closed:
@@ -220,7 +238,27 @@ class MorekScheduleChecker:
 
     # ---- result
 
-    def _apply(self, result: dict[str, Any], trigger: str) -> None:
+    def repair_current(self, token: dict[str, Any]) -> bool:
+        """The worker's pre-dispatch revalidation of a confirmation: still the live token, link up, same connection."""
+        monitor = getattr(self._worker, "link_monitor", None)
+        return bool(not self._closed and token is self._confirmation and monitor is not None
+                    and monitor.state == "up" and monitor.connection_id == token["connection_id"])
+
+    def _confirm(self, result: dict[str, Any], conn: Any, read_mono: float | None) -> bool:
+        """Record this clean covering mismatch; True when it, with an earlier one, confirms the mismatch."""
+        attempt_id, readback_at = result.get("attempt_id"), result.get("readback_at")
+        if conn is None or read_mono is None or not attempt_id or not readback_at:
+            self._observations = []
+            return False
+        observation = {"attempt_id": attempt_id, "connection_id": conn, "readback_at": readback_at, "mono": read_mono}
+        self._observations = [o for o in self._observations
+                              if o["attempt_id"] == attempt_id and o["connection_id"] == conn][-3:]
+        confirmed = morek_schedule.confirm_mismatch(
+            self._observations, {**observation, "mono_age": self._mono() - read_mono})
+        self._observations.append(observation)
+        return confirmed
+
+    def _apply(self, result: dict[str, Any], trigger: str, *, conn: Any = None, read_mono: float | None = None) -> None:
         state, reason = result["class"], result.get("reason")
         recheck = trigger == "recheck"
         if recheck:
@@ -228,12 +266,24 @@ class MorekScheduleChecker:
         if state == morek_schedule.CHECK_DIFFERS:
             if self._episode_attempt is None:
                 self._episode_attempt = result.get("attempt_id")
+            confirmed = self._confirm(result, conn, read_mono)
+            if confirmed:
+                state = morek_schedule.CHECK_CONFIRMED
             self._record(state, reason, result.get("readback_at"), trigger)
+            if confirmed:
+                self._confirmation = {"attempt_id": result["attempt_id"], "connection_id": conn,
+                                      "readback_at": result["readback_at"]}
+                token = self._confirmation
+                try:
+                    self._worker.request_repair({**token, "current": lambda: self.repair_current(token)})
+                except Exception:  # noqa: BLE001 - a failed request is a finding that stays recorded, never a send
+                    _LOGGER.debug("Morek repair request failed", exc_info=True)
             if self._rechecks < CHECK_RECHECK_LIMIT:
                 delay = CHECK_RECHECK_DELAYS[min(self._rechecks, len(CHECK_RECHECK_DELAYS) - 1)]
                 self._arm(delay, recheck=True)
             return
         self._episode_attempt = None  # healthy or unknown ends the episode
+        self._forget_observations()
         self._record(state, reason, result.get("readback_at"), trigger)
 
     def _record(self, state: str, reason: Any, readback_at: Any, trigger: str) -> None:

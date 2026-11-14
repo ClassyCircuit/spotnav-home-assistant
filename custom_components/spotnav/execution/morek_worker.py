@@ -24,9 +24,10 @@ _LOGGER = logging.getLogger(__name__)
 _COALESCE_SECONDS = 0.1  # explicit controls, plug-in, settings: do not wait
 _ROUTINE_COALESCE_SECONDS = 2.0  # routine SOC/price bursts
 _SOC_END_TOLERANCE = timedelta(minutes=5)  # SOC-only: an end instant that moves less is not news
-_TRIGGER_RANK = ("plug_in", "sync", "settings", "control", "sensor", "recovery", "recalc", "price", "routine")
+_TRIGGER_RANK = ("plug_in", "sync", "settings", "control", "repair", "sensor", "recovery", "recalc", "price", "routine")
 _SETTLED = ("upload_accepted_unverified", "unchanged")  # outcomes that end a pending price decision
 _DECISION_HISTORY = 10
+_DECISION_REPAIR_SENT = ("upload_accepted_unverified", "upload_rejected", "upload_uncertain")
 _SOC_CAUSE = "soc"  # the only planner cause that is routine and may use the SOC tolerance
 
 
@@ -84,6 +85,12 @@ class MorekScheduleWorker:
         self._continuity_fresh = False
         self._dispatch_before: str | None = None
         self._run_attempt_id: str | None = None
+        # Stage 15.4a: the checker's confirmed-mismatch request and the status of the last one. The request is
+        # consumed by the run it triggers; `repairing` is true only inside that run (the intent it builds is the
+        # *current* guarded one, but never carries a price or cap trigger, so a repair cannot release a window).
+        self._repair_request: dict[str, Any] | None = None
+        self._repair_run: dict[str, Any] | None = None
+        self.repair_confirmed: dict[str, Any] | None = None
 
     def _dispatched_id(self) -> str | None:
         return self._hass.data.get("spotnav_morek_dispatched", {}).get(self._entry_id)
@@ -135,6 +142,28 @@ class MorekScheduleWorker:
             self._sync_serial = self._serial
         if self._task is None or self._task.done():
             self._task = self._hass.async_create_task(self._run())
+
+    def request_repair(self, confirmation: dict[str, Any]) -> None:
+        """Stage 15.4a: the checker confirmed a material mismatch of the acknowledged intent.
+
+        `confirmation` is `{attempt_id, connection_id, readback_at, current}` (`current()` re-asserts the
+        confirmation: same token, link up, same connection). With the gate off (`REPAIR_DISPATCH_ENABLED`, until
+        15.4b) this only records the finding: no run is raised, so nothing at all is sent. With it on, a strict
+        `repair` run goes through the one guarded path (`_reconcile` -> `_send_profile_shared`); every existing
+        guard, the repair budget and the pre-dispatch revalidation still apply."""
+        if self._closed:
+            return
+        now = datetime.now(timezone.utc).isoformat()
+        info = {"attempt_id": confirmation.get("attempt_id"), "at": now, "readback_at": confirmation.get("readback_at"),
+                "state": "confirmed", "result": None}
+        if not morek_schedule.REPAIR_DISPATCH_ENABLED:
+            info["state"], info["result"] = "gated", "repair_gated"
+            self.repair_confirmed = info
+            self._record_decision({"repair"}, reason="repair_gated", trigger="repair")
+            return
+        self.repair_confirmed = info
+        self._repair_request = confirmation
+        self.trigger(kind="repair")
 
     def note_plug_in(self) -> None:
         """A vehicle was reliably seen going from Available to connected: always recalculate, then compare.
@@ -248,8 +277,8 @@ class MorekScheduleWorker:
             self.continuity = {"evidence": evidence, "preserved": False, "until": until,
                                "reason": "vehicle_unplugged"}
             return None
-        lowered = morek_schedule.cap_lowered(record, settings)
-        price_event = self._price_pending and not lowered
+        lowered = morek_schedule.cap_lowered(record, settings) and self._repair_run is None
+        price_event = self._price_pending and not lowered and self._repair_run is None
         release, reason = morek_schedule.window_release(
             self._planner.snapshot(), settings, now, profile, cap_lowered=lowered,
             price_event=price_event, evidence=evidence,
@@ -391,6 +420,8 @@ class MorekScheduleWorker:
                 self._continuity_fresh = False
                 self._run_attempt_id = None
                 self._dispatch_before = self._dispatched_id()
+                repair_asked = self._repair_request if "repair" in kinds else None
+                self._repair_run = repair_asked if morek_schedule.REPAIR_DISPATCH_ENABLED else None
                 try:
                     await self._reconcile(serial, None if self._strict else _SOC_END_TOLERANCE)
                 except morek_schedule.ScheduleRefused as error:
@@ -398,8 +429,15 @@ class MorekScheduleWorker:
                 except Exception:  # noqa: BLE001 - a failed calculation is not permission to send
                     self.reason = "worker_unavailable"
                     _LOGGER.exception("Morek schedule worker failed")
+                repaired, self._repair_run = self._repair_run, None
                 if serial == self._serial:
-                    if self._price_pending and (self._price_evaluated or self.reason in _SETTLED):
+                    if repaired is not None and self.repair_confirmed is not None:
+                        self.repair_confirmed.update(state="sent" if self.reason in _DECISION_REPAIR_SENT else "refused",
+                                                     result=self.reason)
+                    if repair_asked is not None:
+                        self._repair_request = None
+                    # a repair carries no price decision: its acceptance must not end a pending one
+                    if self._price_pending and (self._price_evaluated or (self.reason in _SETTLED and repaired is None)):
                         self._price_pending = False
                     self.reason_serial = serial
                     self._strict = False
@@ -411,7 +449,7 @@ class MorekScheduleWorker:
         finally:
             self._task = None
 
-    def _record_decision(self, kinds: set[str]) -> None:
+    def _record_decision(self, kinds: set[str], *, reason: str | None = None, trigger: str | None = None) -> None:
         """Describe the finished run: trigger, input/state freshness, changed or not, preserved or interrupted,
         sent or skipped and the result. A repeat of the same decision only counts (no new log line), so a burst of
         sensor updates while charging stays one line. Never raises: diagnostics must not affect charging."""
@@ -419,12 +457,12 @@ class MorekScheduleWorker:
             now = datetime.now(timezone.utc)
             controller = controller_for(self._hass, self._entry_id)
             event = morek_schedule.decision_event(
-                now=now, kinds=kinds, last_trigger=self.last_trigger, reason=self.reason,
+                now=now, kinds=kinds, last_trigger=trigger or self.last_trigger, reason=reason or self.reason,
                 inputs=morek_schedule._planning_inputs(self._hass, self._entry_id),
                 evidence=morek_schedule.connector_evidence(self._hass, controller, now),
-                continuity=self.continuity if self._continuity_fresh else None,
-                dispatched=self._dispatched_id() not in (None, self._dispatch_before),
-                attempt_id=self._run_attempt_id)
+                continuity=self.continuity if self._continuity_fresh and reason is None else None,
+                dispatched=False if reason else self._dispatched_id() not in (None, self._dispatch_before),
+                attempt_id=None if reason else self._run_attempt_id)
             key = (event["action"], event["result"], event["evidence"], event["changed"], event["attempt_id"],
                    None if event["continuity"] is None else tuple(event["continuity"].values()),
                    event["inputs"].get("plan_state"), event["inputs"].get("uncertain"))
@@ -474,6 +512,8 @@ class MorekScheduleWorker:
         admission = command_admission(self._hass)
         generation = admission.generation(connector)
 
+        repair = self._repair_run
+
         async def dispatch() -> tuple[str, str | None, str | None]:
             # Admission has checked identity, ownership and generation under the
             # physical connector lock. Do not await between this recheck and call.
@@ -493,6 +533,8 @@ class MorekScheduleWorker:
                     raise morek_schedule.ScheduleRefused("migration_confirmation_required")
                 if self._suspended or not self._available():
                     raise morek_schedule.ScheduleRefused("charger_unavailable")
+                if repair is not None and not repair["current"]():
+                    raise morek_schedule.ScheduleRefused("repair_unconfirmed")  # reconnect / new attempt / unload
                 identity_now = self._identity()
                 if classify_morek_identity(identity_now) != "supported_morek" or physical_connector(identity_now) != connector:
                     raise morek_schedule.ScheduleRefused("identity_changed")
@@ -538,6 +580,7 @@ class MorekScheduleWorker:
                     override_id=(record.get("charge_now") or {}).get("id") if record.get("charge_now")
                         and datetime.fromisoformat(record["charge_now"]["end"]) > datetime.now(timezone.utc) else None,
                     force_sync=sync, end_tolerance=end_tolerance, baseline=lambda: self._baseline,
+                    repair=None if repair is None else repair["attempt_id"],
                     validate_durable=lambda: admission.async_owned_boundary_current(self._entry_id, connector),
                     migration_id=None if ticket is None else ticket[1])
                 return outcome, data.get("sent_at"), data.get("attempt_id")

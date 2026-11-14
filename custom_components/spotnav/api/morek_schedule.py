@@ -748,6 +748,78 @@ CHECK_UNKNOWN = "unknown"
 CHECK_DIFFERS = "differs_unconfirmed"
 CHECK_CLOCK_DOUBT_S = 30  # wall clock vs monotonic clock drift across one read that makes the comparison doubtful
 _DISPATCHED_KEY = "spotnav_morek_dispatched"
+CHECK_CONFIRMED = "differs_confirmed"  # Stage 15.4a: a mismatch two clean readbacks agree on (see `confirm_mismatch`)
+#: Stage 15.4a feature gate. The repair dispatcher is production-wired but disabled: until 15.4b adds the
+#: active-charge deferral and post-repair escalation, a confirmed mismatch is classified and recorded and
+#: makes ZERO automatic writes. Only 15.4b flips it.
+REPAIR_DISPATCH_ENABLED = False
+REPAIR_CONFIRM_GAP_S = 30  # the earlier observation is at least this much older than the latest
+REPAIR_FRESH_S = 30  # the latest observation is at most this old when the decision is made
+REPAIR_BUDGET_MAX = 2  # wire-reaching repairs per rolling window per charger
+REPAIR_BUDGET_WINDOW = timedelta(hours=24)
+REPAIR_MIN_SPACING = timedelta(minutes=30)
+_REPAIR_LIST_KEY = "repair_attempts"
+
+
+def confirm_mismatch(observations: list[dict[str, Any]], latest: dict[str, Any]) -> bool:
+    """Stage 15.4a: whether `latest` plus an earlier observation confirm a material mismatch. Pure.
+
+    Each observation is `{attempt_id, connection_id, readback_at (ISO), mono (monotonic s)}` from a clean covering
+    `limits_or_transitions_differ` readback; `latest` also carries `mono_age` (monotonic seconds since it was read).
+    The latest must be fresh (<= `REPAIR_FRESH_S` on both clocks) and an earlier one from the same connection and
+    acknowledged attempt must be >= `REPAIR_CONFIRM_GAP_S` older on both the monotonic clock and the charger
+    readback timestamps (a replayed or re-stamped reading, a clock jump or one odd reading never confirms)."""
+    try:
+        latest_at = _utc(datetime.fromisoformat(latest["readback_at"]))
+        age = (datetime.now(timezone.utc) - latest_at).total_seconds()
+        if not 0 <= age <= REPAIR_FRESH_S or not 0 <= latest["mono_age"] <= REPAIR_FRESH_S:
+            return False
+        for earlier in observations:
+            if (earlier is latest or earlier["attempt_id"] != latest["attempt_id"]
+                    or earlier["connection_id"] != latest["connection_id"]):
+                continue
+            wall = (latest_at - _utc(datetime.fromisoformat(earlier["readback_at"]))).total_seconds()
+            mono = latest["mono"] - earlier["mono"]
+            if wall >= REPAIR_CONFIRM_GAP_S and mono >= REPAIR_CONFIRM_GAP_S and abs(wall - mono) <= REPAIR_CONFIRM_GAP_S:
+                return True
+    except (KeyError, TypeError, ValueError, AttributeError, OverflowError, ScheduleRefused):
+        return False
+    return False
+
+
+def repair_budget(record: dict[str, Any] | None, now: datetime) -> dict[str, Any]:
+    """Stage 15.4a: the stored repair budget, read as untrusted. No I/O.
+
+    `{state, recent, next_at}`: `ok`; `spacing` (the newest is under `REPAIR_MIN_SPACING` old, `next_at` says when);
+    `exhausted` (`REPAIR_BUDGET_MAX` inside the rolling window); `invalid` (a malformed list or entry, or one dated
+    in the future: no repair, a person looks). A missing list is an old record: an empty budget."""
+    raw = record.get(_REPAIR_LIST_KEY) if isinstance(record, dict) else None
+    if raw is None:
+        return {"state": "ok", "recent": [], "next_at": None}
+    now = _utc(now)
+    recent: list[dict[str, str]] = []
+    try:
+        if not isinstance(raw, list) or len(raw) > 16:
+            raise ValueError
+        for entry in raw:
+            if (not isinstance(entry, dict) or not isinstance(entry.get("attempt_id"), str)
+                    or not isinstance(entry.get("at"), str)):
+                raise ValueError
+            at = _utc(datetime.fromisoformat(entry["at"]))
+            if at > now + timedelta(minutes=5):
+                raise ValueError
+            if now - at < REPAIR_BUDGET_WINDOW:
+                recent.append({"at": at.isoformat(), "attempt_id": entry["attempt_id"]})
+    except (ValueError, TypeError, OverflowError, ScheduleRefused):
+        return {"state": "invalid", "recent": [], "next_at": None}
+    recent.sort(key=lambda entry: entry["at"])
+    if len(recent) >= REPAIR_BUDGET_MAX:
+        return {"state": "exhausted", "recent": recent, "next_at": None}
+    if recent:
+        due = datetime.fromisoformat(recent[-1]["at"]) + REPAIR_MIN_SPACING
+        if now < due:
+            return {"state": "spacing", "recent": recent, "next_at": due.isoformat()}
+    return {"state": "ok", "recent": recent, "next_at": None}
 
 
 def check_candidate(record: dict[str, Any] | None, now: datetime, *, sending: Any = None,
@@ -1470,6 +1542,10 @@ DECISION_BLOCKERS.update({
     "vehicle_identity_unavailable": "wait_for_fresh_inputs", "plan_inputs_changed": "wait_for_planner",
     "no_current_plan": "wait_for_planner", "plan_input_provenance_unavailable": "adjust_planning_settings",
     "current_must_be_16": "adjust_planning_settings",
+    "repair_gated": "wait_for_repair_release",  # 15.4a: a confirmed mismatch is recorded; automatic repair is off
+    "repair_needs_person": "needs_person",  # 15.4a: repair budget used up or its record unreadable
+    "repair_spacing": "wait_for_repair_spacing",
+    "repair_unconfirmed": "wait_for_confirmation",
 })
 #: Stage 9.5: blockers that clear on their own (a reconnect, prices, a fresh reading, a finished Stop). The worker
 #: re-evaluates them after a bounded backoff when no event arrives; every one is only a read-and-compare, a send
@@ -1543,6 +1619,17 @@ def decision_event(*, now: datetime, kinds: Any, last_trigger: str | None, reaso
                    "readback": None, "physical": "not_measured"},
         "blocker": decision_blocker(reason), "repeat": 1,
     }
+
+
+def repair_status(worker: Any, record: Any = None) -> dict[str, Any]:
+    """Stage 15.4a (additive, codes and times only): the repair gate, the last confirmation and the budget."""
+    confirmed = getattr(worker, "repair_confirmed", None)
+    budget = repair_budget(record if isinstance(record, dict) else None, datetime.now(timezone.utc))
+    return {"gate_enabled": bool(REPAIR_DISPATCH_ENABLED),
+            "confirmed": dict(confirmed) if isinstance(confirmed, dict) else None,
+            "budget": {"state": budget["state"], "used": len(budget["recent"]), "limit": REPAIR_BUDGET_MAX,
+                       "next_at": budget["next_at"]},
+            "needs_person": budget["state"] in ("exhausted", "invalid")}
 
 
 def decision_status(worker: Any, verification: dict[str, Any], verified: bool,
@@ -1908,10 +1995,14 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
                                fingerprint: str, validate: Any, *, automatic: bool, pause_id: str | None = None,
                                validate_durable: Any = None, migration_id: str | None = None,
                                override_id: str | None = None, force_sync: bool = False,
-                               end_tolerance: timedelta | None = None, baseline: Any = None) -> str:
+                               end_tolerance: timedelta | None = None, baseline: Any = None,
+                               repair: str | None = None) -> str:
     """Connector lock held. Record first, revalidate after every pre-dispatch await.
 
-    `baseline` (optional) returns the reserve-free twin of the profile `validate` just built (Stage 15.1a)."""
+    `baseline` (optional) returns the reserve-free twin of the profile `validate` just built (Stage 15.1a).
+    `repair` (Stage 15.4a) is the confirmed acknowledged attempt id being repaired: it bypasses ONLY the two
+    `unchanged` returns, and only for that exact still-current acknowledged attempt of the same intent kind and
+    inside the repair budget; the uncertain-record return and the rejection cooldown still apply."""
     ledger = outcomes_for(hass)
     record = await _outcome_record(hass, entry_id, data)
     profile, point, target = validate()
@@ -1923,9 +2014,9 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
         return "upload_uncertain"
     acknowledged = record.get("acknowledged") or {}
     attempt = record.get("attempt") or {}
-    if automatic and not force_sync and acknowledged.get("fingerprint") == fingerprint:
+    if automatic and not force_sync and not repair and acknowledged.get("fingerprint") == fingerprint:
         return "unchanged"
-    if (automatic and not force_sync and pause_id is None and override_id is None
+    if (automatic and not force_sync and not repair and pause_id is None and override_id is None
             and acknowledged_revision(record) == domain_data(hass).auto_store.settings(entry_id).revision
             and same_effective_schedule(acknowledged_profile(record), profile, end_tolerance,
                                         accepted_baseline=acknowledged_baseline(record),
@@ -1942,6 +2033,18 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
         retry_at = rejection_retry_at(record)
         if not force_sync and (retry_at is None or datetime.now(timezone.utc) < retry_at):
             return "upload_rejected"
+    if repair:
+        # Stage 15.4a: the confirmed attempt must still be the latest accepted one, of the same intent kind
+        # (a hold repairs as a hold, Charge Now as its own override, a plan as a plan); then the budget.
+        if (attempt.get("id") != repair or attempt.get("state") != "accepted" or acknowledged.get("id") != repair
+                or attempt.get("pause_id") != pause_id or attempt.get("override_id") != override_id
+                or bool(acknowledged.get("routine")) != (pause_id is None and override_id is None)):
+            return "repair_unconfirmed"
+        budget = repair_budget(record, datetime.now(timezone.utc))
+        if budget["state"] in ("exhausted", "invalid"):
+            return "repair_needs_person"
+        if budget["state"] == "spacing":
+            return "repair_spacing"
     now = datetime.now(timezone.utc).isoformat()
     attempt_id = uuid4().hex
     settings_now = domain_data(hass).auto_store.settings(entry_id)
@@ -1962,7 +2065,7 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
     # Stage 15.3: a new attempt ends any read-only check episode (its finding no longer describes what is in force).
     checker = hass.data.get("spotnav_morek_checker", {}).get(entry_id)
     if checker is not None:
-        checker.note_new_attempt()
+        checker.note_new_attempt(repair=repair)
     # Evidence of the intent (the exact wire profile), kept after the durable attempt record and before dispatch.
     _evidence_plan(hass, entry_id, record["attempt"], wire_profile)
     # Recheck after persistence: a settings edit, new calculation, identity or
@@ -2003,7 +2106,17 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
             _evidence_call(hass, entry_id, "record_event", "dispatch_aborted", plan_id=attempt_id,
                            reason="durable_check_refused")
             return "upload_uncertain"
+        if repair:
+            # Stage 15.4a: the budget entry is durable BEFORE the wire call (a crash cannot lose a repair), then the
+            # final validation runs again after that await. A refusal below removes it: only a run that reaches
+            # the wire call consumes budget.
+            kept = repair_budget(record, datetime.now(timezone.utc))["recent"]
+            record[_REPAIR_LIST_KEY] = [*kept, {"at": now, "attempt_id": attempt_id}]
+            await ledger.write(record)
+            profile, point, target = validate()
     except Exception:
+        if repair:
+            record[_REPAIR_LIST_KEY] = [e for e in record.get(_REPAIR_LIST_KEY, []) if e.get("attempt_id") != attempt_id]
         record["attempt"]["state"] = "aborted_before_dispatch"
         record["uncertain"] = False
         await ledger.write(record)
@@ -2656,6 +2769,7 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
                       "readiness": readiness,
                       "schedule_pause": _owned_pause_status(outcomes, verification, verified, worker, stop_pending=stop_pending),
                       "reconciliation": {"check": checker.status() if checker is not None else None,
+                                         "repair": repair_status(worker, outcomes),
                                          "reason": worker.reason if worker is not None and
                                          getattr(worker, "reason_serial", -1) == worker._serial else "pending",
                                          "continuity": getattr(worker, "continuity", None),
