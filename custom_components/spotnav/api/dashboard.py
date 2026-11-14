@@ -2142,7 +2142,10 @@ def _proposal_section(capture: CapturedDashboard) -> dict[str, Any] | None:
                        "age_s": finite_number(getattr(snapshot, "projection_age_s", None)),
                        "source": getattr(snapshot, "projection_source", None),
                        "estimated": getattr(snapshot, "projection_estimated", False),
-                       "time_basis": getattr(snapshot, "projection_time_basis", None)},
+                       "time_basis": getattr(snapshot, "projection_time_basis", None),
+                       # Some measured energy since the reading could not be attributed to this car: the need was
+                       # taken from the reading without it, so the planned energy may be too high. Never "measured".
+                       "progress_unknown": getattr(snapshot, "progress_unknown", False) is True},
         "amps": _count(settings.amps) if same_generation else None,
         "phases": _count(_effective_phases(capture)) if same_generation else None,
         "power_kw": finite_number(proposal.power_kw),

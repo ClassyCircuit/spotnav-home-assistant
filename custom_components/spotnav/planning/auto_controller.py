@@ -391,7 +391,8 @@ AutoReason = Literal[
     #: A target needs the car's state of charge and no source provides or can estimate one.
     "target_soc_unknown",
     "target_soc_stale",
-    #: Measured energy since the car's level cannot be attributed reliably: the accepted plan stands.
+    #: Retired: unattributable measured energy no longer holds the plan (it plans from the reading and sets
+    #: `AutoSnapshot.progress_unknown`). Kept so an older stored or reported reason still validates.
     "target_progress_uncertain",
     "minimum_above_target",
     "no_prices_yet",
@@ -538,6 +539,9 @@ class _EnergyResolution:
     soc_source: str | None = None
     soc_estimated: bool = False
     soc_time_basis: str | None = None
+    #: A target only: some measured energy since the reading could not be attributed to this car (`Progress.unknown`),
+    #: so the need was worked out from the reading without it and may be too high. Never "measured".
+    progress_unknown: bool = False
 
 
 def capped_vehicle_energy(
@@ -725,6 +729,9 @@ class AutoSnapshot:
     projection_source: str | None = None
     projection_estimated: bool = False
     projection_time_basis: str | None = None
+    #: The plan's need was taken from the reading without some measured energy that could not be attributed to this
+    #: car (`vehicle_update_wait.Progress.unknown`): the planned energy, and a minimum-SOC exception, may be too high.
+    progress_unknown: bool = False
     #: When this process began the calculation, before waiting for the calculation
     #: lock. Unlike calculated_at this cannot make an already-running calculation
     #: appear to have begun after a connection event.
@@ -777,6 +784,7 @@ class AutoSnapshot:
             self.room_limited,
             self.fill,
             self.departure_at,
+            self.progress_unknown,
             None if self.proposal is None else self._proposal_key(self.proposal),
         )
 
@@ -1727,6 +1735,8 @@ class AutoPlannerController:
             return resolved
         energy_kwh = resolved.kwh
         delivered_energy_trustworthy = resolved.delivered_energy_trustworthy
+        if resolved.progress_unknown:
+            energy["progress_unknown"] = True  # stamped on whatever this calculation returns, price wait included
         if resolved.basis is not None:
             energy.update(
                 energy_basis=resolved.basis,
@@ -3326,12 +3336,13 @@ class AutoPlannerController:
             )
             if isinstance(adjusted, AutoSnapshot):
                 return adjusted
-            target_kwh, minimum_kwh = adjusted
+            target_kwh, minimum_kwh, progress_unknown = adjusted
             return _EnergyResolution(
                 kwh=target_kwh, delivered_energy_trustworthy=True, soc_percent=live_soc,
                 capacity_kwh=capacity, kwh_per_percent=learned.use_kwh_per_percent,
                 minimum_energy_kwh=minimum_kwh, soc_age_s=facts.soc_age_s,
                 soc_source=facts.soc_source, soc_estimated=facts.soc_estimated, soc_time_basis=facts.soc_time_basis,
+                progress_unknown=progress_unknown,
             )
         planned_from = self._planned_from_floor(settings, facts, live_soc, calculated_at)
         # Energy the wall must deliver: battery need divided by charging efficiency
@@ -3381,7 +3392,9 @@ class AutoPlannerController:
             )
             if isinstance(adjusted, AutoSnapshot):
                 return adjusted
-            wall_kwh = adjusted[0]
+            wall_kwh, _minimum, progress_unknown = adjusted
+        else:
+            progress_unknown = False
         kwh = wall_kwh if wall_kwh is not None else settings.requested_kwh
         # Always trustworthy: live state of charge already reflects everything delivered.
         return _EnergyResolution(
@@ -3391,6 +3404,7 @@ class AutoPlannerController:
             soc_source=None if facts is None else facts.soc_source,
             soc_estimated=bool(facts is not None and facts.soc_estimated),
             soc_time_basis=None if facts is None else facts.soc_time_basis,
+            progress_unknown=progress_unknown,
         )
 
     def _charger_controller(self) -> Any:
@@ -3425,15 +3439,20 @@ class AutoPlannerController:
         price_snapshot: Any,
         need_kwh: float,
         minimum_kwh: float | None,
-    ) -> AutoSnapshot | tuple[float, float | None]:
-        """The need less measured energy delivered since the reading, counted once (14.5).
+    ) -> AutoSnapshot | tuple[float, float | None, bool]:
+        """The need less measured energy delivered since the reading, counted once (14.5), and whether some
+        measured energy could not be attributed (`progress_unknown`).
 
         Existing accounting is reused (`vehicle_update_wait.measured_progress`): only measured (register or
         integrated) sessions of this plug-in and car that began after the reading, so a newer reading rebases
         at once. Unmeasured sessions are not evidence (the plan is made from the reading, as before). When
-        some measured energy since the reading cannot be attributed, the accepted plan is kept:
-        `planning_unavailable`/`target_progress_uncertain`. Energy that covers the need holds the plan."""
-        unchanged = (need_kwh, minimum_kwh)
+        some measured energy since the reading cannot be attributed (no car recorded, a charge straddling an old
+        reading, a just-closed session whose total is not final), it is *not* guessed: the plan is made from the
+        reading less only the energy that is attributed, and is marked unknown. That can overstate the need and,
+        with a minimum level, plan a cap exception for energy the car may already have; the car's own limit, a
+        newer reading (which rebases) or the finished measurement then correct it. Energy that covers the need
+        holds the plan."""
+        unchanged = (need_kwh, minimum_kwh, False)
         controller = self._charger_controller()
         if controller is None or facts.soc_estimated:  # an estimate already counts the energy
             return unchanged
@@ -3452,20 +3471,15 @@ class AutoPlannerController:
             sessions, read_at=instant, plugged_in_at=plugged_in_at, vehicle_id=facts.vehicle_id or None,
             now=calculated_at,
         )
-        if progress.uncertain:
-            return self._fresh_snapshot(
-                settings, "planning_unavailable", "target_progress_uncertain", calculated_at,
-                entry=entry, price_snapshot=price_snapshot,
-            )
         if progress.kwh <= 0:
-            return unchanged
+            return need_kwh, minimum_kwh, progress.unknown
         remaining = need_kwh - progress.kwh
         if remaining <= vehicle_update_wait.NEED_TOLERANCE_KWH:
             return self._fresh_snapshot(
                 settings, "nothing_to_charge", "waiting_for_vehicle_update", calculated_at,
                 entry=entry, price_snapshot=price_snapshot,
             )
-        return remaining, None if minimum_kwh is None else max(0.0, minimum_kwh - progress.kwh)
+        return remaining, None if minimum_kwh is None else max(0.0, minimum_kwh - progress.kwh), progress.unknown
 
     def _capped_input_problem(
         self, facts: LiveVehicleFacts | None, calculated_at: datetime, *, preview: bool
@@ -4299,7 +4313,11 @@ class AutoPlannerController:
         if open_session is not None:
             sessions.append(open_session)
         return sum(
-            session.energy_kwh for session in sessions if session.start >= since and session.energy_kwh > 0
+            session.energy_kwh
+            for session in sessions
+            if session.start >= since
+            and vehicle_update_wait.valid_energy_kwh(session.energy_kwh)
+            and session.energy_kwh > 0
         )
 
     def _execution_facts(self) -> tuple[str, str | None, str | None, int]:

@@ -60577,6 +60577,8 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
   const ageText = projectionAge == null ? "age unavailable" : `${projectionAge} min old`;
   const projectionTime = rawProjection?.time_basis === "vehicle_timestamp" ? `vehicle report ${ageText}` : rawProjection?.time_basis === "last_updated" ? `HA state ${ageText}${rawProjection?.source === "vehicle" ? "; vehicle report time unavailable" : ""}` : `anchor/time basis unknown, ${ageText}; vehicle report time unavailable`;
   const projectionNote = projectionValid ? `Estimated end and SOC use assumed charging power and the plan's last-known ${rawProjection?.source === "charger" ? "charger" : rawProjection?.source === "vehicle" ? "vehicle" : "unknown-source"} SOC${rawProjection?.estimated ? " estimate" : ""} (${projectionTime}), capacity/efficiency or learned energy; it may be inaccurate after driving. Actual delivered energy and the car's separate charge limit are unverified; no exact SOC or physical stop is guaranteed.` : "SOC projection unavailable: target-SOC planning, a valid SOC and usable capacity or a trusted energy-per-percent estimate are required.";
+  const progressNote = !planStale && rawProjection?.progress_unknown === true ? " Charging progress since this reading is unknown: some measured energy could not be attributed to this car, so it is not subtracted and the planned energy may be overestimated, including energy planned above the soft price cap to reach the minimum SOC. Not measured; the car itself ends the charge at its own limit and a newer reading corrects the plan." : "";
+  const projectionNoteFull = projectionNote + progressNote;
   const deadlineText = raw?.planning?.departure_at;
   const deadline = typeof deadlineText === "string" && /(?:Z|[+-]\d\d:\d\d)$/i.test(deadlineText) ? Date.parse(deadlineText) : NaN;
   const deadlineCurrent = !stale && !d3.planning?.historical;
@@ -60612,7 +60614,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
       chart: published?.chart,
       totals: !planStale && proposal ? { energy: proposal.planned_kwh, cost: proposal.unpriced ? null : proposal.cost?.value, pricePerKwh: avg } : null,
       vehicle: { status: stale ? "Connection unavailable \xB7 stale dashboard" : d3.charger.available ? d3.connection?.state || U : "Charger unavailable", detail: `Dashboard observed ${date(d3.generated_at, zone)}${stale ? ` \xB7 stale: ${staleReason}` : ""}`, power: live.power, live: live.summary, liveMismatch: live.mismatch, soc: validPercent(soc2) ? soc2 : null, stale: socStale, planStale, socDetail, socEstimated: !useRaw && d3.soc?.estimated === true, policy: policyText },
-      assumptions: { startingSoc: projectionValid ? rawProjection.starting_soc : null, capacityKwh: d3.soc?.capacity_kwh, efficiency: d3.soc?.efficiency, projectionSupported: projectionValid, projectionKwhPerPercent: rawProjection?.kwh_per_percent, projectionNote },
+      assumptions: { startingSoc: projectionValid ? rawProjection.starting_soc : null, capacityKwh: d3.soc?.capacity_kwh, efficiency: d3.soc?.efficiency, projectionSupported: projectionValid, projectionKwhPerPercent: rawProjection?.kwh_per_percent, projectionNote: projectionNoteFull },
       settings: { target: d3.soc?.target_percent, minimum: d3.settings?.minimum_ready_by_soc, cap: d3.settings?.soft_price_cap, readyBy: d3.settings?.departure_time },
       canSave: false,
       untilDeadline,
@@ -60940,7 +60942,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.144";
+var CARD_VERSION = "2.5.146";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {

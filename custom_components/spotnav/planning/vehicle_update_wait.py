@@ -41,6 +41,7 @@ A newer reading, an unplug or that instant ends the wait; the planner then plans
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -92,6 +93,17 @@ class WaitDecision:
     delivery: MeasuredDelivery | None = None
 
 
+def valid_energy_kwh(energy: object) -> bool:
+    """Whether a session's energy is a usable measurement: a real finite number, not a bool, never negative.
+    Zero is valid (it counts for nothing)."""
+    return (
+        not isinstance(energy, bool)
+        and isinstance(energy, (int, float))
+        and math.isfinite(energy)
+        and energy >= 0
+    )
+
+
 def measured_delivery_since(
     sessions: Iterable[ChargeSession],
     *,
@@ -100,13 +112,15 @@ def measured_delivery_since(
     vehicle_id: str | None,
 ) -> MeasuredDelivery | None:
     """The measured energy of the sessions that began at or after both `read_at` and the plug-in and were
-    recorded for `vehicle_id`; `None` when there is none."""
+    recorded for `vehicle_id`; `None` when there is none. Only valid, finite, positive energy counts
+    (`valid_energy_kwh`); a session with invalid energy is skipped here and flagged by `measured_progress`."""
     counted = sorted(
         (
             session
             for session in sessions
             if session.energy_source in MEASURED_SOURCES
             and session.source is None
+            and valid_energy_kwh(session.energy_kwh)
             and session.energy_kwh > 0
             and session.start >= read_at
             and session.start >= plugged_in_at
@@ -131,11 +145,14 @@ PROGRESS_FRESH_S: Final = 300.0
 
 @dataclass(frozen=True, slots=True)
 class Progress:
-    """Measured energy since a reading: `kwh` counted once; `uncertain` when some energy since the reading
-    cannot be attributed reliably (a charge that straddles it, or one recorded for no car)."""
+    """Measured energy since a reading: `kwh` counted once (identified sessions of this car that began at or after
+    the reading); `unknown` when some measured energy that overlaps the reading cannot be attributed to this car
+    (a charge for no car, a charge that straddles a reading older than `PROGRESS_FRESH_S`, or invalid energy).
+    The unattributed energy is never counted in `kwh` (sessions are disjoint, so nothing is subtracted twice) and
+    its size is not known: the caller plans from the reading without it, which can overstate the need."""
 
     kwh: float = 0.0
-    uncertain: bool = False
+    unknown: bool = False
 
 
 def measured_progress(
@@ -146,28 +163,32 @@ def measured_progress(
     vehicle_id: str | None,
     now: datetime,
 ) -> Progress:
-    """The measured energy delivered since `read_at` that the reading cannot include, counted once.
+    """The measured energy delivered since `read_at`, counted once, and whether some is unattributable.
 
     Only sessions that began at or after the reading count (`measured_delivery_since`), so a fresh reading
     rebases at once: a charge that began before it is already in it. A measured charge for another car is
     ignored. Estimated sessions are not evidence. A measured charge for no car, or one that began before the
-    reading and carries on while the reading is older than `PROGRESS_FRESH_S`, makes the sum `uncertain`."""
+    reading (or the plug-in) and carries on while the reading is older than `PROGRESS_FRESH_S`, or one with
+    invalid energy that overlaps the reading, is unattributable and makes the result `unknown`."""
     sessions = list(sessions)
     since = max(read_at, plugged_in_at)
     delivery = measured_delivery_since(sessions, read_at=read_at, plugged_in_at=plugged_in_at, vehicle_id=vehicle_id)
-    uncertain = False
+    unknown = False
     stale = (now - read_at).total_seconds() > PROGRESS_FRESH_S
     for session in sessions:
-        if (session.energy_source not in MEASURED_SOURCES or session.source is not None
-                or not session.energy_kwh > 0 or (session.end is not None and session.end <= since)):
+        if session.energy_source not in MEASURED_SOURCES or session.source is not None:
+            continue
+        if session.end is not None and session.end <= since:
             continue
         if session.vehicle_id is not None and session.vehicle_id != vehicle_id:
             continue
-        if session.vehicle_id is None:
-            uncertain = True
-        elif session.start < since and stale:
-            uncertain = True
-    return Progress(0.0 if delivery is None else delivery.kwh, uncertain)
+        energy = session.energy_kwh
+        invalid = not valid_energy_kwh(energy)
+        if not invalid and energy == 0:
+            continue
+        if invalid or session.vehicle_id is None or (session.start < since and stale):
+            unknown = True
+    return Progress(0.0 if delivery is None else delivery.kwh, unknown)
 
 
 def decide_vehicle_update_wait(
