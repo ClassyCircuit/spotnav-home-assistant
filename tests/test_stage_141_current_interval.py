@@ -92,7 +92,7 @@ async def test_schedule_owned_uncapped_plan_starts_now_and_stops_at_the_need(mon
     world = await _world(monkeypatch)
     prices = _prices()
     now, snapshot = await _plan(world, prices, owned=True, soft_price_cap=None, cap_price_basis=None,
-                                minimum_ready_by_soc=None, max_periods=2,
+                                minimum_ready_by_soc=None, max_periods=2, time_reserve_percent=0,  # the 14.1 baseline; the reserve is 15.1a's
                                 departure_enabled=True, departure=time(22))
     proposal = snapshot.proposal
     assert proposal.has_plan and proposal.ends_at_need

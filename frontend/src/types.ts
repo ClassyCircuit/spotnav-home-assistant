@@ -143,6 +143,8 @@ export interface SettingsBody {
   soft_price_cap?: number | null;
   cap_price_basis?: "nord_pool" | "configured_variable_cost" | null;
   minimum_ready_by_soc?: number | null;
+  /** Stage 15.1a: extra allowed charging time, a whole percent (0 to 50); carried through unchanged (no control yet). */
+  time_reserve_percent?: number;
   area_id: string | null;
   overrides: AreaOverride[];
   phases: number | null;

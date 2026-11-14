@@ -464,6 +464,54 @@ than assumed. Older entries below that say "the roadmap" mean the archived text.
 
 ## Tests, build, and next steps
 
+**User restriction (2026-11-14): ONLY FAST tests.** No full isolated runner, browser/Playwright or broad suites; run focused
+module files individually with a short timeout and report unrun checks. (Also recorded in the active roadmap §4.)
+
+### 2026-11-14 — Stage 15.1a planner time reserve, backend (2.5.129; local mocked; coordinator reviewed; no live HA/charger action)
+
+Coordinator review: reserve precision and SOC-tolerance regressions corrected; independent fast reserve check: 79 passed, one timezone-harness case deselected (10 s). No live verification.
+
+- **Behavior:** `time_reserve_percent` (int 0–50, default 10; absent in stored records = 10, written only when ≠10; settings API
+  key, optional on replacement = keep stored, compare-and-set via the settings revision; refusals use `invalid_number`).
+  `planner.with_time_reserve(request, result)` (called by `AutoPlannerController` only for Morek-owned plans and only when
+  no price-wait facts, after `ending_at_need`) adds `percent` of the baseline active time, rounded up only to 1 second
+  (`RESERVE_RESOLUTION`, the whole-second dispatch resolution of `profile_for`), at most 2 h (`RESERVE_MAX`), into the cheapest free published within-cap time before the deadline (a part-elapsed current
+  interval only where it continues a baseline window: a piece starting at `now` would creep), ties to continuing a window then earliest, respecting `max_blocks`/period limit (never a 4th window;
+  what fits is kept, `reserve_limit` says why less). Unpriced, short-of-deadline and refused plans, and 0 %, are returned
+  unchanged. Feasibility/soft-cap/minimum-SOC logic is untouched.
+- **Data:** `PlanResult.reserve_percent/reserve_requested_minutes/reserve_pieces/reserve_limit` and properties `reserve_periods`,
+  `reserve_minutes`, `reserve_energy_kwh`, `reserve_cost` (upper allowance at plan power/prices), `baseline_shown_periods`,
+  `shown_periods` (= baseline + reserve, what the profile and notifier use), `periods_with_reserve` (chart shading). Baseline
+  `periods/slots/delivered_kwh/estimated_cost` never include reserve. `window_release` uses `baseline_shown_periods` (getattr
+  fallback for fakes). Dashboard `proposal.reserve {percent, minutes, requested_minutes, limit, periods, allowance{kind
+  "upper_allowance", energy_kwh, cost}}` and per-window `reserve_minutes/kwh/cost` (only when a reserve exists; `energy_kwh/cost`
+  stay baseline). `_proposal_key` includes the reserve.
+- **Minimal frontend change (not the 15.1b UI):** `frontend/src/settings.ts`/`types.ts` accept and carry `time_reserve_percent`
+  through replacement bodies, because the strict decoder would otherwise refuse the new backend key. No control or display.
+- **Stage 14 stays reserve-free (review corrections, same 2.5.129):** an accepted profile that carried a reserve also stores its
+  reserve-free twin (`acknowledged.baseline`/`attempt.baseline`, written by `_send_profile_shared` from the worker's
+  `_proposed_baseline`; absent without a reserve and in older records). `same_effective_schedule(..., accepted_baseline=,
+  candidate_baseline=)` judges the unchanged 5-minute SOC end tolerance on the twins (strict at ≥ 5 min of need drift, structure
+  exact), then lets a reserve switch-off differ by less than that tolerance plus the change in total reserve seconds (the only other
+  thing a need drift moves); a missing twin on either side is the plain comparison. Strict causes (settings, price, plug-in,
+  recovery, mixed bursts) pass no tolerance and are unchanged. `window_release(..., active_baseline=)` carries the accepted
+  *twin* window and compares against `baseline_shown_periods`: before this fix a reserve inside the accepted active window
+  inflated the kept cost and could release on price where the reserve-free plan would not (16-19 min windows in the fixture).
+  Residual, by design: if the reserve itself disappears or is re-placed beyond the tolerance sum, that is a normal resend.
+- **Limits:** a reserve crossing its fragment's capacity adds a new piece (one normal resend); excluding the part-elapsed current
+  interval means a reserve may use a dearer later slot instead of the rest of the current one; legacy HA entities (period
+  sensors) still show baseline periods; non-Morek chargers get no reserve. Existing 14.1 test
+  `test_schedule_owned_uncapped_plan_starts_now_and_stops_at_the_need` pins `time_reserve_percent=0` (it asserts the
+  reserve-free baseline); the default-10 path is covered in `test_stage_151a_time_reserve.py`.
+- **Checks run (fast, isolated runner bootstrap, one file at a time; after the review corrections):** `test_stage_151a_time_reserve.py` 79 passed + 1 harness failure (`test_reserve_edit_is_a_compare_and_set_revision`, `Europe/Stockholm` unknown in this Windows harness; fails the same way for the untouched 14.1 `_world` tests), each test < 5 s; mutation check (twin disabled) fails the six sub-5-minute drift cases. Earlier list: Stage 14.1, 14.2, 14.3, 14.4, 14.6, 14.5
+  (both), 103_partial, 95_recovery, morek_schedule (106), morek_worker (142), planner_current_interval, planner, settings_contract,
+  price_policy_settings, frontend settings tests passed. `npm run build`, `npm run check-dist`, ruff clean. Failing both before and
+  after this change (verified via stash): `test_morek_session.py` production-setup tests (6), `test_morek_session_activation.py::
+  test_production_listener_is_a_loop_callback_and_plugin_starts_once`, `test_capped_auto_execution_isolated.py::
+  test_saved_capped_settings_reach_real_calculation_and_preview` (all missing-HA-import/harness limits). **Unrun:** full
+  isolated runner list (too slow), `test_stage_13_reactive.py` (exceeded 110 s), `test_price_policy_settings` hass-fixture test,
+  browser/Playwright, full frontend suite, HA-plugin suite (fcntl).
+
 ### 2026-11-13 — Charge-session status and warning (2.5.127; local mocked; no live HA/charger action)
 
 - **What the user sees:** a `#charge-session` card in the existing sidebar host (above `#recovery-banner`, painted by

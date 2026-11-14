@@ -187,6 +187,7 @@ const OPTIONAL_RECORD_KEYS = [
   "soft_price_cap",
   "cap_price_basis",
   "minimum_ready_by_soc",
+  "time_reserve_percent",
   "departure_date",
   "departure_weekdays",
   "fiscal_included",
@@ -351,6 +352,7 @@ export function decodeSettingsRecord(raw: unknown): SettingsRecord {
     revision,
     ...(present.includes("soft_price_cap") ? { soft_price_cap: source["soft_price_cap"] === null ? null : finite(source, "soft_price_cap") } : {}),
     ...(present.includes("minimum_ready_by_soc") ? { minimum_ready_by_soc: source["minimum_ready_by_soc"] === null ? null : finite(source, "minimum_ready_by_soc") } : {}),
+    ...(present.includes("time_reserve_percent") ? { time_reserve_percent: whole(source, "time_reserve_percent") } : {}),
     ...(present.includes("cap_price_basis") ? { cap_price_basis: source["cap_price_basis"] === null ? null : oneOf(source, "cap_price_basis", ["nord_pool", "configured_variable_cost"] as const) } : {}),
     area_id: textOrNull(source, "area_id"),
     overrides: list(source, "overrides").map((item) => decodeOverride(record(item))),
@@ -495,6 +497,7 @@ export function encodeBody(record: SettingsRecord): SettingsBody {
     ...(record.soft_price_cap === undefined ? {} : { soft_price_cap: record.soft_price_cap }),
     ...(record.minimum_ready_by_soc === undefined ? {} : { minimum_ready_by_soc: record.minimum_ready_by_soc }),
     ...(record.cap_price_basis === undefined ? {} : { cap_price_basis: record.cap_price_basis }),
+    ...(record.time_reserve_percent === undefined ? {} : { time_reserve_percent: record.time_reserve_percent }),
     area_id: record.area_id,
     overrides: record.overrides.map((item) => ({
       area_id: item.area_id,

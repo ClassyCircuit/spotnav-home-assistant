@@ -87,6 +87,11 @@ DEFAULT_MAX_PERIODS: Final = None
 #: The numbers a person may set in place of automatic periods.
 MIN_PERIODS: Final = 1
 MAX_PERIODS: Final = 8
+
+#: The planner's time reserve (Stage 15.1a): extra allowed charging time as a whole percent of the planned active
+#: time. 0 is off. A record without the key is the default.
+DEFAULT_TIME_RESERVE_PERCENT: Final = 10
+MAX_TIME_RESERVE_PERCENT: Final = 50
 DEFAULT_DEPARTURE: Final = time(8, 0)
 
 #: How a charger with more than one vehicle finds out which one is plugged in (`vehicles/identification.py`):
@@ -704,6 +709,9 @@ class AutoSettings:
     soft_price_cap: float | None = None
     cap_price_basis: str | None = None
     minimum_ready_by_soc: float | None = None
+    #: Extra allowed charging time for a schedule-owned (Morek) plan, a whole percent (0 to 50) of the planned
+    #: active time; time only, never a higher target, price tolerance or cap exception. 0 is off.
+    time_reserve_percent: int = DEFAULT_TIME_RESERVE_PERCENT
     #: What the system optimizes for (`STORED_STRATEGIES`).
     strategy: str = STRATEGY_CHEAPEST
     #: Which phones hear about which events (`notifications/settings.py`). Not a planning input: a
@@ -848,6 +856,12 @@ class AutoSettings:
         )
         if minimum is not None and not 0 <= minimum <= 100:
             _refuse("invalid_price_policy", "minimum_ready_by_soc must be between 0 and 100")
+        if (
+            isinstance(self.time_reserve_percent, bool)
+            or not isinstance(self.time_reserve_percent, int)
+            or not 0 <= self.time_reserve_percent <= MAX_TIME_RESERVE_PERCENT
+        ):
+            _refuse("invalid_number", f"time_reserve_percent must be a whole number from 0 to {MAX_TIME_RESERVE_PERCENT}")
         if self.cap_price_basis is not None and (
             not isinstance(self.cap_price_basis, str) or self.cap_price_basis not in PRICE_BASES
         ):
@@ -927,6 +941,9 @@ class AutoSettings:
         for name in ("soft_price_cap", "cap_price_basis", "minimum_ready_by_soc"):
             if (value := getattr(self, name)) is not None:
                 stored[name] = value
+        if self.time_reserve_percent != DEFAULT_TIME_RESERVE_PERCENT:
+            # Additive: written only when it is not the default, so a record without the key is the default.
+            stored["time_reserve_percent"] = self.time_reserve_percent
         return stored
 
     @classmethod
@@ -945,7 +962,7 @@ class AutoSettings:
                 {
                     "departure_date", "departure_weekdays", "notifications", "fill_to_limit", "vehicle_ids",
                     "identify_mode", "identify_camera", "periods", "max_periods", "users_change_plan", "if_not_ready",
-                    "soft_price_cap", "cap_price_basis", "minimum_ready_by_soc",
+                    "soft_price_cap", "cap_price_basis", "minimum_ready_by_soc", "time_reserve_percent",
                 }
             ),
         )
@@ -1012,6 +1029,7 @@ class AutoSettings:
             soft_price_cap=stored.get("soft_price_cap"),
             cap_price_basis=stored.get("cap_price_basis"),
             minimum_ready_by_soc=stored.get("minimum_ready_by_soc"),
+            time_reserve_percent=stored.get("time_reserve_percent", DEFAULT_TIME_RESERVE_PERCENT),
             strategy=stored["strategy"],
             notifications=notifications,
             vehicle_ids=None if vehicle_ids is None else tuple(vehicle_ids),

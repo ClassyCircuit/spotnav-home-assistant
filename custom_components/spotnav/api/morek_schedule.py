@@ -239,6 +239,19 @@ def acknowledged_profile(record: dict[str, Any] | None, revision: Any = None) ->
     return profile if isinstance(profile, dict) else None
 
 
+def acknowledged_baseline(record: dict[str, Any] | None) -> dict[str, Any] | None:
+    """The reserve-free twin of the accepted routine profile (Stage 15.1a), or `None` (no reserve, or an older record).
+
+    Written next to the profile at acceptance when the plan carried a time reserve: the same windows without the
+    reserve. It lets Stage 14 judge SOC drift and window release on the need alone (see `same_effective_schedule`
+    and `window_release`) without guessing which part of a window is reserve.
+    """
+    if acknowledged_profile(record) is None:
+        return None
+    baseline = (record.get("acknowledged") or {}).get("baseline")
+    return baseline if isinstance(baseline, dict) else None
+
+
 def active_window(profile: dict[str, Any] | None, now: datetime) -> tuple[datetime, int | float] | None:
     """End and limit of the window a fixed-time profile allows at `now`; None if idle or open-ended."""
     try:
@@ -346,7 +359,8 @@ def _energy_between(periods: tuple[tuple[datetime, datetime], ...], start: datet
 
 
 def window_release(snapshot: Any, settings: Any, now: datetime, active_profile: dict[str, Any] | None, *,
-                   cap_lowered: bool, price_event: bool, evidence: str) -> tuple[bool, str]:
+                   cap_lowered: bool, price_event: bool, evidence: str,
+                   active_baseline: dict[str, Any] | None = None) -> tuple[bool, str]:
     """Whether the replanned schedule may replace (not just extend) the acknowledged active window.
 
     Returns (release, reason). Only two things can release it: a cap that is actually lower than the one the
@@ -356,19 +370,29 @@ def window_release(snapshot: Any, settings: Any, now: datetime, active_profile: 
     energy, fresh known prices throughout, a real gap of at least 30 minutes (to the next resumption or, with
     none, to ready-by) and the minimum (or, with no minimum configured, the whole plan) delivered at least
     15 minutes before ready-by. Not proof of savings or of physical charging.
+
+    Reserve-free (Stage 15.1a): the new plan's periods are its `baseline_shown_periods` and the window that is
+    carried is the accepted profile's reserve-free twin (`active_baseline`, see `acknowledged_baseline`), so the
+    time reserve inside the accepted window can neither create nor prevent a release. Without a twin the accepted
+    profile is used as it is (an older record, which has no reserve).
     """
     if not (cap_lowered or price_event):
         return False, "active_window_preserved"  # a routine update never releases a window
     try:
         proposal = snapshot.proposal
         now = _utc(now)
+        if isinstance(active_baseline, dict):
+            active_profile = active_baseline
         active = active_window(active_profile, now)
         if proposal is None or active is None or not proposal.has_plan or not getattr(snapshot, "in_process", False):
             return False, "active_window_preserved"
         if evidence not in ("charging", "waiting"):
             return False, "active_window_state_unknown"
         power = float(proposal.power_kw)
-        periods = tuple(sorted((_utc(s), _utc(e)) for s, e in proposal.shown_periods if _utc(e) > now))
+        # Reserve-free (Stage 15.1a): every quantity below is judged on the periods the need itself requires, so the
+        # time reserve can neither create nor prevent a release. (The fallback is for a plan without a reserve.)
+        needed_periods = getattr(proposal, "baseline_shown_periods", proposal.shown_periods)
+        periods = tuple(sorted((_utc(s), _utc(e)) for s, e in needed_periods if _utc(e) > now))
         if not periods or not power > 0:
             return False, "active_window_preserved"
         union, _ = continue_active_window(periods, active[1], now, active_profile)
@@ -481,17 +505,50 @@ def _effective_schedule(profile: dict[str, Any], now: datetime) -> tuple[Any, ..
     return attributes, state, future
 
 
+def _allowed_seconds(profile: dict[str, Any], now: datetime) -> float:
+    """Seconds of permission (any non-zero limit) a profile still gives from `now`; raises if it never closes."""
+    _, state, future = _effective_schedule(profile, now)
+    total, opened = 0.0, now if state.get("limit") else None
+    for at, rest in future:
+        if rest.get("limit"):
+            opened = at if opened is None else opened
+        elif opened is not None:
+            total += (at - opened).total_seconds()
+            opened = None
+    if opened is not None:
+        raise ValueError("open-ended permission")
+    return total
+
+
 def same_effective_schedule(accepted: dict[str, Any] | None, candidate: dict[str, Any],
-                            tolerance: timedelta | None = None) -> bool:
+                            tolerance: timedelta | None = None, *,
+                            accepted_baseline: dict[str, Any] | None = None,
+                            candidate_baseline: dict[str, Any] | None = None) -> bool:
     """Whether `candidate` would leave the same effective future schedule as `accepted`.
 
     With `tolerance`, only a switch-off (0 A) instant may differ, and by less than it; every
     other future transition and the current permission must match exactly. Anything that
     cannot be parsed is different, so a doubtful comparison never suppresses a send. "From
     now" is the candidate's own start instant, which is when it was calculated.
+
+    Time reserve (Stage 15.1a): when both profiles come with their reserve-free twins, the tolerance is judged on
+    the twins, exactly as before (a SOC-only drift of the need below it, strictly), so a reserve never turns a
+    sub-tolerance drift into a send. The reserve profiles must then agree structurally, and a switch-off may
+    differ by less than the tolerance plus the change of the total reserve time, which is the only other thing
+    a drift of the need moves. A twin missing on either side is the plain comparison.
     """
     if not isinstance(accepted, dict):
         return False
+    if tolerance is not None and isinstance(accepted_baseline, dict) and isinstance(candidate_baseline, dict):
+        if not same_effective_schedule(accepted_baseline, candidate_baseline, tolerance):
+            return False
+        try:
+            at = _utc(datetime.fromisoformat(candidate["chargingSchedule"]["startSchedule"].replace("Z", "+00:00")))
+            tolerance += timedelta(seconds=abs(
+                (_allowed_seconds(candidate, at) - _allowed_seconds(candidate_baseline, at))
+                - (_allowed_seconds(accepted, at) - _allowed_seconds(accepted_baseline, at))))
+        except (KeyError, TypeError, ValueError, AttributeError, OverflowError, ScheduleRefused):
+            return False
     try:
         now = datetime.fromisoformat(candidate["chargingSchedule"]["startSchedule"].replace("Z", "+00:00"))
         old_attrs, old_state, old_future = _effective_schedule(accepted, now)
@@ -1151,6 +1208,43 @@ def _proposed_profile(hass: HomeAssistant, entry_id: str, now: datetime, *,
 
     Refusal means no proposed action, never permission to clear or release a limit.
     """
+    settings, proposal = _validated_proposal(hass, entry_id)
+    # The stored profile is a fixed-time snapshot of exactly what the card shows,
+    # including the estimated shorter final block. It does not implement feedback-based energy stopping.
+    periods = tuple(proposal.shown_periods)
+    if active_profile is not None:
+        periods, preserved = continue_active_window(periods, settings.amps, now, active_profile)
+        if preserved is not None and len(periods) > MOREK_MAX_BLOCKS:
+            # The old window is not dropped to fit the new plan; leave the accepted schedule alone.
+            raise ScheduleRefused("active_window_block_limit")
+    return profile_for(periods, settings.amps, now, allow_active=True)
+
+
+def _proposed_baseline(hass: HomeAssistant, entry_id: str, now: datetime, *,
+                       active_profile: dict[str, Any] | None = None,
+                       active_baseline: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    """The reserve-free twin of `_proposed_profile` (same windows, no time reserve), or `None`.
+
+    `None` when the plan has no reserve (nothing to separate), when a window is being carried but the accepted
+    profile has no twin to carry (an older record), or on any refusal: a missing twin only means the plain
+    comparison, never a send or a skipped send of its own.
+    """
+    try:
+        settings, proposal = _validated_proposal(hass, entry_id)
+        if not getattr(proposal, "reserve_pieces", ()):
+            return None
+        periods = tuple(proposal.baseline_shown_periods)
+        if active_profile is not None:
+            periods, preserved = continue_active_window(periods, settings.amps, now, active_baseline)
+            if preserved is None and active_window(active_profile, now) is not None:
+                return None
+        return profile_for(periods, settings.amps, now, allow_active=True)
+    except (ScheduleRefused, AttributeError, TypeError, ValueError):
+        return None
+
+
+def _validated_proposal(hass: HomeAssistant, entry_id: str) -> tuple[Any, Any]:
+    """The current settings and the planner's current, priced proposal, or the reason there is none."""
     settings = domain_data(hass).auto_store.settings(entry_id)
     if settings.amps != 16:
         raise ScheduleRefused("current_must_be_16")
@@ -1171,15 +1265,7 @@ def _proposed_profile(hass: HomeAssistant, entry_id: str, now: datetime, *,
         raise ScheduleRefused("prices_unavailable")
     if not proposal.has_plan or not proposal.shown_periods:
         raise ScheduleRefused("no_current_plan")
-    # The stored profile is a fixed-time snapshot of exactly what the card shows,
-    # including the estimated shorter final block. It does not implement feedback-based energy stopping.
-    periods = tuple(proposal.shown_periods)
-    if active_profile is not None:
-        periods, preserved = continue_active_window(periods, settings.amps, now, active_profile)
-        if preserved is not None and len(periods) > MOREK_MAX_BLOCKS:
-            # The old window is not dropped to fit the new plan; leave the accepted schedule alone.
-            raise ScheduleRefused("active_window_block_limit")
-    return profile_for(periods, settings.amps, now, allow_active=True)
+    return settings, proposal
 
 
 def rejection_count(attempt: dict[str, Any] | None) -> int:
@@ -1698,14 +1784,17 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
                                fingerprint: str, validate: Any, *, automatic: bool, pause_id: str | None = None,
                                validate_durable: Any = None, migration_id: str | None = None,
                                override_id: str | None = None, force_sync: bool = False,
-                               end_tolerance: timedelta | None = None) -> str:
-    """Connector lock held. Record first, revalidate after every pre-dispatch await."""
+                               end_tolerance: timedelta | None = None, baseline: Any = None) -> str:
+    """Connector lock held. Record first, revalidate after every pre-dispatch await.
+
+    `baseline` (optional) returns the reserve-free twin of the profile `validate` just built (Stage 15.1a)."""
     ledger = outcomes_for(hass)
     record = await _outcome_record(hass, entry_id, data)
     profile, point, target = validate()
     # This exact wire payload is the one recorded and later dispatched. A
     # revalidation may rebuild an equivalent profile with a later startSchedule.
     wire_profile = profile
+    wire_baseline = baseline() if callable(baseline) else None
     if record["uncertain"]:
         return "upload_uncertain"
     acknowledged = record.get("acknowledged") or {}
@@ -1714,7 +1803,9 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
         return "unchanged"
     if (automatic and not force_sync and pause_id is None and override_id is None
             and acknowledged_revision(record) == domain_data(hass).auto_store.settings(entry_id).revision
-            and same_effective_schedule(acknowledged_profile(record), profile, end_tolerance)):
+            and same_effective_schedule(acknowledged_profile(record), profile, end_tolerance,
+                                        accepted_baseline=acknowledged_baseline(record),
+                                        candidate_baseline=wire_baseline)):
         # The accepted routine schedule already says this from now on (a settings edit, an explicit
         # control, a pause or a needed sync is never suppressed here); a profile creation time is not a change.
         return "unchanged"
@@ -1736,7 +1827,8 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
                    "attempt": {"fingerprint": fingerprint, "profile": profile, "at": now, "id": attempt_id,
                                "revision": revision,
                                "source": "worker" if automatic else "manual", "state": "uncertain",
-                               **({"rejections": rejections} if rejections else {})},
+                               **({"rejections": rejections} if rejections else {}),
+                               **({} if wire_baseline is None else {"baseline": wire_baseline})},
                    "uncertain": True, "verified": None})
     if pause_id is not None:
         record["attempt"]["pause_id"] = pause_id
@@ -1819,6 +1911,7 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
         record.update({"acknowledged": {
             "fingerprint": fingerprint, "at": now, "id": attempt_id, "profile": wire_profile,
             "revision": revision, "routine": pause_id is None and override_id is None,
+            **({} if wire_baseline is None else {"baseline": wire_baseline}),
             **({} if cap_evidence is None else {"cap": cap_evidence})}, "uncertain": False})
         record["attempt"]["state"] = "accepted"
     elif state in ("rejected", "notsupported"):

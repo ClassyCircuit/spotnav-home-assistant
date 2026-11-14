@@ -57363,6 +57363,7 @@ var OPTIONAL_RECORD_KEYS = [
   "soft_price_cap",
   "cap_price_basis",
   "minimum_ready_by_soc",
+  "time_reserve_percent",
   "departure_date",
   "departure_weekdays",
   "fiscal_included",
@@ -57492,6 +57493,7 @@ function decodeSettingsRecord(raw) {
     revision,
     ...present.includes("soft_price_cap") ? { soft_price_cap: source["soft_price_cap"] === null ? null : finite(source, "soft_price_cap") } : {},
     ...present.includes("minimum_ready_by_soc") ? { minimum_ready_by_soc: source["minimum_ready_by_soc"] === null ? null : finite(source, "minimum_ready_by_soc") } : {},
+    ...present.includes("time_reserve_percent") ? { time_reserve_percent: whole(source, "time_reserve_percent") } : {},
     ...present.includes("cap_price_basis") ? { cap_price_basis: source["cap_price_basis"] === null ? null : oneOf(source, "cap_price_basis", ["nord_pool", "configured_variable_cost"]) } : {},
     area_id: textOrNull(source, "area_id"),
     overrides: list(source, "overrides").map((item) => decodeOverride(record(item))),
@@ -57583,6 +57585,7 @@ function encodeBody(record3) {
     ...record3.soft_price_cap === void 0 ? {} : { soft_price_cap: record3.soft_price_cap },
     ...record3.minimum_ready_by_soc === void 0 ? {} : { minimum_ready_by_soc: record3.minimum_ready_by_soc },
     ...record3.cap_price_basis === void 0 ? {} : { cap_price_basis: record3.cap_price_basis },
+    ...record3.time_reserve_percent === void 0 ? {} : { time_reserve_percent: record3.time_reserve_percent },
     area_id: record3.area_id,
     overrides: record3.overrides.map((item) => ({
       area_id: item.area_id,
@@ -60598,7 +60601,7 @@ function recoveryBanner(state, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.128";
+var CARD_VERSION = "2.5.129";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {

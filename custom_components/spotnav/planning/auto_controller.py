@@ -106,6 +106,7 @@ from .phases import effective_phases
 from .planner import (
     calculate_plan,
     ending_at_need,
+    with_time_reserve,
     effective_target_soc_percent,
     FiscalChoice,
     local_instant,
@@ -778,6 +779,9 @@ class AutoSnapshot:
             proposal.block_limit,
             proposal.unrestricted_blocks,
             proposal.block_limit_extra_cost,
+            proposal.reserve_percent,
+            tuple((piece.start.isoformat(), piece.end.isoformat(), piece.effective_minor_per_kwh)
+                  for piece in proposal.reserve_pieces),
             tuple((start.isoformat(), end.isoformat()) for start, end in proposal.periods),
             tuple(
                 (slot.start.isoformat(), slot.end.isoformat(), slot.unpriced, slot.source)
@@ -1768,6 +1772,9 @@ class AutoPlannerController:
             minimum_energy_kwh=resolved.minimum_energy_kwh,
             include_current_interval=morek_planning,
             max_blocks=MOREK_MAX_BLOCKS if morek_planning else None,
+            # The time reserve (15.1a) is for the schedule-owned fixed-time profile only: a live-controlled charger
+            # can simply keep charging, so its plans are unchanged.
+            time_reserve_percent=settings.time_reserve_percent if morek_planning else 0,
             # A guest car with no departure is charged within `GUEST_WITHIN`, not the whole horizon.
             window_end=(
                 calculated_at + GUEST_WITHIN if is_guest(settings) and not settings.departure_enabled else None
@@ -1856,6 +1863,9 @@ class AutoPlannerController:
             result = ending_at_need(result)
         if gap is not None and plan_request.soft_price_cap is None:
             result = replace(result, policy_shortfall_kwh=max(0.0, energy_kwh - result.delivered_kwh))
+        if not wait_facts:
+            # After the need is final: the reserve only adds time, and never to a plan bought for missing prices.
+            result = with_time_reserve(plan_request, result)
         state: AutoState = "proposal_unpriced" if result.unpriced else "proposal_ready"
         reason: AutoReason = "unpriced" if result.unpriced else "ready"
         if wait_facts.get("price_wait_action") == "buy_now":

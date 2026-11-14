@@ -109,7 +109,7 @@ cases; no live command; truthful updates to this checklist and the handoff; the 
 binding**. Any integration or card change also needs the `custom_components/spotnav/manifest.json` bump,
 `npm run build` and `npm run check-dist` from `frontend/` (AGENTS.md), with the committed
 `custom_components/spotnav/www/` artifacts. Skip browser/Playwright and long suites unless the user asks;
-report every unrun check by name. A new i18n string needs an entry in every shipped language file (parity
+report every unrun check by name. **User restriction (2026-11-14, binding on every session): only FAST tests.** Run focused isolated module tests and quick Stage 14 regression files one at a time with a short timeout; never launch the full `tools/run_isolated_planning_tests.py` list, browser/Playwright or broad frontend/backend suites, even where a §5 list names a file, if it is expensive. Report each unrun check and why; do not call a ◆ substage fully regression-verified on that basis. A new i18n string needs an entry in every shipped language file (parity
 tooling). A docs-only change needs none of the above. No mock test establishes installed or physical
 behavior.
 
@@ -183,7 +183,7 @@ Current-behaviour claims are source reading of 2.5.128. Archive references: “S
 audit table, reconnect model, per-substage text), “Learning rules”, “Status wording”, “Active charge control
 while offline”.
 
-- [ ] **15.1a Planner time reserve — backend ◆.**
+- [x] **15.1a Planner time reserve — backend ◆.** *Locally implemented with mocked checks (2.5.129); coordinator reviewed; not installed or live-verified.* Landed as: `AutoSettings.time_reserve_percent` (stored only when ≠10), settings API/compare-and-set, `planner.with_time_reserve` (applied by the auto controller to Morek-owned plans only, after `ending_at_need`; other chargers unchanged), `PlanResult.reserve_*`/`baseline_shown_periods`/`shown_periods`, `window_release` on baseline periods, dashboard `proposal.reserve` + per-window reserve fields. The reserve is rounded up only to the dispatch resolution (1 second; the profile is sent in whole-second offsets). Reserve pieces are taken from the start of free within-cap time, never from a part-elapsed current interval unless it continues a baseline window (so nothing creeps with the clock). Stage 14 stays reserve-free: an accepted profile that carried a reserve also stores its reserve-free twin (`acknowledged.baseline`); the 5-minute SOC end tolerance (strict at ≥ 5 min, measured on the need alone) and `window_release` (accepted window and new plan) are judged on the twin/`baseline_shown_periods`, so a reserve neither turns a sub-5-minute SOC drift into a resend nor changes a release decision (a missing twin means the plain comparison). Tests: `tests/test_stage_151a_time_reserve.py`.
   *Scope:* `AutoSettings.time_reserve_percent` (int, default 10, 0–50; absent in stored records = 10;
   validated, stored and exposed through the settings API with compare-and-set). The planner multiplies the
   target-need **active time** by `1 + p/100` at the single energy→time seam, using existing partial-window

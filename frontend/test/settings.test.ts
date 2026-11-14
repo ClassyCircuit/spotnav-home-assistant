@@ -69,6 +69,16 @@ function aRecord(overrides: Partial<SettingsRecord> = {}): SettingsRecord {
   };
 }
 
+describe("time reserve passthrough (Stage 15.1a, no control yet)", () => {
+  it("accepts the backend's time_reserve_percent and carries it unchanged into a replacement body", () => {
+    const record = aRecord({ time_reserve_percent: 25 });
+    const result = decodeSettingsAnswer(success(record));
+    expect(result.ok && result.value.settings?.time_reserve_percent).toBe(25);
+    expect(encodeBody(record)).toMatchObject({ time_reserve_percent: 25 });
+    expect("time_reserve_percent" in encodeBody(aRecord({}))).toBe(false);
+  });
+});
+
 describe("price policy settings", () => {
   it("decodes and preserves the real policy fields in revision-checked replacement bodies", () => {
     const record = aRecord({ soft_price_cap: 0.1, cap_price_basis: "nord_pool", minimum_ready_by_soc: 40 });

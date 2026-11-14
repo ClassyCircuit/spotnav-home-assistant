@@ -1707,7 +1707,7 @@ def _proposal_spans(capture: CapturedDashboard) -> tuple[tuple[datetime, datetim
     proposal = None if capture.snapshot is None else capture.snapshot.proposal
     if proposal is None or proposal.reason is not None or not proposal.periods:
         return ()
-    return _spans(proposal.periods)
+    return _spans(proposal.periods_with_reserve)
 
 
 def _installed_shown(
@@ -1719,7 +1719,8 @@ def _installed_shown(
     snapshot = capture.snapshot
     proposal = None if snapshot is None else snapshot.proposal
     met = None if proposal is None or snapshot.applied is not True else _utc(proposal.need_met_at)
-    if met is None or not windows or not proposal.periods:
+    if met is None or not windows or not proposal.periods or proposal.reserve_pieces:
+        # With a time reserve the sent windows are the proposal's shown windows (reserve included): no trimming.
         return list(windows)
     start, end = windows[-1]
     first, last, planned_end = _utc(start), _utc(end), _utc(proposal.periods[-1][1])
@@ -2019,11 +2020,18 @@ def _need_progress(snapshot: AutoSnapshot | None) -> dict[str, float | None]:
 
 
 def _proposal_window_details(proposal: Any, snapshot: AutoSnapshot) -> list[dict[str, Any]] | None:
-    """Reconcile shown windows against selected slots and unrounded planner totals."""
+    """Reconcile shown windows against selected slots and unrounded planner totals.
+
+    `energy_kwh`/`cost` are the baseline the need requires (they sum to the plan's totals, the time reserve
+    never inside them); with a reserve each row also carries `reserve_minutes`, `reserve_kwh` and `reserve_cost`,
+    its separate upper allowance, so a window shown whole is never double counted."""
     power = finite_number(proposal.power_kw)
     total_energy = finite_number(proposal.delivered_kwh)
     if power is None or power <= 0 or total_energy is None or total_energy < 0:
         return None
+    baseline = [(_utc(start), _utc(end)) for start, end in proposal.baseline_shown_periods]
+    reserve = [(_utc(piece.start), _utc(piece.end), finite_number(piece.effective_minor_per_kwh))
+               for piece in proposal.reserve_pieces]
     rows: list[dict[str, Any]] = []
     for start, end in proposal.shown_periods:
         start, end = _utc(start), _utc(end)
@@ -2038,18 +2046,31 @@ def _proposal_window_details(proposal: Any, snapshot: AutoSnapshot) -> list[dict
             left, right = _utc(slot.start), _utc(slot.end)
             if left is None or right is None or right <= left:
                 return None
+            for base_start, base_end in baseline:
+                seconds = max(0.0, (min(end, right, base_end) - max(start, left, base_start)).total_seconds())
+                if not seconds:
+                    continue
+                spans.append((max(start, left, base_start), min(end, right, base_end)))
+                duration += seconds
+                part = seconds * power / 3600
+                energy += part
+                price = finite_number(slot.effective_minor_per_kwh)
+                if slot.unpriced or price is None:
+                    priced = False
+                elif priced:
+                    cost += part * price / 100
+        reserve_seconds = 0.0
+        reserve_cost = 0.0
+        for left, right, price in reserve:
             seconds = max(0.0, (min(end, right) - max(start, left)).total_seconds())
             if not seconds:
                 continue
+            if price is None:
+                return None
             spans.append((max(start, left), min(end, right)))
             duration += seconds
-            part = seconds * power / 3600
-            energy += part
-            price = finite_number(slot.effective_minor_per_kwh)
-            if slot.unpriced or price is None:
-                priced = False
-            elif priced:
-                cost += part * price / 100
+            reserve_seconds += seconds
+            reserve_cost += seconds * power / 3600 * price / 100
         cursor = start
         for left, right in sorted(spans):
             if left != cursor:
@@ -2057,8 +2078,12 @@ def _proposal_window_details(proposal: Any, snapshot: AutoSnapshot) -> list[dict
             cursor = right
         if cursor != end or abs(duration - (end - start).total_seconds()) > 0.001:
             return None
-        rows.append({"start": aware_iso(start), "end": aware_iso(end), "energy_kwh": energy,
-                     "cost": cost if priced else None})
+        row = {"start": aware_iso(start), "end": aware_iso(end), "energy_kwh": energy,
+               "cost": cost if priced else None}
+        if proposal.reserve_pieces:
+            row.update(reserve_minutes=reserve_seconds / 60, reserve_kwh=reserve_seconds * power / 3600,
+                       reserve_cost=reserve_cost if not proposal.unpriced else None)
+        rows.append(row)
     if abs(sum(row["energy_kwh"] for row in rows) - total_energy) > max(1e-6, total_energy * 1e-8):
         return None
     cost_total = finite_number(proposal.estimated_cost)
@@ -2112,7 +2137,31 @@ def _proposal_section(capture: CapturedDashboard) -> dict[str, Any] | None:
         "unpriced": proposal.unpriced,
         "unpriced_slots": proposal.unpriced_slots,
         "priced_slots": proposal.priced_slots,
+        **_reserve_fields(proposal, currency),
     }
+
+
+def _reserve_fields(proposal: Any, currency: str | None) -> dict[str, Any]:
+    """The additive time-reserve block (nothing at all when no reserve applies, so a 0 % plan is unchanged).
+
+    `planned_kwh`/`cost`/`distance_mil` above are the required baseline; `allowance` is a separately labelled
+    *upper* allowance (the reserve time at the plan's power and prices): neither measured nor expected use, and
+    never added into the baseline."""
+    if not proposal.reserve_percent:
+        return {}
+    cost = finite_number(proposal.reserve_cost)
+    return {"reserve": {
+        "percent": proposal.reserve_percent,
+        "minutes": finite_number(proposal.reserve_minutes),
+        "requested_minutes": finite_number(proposal.reserve_requested_minutes),
+        "limit": proposal.reserve_limit,
+        "periods": [{"start": aware_iso(start), "end": aware_iso(end)} for start, end in proposal.reserve_periods],
+        "allowance": {
+            "kind": "upper_allowance",
+            "energy_kwh": finite_number(proposal.reserve_energy_kwh),
+            "cost": None if cost is None or currency is None else {"value": cost, "currency": currency},
+        },
+    }}
 
 
 def _installed_section(capture: CapturedDashboard) -> dict[str, Any] | None:

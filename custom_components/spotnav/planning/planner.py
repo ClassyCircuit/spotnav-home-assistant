@@ -58,6 +58,14 @@ SHORTEST_BLOCK_SLOTS: Final = 2
 #: Most separate charging windows the Morek fixed-time profile can carry (`api/morek_schedule.profile_for`).
 MOREK_MAX_BLOCKS: Final = 3
 
+#: Time reserve (Stage 15.1a): the whole-percent bound of `PlanRequest.time_reserve_percent`, the most extra time a
+#: plan may add, and the resolution the reserve is rounded UP to. The Morek profile is dispatched in whole SECOND
+#: offsets (`api/morek_schedule.profile_for`), so the reserve is a whole number of seconds: rounding it to minutes
+#: would add up to a minute of unrequested time. (The planner does not import the dispatcher; a test pins the two.)
+MAX_TIME_RESERVE_PERCENT: Final = 50
+RESERVE_MAX: Final = timedelta(hours=2)
+RESERVE_RESOLUTION: Final = timedelta(seconds=1)
+
 #: Target-SoC slider bounds and its starting value.
 DEFAULT_TARGET_SOC_PERCENT: Final = 80
 ENERGY_SLIDER_MIN_KWH: Final = 1
@@ -562,6 +570,9 @@ class PlanRequest:
     #: A hard limit on separate windows the executor can carry, applied on top of `max_periods`, in
     #: automatic-period mode too. `None` for no executor limit.
     max_blocks: int | None = None
+    #: Extra allowed active time, a whole percent of the planned time (`with_time_reserve`). Only the caller that
+    #: applies the reserve passes it; 0 changes nothing.
+    time_reserve_percent: int = 0
 
     @property
     def planned_kw(self) -> float:
@@ -582,6 +593,9 @@ class PlanRequest:
             _refuse("invalid_periods", f"max_blocks must be between {MIN_PERIODS} and {MAX_PERIODS}")
         if not isinstance(self.include_current_interval, bool):
             _refuse("invalid_number", "include_current_interval must be a boolean")
+        if (isinstance(self.time_reserve_percent, bool) or not isinstance(self.time_reserve_percent, int)
+                or not 0 <= self.time_reserve_percent <= MAX_TIME_RESERVE_PERCENT):
+            _refuse("invalid_number", f"time_reserve_percent must be a whole number from 0 to {MAX_TIME_RESERVE_PERCENT}")
         _positive(self.requested_kwh, "invalid_energy", "requested_kwh")
         if self.minimum_energy_kwh is not None:
             minimum = _finite(self.minimum_energy_kwh, "invalid_energy", "minimum_energy_kwh")
@@ -653,6 +667,7 @@ class PlanRequest:
             partial_recheck_at=self.partial_recheck_at,
             include_current_interval=self.include_current_interval,
             max_blocks=self.max_blocks,
+            time_reserve_percent=self.time_reserve_percent,
         )
 
 
@@ -670,6 +685,26 @@ class CurrentInterval:
     end: datetime
     effective_minor_per_kwh: float
     within_cap: bool | None
+
+
+@dataclass(frozen=True, slots=True)
+class ReservePiece:
+    """One stretch of reserve time (`with_time_reserve`), with the effective price of the interval it lies in."""
+
+    start: datetime
+    end: datetime
+    effective_minor_per_kwh: float
+
+
+def _merge_spans(spans: Any) -> tuple[tuple[datetime, datetime], ...]:
+    """Sorted spans with overlapping or touching ones joined (compared as instants; the first one's zone is kept)."""
+    merged: list[tuple[datetime, datetime]] = []
+    for start, end in sorted(spans, key=lambda span: (span[0], span[1])):
+        if merged and start <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((start, end))
+    return tuple(merged)
 
 
 @dataclass(frozen=True, slots=True)
@@ -737,6 +772,39 @@ class PlanResult:
     #: Morek active-window interruption policy only; `None` means unknown, never "zero".
     current_interval: CurrentInterval | None = None
     minimum_energy_kwh: float | None = None
+    #: Time reserve (`with_time_reserve`; all zero/empty when there is none). `reserve_percent` is the setting
+    #: applied, `reserve_requested_minutes` the reserve it asked for (after the 2 h limit and rounding up),
+    #: `reserve_pieces` what fitted, and `reserve_limit` why less than asked fitted: `two_hour_limit` (the percent
+    #: asked for more than 2 h), `no_eligible_time` (no free within-cap time before the deadline) or
+    #: `window_limit` (the remaining time would have needed a window beyond the executor's/period limit).
+    #: The baseline fields above (`periods`, `slots`, `delivered_kwh`, `estimated_cost`) never include it.
+    reserve_percent: int = 0
+    reserve_requested_minutes: float = 0.0
+    reserve_pieces: tuple[ReservePiece, ...] = ()
+    reserve_limit: str | None = None
+
+    @property
+    def reserve_periods(self) -> tuple[tuple[datetime, datetime], ...]:
+        """The reserve as joined spans (they may touch a baseline window; `shown_periods` joins those too)."""
+        return _merge_spans((piece.start, piece.end) for piece in self.reserve_pieces)
+
+    @property
+    def reserve_minutes(self) -> float:
+        return sum((piece.end - piece.start).total_seconds() for piece in self.reserve_pieces) / 60
+
+    @property
+    def reserve_energy_kwh(self) -> float:
+        """Energy the reserve time could deliver at the plan's power: an upper allowance, never a measurement."""
+        return self.reserve_minutes / 60 * self.power_kw
+
+    @property
+    def reserve_cost(self) -> float | None:
+        """Cost (major unit) of the reserve time at that power and its own prices, an upper allowance; `None` when
+        the plan carries no prices."""
+        if self.unpriced:
+            return None
+        return sum((piece.end - piece.start).total_seconds() / 3600 * self.power_kw * piece.effective_minor_per_kwh
+                   for piece in self.reserve_pieces) / 100
 
     @property
     def block_limit_compromise(self) -> bool:
@@ -760,13 +828,29 @@ class PlanResult:
         return self.periods[-1][1] - timedelta(hours=extra / self.power_kw)
 
     @property
-    def shown_periods(self) -> tuple[tuple[datetime, datetime], ...]:
-        """The periods as a person is shown them: the last one ending where the need is expected to be met.
-        Legacy plans install whole slots; cap-aware plans already contain exact periods."""
+    def baseline_shown_periods(self) -> tuple[tuple[datetime, datetime], ...]:
+        """The periods the need itself requires, as a person is shown them (the last one ending where the need is
+        expected to be met), without any time reserve. What every Stage 14 `window_release` quantity is judged on."""
         met = self.need_met_at
         if met is None:
             return self.periods
         return (*self.periods[:-1], (self.periods[-1][0], met))
+
+    @property
+    def shown_periods(self) -> tuple[tuple[datetime, datetime], ...]:
+        """The periods as a person is shown them and the Morek profile is sent: the baseline plus the time reserve,
+        touching windows joined. Legacy plans install whole slots; cap-aware plans already contain exact periods."""
+        base = self.baseline_shown_periods
+        if not self.reserve_pieces:
+            return base
+        return _merge_spans((*base, *self.reserve_periods))
+
+    @property
+    def periods_with_reserve(self) -> tuple[tuple[datetime, datetime], ...]:
+        """`periods` (whole slots) plus the time reserve, for what shades the chart; `periods` itself without one."""
+        if not self.reserve_pieces:
+            return self.periods
+        return _merge_spans((*self.periods, *self.reserve_periods))
 
 
 def first_start_for(documents: tuple[PriceDocument, ...], *, now: datetime, tz: str) -> datetime:
@@ -1711,6 +1795,121 @@ def ending_at_need(result: PlanResult) -> PlanResult:
         now_cost=now_cost,
         ends_at_need=True,
     )
+
+
+def _reserve_end(request: PlanRequest, first: datetime) -> datetime:
+    """The last instant reserve time may end at: the departure (or the caller's tighter `window_end`), else the
+    horizon, as both planners bound a plan."""
+    zone = time_zones.require_zone(request.timezone)
+    end = first + timedelta(hours=HORIZON_HOURS)
+    if request.departure is not None:
+        if request.departure_date is not None:
+            end = local_instant(request.departure_date, request.departure, zone)
+        else:
+            reference = request.now if request.include_current_interval else first
+            end = min(end, resolve_departure(request.now, request.timezone, request.departure, reference))
+    if request.window_end is not None:
+        end = min(end, request.window_end)
+    return end.astimezone(timezone.utc)
+
+
+def with_time_reserve(request: PlanRequest, result: PlanResult) -> PlanResult:
+    """The plan with its time reserve (Stage 15.1a): extra allowed active time on top of the need, never extra
+    energy, price tolerance or soft-cap exception.
+
+    The reserve is `time_reserve_percent` of the plan's active time (its `baseline_shown_periods`, partial last
+    window included), rounded up only to `RESERVE_RESOLUTION` (one second, the dispatch resolution) and at most
+    `RESERVE_MAX`. It goes into the cheapest free published time before the deadline that is within the soft cap
+    (one of the last interval only up to the deadline; the part of the current interval after `now` is used only
+    where it continues a baseline window, because a piece that starts at `now` would creep forward with every
+    recalculation), cheapest price first, ties to time
+    that continues a window and then to the earliest, always taken from the start of the free time (so only a
+    switch-off instant moves with the amount), and never needs more windows than `_effective_limit`
+    allows: what fits is kept. Whether the plan is feasible was decided before and is never changed; the baseline
+    fields stay reserve-free. The result is unchanged (the same object) for 0 %, a refusal, a plan without prices
+    and a best-effort plan that is already short of its deadline.
+    """
+    percent = request.time_reserve_percent
+    if (percent <= 0 or not result.has_plan or result.unpriced or result.short_of_deadline
+            or not result.periods or result.power_kw <= 0):
+        return result
+    request = request.validated()
+    base = _merge_spans(
+        (start.astimezone(timezone.utc), end.astimezone(timezone.utc)) for start, end in result.baseline_shown_periods
+    )
+    active = sum((end - start).total_seconds() for start, end in base)
+    # Rounded before the ceiling like `slots_needed`: an exact multiple of the resolution must stay itself.
+    step = RESERVE_RESOLUTION.total_seconds()
+    wanted = timedelta(seconds=math.ceil(round(active * percent / 100 / step, _SLOT_DIGITS)) * step)
+    limit: str | None = None
+    if wanted > RESERVE_MAX:
+        wanted, limit = RESERVE_MAX, "two_hour_limit"
+    labelled = replace(result, reserve_percent=percent, reserve_requested_minutes=wanted.total_seconds() / 60,
+                       reserve_limit=limit)
+
+    now = request.now.astimezone(timezone.utc)
+    first = first_start_for(request.documents, now=request.now, tz=request.timezone).astimezone(timezone.utc)
+    end = _reserve_end(request, first)
+    rows: list[tuple[datetime, datetime, float]] = []  # (start, end, effective minor price) of eligible time
+    for row in result.horizon:
+        if request.soft_price_cap is not None and not price_within_cap(
+            row.published_major_per_kwh, cap_major_per_kwh=request.soft_price_cap,
+            basis=request.cap_price_basis, fiscal=request.fiscal, start=row.utc_start,
+        ):
+            continue
+        rows.append((row.utc_start, row.utc_end, row.effective_minor_per_kwh))
+    interval = result.current_interval
+    if (request.include_current_interval and interval is not None and interval.within_cap is not False
+            and interval.start < first and interval.start <= now < interval.end):
+        rows.append((interval.start, interval.end, interval.effective_minor_per_kwh))
+    free: list[list[Any]] = []
+    for row_start, row_end, price in rows:
+        cursor, stop = max(row_start, now), min(row_end, end)
+        # Free time that begins at `now` inside a part-elapsed interval is not anchored to anything fixed: a reserve
+        # piece there would start (or end) later at every recalculation. Only free time that follows a baseline
+        # window (or begins at a published boundary) is eligible.
+        floating = row_start < now
+        for window_start, window_end in base:
+            if window_end <= cursor or window_start >= stop:
+                continue
+            if window_start > cursor and not floating:
+                free.append([cursor, window_start, price])
+            cursor, floating = max(cursor, window_end), False
+        if cursor < stop and not floating:
+            free.append([cursor, stop, price])
+
+    block_limit = _effective_limit(request)
+    remaining = wanted
+    chosen: list[ReservePiece] = []
+    blocked = False
+    while remaining > timedelta(0) and free:
+        windows = _merge_spans((*base, *((piece.start, piece.end) for piece in chosen)))
+        best: tuple[Any, list[Any], timedelta] | None = None
+        blocked = False
+        for fragment in free:
+            take = min(remaining, fragment[1] - fragment[0])
+            joined = _merge_spans((*windows, (fragment[0], fragment[0] + take)))
+            if block_limit is not None and len(joined) > max(block_limit, len(windows)):
+                blocked = True
+                continue
+            # Cheapest first; at a price tie, time that continues a window (no new window), then the earliest.
+            extends = any(window_end == fragment[0] for _, window_end in windows)
+            key = (fragment[2], 0 if extends else 1, fragment[0])
+            if best is None or key < best[0]:
+                best = (key, fragment, take)
+        if best is None:
+            break
+        _, fragment, take = best
+        # Always from the start of the free time: a rising edge of the schedule never moves with the amount, only a
+        # switch-off instant does (the 5-minute SOC tolerance of Stage 14.3 applies to those alone).
+        chosen.append(ReservePiece(fragment[0], fragment[0] + take, fragment[2]))
+        fragment[0] = fragment[0] + take
+        if fragment[1] <= fragment[0]:
+            free.remove(fragment)
+        remaining -= take
+    if remaining > timedelta(0):
+        limit = "window_limit" if blocked else "no_eligible_time"
+    return replace(labelled, reserve_pieces=tuple(sorted(chosen, key=lambda piece: piece.start)), reserve_limit=limit)
 
 
 def _no_plan(request: PlanRequest, reason: PlannerReason) -> PlanResult:

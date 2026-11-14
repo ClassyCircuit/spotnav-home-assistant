@@ -27,6 +27,9 @@ public face, so nothing here serializes `as_dict()` or accepts `from_stored()` p
   its departure under it): left out, the stored value is kept. A plan field, as the departure is.
 * `soft_price_cap`, `cap_price_basis`, and `minimum_ready_by_soc` are additive: omitted fields retain their
   stored values, and null clears them. They are stored inputs only; the planner does not enforce them yet.
+* `time_reserve_percent` (Stage 15.1a: a whole percent, 0 to 50, 0 off, of extra allowed charging time for a Morek
+  plan) is additive: left out, the stored value is kept; a stored record without it is the default 10. `null` is
+  refused (`invalid_number`).
 * One read-only fact, `fiscal_included`: the fiscal components (`vat`, `tax`, `transfer`) the selected area's
   published price already contains (contract v2's `included`). They are locked as "included in the price" and
   nothing is added for them, whatever the overrides say. A body may echo it; it is never stored.
@@ -68,6 +71,7 @@ from ..planning.auto_settings import (
     AreaAutoSettings,
     AutoSettings,
     AutoSettingsError,
+    DEFAULT_TIME_RESERVE_PERCENT,
     FiscalOverride,
     IDENTIFY_AUTOMATIC,
     IDENTIFY_MODES,
@@ -123,6 +127,7 @@ SETTINGS_KEYS: Final = frozenset(
         "soft_price_cap",
         "cap_price_basis",
         "minimum_ready_by_soc",
+        "time_reserve_percent",
         "notifications",
         "vehicle_ids",
         "identify_mode",
@@ -138,7 +143,7 @@ OPTIONAL_SETTINGS_KEYS: Final = frozenset(
     {
         "departure_date", "departure_weekdays", "phases", "notifications", "fill_to_limit", "vehicle_ids",
         "identify_mode", "identify_camera", "users_change_plan", "if_not_ready",
-        "soft_price_cap", "cap_price_basis", "minimum_ready_by_soc",
+        "soft_price_cap", "cap_price_basis", "minimum_ready_by_soc", "time_reserve_percent",
     }
 )
 
@@ -417,6 +422,7 @@ def encode_settings(
         "soft_price_cap": settings.soft_price_cap,
         "cap_price_basis": settings.cap_price_basis,
         "minimum_ready_by_soc": settings.minimum_ready_by_soc,
+        "time_reserve_percent": settings.time_reserve_percent,
         "fiscal_included": list(included),
         "notifications": encode_notifications(settings.notifications, available),
         "vehicle_ids": None if settings.vehicle_ids is None else list(settings.vehicle_ids),
@@ -500,6 +506,11 @@ def decode_settings(raw: Any) -> AutoSettings:
         soft_price_cap=stored.get("soft_price_cap"),
         cap_price_basis=stored.get("cap_price_basis"),
         minimum_ready_by_soc=stored.get("minimum_ready_by_soc"),
+        time_reserve_percent=(
+            _whole(stored["time_reserve_percent"], "time_reserve_percent", "invalid_number")
+            if "time_reserve_percent" in stored
+            else DEFAULT_TIME_RESERVE_PERCENT
+        ),
         notifications=(
             decode_notifications(stored["notifications"]) if "notifications" in stored else NotificationSettings()
         ),
@@ -541,6 +552,7 @@ def replacement_mutator(
     keep_soft_price_cap: bool = False,
     keep_cap_price_basis: bool = False,
     keep_minimum_ready_by_soc: bool = False,
+    keep_time_reserve_percent: bool = False,
     vehicle_target: Callable[[str | None], float | None] | None = None,
 ) -> Callable[[AutoSettings], AutoSettings]:
     """A full replacement expressed as the store's own mutation hook.
@@ -596,6 +608,8 @@ def replacement_mutator(
             kept["cap_price_basis"] = current.cap_price_basis
         if keep_minimum_ready_by_soc:
             kept["minimum_ready_by_soc"] = current.minimum_ready_by_soc
+        if keep_time_reserve_percent:
+            kept["time_reserve_percent"] = current.time_reserve_percent
         if keep_auto_periods and current.max_periods is None and replacement.max_periods == MAX_PERIODS:
             kept["max_periods"] = None
         updated = replace(replacement, pause=current.pause, **kept)
@@ -924,6 +938,7 @@ def body_mutator(
         keep_soft_price_cap=left_out("soft_price_cap"),
         keep_cap_price_basis=left_out("cap_price_basis"),
         keep_minimum_ready_by_soc=left_out("minimum_ready_by_soc"),
+        keep_time_reserve_percent=left_out("time_reserve_percent"),
         vehicle_target=lambda vehicle_id: vehicle_properties.stored_properties(hass, vehicle_id).target_percent,
     )
 

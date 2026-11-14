@@ -51,6 +51,7 @@ class MorekScheduleWorker:
         self.hold_ticket = None
         self._expiry = None
         self.override_degraded = None
+        self._baseline: dict[str, Any] | None = None  # reserve-free twin of the profile `_intent` last built
         self._sync_serial = None
         self.continuity: dict[str, Any] | None = None
         self._continuity_timer = None
@@ -245,7 +246,8 @@ class MorekScheduleWorker:
         price_event = self._price_pending and not lowered
         release, reason = morek_schedule.window_release(
             self._planner.snapshot(), settings, now, profile, cap_lowered=lowered,
-            price_event=price_event, evidence=evidence)
+            price_event=price_event, evidence=evidence,
+            active_baseline=morek_schedule.acknowledged_baseline(record))
         self._price_evaluated = price_event and not release
         if release:
             self.continuity = {"evidence": evidence, "preserved": False, "until": until, "reason": reason}
@@ -318,6 +320,7 @@ class MorekScheduleWorker:
     def _intent(self, pause: dict[str, Any] | None = None, override: dict[str, Any] | None = None,
                 record: dict[str, Any] | None = None) -> tuple[dict[str, Any], str]:
         settings = domain_data(self._hass).auto_store.settings(self._entry_id)
+        self._baseline = None
         if pause is not None and pause["type"] == "pause_until_resumed":
             self.continuity = self._continuity_end = None
             profile = morek_schedule.held_off_profile(datetime.now(timezone.utc))
@@ -346,9 +349,12 @@ class MorekScheduleWorker:
             return profile, morek_schedule._preview_id(profile, [settings.revision, override["id"]])
         self.override_degraded = None
         now = datetime.now(timezone.utc)
-        profile = morek_schedule._proposed_profile(
-            self._hass, self._entry_id, now,
-            active_profile=None if pause is not None else self._continued_profile(record, settings, now))
+        continued = None if pause is not None else self._continued_profile(record, settings, now)
+        profile = morek_schedule._proposed_profile(self._hass, self._entry_id, now, active_profile=continued)
+        # The reserve-free twin (Stage 15.1a) judges SOC-only drift on the need alone; None when there is no reserve.
+        self._baseline = morek_schedule._proposed_baseline(
+            self._hass, self._entry_id, now, active_profile=continued,
+            active_baseline=morek_schedule.acknowledged_baseline(record))
         blocker = self._planner.morek_plan_blocker(self._planner.snapshot(), datetime.now(timezone.utc))
         if blocker is not None:
             raise morek_schedule.ScheduleRefused(blocker)
@@ -525,7 +531,7 @@ class MorekScheduleWorker:
                     pause_id=None if pause is None else pause["id"],
                     override_id=(record.get("charge_now") or {}).get("id") if record.get("charge_now")
                         and datetime.fromisoformat(record["charge_now"]["end"]) > datetime.now(timezone.utc) else None,
-                    force_sync=sync, end_tolerance=end_tolerance,
+                    force_sync=sync, end_tolerance=end_tolerance, baseline=lambda: self._baseline,
                     validate_durable=lambda: admission.async_owned_boundary_current(self._entry_id, connector),
                     migration_id=None if ticket is None else ticket[1])
                 return outcome, data.get("sent_at"), data.get("attempt_id")
