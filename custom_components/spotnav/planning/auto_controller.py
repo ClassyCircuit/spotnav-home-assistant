@@ -123,6 +123,7 @@ from .planner import (
     PlanRequest,
     PlanResult,
     power_kw,
+    plan_published_portion,
     price_gap,
     PriceGap,
     resolve_departure,
@@ -133,6 +134,8 @@ _LOGGER = logging.getLogger(__name__)
 
 #: Stands in for a request's `now` when telling whether a preview failure repeats: the clock moves every call.
 _FAILURE_CLOCK: Final = datetime(2000, 1, 1, tzinfo=timezone.utc)
+#: Private marker in the wait facts of a Morek plan made of published prices only (Stage 16.1); never reaches a snapshot.
+_PUBLISHED_ONLY: Final = "_published_only"
 
 
 #: A guest car with no departure is charged within this long of the calculation (`vehicles/guest.py`).
@@ -1832,6 +1835,7 @@ class AutoPlannerController:
             ),
         )
         wait_facts: dict[str, Any] = {}
+        published_only = False
         try:
             gap = price_gap(plan_request)
             if gap is not None and plan_request.soft_price_cap is not None and plan_request.departure is not None:
@@ -1856,7 +1860,8 @@ class AutoPlannerController:
                 waited = None
                 if plan_request.departure is not None:
                     waited = await self._plan_departure_by_history(
-                        plan_request, result, entry, calculated_at, preview=preview
+                        plan_request, result, entry, calculated_at, preview=preview,
+                        published_first=morek_planning,
                     )
                 if waited is None:
                     waited = self._plan_while_prices_are_missing(
@@ -1864,6 +1869,7 @@ class AutoPlannerController:
                     )
                 if waited is not None:
                     result, wait_facts, early = waited
+                    published_only = bool(wait_facts.pop(_PUBLISHED_ONLY, False))
                     if early is not None:
                         if gap is not None:
                             result = replace(result, price_coverage_end=gap.missing_from)
@@ -1914,8 +1920,10 @@ class AutoPlannerController:
             result = ending_at_need(result)
         if gap is not None and plan_request.soft_price_cap is None:
             result = replace(result, policy_shortfall_kwh=max(0.0, energy_kwh - result.delivered_kwh))
-        if not wait_facts:
+        if not wait_facts or published_only:
             # After the need is final: the reserve only adds time, and never to a plan bought for missing prices.
+            # A Morek plan made of published prices only (Stage 16.1) is priced time, so diagnostics about the
+            # unpublished hours do not skip it; only a purchase before a publication does.
             result = with_time_reserve(plan_request, result)
         state: AutoState = "proposal_unpriced" if result.unpriced else "proposal_ready"
         reason: AutoReason = "unpriced" if result.unpriced else "ready"
@@ -2040,8 +2048,15 @@ class AutoPlannerController:
         calculated_at: datetime,
         *,
         preview: bool = False,
+        published_first: bool = False,
     ) -> tuple[PlanResult, dict[str, Any], tuple[AutoState, AutoReason] | None] | None:
         """A departure (dated or daily) whose window runs past the last published price.
+
+        `published_first` (an uncapped Morek schedule-owned plan, Stage 16.1): missing future prices alone never
+        veto a plan. When the published intervals cannot hold the whole need, the published portion is planned
+        (`plan_published_portion`; the remaining need and the real deadline are unchanged). Only a history
+        comparison that clearly favours the unpublished hours, or a purchase that cannot wait (`price_wait`),
+        keeps the earlier wait/buy behaviour.
 
         A daily departure takes this path too (its deadline tomorrow morning is partly unpriced before the
         afternoon publication), but only with a usable profile: without one it returns `None` and the
@@ -2063,14 +2078,29 @@ class AutoPlannerController:
         if gap is None:
             return None
         known = calculate_plan(replace(request, window_end=gap.missing_from))
+        partial = False
         if not known.has_plan:
-            return None
+            if not published_first:
+                return None
+            published = plan_published_portion(request, gap)
+            if published is None:
+                return None
+            known, partial = published, True
         profile = await self._manager.async_profile(request.area_id)
         decision = history_wait.evaluate(request, gap, known, profile)
+        marker: dict[str, Any] = {_PUBLISHED_ONLY: True} if published_first else {}
         if request.departure_date is None:
-            return self._daily_by_history(request, refusal, entry, calculated_at, known, decision, preview=preview)
-        facts: dict[str, Any] = {"history": decision, "wait_rule": "history"}
+            return self._daily_by_history(
+                request, refusal, entry, calculated_at, known, decision, preview=preview,
+                published_first=published_first,
+            )
+        facts: dict[str, Any] = {"history": decision, "wait_rule": "history", **marker}
         if decision.outcome != "wait":
+            if partial:
+                # Only part of the need is published: whatever cannot wait is still bought as before.
+                urgent = self._urgent_purchase(request, refusal, entry, calculated_at, preview=preview)
+                if urgent is not None:
+                    return urgent
             return (known, facts, None)
 
         waited = price_wait.decide(
@@ -2083,7 +2113,7 @@ class AutoPlannerController:
         )
         if waited.action == "guarantee":
             # Waiting would miss the deadline: the published plan stands, the price given up is only the hope.
-            return (known, {"history": history_wait.unsafe(decision), "wait_rule": "history"}, None)
+            return (known, {"history": history_wait.unsafe(decision), "wait_rule": "history", **marker}, None)
         # A replan is also owed when waiting stops being safe (the latest safe start less one slot).
         if not preview:
             self._arm_wake(waited.act_by)
@@ -2100,7 +2130,7 @@ class AutoPlannerController:
         if bought.has_plan:
             return (bought, facts, None)
         # The cheapest published slots could not hold even the part that cannot wait: install the whole plan.
-        return (known, {"history": history_wait.unsafe(decision), "wait_rule": "history"}, None)
+        return (known, {"history": history_wait.unsafe(decision), "wait_rule": "history", **marker}, None)
 
     def _daily_by_history(
         self,
@@ -2112,18 +2142,31 @@ class AutoPlannerController:
         decision: history_wait.HistoryDecision,
         *,
         preview: bool = False,
+        published_first: bool = False,
     ) -> tuple[PlanResult, dict[str, Any], tuple[AutoState, AutoReason] | None] | None:
         """A daily departure: the implicit rule stands unless history says something definite.
+
+        With `published_first` (an uncapped Morek schedule-owned plan, Stage 16.1) the wait for the publication
+        is no longer the default: unless history clearly favours the unpublished hours (`wait`), the plan in the
+        published intervals (`known`: the whole need, or only the published portion) is installed as a
+        provisional plan and the publication replans it. A purchase that cannot wait (`buy_now`/`guarantee`)
+        is kept as it was.
 
         Waiting for the publication is nearly free, so history may only (1) explain a wait the implicit rule
         makes anyway (the unpublished hours are clearly cheaper), or (2) end it: the published hours are
         clearly cheaper than the expected unpublished ones, so the published plan is installed. Anything
         else (flat, no profile) returns `None`: the implicit rule, bit for bit.
         """
+        marker: dict[str, Any] = {_PUBLISHED_ONLY: True} if published_first else {}
         if decision.known_cheaper:
-            return (known, {"history": decision, "wait_rule": "history"}, None)
+            return (known, {"history": decision, "wait_rule": "history", **marker}, None)
         if decision.outcome != "wait":
-            return None
+            if not published_first:
+                return None
+            urgent = self._urgent_purchase(request, refusal, entry, calculated_at, preview=preview)
+            if urgent is not None:
+                return urgent
+            return (known, {"history": decision, "wait_rule": "history", **marker}, None)
         implicit = self._plan_while_prices_are_missing(request, refusal, entry, calculated_at, preview=preview)
         if implicit is None:
             return None
@@ -2131,6 +2174,18 @@ class AutoPlannerController:
         if early is not None and early[1] == "publication_pending":
             facts = {**facts, "history": decision, "wait_rule": "history"}
             return (result, facts, ("waiting_for_publication", "waiting_for_history"))
+        return implicit
+
+    def _urgent_purchase(
+        self, request: PlanRequest, refusal: PlanResult, entry: AreaEntry, calculated_at: datetime,
+        *, preview: bool = False,
+    ) -> tuple[PlanResult, dict[str, Any], tuple[AutoState, AutoReason] | None] | None:
+        """The implicit rule's answer when it is not a plain wait (`buy_now`, `guarantee`), else `None`.
+
+        Also arms the wake-up for the latest safe start, as the wait it replaces did."""
+        implicit = self._plan_while_prices_are_missing(request, refusal, entry, calculated_at, preview=preview)
+        if implicit is None or implicit[2] is not None:
+            return None
         return implicit
 
     def _arm_wake(self, when: datetime) -> None:

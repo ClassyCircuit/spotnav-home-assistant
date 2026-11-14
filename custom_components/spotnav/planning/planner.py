@@ -1200,6 +1200,35 @@ def price_gap(request: PlanRequest) -> PriceGap | None:
     return None
 
 
+def plan_published_portion(request: PlanRequest, gap: PriceGap) -> PlanResult | None:
+    """The part of an uncapped request the published prices can carry, or `None` when none can (Stage 16.1).
+
+    Used when the whole need does not fit before the first unpublished instant: every published whole slot,
+    plus the rest of the current interval when the request counts it, is planned. The result still states the
+    full remaining need as `requested_kwh`, and the deadline is the real one (the truncation only bounds which
+    prices are used), so the shortfall is `requested_kwh - delivered_kwh` and no deadline is claimed
+    unreachable. Unpublished time is never priced. Nothing when the need does not fit before the departure at
+    all (`gap.short`: best effort, `plan_unpriced`'s case) or when no published time is usable.
+    """
+    request = request.validated()
+    if request.soft_price_cap is not None or gap.short:
+        return None
+    per_slot = energy_per_slot_kwh(
+        request.amps, request.phases, request.voltage_between_phases_v, request.power_cap_kw
+    )
+    lead_kwh = 0.0
+    if request.include_current_interval and gap.current is not None:
+        lead_kwh = (gap.current.end - gap.current.start).total_seconds() / 3600 * request.planned_kw
+    capacity = len(gap.known) * per_slot + lead_kwh
+    kwh = min(capacity, request.requested_kwh)
+    if kwh <= _WHOLE_SLOTS_KWH:
+        return None
+    portion = calculate_plan(replace(request, requested_kwh=kwh, window_end=gap.missing_from))
+    if not portion.has_plan:
+        return None
+    return replace(portion, requested_kwh=request.requested_kwh)
+
+
 def plan_unpriced(request: PlanRequest) -> PlanResult:
     """Charge at once from the first usable slot, at unknown prices.
 

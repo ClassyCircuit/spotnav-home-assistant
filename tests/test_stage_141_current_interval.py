@@ -134,20 +134,21 @@ async def _missing_prices(world, *, soc, hours, published, departure, minutes=7)
 
 
 @pytest.mark.asyncio
-async def test_a_current_interval_that_covers_the_need_still_waits_for_unpublished_prices(monkeypatch):
-    # 10:07, tomorrow's prices unpublished, the car leaves at 08:00: waiting is safe, so nothing is charged
-    # now just because the rest of the 10:00 interval could hold a 0.33 kWh need.
+async def test_a_current_interval_that_covers_the_need_is_a_provisional_published_plan(monkeypatch):
+    # 10:07, tomorrow's prices unpublished, the car leaves at 08:00 and waiting is safe. Stage 16.1: the missing
+    # future prices alone no longer veto a plan; the cheapest published placement (the rest of the 10:00 interval,
+    # which covers the 0.33 kWh need) is a provisional plan that the publication replans.
     world = await _world(monkeypatch)
     prices = _prices()
     world.controller._manager.async_profile = AsyncMock(return_value=None)
     world.facts[0] = replace(world.facts[0], soc_percent=79.5)
-    _, snapshot = await _plan(world, prices, owned=True, soft_price_cap=None, cap_price_basis=None,
-                              minimum_ready_by_soc=None, max_periods=2, departure_enabled=True, departure=time(8))
-    assert (snapshot.state, snapshot.reason) == ("waiting_for_publication", "publication_pending")
-    assert snapshot.price_wait == "waiting" and snapshot.must_buy_kwh == 0.0
-    assert snapshot.proposal is not None and not snapshot.proposal.has_plan
-    assert snapshot.proposal.reason == "insufficient_price_horizon"
-    assert snapshot.proposal.requested_kwh < .8  # less than the rest of the current interval holds
+    now, snapshot = await _plan(world, prices, owned=True, soft_price_cap=None, cap_price_basis=None,
+                                minimum_ready_by_soc=None, max_periods=2, departure_enabled=True, departure=time(8))
+    assert (snapshot.state, snapshot.reason) == ("proposal_ready", "ready")
+    assert snapshot.price_wait is None and snapshot.must_buy_kwh is None
+    proposal = snapshot.proposal
+    assert proposal.has_plan and not proposal.unpriced and proposal.lead_kwh > 0
+    assert proposal.periods[0][0] == now and proposal.requested_kwh < .8
 
 
 @pytest.mark.asyncio

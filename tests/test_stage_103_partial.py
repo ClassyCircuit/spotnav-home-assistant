@@ -157,6 +157,7 @@ async def test_uncapped_necessary_purchase_passes_real_morek_path(monkeypatch, t
     world.area.catalogue.publication = SimpleNamespace(tz=doc.tz, local_time=time(13))
     world.controller._now = lambda: now
     world.controller._schedule_owned = AsyncMock(return_value=True)
+    world.controller._manager.async_profile = AsyncMock(return_value=None)  # no history
     world.facts[0] = replace(world.facts[0], soc_percent=0, reported_capacity_kwh=100)
     class Clock:
         now = staticmethod(lambda _: now)

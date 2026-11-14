@@ -473,7 +473,7 @@ every plug-in. Unknown prices never become zero or authorize an unpriced profile
 proof the real deadline is infeasible. Preserve the 10% reserve where it fits valid priced time; do not add
 reserve or repeated purchases beyond the remaining need through successive recalculations.
 
-- [ ] **16.1 Published-only full and partial planning ◆.** Inspect and extend the smallest production seam
+- [x] **16.1 Published-only full and partial planning ◆.** *(Locally implemented in 2.5.144 with mocked checks; coordinator reviewed. Root focused checks: 25 passed; build/dist and lint passed. Admission/UI remain 16.2; not deployed or live-verified.)* Inspect and extend the smallest production seam
   in `AutoPlannerController`, `price_gap` and existing history/wait helpers. An uncapped schedule-owned daily
   departure with incomplete future prices can produce a provisional cheapest-known plan. Support both the
   whole remaining need and a useful smaller published portion, including a part-elapsed current interval.
