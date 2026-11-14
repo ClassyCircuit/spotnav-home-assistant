@@ -918,6 +918,14 @@ def _known_intervals(gap: PriceGap) -> tuple[price_wait.KnownInterval, ...]:
     return (current, *known)
 
 
+@dataclass(frozen=True, slots=True)
+class ProgressWatch:
+    """The open charge a target calculation counted (`unknown`: its energy could not be attributed)."""
+
+    session_id: str
+    unknown: bool
+
+
 class AutoPlannerController:
     """One charger entry's Auto preview: settings in, a proposal out.
 
@@ -995,6 +1003,15 @@ class AutoPlannerController:
         self._register_unread_since: datetime | None = None
         self._reading_replan_asked = False
         self._unread_notice_cancel: Callable[[], None] | None = None
+        # Stage 17.4: what the last target calculation counted from an open session (`ProgressWatch`), the closed
+        # sessions already acted on (one replan and one ask per id), the running recovery, and the car's reading
+        # request (`set_reading_asker`, the one a target's estimate check uses). Memory only: a restart finds the
+        # flag again in its first calculation.
+        self._progress_watch: ProgressWatch | None = None
+        self._finalized_seen: list[str] = []
+        self._finalize_task: asyncio.Task[Any] | None = None
+        self._finalize_deferred: str | None = None  # a close seen while a send/Pause/Stop/recovery held it
+        self._reading_asker: Callable[[str | None], bool] | None = None
         # The last unexpected preview failure, as (error, request without its clock): a repeat of it is
         # logged at DEBUG, so a failure that every site update hits does not flood the log.
         self._last_failure: tuple[str, str, PlanRequest] | None = None
@@ -1554,6 +1571,7 @@ class AutoPlannerController:
         Only the execution facts are re-read (prices have not moved), which also covers a change at a
         window boundary where no price notification arrives. Publishes only when something changed.
         """
+        self._retry_deferred_finalization()  # a settlement or Resume may have released a held close (17.4)
         current = self._snapshot
         if current is None:
             return self.snapshot()
@@ -3395,6 +3413,8 @@ class AutoPlannerController:
     ) -> _EnergyResolution | AutoSnapshot:
         """The energy the plan should deliver: the manual figure (less energy already delivered toward
         the current departure, when trustworthy) or what a target needs from live state of charge."""
+        if not preview:  # a preview keeps nothing, so it never erases or writes the live watch (17.4)
+            self._progress_watch = None  # set again only by a calculation that counted an open session
         if settings.driver != DRIVER_TARGET_SOC:
             return self._capped_by_room(
                 settings, await self._manual_kwh_remaining(settings, calculated_at, entry, preview=preview)
@@ -3448,7 +3468,7 @@ class AutoPlannerController:
                 if waiting is not None:
                     return waiting
             adjusted = self._progress_adjusted(
-                settings, facts, calculated_at, entry, price_snapshot, target_kwh, minimum_kwh
+                settings, facts, calculated_at, entry, price_snapshot, target_kwh, minimum_kwh, preview=preview
             )
             if isinstance(adjusted, AutoSnapshot):
                 return adjusted
@@ -3504,7 +3524,7 @@ class AutoPlannerController:
                 return waiting
         if owned and wall_kwh is not None:
             adjusted = self._progress_adjusted(
-                settings, facts, calculated_at, entry, price_snapshot, wall_kwh, None
+                settings, facts, calculated_at, entry, price_snapshot, wall_kwh, None, preview=preview
             )
             if isinstance(adjusted, AutoSnapshot):
                 return adjusted
@@ -3555,6 +3575,8 @@ class AutoPlannerController:
         price_snapshot: Any,
         need_kwh: float,
         minimum_kwh: float | None,
+        *,
+        preview: bool = False,
     ) -> AutoSnapshot | tuple[float, float | None, bool]:
         """The need less measured energy delivered since the reading, counted once (14.5), and whether some
         measured energy could not be attributed (`progress_unknown`).
@@ -3587,6 +3609,10 @@ class AutoPlannerController:
             sessions, read_at=instant, plugged_in_at=plugged_in_at, vehicle_id=facts.vehicle_id or None,
             now=calculated_at,
         )
+        if not preview and open_session is not None and open_session.vehicle_id in (None, facts.vehicle_id):
+            # An open charge of this car (or of none) was counted or flagged as it stood: its close is the one
+            # event that can change the figure (17.4). The unknown part stays unknown after it closes.
+            self._progress_watch = ProgressWatch(open_session.id, progress.unknown)
         if progress.kwh <= 0:
             return need_kwh, minimum_kwh, progress.unknown
         remaining = need_kwh - progress.kwh
@@ -3998,12 +4024,22 @@ class AutoPlannerController:
             return
         self._sessions_cancel = store.add_listener(self._entry_id, self._on_sessions_changed)
 
+    def set_reading_asker(self, asker: Callable[[str | None], bool] | None) -> None:
+        """The request for a fresh reading of a car (the one the charging controller's target check uses): after a
+        finalization that leaves progress unknown, the car is asked once, never woken by this code."""
+        self._reading_asker = asker
+
     @callback
     def _on_sessions_changed(self) -> None:
-        if self._shutdown or self._plugged_in_at() is not None:
+        if self._shutdown:
+            return
+        if self._store.settings(self._entry_id).driver == DRIVER_TARGET_SOC:
+            self._note_finalization()
+            return
+        if self._plugged_in_at() is not None:
             return
         settings = self._store.settings(self._entry_id)
-        if settings.driver == DRIVER_TARGET_SOC or settings.departure_enabled:
+        if settings.departure_enabled:
             return
         stored = self._baseline()
         if stored is None or stored.met_at is None:
@@ -4012,6 +4048,73 @@ class AutoPlannerController:
         if begun is None or stored.departure_key == f"charge:{begun.astimezone(timezone.utc).isoformat()}":
             return
         self.note_connection(CHARGE_BEGUN)
+
+    def _recovery_held(self) -> bool:
+        """A Pause, a person's Stop or a send still being settled: finalization causes no calculation then."""
+        executor = self._executor
+        if executor is not None and (bool(executor.paused) or executor.pending is not None):
+            return True
+        controller = self._charger_controller()
+        return controller is not None and bool(getattr(controller, "held_off_by_person", False))
+
+    def _note_finalization(self) -> None:
+        """Stage 17.4: the open charge the last target calculation counted (or flagged unknown) has closed.
+
+        Its final total can change the *known* energy of an identified charge that began after the reading, so
+        the plan is calculated again, once per closed session id and through the ordinary path (the worker's
+        compare sends nothing for an equal schedule). Nothing here sends. A late reconciliation or any other
+        store notification is not a trigger: it never changes a session's energy, and an open session still
+        accruing is not final."""
+        watch = self._progress_watch
+        if watch is None or self._morek_energy is not True or watch.session_id in self._finalized_seen:
+            return
+        store = domain_data(self._hass).session_store
+        if store is None:
+            return
+        opened = store.open_raw(self._entry_id)
+        if opened is not None and opened.id == watch.session_id:
+            return
+        if not any(item.id == watch.session_id for item in store.closed_raw(self._entry_id)):
+            return
+        if self._recovery_held() or (self._finalize_task is not None and not self._finalize_task.done()):
+            self._finalize_deferred = watch.session_id  # retried by `_retry_deferred_finalization`, never polled
+            return
+        self._finalize_deferred = None
+        self._finalized_seen = [*self._finalized_seen[-15:], watch.session_id]
+        self._finalize_task = self._hass.async_create_task(self._async_recover_finalized())
+
+    def _retry_deferred_finalization(self) -> None:
+        """Retry a close that was held, on an existing event: an execution change (a send's settlement, Resume)
+        or the end of a running recovery. Bounded: each closed id is acted on once, nothing here sends, and
+        nothing happens while still held. A calculation made after the close has reset the watch, so the retry
+        then finds nothing to do and drops the deferral (it already counted the final energy)."""
+        deferred = self._finalize_deferred
+        if deferred is None or self._shutdown:
+            return
+        watch = self._progress_watch
+        if watch is None or watch.session_id != deferred:
+            self._finalize_deferred = None
+            return
+        self._note_finalization()
+
+    async def _async_recover_finalized(self) -> None:
+        """One calculation after a finalization. When it still reports unknown progress (the charge straddled the
+        reading or has no car, so its close does not attribute it), only a newer reading can clear that: the car is
+        asked once for it through the existing request, and the flag stays until one arrives."""
+        try:
+            snapshot = await self.async_recalculate(cause="session_finalized")
+            asker = self._reading_asker
+            if snapshot.progress_unknown and asker is not None and not self._shutdown and not self._recovery_held():
+                vehicle_id = self._store.settings(self._entry_id).target.vehicle_id
+                if vehicle_id:
+                    asker(vehicle_id)
+        except Exception as err:  # noqa: BLE001 - a failed recovery is retried by the next trigger, never raised
+            _LOGGER.warning("Planning again after a charge ended failed: %s", type(err).__name__)
+        finally:
+            # A close deferred while this ran: its turn (still never while held; each id once).
+            if self._finalize_deferred is not None:
+                self._finalize_task = None
+                self._retry_deferred_finalization()
 
     @callback
     def _on_energy_reading(self, event: Any = None) -> None:

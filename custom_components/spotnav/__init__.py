@@ -1049,6 +1049,8 @@ async def _async_setup_auto_preview(
 
     data.controller.set_reading_asker(_ask_reading)
     entry.async_on_unload(lambda: data.controller.set_reading_asker(None))
+    # Stage 17.4: the planner asks through the same request once, after a charge's close leaves progress unknown.
+    preview.set_reading_asker(_ask_reading)
 
     def _floor_inputs() -> FloorInputs | None:
         # The car the charger plans for, read as the planner reads it, with no side effect on the planner's wait.

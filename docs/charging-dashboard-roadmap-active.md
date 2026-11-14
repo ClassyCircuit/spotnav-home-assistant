@@ -566,7 +566,7 @@ input-evidence → recalculation → worker-compare path.
 | 2 | **16.2** Safe dispatch, publication continuity, partial-plan UI (existing item, scope unchanged, above) | 16.1, 17.1 |
 | 3 | 17.2 Stale SOC with trustworthy estimates — **done locally (2.5.149), awaiting coordinator commit** | 17.1; after 16.2 (same `morek_plan_blocker`) |
 | 4 | 17.3 Missing-capacity fallback — **done locally (2.5.151), awaiting coordinator commit** | 17.2 (shares the capped-energy seam) |
-| 5 | 17.4 Automatic recovery on session finalization | 17.1 |
+| 5 | 17.4 Automatic recovery on session finalization — **done locally (2.5.153), awaiting coordinator commit** | 17.1 |
 | 6 | 17.5 Exchange-rate freshness and truthful cap policy | 16.2 (one coverage judgement) |
 | 7 | 17.6 Clear blockers and end-to-end automatic recovery | 17.2–17.5 |
 
@@ -641,7 +641,7 @@ input-evidence → recalculation → worker-compare path.
   wording shown, recovers on arrival without a manual action and sends once; untrusted (4-of-5) learned data not
   used; uncapped path unchanged; dashboard `soc`/learning block consistent with the plan; minimum-SOC arithmetic
   unchanged. *Exclusions:* no capacity guessing, no learner rule change, no new setting.
-- [ ] **17.4 Automatic recovery on session finalization ◆.** *Seam (verified):* `AutoPlannerController.
+- [x] **17.4 Automatic recovery on session finalization ◆.** *Locally implemented with mocked checks (2.5.152; coordinator review/commit pending); not installed or live-verified. `_on_sessions_changed` now handles a target plan: the close of the open session the last target calculation counted or flagged (`ProgressWatch`) schedules one `async_recalculate(cause="session_finalized")`, once per closed session id, and never while Paused, person-Stopped or with a send pending. Finalization changes only the *known* energy of an identified session that began after the reading (the plan shrinks once); a straddling or car-less charge stays `progress_unknown` after its close, so there the replan is followed by one request through the existing `_ask_reading` (same wake/once-per-plug-in rules; no new wake) and the sidebar says it waits for the car's next level. A late reconciliation or sample notification is not a trigger. 2.5.153 correction: a preview no longer touches the watch; a close held by a pending send/Pause/Stop is deferred and retried once on the existing execution-change/recovery-end events (no timer; Stop release has no verified event, so that case waits for the next ordinary event; failed recalc/ask are not retried here). Tests `tests/test_stage_174_finalization_recovery.py` (18); details in the handoff.* *Seam (verified):* `AutoPlannerController.
   _on_sessions_changed` (listener on `SessionStore`, armed by `_arm_charge_watch`) returns at once for a target
   driver, so a plan made while a session was open, closing or unreconciled never replans when that session
   finalizes; today a `progress_unknown` plan persists until another trigger (reading, price, settings). *Scope:*
