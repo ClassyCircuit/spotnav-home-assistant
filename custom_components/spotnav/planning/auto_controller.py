@@ -85,6 +85,7 @@ from .auto_settings import (
 )
 from .grid_voltage import voltage_between_phases_v
 from .learned_energy import (
+    CaptureContext,
     EnergySampler,
     LearnedEnergy,
     LearnedEnergyStore,
@@ -138,6 +139,8 @@ OWNER_PREFIX: Final = "auto:"
 #: A plug-in or unplug is planned for once its status has settled this long (a connector passes
 #: through a few values on the way).
 CONNECTION_DEBOUNCE_S: Final = 5.0
+#: Stage 15.9a: the capture-only energy tick under Morek schedule ownership (one appointment, while a car is known plugged in).
+CAPTURE_TICK_S: Final = 60.0
 
 #: What `note_connection` is told when a charger that cannot report a plug-in begins a new charge.
 CHARGE_BEGUN: Final = "charge_begun"
@@ -939,6 +942,11 @@ class AutoPlannerController:
         # (`planning/learned_energy.py`).
         self._learned_energy = learned_energy
         self._energy_sampler = None if learned_energy is None else EnergySampler(learned_energy)
+        # Stage 15.9a: capture-only energy under Morek schedule ownership. Its own sampler (its own stretch start in the
+        # store), one appointment, never PlanWatch, a calculation or a send; planning ignores what it writes.
+        self._capture_sampler = None if learned_energy is None else EnergySampler(learned_energy)
+        self._capture_cancel: Callable[[], None] | None = None
+        self._capture_running = False
         self._watch_cancel: Callable[[], None] | None = None
         self._watch_due: datetime | None = None
 
@@ -1002,6 +1010,7 @@ class AutoPlannerController:
         self._drop_energy_watch()
         self._cancel_unread_notice()
         self._cancel_watch()
+        self._cancel_capture()
         if self._count_save_cancel is not None:
             self._count_save_cancel()
             self._count_save_cancel = None
@@ -2365,6 +2374,144 @@ class AutoPlannerController:
             capacity_kwh=None if facts is None else facts.reported_capacity_kwh,
             charging=bool(controller.charging),
         )
+
+    def _arm_capture(self) -> None:
+        """Keep the one appointment of the capture-only energy tick (Stage 15.9a) while a car is known plugged in; a
+        calculation's publication (which follows every plug-in, ownership change and settings change) restarts it. Arms
+        nothing without a learned-energy store, an executor, a known connection or after shutdown; never sends."""
+        try:
+            if self._shutdown or self._capture_sampler is None or self._capture_cancel is not None:
+                return
+            if self._capture_running:
+                return
+            controller = self._charger_controller()
+            if controller is None or controller.known_connected is not True:
+                return
+            self._capture_cancel = self._manager.schedule_at(
+                self._now() + timedelta(seconds=CAPTURE_TICK_S), self._on_capture_due
+            )
+        except Exception:  # noqa: BLE001 - a capture is a convenience, never worth a calculation
+            _LOGGER.debug("Arming the energy capture failed", exc_info=True)
+
+    def _cancel_capture(self) -> None:
+        if self._capture_cancel is not None:
+            self._capture_cancel()
+        self._capture_cancel = None
+
+    @callback
+    def _on_capture_due(self, _now: datetime) -> None:
+        self._capture_cancel = None
+        if self._shutdown or self._capture_running:
+            return
+        self._capture_running = True
+        self._hass.async_create_task(self._async_capture_tick())
+
+    async def _async_capture_tick(self) -> None:
+        """One capture-only look, only while Morek schedule ownership holds (never for a guest car). It writes captures
+        into the learned-energy store and nothing else: no PlanWatch, no `async_recalculate()`, no send. Re-armed only
+        while owned (an ownership change plans again, which arms it)."""
+        keep = False
+        try:
+            settings = self._effective(self._store.settings(self._entry_id))
+            owned = await self._morek_owned(settings)
+            sampler = self._capture_sampler
+            if self._shutdown or sampler is None:
+                return
+            store = self._learned_energy
+            if not owned or is_guest(settings):
+                # Another owner (or a guest car): nothing is sampled, and a stretch begun before is left discarded.
+                if store is not None:
+                    store.set_capture_anchor(None)
+                    store.set_capture_open(None)
+                return
+            keep = True
+            self._capture_energy(sampler, settings)
+        except Exception:  # noqa: BLE001 - learning is a convenience, never worth anything else
+            _LOGGER.debug("Capturing the energy per percent failed", exc_info=True)
+        finally:
+            self._capture_running = False
+            if keep and not self._shutdown:
+                self._arm_capture()
+
+    def _capture_energy(self, sampler: EnergySampler, settings: AutoSettings) -> None:
+        """One capture look from facts the charger's own controller keeps whoever owns the schedule (it observes the
+        connection and charge state itself): the plug-in it counts from (`plugged_in_for_count`, `None` unless the car is
+        known connected, a car found plugged in after a gap counting as a new plug-in), the charge state, the energy
+        register (and when it posted), and the identified car's non-estimated level with its own report time."""
+        controller = self._charger_controller()
+        if controller is None:
+            return
+        now = self._now()
+        facts = None if self._vehicle_reader is None else self._vehicle_reader(settings.target.vehicle_id or "")
+        checked, identified = self._notification_vehicle()
+        # Only the car the charger identified: a level read for another car is never this plug-in's.
+        vehicle_id = facts.vehicle_id if facts is not None and checked and identified == facts.vehicle_id else None
+        plugged = controller.plugged_in_for_count
+        entity_id = self._energy_register_entity_id()
+        reading = self._read_energy_register()
+        state = None if entity_id is None else self._hass.states.get(entity_id)
+        reading_at = None if state is None or reading is None else max(state.last_changed, state.last_reported)
+        try:
+            held = self._held_by_spotnav(controller, settings.amps or 0) is not None
+        except Exception:  # noqa: BLE001 - unknown is flagged as held, not clean
+            held = True
+        try:
+            paused = bool(self._executor.paused if self._executor is not None else False) or bool(
+                controller.held_off_by_person
+            )
+            phases: int | None = effective_phases(self._hass, self._entry_id)
+            voltage: float | None = voltage_between_phases_v(self._hass, self._entry_id)
+        except Exception:  # noqa: BLE001 - what cannot be read is recorded as missing
+            paused, phases, voltage = True, None, None
+        context = CaptureContext(
+            register_entity=entity_id if reading is not None else None,
+            phases=phases,
+            voltage_v=voltage,
+            plug_in_basis=None if plugged is None else (
+                "watched" if controller.plugged_in_since is not None else "found_connected"
+            ),
+            held=held,
+            paused=paused,
+            soc_report_at=None if facts is None else facts.soc_report_at,
+            soc_time_basis=None if facts is None else facts.soc_time_basis,
+            late_energy=self._capture_late_energy,
+        )
+        sampler.observe_capture(
+            now,
+            vehicle_id=vehicle_id,
+            session=None if plugged is None else f"plug_in:{plugged.isoformat()}",
+            soc=SocSeen(
+                soc_percent=None if facts is None else facts.soc_percent,
+                age_s=None if facts is None else facts.soc_age_s,
+                estimated=facts is not None and facts.soc_estimated,
+                source=None if facts is None else facts.soc_source,
+            ),
+            register_kwh=reading,
+            register_posted_at=reading_at,
+            capacity_kwh=None if facts is None else facts.reported_capacity_kwh,
+            charging=bool(controller.charging),
+            context=context,
+        )
+
+    def _capture_late_energy(self, start: datetime, end: datetime) -> str:
+        """Whether the sessions that overlap a captured stretch are known clean of unplaced late energy (15.8): `clean`
+        only when each is `consistent`; `unplaced` or `uncertain` as the reconciliation says; else `unknown`, which Stage
+        15.9b rejects like the others. A record not yet reconciled (or none) is never taken as clean."""
+        store = domain_data(self._hass).session_store
+        if store is None:
+            return "unknown"
+        overlapping = [
+            session for session in store.all_sessions(self._entry_id)
+            if session.start <= end and (session.end is None or session.end >= start)
+        ]
+        if not overlapping:
+            return "unknown"
+        states = [(session.late or {}).get("state") for session in overlapping]
+        if any(state == "uncertain" for state in states):
+            return "uncertain"
+        if any(session.unplaced_late_kwh for session in overlapping):
+            return "unplaced"
+        return "clean" if all(state == "consistent" for state in states) else "unknown"
 
     @staticmethod
     def _car_ending(controller: Any) -> bool:
@@ -3751,6 +3898,7 @@ class AutoPlannerController:
             if snapshot.settings_revision != self._store.settings(self._entry_id).revision:
                 return
         self._snapshot = snapshot
+        self._arm_capture()
         for listener in list(self._publication_listeners):
             self._deliver(listener, snapshot)
         key = snapshot.meaningful_key()

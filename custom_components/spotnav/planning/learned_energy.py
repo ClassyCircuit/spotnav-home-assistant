@@ -34,6 +34,11 @@ level before and after a stretch of charging only one number can be seen: wall k
   learned power and the behind-plan rule use), so only charges of an Auto plan are learned from.
 * **Stored** per charger (`spotnav.learned_energy.<entry>`), keyed by car, and read as untrusted: anything
   malformed is dropped, and a file that cannot be read starts empty.
+* **Captured** (Stage 15.9a, capture-only). Under Morek schedule ownership a bounded 60 s tick
+  (`AutoPlannerController._capture_energy`) feeds `EnergySampler.observe_capture`, which writes stretches as
+  `Capture` records (`origin: morek_capture`) with their provenance into the same store, apart from the samples. A
+  capture is **never read by `LearnedEnergyStore.learned()` or anything the planner uses**: Stage 15.9b revalidates
+  and promotes captures; until then they only accrue. The legacy path above is unchanged.
 """
 
 from __future__ import annotations
@@ -41,9 +46,9 @@ from __future__ import annotations
 import logging
 import math
 import statistics
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Final
+from typing import Any, Callable, Final
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
@@ -79,6 +84,14 @@ SAVE_DELAY_S: Final = 30.0
 #: Bounds on what is stored: identifiers, and the count of discarded samples.
 _MAX_ID_LEN: Final = 128
 _MAX_DISCARDED: Final = 1_000_000
+#: Stage 15.9a capture-only records: the tag, the schema version, how many are kept per car and for how long.
+ORIGIN_CAPTURE: Final = "morek_capture"
+CAPTURE_VERSION: Final = 1
+MAX_CAPTURES: Final = 12
+CAPTURE_MAX_AGE: Final = timedelta(days=120)
+#: Looks further apart than this (s) inside one stretch are counted as a gap in the provenance.
+CAPTURE_GAP_S: Final = 150.0
+_MAX_COUNT: Final = 1_000_000
 
 
 def fits(kwh_per_percent: float, capacity_kwh: float | None) -> bool:
@@ -110,7 +123,8 @@ class EnergySample:
 
     @staticmethod
     def from_stored(raw: Any) -> EnergySample | None:
-        if not isinstance(raw, dict):
+        if not isinstance(raw, dict) or "origin" in raw:
+            # A tagged record is a capture, never a sample the planner may trust (Stage 15.9a): fail closed.
             return None
         ident, kwh, delta, at = raw.get("id"), raw.get("kwh"), raw.get("delta_percent"), _when(raw.get("at"))
         if not _ident(ident) or at is None or not _finite_positive(kwh) or not _finite(delta):
@@ -158,6 +172,132 @@ class Anchor:
         return Anchor(
             vehicle_id=vehicle, session=session, soc_percent=float(soc), at=at, kwh=float(kwh), source=source
         )
+
+
+_QUALITY_KEYS: Final = (
+    "looks", "gaps", "max_gap_s", "restarts", "not_charging_looks", "held_looks", "paused_looks", "unposted_looks",
+)
+_ENUMS: Final = {
+    "register_basis_start": ("interpolated", "held"),
+    "register_basis_end": ("interpolated", "held"),
+    "plug_in_basis": ("watched", "found_connected"),
+    "soc_time_basis": ("vehicle_timestamp", "last_updated"),
+    "late_energy": ("clean", "unplaced", "uncertain", "unknown"),
+}
+_META_STRINGS: Final = ("soc_source", "register_entity")
+_META_NUMBERS: Final = ("soc_start", "soc_end", "register_start_kwh", "register_end_kwh", "capacity_kwh", "voltage_v")
+_META_TIMES: Final = ("soc_start_at", "soc_end_at")
+#: What Stage 15.9b needs from a capture before it may promote it: a capture lacking any is listed in `missing`.
+REQUIRED_META: Final = (
+    "soc_source", "soc_time_basis", "soc_start", "soc_end", "soc_start_at", "soc_end_at", "register_entity",
+    "register_start_kwh", "register_end_kwh", "register_basis_start", "register_basis_end", "capacity_kwh",
+    "phases", "voltage_v", "plug_in_basis", "late_energy",
+)
+
+
+def _clean_quality(raw: Any) -> dict[str, int] | None:
+    """The provenance counters, exactly as written: any other shape is not a capture's quality (`None`)."""
+    if not isinstance(raw, dict) or set(raw) != set(_QUALITY_KEYS):
+        return None
+    for key in _QUALITY_KEYS:
+        value = raw[key]
+        if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= _MAX_COUNT:
+            return None
+    return {key: raw[key] for key in _QUALITY_KEYS}
+
+
+def clean_meta(raw: Any) -> dict[str, Any] | None:
+    """A capture's provenance read as untrusted: bounded, typed, unknown keys dropped, `missing` recomputed (never
+    taken from the file). `None` (the capture is dropped) when the quality counters are not exactly what this writes."""
+    if not isinstance(raw, dict) or raw.get("v") != CAPTURE_VERSION:
+        return None
+    quality = _clean_quality(raw.get("quality"))
+    if quality is None:
+        return None
+    meta: dict[str, Any] = {"v": CAPTURE_VERSION, "quality": quality}
+    for key in _META_STRINGS:
+        value = raw.get(key)
+        meta[key] = value if _ident(value) else None
+    for key in _META_NUMBERS:
+        value = raw.get(key)
+        meta[key] = float(value) if _finite(value) else None
+    for key in _META_TIMES:
+        parsed = _when(raw.get(key))
+        meta[key] = None if parsed is None else parsed.isoformat()
+    phases = raw.get("phases")
+    meta["phases"] = phases if isinstance(phases, int) and not isinstance(phases, bool) and 1 <= phases <= 3 else None
+    for key, allowed in _ENUMS.items():
+        value = raw.get(key)
+        meta[key] = value if value in allowed else None
+    meta["missing"] = [key for key in REQUIRED_META if meta.get(key) is None]
+    return meta
+
+
+@dataclass(frozen=True, slots=True)
+class Capture:
+    """One capture-only stretch (Stage 15.9a): what a sample holds, tagged `origin: morek_capture`, plus the provenance
+    Stage 15.9b needs to revalidate it. Nothing the planner reads."""
+
+    id: str
+    kwh: float
+    delta_percent: float
+    at: datetime
+    meta: dict[str, Any]
+
+    @property
+    def kwh_per_percent(self) -> float:
+        return self.kwh / self.delta_percent
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "origin": ORIGIN_CAPTURE, "id": self.id, "kwh": self.kwh, "delta_percent": self.delta_percent,
+            "at": self.at.isoformat(), "meta": self.meta,
+        }
+
+    @staticmethod
+    def from_stored(raw: Any) -> Capture | None:
+        if not isinstance(raw, dict) or raw.get("origin") != ORIGIN_CAPTURE:
+            return None  # an unknown or missing origin is not a capture: fail closed
+        ident, kwh, delta, at = raw.get("id"), raw.get("kwh"), raw.get("delta_percent"), _when(raw.get("at"))
+        if not _ident(ident) or at is None or not _finite_positive(kwh) or not _finite(delta):
+            return None
+        if not MIN_DELTA_PERCENT <= float(delta) <= 100.0:
+            return None
+        meta = clean_meta(raw.get("meta"))
+        if meta is None:
+            return None
+        return Capture(id=ident, kwh=float(kwh), delta_percent=float(delta), at=at, meta=meta)
+
+
+@dataclass(frozen=True, slots=True)
+class CaptureAnchor:
+    """A capture stretch's start: the `Anchor` and what was true there, with the counters of what happened since."""
+
+    anchor: Anchor
+    meta: dict[str, Any]
+
+    def identity(self) -> tuple[Any, ...]:
+        """What must stay the same for the stretch to go on; any change discards it (starts again)."""
+        meta = self.meta
+        return (
+            self.anchor.vehicle_id, self.anchor.session, self.anchor.source, meta.get("capacity_kwh"),
+            meta.get("register_entity"), meta.get("phases"), meta.get("voltage_v"), meta.get("plug_in_basis"),
+        )
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"anchor": self.anchor.as_dict(), "meta": self.meta}
+
+    @staticmethod
+    def from_stored(raw: Any) -> CaptureAnchor | None:
+        if not isinstance(raw, dict):
+            return None
+        anchor = Anchor.from_stored(raw.get("anchor"))
+        meta = clean_meta(raw.get("meta"))
+        last = _when(raw.get("meta", {}).get("last_look_at")) if isinstance(raw.get("meta"), dict) else None
+        if anchor is None or meta is None:
+            return None
+        meta["last_look_at"] = None if last is None else last.isoformat()
+        return CaptureAnchor(anchor, meta)
 
 
 @dataclass(frozen=True, slots=True)
@@ -226,6 +366,9 @@ class _Car:
     discarded: int = 0
     #: The last plug-in whose sample was discarded, so a stretch that stays out of bounds is counted once.
     discarded_session: str | None = None
+    #: Stage 15.9a capture-only stretches: apart from `samples`, never read by `learned()`.
+    captures: list[Capture] = field(default_factory=list)
+    captures_discarded: int = 0
 
 
 class LearnedEnergyStore:
@@ -237,6 +380,9 @@ class LearnedEnergyStore:
         self.anchor: Anchor | None = None
         #: The plug-in (car, plug-in) last seen going on: its sample is not counted until it ends.
         self.open: tuple[str, str] | None = None
+        #: The capture stretch's own start and open plug-in (Stage 15.9a): never the legacy `anchor`/`open`.
+        self.capture_anchor: CaptureAnchor | None = None
+        self.capture_open: tuple[str, str] | None = None
 
     async def async_load(self) -> None:
         """Read what was stored; anything that is not exactly what this writes is dropped. A file that cannot be read
@@ -249,6 +395,7 @@ class LearnedEnergyStore:
             )
             raw = None
         self._cars, self.anchor, self.open = parse_stored(raw)
+        self.capture_anchor, self.capture_open = parse_captures(raw, self._cars)
 
     @staticmethod
     async def async_remove_stored(hass: HomeAssistant, entry_id: str) -> None:
@@ -292,6 +439,35 @@ class LearnedEnergyStore:
         self._save()
         return True
 
+    def captures(self, vehicle_id: str) -> tuple[Capture, ...]:
+        """The capture-only stretches of one car (diagnostics and Stage 15.9b's revalidation; never the planner)."""
+        car = self._cars.get(vehicle_id)
+        return () if car is None else tuple(car.captures)
+
+    def put_capture(self, vehicle_id: str, capture: Capture, capacity_kwh: float | None) -> bool:
+        """Keep `capture` as its plug-in's capture (replacing that plug-in's shorter one), within bounds and retention;
+        a stretch out of bounds is not kept and is counted. Touches nothing the planner reads."""
+        car = self._cars.setdefault(vehicle_id, _Car(samples=[]))
+        others = [kept for kept in car.captures if kept.id != capture.id and kept.at >= capture.at - CAPTURE_MAX_AGE]
+        if not fits(capture.kwh_per_percent, capacity_kwh):
+            car.captures = others
+            car.captures_discarded = min(_MAX_DISCARDED, car.captures_discarded + 1)
+            self._save()
+            return False
+        car.captures = [*others, capture][-MAX_CAPTURES:]
+        self._save()
+        return True
+
+    def set_capture_anchor(self, anchor: CaptureAnchor | None) -> None:
+        if anchor != self.capture_anchor:
+            self.capture_anchor = anchor
+            self._save()
+
+    def set_capture_open(self, plug_in: tuple[str, str] | None) -> None:
+        if plug_in != self.capture_open:
+            self.capture_open = plug_in
+            self._save()
+
     def set_anchor(self, anchor: Anchor | None) -> None:
         if anchor != self.anchor:
             self.anchor = anchor
@@ -306,18 +482,30 @@ class LearnedEnergyStore:
         self._store.async_delay_save(self._to_store, SAVE_DELAY_S)
 
     def _to_store(self) -> dict[str, Any]:
-        return {
+        stored: dict[str, Any] = {
             "vehicles": {
                 vehicle_id: {
                     "samples": [sample.as_dict() for sample in car.samples],
                     "discarded": car.discarded,
                     "discarded_session": car.discarded_session,
+                    **(
+                        {"captures": [c.as_dict() for c in car.captures], "captures_discarded": car.captures_discarded}
+                        if car.captures or car.captures_discarded else {}
+                    ),
                 }
                 for vehicle_id, car in self._cars.items()
             },
             "anchor": None if self.anchor is None else self.anchor.as_dict(),
             "open": None if self.open is None else {"vehicle_id": self.open[0], "session": self.open[1]},
         }
+        if self.capture_anchor is not None or self.capture_open is not None:
+            stored["capture"] = {
+                "anchor": None if self.capture_anchor is None else self.capture_anchor.as_dict(),
+                "open": None if self.capture_open is None else {
+                    "vehicle_id": self.capture_open[0], "session": self.capture_open[1],
+                },
+            }
+        return stored
 
 
 @dataclass(frozen=True, slots=True)
@@ -340,6 +528,23 @@ class SocSeen:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class CaptureContext:
+    """What one capture look knows beyond the level and the count (Stage 15.9a): where the count is read, the wiring,
+    how the plug-in is known, whether the charge is held or paused now, when and on what basis the level was reported,
+    and how to tell whether energy of a stretch is clean of unplaced late energy (`None`: unknown)."""
+
+    register_entity: str | None
+    phases: int | None
+    voltage_v: float | None
+    plug_in_basis: str | None
+    held: bool
+    paused: bool
+    soc_report_at: datetime | None
+    soc_time_basis: str | None
+    late_energy: Callable[[datetime, datetime], str] | None = None
+
+
 class EnergySampler:
     """Turns the once-a-minute looks into samples for the store (see the module docstring)."""
 
@@ -348,6 +553,8 @@ class EnergySampler:
         #: The register's values by when they were posted, and by when they were looked at.
         self._posts: dict[datetime, float] = {}
         self._looks: list[tuple[datetime, float]] = []
+        #: Whether this process has made a capture look yet: the first one after a restart marks the stretch.
+        self._capture_seen = False
 
     def observe(
         self,
@@ -402,6 +609,149 @@ class EnergySampler:
         if delta >= MIN_DELTA_PERCENT and energy > 0:
             self._store.put(vehicle_id, EnergySample(session, energy, delta, made_at), capacity_kwh)
 
+    def observe_capture(
+        self,
+        now: datetime,
+        *,
+        vehicle_id: str | None,
+        session: str | None,
+        soc: SocSeen,
+        register_kwh: float | None,
+        register_posted_at: datetime | None,
+        capacity_kwh: float | None,
+        charging: bool,
+        context: CaptureContext,
+    ) -> None:
+        """One capture look (Stage 15.9a). Same stretch rules as `observe`, kept apart: its own start in the store, a
+        capture written with its provenance, nothing a plan reads. A level counts only at the time the car reported it
+        (never when it arrived), from a source whose time is known; a change of car, source, battery size, register,
+        wiring or the way the plug-in is known starts the stretch again (the discarded stretch leaves no capture)."""
+        resumed = not self._capture_seen
+        self._capture_seen = True
+        self._remember(now, register_kwh, register_posted_at)
+        store = self._store
+        if not session:
+            store.set_capture_anchor(None)
+            store.set_capture_open(None)
+            return
+        if not vehicle_id:
+            store.set_capture_anchor(None)
+            return
+        store.set_capture_open((vehicle_id, session))
+        held = store.capture_anchor
+        identity = (
+            vehicle_id, session, soc.source, capacity_kwh, context.register_entity, context.phases, context.voltage_v,
+            context.plug_in_basis,
+        )
+        if held is not None and (held.identity() != identity or (
+            register_kwh is not None and register_kwh < held.anchor.kwh - REGISTER_TOLERANCE_KWH
+        )):
+            held = None
+        if held is not None:
+            held = self._looked(held, now, charging, register_posted_at, context, resumed)
+        made_at = self._endpoint_time(now, soc, context)
+        if register_kwh is None or context.register_entity is None or not soc.fresh or made_at is None:
+            store.set_capture_anchor(held)
+            return
+        assert soc.soc_percent is not None
+        kwh, basis = self._value_and_basis(made_at, now, register_kwh, charging=charging)
+        if kwh is None or basis is None:
+            store.set_capture_anchor(held)
+            return
+        if held is None or soc.soc_percent < held.anchor.soc_percent or kwh < held.anchor.kwh - REGISTER_TOLERANCE_KWH:
+            store.set_capture_anchor(self._started(
+                Anchor(vehicle_id, session, soc.soc_percent, made_at, kwh, soc.source), now, basis, capacity_kwh,
+                charging, register_posted_at, context,
+            ))
+            return
+        store.set_capture_anchor(held)
+        if made_at <= held.anchor.at:
+            return
+        delta = soc.soc_percent - held.anchor.soc_percent
+        energy = kwh - held.anchor.kwh
+        if delta < MIN_DELTA_PERCENT or energy <= 0:
+            return
+        start = held.meta
+        meta: dict[str, Any] = {
+            "v": CAPTURE_VERSION,
+            "soc_source": soc.source,
+            "soc_time_basis": context.soc_time_basis,
+            "soc_start": held.anchor.soc_percent,
+            "soc_end": soc.soc_percent,
+            "soc_start_at": held.anchor.at.isoformat(),
+            "soc_end_at": made_at.isoformat(),
+            "register_entity": context.register_entity,
+            "register_start_kwh": held.anchor.kwh,
+            "register_end_kwh": kwh,
+            "register_basis_start": start.get("register_basis_start"),
+            "register_basis_end": basis,
+            "capacity_kwh": capacity_kwh,
+            "phases": context.phases,
+            "voltage_v": context.voltage_v,
+            "plug_in_basis": context.plug_in_basis,
+            "late_energy": "unknown",
+            "quality": dict(start["quality"]),
+        }
+        if context.late_energy is not None:
+            try:
+                meta["late_energy"] = context.late_energy(held.anchor.at, made_at)
+            except Exception:  # noqa: BLE001 - unknown is the safe answer, never clean
+                meta["late_energy"] = "unknown"
+        cleaned = clean_meta(meta)
+        if cleaned is None:
+            return
+        store.put_capture(vehicle_id, Capture(session, energy, delta, made_at, cleaned), capacity_kwh)
+
+    @staticmethod
+    def _endpoint_time(now: datetime, soc: SocSeen, context: CaptureContext) -> datetime | None:
+        """When the car's level was made: the car's own report time, never the time it arrived. `None` (no endpoint)
+        when the report time is not known: a vehicle level stamped only by when Home Assistant wrote it is arrival."""
+        if soc.age_s is None:
+            return None
+        if context.soc_time_basis == "vehicle_timestamp":
+            reported = context.soc_report_at
+            if reported is None or reported.tzinfo is None or reported > now + timedelta(seconds=60):
+                return None
+            return reported
+        if soc.source == "charger" and context.soc_time_basis in (None, "last_updated"):
+            return now - timedelta(seconds=soc.age_s)
+        return None
+
+    @staticmethod
+    def _counters(meta: dict[str, Any], now: datetime, charging: bool, posted_at: datetime | None,
+                  context: CaptureContext, *, resumed: bool = False) -> dict[str, Any]:
+        quality = dict(meta["quality"])
+        last = _when(meta.get("last_look_at"))
+        quality["looks"] = min(_MAX_COUNT, quality["looks"] + 1)
+        if last is not None:
+            gap = (now - last).total_seconds()
+            if gap < 0 or gap > CAPTURE_GAP_S:
+                quality["gaps"] = min(_MAX_COUNT, quality["gaps"] + 1)
+                quality["max_gap_s"] = min(_MAX_COUNT, max(quality["max_gap_s"], int(abs(gap))))
+        if resumed:
+            quality["restarts"] = min(_MAX_COUNT, quality["restarts"] + 1)
+        for key, hit in (
+            ("not_charging_looks", not charging), ("held_looks", context.held), ("paused_looks", context.paused),
+            ("unposted_looks", posted_at is None),
+        ):
+            if hit:
+                quality[key] = min(_MAX_COUNT, quality[key] + 1)
+        return {**meta, "quality": quality, "last_look_at": now.isoformat()}
+
+    def _looked(self, held: CaptureAnchor, now: datetime, charging: bool, posted_at: datetime | None,
+                context: CaptureContext, resumed: bool) -> CaptureAnchor:
+        return CaptureAnchor(held.anchor, self._counters(held.meta, now, charging, posted_at, context, resumed=resumed))
+
+    def _started(self, anchor: Anchor, now: datetime, basis: str, capacity_kwh: float | None, charging: bool,
+                 posted_at: datetime | None, context: CaptureContext) -> CaptureAnchor:
+        quality = dict.fromkeys(_QUALITY_KEYS, 0)
+        meta = {
+            "v": CAPTURE_VERSION, "quality": quality, "capacity_kwh": capacity_kwh,
+            "register_entity": context.register_entity, "phases": context.phases, "voltage_v": context.voltage_v,
+            "plug_in_basis": context.plug_in_basis, "register_basis_start": basis, "last_look_at": None,
+        }
+        return CaptureAnchor(anchor, self._counters(meta, now, charging, posted_at, context))
+
     def _remember(self, now: datetime, register_kwh: float | None, posted_at: datetime | None) -> None:
         horizon = now - timedelta(seconds=HISTORY_S)
         if register_kwh is not None:
@@ -409,6 +759,16 @@ class EnergySampler:
             self._looks.append((now, register_kwh))
         self._posts = {at: value for at, value in self._posts.items() if at >= horizon}
         self._looks = [(at, value) for at, value in self._looks if at >= horizon]
+
+    def _value_and_basis(
+        self, made_at: datetime, now: datetime, register_kwh: float, *, charging: bool
+    ) -> tuple[float | None, str | None]:
+        """`_value_at` with how the value was found: `interpolated` between posts, or `held` (not charging)."""
+        value = register_value_at(self._posts.items(), made_at, now)
+        if value is not None:
+            return value, "interpolated"
+        held = self._value_at(made_at, now, register_kwh, charging=charging)
+        return (None, None) if held is None else (held, "held")
 
     def _value_at(self, made_at: datetime, now: datetime, register_kwh: float, *, charging: bool) -> float | None:
         """The count when the level was made: interpolated between the register's posts while it posts steadily,
@@ -453,6 +813,33 @@ def parse_stored(raw: Any) -> tuple[dict[str, _Car], Anchor | None, tuple[str, s
     if isinstance(stored_open, dict) and _ident(stored_open.get("vehicle_id")) and _ident(stored_open.get("session")):
         plug_in = (stored_open["vehicle_id"], stored_open["session"])
     return cars, Anchor.from_stored(raw.get("anchor")), plug_in
+
+
+def parse_captures(
+    raw: Any, cars: dict[str, _Car]
+) -> tuple[CaptureAnchor | None, tuple[str, str] | None]:
+    """Fill each car's captures from what was stored (anything malformed, or tagged otherwise, is dropped), and return
+    the capture stretch's start and open plug-in. Separate from `parse_stored`, which the legacy path reads."""
+    if not isinstance(raw, dict):
+        return None, None
+    vehicles = raw.get("vehicles")
+    if isinstance(vehicles, dict):
+        for vehicle_id, item in vehicles.items():
+            car = cars.get(vehicle_id)
+            if car is None or not isinstance(item, dict) or not isinstance(item.get("captures"), list):
+                continue
+            kept = [c for c in (Capture.from_stored(entry) for entry in item["captures"]) if c is not None]
+            car.captures = kept[-MAX_CAPTURES:]
+            count = item.get("captures_discarded")
+            car.captures_discarded = int(count) if _finite(count) and 0 <= count <= _MAX_DISCARDED else 0
+    block = raw.get("capture")
+    if not isinstance(block, dict):
+        return None, None
+    stored_open = block.get("open")
+    plug_in = None
+    if isinstance(stored_open, dict) and _ident(stored_open.get("vehicle_id")) and _ident(stored_open.get("session")):
+        plug_in = (stored_open["vehicle_id"], stored_open["session"])
+    return CaptureAnchor.from_stored(block.get("anchor")), plug_in
 
 
 def with_learned(learned: LearnedEnergy, capacity_kwh: float | None) -> float | None:

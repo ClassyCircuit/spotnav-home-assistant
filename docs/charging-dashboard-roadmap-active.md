@@ -384,7 +384,7 @@ while offline”.
   outcomes identical before/after with and without a reconciled session; no replan, trigger or send results.
   *Exclusions:* no timeline backfill, no charger command, no new store beyond additive fields, no claim of when
   the energy occurred.
-- [ ] **15.9a Energy learner fed on the Morek path ◆ (former 11.1, part 1).** *Scope:* under Morek schedule
+- [x] **15.9a Energy learner fed on the Morek path ◆ (former 11.1, part 1).** *Locally implemented, capture-only, with mocked checks (2.5.140); coordinator reviewed; not installed or live-verified. Landed as `AutoPlannerController._capture_energy` (60 s `@callback` tick, Morek-owned only), `EnergySampler.observe_capture`, `Capture`/`CaptureAnchor` in `planning/learned_energy.py`; tests `tests/test_stage_159a_energy_capture.py`. Limits in the handoff: controller facts inferred from code and a fake controller, not proven on hardware; safety-stop/protection not recorded; `late_energy` is a capture-time snapshot; `tests/test_learned_energy.py` hass-fixture tests not re-run here.* *Scope:* under Morek schedule
   ownership nothing is sampled today (`_check_plan`, the only caller of `_sample_energy`, runs only from
   `_arm_watch` on Auto-owned windows). Add a bounded 60 s tick tied to a known plug-in that calls only
   `_sample_energy` into the **existing** `EnergySampler`/`LearnedEnergyStore`. First prove by test which
