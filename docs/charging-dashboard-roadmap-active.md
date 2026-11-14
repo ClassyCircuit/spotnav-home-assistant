@@ -95,7 +95,7 @@ One at a time; “Needs” lists the only real dependencies. Stable parent ids; 
 | 29 | 8.3a Savings baseline (backend) | 8.2a, D2 | |
 | 30 | 8.3b Savings and summary cards | 8.3a, 7.5 | |
 
-Items 1–15 (Stage 15) are now locally implemented and coordinator-reviewed through 2.5.143. Do not reassign them. The next feature work is item 16 (Stage 13.1), only when the user requests it. Items 16–30 are later features: none is a prerequisite for Stage 15 or for 5.8; the order is the
+Items 1–15 (Stage 15) are now locally implemented and coordinator-reviewed through 2.5.143. Do not reassign them. **Stage 16 below takes priority over items 16–30**, as requested on 2026-11-14. After it, resume item 16 (Stage 13.1) only when requested. Items 16–30 are later features: none is a prerequisite for Stage 15 or for 5.8; the order is the
 suggested default (13, then 7, then 8) and the user may reorder it. **Not in the queue:** §9.B reviews,
 §9.C user-owned items, E1/E2.
 
@@ -455,6 +455,57 @@ reconnect comes from the charger’s retained-profile evaluation, the HA OCPP in
 finding only; may tighten 15.4 constants). **E2** — controlled outage/replay test (archive “Safe user test”;
 never `clear_profile`, `configure`, `set_charge_rate`, `update_firmware`, `data_transfer`); informs buffering
 only, nothing depends on it.
+
+## Stage 16 — Use published charging opportunities while tomorrow is missing
+
+**Approved 2026-11-14; implement next, one fresh Claude medium delegate per substage.** This closes the
+uncapped Morek gap left by Stage 10.3. The daily ready-by may roll into tomorrow while only today's prices
+exist. Missing future prices alone must not prevent a useful published-price plan, including a partial
+charge when the available periods cannot cover the whole need. Keep the actual ready-by unchanged.
+
+**Scope and decisions:** Morek schedule ownership only. Reuse the existing cheapest-period selection,
+current-interval support and history comparison; introduce no fixed cheap-price threshold, price forecasts,
+new setting, store or controller. With no cap, select the cheapest available published placement; a usable
+history comparison may still justify waiting when it clearly favours unpublished hours under its existing
+rule, but absent or inconclusive history must not force waiting. Capped planning and its minimum-SOC
+exceptions remain unchanged. A provisional plan may start now if now is selected; it need not start on
+every plug-in. Unknown prices never become zero or authorize an unpriced profile. Partial coverage is not
+proof the real deadline is infeasible. Preserve the 10% reserve where it fits valid priced time; do not add
+reserve or repeated purchases beyond the remaining need through successive recalculations.
+
+- [ ] **16.1 Published-only full and partial planning ◆.** Inspect and extend the smallest production seam
+  in `AutoPlannerController`, `price_gap` and existing history/wait helpers. An uncapped schedule-owned daily
+  departure with incomplete future prices can produce a provisional cheapest-known plan. Support both the
+  whole remaining need and a useful smaller published portion, including a part-elapsed current interval.
+  Apply existing history comparison only where supported; no usable comparison is not a veto. Keep genuine
+  urgency/best-effort behaviour, the real departure, target/progress accounting, price coverage marker,
+  reserve arithmetic and maximum windows intact. Do not globally change legacy/non-Morek history/wait.
+  Reuse existing publication/wake events and bounded retries; verify expected publication date rolls
+  correctly. *Acceptance:* daily 08:00 rolled to tomorrow; current interval selected vs cheaper later known
+  slot; insufficient published capacity produces partial known charge without a false deadline-failure
+  claim; no/flat/history-clearly-cheaper cases; no usable price yields no priced plan; capped/non-Morek
+  unchanged; reserve and DST/deadline boundaries. Focused fast tests of real controller/planner boundaries.
+  Stage 14 contract: SOC-only dedup, protected active window, progress and uncertain writes remain binding.
+  *Exclusions:* no broad price-state admission change, new urgency rule, forecast or UI redesign.
+
+- [ ] **16.2 Safe dispatch, publication continuity and clear partial-plan UI ◆.** Reuse and narrowly fix
+  automatic/manual admission: a degraded aggregate price state may pass only with authoritative ready,
+  listed, valid data covering every remaining scheduled minute (including reserve), identical calculation
+  provenance and all existing pre-wire checks. Tomorrow missing/fetch failure must not invalidate valid
+  today coverage; genuinely stale, unavailable, invalid, held/untrusted or gapped used data still blocks.
+  Reuse one coverage judgement instead of divergent manual/automatic exceptions. Render a concise existing
+  partial-coverage indicator, e.g. "Planned using available prices; tomorrow pending", showing the remaining
+  need honestly when only part fits. No UI claim of completion, future price knowledge or physical flow.
+  *Acceptance:* production plug-in -> proposal -> guarded dispatch with today-only data; degraded due only
+  to tomorrow passes while stale/gapped used prices fail; current slot sends correctly; publication improves
+  future planning while healthy active charging retains Stage 14 protection; identical publication or SOC
+  update sends nothing; partial progress is not bought twice; restart and uncertain/Stop/Pause cases stay
+  guarded. Fast focused backend and frontend checks plus required build/check-dist. Mark source-only vs live
+  evidence truthfully. *Exclusions:* no HA access, live profile, restart or deployment; no new sender or
+  bypass of ownership, authorization, rejection cooldown, uncertainty, cap or active-window rules.
+
+Standard acceptance and the Stage 14 non-regression contract apply to both substages, subject to the
+binding fast-tests-only restriction. After each review, commit and push before delegating the next.
 
 ## 8. Later feature stages
 

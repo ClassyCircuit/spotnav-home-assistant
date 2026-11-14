@@ -13,8 +13,10 @@ Follow the actual request rather than automatically starting new work.
 - Current source manifest is **2.5.143** after Stage 15 implementation. The coordinator committed and
   pushed each reviewed substage under the user's authorization. Recheck `git log` and `git status` for the
   exact current HEAD; a push does not install or restart Home Assistant.
-- **Active roadmap items 1–15 (Stage 15) are locally implemented and coordinator-reviewed.** Next feature
-  work is Stage 13.1–13.4, then 7 and 8, only when the user requests it. The active roadmap is the only queue;
+- **Active roadmap items 1–15 (Stage 15) are locally implemented and coordinator-reviewed.** Stage 16
+  (today-only published opportunities while tomorrow is missing) is now authorized and takes priority:
+  16.1 planning, then 16.2 guarded dispatch/UI, each fresh Claude Sonnet 5.5 medium, review and commit/push.
+  Later work is Stage 13.1–13.4, then 7 and 8, only when requested. The active roadmap is the only queue;
   §9 retains open decisions D1–D3, unrun acceptance and user-owned work. Do not reassign completed stages.
 - **Fast focused tests only.** No full frontend/backend suites, browser/Playwright or global isolated runner.
   Use named files or selected cases with a short command timeout; stop slow checks and report them unrun.

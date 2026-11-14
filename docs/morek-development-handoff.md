@@ -6,6 +6,13 @@ Re-check the live system and Git state before acting; observations below may bec
 
 ## Current handoff and approved direction
 
+**Stage 16 authorized (2026-11-14):** close the uncapped Morek partial-price-horizon gap without
+reimplementing Stage 15. Missing tomorrow alone must not veto a full or partial cheapest-known plan;
+keep the real ready-by, existing history comparison, caps, progress, reserve and Stage 14 stability.
+The active roadmap defines 16.1 planning and 16.2 guarded price admission/UI, ahead of later feature
+work. Each gets a fresh Claude Sonnet 5.5 medium delegate, focused fast checks, coordinator review and
+commit/push. No HA operations or deployment are authorized by this implementation stage.
+
 **Stage 15 implementation complete locally (2.5.143, 2026-11-14):** all 15 implementation substages were delegated separately, coordinator-reviewed and committed/pushed in sequence. Focused mocked checks and required builds passed; detailed entries retain harness failures and unrun checks. No deployment, live charger commands or physical validation were performed. Next feature work is Stage 13, then 7 and 8 when requested; E1/E2 and user-owned 5.1/5.8 remain. Late unbound meter rises remain unassigned, and learning falls back to defaults when proof is missing.
 
 **Stage 10 is done locally:** 10.1 Charge Now backend, 10.2 sidebar controls and
