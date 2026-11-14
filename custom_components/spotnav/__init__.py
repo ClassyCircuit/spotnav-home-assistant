@@ -380,6 +380,9 @@ async def _async_setup_ownership_metadata(
             if session is not None:
                 session.availability_lost()
         generation = worker.suspend_for_availability_change() if worker is not None else None
+        monitor = getattr(worker, "link_monitor", None)
+        if monitor is not None:
+            monitor.poke()  # a local read of the point's link; never a charger call
         if is_available:
             async def initialize_and_reconcile() -> None:
                 nonlocal restart_pending
@@ -836,6 +839,9 @@ def _setup_morek_session_observation(hass, entry, session, target):
         # Must be a loop callback: observe schedules tasks, which is only legal on the event loop.
         old, new = event.data.get("old_state"), event.data.get("new_state")
         session.observe(getattr(old, "state", None), getattr(new, "state", None))
+        monitor = getattr(session.worker, "link_monitor", None)
+        if monitor is not None:
+            monitor.poke()
 
     entry.async_on_unload(async_track_state_change_event(hass, [sensor], session_status_changed))
     session.observe_initial(hass.states.get(sensor), datetime.now(timezone.utc))
@@ -933,6 +939,11 @@ async def _async_setup_auto_preview(
     entry.async_on_unload(session.close)
     worker.start()
     entry.async_on_unload(worker.close)
+    from .execution.morek_link import MorekLinkMonitor
+
+    worker.link_monitor = MorekLinkMonitor(hass, entry_id, worker)
+    worker.link_monitor.start()  # one bounded poll timer; read-only, cancelled on unload
+    entry.async_on_unload(worker.link_monitor.stop)
     await _async_start_charging_evidence(hass, entry, data)
 
     def _soc_moved() -> None:

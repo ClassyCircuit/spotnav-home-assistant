@@ -217,7 +217,7 @@ while offline”.
   absent backend fields degrade to today’s display; i18n. *Acceptance:* values shown equal the backend’s;
   allowance never added into the baseline; opening the view writes nothing; build/check-dist/i18n parity.
   *Exclusions:* no client-side planning or cost arithmetic, no BMW-limit control.
-- [ ] **15.2 Link monitor and offline/reconnect signals ◆.** *Scope:* a small in-process monitor per Morek
+- [x] **15.2 Link monitor and offline/reconnect signals ◆.** *Locally implemented with mocked checks (2.5.131); coordinator reviewed; not installed or live-verified.* Landed as `execution/morek_link.py` (`MorekLinkMonitor`, started in `__init__.py` beside the worker, `worker.link_monitor`), `morek_schedule.link_reading`, status field `link` (`state`, `since`, `connection_id`, `connection_changed_at`, `boot_generation`, `boot_changed_at`), `morek_offline` in `TRANSIENT_BLOCKERS`/`DECISION_BLOCKERS`. Tests: `tests/test_stage_152_link_monitor.py`. *Scope:* a small in-process monitor per Morek
   entry: every 30 s (constant) and on existing entity/connector events it reads, with **no OCPP traffic**, the
   point’s connection (`status == "ok"` as `_charge_point` judges it), the **point object identity** (a new
   object is a new connection) and the boot counter if exposed (`charger_generation`, read via `getattr`; that

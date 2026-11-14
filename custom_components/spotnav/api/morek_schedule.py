@@ -998,6 +998,27 @@ def _charge_point(hass: HomeAssistant, target: Any) -> Any:
     return point
 
 
+def link_reading(hass: HomeAssistant, target: Any) -> tuple[str, Any, int | None]:
+    """Stage 15.2: the point's connection as `_charge_point` judges it, read locally (no OCPP traffic).
+
+    Returns `(state, point, boot_generation)`. `up`/`down` only for exactly one point of the one Morek station and
+    OCPP 1.6 whose `status` is a string (`"ok"` is up). A missing, ambiguous, foreign or unsupported point, or a
+    `status` that is not a string, is `unknown` (never `down`). `status`/`charger_generation` are attributes of the
+    installed OCPP integration's point object, read via `getattr`; that it exposes them is unverified."""
+    try:
+        found = _matching_points(hass, target)
+    except Exception:  # noqa: BLE001 - an unreadable registry is unknown, not down
+        return "unknown", None, None
+    if len(found) != 1 or found[0][0] != MOREK_STATION_ID:
+        return "unknown", None, None
+    point = found[0][1]
+    status = getattr(point, "status", None)
+    if getattr(point, "_ocpp_version", None) != "1.6" or not isinstance(status, str):
+        return "unknown", None, None
+    boot = getattr(point, "charger_generation", None)
+    return ("up" if status == "ok" else "down"), point, (boot if type(boot) is int and boot > 0 else None)
+
+
 LIVE_MAX_AGE_S = 180  # same bound as the connector observation: a presentation limit, not a heartbeat
 
 
@@ -1317,6 +1338,7 @@ def recovery_status(record: dict[str, Any] | None, now: datetime) -> dict[str, A
 #: Stage 14.6: reason code -> what the person (or time) can do about it. Codes only, no household data.
 DECISION_BLOCKERS: dict[str, str] = {
     "charger_unavailable": "wait_for_charger_connection",
+    "morek_offline": "wait_for_charger_connection",
     "identity_unresolved": "check_charger_identity",
     "identity_changed": "check_charger_identity",
     "stale_generation": "retry_after_stop_or_change",
@@ -1352,8 +1374,8 @@ DECISION_BLOCKERS.update({
 #: still passes every guard. Never here: an uncertain write (`upload_uncertain`), a rejection (own cooldown), a
 #: person pause, an ownership or protection conflict, settings problems.
 TRANSIENT_BLOCKERS = frozenset({
-    "charger_unavailable", "identity_unresolved", "identity_changed", "stale_generation", "planner_changed",
-    "worker_unavailable", "planning_unavailable", "target_soc_stale", "target_progress_uncertain",
+    "charger_unavailable", "morek_offline", "identity_unresolved", "identity_changed", "stale_generation",
+    "planner_changed", "worker_unavailable", "planning_unavailable", "target_soc_stale", "target_progress_uncertain",
     "waiting_for_vehicle_update", "prices_unavailable", "prices_stale_or_unavailable", "price_evidence_unavailable",
     "price_inputs_changed", "price_coverage_unavailable", "plan_inputs_changed", "no_current_plan",
     "vehicle_input_unavailable", "vehicle_input_stale", "vehicle_identity_unavailable",
@@ -2434,6 +2456,7 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
             if not verified and outcomes.get("verified"):
                 outcomes = {**outcomes, "verified": None}
             preview = _preview(hass, entry.entry_id, target)
+            link_monitor = getattr(worker, "link_monitor", None)
             try:
                 _charge_point(hass, target)
                 online = worker is None or (not worker._suspended and worker._available() and not worker._closed)
@@ -2460,6 +2483,7 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
             if not settled:
                 readiness["activation_blockers"].append(evidence_blocker)
             result = {**identity,
+                      "link": link_monitor.status() if link_monitor is not None else None,
                       "readiness": readiness,
                       "schedule_pause": _owned_pause_status(outcomes, verification, verified, worker, stop_pending=stop_pending),
                       "reconciliation": {"reason": worker.reason if worker is not None and
