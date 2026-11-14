@@ -235,7 +235,7 @@ while offline”.
   exactly once through the existing reconcile; the new transient blocker adds only a non-sending timer within
   the 12-check cap; a changed point object never creates a plug-in (14.3 `note_sensor` rule).
   *Exclusions:* no readback, no start, no UI beyond the status field, no boot counter persistence.
-- [ ] **15.5 Guarded start after a confirmed reboot (boot signal); backend “charging must be enabled” ◆.** *Scope:* make the
+- [x] **15.5 Guarded start after a confirmed reboot (boot signal); backend “charging must be enabled” ◆.** *Locally implemented with mocked checks (2.5.132); mocked review pending (coordinator); not installed or live-verified. Whether the installed OCPP integration exposes `charger_generation`, and whether HA re-stamps the status/transaction sensors after a reboot, is unverified; without them readiness says `unknown` and only the existing paths act.* Landed as `MorekSessionCoordinator.note_boot`/`evaluate_boot`/`boot_status` (the monitor delivers a within-process counter rise and re-evaluates on every poll/event; `reconnect()` no longer mints `boot:` from a counter compare), readiness `boot_start` and `charging_enabled` (`enabled`/`not_ready`/`unknown`). Tests: `tests/test_stage_155_boot_start.py`. *Scope:* make the
   existing `boot:`/`offline:` token path reachable from reliable evidence. **Confirmed reboot** = positive boot
   evidence only: the boot counter rose within this process, **and** a fresh connector report of `Preparing`
   was observed after that signal. A failed link plus a changed connection/point object is **connection

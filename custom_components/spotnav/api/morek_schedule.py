@@ -1144,6 +1144,21 @@ def _live_measurements(hass: HomeAssistant, controller: Any, now: datetime,
     return live
 
 
+def _charging_enabled(reading: dict[str, Any] | None) -> dict[str, Any]:
+    """The charge-control switch as evidence that charging is enabled; never a command or an inference.
+
+    Only a fresh `on` is `enabled`. A fresh `off` and an unreadable or stale switch are both `not_ready`
+    (unconfirmed is not enabled). Even `enabled` proves neither authorization nor a transaction."""
+    if not isinstance(reading, dict) or reading.get("value") not in ("on", "off"):
+        return {"state": "not_ready", "reason": "control_unconfirmed"}
+    base = {"observed_at": reading.get("observed_at")}
+    if reading.get("fresh") is not True:
+        return {"state": "not_ready", "reason": "control_unconfirmed", **base}
+    if reading["value"] == "off":
+        return {"state": "not_ready", "reason": "control_off", **base}
+    return {"state": "enabled", "reason": "control_on", **base}
+
+
 def _session_readiness(hass: HomeAssistant, controller: Any, identity: dict[str, Any], online: bool,
                        now: datetime) -> dict[str, Any]:
     """Read connector observations only; no inference of authorization or physical flow.
@@ -1154,6 +1169,11 @@ def _session_readiness(hass: HomeAssistant, controller: Any, identity: dict[str,
     result: dict[str, Any] = {
         "control": "unknown", "vehicle": "unknown", "transaction": "unknown",
         "measurement": "unknown", "vehicle_observed_at": None, "live": None,
+        # Stage 15.5, additive and read-only: whether the charge-control switch confirms enabled charging
+        # (`enabled` / `not_ready` / `unknown`). The switch is a derived OCPP entity, not authorization evidence;
+        # `not_ready` sends, clears and starts nothing. `boot_start` is the guarded post-reboot start's evidence.
+        "charging_enabled": {"state": "unknown", "reason": "no_evidence"},
+        "boot_start": {"state": "unknown", "reason": "boot_counter_unavailable"},
         # This is not an admission decision: no session-start dispatcher exists.
         # Keep it separate from schedule upload readiness and never infer a session
         # from the control switch or a connector status.
@@ -1177,10 +1197,12 @@ def _session_readiness(hass: HomeAssistant, controller: Any, identity: dict[str,
         control = hass.states.get(controller.charge_control)
         if control is None or str(control.state).lower() in ("unknown", "unavailable"):
             result["control"] = "unavailable"
+            result["charging_enabled"] = {"state": "not_ready", "reason": "control_unavailable"}
             return result
         result["control"] = "available"
         result["live"] = _live_measurements(hass, controller, now)
         live = result["live"]
+        result["charging_enabled"] = _charging_enabled(live.get("control_state"))
         if any((live.get(k) or {}).get("fresh") for k in ("current_a", "power_w")):
             result["measurement"] = "measured"  # flow was measured; never implies a transaction or authorization
         from ..execution.charger_connection import normalise_ocpp
@@ -2475,6 +2497,9 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
                 readiness["session_start"] = dict(session.state)
                 changed = getattr(session, "state_at", None)
                 readiness["session_start_at"] = changed.isoformat() if isinstance(changed, datetime) else None
+            if session is not None:
+                readiness["boot_start"] = session.boot_status(
+                    getattr(link_monitor, "boot_generation", None) is not None)
             # Diagnostic only: the preview is not a checked dispatch intent and
             # even a matching readback cannot itself authorize a session start.
             readiness["session_schedule_evidence"] = session_start_schedule_evidence(

@@ -118,6 +118,9 @@ class MorekLinkMonitor:
             reading = self._read()
             now = self._now()
             self._compare(reading, now)
+            evaluate = getattr(getattr(self._worker, "session", None), "evaluate_boot", None)
+            if callable(evaluate):
+                evaluate()  # a pending boot signal re-reads its local evidence on every poll/event
         except Exception as err:  # noqa: BLE001 - monitoring must never affect charging or the event bus
             _LOGGER.debug("Morek link check failed: %s", type(err).__name__)
 
@@ -178,8 +181,18 @@ class MorekLinkMonitor:
         self.boot_generation = boot
         if previous is not None and boot > previous:
             self.boot_changed_at = now
+            self._deliver_boot(boot)
 
     # ---- deliveries (each edge once)
+
+    def _deliver_boot(self, boot: int) -> None:
+        """A rise within this process opens the session's evidence window (15.5); it starts nothing itself."""
+        note = getattr(getattr(self._worker, "session", None), "note_boot", None)
+        if callable(note):
+            try:
+                note(boot)
+            except Exception as err:  # noqa: BLE001 - never stop the edge deliveries that follow
+                _LOGGER.debug("Morek boot signal not delivered: %s", type(err).__name__)
 
     def _deliver_offline(self, now: datetime) -> None:
         session = getattr(self._worker, "session", None)

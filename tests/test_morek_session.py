@@ -260,7 +260,8 @@ async def test_multiple_observed_disconnects_create_bounded_opportunities(monkey
 
 
 @pytest.mark.asyncio
-async def test_second_genuine_charger_restart_needs_a_new_recovery_generation(monkeypatch):
+async def test_boot_counter_rise_alone_no_longer_mints_a_request_on_reconnect(monkeypatch):
+    """15.5: a boot needs positive post-boot evidence (see test_stage_155_boot_start); a reconnect never infers it."""
     coordinator, point, _, _ = setup(monkeypatch)
     point.charger_generation = 1
     coordinator.observe("Available", "Preparing")
@@ -268,10 +269,7 @@ async def test_second_genuine_charger_restart_needs_a_new_recovery_generation(mo
     point.charger_generation = 2
     coordinator.reconnect()
     await coordinator.task
-    point.charger_generation = 3
-    coordinator.reconnect()
-    await coordinator.task
-    assert point.calls == 3
+    assert point.calls == 1
 
 
 @pytest.mark.asyncio

@@ -18,6 +18,8 @@ _LOGGER = logging.getLogger(__name__)
 SESSION_RETRY_DELAYS = (5, 15, 30, 60, 120, 300)
 SESSION_RETRY_LIMIT = 12
 NO_TRANSACTION_AFTER_S = 120  # an accepted start with the connector still Preparing: show it, never repeat it
+BOOT_EVIDENCE_WINDOW_S = 600  # Stage 15.5: how long a boot signal waits for its post-boot status evidence
+_ACTIVE_STATUSES = ("charging", "suspendedev", "suspendedevse")
 TRANSIENT_SESSION_BLOCKERS = frozenset({
     "worker_suspended", "charger_unavailable", "stale_generation", "ownership_not_current",
     "identity_changed", "connector_quiescing", "lifecycle_initializing", "retry_cooldown",
@@ -102,7 +104,7 @@ class MorekSessionCoordinator:
         self.retry = None
         self.completed = False
         self.vehicle_events = []
-        self.boot_generation = None
+        self._boot = None  # Stage 15.5: the one pending/last boot signal (memory only)
         self.offline_observed = False
         self.available_before_loss = False
         self._fresh_connection = False
@@ -145,11 +147,15 @@ class MorekSessionCoordinator:
             self._note_schedule_evidence(old, new, self._fresh_connection)
         except Exception as error:  # noqa: BLE001 - the recalculation is best effort; the start is not
             _LOGGER.warning("Morek schedule evidence could not be noted (%s)", type(error).__name__)
+        self.evaluate_boot()
 
     def _observe(self, old, new):
-        if self.boot_generation is None:
-            self.boot_generation = self._charger_boot_generation()
         self.observation = new
+        boot = self._boot
+        if boot is not None and new in _ACTIVE_STATUSES and (not boot["done"] or boot.get("token")):
+            boot["active_seen"] = True  # also after the token is minted: it must stay revocable until dispatch
+        elif boot is not None and not boot["done"] and new == "available":
+            self._close_boot("unplugged_after_boot")
         if new != "preparing":
             self._cancel_no_transaction()
         if new == "available":
@@ -228,21 +234,134 @@ class MorekSessionCoordinator:
             self.trigger()
 
     def reconnect(self):
-        """A reconnect in Preparing is ambiguous, never proof an old session ended."""
+        """A reconnect in Preparing is ambiguous, never proof an old session ended.
+
+        Only an observed offline period gives the existing guarded `offline:` recovery token. A boot counter
+        rise is not decided here: `note_boot`/`evaluate_boot` require positive post-boot evidence (15.5).
+        """
         if self.observation == "preparing" and not self.completed:
-            boot = self._charger_boot_generation()
             if self.offline_observed:
                 self.connection = "offline:" + uuid4().hex
                 self.offline_observed = False
-            elif (boot is not None and self.boot_generation is not None and boot > self.boot_generation):
-                # Only an increase seen within this process establishes a new boot.
-                # A reset across HA restart is not itself a new charger boot.
-                self.connection = "boot:" + uuid4().hex
+                if self._boot is not None and not self._boot["done"]:
+                    # This boot's one recovery opportunity is the existing offline request, never a second one.
+                    self._close_boot("covered_by_offline_recovery")
             elif self.connection is None:
                 self.connection = "recovery"
-            if boot is not None:
-                self.boot_generation = boot
         self.trigger()
+
+    # ---- Stage 15.5: guarded start after a confirmed reboot
+
+    def note_boot(self, generation):
+        """The link monitor saw the boot counter rise within this process: the only positive boot evidence.
+
+        This only opens an evidence window. It starts nothing by itself: `evaluate_boot` mints the `boot:` token
+        once a fresh post-boot Preparing report and an affirmative no-transaction report exist. It is deliberately
+        not evaluated in this call, so a link edge delivered right after it is ordered first.
+        """
+        self._boot = {"at": datetime.now(timezone.utc), "generation": generation, "done": False,
+                      "active_seen": False, "connection": self.connection,
+                      "state": "waiting", "reason": "waiting_for_post_boot_status"}
+
+    def _close_boot(self, reason, state="closed"):
+        if self._boot is not None:
+            self._boot.update(done=True, state=state, reason=reason)
+
+    def boot_status(self, counter_known):
+        """Additive readiness evidence for the boot-triggered start (a request intent, never measured charging)."""
+        boot = self._boot
+        if boot is None:
+            return ({"state": "none", "reason": "no_boot_observed"} if counter_known
+                    else {"state": "unknown", "reason": "boot_counter_unavailable"})
+        return {"state": boot["state"], "reason": boot["reason"], "at": boot["at"].isoformat(),
+                "boot_generation": boot["generation"]}
+
+    def evaluate_boot(self):
+        """Re-evaluate a pending boot signal. Local reads only; never raises; at most one token per boot.
+
+        A confirmed reboot is a counter rise **and**, after that signal: a fresh `Preparing` connector report, an
+        affirmative no-transaction report (a missing, unknown or pre-signal value blocks) and no Charging/Suspended.
+        Everything else (link edges, a new point object, an HA restart) is not boot evidence.
+        """
+        boot = self._boot
+        if boot is None or boot["done"] or self.closed:
+            return
+        try:
+            now = datetime.now(timezone.utc)
+            if (now - boot["at"]).total_seconds() > BOOT_EVIDENCE_WINDOW_S:
+                self._close_boot("boot_evidence_expired")
+                return
+            if self.connection != boot["connection"]:
+                # A plug-in, recovery or offline request since the signal already owns this opportunity.
+                self._close_boot("covered_by_new_connection")
+                return
+            if boot["active_seen"]:
+                self._close_boot("charging_seen_after_boot")
+                return
+            if self.completed:
+                self._close_boot("completion_reported")
+                return
+            if self.observation != "preparing":
+                boot.update(state="waiting", reason="connector_not_preparing")
+                return
+            reason = self._post_boot_blocker(boot, now)
+            if reason == "charging_seen_after_boot":
+                boot["active_seen"] = True
+                self._close_boot(reason)
+            elif reason is not None:
+                boot.update(state="waiting" if reason == "waiting_for_post_boot_status" else "blocked", reason=reason)
+            else:
+                self.connection = boot["token"] = "boot:" + uuid4().hex  # the evidence this token stands for
+                self._close_boot("boot_start_requested", state="requested")
+                self.trigger()
+        except Exception as error:  # noqa: BLE001 - boot evidence is best effort and never blocks other paths
+            _LOGGER.debug("Morek boot evidence failed (%s)", type(error).__name__)
+
+    def _post_boot_blocker(self, boot, now):
+        """None when the post-boot evidence is complete; otherwise the truthful reason it is not."""
+        live = morek_schedule._live_measurements(self.hass, controller_for(self.hass, self.entry_id), now)
+
+        def after(reading):  # a fresh HA-stamped reading that postdates the boot signal
+            return (isinstance(reading, dict) and reading.get("fresh") is True
+                    and datetime.fromisoformat(reading["observed_at"]) > boot["at"])
+
+        status = live.get("status")
+        value = str((status or {}).get("value", "")).lower()
+        if after(status) and value in _ACTIVE_STATUSES:
+            return "charging_seen_after_boot"
+        if not after(status) or value != "preparing":
+            return "waiting_for_post_boot_status"
+        transaction = live.get("transaction")
+        if transaction is None or transaction.get("value") is None:
+            return "transaction_unknown"
+        if not after(transaction):
+            return "transaction_not_reported_after_boot"
+        if transaction["value"] is not False:
+            return "transaction_present"
+        return None
+
+    def _boot_start_blocker(self, connection):
+        """Pre-dispatch recheck of a `boot:` token against its own boot evidence (None = still valid).
+
+        The token was minted from fresh post-boot evidence, but `_reconcile` awaits storage and admission before
+        the wire; a transaction or Charging can appear meanwhile. Local reads only, never raises.
+        """
+        try:
+            boot = self._boot
+            if boot is None or boot.get("token") != connection:
+                return "boot_evidence_replaced"
+            now = datetime.now(timezone.utc)
+            if (now - boot["at"]).total_seconds() > BOOT_EVIDENCE_WINDOW_S:
+                return "boot_evidence_expired"
+            if boot["active_seen"]:
+                return "charging_seen_after_boot"
+            reason = self._post_boot_blocker(boot, now)
+            if reason == "charging_seen_after_boot":
+                boot["active_seen"] = True
+            return reason
+        except Exception as error:  # noqa: BLE001 - unverifiable evidence withholds the start
+            _LOGGER.debug("Morek boot recheck failed (%s)", type(error).__name__)
+            return "boot_evidence_unavailable"
 
     def offline(self):
         """Remember a real availability loss until its subsequent online observation."""
@@ -263,14 +382,6 @@ class MorekSessionCoordinator:
                     self.offline()
         except Exception:  # noqa: BLE001 - ambiguous availability is not a reconnect edge
             return
-
-    def _charger_boot_generation(self):
-        try:
-            target = controller_for(self.hass, self.entry_id).ocpp_target
-            value = getattr(morek_schedule._charge_point(self.hass, target), "charger_generation", None)
-            return value if type(value) is int and value > 0 else None
-        except Exception:  # noqa: BLE001 - unsupported or offline is not boot evidence
-            return None
 
     def observe_initial(self, state, now):
         """Use a fresh HA state, or a corroborating in-process OCPP Preparing value.
@@ -453,6 +564,10 @@ class MorekSessionCoordinator:
                             return "session_completed"
                         if self.observation != "preparing":
                             return "connector_not_preparing"
+                        if connection.startswith("boot:"):
+                            reason = self._boot_start_blocker(connection)
+                            if reason is not None:
+                                return reason
                     pause = record.get("schedule_pause")
                     if pause and not morek_schedule._resume_authorized(record, worker, generation):
                         return "paused_until_resume"
