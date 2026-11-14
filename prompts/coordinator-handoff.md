@@ -10,15 +10,14 @@ Follow the actual request rather than automatically starting new work.
 
 ## Current handoff — 2026-11-14
 
-- Baseline: `main` at `6a50a7ae` (source manifest 2.5.128) before the Stage 15 / roadmap-split
-  documentation (active roadmap, archive, redirect, `AGENTS.md`, `README.md`, development handoff, this
-  file). The coordinator commits those docs when the user asks; `git log`/`git status` are authoritative for
-  what is committed or pushed. Recheck Git, the roadmap and the installed/running version before acting. A push
-  does not install or restart Home Assistant.
-- **Start with the active roadmap's "Ordered work queue" (§3)**: the single ordered list (items 1–15
-  Stage 15 implementation, 16–30 later features 13/7/8), with §9 holding open decisions D1–D3, outstanding
-  local review (5.7b3 unrun suites) and user-owned items. Do not rebuild a queue from older notes or from
-  the archive.
+- Current source manifest is **2.5.143** after Stage 15 implementation. The coordinator committed and
+  pushed each reviewed substage under the user's authorization. Recheck `git log` and `git status` for the
+  exact current HEAD; a push does not install or restart Home Assistant.
+- **Active roadmap items 1–15 (Stage 15) are locally implemented and coordinator-reviewed.** Next feature
+  work is Stage 13.1–13.4, then 7 and 8, only when the user requests it. The active roadmap is the only queue;
+  §9 retains open decisions D1–D3, unrun acceptance and user-owned work. Do not reassign completed stages.
+- **Fast focused tests only.** No full frontend/backend suites, browser/Playwright or global isolated runner.
+  Use named files or selected cases with a short command timeout; stop slow checks and report them unrun.
 - Stages 6.1–6.3, 9.4–9.5, 10 and 14 are locally implemented with mocked checks.
   Stage 6 captures genuine available measurements and exposes a history API, not a
   history dashboard; observed sources, cadence and flow thresholds remain unverified.
@@ -27,8 +26,8 @@ Follow the actual request rather than automatically starting new work.
 - Stage 5.7b2 monitoring is locally implemented. 5.7b3 remains partial: focused
   mocked checks passed but browser acceptance and the HA-plugin suite were not run.
   The user owns 5.1 visual approval and 5.8 installation/live testing. Stages 7, 8 and 13
-  remain later features and Stage 15 is the next implementation work; **Stage 11 is
-  superseded and migrated to 15.9–15.11 (not implemented)**; umbrellas 5.4 and 5.6 are closed
+  remain later features; Stage 15 is locally complete. **Stage 11 is
+  superseded; its scope is implemented in Stage 15.9–15.11**; umbrellas 5.4 and 5.6 are closed
   as locally implemented. Follow the user's chosen priority and the queue.
 - A prior read-only HA investigation found an accepted automatic schedule but a
   plugged-in connector in Preparing without a confirmed transaction. A listener
@@ -41,33 +40,20 @@ Follow the actual request rather than automatically starting new work.
   SOC is stale. Keep explicit Pause/Stop, electrical protection, connector identity,
   ownership and genuinely pending/unknown dispatched operations intact. A retained
   schedule is not proven effective; an accepted start is not a transaction or flow.
-- Stage 15 (active roadmap §7, finalized and Stage-14-audited 2026-11-14, docs only, **nothing implemented**)
-  holds start-ready substages 15.1–15.11 (reserve, link monitor, read-only schedule check, guarded
-  repair, guarded post-reboot start, connection-aware freshness, UI wording, register reconciliation,
-  Morek-path learner, behind-plan, learned display) and optional evidence tasks E1/E2. Since the roadmap split,
-  15.1, 15.4, 15.7 and 15.9 are sized halves (a/b; the parent number is the stable id). **Queue order:**
-  15.1a → 15.1b → 15.2 → 15.5 → 15.3 → 15.4a → 15.4b → 15.6 → 15.7a → 15.7b → 15.8 → 15.9a → 15.9b → 15.11 → 15.10
-  (15.10 deferrable); the numbers are identifiers. Real dependencies only: 15.3/15.5/15.6 need 15.2, 15.4a needs
-  15.3, 15.7a needs 15.6, 15.9b/15.10 need 15.9a, 15.11 needs 15.9b. Substages marked ◆ must pass the roadmap's
-  **"Stage 14 non-regression contract"** (active roadmap §5) (protected active windows, 14.4 material triggers, 5-minute SOC tolerance, dedup, uncertainty,
-  Stop/Pause ownership, 14.5 progress accounting) with meaningful tests and the existing Stage 14 test files;
-  no new controller or parallel sender. Split-substage safety: 15.4a ships the repair dispatcher **gated off**
-  (zero writes) and only 15.4b enables it; 15.9a only captures samples (planning ignores them) until 15.9b
-  revalidates and promotes them; 15.5's reboot means a boot-counter signal, not a reconnect. The audit corrected three regression traps: the 15.1 reserve must
-  stay out of `window_release` arithmetic; Stage 14 call sites keep `connector_evidence`'s strict 180 s
-  bound while 15.6 changes only display/readiness; 15.8 must not alter the session energy that 14.5 reads.
-  User decisions are preserved: 10% configurable reserve (soft cap unchanged), guarded repair only after
-  *repeated* confirming checks, a guarded start after a *confirmed* reboot (reconnect alone is not one), and
-  charging *enabled* through the existing guarded start path (15.5 backend, 15.7 UI), never by blind switch
-  toggling. No mandatory periodic OCPP readback. Its audit is source-reading only.
-  The user confirmed (2026-11-14) the BMW will stop at its configured 80% limit: an agreed operating
-  assumption (not agent hardware-verified, not a blocker; do not reopen). Reserve is extra allowed time to
-  reach the target, not energy beyond it; allowance energy/cost is labelled separately, only measured is actual.
-- **Stage 11 is closed as superseded.** Its 11.1/11.2 scope was migrated to 15.9a/15.9b (energy learner on the
-  Morek path), 15.10 (behind-plan and power feed) and 15.11 (display/reset) with an exact mapping table in the
-  active roadmap (§10). Source fact: nothing is sampled by the learners under Morek ownership (`_check_plan` runs only
-  from `_arm_watch` on Auto-owned windows); the stores are already consumed by planning. Do not assign
-  11.1/11.2 or call them implemented.
+- **Stage 15 is locally complete with mocked checks (2.5.129–2.5.143), not deployed or physically verified.**
+  It adds the configurable 10% reserve, local link monitor, read-only reconnect schedule checks, guarded
+  repair and reboot recovery, connection-aware status, late-energy evidence, robust median learning,
+  learned-estimate display/reset, and measured behind-plan checks. Stage 14 guards remain binding.
+  Repair is enabled in source: repeated clean mismatches, fresh confirmation at the wire boundary,
+  active-charge deferral, persisted budget and post-repair escalation. Unknown writes are never retried.
+  No mandatory periodic OCPP readback. A reconnect alone is not a reboot.
+- Learning uses validated completed plug-ins: three agreeing votes to lengthen, five to shorten, bounded
+  median estimates before the separate reserve. Missing proof means defaults; a healthy active window's
+  used power is frozen. Late receipt-only register rises cannot certify a prior session's total and remain
+  unassigned/uncertain. Known harness limits and unrun checks are in the development handoff.
+- The user confirms the BMW stops at its own configured 80% limit. This is an agreed operating assumption;
+  SpotNav does not set that limit. Do not reopen it. Stage 11 is superseded, not a separate future queue.
+- E1/E2 evidence tasks and 5.1 visual approval / 5.8 installation and physical validation remain user-directed.
 - The user prefers stable charging: routine sensor updates should not interrupt an
   active window or spam uploads. Stage 14 documents the agreed interruption thresholds,
   plug-in recalculation, schedule deduplication and conservative uncertainty rules.

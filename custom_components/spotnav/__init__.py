@@ -908,6 +908,27 @@ async def _async_setup_auto_preview(
                 and status.get("recorded_owner") == "morek_schedule"
                 and status.get("handover_evidence") == "completed")
 
+    async def _morek_progress(now: datetime) -> dict[str, Any] | None:
+        """Stage 15.10, read-only: the settled outcome record, whether an upload is in flight, the link as the monitor
+        last saw it and the connector's measured readings. Nothing here sends or writes."""
+        from .api import morek_schedule
+
+        mdata, _mstore = await morek_schedule._state(hass, entry_id)
+        record = await morek_schedule._outcome_record(hass, entry_id, mdata)
+        monitor = getattr(getattr(data, "morek_worker", None), "link_monitor", None)
+        link = None if monitor is None else monitor.status()
+        live = morek_schedule._live_measurements(hass, data.controller, now)
+        return {
+            "window": morek_schedule.behind_window(record, now),
+            # The acknowledged attempt id of a settled routine record (window open or not), else None: the controller
+            # judges a mid or ended window only while this is known, and drops an ended one if it changes.
+            "settled": morek_schedule.behind_settled(record, now),
+            "sending": bool(hass.data.get("spotnav_morek_sending", {}).get(entry_id)),
+            "link": link,
+            "live": live,
+            "flow": morek_schedule.measured_flow(live),
+        }
+
     preview = data.preview = AutoPlannerController(
         hass,
         entry_id,
@@ -921,6 +942,7 @@ async def _async_setup_auto_preview(
         learned=learned,
         learned_energy=learned_energy,
         schedule_owned=_schedule_owned,
+        morek_progress=_morek_progress,
     )
     entry.async_on_unload(preview.async_shutdown)
     await preview.async_start()

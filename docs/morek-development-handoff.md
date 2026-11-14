@@ -6,6 +6,8 @@ Re-check the live system and Git state before acting; observations below may bec
 
 ## Current handoff and approved direction
 
+**Stage 15 implementation complete locally (2.5.143, 2026-11-14):** all 15 implementation substages were delegated separately, coordinator-reviewed and committed/pushed in sequence. Focused mocked checks and required builds passed; detailed entries retain harness failures and unrun checks. No deployment, live charger commands or physical validation were performed. Next feature work is Stage 13, then 7 and 8 when requested; E1/E2 and user-owned 5.1/5.8 remain. Late unbound meter rises remain unassigned, and learning falls back to defaults when proof is missing.
+
 **Stage 10 is done locally:** 10.1 Charge Now backend, 10.2 sidebar controls and
 10.3 partial-price-horizon planning are checked in the roadmap. The user says Stage
 10 is done; do not reassign it as incomplete. Local mocked tests do not establish
@@ -465,6 +467,50 @@ than assumed. Older entries below that say "the roadmap" mean the archived text.
 
 **User restriction (2026-11-14): ONLY FAST tests.** No full isolated runner, browser/Playwright or broad suites; run focused
 module files individually with a short timeout and report unrun checks. (Also recorded in the active roadmap §4.)
+
+### 2026-11-14 — Stage 15.10 Morek behind-plan check and power-learner feed (2.5.143; local mocked; **coordinator reviewed**; no live HA/charger action)
+
+- **What changed.** The existing 60 s Morek capture tick (`AutoPlannerController._async_capture_tick`, Morek-owned and known plugged in only)
+  now also calls `_async_morek_behind`: the existing `PlanWatch` and `PowerSampler` run against the **acknowledged active window**
+  (`morek_schedule.behind_window`, pure and fail-closed: settled record, latest attempt is the accepted acknowledged one, no Pause
+  intent, no live Charge Now, routine profile, fixed-time window) through one read-only seam (`__init__._morek_progress`: record,
+  `spotnav_morek_sending`, `MorekLinkMonitor.status()`, `_live_measurements`, `measured_flow`). A confirmed behind (PlanWatch's own
+  `BEHIND_KWH`/`CONFIRM_S`/`REPLAN_EVERY_S` backoff/window-end rule, no new threshold) makes **one** `async_recalculate()` with no cause (a
+  strict `recalc` publication to the guarded worker, no price/cap trigger, active window continued, equal schedule deduplicated). No
+  `_arm_watch`, no executor/legacy start or stop, no second sender.
+- **Facts required (otherwise unknown, never behind):** acknowledged window; link `up` and the same `(connection_id, since)` as the previous
+  tick; identified car equals the planned car's facts; fresh energy register reading; register time credible (`_register_time_credible`:
+  newest retained row not flagged, received within `CAPTURE_REPLAY_S`, no recorded gap in `MAX_STEP_S`; no evidence store = not credible);
+  measured flow `charging` (fresh power/current, never nominal amps, never SOC); not guest, not paused/person-Stop, not held by SpotNav,
+  not tapering, car not ending, past `START_GRACE_S` of the window, window current equal to the planned current. A tick failing any of
+  these hands PlanWatch a `None` reading (it re-bases on the next good one) and ends the power stretch.
+- **Power learner.** Unchanged `PowerSampler`/`LearnedPowerStore`/trust rules (`TRUST_MINUTES`, `TRUST_SESSIONS`, bounds); the learned cap
+  is bounded by the planned power so it can only **lengthen** time; no shortening and no new constant.
+- **Stability.** `_frozen_learned_cap` holds the figure the accepted plan used (`_power_freeze`, key = subject, wiring, plug-in) while the
+  acknowledged window is open, so routine SOC updates never see the power input (`_morek_input_evidence`, planner request,
+  `vehicle_update_wait`) move, however many clean minutes are collected. The live figure applies when no window is open (next plug-in or
+  planning decision), when the freeze key changes, and on a confirmed-behind replan (`_async_replan_morek_behind` drops the hold first).
+  No explicit recalculation is made when a window ends; the next natural planning decision reads the live figure. Unplug, a foreign
+  owner, a guest or the 15.11 reset (`async_reset_learning` clears the hold, the link key and the sampler) drop the Morek state
+  (`_morek_behind_reset`, only if the Morek look ever ran, so legacy chargers keep their own watch and sampler).
+- **Tests:** `tests/test_stage_1510_behind_power.py` (26: slow charge one bounded replan and PlanWatch backoff, healthy charge plus new
+  samples nothing and the held figure, confirmed behind applies the live figure, 14 doubtful/held matrices yielding no replan and no
+  sample, link gap/replay, current mismatch/grace, lengthen-only, reset, wrong owner, failing seam, `behind_window` and
+  `_register_time_credible` units). Run with `python tools/run_isolated_logs_tests.py tests/test_stage_1510_behind_power.py`. Also passed,
+  one file at a time: 159a (18), 159b (70), 1511 (20), `test_plan_watch` (34), 142 (22), 143 (22), 144 (50), 145_progress (13),
+  `test_morek_worker`, `test_morek_schedule`. `npm run build`/`check-dist` current at 2.5.143 (no card change); ruff clean on touched files.
+  `tests/test_learned_power.py`: its `hass`-fixture tests error here as before (HA plugin cannot load on Windows). Not run: 141/145_fresh/146,
+  `test_morek_session*`, `test_stage_95_recovery`, `test_stage_103_partial`, full suites, browser.
+- **Review correction (2.5.143, root review pending).** (1) End judgement: `PlanWatch._judge_end` still falls back to the last held reading after `END_WAIT_S` (legacy behaviour untouched). The Morek wrapper now builds one `proof` (not guest/paused/sending, known connected with a plug-in, unbroken link, planned car, fresh credible register reading) and passes the reading to the watch only under it, window or not; an ended window with no proof past `END_WAIT_S`, or from another plug-in, is dropped unjudged (`PlanWatch.ended_end`/`discard_ended`, two new helpers, no change to `check`). A healthy end with fresh proof is judged by the existing rule. (2) Held figure: an absent window (pending/uncertain write, unknown or down link, unreachable record, Charge Now) no longer clears `_morek_window_end`/`_power_freeze`; they are kept until the known end passes, a person's Stop/paused executor/guest/known unplug/new plug-in, a reset or a confirmed behind (`_morek_session`; a momentarily unknown plug-in keeps the freeze key). Tests added in `test_stage_1510_behind_power.py` (36 total; end without proof x7, healthy end, unknown progress holds the cap, release rules); 159a (18) passed; `test_plan_watch` passes, `test_charge_behind_plan` has 4 `hass`-fixture errors as before. Limit: whether a Charge Now/Pause that leaves no window within the known end should release the figure is not distinguished (it is kept; harmless, same plug-in and wiring only). Unverified on hardware.
+- **Final focused correction (2.5.143, root review pending).** `behind_window` was factored onto `_settled_profile`; new pure `behind_settled(record, now)` returns the acknowledged attempt id of a settled routine record (not uncertain, latest accepted attempt == ack id, routine, no Pause/live Charge Now) whether or not a window is open, and `_morek_progress` carries it as `settled`. The wrapper's `proof` (mid and end) now requires it, so an unknown record (uncertain, pending, Pause, Charge Now, unreadable seam) never lets a fresh register/live link judge an ended window or sample power; the ended judgement is dropped after `END_WAIT_S` and the freeze is preserved. A newer accepted intent (settled id differs from the watched window's `_morek_ack`) drops the old end unjudged. The previous plug-in is compared before the new window overwrites `_morek_session`; a positive change resets the Morek watch (`_morek_behind_reset`); an unknown plug-in is not a change. Legacy `PlanWatch` semantics untouched. Tests: 6 added to `test_stage_1510_behind_power.py` (31 total), run with the `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ... --noconftest` form with 159a: 60 passed in 2.6 s; ruff and `check-dist` clean; no build needed (no card change). No HA, commit, push or deploy.
+- **Limits.** Whether the real controller's `held_by_spotnav` inputs (`setpoint_current_a`, `requested_current_a`, `car_ended_at`,
+  `charge_progress`) are meaningful under Morek ownership is inferred, not proven: a stale value only makes the feature inert (fail
+  closed). The link monitor's `since`/`connection_id` and OCPP `status` are unverified on hardware; a link drop shorter than the 30 s poll
+  that keeps the same point object is not detectable. `plan.proposal.power_kw`/`need_met_at` are used only to lower the expectation
+  (min). An infeasible target is reported by the existing planner (`short_of_deadline`), never promised by this code. No physical-charging
+  proof; nothing installed or live-verified; no HA, charger, deploy, commit or push.
+
+Coordinator review: end-of-window unknowns, settled-intent/plug-in binding and power-freeze corrections checked. Independent final focused tests: 89 passed in 2.68 s (15.10, PlanWatch, 14.5 progress). An additional 14.2/14.3/14.4 selection ran slowly and was stopped under the fast-only rule, so that final combined rerun is incomplete. Build and check-dist passed at 2.5.143. No live verification.
 
 ### 2026-11-14 — Stage 15.11 learned-estimate display and administrator reset (2.5.142; local mocked; **coordinator reviewed**; no live HA/charger action)
 

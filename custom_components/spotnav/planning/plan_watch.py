@@ -170,6 +170,21 @@ class PlanWatch:
             return self._watched.end
         return None if self._ending is None else self._ending.end
 
+    def ended_end(self, now: datetime) -> datetime | None:
+        """The end of a window that has ended at `now` and is not judged yet (pending, or watched past its end)."""
+        if self._ending is not None:
+            return self._ending.end
+        if self._watched is not None and now >= self._watched.end:
+            return self._watched.end
+        return None
+
+    def discard_ended(self, now: datetime) -> None:
+        """Drop the judgement of a window that has ended at `now`, unjudged (the caller cannot prove its evidence; no
+        semantics of `check` change)."""
+        self._ending = None
+        if self._watched is not None and now >= self._watched.end:
+            self._watched = None
+
     def shortfall_kwh(self) -> float:
         """How far the window watched now is behind its plan at the last check (kWh, `0.0` when it is not)."""
         watched, check = self._watched, self.last_check

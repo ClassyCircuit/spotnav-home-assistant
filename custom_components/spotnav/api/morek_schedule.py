@@ -271,6 +271,67 @@ def active_window(profile: dict[str, Any] | None, now: datetime) -> tuple[dateti
         return None
 
 
+def _settled_profile(record: dict[str, Any] | None, now: datetime) -> dict[str, Any] | None:
+    """The acknowledged routine profile of a *settled* record, or `None`: not uncertain, the latest attempt is the
+    accepted acknowledged one, no Pause intent, no live Charge Now. Independent of whether a window is open."""
+    try:
+        profile = acknowledged_profile(record)
+        if profile is None or record.get("schedule_pause") is not None:
+            return None
+        ack, attempt = record["acknowledged"], record.get("attempt")
+        if not isinstance(attempt, dict) or attempt.get("id") != ack.get("id") or attempt.get("state") != "accepted":
+            return None
+        override = record.get("charge_now")
+        if override is not None and _utc(datetime.fromisoformat(override["end"])) > _utc(now):
+            return None
+        return profile
+    except (KeyError, TypeError, ValueError, AttributeError, ScheduleRefused):
+        return None
+
+
+def behind_settled(record: dict[str, Any] | None, now: datetime) -> str | None:
+    """Stage 15.10: the acknowledged attempt id of a settled routine record (see `_settled_profile`), else `None`.
+    Says nothing about whether a window is open now; an ended window is judged only while this holds."""
+    if _settled_profile(record, now) is None:
+        return None
+    ack_id = record["acknowledged"].get("id")
+    return ack_id if isinstance(ack_id, str) else str(ack_id)
+
+
+def behind_window(record: dict[str, Any] | None, now: datetime) -> tuple[datetime, datetime, int | float] | None:
+    """Stage 15.10: `(start, end, limit)` of the *acknowledged routine* window open at `now`, or `None`; pure, no I/O.
+
+    Fail closed: only a settled record counts (`_settled_profile`; fixed-time window with a known end). Anything
+    pending, replaced, held or unreadable is `None`, so a behind-plan judgement is never made for it. `start` is where
+    the contiguous run of positive limits that contains `now` begins (the profile's own start for a window the profile
+    opens at; a continued window is re-sent from the resend, so it starts there). Reuses `active_window`."""
+    try:
+        profile = _settled_profile(record, now)
+        if profile is None:
+            return None
+        active = active_window(profile, now)
+        if active is None:
+            return None
+        schedule = profile["chargingSchedule"]
+        begin = _utc(datetime.fromisoformat(schedule["startSchedule"].replace("Z", "+00:00")))
+        changes = sorted((begin + timedelta(seconds=p["startPeriod"]), p["limit"])
+                         for p in schedule["chargingSchedulePeriod"])
+        moment = _utc(now)
+        start = None
+        for at, limit in changes:
+            if at > moment:
+                break
+            if limit and limit > 0:
+                start = at if start is None else start
+            else:
+                start = None
+        if start is None:
+            return None
+        return start, active[0], active[1]
+    except (KeyError, TypeError, ValueError, AttributeError, ScheduleRefused):
+        return None
+
+
 def continue_active_window(periods: tuple[tuple[datetime, datetime], ...], amps: int, now: datetime,
                            active_profile: dict[str, Any] | None) -> tuple[tuple[tuple[datetime, datetime], ...], datetime | None]:
     """Union the acknowledged, currently allowed window with a replanned schedule.

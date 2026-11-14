@@ -100,13 +100,14 @@ from .learned_energy import (
 from .learned_power import (
     LearnedPower,
     LearnedPowerStore,
+    MAX_STEP_S,
     PowerSample,
     PowerSampler,
     subject_for,
     TAPER_PERCENT,
     Wiring,
 )
-from .plan_watch import DECISION_END_REPLAN, HELD_IMPORT_TARGET, next_check_at, PlanWatch, START_GRACE_S, WindowFacts
+from .plan_watch import DECISION_END_REPLAN, END_WAIT_S, HELD_IMPORT_TARGET, next_check_at, PlanWatch, START_GRACE_S, WindowFacts
 from .phases import effective_phases
 from .planner import (
     calculate_plan,
@@ -869,6 +870,7 @@ class AutoPlannerController:
         learned: LearnedPowerStore | None = None,
         learned_energy: LearnedEnergyStore | None = None,
         schedule_owned: Callable[[], Awaitable[bool]] | None = None,
+        morek_progress: Callable[[datetime], Awaitable[dict[str, Any] | None]] | None = None,
     ) -> None:
         self._hass = hass
         self._entry_id = entry_id
@@ -973,6 +975,21 @@ class AutoPlannerController:
             learned_energy.checker = self._prove_capture
         self._watch_cancel: Callable[[], None] | None = None
         self._watch_due: datetime | None = None
+        # Stage 15.10: the existing PlanWatch/PowerSampler run on the Morek capture tick against the acknowledged active
+        # window. `_morek_progress` is a read-only seam (record, link, measured readings). `_morek_window_end` is the
+        # synchronous cache of the acknowledged window's end that `_frozen_learned_cap` reads; `_power_freeze` the learned
+        # power the accepted plan used (`(key, cap_kw)`), held for the healthy active charge; `_behind_link_key` the link's
+        # (connection, since) at the previous tick (a change ends the clean stretch); `_behind_replanning` one replan at a time.
+        self._morek_progress = morek_progress
+        self._morek_window_end: datetime | None = None
+        #: The plug-in the watched/frozen window belongs to (`plugged_in_for_count`), kept while the window is unknown.
+        self._morek_session: datetime | None = None
+        #: The acknowledged attempt id the watched window belongs to (a newer accepted intent cannot judge the old end).
+        self._morek_ack: str | None = None
+        self._power_freeze: tuple[tuple[Any, ...], float | None] | None = None
+        self._behind_link_key: tuple[Any, Any] | None = None
+        self._behind_replanning = False
+        self._morek_behind_active = False
 
     async def async_start(self) -> AutoSnapshot:
         """Bring the controller in line with the stored settings, once."""
@@ -2175,12 +2192,34 @@ class AutoPlannerController:
         """The most power a plan counts on: what is learned of the car (`_learned_power`), and no more than the site's
         import target leaves it (`SiteCapacityController.import_target_plan_kw`), so a held hour is planned as held and
         the plan buys the hours it needs for that instead of finding out at each window's end."""
-        learned = self._learned_power(settings).cap_kw
+        learned = self._frozen_learned_cap(settings)
         site = site_controller_for_charger(self._hass, self._entry_id)
         target = None if site is None else site.import_target_plan_kw(self._entry_id)
         if target is None:
             return learned
         return target if learned is None else min(learned, target)
+
+    def _frozen_learned_cap(self, settings: AutoSettings) -> float | None:
+        """The learned power cap the planner counts on (`LearnedPower.cap_kw`), held still for a healthy active Morek
+        charge (Stage 15.10): while an acknowledged window is open (`_morek_window_end`, set by the capture tick) the
+        figure the accepted plan used is returned for that plug-in and wiring, however many clean minutes the learner has
+        collected since, so routine SOC updates never see the power input move (no `plan_inputs_changed`, no resend).
+        The live figure applies again outside an active window (the next plug-in or planning decision) and on a confirmed
+        behind-plan replan (`_async_replan_morek_behind` drops the hold first)."""
+        learned = self._learned_power(settings)
+        end = self._morek_window_end
+        if end is None or end <= self._now() or not self._morek_learning():
+            self._power_freeze = None
+            return learned.cap_kw
+        controller = self._charger_controller()
+        count = None if controller is None else controller.plugged_in_for_count
+        if count is None and self._power_freeze is not None:
+            count = self._power_freeze[0][2]  # the plug-in is momentarily unknown: it is the one the freeze was made for
+        key = (learned.subject, self._wiring(settings), count)
+        freeze = self._power_freeze
+        if freeze is None or freeze[0] != key:
+            freeze = self._power_freeze = (key, learned.cap_kw)
+        return freeze[1]
 
     def plan_watch_facts(self) -> dict[str, Any]:
         """The diagnostics' view: the last behind-plan check and the learned power the plan counts on."""
@@ -2197,7 +2236,10 @@ class AutoPlannerController:
         anchor = None if self._learned_energy is None else self._learned_energy.anchor
         return {
             "behind_check": None if check is None else check.as_dict(),
-            "learned_power": {**learned.as_dict(), "planned_with": learned.cap_kw is not None},
+            "learned_power": {
+                **learned.as_dict(), "planned_with": learned.cap_kw is not None,
+                "held_for_active_window": self._power_freeze is not None,
+            },
             "learned_energy": {
                 **energy.as_dict(),
                 # The need counts on it: trusted, for a target (a fixed amount is never changed by it).
@@ -2270,6 +2312,9 @@ class AutoPlannerController:
                     sampler.reset()
             if self._sampler is not None:
                 self._sampler.reset()
+            # Stage 15.10: no held power figure or pending stretch from before the reset survives it.
+            self._power_freeze = None
+            self._behind_link_key = None
             for key, store in (("energy", self._learned_energy), ("power", self._learned)):
                 if store is None:
                     continue
@@ -2486,6 +2531,8 @@ class AutoPlannerController:
                 # proven (Stage 15.9b); nothing else happens.
                 self._learned_energy.set_capture_anchor(None)
                 self._learned_energy.set_capture_open(None)
+            if controller is not None and controller.known_connected is False:
+                self._morek_behind_reset()
             if self._capture_cancel is not None or self._capture_running:
                 return
             if controller is None or controller.known_connected is not True:
@@ -2526,9 +2573,11 @@ class AutoPlannerController:
                 if store is not None:
                     store.set_capture_anchor(None)
                     store.set_capture_open(None)
+                self._morek_behind_reset()
                 return
             keep = True
             self._capture_energy(sampler, settings)
+            await self._async_morek_behind(settings)
         except Exception:  # noqa: BLE001 - learning is a convenience, never worth anything else
             _LOGGER.debug("Capturing the energy per percent failed", exc_info=True)
         finally:
@@ -2595,6 +2644,225 @@ class AutoPlannerController:
             charging=bool(controller.charging),
             context=context,
         )
+
+    def _morek_behind_reset(self) -> None:
+        """Stage 15.10: the Morek watch starts again (not Morek-owned, a guest, unplugged): no held power figure, no
+        cached window, no stretch, and a fresh `PlanWatch` (its backoff belongs to one plug-in). Only if this look ever ran:
+        a charger the Morek look never touched keeps its own watch and sampler."""
+        if not self._morek_behind_active:
+            return
+        self._morek_behind_active = False
+        self._morek_window_end = None
+        self._morek_session = None
+        self._morek_ack = None
+        self._power_freeze = None
+        self._behind_link_key = None
+        if self._sampler is not None:
+            self._sampler.reset()
+        if self._watch.watching or self._watch.last_check is not None:
+            self._watch = PlanWatch()
+
+    def _register_time_credible(self, now: datetime, entity_id: str | None) -> bool:
+        """Whether the newest retained register row of `entity_id` is a live look at a credible time: not flagged, not
+        received later than `CAPTURE_REPLAY_S` after it was observed, and no recorded gap in the last `MAX_STEP_S`.
+        Missing evidence is not credible (fail closed)."""
+        evidence = evidence_for(self._hass)
+        if evidence is None or not entity_id:
+            return False
+        rows = [
+            row
+            for row in evidence.samples(
+                self._entry_id, KIND_REGISTER, since=now - timedelta(seconds=MAX_STEP_S),
+                until=now + timedelta(seconds=1),
+            )
+            if row.get("e") == entity_id
+        ]
+        if not rows:
+            return False
+        row = rows[-1]
+        seen, received = dt_util.parse_datetime(row.get("t", "")), dt_util.parse_datetime(row.get("r", ""))
+        if (
+            row.get("q") or seen is None or received is None
+            or not 0 <= (received - seen).total_seconds() <= CAPTURE_REPLAY_S
+        ):
+            return False
+        horizon = now - timedelta(seconds=MAX_STEP_S)
+        for gap in evidence.gaps(self._entry_id, KIND_REGISTER):
+            raw = gap.get("r2") if isinstance(gap.get("r2"), str) else gap.get("r")
+            last = dt_util.parse_datetime(raw) if isinstance(raw, str) else None
+            if last is None or last >= horizon:
+                return False
+        return True
+
+    async def _async_morek_behind(self, settings: AutoSettings) -> None:
+        """Stage 15.10, one look on the capture tick (Morek-owned, car known plugged in, never for a guest car): the
+        existing `PlanWatch` against the *acknowledged active window* and the existing `PowerSampler` for clean minutes.
+        A confirmed behind (PlanWatch's own thresholds, confirmation and backoff) makes one `async_recalculate()`, the
+        existing strict recalculation that reaches the guarded worker; this look sends nothing itself and never starts
+        or stops a charge. Every missing or doubtful fact is *unknown* (no judgement, no sample), never behind."""
+        try:
+            await self._morek_behind_look(settings)
+        except Exception:  # noqa: BLE001 - a look at the plan is a convenience, never a failure
+            _LOGGER.debug("Looking at the Morek plan's progress failed", exc_info=True)
+
+    async def _morek_behind_look(self, settings: AutoSettings) -> None:
+        controller = self._charger_controller()
+        if controller is None or self._morek_progress is None or self._sampler is None:
+            return
+        now = self._now()
+        guest = is_guest(settings)
+        self._morek_behind_active = True
+        try:
+            progress = await self._morek_progress(now)
+        except Exception:  # noqa: BLE001 - unreadable evidence is unknown
+            progress = None
+        if self._shutdown:
+            return
+        progress = progress if isinstance(progress, dict) else {}
+        window = None if progress.get("sending") else progress.get("window")
+        if not (isinstance(window, tuple) and len(window) == 3):
+            window = None
+        paused = bool(self._executor.paused if self._executor is not None else False) or bool(
+            controller.held_off_by_person
+        )
+        # A hold (Pause/Stop/Charge Now never reach `window`; a person's Stop or a paused executor are here), a guest
+        # car or a car not known connected drops the window: nothing is watched or learned.
+        if guest or paused or controller.known_connected is not True or controller.plugged_in_for_count is None:
+            window = None
+        count = controller.plugged_in_for_count
+        # The settled routine record's acknowledged attempt id (window open or not); unknown/uncertain/pending/Pause/
+        # Charge Now/replaced is None. Only a known id lets a mid or ended window be judged.
+        settled = progress.get("settled")
+        settled = settled if isinstance(settled, str) and settled else None
+        prior_ack = self._morek_ack
+        if count is not None and self._morek_session is not None and count != self._morek_session:
+            # A positively different plug-in (unknown is not a change): the watch, held figure and stretch were another
+            # car session's, compared before the new window overwrites the session below.
+            self._morek_behind_reset()
+            self._morek_behind_active = True
+            self._morek_session = count
+            prior_ack = None
+        if window is not None:
+            self._morek_window_end, self._morek_session = window[1], count
+            if settled is not None:
+                self._morek_ack = settled
+        elif guest or paused or controller.known_connected is False:
+            # A known new intent (a person's Stop, a paused executor, a guest, a known unplug, a new plug-in): over.
+            self._morek_window_end = None
+        # Otherwise an absent window (pending/uncertain write, unknown link, unreachable record, Charge Now) is not proof
+        # that the window ended: the end and the held figure stay until the known end passes (`_frozen_learned_cap`).
+        end = self._morek_window_end
+        if end is not None and end <= now:
+            self._morek_window_end = end = None
+        if end is None and self._power_freeze is not None:
+            self._power_freeze = None  # the active window is over: the next planning decision reads the live figure
+        if end is not None:
+            self._plan_power_cap_kw(settings)  # hold the figure the plan uses before any sample can move it
+        link = progress.get("link")
+        link_up = isinstance(link, dict) and link.get("state") == "up"
+        link_key = (link.get("connection_id"), link.get("since")) if link_up else None
+        continuous = link_key is not None and (self._behind_link_key is None or self._behind_link_key == link_key)
+        self._behind_link_key = link_key
+        live = progress.get("live") if isinstance(progress.get("live"), dict) else {}
+        register = live.get("energy_register_kwh")
+        register_fresh = isinstance(register, dict) and register.get("fresh") is True
+        flow = progress.get("flow")
+        facts = None if self._vehicle_reader is None else self._vehicle_reader(settings.target.vehicle_id or "")
+        checked, identified = self._notification_vehicle()
+        known_car = checked and bool(identified) and facts is not None and facts.vehicle_id == identified
+        entity_id = self._energy_register_entity_id()
+        reading = self._read_energy_register()
+        # Fresh, session-bound, measurable evidence (window or not): a live link without a break, the planned car, a
+        # fresh credible register reading, nothing held, paused or being written.
+        proof = (
+            settled is not None and not guest and not paused and not progress.get("sending")
+            and controller.known_connected is True
+            and count is not None and continuous and known_car and register_fresh and reading is not None
+            and self._register_time_credible(now, entity_id)
+        )
+        countable = window is not None and proof
+        # An ended window is judged only on such evidence of its own plug-in; without it past the wait it is dropped
+        # unjudged (never against the last reading held), so a doubtful end is "unknown", not behind.
+        ending_end = self._watch.ended_end(now)
+        if ending_end is not None and (
+            (settled is not None and prior_ack is not None and settled != prior_ack)  # a newer accepted intent
+            or (not proof and (now - ending_end).total_seconds() >= END_WAIT_S)
+        ):
+            self._watch.discard_ended(now)
+        state = None if entity_id is None else self._hass.states.get(entity_id)
+        reading_at = None if state is None or reading is None else max(state.last_changed, state.last_reported)
+        wiring = self._wiring(settings)
+        amps = int(window[2]) if window is not None else 0
+        planned_kw = power_kw(amps, wiring.phases, wiring.voltage_v) if wiring is not None and amps else 0.0
+        cap = self._plan_power_cap_kw(settings) if window is not None else None
+        power = planned_kw if cap is None else min(planned_kw, cap)
+        need_met_at = None
+        proposal = None if self._snapshot is None else self._snapshot.proposal
+        if proposal is not None and proposal.has_plan and proposal.power_kw > 0:
+            power = min(power, proposal.power_kw)
+            need_met_at = proposal.need_met_at
+        try:
+            held = self._held_by_spotnav(controller, amps)
+        except Exception:  # noqa: BLE001 - unknown is held, not clean
+            held = "unknown"
+        car_ended_at = getattr(controller, "car_ended_at", None)
+        car_ended = window is not None and car_ended_at is not None and car_ended_at >= window[0]
+        ending = self._car_ending(controller)
+        decision = self._watch.check(
+            now,
+            WindowFacts(
+                window=None if window is None else (window[0], window[1]),
+                power_kw=power,
+                need_met_at=need_met_at,
+                reading_kwh=reading if proof else None,
+                reading_at=reading_at if proof else None,
+                held=held,
+                car_ended=car_ended,
+                charging=flow == "charging" and not ending,
+            ),
+        )
+        clean = (
+            countable
+            and held is None
+            and not car_ended
+            and not ending
+            and flow == "charging"
+            and wiring is not None
+            and amps == settings.amps
+            and (now - window[0]).total_seconds() >= START_GRACE_S
+            and not self._tapering(facts)
+        )
+        sample = None
+        if clean:
+            assert wiring is not None and reading is not None
+            learned = self._learned_power(settings)
+            if learned.subject == subject_for(identified):
+                session = f"plug_in:{controller.plugged_in_for_count.isoformat()}"
+                sample = PowerSample(at=now, kwh=reading, session=session, subject=learned.subject, wiring=wiring)
+        self._sampler.sample(sample, planned_kw)
+        if decision is not None and not self._behind_replanning:
+            check = self._watch.last_check
+            tell = check is None or self._watch.tell((check.window_start, check.window_end))
+            (_LOGGER.info if tell else _LOGGER.debug)(
+                "SpotNav charger %s: the Morek charge is behind its plan (%s kWh of %s expected): planning again%s",
+                self._entry_id,
+                None if check is None or check.delivered_kwh is None else round(check.delivered_kwh, 2),
+                None if check is None else round(check.expected_kwh, 2),
+                " after the window" if decision == DECISION_END_REPLAN else "",
+            )
+            self._behind_replanning = True
+            self._hass.async_create_task(self._async_replan_morek_behind())
+
+    async def _async_replan_morek_behind(self) -> None:
+        """One confirmed behind-plan replan: the held power figure is dropped first (a confirmed behind is the one
+        mid-charge moment the learned power may apply), then the existing `_async_replan_behind` (a strict recalculation,
+        no price or cap trigger; the worker's compared, guarded reconcile keeps the active window and sends nothing for an
+        equal schedule)."""
+        try:
+            self._power_freeze = None
+            await self._async_replan_behind()
+        finally:
+            self._behind_replanning = False
 
     def _prove_capture(self, vehicle_id: str, capture: Capture, initial: bool) -> str | None:
         """Stage 15.9b: whether the records retained now prove a capture (`None`) or why not (a `REJECT_REASONS` code).

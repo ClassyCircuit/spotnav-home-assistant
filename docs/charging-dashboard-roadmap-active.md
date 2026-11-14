@@ -3,7 +3,7 @@
 Status: **in progress. This is the only work queue.** Created 2026-11-14 by splitting the old roadmap, which
 is now frozen as a historical reference:
 [archive/charging-dashboard-roadmap-2026-11-14.md](archive/charging-dashboard-roadmap-2026-11-14.md)
-(“the archive”). Source basis: manifest 2.5.128, HEAD `6a50a7ae`, source reading only. Nothing below is
+(“the archive”). Initial audit basis: manifest 2.5.128, HEAD `6a50a7ae`. Stage 15 is now locally implemented and coordinator-reviewed through 2.5.143 with focused mocked checks; see its entries and the handoff for unrun checks. Nothing below is
 installed, deployed or physically verified, and this file authorizes no HA access, charger command, restart
 or deployment. Read `AGENTS.md` and [the development handoff](morek-development-handoff.md) first.
 
@@ -52,7 +52,7 @@ formality.
 | Stage 8.1–8.3 | **Refined and carried** into Stage 8 below (8.2 and 8.3 each split a/b); two product decisions flagged (§9). |
 | Stage 11 (11.1/11.2) | **Superseded `[>]`**, migrated to 15.9a/15.9b, 15.10, 15.11 (exact table in §10). |
 | Stage 13.1–13.4 | **Carried** into Stage 13 below, unchanged in scope. |
-| Stage 15.1–15.11, E1, E2 | **Carried**, with 15.1, 15.4, 15.7, 15.9 split into sized halves (ids keep the parent number). |
+| Stage 15.1–15.11, E1, E2 | **Stage 15 locally implemented and reviewed** through 2.5.143; E1/E2 remain optional user-directed evidence tasks. Split a/b ids stay stable. |
 | Archive B1/B2/B3/B4/C1 detail | Delivered by Stages 5–6, 12 and carried by 7–8. Obsolete wording (Sections host, A/B chart switch, per-stage “Done when”) is dropped. |
 | Archive C2 “finish the product” | Covered by Stage 12/13 plus the 8.1 session rows; no separate stage. |
 | Archive §6 “decisions still to settle” | Only three remain open: D1 cost display, D2 savings baseline, D3 history retention (§9). Visual approval is 5.1. |
@@ -95,8 +95,7 @@ One at a time; “Needs” lists the only real dependencies. Stable parent ids; 
 | 29 | 8.3a Savings baseline (backend) | 8.2a, D2 | |
 | 30 | 8.3b Savings and summary cards | 8.3a, 7.5 | |
 
-Items 1–15 are the committed implementation sequence (Stage 15; 15.10 may be skipped without blocking
-anything). Items 16–30 are later features: none is a prerequisite for Stage 15 or for 5.8; the order is the
+Items 1–15 (Stage 15) are now locally implemented and coordinator-reviewed through 2.5.143. Do not reassign them. The next feature work is item 16 (Stage 13.1), only when the user requests it. Items 16–30 are later features: none is a prerequisite for Stage 15 or for 5.8; the order is the
 suggested default (13, then 7, then 8) and the user may reorder it. **Not in the queue:** §9.B reviews,
 §9.C user-owned items, E1/E2.
 
@@ -176,7 +175,7 @@ it or prove deployed behavior.
    reason to dispatch; an interrupted or unknown outcome is never blind-retried; optional hardware
    experiments (E1/E2) are evidence tasks and block nothing.
 
-## 7. Stage 15 — resilience, connection-aware status, trustworthy learning (substages)
+## 7. Stage 15 — locally implemented and reviewed (2.5.129–2.5.143)
 
 Every item: Standard acceptance (§4); ◆ also the §5 contract, with the **rows named** below as extra checks.
 Current-behaviour claims are source reading of 2.5.128. Archive references: “Stage 15” (settled decisions,
@@ -235,7 +234,7 @@ while offline”.
   exactly once through the existing reconcile; the new transient blocker adds only a non-sending timer within
   the 12-check cap; a changed point object never creates a plug-in (14.3 `note_sensor` rule).
   *Exclusions:* no readback, no start, no UI beyond the status field, no boot counter persistence.
-- [x] **15.5 Guarded start after a confirmed reboot (boot signal); backend “charging must be enabled” ◆.** *Locally implemented with mocked checks (2.5.132); mocked review pending (coordinator); not installed or live-verified. Whether the installed OCPP integration exposes `charger_generation`, and whether HA re-stamps the status/transaction sensors after a reboot, is unverified; without them readiness says `unknown` and only the existing paths act.* Landed as `MorekSessionCoordinator.note_boot`/`evaluate_boot`/`boot_status` (the monitor delivers a within-process counter rise and re-evaluates on every poll/event; `reconnect()` no longer mints `boot:` from a counter compare), readiness `boot_start` and `charging_enabled` (`enabled`/`not_ready`/`unknown`). Tests: `tests/test_stage_155_boot_start.py`. *Scope:* make the
+- [x] **15.5 Guarded start after a confirmed reboot (boot signal); backend “charging must be enabled” ◆.** *Locally implemented with mocked checks (2.5.132); coordinator reviewed; not installed or live-verified. Whether the installed OCPP integration exposes `charger_generation`, and whether HA re-stamps the status/transaction sensors after a reboot, is unverified; without them readiness says `unknown` and only the existing paths act.* Landed as `MorekSessionCoordinator.note_boot`/`evaluate_boot`/`boot_status` (the monitor delivers a within-process counter rise and re-evaluates on every poll/event; `reconnect()` no longer mints `boot:` from a counter compare), readiness `boot_start` and `charging_enabled` (`enabled`/`not_ready`/`unknown`). Tests: `tests/test_stage_155_boot_start.py`. *Scope:* make the
   existing `boot:`/`offline:` token path reachable from reliable evidence. **Confirmed reboot** = positive boot
   evidence only: the boot counter rose within this process, **and** a fresh connector report of `Preparing`
   was observed after that signal. A failed link plus a changed connection/point object is **connection
@@ -265,7 +264,7 @@ while offline”.
   `not_ready` causes no send, clear or second start; also rerun `test_morek_start_schedule_evidence.py`,
   `test_morek_readiness.py`. *Exclusions:* no retry loop, no start from unknown/stale status, no change to
   Morek’s authorization setting, no schedule send.
-- [x] **15.3 Reconnect and startup read-only schedule check ◆.** *Locally implemented with mocked checks (2.5.133); mocked review pending (coordinator); not installed or live-verified. What the installed charger answers to `GetCompositeSchedule` after a reconnect is unverified.* Landed as `execution/morek_checker.py` (`MorekScheduleChecker`, `worker.checker`, created in `__init__.py` before the link monitor starts), `async_schedule_action(..., "fetch", check=...)` (a writeless branch `_checked_readback`; `check_candidate`/`classify_check` in `api/morek_schedule.py`), status `reconciliation.check`. Tests: `tests/test_stage_153_schedule_check.py`. *Scope:* a `ScheduleChecker` in the worker
+- [x] **15.3 Reconnect and startup read-only schedule check ◆.** *Locally implemented with mocked checks (2.5.133); coordinator reviewed; not installed or live-verified. What the installed charger answers to `GetCompositeSchedule` after a reconnect is unverified.* Landed as `execution/morek_checker.py` (`MorekScheduleChecker`, `worker.checker`, created in `__init__.py` before the link monitor starts), `async_schedule_action(..., "fetch", check=...)` (a writeless branch `_checked_readback`; `check_candidate`/`classify_check` in `api/morek_schedule.py`), status `reconciliation.check`. Tests: `tests/test_stage_153_schedule_check.py`. *Scope:* a `ScheduleChecker` in the worker
   lifecycle running the existing read-only `fetch` path (`async_schedule_action(..., "fetch")`, `read_only`
   admission, `compare_schedule`: remaining intervals only) after a link-up/connection-change edge, the
   existing availability-return hook, a detected boot, and HA startup once the link is up. Only an acknowledged
@@ -314,7 +313,7 @@ while offline”.
   the 14.5 retry count; the run is a normal bounded decision event (`trigger=repair`). *Exclusions:* no change
   to Stage 14 triggers or 14.4 rules; no `clear_profile`; no repair from age, SOC delta or a replayed update;
   no start request; **no automatic wire repair in a shipped build** (gate stays off).
-- [x] **15.4b Repair deferral for a correct charge and post-repair escalation ◆.** *Locally implemented with mocked checks (2.5.135); coordinator reviewed; **`REPAIR_DISPATCH_ENABLED = True` in the working tree only — not committed, not installed, not live-verified**. Decisions: unknown/stale flow or unknown facts defer (never permission to interrupt); a repair the charger rejects, and a confirmed mismatch of an attempt that is itself a repair, persist `repair_escalation` (needs a person, restart-proof, no further automatic repair). Handoff entry 2026-11-14 “Stage 15.4b”.* *Scope:* Before enabling dispatch, revalidate confirmation age at the final pre-wire boundary (latest readback at most 30 s old on wall and monotonic clocks); storage/lock delays must not reuse stale evidence.  when fresh measured
+- [x] **15.4b Repair deferral for a correct charge and post-repair escalation ◆.** *Locally implemented with mocked checks (2.5.135); coordinator reviewed; **`REPAIR_DISPATCH_ENABLED = True` in committed source since 2.5.135; not installed or live-verified**. Decisions: unknown/stale flow or unknown facts defer (never permission to interrupt); a repair the charger rejects, and a confirmed mismatch of an attempt that is itself a repair, persist `repair_escalation` (needs a person, restart-proof, no further automatic repair). Handoff entry 2026-11-14 “Stage 15.4b”.* *Scope:* Before enabling dispatch, revalidate confirmation age at the final pre-wire boundary (latest readback at most 30 s old on wall and monotonic clocks); storage/lock delays must not reuse stale evidence.  when fresh measured
   power shows the car charging, the readback’s *current* limit equals the intended current and the difference is
   only a future transition more than **10 minutes** away (constant), defer the repair and recheck every
   5 minutes; proceed when the gap reaches 10 minutes, when charging or the current limit no longer matches, or
@@ -368,7 +367,7 @@ while offline”.
   Default copy and who-acts rules: archive “Status wording”. *Acceptance:* each state has a wording test;
   nothing claims a repair or check proves charging; offline never reads as a charging failure; absent fields
   degrade; i18n parity in every language file; no new write path. *Exclusions:* no backend change.
-- [x] **15.8 Late cumulative-register reconciliation of closed session totals ◆.** *Locally implemented with mocked checks (2.5.139); coordinator reviewed (coordinator); not installed or live-verified. Corrected before commit: only the recorder's own open/close register pair counts as association proof; a later register rise has no session/transaction binding in the evidence store, so it is shown as `unassigned_register_kwh` on an `uncertain` record with no total (the overnight 20.9 kWh case is not automatically attributable). Whether the installed charger/HA replays register values is unverified; limits are in the handoff.* Landed as `sessions/reconcile.py`, the recorder's `register_pair` and `_reconcile_late`, `ChargeSession.late`, history `sessions[].reconciliation`. Tests: `tests/test_stage_158_late_reconciliation.py`. *Scope:* one bounded
+- [x] **15.8 Late cumulative-register reconciliation of closed session totals ◆.** *Locally implemented with mocked checks (2.5.139); coordinator reviewed; not installed or live-verified. Corrected before commit: only the recorder's own open/close register pair counts as association proof; a later register rise has no session/transaction binding in the evidence store, so it is shown as `unassigned_register_kwh` on an `uncertain` record with no total (the overnight 20.9 kWh case is not automatically attributable). Whether the installed charger/HA replays register values is unverified; limits are in the handoff.* Landed as `sessions/reconcile.py`, the recorder's `register_pair` and `_reconcile_late`, `ChargeSession.late`, history `sessions[].reconciliation`. Tests: `tests/test_stage_158_late_reconciliation.py`. *Scope:* one bounded
   reconciliation when a session closes or a late register value arrives: total = register at close − register
   at open (the session recorder’s pair) versus energy already placed from observed samples; the remainder is
   stored as **unplaced late energy** with `placement: unknown` and a reason (gap, `link_down` once 15.2
@@ -385,7 +384,7 @@ while offline”.
   *Exclusions:* no timeline backfill, no charger command, no new store beyond additive fields, no claim of when
   the energy occurred.
 - [x] **15.9a Energy learner fed on the Morek path ◆ (former 11.1, part 1).** *Locally implemented, capture-only, with mocked checks (2.5.140); coordinator reviewed; not installed or live-verified. Landed as `AutoPlannerController._capture_energy` (60 s `@callback` tick, Morek-owned only), `EnergySampler.observe_capture`, `Capture`/`CaptureAnchor` in `planning/learned_energy.py`; tests `tests/test_stage_159a_energy_capture.py`. Limits in the handoff: controller facts inferred from code and a fake controller, not proven on hardware; safety-stop/protection not recorded; `late_energy` is a capture-time snapshot; `tests/test_learned_energy.py` hass-fixture tests not re-run here.* *Scope:* under Morek schedule
-  ownership nothing is sampled today (`_check_plan`, the only caller of `_sample_energy`, runs only from
+  ownership nothing was sampled before 15.9a (`_check_plan`, the former sole caller of `_sample_energy`, ran only from
   `_arm_watch` on Auto-owned windows). Add a bounded 60 s tick tied to a known plug-in that calls only
   `_sample_energy` into the **existing** `EnergySampler`/`LearnedEnergyStore`. First prove by test which
   controller facts (`plugged_in_at`, `known_connected`, `charging`) are live under Morek ownership; where one
@@ -436,7 +435,7 @@ while offline”.
   refused; i18n parity; stale display never claims precision; opening the view writes nothing. Only the reset
   action needs the Stage 14 backend files. *Exclusions:* no new learning rule; retuning constants from user
   summaries is a separate optional review.
-- [ ] **15.10 Morek behind-plan check and power-learner feed ◆ (former 11.2; deferrable).** *Scope:* run the
+- [x] **15.10 Morek behind-plan check and power-learner feed ◆ (former 11.2; deferrable).** *Locally implemented with mocked checks (2.5.143); coordinator reviewed; not installed or live-verified. Landed in `AutoPlannerController._async_morek_behind` on the 60 s capture tick (existing `PlanWatch`/`PowerSampler`), `morek_schedule.behind_window`, `__init__._morek_progress`, and the held power figure `_frozen_learned_cap`; tests `tests/test_stage_1510_behind_power.py`. Limits in the handoff: controller hold facts under Morek ownership and the link monitor are inferred, not hardware-proven; Stage 14 ◆ files 141/145_fresh/146, session and recovery files not re-run. Stage 15 implementation and coordinator review are locally complete; optional E1/E2 remain open.* *Scope:* run the
   existing `PlanWatch` and `PowerSampler` against the **acknowledged active window**
   (`morek_schedule.active_window`) instead of an Auto plan’s windows; a confirmed “behind” calls the existing
   `async_recalculate()`, whose changed plan reaches the worker as a strict recalculation. The power learner
@@ -633,8 +632,7 @@ whether the installed OCPP integration exposes `charger_generation`); E1 and E2;
 
 ## 10. Closed and superseded (do not reassign)
 
-Stage 11 is **superseded `[>]` and not implemented**. Source fact: nothing is sampled by the learners under
-Morek ownership, while both stores already feed `_morek_input_evidence` (`_learned_energy_for`,
+Stage 11 is **superseded `[>]` as a separate queue**; its carried scope is now locally implemented in Stage 15.9–15.11. At the initial audit, nothing was sampled under Morek ownership, while both stores already fed `_morek_input_evidence` (`_learned_energy_for`,
 `_plan_power_cap_kw`); only the feed and safe behind-plan use are missing.
 
 | Former Stage 11 requirement | Destination |
