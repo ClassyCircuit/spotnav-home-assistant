@@ -56046,6 +56046,7 @@ var en_default2 = {
   "issue.planningUnavailable.deadlineTooShort": "Not one whole quarter-hour is left before the departure, so nothing can be charged for it.",
   "issue.planningUnavailable.noPublishedPrices": "No prices are published for this price area today.",
   "issue.planningUnavailable.missingFxRate": "The prices cannot be converted to the area's currency yet: waiting for the ECB exchange rate, which is asked for again automatically.",
+  "issue.planningUnavailable.targetSocStale": "The charging plan is waiting for a fresh charge level from the car: the last reading is too old or does not match this charge. It is planned automatically when the car reports its level.",
   "issue.planningUnavailable.unexpectedFailure": "The charging plan could not be calculated because of an unexpected error. The log has the details.",
   "issue.solarUnavailable": "Solar charging is not available: this site cannot measure solar surplus.",
   "issue.priceHorizon": "Prices are missing for part of the required planning window. Set a deadline.",
@@ -60774,6 +60775,9 @@ var WHAT = {
   wait_for_planner: "The plan is being recalculated.",
   check_logs: "The schedule check failed unexpectedly; see SpotNav logs.",
   wait_for_fresh_inputs: "Waiting for a fresh vehicle reading.",
+  // Stage 17.6: a hold the planner names itself; who acts is stated, none of these claims charging.
+  set_battery_capacity: "No plan yet: the battery capacity is not known. Enter it in Plan; the plan is then made automatically, and sent automatically only if the usual safety checks allow it.",
+  wait_for_exchange_rate: "No plan yet: waiting for the ECB exchange rate to convert the prices. It is asked for again automatically and the plan follows.",
   adjust_planning_settings: "The plan cannot be sent as saved; adjust the planning settings.",
   wait_for_prices: "Prices are unavailable or incomplete for the planned window.",
   see_reason: "The schedule is not being updated.",
@@ -60785,7 +60789,8 @@ var WHAT = {
   wait_for_repair_release: "The charger\u2019s schedule differs from the plan, but automatic repair is off, so nothing was sent. Check the schedule in the Morek app."
 };
 var REPAIR_NOTE = /* @__PURE__ */ new Set(["wait_for_repair_deferral", "wait_for_repair_spacing", "wait_for_confirmation", "wait_for_repair_release"]);
-var AUTOMATIC = /* @__PURE__ */ new Set(["wait_for_charger_connection", "check_charger_identity", "retry_after_stop_or_change", "wait_for_planner", "wait_for_fresh_inputs", "wait_for_prices", "check_logs"]);
+var PERSON_THEN_AUTOMATIC = /* @__PURE__ */ new Set(["set_battery_capacity"]);
+var AUTOMATIC = /* @__PURE__ */ new Set(["wait_for_charger_connection", "check_charger_identity", "retry_after_stop_or_change", "wait_for_planner", "wait_for_fresh_inputs", "wait_for_prices", "wait_for_exchange_rate", "check_logs"]);
 var time = (iso) => {
   const at = Date.parse(iso || "");
   return Number.isFinite(at) ? new Date(at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : null;
@@ -60809,8 +60814,12 @@ function recoveryBanner(state, now = Date.now()) {
     const due = next && Date.parse(repair.budget.next_at) > now ? ` It can send again after ${next}.` : "";
     return { level: blocker.action === "wait_for_repair_release" ? "warning" : "info", code: blocker.code, text: `${WHAT[blocker.action]}${due}` };
   }
+  const inputs = reconciliation.inputs || {};
+  if (blocker.action === "wait_for_planner" && inputs.plan_state === "nothing_to_charge" && blocker.code !== "plan_inputs_changed") {
+    return { level: "info", code: blocker.code, text: "Nothing to charge right now: the plan needs no charging, so no schedule is being sent. This describes the plan, not the charger\u2019s actual power. SpotNav plans again when the car, prices or settings change." };
+  }
   const what = WHAT[blocker.action] || WHAT.see_reason;
-  const suffix = ` (${blocker.code})`;
+  const suffix = ` (${blocker.detail || blocker.code})`;
   if (blocker.code === "upload_rejected") {
     const next = time(recovery.next_retry_at);
     if (next && Date.parse(recovery.next_retry_at) > now) {
@@ -60820,10 +60829,12 @@ function recoveryBanner(state, now = Date.now()) {
     return { level: "warning", code: blocker.code, text: `${what} Retrying shortly.${suffix}` };
   }
   const retry = recovery.blocker_retry;
+  if (PERSON_THEN_AUTOMATIC.has(blocker.action)) return { level: "warning", code: blocker.code, text: `${what}${suffix}` };
   if (AUTOMATIC.has(blocker.action)) {
     const next = retry && !retry.exhausted ? time(retry.next_retry_at) : null;
     const when2 = next ? ` SpotNav re-checks automatically at ${next}, and as soon as something changes.` : retry?.exhausted ? " Timed re-checks stopped; SpotNav re-checks when something changes. Use Recalculate/sync to check now." : " SpotNav re-checks when something changes.";
-    return { level: "warning", code: blocker.code, text: `${what}${when2}${suffix}` };
+    const car = blocker.who === "vehicle" ? " The plan is made automatically when the car reports its charge level." : "";
+    return { level: "warning", code: blocker.code, text: `${what}${car}${when2}${suffix}` };
   }
   const paused = blocker.action === "resume_schedule" || blocker.action === "wait_for_charge_now_end";
   return { level: paused ? "info" : "error", code: blocker.code, text: `${what}${paused ? "" : " Needs your attention; it does not clear by itself."}${suffix}` };
@@ -60945,7 +60956,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.154";
+var CARD_VERSION = "2.5.155";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {

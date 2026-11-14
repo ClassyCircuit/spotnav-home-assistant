@@ -201,6 +201,7 @@
   "issue.planningUnavailable.deadlineTooShort": "No queda ni un cuarto de hora completo antes de la salida, así que no se puede cargar nada para ella.",
   "issue.planningUnavailable.noPublishedPrices": "Hoy no hay precios publicados para esta zona de precio.",
   "issue.planningUnavailable.missingFxRate": "Los precios no se pueden convertir a la moneda de la zona: falta el tipo de cambio del día.",
+  "issue.planningUnavailable.targetSocStale": "El plan de carga espera un nivel de carga reciente del coche: la última lectura es demasiado antigua o no corresponde a esta carga. Se planifica automáticamente cuando el coche informe de su nivel.",
   "issue.planningUnavailable.unexpectedFailure": "No se ha podido calcular el plan de carga por un error inesperado. El registro tiene los detalles.",
   "issue.solarUnavailable": "La carga solar no está disponible: esta instalación no puede medir el excedente solar.",
   "issue.priceHorizon": "Faltan precios para parte de la franja de planificación necesaria. Fija una hora límite.",

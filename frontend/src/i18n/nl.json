@@ -201,6 +201,7 @@
   "issue.planningUnavailable.deadlineTooShort": "Er is geen heel kwartier meer over voor het vertrek, dus er kan niets meer voor worden geladen.",
   "issue.planningUnavailable.noPublishedPrices": "Er zijn vandaag geen prijzen gepubliceerd voor dit prijsgebied.",
   "issue.planningUnavailable.missingFxRate": "De prijzen kunnen niet worden omgerekend naar de valuta van het gebied: de wisselkoers van de dag ontbreekt.",
+  "issue.planningUnavailable.targetSocStale": "Het laadplan wacht op een actueel laadniveau van de auto: de laatste meting is te oud of hoort niet bij deze lading. Het wordt automatisch gepland zodra de auto zijn niveau meldt.",
   "issue.planningUnavailable.unexpectedFailure": "Het laadplan kon niet worden berekend door een onverwachte fout. Het logboek bevat de details.",
   "issue.solarUnavailable": "Laden op zonne-energie is niet beschikbaar: deze locatie kan geen zonne-overschot meten.",
   "issue.priceHorizon": "Er ontbreken prijzen voor een deel van het benodigde planningsvenster. Stel een deadline in.",

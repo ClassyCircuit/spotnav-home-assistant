@@ -70,6 +70,7 @@ describe("a planning_unavailable reason the backend names", () => {
       "deadline_too_short",
       "no_published_prices",
       "missing_fx_rate",
+      "target_soc_stale",
       "unexpected_failure",
       "price_data_invalid",
       "insufficient_price_horizon",
@@ -77,6 +78,8 @@ describe("a planning_unavailable reason the backend names", () => {
     ]) {
       expect(worded(reason), reason).not.toBe(generic);
     }
+    // Stage 17.6: a stale/unmatched vehicle reading says what it waits for, and that the plan follows by itself.
+    expect(worded("target_soc_stale")).toMatch(/waiting for a fresh charge level from the car.*planned automatically/);
     expect(worded("deadline_too_short")).toBe(
       "Not one whole quarter-hour is left before the departure, so nothing can be charged for it.",
     );

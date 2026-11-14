@@ -201,6 +201,7 @@
   "issue.planningUnavailable.deadlineTooShort": "Il ne reste même pas un quart d'heure complet avant le départ, rien ne peut donc être chargé.",
   "issue.planningUnavailable.noPublishedPrices": "Aucun prix n'est publié aujourd'hui pour cette zone de prix.",
   "issue.planningUnavailable.missingFxRate": "Les prix ne peuvent pas être convertis dans la devise de la zone : le taux de change du jour manque.",
+  "issue.planningUnavailable.targetSocStale": "Le plan de charge attend un niveau de charge récent de la voiture : la dernière lecture est trop ancienne ou ne correspond pas à cette charge. Il est planifié automatiquement dès que la voiture indique son niveau.",
   "issue.planningUnavailable.unexpectedFailure": "Le plan de charge n'a pas pu être calculé à cause d'une erreur inattendue. Le journal contient les détails.",
   "issue.solarUnavailable": "La charge solaire n'est pas disponible : ce site ne peut pas mesurer le surplus solaire.",
   "issue.priceHorizon": "Des prix manquent pour une partie de la période de planification nécessaire. Définissez une échéance.",

@@ -568,7 +568,7 @@ input-evidence → recalculation → worker-compare path.
 | 4 | 17.3 Missing-capacity fallback — **done locally (2.5.151), awaiting coordinator commit** | 17.2 (shares the capped-energy seam) |
 | 5 | 17.4 Automatic recovery on session finalization — **done locally (2.5.153), awaiting coordinator commit** | 17.1 |
 | 6 | 17.5 Exchange-rate freshness and truthful cap policy — **done locally (2.5.154), awaiting coordinator commit** | 16.2 (one coverage judgement) |
-| 7 | 17.6 Clear blockers and end-to-end automatic recovery | 17.2–17.5 |
+| 7 | 17.6 Clear blockers and end-to-end automatic recovery — **done locally (2.5.155), awaiting coordinator commit** | 17.2–17.5 |
 
 - [x] **17.1 Review and finish the 2.5.146 progress-uncertainty fallback ◆.** *Reviewed and finished locally at
   manifest 2.5.147 (implementation sub-agent; **coordinator review/commit pending**); mocked checks only. Not
@@ -674,7 +674,7 @@ input-evidence → recalculation → worker-compare path.
   (prove; no second rule). EUR areas are unaffected. *Acceptance:* dated rate plans and labels; rate older than 7
   days or absent → blocked, recovers once on arrival; cap boundary price converted with the labelled rate; EUR
   byte-identical; no retry loop added. *Exclusions:* no new FX source, retry schedule or rate estimation.
-- [ ] **17.6 Clear blockers and end-to-end automatic recovery ◆.** *Scope:* one table in code/tests of the
+- [x] **17.6 Clear blockers and end-to-end automatic recovery ◆.** *Locally implemented with mocked checks (2.5.155; coordinator review/commit pending); not installed or live-verified. Found mismatch: with no plan the worker's reason is only `no_current_plan`/`prices_*`, so the recovery banner said "The plan is being recalculated" (or "Waiting for a fresh vehicle reading") even when the planner was waiting for a battery capacity or the ECB rate. Fix: the one table `morek_schedule.PLANNING_HOLDS` (planner/blocker reason → banner action, who acts `system`/`vehicle`/`person`, existing recovery trigger) refines the generic reason through `decision_blocker(reason, plan_reason)` (additive `detail`/`who`/`recovery` on status `reconciliation.blocker` and decision events); banner gains `set_battery_capacity` and `wait_for_exchange_rate` sentences and a car-reports sentence; `target_soc_stale` gets its own status sentence (`issue.planningUnavailable.targetSocStale`, 9 languages) instead of the generic one. No new store, panel, trigger or retry. Tests `tests/test_stage_176_blockers_recovery.py` (19), banner/wording vitest. Final correction: a healthy `nothing_to_charge` now shows a truthful info banner instead of "being recalculated", and the capacity sentence says the automatic send is subject to the usual checks (frontend tests; not live-verified). Honest limits in the handoff.* *Scope:* one table in code/tests of the
   planning holds Stage 17 touches — `target_soc_unknown`, `target_soc_stale`, `target_capacity_unknown`,
   `missing_fx_rate`, `price_data_stale`, `no_prices_yet`/`no_published_prices`, `plan_inputs_changed`,
   `price_inputs_changed` — each with: who acts, the **existing** automatic recovery trigger, and the text in the

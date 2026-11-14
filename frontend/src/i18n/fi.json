@@ -201,6 +201,7 @@
   "issue.planningUnavailable.deadlineTooShort": "Ennen lähtöä ei ole jäljellä yhtään kokonaista varttia, joten mitään ei voi ladata sitä varten.",
   "issue.planningUnavailable.noPublishedPrices": "Tälle hinta-alueelle ei ole julkaistu hintoja tänään.",
   "issue.planningUnavailable.missingFxRate": "Hintoja ei voi muuntaa alueen valuuttaan: päivän valuuttakurssi puuttuu.",
+  "issue.planningUnavailable.targetSocStale": "Latausaikataulu odottaa autolta tuoretta varaustasoa: viimeisin lukema on liian vanha tai ei vastaa tätä latausta. Aikataulu tehdään automaattisesti, kun auto ilmoittaa tasonsa.",
   "issue.planningUnavailable.unexpectedFailure": "Lataussuunnitelmaa ei voitu laskea odottamattoman virheen vuoksi. Lokissa on tiedot.",
   "issue.solarUnavailable": "Aurinkolataus ei ole käytettävissä: tämä kohde ei voi mitata aurinkoylijäämää.",
   "issue.priceHorizon": "Hinnat puuttuvat osasta suunnitteluikkunaa. Aseta lähtöaika.",

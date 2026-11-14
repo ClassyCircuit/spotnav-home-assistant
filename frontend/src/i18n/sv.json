@@ -201,6 +201,7 @@
   "issue.planningUnavailable.deadlineTooShort": "Det finns inte en hel kvart kvar före avresan, så inget kan laddas till den.",
   "issue.planningUnavailable.noPublishedPrices": "Inga priser är publicerade för det här prisområdet i dag.",
   "issue.planningUnavailable.missingFxRate": "Priserna kan inte räknas om till områdets valuta: dagens växelkurs saknas.",
+  "issue.planningUnavailable.targetSocStale": "Laddplanen väntar på en ny laddnivå från bilen: den senaste avläsningen är för gammal eller hör inte till denna laddning. Den planeras automatiskt när bilen rapporterar sin nivå.",
   "issue.planningUnavailable.unexpectedFailure": "Laddplanen kunde inte beräknas på grund av ett oväntat fel. Loggen har detaljerna.",
   "issue.solarUnavailable": "Solladdning är inte tillgänglig: anläggningen kan inte mäta solöverskott.",
   "issue.priceHorizon": "Priser saknas för en del av planeringsperioden. Ange en avresetid.",

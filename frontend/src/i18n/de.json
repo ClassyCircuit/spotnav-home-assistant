@@ -201,6 +201,7 @@
   "issue.planningUnavailable.deadlineTooShort": "Vor der Abfahrt bleibt keine ganze Viertelstunde mehr, daher kann nichts dafür geladen werden.",
   "issue.planningUnavailable.noPublishedPrices": "Für diese Preiszone sind für heute keine Preise veröffentlicht.",
   "issue.planningUnavailable.missingFxRate": "Die Preise lassen sich nicht in die Währung der Preiszone umrechnen: Der Wechselkurs des Tages fehlt.",
+  "issue.planningUnavailable.targetSocStale": "Der Ladeplan wartet auf einen frischen Ladestand des Fahrzeugs: Die letzte Meldung ist zu alt oder passt nicht zu diesem Ladevorgang. Er wird automatisch geplant, sobald das Fahrzeug seinen Stand meldet.",
   "issue.planningUnavailable.unexpectedFailure": "Der Ladeplan konnte wegen eines unerwarteten Fehlers nicht berechnet werden. Details stehen im Protokoll.",
   "issue.solarUnavailable": "Solarladen ist nicht verfügbar: Dieser Standort kann keinen Solarüberschuss messen.",
   "issue.priceHorizon": "Für einen Teil des nötigen Planungszeitraums fehlen Preise. Lege eine Abfahrtszeit fest.",

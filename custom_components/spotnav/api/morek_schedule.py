@@ -1803,11 +1803,43 @@ _DECISION_ACK = {"upload_accepted_unverified": "accepted", "upload_rejected": "r
                  "upload_uncertain": "unknown", "unchanged": "accepted_earlier"}
 
 
-def decision_blocker(reason: str | None) -> dict[str, str] | None:
-    """The current obstacle to applying a new plan, or None. `stale_work` is a superseded run, not a blocker."""
+#: Stage 17.6: the one table of the planning holds Stage 17 touches. Key: a planner reason (`AutoSnapshot.reason`)
+#: or a worker blocker code. Value: (banner action, who acts, the EXISTING input change that ends it). `who` is
+#: `system` (SpotNav waits and recalculates), `vehicle` (the car must report a level; nothing else is guessed) or
+#: `person` (a setting the person owns). Every recovery is the existing path: changed input evidence ->
+#: recalculation -> worker compare -> one send; no hold needs Refresh/Send. None of these claims charging.
+PLANNING_HOLDS: dict[str, tuple[str, str, str]] = {
+    "target_soc_unknown": ("wait_for_fresh_inputs", "vehicle", "vehicle_level_reported"),
+    "target_soc_stale": ("wait_for_fresh_inputs", "vehicle", "vehicle_level_reported"),
+    "target_capacity_unknown": ("set_battery_capacity", "person", "capacity_or_learned_energy_available"),
+    "missing_fx_rate": ("wait_for_exchange_rate", "system", "exchange_rate_published"),
+    "no_prices_yet": ("wait_for_prices", "system", "prices_published"),
+    "no_published_prices": ("wait_for_prices", "system", "prices_published"),
+    "price_data_stale": ("wait_for_prices", "system", "prices_published"),
+    "price_inputs_changed": ("wait_for_prices", "system", "plan_recalculated"),
+    "plan_inputs_changed": ("wait_for_planner", "system", "plan_recalculated"),
+}
+#: Worker reasons that only say "there is no sendable plan": the planner's own reason says why.
+_NO_PLAN_BLOCKERS = frozenset({"no_current_plan", "planning_unavailable", "prices_unavailable",
+                               "prices_stale_or_unavailable"})
+
+
+def decision_blocker(reason: str | None, plan_reason: str | None = None) -> dict[str, str] | None:
+    """The current obstacle to applying a new plan, or None. `stale_work` is a superseded run, not a blocker.
+
+    Stage 17.6: a generic no-plan reason is refined by the planner's own `plan_reason` (additive `detail`, `who`,
+    `recovery`), so a missing exchange rate, battery capacity or vehicle level is never reported as "the plan is
+    being recalculated" or "waiting for a vehicle reading"."""
     if not reason or reason in _DECISION_OK or reason in ("pending", "stale_work", "not_started"):
         return None
-    return {"code": str(reason)[:60], "action": DECISION_BLOCKERS.get(reason, "see_reason")}
+    blocker = {"code": str(reason)[:60], "action": DECISION_BLOCKERS.get(reason, "see_reason")}
+    hold = PLANNING_HOLDS.get(reason)
+    if reason in _NO_PLAN_BLOCKERS and isinstance(plan_reason, str) and plan_reason in PLANNING_HOLDS:
+        hold = PLANNING_HOLDS[plan_reason]
+        blocker["detail"] = plan_reason[:60]
+    if hold is not None:
+        blocker["action"], blocker["who"], blocker["recovery"] = hold
+    return blocker
 
 
 def decision_event(*, now: datetime, kinds: Any, last_trigger: str | None, reason: str | None,
@@ -1839,7 +1871,7 @@ def decision_event(*, now: datetime, kinds: Any, last_trigger: str | None, reaso
         "action": action, "result": reason[:60], "attempt_id": attempt_id,
         "stages": {"intent": "sent" if sent else "none", "ack": ack,
                    "readback": None, "physical": "not_measured"},
-        "blocker": decision_blocker(reason), "repeat": 1,
+        "blocker": decision_blocker(reason, inputs.get("plan_reason")), "repeat": 1,
     }
 
 
@@ -2974,6 +3006,7 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
             if not verified and outcomes.get("verified"):
                 outcomes = {**outcomes, "verified": None}
             preview = _preview(hass, entry.entry_id, target)
+            planning_inputs = _planning_inputs(hass, entry.entry_id)
             link_monitor = getattr(worker, "link_monitor", None)
             checker = getattr(worker, "checker", None)
             try:
@@ -3016,11 +3049,11 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
                                          "continuity": getattr(worker, "continuity", None),
                                          "recovery": {**recovery_status(outcomes, datetime.now(timezone.utc)),
                                                       "blocker_retry": blocker_retry_status(worker)},
-                                         "inputs": _planning_inputs(hass, entry.entry_id),
+                                         "inputs": planning_inputs,
                                          "last_trigger": getattr(worker, "last_trigger", None),
                                          "blocker": decision_blocker(worker.reason if worker is not None and
                                                                      getattr(worker, "reason_serial", -1) == worker._serial
-                                                                     else None),
+                                                                     else None, planning_inputs.get("plan_reason")),
                                          "decision": decision_status(worker, verification, verified, data.get("attempt_id"))},
                       "ownership": ownership,
                       "outcomes": outcomes,

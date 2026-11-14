@@ -327,6 +327,7 @@ export const STATUS_VARIANT_KEYS: readonly TranslationKey[] = [
   "issue.planningUnavailable.deadlineTooShort",
   "issue.planningUnavailable.noPublishedPrices",
   "issue.planningUnavailable.missingFxRate",
+  "issue.planningUnavailable.targetSocStale",
   "issue.planningUnavailable.unexpectedFailure",
 ];
 
@@ -338,6 +339,7 @@ const PLANNING_UNAVAILABLE_KEYS: Readonly<Record<string, TranslationKey>> = {
   deadline_too_short: "issue.planningUnavailable.deadlineTooShort",
   no_published_prices: "issue.planningUnavailable.noPublishedPrices",
   missing_fx_rate: "issue.planningUnavailable.missingFxRate",
+  target_soc_stale: "issue.planningUnavailable.targetSocStale",
   unexpected_failure: "issue.planningUnavailable.unexpectedFailure",
   price_data_invalid: "issue.priceInvalid",
   insufficient_price_horizon: "issue.priceHorizon",

@@ -54,6 +54,44 @@ describe('recoveryBanner', () => {
   });
 });
 
+describe('Stage 17.6 planning holds', () => {
+  const hold = (code, action, who, detail) => state(code, {code, action, who, detail});
+  it('says who acts and that recovery is automatic, without claiming charging', () => {
+    const capacity = recoveryBanner(hold('no_current_plan', 'set_battery_capacity', 'person', 'target_capacity_unknown'), NOW);
+    expect(capacity.text).toMatch(/battery capacity is not known.*Enter it in Plan.*made automatically.*only if the usual safety checks allow.*target_capacity_unknown/);
+    expect(capacity.text).not.toMatch(/made and sent automatically/);
+    expect(capacity.text).not.toMatch(/recalculated|fresh vehicle reading|does not clear by itself/);
+    const rate = recoveryBanner(hold('no_current_plan', 'wait_for_exchange_rate', 'system', 'missing_fx_rate'),
+      NOW);
+    expect(rate.text).toMatch(/ECB exchange rate.*asked for again automatically.*re-checks when something changes.*missing_fx_rate/);
+    const car = recoveryBanner(hold('no_current_plan', 'wait_for_fresh_inputs', 'vehicle', 'target_soc_unknown'), NOW);
+    expect(car.text).toMatch(/fresh vehicle reading.*made automatically when the car reports its charge level/);
+    const prices = recoveryBanner(hold('prices_stale_or_unavailable', 'wait_for_prices', 'system', 'no_prices_yet'), NOW);
+    expect(prices.text).toMatch(/Prices are unavailable.*no_prices_yet/);
+    for (const banner of [capacity, rate, car, prices]) {
+      expect(banner.level).toBe('warning');
+      expect(banner.text).not.toMatch(/charging (has )?(started|is confirmed)|guarantee|Refresh|Send now/i);
+    }
+  });
+  it('describes a healthy nothing_to_charge plan truthfully, not as a recalculation', () => {
+    const idle = recoveryBanner(state('no_current_plan', {code: 'no_current_plan', action: 'wait_for_planner'}, {}, {reconciliation: {reason: 'no_current_plan', blocker: {code: 'no_current_plan', action: 'wait_for_planner'}, recovery: {}, inputs: {plan_state: 'nothing_to_charge', plan_reason: 'already_at_target'}}}), NOW);
+    expect(idle.level).toBe('info');
+    expect(idle.text).toMatch(/Nothing to charge right now.*not the charger’s actual power/);
+    expect(idle.text).not.toMatch(/recalculated|charging (has )?(started|stopped|is confirmed)/i);
+    const recalculating = recoveryBanner(state('plan_inputs_changed', {code: 'plan_inputs_changed', action: 'wait_for_planner'}, {}, {reconciliation: {reason: 'plan_inputs_changed', blocker: {code: 'plan_inputs_changed', action: 'wait_for_planner'}, recovery: {}, inputs: {plan_state: 'nothing_to_charge'}}}), NOW);
+    expect(recalculating.text).toMatch(/recalculated/);
+  });
+  it('keeps Stop precedence over a nothing_to_charge plan', () => {
+    const stop = recoveryBanner(state('connector_changed', {code: 'connector_changed', action: 'retry_after_stop_or_change'}, {}, {reconciliation: {reason: 'connector_changed', blocker: {code: 'connector_changed', action: 'retry_after_stop_or_change'}, recovery: {}, inputs: {plan_state: 'nothing_to_charge'}}}), NOW);
+    expect(stop.text).toMatch(/Stop or a connector change/);
+    expect(stop.text).not.toMatch(/Nothing to charge/);
+  });
+  it('keeps Stop, pause and an unknown outcome blocking', () => {
+    expect(recoveryBanner(state('paused_until_resume', {code: 'paused_until_resume', action: 'resume_schedule'}), NOW).level).toBe('info');
+    expect(recoveryBanner(state('upload_uncertain', {code: 'upload_uncertain', action: 'check_charger_outcome'}, {}, {outcomes: {uncertain: true}}), NOW).level).toBe('error');
+  });
+});
+
 describe('sidebar recovery banner wiring', () => {
   it('is painted from fresh status only and removed when the blocker clears', async () => {
     const raw = JSON.parse(readFileSync('../tests/fixtures/dashboard/target_soc_two_vehicles.json', 'utf8'));

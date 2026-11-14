@@ -201,6 +201,7 @@
   "issue.planningUnavailable.deadlineTooShort": "Det er ikke et helt kvarter igjen før avreise, så ingenting kan lades til den.",
   "issue.planningUnavailable.noPublishedPrices": "Ingen priser er publisert for dette prisområdet i dag.",
   "issue.planningUnavailable.missingFxRate": "Prisene kan ikke regnes om til områdets valuta: dagens valutakurs mangler.",
+  "issue.planningUnavailable.targetSocStale": "Ladeplanen venter på et nytt ladenivå fra bilen: den siste målingen er for gammel eller passer ikke til denne ladingen. Den planlegges automatisk når bilen melder nivået sitt.",
   "issue.planningUnavailable.unexpectedFailure": "Ladeplanen kunne ikke beregnes på grunn av en uventet feil. Loggen har detaljene.",
   "issue.solarUnavailable": "Sollading er ikke tilgjengelig: dette anlegget kan ikke måle soloverskudd.",
   "issue.priceHorizon": "Priser mangler for en del av planleggingsvinduet. Angi et avreisetidspunkt.",
