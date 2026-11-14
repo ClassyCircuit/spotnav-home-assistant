@@ -327,7 +327,7 @@ while offline”.
   window, uncertainty. *Completion step:* flip `REPAIR_DISPATCH_ENABLED` to `True` only after the above pass, with a test that the
   gate-on path cannot send without deferral and escalation present. *Exclusions:* no new thresholds beyond the
   two constants, no UI (15.7b).
-- [ ] **15.6 Connection-aware freshness (backend) ◆.** *Scope:* one shared judgement per quantity returning
+- [x] **15.6 Connection-aware freshness (backend) ◆.** *Locally implemented with mocked checks (2.5.136); coordinator reviewed; not installed or live-verified. Landed as `execution/morek_freshness.py` (pure `judge_event`/`judge_sampled`, cadence from evidence-store samples, `link_facts` from the 15.2 monitor), additive `readiness.freshness {expected, link, quantities}`; `vehicle`, `measurement`, `charging_enabled` and `observe_initial` use it; the readings' strict `fresh` flag, `connector_evidence` (now the named `STRICT_EVIDENCE_MAX_AGE_S`) and the 15.5 post-boot evidence are untouched. Without a link monitor the strict 180 s bound applies. Tests: `tests/test_stage_156_freshness.py`.* *Scope:* one shared judgement per quantity returning
   `{state: current|last_known|idle|unknown, basis, reported_at, age_s, link, reason}`, replacing the fixed
   180 s bounds at the **display/readiness** sites (`_session_readiness`, `LIVE_MAX_AGE_S` display use) and
   the coordinator’s `observe_initial`. Event-driven quantities (connector status, transaction) are `current`

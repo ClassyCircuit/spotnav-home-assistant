@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from ..api import morek_schedule
 from ..runtime import controller_for, domain_data, preview_for
+from .morek_freshness import STRICT_EVIDENCE_MAX_AGE_S, judge_event, link_facts
 from .command_admission import classify_morek_identity, command_admission, physical_connector
 
 _LOGGER = logging.getLogger(__name__)
@@ -393,8 +394,12 @@ class MorekSessionCoordinator:
         if state is None or getattr(state, "attributes", {}).get("restored", False):
             return
         stamp = getattr(state, "last_reported", None) or getattr(state, "last_updated", None)
-        if (isinstance(stamp, datetime) and stamp.tzinfo is not None
-                and 0 <= (now - stamp).total_seconds() <= 180):
+        if isinstance(stamp, datetime) and stamp.tzinfo is not None and (
+                0 <= (now - stamp).total_seconds() <= STRICT_EVIDENCE_MAX_AGE_S
+                # 15.6: an unchanged report is also current while this process has seen the link continuously up
+                # since it (never a report that predates the monitor's own observation, so never pre-restart).
+                or judge_event(stamp, now, link_facts(getattr(self.worker, "link_monitor", None)))["state"]
+                == "current"):
             self.observe(None, state.state)
             return
         if str(state.state).lower() != "preparing":

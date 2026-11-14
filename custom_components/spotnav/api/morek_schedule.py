@@ -27,6 +27,7 @@ from homeassistant.helpers.event import async_call_later
 from ..const import DOMAIN, MOREK_CONNECTOR_ID, MOREK_STATION_ID
 from ..execution.execution_ownership import ownership_store
 from ..execution.command_admission import command_admission
+from ..execution.morek_freshness import STRICT_EVIDENCE_MAX_AGE_S
 from ..execution.morek_outcomes import OutcomeUnavailable, outcomes_for
 from ..planning.planner import MOREK_MAX_BLOCKS
 from ..runtime import domain_data, preview_for, controller_for
@@ -466,7 +467,7 @@ def connector_evidence(hass: Any, controller: Any, now: datetime) -> str:
         if not isinstance(timestamp, datetime) or timestamp.tzinfo is None:
             return "unknown"
         age = (_utc(now) - timestamp).total_seconds()
-        if age < 0 or age > 180:
+        if age < 0 or age > STRICT_EVIDENCE_MAX_AGE_S:  # Stage 14 bound: 15.6 display freshness never loosens it
             return "unknown"
         state = normalise_ocpp(str(observation.state))
     except Exception:  # noqa: BLE001 - unavailable evidence is unknown
@@ -1274,7 +1275,7 @@ def link_reading(hass: HomeAssistant, target: Any) -> tuple[str, Any, int | None
     return ("up" if status == "ok" else "down"), point, (boot if type(boot) is int and boot > 0 else None)
 
 
-LIVE_MAX_AGE_S = 180  # same bound as the connector observation: a presentation limit, not a heartbeat
+LIVE_MAX_AGE_S = STRICT_EVIDENCE_MAX_AGE_S  # the strict `fresh` flag control flow reads; display uses 15.6 judgements
 
 
 def _live_reading(state: Any, now: datetime, value: Any, unit: str) -> dict[str, Any] | None:
@@ -1399,31 +1400,80 @@ def _live_measurements(hass: HomeAssistant, controller: Any, now: datetime,
     return live
 
 
-def _charging_enabled(reading: dict[str, Any] | None) -> dict[str, Any]:
+def _charging_enabled(reading: dict[str, Any] | None, judgement: dict[str, Any] | None = None) -> dict[str, Any]:
     """The charge-control switch as evidence that charging is enabled; never a command or an inference.
 
-    Only a fresh `on` is `enabled`. A fresh `off` and an unreadable or stale switch are both `not_ready`
-    (unconfirmed is not enabled). Even `enabled` proves neither authorization nor a transaction."""
+    Only a current `on` is `enabled`. A current `off` and an unreadable or not-current switch are both `not_ready`
+    (unconfirmed is not enabled). `judgement` (15.6) says whether the quiet derived switch is still current on the
+    link; without one the strict `fresh` flag decides. Even `enabled` proves neither authorization nor a transaction."""
     if not isinstance(reading, dict) or reading.get("value") not in ("on", "off"):
         return {"state": "not_ready", "reason": "control_unconfirmed"}
     base = {"observed_at": reading.get("observed_at")}
-    if reading.get("fresh") is not True:
+    current = reading.get("fresh") is True if judgement is None else judgement.get("state") == "current"
+    if not current:
         return {"state": "not_ready", "reason": "control_unconfirmed", **base}
     if reading["value"] == "off":
         return {"state": "not_ready", "reason": "control_off", **base}
     return {"state": "enabled", "reason": "control_on", **base}
 
 
+def _reading_time(reading: Any) -> datetime | None:
+    try:
+        stamp = datetime.fromisoformat(reading["observed_at"])
+    except (TypeError, KeyError, ValueError):
+        return None
+    return stamp if stamp.tzinfo is not None else None
+
+
+def _quantity_freshness(hass: Any, live: dict[str, Any], monitor: Any, entry_id: str | None,
+                        now: datetime) -> dict[str, Any]:
+    """Stage 15.6: the shared display/readiness judgement per quantity (additive; control flow never reads it).
+
+    Event quantities are current while the link is continuous since the report; sampled ones within the adaptive
+    cadence bound, idle only when no reading is expected. See `execution/morek_freshness`."""
+    from ..execution import morek_freshness as fresh
+    from ..sessions import evidence
+
+    link = fresh.link_facts(monitor)
+    now = _utc(now)
+    out: dict[str, Any] = {}
+    status, transaction = live.get("status"), live.get("transaction")
+    for name, reading in (("status", status), ("transaction", transaction),
+                          ("charging_control", live.get("control_state"))):
+        out[name] = fresh.judge_event(_reading_time(reading), now, link)
+        if isinstance(reading, dict) and reading.get("value") is None and out[name]["state"] == "current":
+            out[name] = {**out[name], "state": "unknown", "basis": "unreadable", "reason": "unreadable"}
+    expected = fresh.expectation(
+        {"judgement": out["status"], "value": (status or {}).get("normalized")} if status else None,
+        {"judgement": out["transaction"], "value": (transaction or {}).get("value")} if transaction else None)
+    store = evidence.evidence_for(hass) if entry_id else None
+    for name, kind in (("power_w", evidence.KIND_POWER), ("current_a", evidence.KIND_CURRENT),
+                       ("energy_register_kwh", evidence.KIND_REGISTER)):
+        rows: list[dict[str, Any]] = []
+        try:
+            if store is not None:
+                rows = store.samples(entry_id, kind, since=now - timedelta(hours=2), until=now)
+        except Exception:  # noqa: BLE001 - no cadence evidence means the 180 s floor, never a guess
+            rows = []
+        out[name] = fresh.judge_sampled(_reading_time(live.get(name)), now, link,
+                                        bound_s=fresh.sampled_bound_s(rows), expected=expected)
+    return {"expected": expected, "link": out["status"]["link"], "quantities": out}
+
+
 def _session_readiness(hass: HomeAssistant, controller: Any, identity: dict[str, Any], online: bool,
-                       now: datetime) -> dict[str, Any]:
+                       now: datetime, monitor: Any = None, entry_id: str | None = None) -> dict[str, Any]:
     """Read connector observations only; no inference of authorization or physical flow.
 
-    HA state timestamps are conservative evidence of freshness, not a heartbeat: an
-    unchanged state may age out even while the charger is connected.
+    HA state timestamps are conservative evidence of freshness, not a heartbeat. With the link `monitor` (15.6) an
+    unchanged event state stays current while the link has been continuous since its report and sampled values use
+    an adaptive bound (`freshness`); without one the strict 180 s bound applies. Readings keep their strict `fresh`
+    flag for control flow.
     """
     result: dict[str, Any] = {
         "control": "unknown", "vehicle": "unknown", "transaction": "unknown",
         "measurement": "unknown", "vehicle_observed_at": None, "live": None,
+        # Stage 15.6, additive: the per-quantity connection-aware judgement (None until live evidence is read).
+        "freshness": None,
         # Stage 15.5, additive and read-only: whether the charge-control switch confirms enabled charging
         # (`enabled` / `not_ready` / `unknown`). The switch is a derived OCPP entity, not authorization evidence;
         # `not_ready` sends, clears and starts nothing. `boot_start` is the guarded post-reboot start's evidence.
@@ -1457,24 +1507,17 @@ def _session_readiness(hass: HomeAssistant, controller: Any, identity: dict[str,
         result["control"] = "available"
         result["live"] = _live_measurements(hass, controller, now)
         live = result["live"]
-        result["charging_enabled"] = _charging_enabled(live.get("control_state"))
-        if any((live.get(k) or {}).get("fresh") for k in ("current_a", "power_w")):
+        judged = _quantity_freshness(hass, live, monitor, entry_id, now)
+        result["freshness"] = judged
+        quantities = judged["quantities"]
+        result["charging_enabled"] = _charging_enabled(live.get("control_state"), quantities["charging_control"])
+        if any(quantities[k]["state"] == "current" and live.get(k) is not None for k in ("current_a", "power_w")):
             result["measurement"] = "measured"  # flow was measured; never implies a transaction or authorization
-        from ..execution.charger_connection import normalise_ocpp
-        from ..vehicles.ocpp_identity import STATUS_CONNECTOR_KEY, connector_sensor_entity_id
-
-        source = connector_sensor_entity_id(hass, controller.ocpp_target, STATUS_CONNECTOR_KEY)
-        observation = hass.states.get(source)
-        if observation is None or str(observation.state).lower() in ("unknown", "unavailable"):
+        status = live.get("status")
+        if status is None or quantities["status"]["state"] != "current":
             return result
-        timestamp = getattr(observation, "last_reported", None) or getattr(observation, "last_updated", None)
-        if not isinstance(timestamp, datetime) or timestamp.tzinfo is None:
-            return result
-        age = (now - timestamp).total_seconds()
-        if age < 0 or age > 180:
-            return result
-        result["vehicle_observed_at"] = timestamp.isoformat()
-        state = normalise_ocpp(str(observation.state))
+        result["vehicle_observed_at"] = status["observed_at"]
+        state = status.get("normalized")
         if state == "disconnected":
             result["vehicle"] = "disconnected"
         elif state in ("connected", "charging", "paused", "finished"):
@@ -2866,7 +2909,8 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
             aborted_attempt = outcomes.get("attempt") or {}
             aborted_display = (aborted_attempt.get("state") == "aborted_before_dispatch"
                                and aborted_attempt.get("id") == data.get("attempt_id"))
-            readiness = _session_readiness(hass, controller, identity, online, datetime.now(timezone.utc))
+            readiness = _session_readiness(hass, controller, identity, online, datetime.now(timezone.utc),
+                                           link_monitor, entry.entry_id)
             session = getattr(worker, "session", None)
             if session is not None and online:
                 readiness["session_start"] = dict(session.state)
