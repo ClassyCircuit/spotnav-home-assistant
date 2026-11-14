@@ -51,7 +51,8 @@ def test_order_future_and_older_reports():
 
 def test_reading_for_another_car_is_not_used(monkeypatch):
     reading = SimpleNamespace(soc_percent=50, vehicle_id="other", source="vehicle", age_s=1, estimated=False,
-                              reported_at=None, entity_id=None, time_basis="last_updated")
+                              reported_at=None, entity_id=None, time_basis="last_updated",
+                              anchor_percent=None, anchor_at=None, delivered_kwh=None, register_reset=False)
     soc = SimpleNamespace(ensure_watch=lambda _: None, read=lambda _: reading, await_reading=lambda _: None,
                           capacity_kwh=lambda _: 60, vehicle_max_percent=lambda _: None)
     monkeypatch.setattr(auto_controller, "resolve_target_vehicle", lambda *_: ("veh-1", None))

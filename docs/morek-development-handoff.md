@@ -4670,3 +4670,35 @@ Historical partial entry; superseded by the completed foundation above.
 - Not run: full suites, browser/Playwright, HA-fixture tests, live HA/charger/deployment; whether the installed price manager reports `degraded` with these authorities as read here is unverified. Mocks never prove physical charging.
 
 - **Stage 16.2 review correction (uncommitted).** `_validated_proposal` now calls the planner's `morek_price_blocker` for `ready`, `waiting_for_tomorrow` and `degraded` alike (evidence unchanged + coverage by ready/listed finite intervals); a planner without the judge refuses. Uncapped Morek planning uses only `ready`+`listed` days, else `waiting_for_prices/no_prices_yet` (the `or documents` fallback is removed). Fakes in `tests/test_morek_schedule.py` and `tests/test_morek_worker.py` gained a `morek_price_blocker` stand-in. New real-planner tests in `tests/test_stage_162_safe_dispatch.py` (25 pass): ready/waiting changed evidence, stale/unlisted/gapped/non-finite/area-stale, manual-vs-auto parity, blind planner, no usable today. Passed: `test_morek_schedule.py` + `test_stage_162_safe_dispatch.py` (131) with the isolated `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ... --noconftest` form; ruff clean. **Follow-up checks:** worker tests in short chunks: 140 passed, 3 failed with missing Europe/Stockholm timezone data; two failures reproduced on the baseline and the third had the same error. `test_stage_13_reactive.py` was not run again. `npm run build` and `npm run check-dist` passed at 2.5.148. No HA, charger, commit or push.
+
+### 2026-11-14 — Stage 17.2 stale SOC with trustworthy estimates (2.5.149; local mocked; no live HA/charger action; coordinator review/commit pending)
+
+- **Rule (one judgement, in `planning/auto_controller.py`).** `estimate_trusted(facts)` is used by the capped energy resolver
+  (`capped_vehicle_energy`), the capped `_energy_for` basis and `morek_plan_blocker` (guarded admission). An energy-derived estimate is
+  trusted only when: this car (`vehicle_id`), an anchor reading (`anchor_percent` 0–100, `anchor_at`), a known positive capacity,
+  register-measured `delivered_kwh` > 0 and ≤ `ESTIMATE_MAX_DELIVERED_KWH` (40), no register reset (`register_reset`), and anchor age
+  (`soc_age_s`) ≤ `ESTIMATE_MAX_ANCHOR_AGE_S` (12 h). Both constants are named and are the delegate's choice.
+  `capped_planning_facts(facts)`: actual reading → as is; trusted estimate → as is; untrusted estimate → its **anchor reading as an actual
+  level** (12.8 behaviour, never worse; `_progress_adjusted` then subtracts attributed measured progress as for any actual reading);
+  estimate with no anchor → `target_soc_stale`.
+- **Provenance.** `SocReading` (and `LiveVehicleFacts`) gained `anchor_percent`, `anchor_at`, `delivered_kwh`, `register_reset`, set only by
+  `resolve_soc` for an estimate. A register that fell back and kept counting leaves a carried estimate that is flagged `register_reset` and
+  therefore not trusted (the spec's “no reset/gap/backwards”; a backwards register already leaves no estimate). No new SOC source, wake or
+  learner change; the minimum-SOC protection floor (`min_soc_floor`) and the uncapped Morek path are untouched.
+- **Churn guard.** For a capped plan whose level is estimated, `_morek_input_evidence` identifies the level by anchor (vehicle, anchor
+  percent, `anchor_at`, entity, estimated flag) plus `estimate_trusted`, not by the running `soc_percent`; register ticks therefore neither
+  produce `plan_inputs_changed` nor a resend. A new anchor (fresh reading), a trust flip or a cleared label do change it. Uncapped evidence is
+  unchanged. Not done: a pure passage of time that expires trust (12 h) has no input change, so it is noticed at the next recalculation or
+  pre-wire check (`plan_inputs_changed`), not by a timer.
+- **Tests (isolated harness, one file at a time):** new `tests/test_stage_172_stale_soc.py` (12): trust-rule matrix and fallback basis, capped
+  energy shrinks target and minimum from one trusted figure, `resolve_soc` provenance and reset flag, real controller (trusted estimate plans
+  and is labelled; untrusted estimate plans from the anchor; no anchor / unknown car / other car / missing capacity hold), evidence drift vs
+  anchor/trust, blocker, and real worker (dispatch once, drift neither resends nor blocks; fallback dispatches once). Reruns passed:
+  `test_capped_vehicle_energy` 21, 145_fresh 11 (one `SimpleNamespace` reading mock gained the new fields), 145_progress 32, 146 15, 142 22,
+  143 22, 162 25, `test_stage_95_recovery` 14, `test_review_vehicle_update_wait` 2, `test_plan_car_ended_rules` 29,
+  `test_soc_dashboard_provenance_isolated` 6, `test_review_soc_anchor` 3, `test_morek_worker` selected `-k "soc or vehicle or evidence or
+  last_known or unchanged"` 14. Ruff clean; `npm run build` and `check-dist` pass at 2.5.149.
+- **Unrun/limits:** `test_morek_worker` whole file (72 passed before the 25 s limit, no failure seen), `test_stage_13_reactive` whole file
+  (timed out at 25 s with no output), `test_min_soc_floor`/`test_soc_anchor_register`/`test_soc_lagging_register`/`test_soc_report_time_baseline`
+  (`hass`-fixture cases cannot run on this Windows harness; their non-`hass` cases passed), `test_target_soc` (needs `offline_relay`), full
+  suites, browser. Estimates are never claimed to be physical charging; live behavior unverified; not installed.

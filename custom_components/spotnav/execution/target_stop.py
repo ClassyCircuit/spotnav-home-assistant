@@ -119,6 +119,13 @@ class SocReading:
     time_entity_id: str | None = None
     #: Exact vehicle report timestamp, never the HA state-write time.
     reported_at: datetime | None = None
+    #: An estimate only (Stage 17.2): the actual reading it was carried forward from, when that was made, the
+    #: register-measured energy delivered since it and whether the register fell back (a reset) in between.
+    #: Internal provenance for `planning.auto_controller.estimate_trusted`; never planned from by itself.
+    anchor_percent: float | None = None
+    anchor_at: datetime | None = None
+    delivered_kwh: float | None = None
+    register_reset: bool = False
 
 
 @dataclass(frozen=True, slots=True)

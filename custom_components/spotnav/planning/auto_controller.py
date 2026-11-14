@@ -460,6 +460,51 @@ class LiveVehicleFacts:
     soc_time_basis: str | None = None
     #: The car's minimum charge level (`vehicle_properties`), `None` when off.
     min_percent: float | None = None
+    #: An estimate's provenance (`SocReading`, Stage 17.2): the actual reading it started from and when, the
+    #: register-measured energy since, and whether the register reset. `None` for an actual reading.
+    anchor_percent: float | None = None
+    anchor_at: datetime | None = None
+    delivered_kwh: float | None = None
+    register_reset: bool = False
+
+
+#: Stage 17.2: an energy-derived estimate may plan a capped target only while its anchor reading is at most this
+#: old and the register-measured energy since it at most this large (beyond either, error and unseen charging
+#: accumulate); otherwise the plan falls back to the anchor reading itself, as 12.8 always did.
+ESTIMATE_MAX_ANCHOR_AGE_S: Final = 12 * 3600.0
+ESTIMATE_MAX_DELIVERED_KWH: Final = 40.0
+
+
+def _finite(value: Any) -> bool:
+    return not isinstance(value, bool) and isinstance(value, (int, float)) and math.isfinite(value)
+
+
+def estimate_trusted(facts: LiveVehicleFacts | None) -> bool:
+    """The one judgement of whether an energy-derived estimate may be planned from (capped planning and guarded
+    admission alike): anchored on an actual reading of this car, a known capacity, valid register-measured energy
+    since it (no reset or backwards register, which leave none), and anchor age and energy inside the limits."""
+    if facts is None or not facts.soc_estimated or not facts.vehicle_id:
+        return False
+    return (
+        _finite(facts.anchor_percent) and 0 <= facts.anchor_percent <= 100 and facts.anchor_at is not None
+        and _finite(facts.reported_capacity_kwh) and facts.reported_capacity_kwh > 0
+        and _finite(facts.delivered_kwh) and 0 < facts.delivered_kwh <= ESTIMATE_MAX_DELIVERED_KWH
+        and not facts.register_reset
+        and _finite(facts.soc_age_s) and 0 <= facts.soc_age_s <= ESTIMATE_MAX_ANCHOR_AGE_S
+    )
+
+
+def capped_planning_facts(facts: LiveVehicleFacts | None) -> LiveVehicleFacts | None:
+    """The facts a capped plan is made from: an actual reading as it is; a trusted estimate as it is; an untrusted
+    estimate replaced by its anchor reading (never worse than 12.8); `None` when an estimate has no anchor."""
+    if facts is None or not facts.soc_estimated:
+        return facts
+    if estimate_trusted(facts):
+        return facts
+    if not _finite(facts.anchor_percent) or not 0 <= facts.anchor_percent <= 100:
+        return None
+    return replace(facts, soc_percent=facts.anchor_percent, soc_estimated=False, delivered_kwh=None,
+                   register_reset=False)
 
 
 def live_vehicle_facts(
@@ -493,6 +538,10 @@ def live_vehicle_facts(
         soc_entity_id=None if reading is None else reading.entity_id,
         soc_time_basis=None if reading is None else reading.time_basis,
         min_percent=stored_properties(hass, vehicle_id).min_percent,
+        anchor_percent=None if reading is None else reading.anchor_percent,
+        anchor_at=None if reading is None else reading.anchor_at,
+        delivered_kwh=None if reading is None else reading.delivered_kwh,
+        register_reset=bool(reading is not None and reading.register_reset),
     )
 
 
@@ -560,7 +609,7 @@ def capped_vehicle_energy(
         return ("target_soc_unknown", None, None)
     soc, age, capacity = facts.soc_percent, facts.soc_age_s, facts.reported_capacity_kwh
     if (
-        facts.soc_estimated or isinstance(soc, bool) or not isinstance(soc, (int, float))
+        (facts.soc_estimated and not estimate_trusted(facts)) or isinstance(soc, bool) or not isinstance(soc, (int, float))
         or not math.isfinite(soc) or not 0 <= soc <= 100
         or (age is not None and (isinstance(age, bool) or not isinstance(age, (int, float))
                                 or not math.isfinite(age) or age < 0))
@@ -1136,6 +1185,12 @@ class AutoPlannerController:
         vehicle = None if facts is None else (facts.vehicle_id, facts.soc_percent,
             facts.reported_capacity_kwh, facts.max_percent, facts.min_percent,
             facts.soc_source, facts.soc_estimated, facts.soc_report_at, facts.soc_entity_id)
+        if facts is not None and facts.soc_estimated and effective.soft_price_cap is not None:
+            # Stage 17.2: a capped plan's estimated level is identified by its anchor reading, not by the running
+            # value, so register ticks neither invalidate a plan nor trigger a resend; trust flips still do.
+            vehicle = (facts.vehicle_id, facts.anchor_percent, facts.reported_capacity_kwh, facts.max_percent,
+                facts.min_percent, facts.soc_source, True, facts.anchor_at, facts.soc_entity_id,
+                estimate_trusted(facts))
         controller = None if self._executor is None else self._executor.controller
         return (settings.revision, self._key_of(source), effective.area_id, vehicle,
                 self._notification_vehicle(), self._connection_generation, self._connection_ready_generation,
@@ -1167,7 +1222,7 @@ class AutoPlannerController:
             if not checked or not vehicle_id or facts.vehicle_id != vehicle_id:
                 return "vehicle_identity_unavailable"
             age = facts.soc_age_s
-            if (settings.soft_price_cap is not None and facts.soc_estimated) or (
+            if (settings.soft_price_cap is not None and capped_planning_facts(facts) is None) or (
                 age is not None and (isinstance(age, bool) or not isinstance(age, (int, float))
                                      or not math.isfinite(age) or age < 0)
             ):
@@ -3328,6 +3383,15 @@ class AutoPlannerController:
                 settings, await self._manual_kwh_remaining(settings, calculated_at, entry, preview=preview)
             )
         facts = None if self._vehicle_reader is None else self._vehicle_reader(settings.target.vehicle_id or "")
+        if settings.soft_price_cap is not None and facts is not None and facts.soc_estimated:
+            # Stage 17.2: a trusted estimate plans as it is, an untrusted one from its anchor reading.
+            basis = capped_planning_facts(facts)
+            if basis is None:  # an estimate with no anchor reading to fall back on
+                return self._fresh_snapshot(
+                    settings, "planning_unavailable", "target_soc_stale", calculated_at,
+                    entry=entry, price_snapshot=price_snapshot,
+                )
+            facts = basis
         live_soc = None if facts is None else facts.soc_percent
         if (live_soc is None or isinstance(live_soc, bool) or not isinstance(live_soc, (int, float))
                 or not math.isfinite(live_soc) or not 0 <= live_soc <= 100):

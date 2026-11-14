@@ -564,7 +564,7 @@ input-evidence → recalculation → worker-compare path.
 | --- | --- | --- |
 | 1 | 17.1 Review and finish the 2.5.146 progress-uncertainty fallback — **done locally (2.5.147), awaiting coordinator commit** | none (committed) |
 | 2 | **16.2** Safe dispatch, publication continuity, partial-plan UI (existing item, scope unchanged, above) | 16.1, 17.1 |
-| 3 | 17.2 Stale SOC with trustworthy estimates | 17.1; after 16.2 (same `morek_plan_blocker`) |
+| 3 | 17.2 Stale SOC with trustworthy estimates — **done locally (2.5.149), awaiting coordinator commit** | 17.1; after 16.2 (same `morek_plan_blocker`) |
 | 4 | 17.3 Missing-capacity fallback | 17.2 (shares the capped-energy seam) |
 | 5 | 17.4 Automatic recovery on session finalization | 17.1 |
 | 6 | 17.5 Exchange-rate freshness and truthful cap policy | 16.2 (one coverage judgement) |
@@ -603,7 +603,7 @@ input-evidence → recalculation → worker-compare path.
   (Stage 16 above). It is the single owner of: degraded-only-by-tomorrow admission with one coverage judgement,
   and “tomorrow missing/fetch failure must not invalidate valid today coverage”. Stage 17 adds no second
   coverage rule and no price-admission change; 17.5 and 17.6 consume it.
-- [ ] **17.2 Stale SOC with trustworthy estimates ◆.** *Seam (verified in source):* `capped_vehicle_energy`
+- [x] **17.2 Stale SOC with trustworthy estimates ◆.** *Locally implemented with mocked checks (2.5.149; coordinator review/commit pending); not installed or live-verified. One `estimate_trusted`/`capped_planning_facts` rule (constants `ESTIMATE_MAX_ANCHOR_AGE_S` 12 h, `ESTIMATE_MAX_DELIVERED_KWH` 40; reset-flagged or unanchored estimates are not trusted) serves the capped resolver, `_energy_for` and `morek_plan_blocker`; an untrusted estimate falls back to its anchor reading; capped evidence uses the anchor identity plus the trust flag. Tests `tests/test_stage_172_stale_soc.py`; details, unrun checks and the no-timer-expiry limit in the handoff.* *Seam (verified in source):* `capped_vehicle_energy`
   refuses any `soc_estimated` level as `target_soc_stale`, and `morek_plan_blocker` returns `vehicle_input_stale`
   for a capped plan with an estimate, while the uncapped Morek path already plans from one; `_progress_adjusted`
   correctly skips subtraction for an estimate (it already counts the energy). *Scope:* one shared predicate (in

@@ -655,6 +655,10 @@ def resolve_soc(
             restored=restored,
             time_basis="anchor",
             reported_at=anchor.read_at if anchor.time_basis == "vehicle_timestamp" else None,
+            anchor_percent=anchor.soc_percent,
+            anchor_at=anchor.read_at,
+            delivered_kwh=delivered,
+            register_reset=anchor.carried_kwh > 0 or anchor.reset_from_kwh is not None,
         ),
         anchor,
     )
