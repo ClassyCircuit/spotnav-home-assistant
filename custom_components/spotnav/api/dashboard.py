@@ -88,6 +88,7 @@ from ..planning.auto_settings import (
     AutoSettings,
     AutoSettingsStore,
     DEFAULT_CONSUMPTION_KWH_PER_10KM,
+    DRIVER_TARGET_SOC,
     IF_NOT_READY_ASK,
     FiscalOverride,
     PauseIntent,
@@ -423,6 +424,8 @@ class CapturedSoc:
     raw_time_basis: str | None = None
     raw_source: str | None = None
     raw_retained: bool = False
+    #: Stage 15.11: the learned-estimate display block (`AutoPlannerController.learning_estimate`), or `None`.
+    learning: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -791,7 +794,20 @@ def capture_soc(
             target_percent=target,
             vehicle_max_percent=max_percent,
         )
+    learning = None
+    maker = None if preview is None else getattr(preview, "learning_estimate", None)
+    if callable(maker):
+        try:
+            made = maker(vehicle_id, capacity, soc_percent=value, target_percent=target,
+                         vehicle_max_percent=max_percent,
+                         capped=settings.soft_price_cap is not None,
+                         minimum_percent=settings.minimum_ready_by_soc,
+                         manual=settings.driver != DRIVER_TARGET_SOC)
+            learning = made if isinstance(made, dict) else None
+        except Exception:  # noqa: BLE001 - a display block never costs the dashboard
+            learning = None
     return CapturedSoc(
+        learning=learning,
         value=value,
         age_s=None if reading is None else reading.age_s,
         source=None if reading is None else reading.source,
@@ -2138,7 +2154,29 @@ def _proposal_section(capture: CapturedDashboard) -> dict[str, Any] | None:
         "unpriced_slots": proposal.unpriced_slots,
         "priced_slots": proposal.priced_slots,
         **_reserve_fields(proposal, currency),
+        **_learning_fields(capture, proposal),
     }
+
+
+def _learning_fields(capture: CapturedDashboard, proposal: Any) -> dict[str, Any]:
+    """The additive learned-estimate block (nothing when the backend has none). The effect on the plan is worked out
+    here, never by the client: with the default figure it is 0; with a learned one it is the difference of the wall
+    energy the target needs with and without it, at the plan's power, in whole minutes (positive = longer). It stays
+    `null` when the level, target, battery size or plan power is unknown. An estimate, not a guarantee."""
+    soc = capture.soc
+    learning = None if soc is None else soc.learning
+    if not isinstance(learning, dict):
+        return {}
+    block = dict(learning)
+    power = finite_number(proposal.power_kw)
+    used, default = finite_number(block.get("need_kwh")), finite_number(block.get("default_need_kwh"))
+    if block.get("source") == "default" or block.get("applies") is False:
+        block["effect_minutes"] = 0
+    elif used is not None and default is not None and power is not None and power > 0:
+        block["effect_minutes"] = round((used - default) / power * 60.0)
+    else:
+        block["effect_minutes"] = None
+    return {"learning": block}
 
 
 def _reserve_fields(proposal: Any, currency: str | None) -> dict[str, Any]:

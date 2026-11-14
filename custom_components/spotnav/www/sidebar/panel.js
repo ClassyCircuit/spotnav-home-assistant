@@ -2157,14 +2157,14 @@ var init_chunk_M45NRQFW = __esm({
       filterMin: "Min",
       filterTo: "To",
       firstPage: "First page",
-      goToSlide: (slide, count) => `Go to slide ${slide} of ${count}`,
+      goToSlide: (slide, count2) => `Go to slide ${slide} of ${count2}`,
       hideColumn: "Hide column",
       hidePassword: "Hide password",
       hour: "Hour",
       incompleteDate: "Enter a valid date.",
       increment: "Increment",
-      jumpBackwardX: (count) => `Jump back ${count} pages`,
-      jumpForwardX: (count) => `Jump forward ${count} pages`,
+      jumpBackwardX: (count2) => `Jump back ${count2} pages`,
+      jumpForwardX: (count2) => `Jump forward ${count2} pages`,
       lastPage: "Last page",
       loading: "Loading",
       locked: "Locked",
@@ -14066,14 +14066,14 @@ function removeDuplicates(arr, getKey2, resolve) {
     if (true) {
       assert(isString(key3));
     }
-    var count = dupMap.get(key3) || 0;
+    var count2 = dupMap.get(key3) || 0;
     if (resolve) {
-      resolve(item, count);
+      resolve(item, count2);
     }
-    if (!count && !resolve) {
+    if (!count2 && !resolve) {
       arr[writeIdx++] = item;
     }
-    dupMap.set(key3, count + 1);
+    dupMap.set(key3, count2 + 1);
   });
   if (!resolve) {
     arr.length = writeIdx;
@@ -16540,8 +16540,8 @@ var Path = (function(_super) {
   };
   Path2.prototype.hasFill = function() {
     var style = this.style;
-    var fill = style.fill;
-    return fill != null && fill !== "none";
+    var fill2 = style.fill;
+    return fill2 != null && fill2 !== "none";
   };
   Path2.prototype.getBoundingRect = function() {
     var rect = this._rect;
@@ -16789,8 +16789,8 @@ var TSpan = (function(_super) {
   };
   TSpan2.prototype.hasFill = function() {
     var style = this.style;
-    var fill = style.fill;
-    return fill != null && fill !== "none";
+    var fill2 = style.fill;
+    return fill2 != null && fill2 !== "none";
   };
   TSpan2.prototype.createStyle = function(obj) {
     return createObject(DEFAULT_TSPAN_STYLE, obj);
@@ -17539,8 +17539,8 @@ function normalizeStyle(style) {
 function getStroke(stroke, lineWidth) {
   return stroke == null || lineWidth <= 0 || stroke === "transparent" || stroke === "none" ? null : stroke.image || stroke.colorStops ? "#000" : stroke;
 }
-function getFill(fill) {
-  return fill == null || fill === "none" ? null : fill.image || fill.colorStops ? "#000" : fill;
+function getFill(fill2) {
+  return fill2 == null || fill2 === "none" ? null : fill2.image || fill2.colorStops ? "#000" : fill2;
 }
 function getTextXForPadding(x2, textAlign, textPadding) {
   return textAlign === "right" ? x2 - textPadding[1] : textAlign === "center" ? x2 + textPadding[3] / 2 - textPadding[1] / 2 : x2 + textPadding[3];
@@ -17948,9 +17948,9 @@ function blurSeriesFromHighlightPayload(seriesModel, payload, api) {
   dataIndex = (isArray(dataIndex) ? dataIndex[0] : dataIndex) || 0;
   var el = data.getItemGraphicEl(dataIndex);
   if (!el) {
-    var count = data.count();
+    var count2 = data.count();
     var current = 0;
-    while (!el && current < count) {
+    while (!el && current < count2) {
       el = data.getItemGraphicEl(current++);
     }
   }
@@ -22332,20 +22332,20 @@ function makeSeriesEncodeForAxisCoordSys(coordDimensions, seriesModel, source) {
   });
   each(coordDimensions, function(coordDimInfo, coordDimIdx) {
     var coordDimName = coordDimInfo.name;
-    var count = getDataDimCountOnCoordDim(coordDimInfo);
+    var count2 = getDataDimCountOnCoordDim(coordDimInfo);
     if (baseCategoryDimIndex == null) {
       var start2 = datasetRecord.valueWayDim;
-      pushDim(encode[coordDimName], start2, count);
-      pushDim(encodeSeriesName, start2, count);
-      datasetRecord.valueWayDim += count;
+      pushDim(encode[coordDimName], start2, count2);
+      pushDim(encodeSeriesName, start2, count2);
+      datasetRecord.valueWayDim += count2;
     } else if (baseCategoryDimIndex === coordDimIdx) {
-      pushDim(encode[coordDimName], 0, count);
-      pushDim(encodeItemName, 0, count);
+      pushDim(encode[coordDimName], 0, count2);
+      pushDim(encodeItemName, 0, count2);
     } else {
       var start2 = datasetRecord.categoryWayDim;
-      pushDim(encode[coordDimName], start2, count);
-      pushDim(encodeSeriesName, start2, count);
-      datasetRecord.categoryWayDim += count;
+      pushDim(encode[coordDimName], start2, count2);
+      pushDim(encodeSeriesName, start2, count2);
+      datasetRecord.categoryWayDim += count2;
     }
   });
   function pushDim(dimIdxArr, idxFrom, idxCount) {
@@ -24142,9 +24142,9 @@ var DefaultDataProvider = (
           var dimExtent = extent[dim];
           var min3 = dimExtent[0] == null ? Infinity : dimExtent[0];
           var max3 = dimExtent[1] == null ? -Infinity : dimExtent[1];
-          var count = end2 - start2;
+          var count2 = end2 - start2;
           var arr = storage[dim];
-          for (var i7 = 0; i7 < count; i7++) {
+          for (var i7 = 0; i7 < count2; i7++) {
             var val = data[i7 * dimSize + dim];
             arr[start2 + i7] = val;
             val < min3 && (min3 = val);
@@ -25363,15 +25363,15 @@ var DataStore = (
         return this;
       }
       var newStore = this.clone();
-      var count = newStore.count();
+      var count2 = newStore.count();
       var Ctor = getIndicesCtor(newStore._rawCount);
-      var newIndices = new Ctor(count);
+      var newIndices = new Ctor(count2);
       var value2 = [];
       var dimSize = dims.length;
       var offset = 0;
       var dim0 = dims[0];
       var chunks = newStore._chunks;
-      for (var i7 = 0; i7 < count; i7++) {
+      for (var i7 = 0; i7 < count2; i7++) {
         var keep = void 0;
         var rawIdx = newStore.getRawIndex(i7);
         if (dimSize === 0) {
@@ -25391,7 +25391,7 @@ var DataStore = (
           newIndices[offset++] = rawIdx;
         }
       }
-      if (offset < count) {
+      if (offset < count2) {
         newStore._indices = newIndices;
       }
       newStore._count = offset;
@@ -28657,8 +28657,8 @@ function isValidStrokeFillStyle(strokeOrFill) {
   return typeof strokeOrFill === "string" && strokeOrFill !== "none";
 }
 function styleHasFill(style) {
-  var fill = style.fill;
-  return fill != null && fill !== "none";
+  var fill2 = style.fill;
+  return fill2 != null && fill2 !== "none";
 }
 function doFillPath(ctx, style) {
   if (style.fillOpacity != null && style.fillOpacity !== 1) {
@@ -28707,11 +28707,11 @@ function brushPath(ctx, el, style, canBatch, scope) {
   var path = el.path || pathProxyForDraw;
   var dirtyFlag = el.__dirty;
   if (!canBatch) {
-    var fill = style.fill;
+    var fill2 = style.fill;
     var stroke = style.stroke;
-    var hasFillGradient = hasFill && !!fill.colorStops;
+    var hasFillGradient = hasFill && !!fill2.colorStops;
     var hasStrokeGradient = hasStroke && !!stroke.colorStops;
-    var hasFillPattern = hasFill && !!fill.image;
+    var hasFillPattern = hasFill && !!fill2.image;
     var hasStrokePattern = hasStroke && !!stroke.image;
     var fillGradient = void 0;
     var strokeGradient = void 0;
@@ -28722,7 +28722,7 @@ function brushPath(ctx, el, style, canBatch, scope) {
       rect = el.getBoundingRect();
     }
     if (hasFillGradient) {
-      fillGradient = dirtyFlag ? getCanvasGradient(ctx, fill, rect) : el.__canvasFillGradient;
+      fillGradient = dirtyFlag ? getCanvasGradient(ctx, fill2, rect) : el.__canvasFillGradient;
       el.__canvasFillGradient = fillGradient;
     }
     if (hasStrokeGradient) {
@@ -28730,7 +28730,7 @@ function brushPath(ctx, el, style, canBatch, scope) {
       el.__canvasStrokeGradient = strokeGradient;
     }
     if (hasFillPattern) {
-      fillPattern = dirtyFlag || !el.__canvasFillPattern ? createCanvasPattern(ctx, fill, el) : el.__canvasFillPattern;
+      fillPattern = dirtyFlag || !el.__canvasFillPattern ? createCanvasPattern(ctx, fill2, el) : el.__canvasFillPattern;
       el.__canvasFillPattern = fillPattern;
     }
     if (hasStrokePattern) {
@@ -33436,17 +33436,17 @@ function getMinorTicks(scale3, splitNumber, breaks, scaleInterval) {
     if (prevTick["break"] || nextTick["break"]) {
       continue;
     }
-    var count = 0;
+    var count2 = 0;
     var minorTicksGroup = [];
     var interval = nextTick.value - prevTick.value;
     var minorInterval = interval / splitNumber;
     var minorIntervalPrecision = getIntervalPrecision(minorInterval);
-    while (count < splitNumber - 1) {
-      var minorTick = round(prevTick.value + (count + 1) * minorInterval, minorIntervalPrecision);
+    while (count2 < splitNumber - 1) {
+      var minorTick = round(prevTick.value + (count2 + 1) * minorInterval, minorIntervalPrecision);
       if (minorTick > extent[0] && minorTick < extent[1]) {
         minorTicksGroup.push(minorTick);
       }
-      count++;
+      count2++;
     }
     var scaleBreakHelper = getScaleBreakHelper();
     scaleBreakHelper && scaleBreakHelper.pruneTicksByBreak("auto", minorTicksGroup, breaks, function(value2) {
@@ -38021,14 +38021,14 @@ function pointsLayout(seriesType2, forceStoreInTypedArray) {
 var samplers = {
   average: function(frame) {
     var sum = 0;
-    var count = 0;
+    var count2 = 0;
     for (var i7 = 0; i7 < frame.length; i7++) {
       if (!isNaN(frame[i7])) {
         sum += frame[i7];
-        count++;
+        count2++;
       }
     }
-    return count === 0 ? NaN : sum / count;
+    return count2 === 0 ? NaN : sum / count2;
   },
   sum: function(frame) {
     var sum = 0;
@@ -38069,14 +38069,14 @@ function dataSample(seriesType2) {
       var data = seriesModel.getData();
       var sampling = seriesModel.get("sampling");
       var coordSys = seriesModel.coordinateSystem;
-      var count = data.count();
-      if (count > 10 && coordSys.type === "cartesian2d" && sampling) {
+      var count2 = data.count();
+      if (count2 > 10 && coordSys.type === "cartesian2d" && sampling) {
         var baseAxis = coordSys.getBaseAxis();
         var valueAxis2 = coordSys.getOtherAxis(baseAxis);
         var extent = baseAxis.getExtent();
         var dpr2 = api.getDevicePixelRatio();
         var size = Math.abs(extent[1] - extent[0]) * (dpr2 || 1);
-        var rate = Math.round(count / size);
+        var rate = Math.round(count2 / size);
         if (isFinite(rate) && rate > 1) {
           if (sampling === "lttb") {
             seriesModel.setData(data.lttbDownSample(data.mapDimension(valueAxis2.dim), 1 / rate));
@@ -49877,11 +49877,11 @@ function getColorStopValues(visualMapModel, valueState, dataExtent) {
   if (dataExtent[0] === dataExtent[1]) {
     return dataExtent.slice();
   }
-  var count = 200;
-  var step = (dataExtent[1] - dataExtent[0]) / count;
+  var count2 = 200;
+  var step = (dataExtent[1] - dataExtent[0]) / count2;
   var value2 = dataExtent[0];
   var stopValues = [];
-  for (var i7 = 0; i7 <= count && value2 < dataExtent[1]; i7++) {
+  for (var i7 = 0; i7 <= count2 && value2 < dataExtent[1]; i7++) {
     stopValues.push(value2);
     value2 += step;
   }
@@ -52266,8 +52266,8 @@ function mountCharts(root, data, format2, modes) {
       const rect = graphic_exports2.clipRectByRect({ x: s4[0], y: Math.min(s4[1], zero[1]), width: Math.max(1, e9[0] - s4[0]), height: Math.max(2, Math.abs(zero[1] - s4[1])) }, params.coordSys);
       if (!rect) return null;
       const color3 = !bands ? "#75b8e8" : api.value(2) <= bands[0] ? "#37c48f" : api.value(2) <= bands[1] ? "#e9b34e" : api.value(2) <= bands[2] ? "#ef8845" : "#ec6266";
-      const fill = mode === "bar" ? color3 : "rgba(0,0,0,0)";
-      const children = [{ type: "rect", shape: rect, style: { fill } }];
+      const fill2 = mode === "bar" ? color3 : "rgba(0,0,0,0)";
+      const children = [{ type: "rect", shape: rect, style: { fill: fill2 } }];
       return { type: "group", children };
     };
     const setPriceOption = (initial) => priceChart.setOption({
@@ -52527,7 +52527,12 @@ function renderReserve(reserve, currency) {
   const allowance = reserve.allowance;
   return `<div class="plan-reserve"><p><b>Extra allowed time:</b> ${minutesText(reserve.minutes)}${asked}, shown inside the windows above.${explain}${reserve.limitText ? ` ${text3(reserve.limitText)}` : ""}</p><p><b>Potential extra allowed reserve:</b> up to ${energy(allowance?.energyKwh)} \xB7 ${money(allowance?.cost, currency)} \u2014 an upper allowance at plan power and prices, separate from the required baseline; not measured or expected use.</p></div>`;
 }
-function renderPlan(windows, assumptions = {}, stale = false, formatters, totals, reserve) {
+function renderLearning(learning) {
+  if (!learning || !Array.isArray(learning.lines)) return "";
+  const lines = learning.lines.map((line) => `<p>${escapeText2(line)}</p>`).join("");
+  return `<div class="plan-learning"><p><b>${escapeText2(learning.title ?? "Charging-time estimate")}</b>${learning.stale && learning.staleText ? ` \xB7 ${escapeText2(learning.staleText)}` : ""}</p>${lines}<p class="projection-note">${escapeText2(learning.note ?? "Estimate, not a guarantee.")}</p></div>`;
+}
+function renderPlan(windows, assumptions = {}, stale = false, formatters, totals, reserve, learning) {
   if (!formatters || typeof formatters.time !== "function" || typeof formatters.day !== "function") throw new TypeError("Plan time and day formatters are required");
   const time2 = (value2) => Number.isFinite(value2) ? escapeText2(formatters.time(value2)) : "Unknown";
   const day = (value2) => Number.isFinite(value2) ? escapeText2(formatters.day(value2)) : "Unknown";
@@ -52545,7 +52550,7 @@ function renderPlan(windows, assumptions = {}, stale = false, formatters, totals
   const capacity = number(assumptions.capacityKwh, 0, " kWh", (n6) => n6 > 0);
   const efficiency = number(Number.isFinite(assumptions.efficiency) ? assumptions.efficiency * 100 : null, 0, "%", (n6) => n6 > 0 && n6 <= 100);
   const projectionBasis = assumptions.projectionSupported ? `${start2} start, ${number(assumptions.projectionKwhPerPercent, 3, " wall kWh per SOC point", (n6) => n6 > 0)}` : `${start2} start, ${capacity} usable capacity, ${efficiency} efficiency`;
-  return `<div class="plan-heading"><div><h3>Complete proposed plan${stale ? ` \xB7 ${escapeText2(formatters.staleLabel ?? "stale")}` : ""}</h3><p>Estimated, not measured or guaranteed \xB7 wall energy \xB7 ${escapeText2(currency === void 0 ? "EUR" : currency || "currency unknown")}${formatters.costBasis ? ` \xB7 ${escapeText2(formatters.costBasis)}` : ""}</p></div><wa-badge variant="neutral" pill>${windows.length} windows</wa-badge></div><div class="plan-label"><span>Window</span><span>Weighted price</span><span>Wall energy</span><span>Cost</span><span>SOC after</span></div>${rows || "<p>No proposed windows</p>"}<div class="plan-total"><div><small>${hasReserve ? "REQUIRED BASELINE ENERGY" : "WALL ENERGY"}</small><strong>${energy(summary.energy)}</strong></div><div><small>${hasReserve ? "REQUIRED BASELINE COST" : "TOTAL COST"}</small><strong>${money(summary.cost, currency)}</strong></div><div><small>WEIGHTED AVERAGE</small><strong>${displayPrice2(summary.pricePerKwh, summary.centsPerKwh)}</strong></div></div>${renderReserve(reserve, currency)}<p class="projection-note">SOC projection: ${projectionBasis}. ${escapeText2(assumptions.projectionNote || "Battery energy = wall energy \xD7 efficiency; capped at 100%.")}</p>${formatters.detailsNote ? `<p class="projection-note">${escapeText2(formatters.detailsNote)}</p>` : ""}`;
+  return `<div class="plan-heading"><div><h3>Complete proposed plan${stale ? ` \xB7 ${escapeText2(formatters.staleLabel ?? "stale")}` : ""}</h3><p>Estimated, not measured or guaranteed \xB7 wall energy \xB7 ${escapeText2(currency === void 0 ? "EUR" : currency || "currency unknown")}${formatters.costBasis ? ` \xB7 ${escapeText2(formatters.costBasis)}` : ""}</p></div><wa-badge variant="neutral" pill>${windows.length} windows</wa-badge></div><div class="plan-label"><span>Window</span><span>Weighted price</span><span>Wall energy</span><span>Cost</span><span>SOC after</span></div>${rows || "<p>No proposed windows</p>"}<div class="plan-total"><div><small>${hasReserve ? "REQUIRED BASELINE ENERGY" : "WALL ENERGY"}</small><strong>${energy(summary.energy)}</strong></div><div><small>${hasReserve ? "REQUIRED BASELINE COST" : "TOTAL COST"}</small><strong>${money(summary.cost, currency)}</strong></div><div><small>WEIGHTED AVERAGE</small><strong>${displayPrice2(summary.pricePerKwh, summary.centsPerKwh)}</strong></div></div>${renderReserve(reserve, currency)}${renderLearning(learning)}<p class="projection-note">SOC projection: ${projectionBasis}. ${escapeText2(assumptions.projectionNote || "Battery energy = wall energy \xD7 efficiency; capped at 100%.")}</p>${formatters.detailsNote ? `<p class="projection-note">${escapeText2(formatters.detailsNote)}</p>` : ""}`;
 }
 
 // shared-dashboard/vehicle-view.js
@@ -52576,7 +52581,7 @@ function renderBattery({ soc: soc2, target, capacityKwh, efficiency, stale = fal
 }
 
 // shared-dashboard/evidence-view.js
-function renderEvidence(data, power, count) {
+function renderEvidence(data, power, count2) {
   const d3 = data || {};
   return `<div class="evidence-status"><strong>${escapeText(d3.status)}</strong><span>${escapeText(d3.context)}</span></div><div class="evidence-grid"><div><small>Proposal calculated</small><b>${escapeText(d3.proposal)}</b></div><div><small>Last sent / ACK</small><b>${escapeText(d3.sent)}</b></div><div><small>Effective limits read</small><b>${escapeText(d3.readback)}</b></div><div><small>Measured charging</small><b>${escapeText(d3.measurement)}</b></div></div><p class="subtext">${escapeText(d3.dispatch)}</p><wa-details id="details" summary="View evidence & debug controls"><div class="details-body">${d3.readiness ? `<p class="subtext">${escapeText(d3.readiness)}</p>` : ""}<div id="morek-debug"><div class="actions"><wa-button size="small" disabled>Send \xB7 unavailable</wa-button><wa-button size="small" disabled>Refresh \xB7 unavailable</wa-button></div></div></div></wa-details>`;
 }
@@ -52690,7 +52695,7 @@ function mountDashboard(root, adapter) {
     const windows = knownPlan ? m4.windows.map((w2) => w2 && typeof w2 === "object" ? w2 : {}) : [];
     const chartWindows = windows.filter((w2) => Number.isFinite(w2.start) && Number.isFinite(w2.end) && w2.end > w2.start);
     const assumptions = m4.assumptions || {};
-    const plan = knownPlan ? renderPlan(windows, assumptions, !!(state.planStale ?? state.stale), f3, m4.totals, m4.reserve) : '<p class="projection-note">Proposed plan unavailable.</p>';
+    const plan = knownPlan ? renderPlan(windows, assumptions, !!(state.planStale ?? state.stale), f3, m4.totals, m4.reserve, m4.learning) : '<p class="projection-note">Proposed plan unavailable.</p>';
     const summary = m4.totals === void 0 ? total(windows) : m4.totals || {}, next = m4.nextWindow === void 0 ? windows[0] : m4.nextWindow;
     const time2 = (x2) => Number.isFinite(x2) ? f3.time(x2) : "Unknown";
     const day = (x2) => Number.isFinite(x2) ? f3.day(x2) : "Unknown";
@@ -55873,6 +55878,25 @@ var en_default2 = {
   "reserve.limit.no_eligible_time": "No free cheap time before the deadline was left for the reserve.",
   "reserve.limit.window_limit": "The charger\u2019s three-window limit left no room for the rest of the reserve.",
   "reserve.limit.unknown": "The reserve is smaller than requested.",
+  "learning.title": "Charging-time estimate",
+  "learning.unknown": "Learned-estimate status is unknown; the backend did not report it.",
+  "learning.default": "Using the default estimate; learned values unavailable.",
+  "learning.learned": "Using a learned estimate from your recorded charges.",
+  "learning.samples": "{agreeing} of {shorten} agreeing charges needed to shorten the time ({lengthen} to lengthen it); {valid} usable.",
+  "learning.effect_longer": "Effect: about {minutes} min longer than the default.",
+  "learning.effect_shorter": "Effect: about {minutes} min shorter than the default.",
+  "learning.effect_none": "Effect: none; the default estimate is in use.",
+  "learning.effect_unknown": "Effect: unknown.",
+  "learning.clamped": "The learned figure is held within a safe range around the default.",
+  "learning.note": "An estimate, not a guarantee. The normal time reserve is separate.",
+  "learning.stale": "stale; may be out of date",
+  "learning.rejected": "Charges not counted: {list}.",
+  "learning.reset.button": "Reset learned estimates",
+  "learning.reset.confirm": "Reset the learned charging estimates (energy and power) for this charger? The plan returns to the default estimate and is recalculated once. Charging history and the schedule are not deleted; the installed schedule is only changed if the new plan differs.",
+  "learning.reset.done": "Learned estimates reset; the plan was recalculated and any schedule change goes through the normal checks.",
+  "learning.reset.partial": "Learned estimates were forgotten in memory, but a stored file could not be removed; it will be overwritten shortly. Check again later.",
+  "learning.reset.failed": "Reset not confirmed; do not assume it did not apply. Refresh and check the estimate.",
+  "learning.reset.busy": "Resetting\u2026",
   "daily.title": "Daily overview",
   "daily.unknown": "Unknown",
   "daily.offline": "Charger offline",
@@ -58989,8 +59013,8 @@ function priceSourceOrNull(root) {
   }
   try {
     exactKeys2(value2, ["entry_id", "title", "charger_count", "choices", "writable", "duplicate"]);
-    const count = value2.charger_count;
-    if (typeof count !== "number" || !Number.isInteger(count) || count < 0 || typeof value2.writable !== "boolean") {
+    const count2 = value2.charger_count;
+    if (typeof count2 !== "number" || !Number.isInteger(count2) || count2 < 0 || typeof value2.writable !== "boolean") {
       return bad2();
     }
     const choices = arrayValue(value2, "choices").map((entry) => {
@@ -59013,7 +59037,7 @@ function priceSourceOrNull(root) {
     return {
       entry_id: text2(value2, "entry_id"),
       title: text2(value2, "title"),
-      charger_count: count,
+      charger_count: count2,
       choices,
       writable: value2.writable,
       duplicate
@@ -59950,6 +59974,37 @@ function reserveModel(raw, currency, text3) {
   };
 }
 
+// shared-dashboard/learning-model.js
+var count = (v2) => Number.isInteger(v2) && v2 >= 0 && v2 <= 1e6 ? v2 : null;
+var fill = (template, values) => String(template).replace(/\{(\w+)\}/g, (_2, key3) => values[key3] ?? "");
+var LEARNING_KEYS = ["title", "unknown", "default", "learned", "samples", "effect_longer", "effect_shorter", "effect_none", "effect_unknown", "clamped", "note", "stale", "rejected"];
+function decodeLearning(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  if (raw.source !== "default" && raw.source !== "learned") return null;
+  if (raw.mode !== "morek" && raw.mode !== "legacy") return null;
+  const valid = count(raw.valid_samples), agreeing = count(raw.agreeing_samples);
+  const lengthen = count(raw.needed_to_lengthen), shorten = count(raw.needed_to_shorten);
+  if (valid === null || agreeing === null || lengthen === null || shorten === null || lengthen < 1 || shorten < 1 || agreeing > valid) return null;
+  const effect = raw.effect_minutes === null || raw.effect_minutes === void 0 ? null : Number.isFinite(raw.effect_minutes) && Math.abs(raw.effect_minutes) <= 1e5 ? Math.round(raw.effect_minutes) : void 0;
+  if (effect === void 0) return null;
+  const rejections = raw.rejections && typeof raw.rejections === "object" && !Array.isArray(raw.rejections) ? Object.entries(raw.rejections).filter(([reason, n6]) => /^[a-z_0-9]{1,40}$/.test(reason) && count(n6) > 0).map(([reason, n6]) => ({ reason, count: n6 })).sort((a4, b3) => b3.count - a4.count || a4.reason.localeCompare(b3.reason)).slice(0, 5) : [];
+  return { source: raw.source, mode: raw.mode, valid, agreeing, lengthen, shorten, effect, clamped: raw.clamped === true, rejections };
+}
+function learningModel(raw, stale, text3) {
+  const state = stale ? "stale" : "fresh";
+  const block = decodeLearning(raw);
+  if (!block) return { state: stale ? "stale" : "unknown", lines: [text3.unknown], note: text3.note, stale: !!stale, staleText: stale ? text3.stale : null };
+  const lines = [
+    block.source === "learned" ? text3.learned : text3.default,
+    fill(text3.samples, { agreeing: block.agreeing, shorten: block.shorten, lengthen: block.lengthen, valid: block.valid })
+  ];
+  if (block.clamped) lines.push(text3.clamped);
+  const effect = stale ? text3.effect_unknown : block.effect === null ? text3.effect_unknown : block.effect === 0 ? text3.effect_none : fill(block.effect > 0 ? text3.effect_longer : text3.effect_shorter, { minutes: Math.abs(block.effect) });
+  lines.push(effect);
+  if (block.rejections.length) lines.push(fill(text3.rejected, { list: block.rejections.map((r7) => `${r7.reason.replace(/_/g, " ")} \xD7${r7.count}`).join(", ") }));
+  return { state, source: block.source, lines, note: text3.note, stale: !!stale, staleText: stale ? text3.stale : null, title: text3.title };
+}
+
 // sidebar/price-chart.js
 function publishedChart(raw, market, now, stale) {
   const rows = raw?.prices?.published_intervals;
@@ -60415,6 +60470,7 @@ function startOutcome(state, reason, { age, young, raw, waitNote, txn, guidance,
 // sidebar/adapter.js
 var U = "Unknown";
 var reserveText = () => ({ explain: translate2("en", "reserve.explain"), limits: Object.fromEntries(["two_hour_limit", "no_eligible_time", "window_limit", "unknown"].map((k2) => [k2, translate2("en", `reserve.limit.${k2}`)])) });
+var learningText = () => Object.fromEntries(LEARNING_KEYS.map((k2) => [k2, translate2("en", `learning.${k2}`)]));
 var date = (value2, zone) => {
   const ms = typeof value2 === "number" ? value2 : Date.parse(value2 || "");
   if (!Number.isFinite(ms)) return U;
@@ -60551,6 +60607,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
     model: {
       windows,
       nextWindow,
+      learning: proposal ? learningModel(rawProposal?.learning, planStale, learningText()) : null,
       reserve: !planStale && proposal ? reserveModel(rawProposal?.reserve, pricedBasis ? planCurrency : null, reserveText()) : null,
       chart: published?.chart,
       totals: !planStale && proposal ? { energy: proposal.planned_kwh, cost: proposal.unpriced ? null : proposal.cost?.value, pricePerKwh: avg } : null,
@@ -60883,7 +60940,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.141";
+var CARD_VERSION = "2.5.142";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {
@@ -61115,6 +61172,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     if (this.chargeBusy && this.charger) this.chargeUnknown?.add(this.charger);
     this.chargeBusy = false;
     this.chargeNotice = "";
+    this.learningNotice = "";
     this.generation++;
     clearInterval(this.ageTimer);
     this.ageTimer = null;
@@ -61519,6 +61577,17 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
         notice.textContent = this.syncNotice;
         target.firstChild.append(notice);
       }
+      const reset = document.createElement("button");
+      reset.type = "button";
+      reset.textContent = translate2("en", this.morekActiveAction === "reset_learning" ? "learning.reset.busy" : "learning.reset.button");
+      reset.disabled = this.morekBusy || this.settingsBusy || this.settingsDirty || this.autoBusy || this.chargeBusy || this.morekUncertain || this.autoUncertain || state.outcomes?.uncertain === true || !fresh(this.statusAt, this.statusFailed);
+      reset.addEventListener("click", () => void this.morekAction("reset_learning"));
+      target.firstChild.append(reset);
+      if (this.learningNotice) {
+        const notice = document.createElement("p");
+        notice.textContent = this.learningNotice;
+        target.firstChild.append(notice);
+      }
     }
     const dashboard = decodeDashboard(this.rawDashboard);
     const send = target.querySelector('[data-morek-action="send"]');
@@ -61526,16 +61595,17 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
   }
   async morekAction(action) {
     const hass = this._hass, charger = this.charger, generation = this.generation, permissionEpoch = this.permissionEpoch, statusSnapshot = this.rawStatus, observedAt = this.statusAt, state = decodeMorekState(statusSnapshot);
-    if (!this.connected || hass?.connected === false || hass?.user?.is_admin !== true || !charger || !state || this.morekBusy || this.autoBusy || this.chargeBusy || !["status", "send", "fetch", "clear", "reconfirm_migration", "recalculate_sync"].includes(action)) return;
+    if (!this.connected || hass?.connected === false || hass?.user?.is_admin !== true || !charger || !state || this.morekBusy || this.autoBusy || this.chargeBusy || !["status", "send", "fetch", "clear", "reconfirm_migration", "recalculate_sync", "reset_learning"].includes(action)) return;
     if (action === "reconfirm_migration" && state.ownership?.reconfirmation_required !== true) return;
     if (action !== "status" && !state.supported) return;
     if (action === "clear" && state.cleanup_supported !== true) return;
     if (this.settingsBusy || action === "send" && this.settingsDirty) return;
-    if (action === "recalculate_sync" && (this.settingsDirty || this.morekUncertain || this.autoUncertain || state.outcomes?.uncertain || !fresh(this.statusAt, this.statusFailed))) return;
+    if ((action === "recalculate_sync" || action === "reset_learning") && (this.settingsDirty || this.morekUncertain || this.autoUncertain || state.outcomes?.uncertain || !fresh(this.statusAt, this.statusFailed))) return;
     if (action === "send" && (this.morekUncertain || this.autoUncertain || state.outcomes?.uncertain || !state.preview?.profile || state.preview.reason !== null || !state.preview.preview_id || !fresh(this.statusAt, this.statusFailed))) return;
     const previewId = state.preview?.preview_id, configured = state.configured_id, resolved = state.resolved_id, dashboardSnapshot = this.rawDashboard;
     if (action === "send" && !window.confirm("Confirm sending the current preview. The final 0 A limit may persist.")) return;
     if (action === "clear" && !window.confirm("Confirm selective removal of SpotNav profile 42001. Effective limits may increase.")) return;
+    if (action === "reset_learning" && !window.confirm(translate2("en", "learning.reset.confirm"))) return;
     if (action === "reconfirm_migration" && !window.confirm("Reconfirm schedule ownership for this connection? This does not verify charger protection, profile inventory or physical charging. A previous schedule or 0 A limit may remain.")) return;
     const latest = decodeMorekState(this.rawStatus);
     const dashboard = decodeDashboard(this.rawDashboard);
@@ -61550,6 +61620,12 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       const raw = await this.bounded(morekSchedule(hass, charger, action, previewId));
       if (action === "reconfirm_migration") {
         this.morekError = null;
+        return;
+      }
+      if (action === "reset_learning") {
+        if (!this.connected || generation !== this.generation || permissionEpoch !== this.permissionEpoch || charger !== this.charger || this._hass?.user?.is_admin !== true) return;
+        const done = raw?.schedule?.learning_reset;
+        this.learningNotice = translate2("en", done && done.energy !== false && done.power !== false && done.replan === "requested" && (done.energy === true || done.power === true) ? "learning.reset.done" : done && (done.energy === false || done.power === false) ? "learning.reset.partial" : "learning.reset.failed");
         return;
       }
       if (action === "recalculate_sync") {
@@ -61569,7 +61645,9 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     } catch (error2) {
       if (this.connected && generation === this.generation && charger === this.charger) {
         if (action === "send") this.morekUncertain = true;
-        if (action === "recalculate_sync") this.syncNotice = `Sync not confirmed${error2?.code ? ` (${error2.code})` : ""}; check reconciliation status before retrying.`;
+        if (action === "reset_learning") {
+          if (permissionEpoch === this.permissionEpoch && this._hass?.user?.is_admin === true) this.learningNotice = translate2("en", "learning.reset.failed");
+        } else if (action === "recalculate_sync") this.syncNotice = `Sync not confirmed${error2?.code ? ` (${error2.code})` : ""}; check reconciliation status before retrying.`;
         else this.morekError = "Request failed or outcome unknown; do not assume the operation did not apply.";
       }
     } finally {

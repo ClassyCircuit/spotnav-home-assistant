@@ -51,7 +51,7 @@ export function mountDashboard(root, adapter) {
     const windows = knownPlan ? m.windows.map(w => w && typeof w === 'object' ? w : {}) : [];
     const chartWindows = windows.filter(w=>Number.isFinite(w.start) && Number.isFinite(w.end) && w.end > w.start);
     const assumptions = m.assumptions || {};
-    const plan = knownPlan ? renderPlan(windows, assumptions, !!(state.planStale ?? state.stale), f, m.totals, m.reserve) : '<p class="projection-note">Proposed plan unavailable.</p>';
+    const plan = knownPlan ? renderPlan(windows, assumptions, !!(state.planStale ?? state.stale), f, m.totals, m.reserve, m.learning) : '<p class="projection-note">Proposed plan unavailable.</p>';
     const summary = m.totals === undefined ? total(windows) : (m.totals || {}), next = m.nextWindow === undefined ? windows[0] : m.nextWindow;
     const time = x => Number.isFinite(x) ? f.time(x) : 'Unknown';
     const day = x => Number.isFinite(x) ? f.day(x) : 'Unknown';

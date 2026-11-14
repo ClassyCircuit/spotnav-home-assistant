@@ -2783,7 +2783,7 @@ async def _async_schedule_action_locked(hass: HomeAssistant, entry_id: str, acti
 
 
 @websocket_api.websocket_command({vol.Required("type"): "spotnav/morek_schedule", vol.Required("api_version"): int,
-                                   vol.Required("charger_id"): str, vol.Required("action"): vol.In(("status", "send", "fetch", "clear", "request_enable", "disable_uploads", "reconfirm_migration", "charge_now", "return_to_auto", "recalculate_sync")),
+                                   vol.Required("charger_id"): str, vol.Required("action"): vol.In(("status", "send", "fetch", "clear", "request_enable", "disable_uploads", "reconfirm_migration", "charge_now", "return_to_auto", "recalculate_sync", "reset_learning")),
                                    vol.Optional("preview_id"): str, vol.Optional("confirm_profile_id"): int,
                                    vol.Optional("duration_minutes"): int, vol.Optional("end_time"): str})
 @websocket_api.async_response
@@ -2992,6 +2992,33 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
             await planner.async_recalculate()
             worker.trigger(sync=True)
             result = {"reconciliation": "requested"}
+        elif msg["action"] == "reset_learning":
+            # Stage 15.11: an administrator's explicit reset of the learned energy and power at this charger (the
+            # admin check above ran before anything here). The planner owns the stores and samplers; replanning is the
+            # one existing evidence round of the worker (recalculate once, then one compared reconcile), which keeps
+            # the active window, every Pause/Stop/uncertainty guard and the equal-intent comparison. Sessions,
+            # profiles and outcomes are never touched. A partial failure is reported, not hidden.
+            entry, failure = lookup_charger(hass, msg["charger_id"])
+            if failure or entry is None:
+                raise ScheduleRefused(failure or "unknown_charger")
+            planner = preview_for(hass, entry.entry_id)
+            if planner is None:
+                raise ScheduleRefused("planner_unavailable")
+            cleared = await planner.async_reset_learning()
+            replan = "unavailable"
+            if cleared.get("energy") is not None or cleared.get("power") is not None:
+                worker = getattr(getattr(entry, "runtime_data", None), "morek_worker", None)
+                if worker is not None and not worker._closed:
+                    worker.note_learned_reset()
+                    replan = "requested"
+                else:
+                    try:
+                        await planner.async_recalculate("learned_reset")
+                        replan = "requested"
+                    except Exception:  # noqa: BLE001 - reported, the reset itself stands
+                        _LOGGER.warning("Replanning after the learning reset failed", exc_info=True)
+            result = {"learning_reset": {"energy": cleared.get("energy"), "power": cleared.get("power"),
+                                         "replan": replan}}
         elif msg["action"] in ("charge_now", "return_to_auto"):
             result = await async_charge_now_action(hass, msg["charger_id"],
                 return_to_auto=msg["action"] == "return_to_auto",

@@ -173,6 +173,12 @@ class MorekScheduleWorker:
         """
         self._note_evidence("plug_in")
 
+    def note_learned_reset(self) -> None:
+        """An administrator reset the learned estimates (Stage 15.11): one recalculation through the existing evidence
+        round (`_evidence_run`), then the one compared reconcile. The comparison, the protected active window and every
+        Pause/Stop/uncertainty guard decide what is sent; an equal schedule sends nothing."""
+        self._note_evidence("learned_reset")
+
     def note_sensor(self) -> None:
         """The connector sensor went to or came back from unknown/unavailable: recalculate and compare.
 
@@ -193,14 +199,14 @@ class MorekScheduleWorker:
         try:
             while self._evidence and not self._closed:
                 kinds, self._evidence = self._evidence, set()
-                kind = "plug_in" if "plug_in" in kinds else "sensor"
+                kind = "plug_in" if "plug_in" in kinds else "learned_reset" if "learned_reset" in kinds else "sensor"
                 try:
                     await self._planner.async_recalculate(kind)
                 except asyncio.CancelledError:
                     raise
                 except Exception:  # noqa: BLE001 - compare with what the planner has rather than skip
                     _LOGGER.debug("Recalculation after %s evidence failed", kind, exc_info=True)
-                self.trigger(kind=kind)
+                self.trigger(kind="recalc" if kind == "learned_reset" else kind)
         finally:
             self._evidence_task = None
 

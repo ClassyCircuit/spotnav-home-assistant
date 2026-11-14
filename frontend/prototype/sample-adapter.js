@@ -3,6 +3,7 @@ import { dailyStates, chooseDailyState, historyFixture } from './daily-sample.js
 import { evidenceFixture } from './evidence-view.js';
 import { history, monthlyRange, baselineRange, futureRange } from './insight-fixture.js';
 import { reserveModel } from '../shared-dashboard/reserve-model.js';
+import { learningModel } from '../shared-dashboard/learning-model.js';
 import { assess, bestOpportunity, summarize } from './insights.js';
 
 const number = n => Number.isFinite(n) ? n.toFixed(2) : 'Unknown';
@@ -21,6 +22,8 @@ export function sampleInsights(missing) {
 }
 // Hand-authored, backend-shaped (same decoder as the live panel); fictional numbers, 10 % of the sample need.
 const sampleReserve = reserveModel({percent:10,minutes:6,requested_minutes:6,limit:null,allowance:{kind:'upper_allowance',energy_kwh:0.6,cost:{value:0.12,currency:'EUR'}}},'EUR',{explain:'Extra allowed time to reach the target; the car’s own limit stops it, so the reserve is not a higher SOC.',limits:{unknown:'The reserve is smaller than requested.'}});
+// Same shape and decoder as the live panel; fictional numbers (four agreeing charges lengthen the sample plan a little).
+const sampleLearning = learningModel({mode:'morek',source:'learned',kwh_per_percent:0.98,default_kwh_per_percent:0.9625,valid_samples:5,agreeing_samples:4,needed_to_lengthen:3,needed_to_shorten:5,clamped:false,effect_minutes:4,rejections:{gap:1}},false,{title:'Charging-time estimate',unknown:'Learned-estimate status is unknown; the backend did not report it.',default:'Using the default estimate; learned values unavailable.',learned:'Using a learned estimate from your recorded charges.',samples:'{agreeing} of {shorten} agreeing charges needed to shorten the time ({lengthen} to lengthen it); {valid} usable.',effect_longer:'Effect: about {minutes} min longer than the default.',effect_shorter:'Effect: about {minutes} min shorter than the default.',effect_none:'Effect: none; the default estimate is in use.',effect_unknown:'Effect: unknown.',clamped:'The learned figure is held within a safe range around the default.',note:'An estimate, not a guarantee. The normal time reserve is separate.',stale:'stale; may be out of date',rejected:'Charges not counted: {list}.'});
 export function createSampleAdapter() {
   const state = chooseDailyState(dailyScenario);
   const lastSoc = windows.at(-1)?.projectedSoc;
@@ -28,7 +31,7 @@ export function createSampleAdapter() {
   const missingInsights = dailyScenario === 'unavailable' || new URLSearchParams(location.search).get('insights') === 'missing';
   return { format:{time,day,minutesPerTimeUnit:60,staleLabel:'stale sample',date:sampleDate,tooltipDate:h=>`${sampleDate(h)} 2026`,days:sampleDays,priceGaps,stepSegments,stepPoints,snapRange,initialRange,timeTicks},
     actions:{selectScenario(selected) { const url = new URL(location.href); url.searchParams.set('state',selected); location.href = url.href; }},
-    model:{sample:true,windows:windows.map((w,i,a)=>i===a.length-1 ? {...w,reserveMinutes:6,reserveKwh:0.6,reserveCost:0.12} : w),reserve:sampleReserve,assumptions:socAssumptions,vehicle:state,settings:{target:80,minimum:40,cap:35,readyBy:'07:00',reserve:10},untilDeadline:'16h 30m',targetNote,nextPriceUnavailable:scenario==='missing',
+    model:{sample:true,windows:windows.map((w,i,a)=>i===a.length-1 ? {...w,reserveMinutes:6,reserveKwh:0.6,reserveCost:0.12} : w),reserve:sampleReserve,learning:sampleLearning,assumptions:socAssumptions,vehicle:state,settings:{target:80,minimum:40,cap:35,readyBy:'07:00',reserve:10},untilDeadline:'16h 30m',targetNote,nextPriceUnavailable:scenario==='missing',
       scenarios:{label:'Sample scenario',selected:dailyScenario,options:Object.entries(dailyStates).map(([value,s])=>({value,label:s.label})),note:'Local illustration only · no settings or charger actions'},
       warning:state.warning ? {title:dailyScenario==='mismatch'?'Schedule needs attention':'Sample state needs attention',detail:dailyScenario==='mismatch'?'Sample effective limits differ from the last sent plan. This is not proof of charging; measured power is shown separately.':state.policy}:null,
       chart:{prices,now,deadline,horizon,cap,bands:[30,45,60],comparison:new URLSearchParams(location.search).get('comparison')==='bar'},

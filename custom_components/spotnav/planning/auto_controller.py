@@ -94,6 +94,7 @@ from .learned_energy import (
     NOTHING_LEARNED,
     SocSeen,
     VOLTAGE_TOLERANCE_V,
+    estimate_view,
     target_need,
 )
 from .learned_power import (
@@ -965,6 +966,8 @@ class AutoPlannerController:
         self._capture_sampler = None if learned_energy is None else EnergySampler(learned_energy)
         self._capture_cancel: Callable[[], None] | None = None
         self._capture_running = False
+        # Stage 15.11: one administrator reset at a time.
+        self._reset_lock = asyncio.Lock()
         if learned_energy is not None:
             # Stage 15.9b: the store proves a capture against the records retained now (sessions, evidence).
             learned_energy.checker = self._prove_capture
@@ -2204,6 +2207,78 @@ class AutoPlannerController:
                 },
             },
         }
+
+    def learning_estimate(
+        self,
+        vehicle_id: str | None,
+        capacity_kwh: float | None,
+        *,
+        soc_percent: float | None,
+        target_percent: float | None,
+        vehicle_max_percent: float | None,
+        capped: bool = False,
+        minimum_percent: float | None = None,
+        manual: bool = False,
+    ) -> dict[str, Any] | None:
+        """The learned-estimate display block (Stage 15.11, `learned_energy.estimate_view`) for the car this charger
+        plans for, with the wall energy the target needs with and without the learned figure (the planner's own
+        `target_need`, never client arithmetic); `None` without a learned-energy store or a car. Read-only.
+
+        `capped` (a soft price cap is set) works both needs out with `capped_vehicle_energy`, the planner's own policy
+        including the minimum-SOC floor, so the effect is what the plan really changes. `manual` (the plan is driven by
+        an energy figure) marks the learned figure as not used: no needs, `applies` false."""
+        if self._learned_energy is None or not vehicle_id:
+            return None
+        learned = self.learned_energy(vehicle_id, capacity_kwh)
+        if manual:
+            block = estimate_view(learned, capacity_kwh, morek=self._morek_learning())
+            block["applies"] = False
+            return block
+        need = default_need = None
+        if capped and soc_percent is not None and target_percent is not None:
+            facts = LiveVehicleFacts(
+                vehicle_id=vehicle_id, soc_percent=soc_percent, reported_capacity_kwh=capacity_kwh,
+                max_percent=vehicle_max_percent,
+            )
+            kwargs = dict(target_percent=target_percent, minimum_percent=minimum_percent)
+            reason, need, _ = capped_vehicle_energy(facts, learned=learned, **kwargs)
+            default_reason, default_need, _ = capped_vehicle_energy(facts, learned=NOTHING_LEARNED, **kwargs)
+            if reason != "ok" or default_reason != "ok":
+                need = default_need = None
+        elif soc_percent is not None and target_percent is not None:
+            kwargs = dict(soc_percent=soc_percent, capacity_kwh=capacity_kwh, target_percent=target_percent,
+                          vehicle_max_percent=vehicle_max_percent)
+            _, need = target_need(learned, **kwargs)
+            _, default_need = target_need(NOTHING_LEARNED, **kwargs)
+        return estimate_view(learned, capacity_kwh, morek=self._morek_learning(), need_kwh=need,
+                             default_need_kwh=default_need)
+
+    async def async_reset_learning(self) -> dict[str, Any]:
+        """Stage 15.11, an administrator's explicit reset (the caller checked the permission and the charger): forget the
+        learned energy per percent (samples, captures, promotions, rejections, stretch starts) and the learned power of
+        this charger through the two stores' own reset, and the samplers' memory of what they had looked at, so no
+        pending reading from before the reset can bring old data back. Sessions, profiles and outcomes are untouched.
+        Replanning is the caller's one existing input-evidence round. Returns `{energy, power}`: whether each store's file
+        is gone (`False`: the figures are forgotten in memory but the file's removal failed and was queued again;
+        `None`: there is no such store). No sampler or store is ever replaced."""
+        async with self._reset_lock:
+            if self._shutdown:
+                return {"energy": None, "power": None}
+            result: dict[str, Any] = {"energy": None, "power": None}
+            for sampler in (self._energy_sampler, self._capture_sampler):
+                if sampler is not None:
+                    sampler.reset()
+            if self._sampler is not None:
+                self._sampler.reset()
+            for key, store in (("energy", self._learned_energy), ("power", self._learned)):
+                if store is None:
+                    continue
+                try:
+                    result[key] = await store.async_reset()
+                except Exception:  # noqa: BLE001 - a failed reset is reported, never raised into the caller
+                    _LOGGER.warning("Resetting the learned %s failed", key, exc_info=True)
+                    result[key] = False
+            return result
 
     def _learned_energy_for(self, facts: LiveVehicleFacts | None, *, drop: bool = False) -> LearnedEnergy:
         """What is learned of the wall kWh per percent of the car the level is read from, when that is the car this

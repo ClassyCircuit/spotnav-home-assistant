@@ -156,7 +156,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     else if (!preserveDraft) {this.draftRevision=null;this.draftCurrency=undefined;}
     if (this.settingsBusy && this.charger) this.unknownSettingsWrites.add(this.charger);
     if (this.chargeBusy && this.charger) this.chargeUnknown?.add(this.charger);
-    this.chargeBusy=false;this.chargeNotice='';
+    this.chargeBusy=false;this.chargeNotice='';this.learningNotice='';
     this.generation++;
     clearInterval(this.ageTimer); this.ageTimer=null;
     for (const cancel of this.cancellations || []) cancel();
@@ -399,24 +399,31 @@ export class SpotnavEnhancedPanel extends HTMLElement {
       button.addEventListener('click',()=>void this.morekAction('recalculate_sync'));
       target.firstChild.append(button);
       if (this.syncNotice) {const notice=document.createElement('p');notice.textContent=this.syncNotice;target.firstChild.append(notice);}
+      const reset=document.createElement('button');
+      reset.type='button';reset.textContent=translate('en',this.morekActiveAction==='reset_learning' ? 'learning.reset.busy' : 'learning.reset.button');
+      reset.disabled=this.morekBusy || this.settingsBusy || this.settingsDirty || this.autoBusy || this.chargeBusy || this.morekUncertain || this.autoUncertain || state.outcomes?.uncertain===true || !fresh(this.statusAt,this.statusFailed);
+      reset.addEventListener('click',()=>void this.morekAction('reset_learning'));
+      target.firstChild.append(reset);
+      if (this.learningNotice) {const notice=document.createElement('p');notice.textContent=this.learningNotice;target.firstChild.append(notice);}
     }
     const dashboard=decodeDashboard(this.rawDashboard);
     const send=target.querySelector('[data-morek-action="send"]');if(send && (this.morekUncertain || this.autoUncertain || !fresh(this.statusAt,this.statusFailed) || !dashboard.ok || !dashboardFresh(dashboard.value,this.dashboardFailed) || dashboard.value.control.pause?.choice!=='until_resumed' || !dashboard.value.control.pause_blocks_execution))send.disabled=true;
   }
   async morekAction(action) {
     const hass=this._hass, charger=this.charger, generation=this.generation, permissionEpoch=this.permissionEpoch, statusSnapshot=this.rawStatus, observedAt=this.statusAt, state=decodeMorekState(statusSnapshot);
-    if (!this.connected || hass?.connected===false || hass?.user?.is_admin!==true || !charger || !state || this.morekBusy || this.autoBusy || this.chargeBusy || !['status','send','fetch','clear','reconfirm_migration','recalculate_sync'].includes(action)) return;
+    if (!this.connected || hass?.connected===false || hass?.user?.is_admin!==true || !charger || !state || this.morekBusy || this.autoBusy || this.chargeBusy || !['status','send','fetch','clear','reconfirm_migration','recalculate_sync','reset_learning'].includes(action)) return;
     if (action==='reconfirm_migration' && state.ownership?.reconfirmation_required!==true) return;
     if (action!=='status' && !state.supported) return;
     if (action==='clear' && state.cleanup_supported!==true) return;
     if (this.settingsBusy || (action==='send' && this.settingsDirty)) return;
-    if (action==='recalculate_sync' && (this.settingsDirty || this.morekUncertain || this.autoUncertain || state.outcomes?.uncertain || !fresh(this.statusAt,this.statusFailed))) return;
+    if ((action==='recalculate_sync' || action==='reset_learning') && (this.settingsDirty || this.morekUncertain || this.autoUncertain || state.outcomes?.uncertain || !fresh(this.statusAt,this.statusFailed))) return;
     if (action==='send' && (this.morekUncertain || this.autoUncertain || state.outcomes?.uncertain || !state.preview?.profile || state.preview.reason!==null || !state.preview.preview_id || !fresh(this.statusAt,this.statusFailed))) return;
     const previewId=state.preview?.preview_id, configured=state.configured_id, resolved=state.resolved_id, dashboardSnapshot=this.rawDashboard;
     // Recheck at the dispatch boundary, independently of the diagnostic view's
     // confirmation and disabled state. A request already sent cannot be recalled.
     if (action==='send' && !window.confirm('Confirm sending the current preview. The final 0 A limit may persist.')) return;
     if (action==='clear' && !window.confirm('Confirm selective removal of SpotNav profile 42001. Effective limits may increase.')) return;
+    if (action==='reset_learning' && !window.confirm(translate('en','learning.reset.confirm'))) return;
     if (action==='reconfirm_migration' && !window.confirm('Reconfirm schedule ownership for this connection? This does not verify charger protection, profile inventory or physical charging. A previous schedule or 0 A limit may remain.')) return;
     const latest=decodeMorekState(this.rawStatus);
     const dashboard=decodeDashboard(this.rawDashboard);
@@ -427,12 +434,20 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     try {
       const raw=await this.bounded(morekSchedule(hass,charger,action,previewId));
       if (action==='reconfirm_migration') {this.morekError=null;return;}
+      if (action==='reset_learning') {
+        // The backend reset already happened; a response for another charger, connection or permission is never shown here.
+        if (!this.connected || generation!==this.generation || permissionEpoch!==this.permissionEpoch || charger!==this.charger || this._hass?.user?.is_admin!==true) return;
+        const done=raw?.schedule?.learning_reset;
+        // Only the backend's own answer is believed: both files gone and a replan asked is "done"; any other answer is said as it is.
+        this.learningNotice=translate('en',done && done.energy!==false && done.power!==false && done.replan==='requested' && (done.energy===true || done.power===true) ? 'learning.reset.done' : done && (done.energy===false || done.power===false) ? 'learning.reset.partial' : 'learning.reset.failed');
+        return;
+      }
       if (action==='recalculate_sync') {this.syncNotice=raw?.schedule?.reconciliation==='requested' ? 'Recalculated; sync requested, not yet confirmed. The schedule sync status above shows the latest worker result.' : 'Sync response unavailable; check schedule sync status before trying again.';return;}
       const result=decodeMorekState(raw);
       if (!this.connected || generation!==this.generation || permissionEpoch!==this.permissionEpoch || charger!==this.charger) return;
       if (!result) {if(action==='send')this.morekUncertain=true;this.morekError='Response unavailable; operation outcome may be unknown.';}
       else {this.rawStatus={api_version:1,schedule:result};this.statusAt=action==='status' ? Date.now() : null;this.statusFailed=action!=='status';}
-    } catch (error) {if(this.connected && generation===this.generation && charger===this.charger) {if(action==='send')this.morekUncertain=true;if(action==='recalculate_sync')this.syncNotice=`Sync not confirmed${error?.code ? ` (${error.code})` : ''}; check reconciliation status before retrying.`;else this.morekError='Request failed or outcome unknown; do not assume the operation did not apply.';}}
+    } catch (error) {if(this.connected && generation===this.generation && charger===this.charger) {if(action==='send')this.morekUncertain=true;if(action==='reset_learning'){if(permissionEpoch===this.permissionEpoch && this._hass?.user?.is_admin===true)this.learningNotice=translate('en','learning.reset.failed');}else if(action==='recalculate_sync')this.syncNotice=`Sync not confirmed${error?.code ? ` (${error.code})` : ''}; check reconciliation status before retrying.`;else this.morekError='Request failed or outcome unknown; do not assume the operation did not apply.';}}
     finally {
       if (this.connected && generation===this.generation && charger===this.charger) {
         this.morekBusy=false;this.morekActiveAction=null;this.paint();

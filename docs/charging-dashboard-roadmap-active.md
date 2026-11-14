@@ -426,7 +426,7 @@ while offline”.
   `window_release`, measured progress. At plug-in end a changed figure causes at most one compared reconcile
   (equal schedule sends nothing, active window protected); shortening cannot weaken the minimum-SOC need that
   14.4’s slack test uses; 14.2/14.5 outcomes unchanged. *Exclusions:* no new store, UI or ML.
-- [ ] **15.11 Learned-estimate display and reset.** *Scope:* where the plan’s time/energy explanation shows,
+- [x] **15.11 Learned-estimate display and reset.** *Locally implemented with mocked checks (2.5.142); coordinator reviewed; not installed or live-verified. Display: backend block `plan.proposal.learning` (`learned_energy.estimate_view`, effect minutes computed in `api/dashboard._learning_fields` from the planner's own `target_need` with/without the learned figure at the plan's power), rendered by `shared-dashboard/learning-model.js` + `plan-view.js` (stale: no effect claimed; absent/malformed: unknown). Reset: `spotnav/morek_schedule` action `reset_learning` (admin) → `AutoPlannerController.async_reset_learning` → both stores' `async_reset` (memory first, then the file's removal) and the samplers' memory; one `worker.note_learned_reset()` evidence round. Tests `tests/test_stage_1511_learning_display_reset.py`, `shared-dashboard/learning-model.test.mjs`. Limits in the handoff.* *Scope:* where the plan’s time/energy explanation shows,
   state whether the estimate is learned or default, the sample count (“n of 5 needed to shorten”), the effect
   in minutes and “estimate; no guarantee”; rejection reasons in diagnostics; an administrator action resetting
   learned energy and power data for the charger (reusing the stores’ own removal) plus its sidebar control.

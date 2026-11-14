@@ -353,6 +353,10 @@ class LearnedEnergy:
     promoted: int = field(default=0, compare=False)
     from_promoted: bool = field(default=False, compare=False)
     rejections: dict[str, int] = field(default_factory=dict, compare=False)
+    #: Stage 15.11 (display only): how many of the valid votes (samples without the promoted rule) agree within
+    #: `TRUST_SPREAD` of their median, and how many are valid for today's battery size. Never compared.
+    agreeing: int = field(default=0, compare=False)
+    valid: int = field(default=0, compare=False)
 
     @property
     def use_kwh_per_percent(self) -> float | None:
@@ -379,6 +383,8 @@ class LearnedEnergy:
             "promoted": self.promoted,
             "from_promoted": self.from_promoted,
             "rejections": dict(self.rejections),
+            "agreeing": self.agreeing,
+            "valid": self.valid,
         }
 
 
@@ -401,7 +407,9 @@ def learned_from(
     ]
     trusted = len(agreeing) >= TRUST_SAMPLES
     figure = statistics.median(agreeing) if trusted else median
-    return LearnedEnergy(vehicle_id, figure, tuple(kept), trusted, discarded, pending)
+    return LearnedEnergy(
+        vehicle_id, figure, tuple(kept), trusted, discarded, pending, agreeing=len(agreeing), valid=len(kept)
+    )
 
 
 @dataclass(slots=True)
@@ -457,6 +465,25 @@ class LearnedEnergyStore:
         """The charger is gone for good: what was learned at it goes too."""
         await Store(hass, _STORE_VERSION, f"{_STORE_PREFIX}.{entry_id}").async_remove()
 
+    async def async_reset(self) -> bool:
+        """Stage 15.11, an administrator's explicit reset: forget everything learned at this charger (samples, captures,
+        promotions, rejections, stretch starts and open plug-ins), in memory first so nothing is read from it again, then
+        the stored file through the store's own removal so it cannot come back after a restart. Returns whether the file
+        is gone; when its removal failed the (now empty) state is queued to replace it and the caller says so."""
+        self._cars = {}
+        self.anchor = None
+        self.open = None
+        self.capture_anchor = None
+        self.capture_open = None
+        self._checked = set()
+        try:
+            await self._store.async_remove()
+        except Exception as err:  # noqa: BLE001 - reported to the caller by the False
+            _LOGGER.warning("SpotNav: the learned energy file could not be removed (%s)", type(err).__name__)
+            self._save()
+            return False
+        return True
+
     def learned(
         self, vehicle_id: str | None, capacity_kwh: float | None, *, drop: bool = False, morek: bool = False
     ) -> LearnedEnergy:
@@ -488,7 +515,8 @@ class LearnedEnergyStore:
         promoted = _promoted_learned(vehicle_id, votes, capacity_kwh, discarded)
         if promoted is not None:
             return replace(promoted, rejections=counts)
-        return replace(none, promoted=len(votes), rejections=counts)
+        valid, agreeing = _vote_counts(votes, capacity_kwh)
+        return replace(none, promoted=len(votes), rejections=counts, agreeing=agreeing, valid=valid)
 
     def put(self, vehicle_id: str, sample: EnergySample, capacity_kwh: float | None) -> bool:
         """Keep `sample` as its plug-in's sample (replacing that plug-in's shorter one), or, when it is out of
@@ -728,6 +756,13 @@ class EnergySampler:
         self._posts: dict[datetime, float] = {}
         self._looks: list[tuple[datetime, float]] = []
         #: Whether this process has made a capture look yet: the first one after a restart marks the stretch.
+        self._capture_seen = False
+
+    def reset(self) -> None:
+        """Forget the register history and the capture restart mark (Stage 15.11, after the store was reset), so nothing
+        looked at before the reset can be paired with a level after it."""
+        self._posts = {}
+        self._looks = []
         self._capture_seen = False
 
     def observe(
@@ -1094,11 +1129,7 @@ def _promoted_learned(
     needs `PROMOTE_SHORTEN_VOTES`; the used figure is clamped to `CLAMP_LOWER`..`CLAMP_UPPER` of the default."""
     if capacity_kwh is None or not _finite_positive(capacity_kwh):
         return None
-    votes = [
-        vote for vote in votes
-        if fits(vote.kwh_per_percent, capacity_kwh)
-        and abs(vote.meta["capacity_kwh"] - capacity_kwh) <= _CAPACITY_TOLERANCE_KWH
-    ]
+    votes = _valid_votes(votes, capacity_kwh)
     if len(votes) < PROMOTE_LENGTHEN_VOTES:
         return None
     default = capacity_kwh / CHARGE_EFFICIENCY / 100.0
@@ -1111,7 +1142,31 @@ def _promoted_learned(
         return None  # four agreeing charges may lengthen the time, never shorten it
     figure = min(max(figure, CLAMP_LOWER * default), CLAMP_UPPER * default)
     samples = tuple(EnergySample(vote.id, vote.kwh, vote.delta_percent, vote.at) for vote in votes)
-    return LearnedEnergy(vehicle_id, figure, samples, True, discarded, None, promoted=len(votes), from_promoted=True)
+    return LearnedEnergy(
+        vehicle_id, figure, samples, True, discarded, None, promoted=len(votes), from_promoted=True,
+        agreeing=len(agreeing), valid=len(votes),
+    )
+
+
+def _valid_votes(votes: list[Capture], capacity_kwh: float | None) -> list[Capture]:
+    """The promoted votes that fit today's battery size (the only ones that can count)."""
+    if capacity_kwh is None or not _finite_positive(capacity_kwh):
+        return []
+    return [
+        vote for vote in votes
+        if fits(vote.kwh_per_percent, capacity_kwh)
+        and abs(vote.meta["capacity_kwh"] - capacity_kwh) <= _CAPACITY_TOLERANCE_KWH
+    ]
+
+
+def _vote_counts(votes: list[Capture], capacity_kwh: float | None) -> tuple[int, int]:
+    """`(valid, agreeing)` for the display: the valid votes, and how many of them lie within `TRUST_SPREAD` of their
+    median (an outlier is valid but does not agree)."""
+    valid = _valid_votes(votes, capacity_kwh)
+    if not valid:
+        return 0, 0
+    median = statistics.median(vote.kwh_per_percent for vote in valid)
+    return len(valid), sum(1 for vote in valid if abs(vote.kwh_per_percent - median) <= TRUST_SPREAD * median)
 
 
 def with_learned(learned: LearnedEnergy, capacity_kwh: float | None) -> float | None:
@@ -1149,6 +1204,46 @@ def efficiency_for(learned: LearnedEnergy, capacity_kwh: float | None) -> float:
         return CHARGE_EFFICIENCY
     efficiency = capacity_kwh / (ratio * 100.0)
     return efficiency if 0.0 < efficiency <= MAX_EFFICIENCY else CHARGE_EFFICIENCY
+
+
+def estimate_view(
+    learned: LearnedEnergy,
+    capacity_kwh: float | None,
+    *,
+    morek: bool,
+    need_kwh: float | None = None,
+    default_need_kwh: float | None = None,
+) -> dict[str, Any]:
+    """The learned-estimate block of Stage 15.11 as the display states it (values only, no wording): whether the figure
+    the plan uses is `learned` or the `default`, today's valid and agreeing sample counts (an outlier is valid but does
+    not agree), how many agreeing samples lengthen or shorten the time, whether the clamp bounds the figure, and the
+    wall energy the target needs with and without it. `effect_minutes` is filled by the caller from the plan's power.
+    Display only: nothing here is read by a plan."""
+    default = None
+    if capacity_kwh is not None and _finite_positive(capacity_kwh):
+        default = capacity_kwh / CHARGE_EFFICIENCY / 100.0
+    used = learned.use_kwh_per_percent
+    clamped = bool(
+        morek and used is not None and default is not None and learned.from_promoted
+        and (abs(used - CLAMP_LOWER * default) < 1e-9 or abs(used - CLAMP_UPPER * default) < 1e-9)
+    )
+    lengthen, shorten = (PROMOTE_LENGTHEN_VOTES, PROMOTE_SHORTEN_VOTES) if morek else (TRUST_SAMPLES, TRUST_SAMPLES)
+    return {
+        "mode": "morek" if morek else "legacy",
+        "source": "default" if used is None else "learned",
+        "kwh_per_percent": None if used is None else round(used, 4),
+        "default_kwh_per_percent": None if default is None else round(default, 4),
+        "valid_samples": learned.valid,
+        "agreeing_samples": learned.agreeing,
+        "needed_to_lengthen": lengthen,
+        "needed_to_shorten": shorten,
+        "clamped": clamped,
+        "need_kwh": None if need_kwh is None or not _finite(need_kwh) else round(need_kwh, 3),
+        "default_need_kwh": None if default_need_kwh is None or not _finite(default_need_kwh) else round(default_need_kwh, 3),
+        "effect_minutes": None,
+        "rejections": {reason: count for reason, count in learned.rejections.items() if reason in REJECT_REASONS and
+                       isinstance(count, int) and not isinstance(count, bool) and count > 0},
+    }
 
 
 def _ident(value: Any) -> bool:

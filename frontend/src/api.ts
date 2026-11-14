@@ -91,7 +91,7 @@ export async function getDashboard(
 export async function morekSchedule(
   hass: HomeAssistantLike,
   chargerId: string,
-  action: "status" | "send" | "fetch" | "clear" | "recalculate_sync",
+  action: "status" | "send" | "fetch" | "clear" | "recalculate_sync" | "reset_learning",
   previewId?: string,
 ): Promise<unknown> {
   return await call<unknown>(hass, {

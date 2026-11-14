@@ -179,6 +179,19 @@ class LearnedPowerStore:
         """The charger is gone for good: what was learned at it goes too."""
         await Store(hass, _STORE_VERSION, f"{_STORE_PREFIX}.{entry_id}").async_remove()
 
+    async def async_reset(self) -> bool:
+        """Stage 15.11, an administrator's explicit reset: forget every learned power of this charger, in memory first,
+        then the stored file (so it cannot return after a restart). `False` when the file's removal failed; the empty
+        state is then queued to replace it."""
+        self._subjects = {}
+        try:
+            await self._store.async_remove()
+        except Exception as err:  # noqa: BLE001 - reported to the caller by the False
+            _LOGGER.warning("SpotNav: the learned power file could not be removed (%s)", type(err).__name__)
+            self._store.async_delay_save(self._to_store, SAVE_DELAY_S)
+            return False
+        return True
+
     def power(self, subject: str, wiring: Wiring, low_kw: float, high_kw: float) -> LearnedPower:
         """What is learned for `subject` on this wiring (nothing when it was learned on another)."""
         held = self._subjects.get(subject)
@@ -229,6 +242,10 @@ class PowerSampler:
     def __init__(self, store: LearnedPowerStore) -> None:
         self._store = store
         self._last: PowerSample | None = None
+
+    def reset(self) -> None:
+        """Forget the last clean reading (Stage 15.11, after the store was reset): the stretch starts again."""
+        self._last = None
 
     def sample(self, sample: PowerSample | None, high_kw: float) -> None:
         """Take one reading (`None`: this minute is not clean, and the stretch ends)."""
