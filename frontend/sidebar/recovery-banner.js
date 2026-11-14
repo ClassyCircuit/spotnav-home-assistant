@@ -19,7 +19,14 @@ const WHAT = {
   adjust_planning_settings: 'The plan cannot be sent as saved; adjust the planning settings.',
   wait_for_prices: 'Prices are unavailable or incomplete for the planned window.',
   see_reason: 'The schedule is not being updated.',
+  // 15.4a/b repair outcomes. Plain words, who acts; none of these asks for a blind resend.
+  needs_person: 'Automatic repair is paused for this attempt: the charger’s schedule still doesn’t match, or the repair limit is used up. Check the charger and the SpotNav logs.',
+  wait_for_repair_deferral: 'The charger’s schedule differs a little. The current charge is left alone and SpotNav fixes it a bit later.',
+  wait_for_repair_spacing: 'SpotNav already fixed the charger’s schedule recently, so it waits before sending again. Nothing is sent now.',
+  wait_for_confirmation: 'Checking the charger’s schedule again: one odd reading isn’t enough to act on.',
+  wait_for_repair_release: 'The charger’s schedule differs from the plan, but automatic repair is off, so nothing was sent. Check the schedule in the Morek app.',
 };
+const REPAIR_NOTE = new Set(['wait_for_repair_deferral', 'wait_for_repair_spacing', 'wait_for_confirmation', 'wait_for_repair_release']);
 // Only these end by themselves: the panel says so and when SpotNav checks again.
 const AUTOMATIC = new Set(['wait_for_charger_connection', 'check_charger_identity', 'retry_after_stop_or_change', 'wait_for_planner', 'wait_for_fresh_inputs', 'wait_for_prices', 'check_logs']);
 
@@ -37,7 +44,20 @@ export function recoveryBanner(state, now = Date.now()) {
   if (state.outcomes?.uncertain === true || blocker?.code === 'upload_uncertain') {
     return {level: 'error', code: 'upload_uncertain', text: `${WHAT.check_charger_outcome} Charging is not confirmed; check Morek and the SpotNav logs before acting. Nothing was cleared.`};
   }
+  const repair = reconciliation.repair || {};
+  const checkClass = reconciliation.check && typeof reconciliation.check === 'object' ? reconciliation.check.class : null;
+  // A repair that gave up is a persistent "needs a person" until a healthy check or a new plan; it outranks the
+  // timed, automatic blockers (but not an unknown write above), and is never reworded as a retry.
+  if (blocker?.code === 'repair_needs_person' || (repair.needs_person === true && checkClass !== 'healthy' && blocker?.code !== 'upload_rejected')) {
+    return {level: 'error', code: 'repair_needs_person', text: WHAT.needs_person};
+  }
   if (!blocker) return null;
+  if (REPAIR_NOTE.has(blocker.action)) {
+    // Not a fault: SpotNav is waiting on purpose. Nothing here is a charging claim and no button resends anything.
+    const next = blocker.action === 'wait_for_repair_spacing' ? time(repair.budget?.next_at) : null;
+    const due = next && Date.parse(repair.budget.next_at) > now ? ` It can send again after ${next}.` : '';
+    return {level: blocker.action === 'wait_for_repair_release' ? 'warning' : 'info', code: blocker.code, text: `${WHAT[blocker.action]}${due}`};
+  }
   const what = WHAT[blocker.action] || WHAT.see_reason;
   const suffix = ` (${blocker.code})`;
   if (blocker.code === 'upload_rejected') {

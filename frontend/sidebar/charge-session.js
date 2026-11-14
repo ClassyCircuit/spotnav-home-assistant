@@ -152,12 +152,14 @@ export function chargeSession(status, observedAt, failed, now = Date.now()) {
     return done(result('control_unavailable', 'warning', 'Charging can’t be started or scheduled', 'The charger’s charge-control switch is missing, disabled or unavailable in Home Assistant, so SpotNav can’t enable charging.',
       {action: 'You: check that the charger’s charge-control switch is enabled in Home Assistant.'}));
   }
+  // Offline / lost connection is "not known", never a charging failure: say what was last confirmed, and when.
+  const lastSeen = reported ? `Connection lost; last confirmed “${reported.value}” at ${clock(reported.at)}. ` : '';
   if (ready.control === 'unavailable' || ss.state === 'offline') {
-    return done(result('offline', 'warning', 'Charger offline', 'Home Assistant cannot reach the charger or its control, so it cannot start or follow a charge.',
+    return done(result('offline', 'warning', 'Charger offline', `${lastSeen}Home Assistant cannot reach the charger or its control, so it cannot start or follow a charge. Whether the car is charging is not known until it reconnects.`,
       {action: 'Check the charger’s power and network connection. SpotNav re-checks automatically.'}));
   }
   if (reported && !reportedFresh && reported.judged === 'last_known') {
-    return done(result('last_known', 'unknown', 'Charger status last known', `The last report (“${reported.value}”, ${clock(reported.at)}) is old and the connection to the charger is not confirmed now, so whether the car is charging is not known.`));
+    return done(result('last_known', 'unknown', 'Charger status last known', `${lastSeen}Whether the car is charging is not known right now.`));
   }
   if (!norm) {
     return done(result('unknown', 'unknown', 'Charging status unknown', 'The charger’s connector state is not currently known, so whether the car will charge cannot be told.'));
@@ -203,7 +205,7 @@ export function chargeSession(status, observedAt, failed, now = Date.now()) {
     const startPending = !outcome || outcome.kind === 'pending' || outcome.kind === 'accepted_waiting';
     if (norm !== 'connected' || txn.kind === 'observed' || startPending) {
       const boot = ready.boot_start?.state;
-      const asked = ss.state === 'starting' || ss.state === 'accepted' || boot === 'requested';
+      const asked = ss.state === 'starting' || ss.state === 'accepted';   // the boot 'requested' token is intent, not proof of a request
       const off = enabled.reason === 'control_off' ? 'off' : 'not confirmed';
       const detail = norm !== 'connected' || txn.kind === 'observed'
         ? `The charger reports ${norm === 'connected' ? 'a transaction' : `“${raw}”`}, but the charge-control switch is ${off}, so charging and any schedule wait are not confirmed. A transaction number may be left over from an earlier session.`

@@ -55799,7 +55799,7 @@ function zoneClock(timeZone) {
     timeZoneName: "shortOffset",
     hour: "2-digit"
   });
-  const clock4 = {
+  const clock5 = {
     timeZone: requested,
     msOfDay(instantMs2) {
       const parts = partsOf(instantMs2);
@@ -55814,19 +55814,19 @@ function zoneClock(timeZone) {
       return parts.find((part2) => part2.type === "timeZoneName")?.value ?? "";
     }
   };
-  clocks.set(requested, clock4);
-  return clock4;
+  clocks.set(requested, clock5);
+  return clock5;
 }
 function localDayKey(instantMs2, timeZone) {
   return zoneClock(timeZone).dayKey(instantMs2);
 }
 function localMidnightAt(instantMs2, timeZone) {
-  const clock4 = zoneClock(timeZone);
-  const estimate = instantMs2 - clock4.msOfDay(instantMs2);
+  const clock5 = zoneClock(timeZone);
+  const estimate = instantMs2 - clock5.msOfDay(instantMs2);
   let best = estimate;
   let bestDistance = Number.POSITIVE_INFINITY;
   for (const candidate of [estimate - HOUR_MS, estimate, estimate + HOUR_MS]) {
-    const reading = clock4.msOfDay(candidate);
+    const reading = clock5.msOfDay(candidate);
     const distance2 = Math.min(reading, 24 * HOUR_MS - reading);
     if (distance2 < bestDistance) {
       best = candidate;
@@ -60266,17 +60266,18 @@ function chargeSession(status, observedAt, failed, now = Date.now()) {
       { action: "You: check that the charger\u2019s charge-control switch is enabled in Home Assistant." }
     ));
   }
+  const lastSeen = reported ? `Connection lost; last confirmed \u201C${reported.value}\u201D at ${clock3(reported.at)}. ` : "";
   if (ready.control === "unavailable" || ss.state === "offline") {
     return done(result(
       "offline",
       "warning",
       "Charger offline",
-      "Home Assistant cannot reach the charger or its control, so it cannot start or follow a charge.",
+      `${lastSeen}Home Assistant cannot reach the charger or its control, so it cannot start or follow a charge. Whether the car is charging is not known until it reconnects.`,
       { action: "Check the charger\u2019s power and network connection. SpotNav re-checks automatically." }
     ));
   }
   if (reported && !reportedFresh && reported.judged === "last_known") {
-    return done(result("last_known", "unknown", "Charger status last known", `The last report (\u201C${reported.value}\u201D, ${clock3(reported.at)}) is old and the connection to the charger is not confirmed now, so whether the car is charging is not known.`));
+    return done(result("last_known", "unknown", "Charger status last known", `${lastSeen}Whether the car is charging is not known right now.`));
   }
   if (!norm) {
     return done(result("unknown", "unknown", "Charging status unknown", "The charger\u2019s connector state is not currently known, so whether the car will charge cannot be told."));
@@ -60324,7 +60325,7 @@ function chargeSession(status, observedAt, failed, now = Date.now()) {
     const startPending = !outcome || outcome.kind === "pending" || outcome.kind === "accepted_waiting";
     if (norm !== "connected" || txn.kind === "observed" || startPending) {
       const boot = ready.boot_start?.state;
-      const asked = ss.state === "starting" || ss.state === "accepted" || boot === "requested";
+      const asked = ss.state === "starting" || ss.state === "accepted";
       const off = enabled.reason === "control_off" ? "off" : "not confirmed";
       const detail = norm !== "connected" || txn.kind === "observed" ? `The charger reports ${norm === "connected" ? "a transaction" : `\u201C${raw}\u201D`}, but the charge-control switch is ${off}, so charging and any schedule wait are not confirmed. A transaction number may be left over from an earlier session.` : asked ? "We asked the charger to enable charging. Waiting for the charger to confirm." : boot === "waiting" ? "Charging isn\u2019t enabled on the charger yet. SpotNav will ask the charger once its checks pass." : "Charging isn\u2019t enabled on the charger yet, so it can\u2019t start.";
       return done(result(
@@ -60713,8 +60714,15 @@ var WHAT = {
   wait_for_fresh_inputs: "Waiting for a fresh vehicle reading.",
   adjust_planning_settings: "The plan cannot be sent as saved; adjust the planning settings.",
   wait_for_prices: "Prices are unavailable or incomplete for the planned window.",
-  see_reason: "The schedule is not being updated."
+  see_reason: "The schedule is not being updated.",
+  // 15.4a/b repair outcomes. Plain words, who acts; none of these asks for a blind resend.
+  needs_person: "Automatic repair is paused for this attempt: the charger\u2019s schedule still doesn\u2019t match, or the repair limit is used up. Check the charger and the SpotNav logs.",
+  wait_for_repair_deferral: "The charger\u2019s schedule differs a little. The current charge is left alone and SpotNav fixes it a bit later.",
+  wait_for_repair_spacing: "SpotNav already fixed the charger\u2019s schedule recently, so it waits before sending again. Nothing is sent now.",
+  wait_for_confirmation: "Checking the charger\u2019s schedule again: one odd reading isn\u2019t enough to act on.",
+  wait_for_repair_release: "The charger\u2019s schedule differs from the plan, but automatic repair is off, so nothing was sent. Check the schedule in the Morek app."
 };
+var REPAIR_NOTE = /* @__PURE__ */ new Set(["wait_for_repair_deferral", "wait_for_repair_spacing", "wait_for_confirmation", "wait_for_repair_release"]);
 var AUTOMATIC = /* @__PURE__ */ new Set(["wait_for_charger_connection", "check_charger_identity", "retry_after_stop_or_change", "wait_for_planner", "wait_for_fresh_inputs", "wait_for_prices", "check_logs"]);
 var time = (iso) => {
   const at = Date.parse(iso || "");
@@ -60728,7 +60736,17 @@ function recoveryBanner(state, now = Date.now()) {
   if (state.outcomes?.uncertain === true || blocker?.code === "upload_uncertain") {
     return { level: "error", code: "upload_uncertain", text: `${WHAT.check_charger_outcome} Charging is not confirmed; check Morek and the SpotNav logs before acting. Nothing was cleared.` };
   }
+  const repair = reconciliation.repair || {};
+  const checkClass = reconciliation.check && typeof reconciliation.check === "object" ? reconciliation.check.class : null;
+  if (blocker?.code === "repair_needs_person" || repair.needs_person === true && checkClass !== "healthy" && blocker?.code !== "upload_rejected") {
+    return { level: "error", code: "repair_needs_person", text: WHAT.needs_person };
+  }
   if (!blocker) return null;
+  if (REPAIR_NOTE.has(blocker.action)) {
+    const next = blocker.action === "wait_for_repair_spacing" ? time(repair.budget?.next_at) : null;
+    const due = next && Date.parse(repair.budget.next_at) > now ? ` It can send again after ${next}.` : "";
+    return { level: blocker.action === "wait_for_repair_release" ? "warning" : "info", code: blocker.code, text: `${WHAT[blocker.action]}${due}` };
+  }
   const what = WHAT[blocker.action] || WHAT.see_reason;
   const suffix = ` (${blocker.code})`;
   if (blocker.code === "upload_rejected") {
@@ -60749,8 +60767,123 @@ function recoveryBanner(state, now = Date.now()) {
   return { level: paused ? "info" : "error", code: blocker.code, text: `${what}${paused ? "" : " Needs your attention; it does not clear by itself."}${suffix}` };
 }
 
+// sidebar/schedule-check.js
+var CLOCK_SKEW_MS3 = 5e3;
+var MAX_CHECK_AGE_MS = 864e5;
+var CLASSES = /* @__PURE__ */ new Set(["healthy", "unknown", "differs_unconfirmed", "differs_confirmed"]);
+var LINK_STATES = /* @__PURE__ */ new Set(["up", "down", "unknown"]);
+var BOOT_STATES = /* @__PURE__ */ new Set(["none", "unknown", "waiting", "requested", "blocked", "closed"]);
+var isObject5 = (v2) => v2 !== null && typeof v2 === "object" && !Array.isArray(v2);
+var clock4 = (ms) => new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+var stamp = (value2, now) => {
+  const ms = typeof value2 === "string" ? Date.parse(value2) : NaN;
+  return Number.isFinite(ms) && Number.isFinite(now) && ms <= now + CLOCK_SKEW_MS3 ? ms : null;
+};
+function linkInfo(status, now) {
+  const link = status?.link;
+  if (!isObject5(link) || !LINK_STATES.has(link.state)) return { state: "unknown", since: null };
+  return { state: link.state, since: stamp(link.since, now) };
+}
+var BOOT_BLOCKED = {
+  transaction_present: "the charger already reports a charging session",
+  transaction_unknown: "the charger has not said whether a session is open",
+  transaction_not_reported_after_boot: "the charger has not reported its session since restarting"
+};
+function checkItem(status, now, link, facts) {
+  const reconciliation = status?.reconciliation;
+  if (!isObject5(reconciliation) || reconciliation.check === void 0 || reconciliation.check === null) return null;
+  const check = reconciliation.check;
+  const unknown = (text3) => ({ kind: "check_unknown", level: "info", text: text3 });
+  if (!isObject5(check)) return unknown("The schedule check result isn\u2019t readable, so it isn\u2019t known whether the charger\u2019s schedule matches.");
+  if (check.class === null || check.class === void 0) return null;
+  const at = stamp(check.at, now);
+  if (!CLASSES.has(check.class) || at === null) return unknown("The schedule check result isn\u2019t readable, so it isn\u2019t known whether the charger\u2019s schedule matches.");
+  facts.push(`Schedule check: ${check.class}${typeof check.reason === "string" ? ` (${check.reason})` : ""} at ${clock4(at)}`);
+  if (Number.isFinite(check.rechecks) && check.rechecks > 0) facts.push(`Re-checks in this episode: ${check.rechecks}`);
+  if (now - at > MAX_CHECK_AGE_MS) return unknown("The last schedule check was over a day ago, so it says nothing about the charger\u2019s schedule now.");
+  const events = Array.isArray(check.events) ? check.events : [];
+  const last = events[events.length - 1];
+  const afterRepair = isObject5(last) && last.trigger === "post_repair" && last.class === check.class;
+  const t6 = clock4(at);
+  const repair = isObject5(reconciliation.repair) ? reconciliation.repair : {};
+  const blocker = isObject5(reconciliation.blocker) ? reconciliation.blocker.code : null;
+  switch (check.class) {
+    case "healthy":
+      facts.push("A matching schedule is not proof that the car is charging.");
+      if (link.state === "down" && link.since !== null && link.since > at) {
+        return { kind: "check_healthy_stale", level: "info", text: `Checked at ${t6}, before the connection was lost. SpotNav checks again when the charger reconnects.` };
+      }
+      return afterRepair ? { kind: "check_repaired", level: "info", text: `SpotNav re-sent the schedule and checked it at ${t6}: it now matches the plan. That doesn\u2019t prove the car is charging.` } : { kind: "check_healthy", level: "info", text: `Checked at ${t6}, nothing needed changing.` };
+    case "differs_unconfirmed":
+      return { kind: "check_rechecking", level: "info", text: "Checking again: one odd reading isn\u2019t enough to act on." };
+    case "differs_confirmed":
+      if (repair.needs_person === true || blocker === "repair_needs_person") {
+        return { kind: "check_needs_person", level: "warning", text: "The charger\u2019s schedule still doesn\u2019t match and automatic repair is paused for this attempt. Check the charger and the SpotNav logs." };
+      }
+      if (blocker === "repair_deferred") return { kind: "check_deferred", level: "info", text: "The charger\u2019s schedule differs a little. The current charge is left alone; SpotNav fixes it a bit later." };
+      if (blocker === "repair_spacing") return { kind: "check_spacing", level: "info", text: "The charger\u2019s schedule differs. SpotNav already fixed it recently, so it waits before sending again." };
+      if (repair.gate_enabled === false) return { kind: "check_gated", level: "info", text: "The charger\u2019s schedule differs from the plan. Automatic repair is off, so nothing was sent." };
+      return { kind: "check_differs", level: "info", text: "The charger\u2019s schedule differs from the plan. SpotNav corrects it by itself when that is safe." };
+    default:
+      if (check.reason === "verification_pending" || check.reason === "upload_pending") {
+        return { kind: "check_waiting", level: "info", text: afterRepair || check.reason === "verification_pending" ? "Waiting for the charger\u2019s new schedule to settle before checking it." : "Waiting for the schedule to be sent before checking it." };
+      }
+      return { kind: "check_unknown", level: "info", text: `Couldn\u2019t check the charger\u2019s schedule at ${t6}.` };
+  }
+}
+function bootItem(status, now, facts) {
+  const boot = status?.readiness?.boot_start;
+  if (boot === void 0 || boot === null) return null;
+  if (!isObject5(boot) || !BOOT_STATES.has(boot.state)) return null;
+  const at = stamp(boot.at, now);
+  const reason = typeof boot.reason === "string" ? boot.reason : "";
+  if (boot.state !== "none" && boot.state !== "unknown") facts.push(`Charger restart: ${boot.state}${reason ? ` (${reason})` : ""}${at !== null ? ` at ${clock4(at)}` : ""}`);
+  if (at === null) return null;
+  const t6 = clock4(at);
+  if (boot.state === "requested") {
+    const ready = status.readiness;
+    const ssAt = stamp(ready.session_start_at, now);
+    const ss = isObject5(ready.session_start) ? ready.session_start : {};
+    if (ssAt === null || ssAt < at || typeof ss.state !== "string") {
+      return { kind: "boot_pending", level: "info", text: `The charger restarted at ${t6}. Restart recovery is pending and unconfirmed: it isn\u2019t known whether SpotNav has asked the charger to enable charging since then.` };
+    }
+    facts.push(`Start request after restart: ${ss.state}${typeof ss.reason === "string" ? ` (${ss.reason})` : ""} at ${clock4(ssAt)}`);
+    if (ss.state === "accepted") {
+      return { kind: "boot_requested", level: "info", text: `The charger restarted at ${t6}. SpotNav asked it to enable charging at ${clock4(ssAt)} and the charger accepted the request. Only the charger can confirm that charging started.` };
+    }
+    if (ss.state === "starting") return { kind: "boot_asking", level: "info", text: `The charger restarted at ${t6}. SpotNav is asking it to enable charging now.` };
+    if (ss.state === "blocked" || ss.state === "rejected") {
+      return { kind: "boot_withheld", level: "warning", text: `The charger restarted at ${t6}, but the request to enable charging was withheld or refused. Check the charger and the SpotNav logs for the reason before trying again.` };
+    }
+    return { kind: "boot_unknown", level: "info", text: `The charger restarted at ${t6}. Whether the request to enable charging reached it isn\u2019t known.` };
+  }
+  if (boot.state === "waiting") return { kind: "boot_waiting", level: "info", text: `The charger restarted at ${t6}. SpotNav is waiting for its reports before asking it to enable charging.` };
+  if (boot.state === "blocked") {
+    const why = BOOT_BLOCKED[reason] || "its reports do not show it is safe to ask";
+    return { kind: "boot_blocked", level: "warning", text: `The charger restarted at ${t6}, but ${why}, so SpotNav did not ask it to charge. Check the charger and the SpotNav logs for the reason before trying again.` };
+  }
+  return null;
+}
+function scheduleNotes(status, now = Date.now()) {
+  if (!status || status.supported === false) return null;
+  const facts = [];
+  const link = linkInfo(status, now);
+  if (link.state !== "unknown") facts.push(`Link to the charger: ${link.state === "up" ? "up" : "down"}${link.since !== null ? ` since ${clock4(link.since)}` : ""}`);
+  const items = [];
+  const check = checkItem(status, now, link, facts);
+  if (check) items.push(check);
+  const boot = bootItem(status, now, facts);
+  if (boot) items.push(boot);
+  if (link.state === "down") {
+    items.push({ kind: "link_lost", level: "info", text: `Connection lost${link.since !== null ? ` at ${clock4(link.since)}` : ""}. SpotNav checks the schedule again when the charger reconnects.` });
+  } else if (!items.length && link.state === "up" && link.since !== null) {
+    items.push({ kind: "link_quiet", level: "info", text: `Link to the charger unchanged since ${clock4(link.since)}.` });
+  }
+  return items.length ? { items, facts } : null;
+}
+
 // src/generated/version.ts
-var CARD_VERSION = "2.5.137";
+var CARD_VERSION = "2.5.138";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {
@@ -60884,7 +61017,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
   connectedCallback() {
     this.connected = true;
     this.classList.add("wa-dark");
-    this.shadowRoot.innerHTML = `<link rel="stylesheet" href="/spotnav-sidebar/panel.css?v=${CARD_VERSION}"><style>:host{display:block;min-height:100%;padding-bottom:env(safe-area-inset-bottom)}.hostbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top));background:#11151d;color:white}.hostbar label{flex:1 1 180px}.hostbar select{max-width:100%}.hostbar button,.hostbar select{font:inherit;padding:8px}.message{padding:16px;color:white;background:#11151d}</style><div class="hostbar"><button id="menu" aria-label="Open navigation">\u2630</button><strong>SpotNav Enhanced</strong><label>Charger <select id="charger"><option value="">Select charger</option></select></label><button id="refresh">Refresh observations</button><div id="automatic-controls"><span id="pause-state">Auto state unknown.</span> <button id="pause-auto" disabled>Pause Auto until resumed</button> <button id="resume-auto" disabled>Resume Auto</button><span id="pause-notice" role="status"></span></div><section id="charge-controls" aria-label="Charge Now"><button id="charge-now" disabled>Charge Now</button><details id="charge-options"><summary>Duration / change end</summary><label>Duration <select id="charge-duration"><option value="30">30 minutes</option><option value="60" selected>1 hour</option><option value="120">2 hours</option><option value="180">3 hours</option><option value="custom">Custom end time</option></select></label><label id="custom-label" hidden>End time <input id="charge-end" type="datetime-local"></label><button id="charge-replace" type="button" hidden>Replace Charge Now end</button></details><span id="charge-state" role="status">Charge Now status unavailable.</span><span id="charge-notice" role="status"></span></section></div><section id="charge-session" hidden></section><div id="recovery-banner" role="alert" hidden></div><div class="message" role="status">Select a charger.</div><main></main>`;
+    this.shadowRoot.innerHTML = `<link rel="stylesheet" href="/spotnav-sidebar/panel.css?v=${CARD_VERSION}"><style>:host{display:block;min-height:100%;padding-bottom:env(safe-area-inset-bottom)}.hostbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top));background:#11151d;color:white}.hostbar label{flex:1 1 180px}.hostbar select{max-width:100%}.hostbar button,.hostbar select{font:inherit;padding:8px}.message{padding:16px;color:white;background:#11151d}</style><div class="hostbar"><button id="menu" aria-label="Open navigation">\u2630</button><strong>SpotNav Enhanced</strong><label>Charger <select id="charger"><option value="">Select charger</option></select></label><button id="refresh">Refresh observations</button><div id="automatic-controls"><span id="pause-state">Auto state unknown.</span> <button id="pause-auto" disabled>Pause Auto until resumed</button> <button id="resume-auto" disabled>Resume Auto</button><span id="pause-notice" role="status"></span></div><section id="charge-controls" aria-label="Charge Now"><button id="charge-now" disabled>Charge Now</button><details id="charge-options"><summary>Duration / change end</summary><label>Duration <select id="charge-duration"><option value="30">30 minutes</option><option value="60" selected>1 hour</option><option value="120">2 hours</option><option value="180">3 hours</option><option value="custom">Custom end time</option></select></label><label id="custom-label" hidden>End time <input id="charge-end" type="datetime-local"></label><button id="charge-replace" type="button" hidden>Replace Charge Now end</button></details><span id="charge-state" role="status">Charge Now status unavailable.</span><span id="charge-notice" role="status"></span></section></div><section id="charge-session" hidden></section><section id="schedule-check" hidden></section><div id="recovery-banner" role="alert" hidden></div><div class="message" role="status">Select a charger.</div><main></main>`;
     const hostStyle = document.createElement("style");
     hostStyle.textContent = ".hostbar label{color:#f0f3f8}.hostbar select,.hostbar input{color:#f0f3f8;background:#202b39;border:1px solid #8191a4;border-radius:8px;min-height:42px} #automatic-controls,#charge-controls{display:flex;flex-wrap:wrap;gap:6px;min-width:0;max-width:100%} #automatic-controls button,#charge-controls button{max-width:100%;white-space:normal} #charge-controls{flex:1 1 100%;align-items:center} #charge-state,#charge-notice{flex:1 1 100%} #charge-options label{display:inline-block;margin:6px}";
     this.shadowRoot.append(hostStyle);
@@ -61042,6 +61175,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this.paintAutomatic(dashboard);
     this.paintChargeNow(dashboard);
     this.paintSession();
+    this.paintCheck();
     this.paintRecovery();
     if (this.settingsRecord && dashboard?.settings?.revision > this.settingsRecord.revision) {
       this.settingsConflict = true;
@@ -61131,6 +61265,44 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     }
     facts.append(list2);
     nodes.push(facts);
+    el.replaceChildren(...nodes);
+  }
+  paintCheck() {
+    const el = this.shadowRoot.querySelector("#schedule-check");
+    if (!el) return;
+    const notes = fresh(this.statusAt, this.statusFailed) ? scheduleNotes(decodeMorekState(this.rawStatus), Date.now()) : null;
+    el.hidden = !notes;
+    if (!notes) {
+      el.replaceChildren();
+      return;
+    }
+    el.setAttribute("role", "status");
+    el.setAttribute("aria-label", "Schedule check");
+    el.dataset.kind = notes.items[0].kind;
+    el.style.cssText = "padding:8px 16px;background:#1b2028;color:#c9d2de;font-size:.92em;line-height:1.4;border-left:3px solid #55606e";
+    const nodes = notes.items.map((item) => {
+      const line = document.createElement("div");
+      line.dataset.kind = item.kind;
+      line.textContent = item.text;
+      if (item.level === "warning") line.style.fontWeight = "600";
+      return line;
+    });
+    if (notes.facts.length) {
+      const d3 = document.createElement("details");
+      d3.style.cssText = "margin-top:4px;opacity:.85";
+      const s4 = document.createElement("summary");
+      s4.textContent = "Schedule check details";
+      d3.append(s4);
+      const ul = document.createElement("ul");
+      ul.style.margin = "4px 0 0";
+      for (const f3 of notes.facts) {
+        const li = document.createElement("li");
+        li.textContent = f3;
+        ul.append(li);
+      }
+      d3.append(ul);
+      nodes.push(d3);
+    }
     el.replaceChildren(...nodes);
   }
   paintRecovery() {

@@ -361,7 +361,7 @@ while offline”.
   per state; i18n parity; preview fixture review (no browser suite unless asked); Pause/Resume, Charge Now and
   Send/Refresh behaviour and safety tests unchanged; opening or refreshing writes nothing. *Exclusions:* no
   backend change, no rename of “Ready by”, no theme work.
-- [ ] **15.7b Check/repair/reboot/offline wording and banner.** *Scope:* the sentences for: reconnect check
+- [x] **15.7b Check/repair/reboot/offline wording and banner.** *Locally implemented with fast mocked tests (2.5.138); coordinator reviewed; not installed, browser-checked or live-verified. New pure `sidebar/schedule-check.js` (separate subdued `#schedule-check` line under the primary charging state: check/rechecking/repaired/needs-person/reboot/link notes, fails closed on malformed/future/over-a-day data, older backends show nothing); `recovery-banner.js` maps `repair_needs_person`, `repair_deferred`, `repair_spacing`, `repair_unconfirmed`, `repair_gated` plainly with no resend action; `charge-session.js` offline/last-known copy is “Connection lost; last confirmed …”. No backend or write change; sidebar copy is English literals as before, so no i18n keys. Tests: `frontend/test/schedule-check.test.ts`.* *Scope:* the sentences for: reconnect check
   result (“checked at {time}, nothing needed changing” / “couldn’t check”), checking (“one odd reading isn’t
   enough to act on”), schedule repaired, **needs a person** (recovery-banner mapping of 15.4a’s blocker),
   reboot-asked-once, offline “last known {state}, {age}”, idle-connected (“unchanged since {time}”), unknown.

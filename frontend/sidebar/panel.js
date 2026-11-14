@@ -9,6 +9,7 @@ import { reconcile } from '../shared-dashboard/reconcile.js';
 import { dashboardAdapter } from './adapter.js';
 import { createLogViewer } from './log-viewer.js';
 import { recoveryBanner } from './recovery-banner.js';
+import { scheduleNotes } from './schedule-check.js';
 import { chargeSession } from './charge-session.js';
 import { CARD_VERSION } from '../src/generated/version.ts';
 import { capInput, capForSave, displayPrice } from '../shared-dashboard/price-format.js';
@@ -101,7 +102,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
   connectedCallback() {
     this.connected = true;
     this.classList.add('wa-dark');
-    this.shadowRoot.innerHTML = `<link rel="stylesheet" href="/spotnav-sidebar/panel.css?v=${CARD_VERSION}"><style>:host{display:block;min-height:100%;padding-bottom:env(safe-area-inset-bottom)}.hostbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top));background:#11151d;color:white}.hostbar label{flex:1 1 180px}.hostbar select{max-width:100%}.hostbar button,.hostbar select{font:inherit;padding:8px}.message{padding:16px;color:white;background:#11151d}</style><div class="hostbar"><button id="menu" aria-label="Open navigation">☰</button><strong>SpotNav Enhanced</strong><label>Charger <select id="charger"><option value="">Select charger</option></select></label><button id="refresh">Refresh observations</button><div id="automatic-controls"><span id="pause-state">Auto state unknown.</span> <button id="pause-auto" disabled>Pause Auto until resumed</button> <button id="resume-auto" disabled>Resume Auto</button><span id="pause-notice" role="status"></span></div><section id="charge-controls" aria-label="Charge Now"><button id="charge-now" disabled>Charge Now</button><details id="charge-options"><summary>Duration / change end</summary><label>Duration <select id="charge-duration"><option value="30">30 minutes</option><option value="60" selected>1 hour</option><option value="120">2 hours</option><option value="180">3 hours</option><option value="custom">Custom end time</option></select></label><label id="custom-label" hidden>End time <input id="charge-end" type="datetime-local"></label><button id="charge-replace" type="button" hidden>Replace Charge Now end</button></details><span id="charge-state" role="status">Charge Now status unavailable.</span><span id="charge-notice" role="status"></span></section></div><section id="charge-session" hidden></section><div id="recovery-banner" role="alert" hidden></div><div class="message" role="status">Select a charger.</div><main></main>`;
+    this.shadowRoot.innerHTML = `<link rel="stylesheet" href="/spotnav-sidebar/panel.css?v=${CARD_VERSION}"><style>:host{display:block;min-height:100%;padding-bottom:env(safe-area-inset-bottom)}.hostbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top));background:#11151d;color:white}.hostbar label{flex:1 1 180px}.hostbar select{max-width:100%}.hostbar button,.hostbar select{font:inherit;padding:8px}.message{padding:16px;color:white;background:#11151d}</style><div class="hostbar"><button id="menu" aria-label="Open navigation">☰</button><strong>SpotNav Enhanced</strong><label>Charger <select id="charger"><option value="">Select charger</option></select></label><button id="refresh">Refresh observations</button><div id="automatic-controls"><span id="pause-state">Auto state unknown.</span> <button id="pause-auto" disabled>Pause Auto until resumed</button> <button id="resume-auto" disabled>Resume Auto</button><span id="pause-notice" role="status"></span></div><section id="charge-controls" aria-label="Charge Now"><button id="charge-now" disabled>Charge Now</button><details id="charge-options"><summary>Duration / change end</summary><label>Duration <select id="charge-duration"><option value="30">30 minutes</option><option value="60" selected>1 hour</option><option value="120">2 hours</option><option value="180">3 hours</option><option value="custom">Custom end time</option></select></label><label id="custom-label" hidden>End time <input id="charge-end" type="datetime-local"></label><button id="charge-replace" type="button" hidden>Replace Charge Now end</button></details><span id="charge-state" role="status">Charge Now status unavailable.</span><span id="charge-notice" role="status"></span></section></div><section id="charge-session" hidden></section><section id="schedule-check" hidden></section><div id="recovery-banner" role="alert" hidden></div><div class="message" role="status">Select a charger.</div><main></main>`;
     const hostStyle=document.createElement('style');
     hostStyle.textContent='.hostbar label{color:#f0f3f8}.hostbar select,.hostbar input{color:#f0f3f8;background:#202b39;border:1px solid #8191a4;border-radius:8px;min-height:42px} #automatic-controls,#charge-controls{display:flex;flex-wrap:wrap;gap:6px;min-width:0;max-width:100%} #automatic-controls button,#charge-controls button{max-width:100%;white-space:normal} #charge-controls{flex:1 1 100%;align-items:center} #charge-state,#charge-notice{flex:1 1 100%} #charge-options label{display:inline-block;margin:6px}';
     this.shadowRoot.append(hostStyle);
@@ -180,6 +181,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     this.paintAutomatic(dashboard);
     this.paintChargeNow(dashboard);
     this.paintSession();
+    this.paintCheck();
     this.paintRecovery();
     if (this.settingsRecord && dashboard?.settings?.revision > this.settingsRecord.revision) {this.settingsConflict=true;this.settingsNotice='Settings changed elsewhere. Reload the charger before editing again.';}
     const allowed=this._hass?.user?.is_admin===true || dashboard?.settings?.users_change_plan===true;
@@ -238,6 +240,18 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     const summary=document.createElement('summary');summary.textContent='What SpotNav sees';facts.append(summary);
     const list=document.createElement('ul');list.style.margin='4px 0 0';for(const fact of info.facts){const li=document.createElement('li');li.textContent=fact;list.append(li);}
     facts.append(list);nodes.push(facts);
+    el.replaceChildren(...nodes);
+  }
+  paintCheck() {
+    const el=this.shadowRoot.querySelector('#schedule-check');if(!el)return;
+    // Secondary and read-only: shown only for a fresh status, subdued, and never in place of the charging state above.
+    const notes=fresh(this.statusAt,this.statusFailed) ? scheduleNotes(decodeMorekState(this.rawStatus),Date.now()) : null;
+    el.hidden=!notes;
+    if(!notes){el.replaceChildren();return;}
+    el.setAttribute('role','status');el.setAttribute('aria-label','Schedule check');el.dataset.kind=notes.items[0].kind;
+    el.style.cssText='padding:8px 16px;background:#1b2028;color:#c9d2de;font-size:.92em;line-height:1.4;border-left:3px solid #55606e';
+    const nodes=notes.items.map(item=>{const line=document.createElement('div');line.dataset.kind=item.kind;line.textContent=item.text;if(item.level==='warning')line.style.fontWeight='600';return line;});
+    if(notes.facts.length){const d=document.createElement('details');d.style.cssText='margin-top:4px;opacity:.85';const s=document.createElement('summary');s.textContent='Schedule check details';d.append(s);const ul=document.createElement('ul');ul.style.margin='4px 0 0';for(const f of notes.facts){const li=document.createElement('li');li.textContent=f;ul.append(li);}d.append(ul);nodes.push(d);}
     el.replaceChildren(...nodes);
   }
   paintRecovery() {
