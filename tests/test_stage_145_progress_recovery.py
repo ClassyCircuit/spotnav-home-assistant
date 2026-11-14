@@ -499,3 +499,73 @@ async def test_unknown_dispatch_outcome_blocks_a_changed_unknown_progress_plan(m
     await drain(w.worker)
     assert w.point.call.await_count == 1 and w.worker.reason == "upload_uncertain"
     w.worker.close()
+
+
+# ---- 17.1 review: evidence, churn, minimum-exception bounds --------------------------------------
+
+def test_decision_evidence_records_progress_unknown_additively_and_never_as_measured(monkeypatch):
+    """A plan sent from an unknown-progress calculation is visible in the decision's `inputs`; no new sensitive field."""
+    from custom_components.spotnav.api import morek_schedule
+
+    async def run():
+        w = await _stale_world(monkeypatch, uncapped=False)
+        _wire(w, [_charge(w.read_at - timedelta(minutes=10), 0.2, hours=0.5)])
+        unknown = await w.controller.async_recalculate()
+        assert unknown.progress_unknown
+        for snap, expected in ((unknown, True), (w.base, False)):
+            monkeypatch.setattr(morek_schedule, "preview_for", lambda *_a, _s=snap: SimpleNamespace(snapshot=lambda: _s))
+            inputs = morek_schedule._planning_inputs(None, "test")  # noqa: SLF001
+            assert inputs["progress_unknown"] is expected
+            event = morek_schedule.decision_event(
+                now=NOW, kinds=("settings",), last_trigger="settings", reason="upload_accepted_unverified",
+                inputs=inputs, evidence="x", continuity=None, dispatched=True)
+            assert event["inputs"]["progress_unknown"] is expected
+            assert event["stages"]["physical"] == "not_measured"
+        # a calculation failure still yields a plain unknown record
+        monkeypatch.setattr(morek_schedule, "preview_for", lambda *_a: (_ for _ in ()).throw(RuntimeError()))
+        assert morek_schedule._planning_inputs(None, "test") == {"plan_state": "unknown", "uncertain": True}  # noqa: SLF001
+    asyncio.run(run())
+
+
+def test_progress_unknown_flip_alone_publishes_once_and_never_recalculates(monkeypatch):
+    """The flag is in `meaningful_key` so the display updates; a repeat of the same flag is silent, and no
+    publication starts another calculation (no loop)."""
+    async def run():
+        w = await _stale_world(monkeypatch, uncapped=False)
+        base = w.base
+        flagged = replace(base, progress_unknown=True)
+        assert base.meaningful_key() != flagged.meaningful_key()
+        assert replace(flagged, progress_unknown=False).meaningful_key() == base.meaningful_key()
+        calls, heard = [], []
+        real = w.controller.async_recalculate
+
+        async def counted(*a, **k):
+            calls.append(1)
+            return await real(*a, **k)
+        monkeypatch.setattr(w.controller, "async_recalculate", counted)
+        w.controller.add_listener(heard.append)
+        heard.clear()  # a new listener is first told the current snapshot
+        w.controller._last_key = base.meaningful_key()  # noqa: SLF001
+        w.controller._publish(flagged, force=False)  # noqa: SLF001
+        w.controller._publish(flagged, force=False)  # noqa: SLF001
+        assert len(heard) == 1 and heard[0].progress_unknown and not calls
+    asyncio.run(run())
+
+
+def test_minimum_exception_never_exceeds_the_minimum_need_from_the_reading_nor_the_target(monkeypatch):
+    """Unknown progress with a soft cap and a minimum level: the above-cap energy stays within the minimum need
+    worked out from the reading (the documented limit) and never past the target; the plan is flagged."""
+    async def run():
+        w = await _stale_world(monkeypatch, uncapped=False)
+        seen = _spy(w)
+        _wire(w, [])
+        await w.controller.async_recalculate()
+        base_need, base_min, _ = seen[-1]
+        _wire(w, [_charge(w.read_at - timedelta(minutes=10), 0.2, hours=0.5)])
+        snap = await w.controller.async_recalculate()
+        need, minimum, unknown = seen[-1]
+        assert unknown and snap.progress_unknown and snap.proposal is not None
+        assert base_min is not None and minimum is not None and minimum <= base_min + 1e-9
+        assert minimum <= need + 1e-9 and need <= base_need + 1e-9  # never past the target need
+        assert _shown(snap.proposal) <= base_need + 1e-6
+    asyncio.run(run())

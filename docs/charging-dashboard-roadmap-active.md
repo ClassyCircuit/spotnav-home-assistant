@@ -3,7 +3,7 @@
 Status: **in progress. This is the only work queue.** Created 2026-11-14 by splitting the old roadmap, which
 is now frozen as a historical reference:
 [archive/charging-dashboard-roadmap-2026-11-14.md](archive/charging-dashboard-roadmap-2026-11-14.md)
-(“the archive”). Initial audit basis: manifest 2.5.128, HEAD `6a50a7ae`. Stage 15 is now locally implemented and coordinator-reviewed through 2.5.143 with focused mocked checks; see its entries and the handoff for unrun checks. Nothing below is
+(“the archive”). Initial audit basis: manifest 2.5.128, HEAD `6a50a7ae`. Stage 15 is now locally implemented and coordinator-reviewed through 2.5.143 with focused mocked checks; see its entries and the handoff for unrun checks. Stage 16.1 (2.5.144) is done locally; Stage 16.2 and Stage 17 (planner resilience, 17.1 first) are the open queue as of manifest 2.5.146. Nothing below is
 installed, deployed or physically verified, and this file authorizes no HA access, charger command, restart
 or deployment. Read `AGENTS.md` and [the development handoff](morek-development-handoff.md) first.
 
@@ -95,7 +95,7 @@ One at a time; “Needs” lists the only real dependencies. Stable parent ids; 
 | 29 | 8.3a Savings baseline (backend) | 8.2a, D2 | |
 | 30 | 8.3b Savings and summary cards | 8.3a, 7.5 | |
 
-Items 1–15 (Stage 15) are now locally implemented and coordinator-reviewed through 2.5.143. Do not reassign them. **Stage 16 below takes priority over items 16–30**, as requested on 2026-11-14. After it, resume item 16 (Stage 13.1) only when requested. Items 16–30 are later features: none is a prerequisite for Stage 15 or for 5.8; the order is the
+Items 1–15 (Stage 15) are now locally implemented and coordinator-reviewed through 2.5.143. Do not reassign them. **Stage 16 and Stage 17 (below, strict order 17.1 → 16.2 → 17.2 … 17.6) take priority over items 16–30**, as requested on 2026-11-14. After them, resume item 16 (Stage 13.1) only when requested. Items 16–30 are later features: none is a prerequisite for Stage 15 or for 5.8; the order is the
 suggested default (13, then 7, then 8) and the user may reorder it. **Not in the queue:** §9.B reviews,
 §9.C user-owned items, E1/E2.
 
@@ -507,6 +507,191 @@ reserve or repeated purchases beyond the remaining need through successive recal
 Standard acceptance and the Stage 14 non-regression contract apply to both substages, subject to the
 binding fast-tests-only restriction. After each review, commit and push before delegating the next.
 
+## Stage 17 — Planner resilience: a useful, honest plan from imperfect inputs
+
+**Planned 2026-11-14 (docs only; nothing below is implemented except what is marked).** Source basis: manifest
+**2.5.146**, HEAD `d9ec44cc`, tree clean, pushed (17.1 then moved the source to 2.5.147). One fresh Claude Sonnet 5.5 medium delegate per substage in the
+queue below, shared worktree; the coordinator reviews, then commits and pushes each substage before the next
+starts (no batching). Every substage: Standard acceptance (§4) with the binding **fast-tests-only** rule, the §5
+contract (all are ◆ unless stated), manifest bump (next free patch, from 2.5.147) only when source or card
+changes, `npm run build` + `npm run check-dist` from `frontend/` when the card/sidebar changes, a truthful update
+of this checklist and a dated development-handoff entry. No HA access, deployment, charger or hardware action.
+
+**Why:** the planner holds (`planning_unavailable`, a retained old plan) for inputs that are merely old, estimated
+or partly missing, while the guards that matter (identity, Pause/Stop, protection, ownership, uncertain writes,
+price coverage of every sent minute) already sit at the wire. Stage 17 narrows each hold to the cases that are
+genuinely unsafe, labels what was estimated or unknown, and makes recovery automatic through the existing
+input-evidence → recalculation → worker-compare path.
+
+**Policy for every substage (binding):**
+1. Plan from the best honest input and say what it was: actual reading vs energy-derived estimate vs last known;
+   estimated, stale or unknown is **never shown or recorded as measured**; unknown is never zero.
+2. **No invented prices.** A missing, invalid, stale-beyond-rule or gapped price never becomes a price, a zero or
+   an unpriced dispatch; `proposal.unpriced` stays undispatchable. Never use an exchange rate older than
+   `MAX_RATE_AGE` or from another currency.
+3. **No guessed identity.** A reading for no car, another car, the future or older than one already planned from
+   still holds the plan (`target_soc_stale`, Stage 14.5). Estimates are tied to the identified car and plug-in.
+4. **No blind retries.** Reuse the existing bounded refresh/backoff (price refresh, ECB `BACKOFF_STEPS_SECONDS`,
+   `FX_RETRY`, `REJECTION_RETRY_DELAYS`, 12-check cap). An unknown dispatched outcome is never retried or cleared.
+   No new timer, controller or sender except where a substage names one non-sending wake.
+5. Pause/Stop, Charge Now ownership, connector identity, electrical protection, the user’s settings (cap, minimum
+   SOC, target, ready-by, reserve) and the BMW-limit assumption stay exactly as they are. The immediate SOC
+   protection floor keeps its own freshness rules.
+6. Recovery is the **existing** path: a changed input (`_morek_input_evidence`, price evidence, area snapshot,
+   session store, reading) → `_on_area_changed`/`async_recalculate` → worker compare. A recovered plan is sent
+   **once**; an equal schedule sends nothing; an active window keeps Stage 14 protection. The user never has to
+   press Refresh/Send for an automatic recovery.
+7. A new user-visible sentence goes into the existing status/projection/banner surfaces (no new panel, no new
+   store, no new architecture). Every blocker states who acts.
+
+**Already implemented — do not redo (source reading of 2.5.146):**
+
+| Area | State | Owner here |
+| --- | --- | --- |
+| 14.5 measured-progress accounting, reading order/identity guards, `vehicle_update_wait` | Done (14.5) | reused by 17.1/17.2 |
+| 16.1 published-only full/partial planning (`published_first`, `plan_published_portion`, reserve on published rows, urgency) | **Done locally, reviewed** (2.5.144) | consumed by 17.5 |
+| 2.5.146 unattributable measured progress plans from the reading, `progress_unknown`, `valid_energy_kwh` | Committed `d9ec44cc`; **17.1 review done locally (2.5.147), coordinator commit pending** | 17.1 |
+| 12.8 capped planning from a last-known *actual* reading of any age | Done (2.5.72) | 17.2 extends to estimates only |
+| Uncapped Morek path accepts an energy-derived estimate; `SocReader`/`soc_estimate` produce it | Done | 17.2 aligns capped path + admission |
+| Uncapped path works from a trusted learned wall kWh/% with no capacity (`with_learned`); capped path refuses first (`capped_vehicle_energy` → `target_capacity_unknown`) | Done / gap | 17.3 |
+| Price refresh/retry/backoff, ECB retry/backoff, `wants_again` rebuild when a rate arrives, ECB table ≤ 7 days before the day | Done | reused; 17.5 only labels/guards |
+| `SessionStore.add_listener`/`_notify` (close at `store.py:365`, second notify at `:443`) and recorder `_reconcile_late` | Done | 17.4 reuses; today `_on_sessions_changed` ignores target plans |
+| Degraded aggregate price state blocks automatic and manual dispatch (`morek_plan_blocker` area states; `_validated_proposal`) and the partial-plan indicator | **Pending: Stage 16.2** (unchanged scope) | **16.2, queued second** |
+
+### Queue (strict order; one at a time)
+
+| # | Substage | Needs |
+| --- | --- | --- |
+| 1 | 17.1 Review and finish the 2.5.146 progress-uncertainty fallback — **done locally (2.5.147), awaiting coordinator commit** | none (committed) |
+| 2 | **16.2** Safe dispatch, publication continuity, partial-plan UI (existing item, scope unchanged, above) | 16.1, 17.1 |
+| 3 | 17.2 Stale SOC with trustworthy estimates | 17.1; after 16.2 (same `morek_plan_blocker`) |
+| 4 | 17.3 Missing-capacity fallback | 17.2 (shares the capped-energy seam) |
+| 5 | 17.4 Automatic recovery on session finalization | 17.1 |
+| 6 | 17.5 Exchange-rate freshness and truthful cap policy | 16.2 (one coverage judgement) |
+| 7 | 17.6 Clear blockers and end-to-end automatic recovery | 17.2–17.5 |
+
+- [x] **17.1 Review and finish the 2.5.146 progress-uncertainty fallback ◆.** *Reviewed and finished locally at
+  manifest 2.5.147 (implementation sub-agent; **coordinator review/commit pending**); mocked checks only. Not
+  installed or live-verified.* Review outcome: (a) was a confirmed gap and is fixed — `_planning_inputs` and the
+  decision event `inputs` now carry `progress_unknown` additively (no new log line or sensitive field); (b) proved by
+  test: a flag flip alone notifies state listeners once (the display text changes), repeats are silent, no
+  recalculation starts, and the existing worker test shows a flip with the same plan sends nothing; notifications use
+  the plan fingerprint, not the key; (c) verified — no UI/status text treats `target_progress_uncertain` as an active
+  hold (only the legacy reason literal and the decision-blocker map for old stored values remain); (d) pinned by test.
+  No attribution, identity, admission, dispatch or threshold change. The earlier note that it was “uncommitted” is stale.
+  *Original scope:* *Scope:* review the committed diff
+  (`vehicle_update_wait.measured_progress`/`valid_energy_kwh`, `auto_controller._progress_adjusted`/
+  `_session_energy_since`, `AutoSnapshot.progress_unknown` in `meaningful_key`, `dashboard._proposal_section`,
+  `sidebar/adapter.js`) against the handoff entry and fix only **confirmed** gaps. Candidates to verify first:
+  (a) the accepted plan’s evidence (`api/morek_schedule.py` `inputs` around lines 1820/2406, which already carries
+  `soc_source`/`soc_estimated`) does not record `progress_unknown`, so “sent from an unknown-progress plan” is
+  invisible in decision/status evidence — add it additively (no new code or log line); (b) `progress_unknown` is
+  part of `meaningful_key`: prove a flag flip alone causes no extra proposal notification, upload or recalculation
+  loop; (c) no UI/banner/status text still calls `target_progress_uncertain` an active hold; (d) with a soft cap and
+  a minimum SOC the above-cap exception is sized from the reading (documented limit): pin the intended behaviour
+  with a test (exception never exceeds the minimum need from the reading, never past the target, flagged) — no
+  new rule. Do not add a threshold or an estimate of the unknown energy. *Acceptance:* the existing 24-case
+  `tests/test_stage_145_progress_recovery.py` plus any new case; plus one-at-a-time reruns of
+  `test_morek_worker.py`, `test_stage_145_fresh_inputs_recovery.py`, `test_stage_142_active_continuity.py`,
+  `test_stage_143_recalculation_triggers.py`, `test_review_vehicle_update_wait.py`, `test_plan_car_ended_rules.py`
+  and frontend `sidebar.test.ts`; known pre-existing failures (`test_stage_103_partial::…real_morek_path`,
+  `test_stage_151a_time_reserve::…baseline_and_allowance_separately`, `test_plan_details_isolated`) are reported
+  as such, not “fixed” here. Mark `[x]` only after review; a docs-only outcome needs no manifest bump.
+  *Exclusions:* no behaviour change to attribution rules, identity guards, admission, dispatch or Stage 14
+  thresholds; no new retry; no session-finalization trigger (17.4).
+- [ ] **16.2 Safe dispatch, publication continuity and clear partial-plan UI ◆.** Unchanged scope and acceptance
+  (Stage 16 above). It is the single owner of: degraded-only-by-tomorrow admission with one coverage judgement,
+  and “tomorrow missing/fetch failure must not invalidate valid today coverage”. Stage 17 adds no second
+  coverage rule and no price-admission change; 17.5 and 17.6 consume it.
+- [ ] **17.2 Stale SOC with trustworthy estimates ◆.** *Seam (verified in source):* `capped_vehicle_energy`
+  refuses any `soc_estimated` level as `target_soc_stale`, and `morek_plan_blocker` returns `vehicle_input_stale`
+  for a capped plan with an estimate, while the uncapped Morek path already plans from one; `_progress_adjusted`
+  correctly skips subtraction for an estimate (it already counts the energy). *Scope:* one shared predicate (in
+  `planning`, used by both the energy resolver and `morek_plan_blocker`, never two judgements) saying when an
+  energy-derived estimate is **trustworthy**: anchored on an actual reading of this car and plug-in, valid
+  register-measured delivered energy since it (`soc_estimate.delivered_since_kwh`; no register reset/gap/
+  backwards), a capacity known, and anchor age and delivered energy inside named constants chosen and listed by
+  the delegate. Trusted → the capped plan uses it (target need and the minimum-SOC exception, one figure,
+  labelled estimated with anchor age in the existing `projection`); not trusted → fall back to the last actual
+  anchor reading when `SocReader` offers it (today’s 12.8 behaviour, never worse), else the existing
+  `target_soc_stale`. **Churn guard (must be proven by test):** `_morek_input_evidence` currently holds the running
+  `soc_percent`, so an estimate that moves with the register would make every pre-wire check read
+  `plan_inputs_changed`; evidence for an estimated level must instead use the anchor identity (reading time,
+  entity, car) plus the estimated flag, so routine register ticks neither invalidate a plan nor trigger a resend
+  (Stage 14.3 5-minute SOC tolerance unchanged). *Reuse:* `vehicles/soc_estimate`, `SocReader`, 14.5 order/identity
+  guard (`_capped_input_problem` still applies). *Default decision (coordinator may overrule before delegating):*
+  the minimum-SOC protection floor (`min_soc_floor`) keeps its own strict freshness and is untouched.
+  *Acceptance (real controller + worker):* trusted estimate plans capped and dispatches once; untrusted estimate,
+  register reset, missing capacity, unknown/other car identity → fallback or hold as described; a fresh reading
+  rebases and clears the estimate label; register drift does not resend or block; no double subtraction of
+  measured progress; stale **actual** reading still plans as in 12.8; Stop/Pause/uncertain outcome block as before.
+  *Exclusions:* no new SOC source, no vehicle wake, no change to the protection floor, learner or Stage 14.5
+  identity/order rules.
+- [ ] **17.3 Missing-capacity fallback ◆.** *Seam (verified):* `soc_source.capacity_kwh(vehicle_id)` feeds
+  `LiveVehicleFacts.reported_capacity_kwh`; the uncapped path calls `target_need` → `with_learned`, which already
+  works from a **trusted learned wall kWh/%** without a capacity, but the capped path returns
+  `target_capacity_unknown` before reaching it. *Scope:* make the capped path use the same `with_learned` figure
+  when (and only when) a trusted learned value exists (15.9b promotion rules and clamp, unchanged); inspect first
+  whether the clamp or `estimate_view`/dashboard need a capacity reference and, if so, keep the display honest
+  (“estimate; capacity unknown”) instead of inventing one. With neither capacity nor a trusted learned figure the
+  plan stays blocked as `target_capacity_unknown` with a clear who-acts sentence (set or enable the battery
+  capacity; 13.1 owns the control, no new settings UI) and **recovers automatically** when a capacity or trusted
+  figure appears (it is already in `_morek_input_evidence`). Never guess a capacity from a model name or another
+  car. *Acceptance:* capped plan with learned figure and no capacity plans, labelled; no learned figure → blocked,
+  wording shown, recovers on arrival without a manual action and sends once; untrusted (4-of-5) learned data not
+  used; uncapped path unchanged; dashboard `soc`/learning block consistent with the plan; minimum-SOC arithmetic
+  unchanged. *Exclusions:* no capacity guessing, no learner rule change, no new setting.
+- [ ] **17.4 Automatic recovery on session finalization ◆.** *Seam (verified):* `AutoPlannerController.
+  _on_sessions_changed` (listener on `SessionStore`, armed by `_arm_charge_watch`) returns at once for a target
+  driver, so a plan made while a session was open, closing or unreconciled never replans when that session
+  finalizes; today a `progress_unknown` plan persists until another trigger (reading, price, settings). *Scope:*
+  for a target-SOC, Morek-owned plan whose snapshot was made with `progress_unknown` or counted an **open**
+  session, a session close/finalization notification (store close and the late-reconciliation notify; verify both
+  fire, add the missing notify additively if not) schedules **one** coalesced `async_recalculate` through the
+  existing path (bounded: one per closed session id, none while an attempt is pending, none after Stop/Pause).
+  **First prove by test whether finalization can change the classification:** a final total changes the *known*
+  energy of an identified session that began after the reading (so the plan shrinks once); a session that
+  straddles an old reading or has no car stays `unknown` — the only recovery for it is a newer reading, so there
+  the replan may use the **existing** `reading_asker` request (same once-per-plug-in/wake settings, no new wake)
+  and the sentence says “waiting for the car’s next level”; the doc and UI claim no more than the test proves.
+  *Acceptance:* close of an identified later session → exactly one replan, plan shrinks, equal schedule sends
+  nothing, active window protected; unknown straddle → one reading request at most, flag persists truthfully,
+  no loop on repeated notifications; no flag/not Morek/not target → nothing; restart loses nothing (flag comes from
+  a fresh calculation); Pause/Stop/uncertain outcome win; no send is caused by the listener itself.
+  *Exclusions:* no new listener class, store or timer; no timeline backfill; 15.8’s reconciliation values are not
+  read as attribution proof.
+- [ ] **17.5 Exchange-rate freshness and truthful cap policy ◆.** *Seam (verified):* producers attach the newest
+  ECB table at most `MAX_RATE_AGE` (7 days) before the day with its date (`fx_src`, `fx_date`); a day built without
+  a rate is asked again at most every `FX_RETRY` and rebuilt when one arrives (`wants_again`); the planner converts
+  with the document’s own rate and refuses `missing_fx_rate` (`planner._rate_for`). *Scope:* (a) prove by test that
+  a day rebuilt after a rate arrives reaches the planner through the existing price evidence and replans once (no
+  manual refresh); (b) when the used rate is a *dated* table rather than the day’s own, the plan’s price/cap
+  statement says so (rate date, source, age) in the existing price-provenance/projection text — a soft cap in local
+  currency is compared against the **converted** price, so the cap decision states the rate it used and never
+  presents a rate older than the rule as current; (c) a missing rate stays `missing_fx_rate` (no other day’s or
+  currency’s number, no zero) with a who/what-waits sentence (“waiting for the ECB rate; asked again automatically”)
+  and recovers on arrival; (d) the **16.2 coverage judgement** treats a day without its rate as not covering
+  (prove; no second rule). EUR areas are unaffected. *Acceptance:* dated rate plans and labels; rate older than 7
+  days or absent → blocked, recovers once on arrival; cap boundary price converted with the labelled rate; EUR
+  byte-identical; no retry loop added. *Exclusions:* no new FX source, retry schedule or rate estimation.
+- [ ] **17.6 Clear blockers and end-to-end automatic recovery ◆.** *Scope:* one table in code/tests of the
+  planning holds Stage 17 touches — `target_soc_unknown`, `target_soc_stale`, `target_capacity_unknown`,
+  `missing_fx_rate`, `price_data_stale`, `no_prices_yet`/`no_published_prices`, `plan_inputs_changed`,
+  `price_inputs_changed` — each with: who acts, the **existing** automatic recovery trigger, and the text in the
+  existing status/recovery-banner surfaces (`status_compose`, `recovery-banner.js`, sidebar adapter; no new panel).
+  Fix only mismatches found (a hold with no recovery trigger, wording that implies a failure of charging, a
+  blocker with no who-acts). Add a production-wiring test per recovering hold: hold → input arrives → plan →
+  worker uploads once; and one combined case (stale SOC + partial published prices + unknown progress) that plans,
+  is labelled, dispatches once and survives restart. Update the handoff with the final Stage 17 status.
+  *Acceptance:* every listed hold has a wording test and a recovery test; none claims physical charging or a
+  guarantee; no manual Refresh/Send needed; Pause/Stop/Charge Now/identity/uncertain outcomes remain blocking;
+  sidebar copy follows the existing English-literal convention (i18n entries only where the file already uses
+  keys). *Exclusions:* no new UI container, store, status family or retry.
+
+**Unrun and unverified (carry in every substage report):** full suites, browser/Playwright, HA-fixture tests
+(`fcntl` plugin), installed behaviour, whether the installed vehicle integration reports capacity/timestamps as
+assumed, and whether the ECB table cadence matches. Mocked checks never prove physical charging.
+
 ## 8. Later feature stages
 
 ### Stage 13 — Useful configuration without the old card (13.1–13.4)
@@ -710,4 +895,4 @@ versus waiting”, “Active charge control while offline”, “Research findin
 limits). Rule: when this file and the archive differ, this file wins; copy requirements here before assigning
 them, never assign from the archive.
 
-**Planning-resilience fix (2.5.146, mocked).** Measured energy since the reading that cannot be attributed to the identified car (a session for no car, a session straddling a reading older than 5 minutes — including one just closed whose total is not yet final — or invalid energy) no longer holds the plan (`target_progress_uncertain` is retired). The plan is made from the reading with only the genuinely attributed energy subtracted (identified sessions that began after the reading, counted once), and the snapshot is marked `progress_unknown` (dashboard `projection.progress_unknown`, sidebar note). The unattributed energy is never counted and its size is unknown, so the planned energy can be overstated, and with a minimum SOC the exception above the soft cap is still sized from the reading. The car's own limit ends a charge; that is not guaranteed by SpotNav. A newer reading rebases and clears the mark. Stale/foreign/unidentified *readings* still hold the plan (`target_soc_stale`) as in Stage 14.5. Upload admission, Pause/Stop, identity, electrical and unknown-outcome guards are unchanged. Not a new stage; not deployed or live-verified.
+**Planning-resilience fix (2.5.146, mocked).** Measured energy since the reading that cannot be attributed to the identified car (a session for no car, a session straddling a reading older than 5 minutes — including one just closed whose total is not yet final — or invalid energy) no longer holds the plan (`target_progress_uncertain` is retired). The plan is made from the reading with only the genuinely attributed energy subtracted (identified sessions that began after the reading, counted once), and the snapshot is marked `progress_unknown` (dashboard `projection.progress_unknown`, sidebar note). The unattributed energy is never counted and its size is unknown, so the planned energy can be overstated, and with a minimum SOC the exception above the soft cap is still sized from the reading. The car's own limit ends a charge; that is not guaranteed by SpotNav. A newer reading rebases and clears the mark. Stale/foreign/unidentified *readings* still hold the plan (`target_soc_stale`) as in Stage 14.5. Upload admission, Pause/Stop, identity, electrical and unknown-outcome guards are unchanged. Committed as `d9ec44cc` and pushed (the earlier “uncommitted” note was stale); **coordinator review pending, tracked as Stage 17.1**; not deployed or live-verified.

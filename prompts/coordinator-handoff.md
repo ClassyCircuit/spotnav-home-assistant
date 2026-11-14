@@ -10,7 +10,7 @@ Follow the actual request rather than automatically starting new work.
 
 ## Current handoff — 2026-11-14
 
-- Current source manifest is **2.5.146** (2.5.144 Stage 16.1; 2.5.146 planning-resilience fix: unattributable measured progress plans from the reading, marked `progress_unknown`; uncommitted, mocked) after Stage 15 implementation. The coordinator committed and
+- Current source manifest is **2.5.147** (2.5.144 Stage 16.1; 2.5.146 planning-resilience fix: unattributable measured progress plans from the reading, marked `progress_unknown`; **committed `d9ec44cc` and pushed; Stage 17.1 review finished locally as 2.5.147 (adds `progress_unknown` to decision evidence + tests), uncommitted, coordinator commit pending**) after Stage 15 implementation. **Open queue, strict order: 17.1 → 16.2 → 17.2 → 17.3 → 17.4 → 17.5 → 17.6** (active roadmap, Stage 17). The coordinator committed and
   pushed each reviewed substage under the user's authorization. Recheck `git log` and `git status` for the
   exact current HEAD; a push does not install or restart Home Assistant.
 - **Active roadmap items 1–15 (Stage 15) are locally implemented and coordinator-reviewed.** Stage 16

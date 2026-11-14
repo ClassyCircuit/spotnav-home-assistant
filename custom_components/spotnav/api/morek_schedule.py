@@ -1818,7 +1818,7 @@ def decision_event(*, now: datetime, kinds: Any, last_trigger: str | None, reaso
     return {
         "at": _utc(now).isoformat(), "trigger": last_trigger, "triggers": sorted(str(k) for k in kinds)[:9],
         "inputs": {key: inputs.get(key) for key in ("plan_state", "plan_reason", "soc_source", "soc_estimated",
-                                                    "soc_age_s", "uncertain")},
+                                                    "soc_age_s", "uncertain", "progress_unknown")},
         "evidence": evidence,
         "changed": True if sent else False if reason == "unchanged" else None,
         "continuity": None if cont is None else {key: cont.get(key) for key in ("evidence", "preserved", "reason")},
@@ -2405,6 +2405,8 @@ def _planning_inputs(hass: HomeAssistant, entry_id: str) -> dict[str, Any]:
         return {"plan_state": snapshot.state, "plan_reason": snapshot.reason,
                 "soc_source": snapshot.projection_source, "soc_estimated": bool(snapshot.projection_estimated),
                 "soc_age_s": None if age is None else int(age),
+                # Some measured energy since the reading was unattributable: the need may be overstated.
+                "progress_unknown": getattr(snapshot, "progress_unknown", False) is True,
                 "uncertain": bool(snapshot.projection_estimated or snapshot.projection_age_s is None
                                   or snapshot.state in ("planning_unavailable", "incomplete_settings"))}
     except Exception:  # noqa: BLE001 - diagnostics only
