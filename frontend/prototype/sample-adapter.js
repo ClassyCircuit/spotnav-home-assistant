@@ -2,6 +2,7 @@ import { windows, time, day, sampleDate, sampleDays, priceGaps, stepSegments, st
 import { dailyStates, chooseDailyState, historyFixture } from './daily-sample.js';
 import { evidenceFixture } from './evidence-view.js';
 import { history, monthlyRange, baselineRange, futureRange } from './insight-fixture.js';
+import { reserveModel } from '../shared-dashboard/reserve-model.js';
 import { assess, bestOpportunity, summarize } from './insights.js';
 
 const number = n => Number.isFinite(n) ? n.toFixed(2) : 'Unknown';
@@ -18,6 +19,8 @@ export function sampleInsights(missing) {
     caution:'Price opportunity, not the proposed plan. It may be outside the deadline or cap, is not necessarily selected or feasible, and does not guarantee charging. Monthly prices are not charging cost or savings.',
     method:`Baseline: ${sampleDate(baselineRange[0])} ${time(baselineRange[0])}–${sampleDate(baselineRange[1])} ${time(baselineRange[1])}, 2026; ${a.baseline?.count ?? 0} available intervals, ${a.baseline ? a.baseline.covered.toFixed(2) : 'Unknown'} of 720 hours (${pct(a.baseline)}). Classification requires at least 90% coverage and 24 intervals. Lower means below the duration-weighted 25th percentile (${number(a.baseline?.p25)} c/kWh); higher means above the 75th (${number(a.baseline?.p75)} c/kWh); values at or between are typical. These are relative to this fictional sample, not universal thresholds. Opportunity: cheapest complete 1-hour average among starts at Now or known interval boundaries through ${sampleDate(futureRange[1])} ${time(futureRange[1])}. Gaps are excluded, not zero; unknown future beyond the shown horizon is not considered. October covers Oct 1 00:00–Nov 1 00:00, 2026: ${month?.count ?? 0} intervals, ${month ? month.covered.toFixed(2) : 'Unknown'} of 744 hours. Monthly low/high and average cover available intervals only. Fixed 24-hour sample days; no timezone/DST or same-weekday inference.` };
 }
+// Hand-authored, backend-shaped (same decoder as the live panel); fictional numbers, 10 % of the sample need.
+const sampleReserve = reserveModel({percent:10,minutes:6,requested_minutes:6,limit:null,allowance:{kind:'upper_allowance',energy_kwh:0.6,cost:{value:0.12,currency:'EUR'}}},'EUR',{explain:'Extra allowed time to reach the target; the car’s own limit stops it, so the reserve is not a higher SOC.',limits:{unknown:'The reserve is smaller than requested.'}});
 export function createSampleAdapter() {
   const state = chooseDailyState(dailyScenario);
   const lastSoc = windows.at(-1)?.projectedSoc;
@@ -25,7 +28,7 @@ export function createSampleAdapter() {
   const missingInsights = dailyScenario === 'unavailable' || new URLSearchParams(location.search).get('insights') === 'missing';
   return { format:{time,day,minutesPerTimeUnit:60,staleLabel:'stale sample',date:sampleDate,tooltipDate:h=>`${sampleDate(h)} 2026`,days:sampleDays,priceGaps,stepSegments,stepPoints,snapRange,initialRange,timeTicks},
     actions:{selectScenario(selected) { const url = new URL(location.href); url.searchParams.set('state',selected); location.href = url.href; }},
-    model:{sample:true,windows,assumptions:socAssumptions,vehicle:state,settings:{target:80,minimum:40,cap:35,readyBy:'07:00'},untilDeadline:'16h 30m',targetNote,nextPriceUnavailable:scenario==='missing',
+    model:{sample:true,windows:windows.map((w,i,a)=>i===a.length-1 ? {...w,reserveMinutes:6,reserveKwh:0.6,reserveCost:0.12} : w),reserve:sampleReserve,assumptions:socAssumptions,vehicle:state,settings:{target:80,minimum:40,cap:35,readyBy:'07:00',reserve:10},untilDeadline:'16h 30m',targetNote,nextPriceUnavailable:scenario==='missing',
       scenarios:{label:'Sample scenario',selected:dailyScenario,options:Object.entries(dailyStates).map(([value,s])=>({value,label:s.label})),note:'Local illustration only · no settings or charger actions'},
       warning:state.warning ? {title:dailyScenario==='mismatch'?'Schedule needs attention':'Sample state needs attention',detail:dailyScenario==='mismatch'?'Sample effective limits differ from the last sent plan. This is not proof of charging; measured power is shown separately.':state.policy}:null,
       chart:{prices,now,deadline,horizon,cap,bands:[30,45,60],comparison:new URLSearchParams(location.search).get('comparison')==='bar'},

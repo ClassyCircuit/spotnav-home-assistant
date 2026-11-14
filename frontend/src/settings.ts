@@ -666,6 +666,8 @@ export interface SettingsFormValues {
   capValue?: string;
   capBasis?: string;
   minimumReadySoc?: string;
+  /** The planner's time reserve, whole percent 0-50; absent against a backend without it. */
+  timeReserve?: string;
   energy: string;
   /** The kWh slider's last step, "Fill" (`fill_to_limit`); always `false` against a backend without it. */
   fill: boolean;
@@ -685,6 +687,7 @@ export interface SettingsFormValues {
 
 export function formFromRecord(record: SettingsRecord): SettingsFormValues {
   return {
+    ...(record.time_reserve_percent === undefined ? {} : { timeReserve: String(record.time_reserve_percent) }),
     ...(record.soft_price_cap === undefined ? {} : { capEnabled: record.soft_price_cap !== null, capValue: record.soft_price_cap === null ? "" : String(record.soft_price_cap), capBasis: record.cap_price_basis ?? "", minimumReadySoc: record.minimum_ready_by_soc == null ? "" : String(record.minimum_ready_by_soc) }),
     energy: String(record.requested_kwh),
     fill: record.fill_to_limit === true,
@@ -740,6 +743,8 @@ function integer(text: string, minimum: number, maximum: number): FormCheck<numb
   return { ok: true, value };
 }
 
+export const TIME_RESERVE_MIN = 0;
+export const TIME_RESERVE_MAX = 50;
 export const TARGET_PERCENT_MIN = 0;
 export const TARGET_PERCENT_MAX = 100;
 /** The car's own charge limit's slider when its integration states no range: whole percent. */
@@ -1037,6 +1042,14 @@ export function replacementFor(
     if (opened === null || capValue !== base.soft_price_cap) { next.soft_price_cap = capValue; changed ||= capValue !== record.soft_price_cap; }
     if (opened === null || minValue !== base.minimum_ready_by_soc) { next.minimum_ready_by_soc = minValue; changed ||= minValue !== record.minimum_ready_by_soc; }
     if (opened === null || basis !== base.cap_price_basis) { next.cap_price_basis = basis; changed ||= basis !== record.cap_price_basis; }
+  }
+  if (kind === "plan" && record.time_reserve_percent !== undefined && values.timeReserve !== undefined) {
+    const reserve = integer(values.timeReserve, TIME_RESERVE_MIN, TIME_RESERVE_MAX);
+    if (!reserve.ok) return reserve;
+    if (opened === null || reserve.value !== opened.time_reserve_percent) {
+      next.time_reserve_percent = reserve.value;
+      changed ||= reserve.value !== record.time_reserve_percent;
+    }
   }
   if (kind === "plan" && driverOk && (opened === null || values.driver !== opened.driver)) {
     next.driver = values.driver;

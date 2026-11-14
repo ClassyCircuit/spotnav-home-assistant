@@ -3400,6 +3400,20 @@ footer {
     margin-bottom: 18px;
   }
 }
+.plan-reserve {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+  border-left: 3px solid var(--line);
+  padding: 2px 0 2px 12px;
+  margin: 0 0 14px;
+}
+.plan-reserve p {
+  margin: 4px 0;
+}
+.plan-reserve b {
+  color: var(--ink);
+}
 
 /* shared-dashboard/dark.css */
 :host {

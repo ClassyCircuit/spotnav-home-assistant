@@ -467,6 +467,33 @@ than assumed. Older entries below that say "the roadmap" mean the archived text.
 **User restriction (2026-11-14): ONLY FAST tests.** No full isolated runner, browser/Playwright or broad suites; run focused
 module files individually with a short timeout and report unrun checks. (Also recorded in the active roadmap §4.)
 
+### 2026-11-14 — Stage 15.1b reserve control and plan display (2.5.130; local mocked; coordinator reviewed; no live HA/charger action)
+
+- **Control:** sidebar "Extra time reserve (%)" number field (0-50, step 1) beside cap/minimum SOC, shown only when the stored
+  record carries `time_reserve_percent` (older backend: no field, never sent). It uses the existing `savePlan` path: canonical settings
+  record, revision-checked `update_settings`, existing draft/conflict/permission behaviour. `settings.ts` gained `timeReserve` in the form,
+  integer 0-50 validation (`outOfRange`/`invalidNumber`), changed-only write, and reapply-onto-newer-record semantics like the other fields.
+- **Display (shared `plan-view.js`, used by the HA panel and the preview):** windows show `includes N min reserve` per window; when a reserve
+  exists the totals are relabelled "REQUIRED BASELINE ENERGY/COST" and a separate "Potential extra allowed reserve: up to X kWh · cost" line is
+  labelled an upper allowance at plan power and prices, not measured or expected use. Wording: "Extra allowed time to reach the target; the
+  car's own limit stops it, so the reserve is not a higher SOC." Zero reserve states "none in this plan (N% asked)" with the backend `limit`
+  reason (`two_hour_limit`, `no_eligible_time`, `window_limit`, else generic); partial shows "N min of M min asked"; null/malformed numbers
+  show Unknown; an allowance cost in another currency than the plan is dropped. Absent `proposal.reserve`/per-window fields (older backend, 0 %,
+  or a stale plan) leave today's display unchanged. All values are the backend's; the client sums or prices nothing, and the baseline totals
+  and window energy are never increased by the allowance. `shared-dashboard/reserve-model.js` maps backend data to display data for both the live
+  adapter and the sample adapter (hand-authored, fictional fixture with the same shape, 10%).
+- **i18n:** the adapter-sourced sentences are keys `reserve.explain`, `reserve.limit.*` in every language file (English text copied, as for
+  the existing `daily.policy.*` keys); the dashboard's own labels are English literals like its neighbours.
+- **Checks (fast, no browser):** `test/reserve-display.test.ts` (8: display vs baseline, no double count, old backend, malformed, zero/limited,
+  currency/stale, control save, out-of-range, revision-conflict draft, old-backend no field), `test/settings.test.ts` (+2 reserve control),
+  with `sidebar`, `i18n-parity`, `i18n`, `settings-editors` (347 passed in total with the existing ones) and node tests for
+  `shared-dashboard` and `prototype` (16 passed). `npm run type-check`, `npm run build` and `npm run check-dist` clean; manifest 2.5.130.
+- **Unrun / limits:** browser/Playwright, the full frontend suite, backend suites (no backend change), HA-plugin suite. The non-English files carry
+  English text for the new keys. The reserve control lives only in the sidebar panel (the Lovelace card has no plan editor for it). The
+  allowance and reserve minutes are backend upper figures; no actual use, physical charging or BMW stop is verified. Not installed on HA.
+
+Coordinator review: save/conflict and baseline/allowance mapping checked; independent fast UI check: 135 passed in 3.43 s. Browser/live verification remains unrun.
+
 ### 2026-11-14 — Stage 15.1a planner time reserve, backend (2.5.129; local mocked; coordinator reviewed; no live HA/charger action)
 
 Coordinator review: reserve precision and SOC-tolerance regressions corrected; independent fast reserve check: 79 passed, one timezone-harness case deselected (10 s). No live verification.

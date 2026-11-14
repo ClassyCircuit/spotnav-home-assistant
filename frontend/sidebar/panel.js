@@ -188,7 +188,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
       const currency=dashboard?.market?.currency || null;
       if (this.settingsDirty && this.draftCurrency!==undefined && this.draftCurrency!==currency) {this.settingsConflict=true;this.settingsNotice='Price currency changed while editing. Reload settings before saving.';}
       adapter.model.capCurrency=currency;
-      adapter.model.settings={driver:record.driver,energy:record.requested_kwh,vehicleId:record.target.vehicle_id || '',target:record.target.target_percent,minimum:record.minimum_ready_by_soc,cap:capInput(record.soft_price_cap,currency),readyBy:record.departure_time,capEnabled:record.soft_price_cap!=null,capBasis:record.cap_price_basis,deadlineEnabled:record.departure_enabled};
+      adapter.model.settings={driver:record.driver,energy:record.requested_kwh,vehicleId:record.target.vehicle_id || '',target:record.target.target_percent,minimum:record.minimum_ready_by_soc,cap:capInput(record.soft_price_cap,currency),readyBy:record.departure_time,...(record.time_reserve_percent===undefined?{}:{reserve:record.time_reserve_percent}),capEnabled:record.soft_price_cap!=null,capBasis:record.cap_price_basis,deadlineEnabled:record.departure_enabled};
       adapter.model.planVehicles=dashboard ? chargerCarsOf(dashboard).filter(v=>v.id && v.id!=='guest') : [];
       const discovered=dashboard?.soc?.vehicle_id, selected=record.target.vehicle_id;
       const defaultVehicle=!selected && !dashboard?.guest?.active && adapter.model.planVehicles.length===1 ? adapter.model.planVehicles[0] : null;
@@ -448,7 +448,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     if (!this.connected || hass?.connected===false || !charger || !record || this.settingsBusy || this.pendingSettingsWrites.has(charger) || this.morekBusy || this.autoBusy || this.chargeBusy || this.settingsConflict || !allowed) {this.settingsNotice='Save unavailable or permission denied.';this.paint();return;}
     const base=formFromRecord(record), driver=values.driver ?? base.driver, vehicleId=values.vehicleId ?? base.vehicleId;
     if (vehicleId!==base.vehicleId && (!decoded.ok || !chargerCarsOf(decoded.value).some(v=>v.id===vehicleId && v.id!=='guest'))) {this.settingsNotice='Choose an available discovered vehicle.';this.paint();return;}
-    const form={...base,driver,energy:values.energy ?? base.energy,vehicleId,targetPercent:values.target ?? base.targetPercent,minimumReadySoc:values.minimum,capValue:capForSave(values.cap,decoded.ok ? decoded.value.market?.currency : null,record.soft_price_cap),capEnabled:values.capEnabled,capBasis:values.capBasis,deadlineEnabled:values.deadlineEnabled,deadlineTime:values.readyBy};
+    const form={...base,driver,energy:values.energy ?? base.energy,vehicleId,targetPercent:values.target ?? base.targetPercent,minimumReadySoc:values.minimum,capValue:capForSave(values.cap,decoded.ok ? decoded.value.market?.currency : null,record.soft_price_cap),capEnabled:values.capEnabled,capBasis:values.capBasis,deadlineEnabled:values.deadlineEnabled,deadlineTime:values.readyBy,...(base.timeReserve===undefined?{}:{timeReserve:values.reserve ?? base.timeReserve})};
     const check=replacementFor('plan',record,form);
     if (!check.ok) {this.settingsNotice=translate('en',check.errorKey);this.paint();return;}
     if (check.body.target.target_percent!=null && check.body.minimum_ready_by_soc!=null && check.body.minimum_ready_by_soc>check.body.target.target_percent) {this.settingsNotice='Minimum SOC must not exceed the planning target.';this.paint();return;}

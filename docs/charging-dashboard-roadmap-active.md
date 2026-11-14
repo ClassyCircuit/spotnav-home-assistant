@@ -208,7 +208,7 @@ while offline”.
   old install changes the next plan once through the normal compare and never interrupts an active window;
   an active window survives a reserve change.
   *Exclusions:* soft-cap rules, the Stage 1 minimum floor, Stage 14 triggers, the SOC target, learners.
-- [ ] **15.1b Reserve setting control and plan display.** *Scope:* sidebar control beside cap/minimum SOC
+- [x] **15.1b Reserve setting control and plan display.** *Locally implemented with mocked frontend checks (2.5.130); coordinator reviewed; not installed, browser-checked or live-verified.* *Scope:* sidebar control beside cap/minimum SOC
   (canonical settings, revision checks, existing draft/conflict behaviour); plan explanation and plan modal
   show reserve minutes and where placed, the **required baseline** and, separately labelled, the *potential
   extra allowed reserve energy/cost* from 15.1a’s `reserve_allowance` (complete windows visible, reserve

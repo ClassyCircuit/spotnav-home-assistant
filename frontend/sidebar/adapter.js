@@ -3,6 +3,7 @@ import { decodeDashboard } from '../src/validate.ts';
 import { decodeMorekState, morekEvidence } from '../src/morek-view.ts';
 import { healthKey } from '../src/daily-overview.ts';
 import { translate } from '../src/i18n/index.ts';
+import { reserveModel, reserveWindow } from '../shared-dashboard/reserve-model.js';
 import { publishedChart } from './price-chart.js';
 import { displayPrice } from '../shared-dashboard/price-format.js';
 import { observationFreshness } from '../src/observation-freshness.ts';
@@ -10,6 +11,7 @@ import { liveCharging } from './live-charging.js';
 import { chargeSession } from './charge-session.js';
 
 const U = 'Unknown';
+const reserveText = () => ({explain:translate('en','reserve.explain'), limits:Object.fromEntries(['two_hour_limit','no_eligible_time','window_limit','unknown'].map(k=>[k,translate('en',`reserve.limit.${k}`)]))});
 const date = (value, zone) => {
   const ms = typeof value === 'number' ? value : Date.parse(value || '');
   if (!Number.isFinite(ms)) return U;
@@ -99,7 +101,8 @@ export function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), f
     const detail=validDetails ? details[i] : null;
     return {start:p.startMs,end:p.endMs,energy:detail?.energy_kwh,cost:pricedBasis ? detail?.cost : null,
       pricePerKwh:pricedBasis && detail?.energy_kwh>0 && Number.isFinite(detail?.cost) ? displayPrice(detail.cost/detail.energy_kwh,planCurrency) : null,
-      projectedSoc:projectionValid ? detail?.projected_soc : null};
+      projectedSoc:projectionValid ? detail?.projected_soc : null,
+      ...reserveWindow(detail,pricedBasis)};
   }) : null;
   const nextWindow = windows?.find(w=>w.end>now) || null;
   const currency = planCurrency;
@@ -128,7 +131,7 @@ export function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), f
       detailsNote:!validDetails ? 'Window energy and costs are unavailable because reconciled planner details are missing.' : proposal?.unpriced ? 'Window costs and prices are unavailable for an unpriced plan.' : !pricedBasis ? 'Window prices and weighted average are unavailable because the cost basis or currency is unknown.' : null,
       minutesPerTimeUnit:1/60000, time: ms=>part(ms,zone,{timeStyle:'short'}), day: ms=>part(ms,zone,{dateStyle:'medium'}), ...published?.format},
     model: {
-      windows, nextWindow, chart:published?.chart, totals: !planStale && proposal ? {energy:proposal.planned_kwh,cost:proposal.unpriced ? null : proposal.cost?.value,pricePerKwh:avg} : null,
+      windows, nextWindow, reserve:!planStale && proposal ? reserveModel(rawProposal?.reserve,pricedBasis ? planCurrency : null,reserveText()) : null, chart:published?.chart, totals: !planStale && proposal ? {energy:proposal.planned_kwh,cost:proposal.unpriced ? null : proposal.cost?.value,pricePerKwh:avg} : null,
       vehicle: {status: stale ? 'Connection unavailable · stale dashboard' : d.charger.available ? (d.connection?.state || U) : 'Charger unavailable', detail:`Dashboard observed ${date(d.generated_at,zone)}${stale ? ` · stale: ${staleReason}` : ''}`, power:live.power,live:live.summary,liveMismatch:live.mismatch, soc:validPercent(soc) ? soc : null, stale:socStale, planStale, socDetail, socEstimated:!useRaw && d.soc?.estimated===true, policy:policyText},
       assumptions:{startingSoc:projectionValid ? rawProjection.starting_soc : null,capacityKwh:d.soc?.capacity_kwh,efficiency:d.soc?.efficiency,projectionSupported:projectionValid,projectionKwhPerPercent:rawProjection?.kwh_per_percent,projectionNote},
       settings: {target:d.soc?.target_percent, minimum:d.settings?.minimum_ready_by_soc, cap:d.settings?.soft_price_cap, readyBy:d.settings?.departure_time},

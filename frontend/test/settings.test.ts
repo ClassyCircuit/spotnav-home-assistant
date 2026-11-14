@@ -79,6 +79,38 @@ describe("time reserve passthrough (Stage 15.1a, no control yet)", () => {
   });
 });
 
+describe("time reserve control (Stage 15.1b)", () => {
+  const withReserve = (percent: number, revision = 7) => aRecord({ time_reserve_percent: percent, revision });
+
+  it("writes only a changed reserve, as a whole percent 0-50, on the stored record", () => {
+    const record = withReserve(10);
+    expect(formFromRecord(record).timeReserve).toBe("10");
+    const same = replacementFor("plan", record, formFromRecord(record));
+    expect(same.ok && same.changed).toBe(false);
+    for (const [typed, expected] of [["0", 0], ["50", 50], [" 25 ", 25]] as const) {
+      const result = replacementFor("plan", record, { ...formFromRecord(record), timeReserve: typed });
+      expect(result.ok && result.changed).toBe(true);
+      expect(result.ok && result.body.time_reserve_percent).toBe(expected);
+    }
+    for (const typed of ["51", "-1", "2.5", "abc", ""]) {
+      expect(replacementFor("plan", record, { ...formFromRecord(record), timeReserve: typed }).ok).toBe(false);
+    }
+  });
+
+  it("is left alone against a backend without the field, and when a newer record is reapplied", () => {
+    const old = aRecord({});
+    expect(formFromRecord(old).timeReserve).toBeUndefined();
+    const oldResult = replacementFor("plan", old, { ...formFromRecord(old), timeReserve: "30" });
+    expect(oldResult.ok && "time_reserve_percent" in oldResult.body).toBe(false);
+    // The reader opened at 10, someone else set 20: an untouched reserve keeps the newer 20; a touched one wins.
+    const opened = withReserve(10), newer = withReserve(20, 8);
+    const untouched = replacementFor("plan", newer, { ...formFromRecord(opened), energy: "30" }, null, opened);
+    expect(untouched.ok && untouched.body.time_reserve_percent).toBe(20);
+    const touched = replacementFor("plan", newer, { ...formFromRecord(opened), timeReserve: "5" }, null, opened);
+    expect(touched.ok && touched.body.time_reserve_percent).toBe(5);
+  });
+});
+
 describe("price policy settings", () => {
   it("decodes and preserves the real policy fields in revision-checked replacement bodies", () => {
     const record = aRecord({ soft_price_cap: 0.1, cap_price_basis: "nord_pool", minimum_ready_by_soc: 40 });

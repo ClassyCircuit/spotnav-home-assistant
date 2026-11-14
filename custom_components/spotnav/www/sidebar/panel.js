@@ -52512,7 +52512,22 @@ var number = (value2, digits, unit = "", valid = () => true) => Number.isFinite(
 var energy = (value2) => number(value2, 2, " kWh", (n6) => n6 >= 0);
 var soc = (value2) => number(value2, 1, "%", (n6) => n6 >= 0 && n6 <= 100);
 var escapeText2 = (value2) => String(value2 ?? "Unknown").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
-function renderPlan(windows, assumptions = {}, stale = false, formatters, totals) {
+var minutesText = (value2) => {
+  if (!Number.isFinite(value2) || value2 < 0) return "Unknown";
+  const rounded = Math.round(value2 * 10) / 10;
+  return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)} min`;
+};
+function renderReserve(reserve, currency) {
+  if (!reserve || typeof reserve !== "object") return "";
+  const text3 = (value2) => escapeText2(value2);
+  const explain = reserve.explain ? ` ${text3(reserve.explain)}` : "";
+  if (!Number.isFinite(reserve.minutes)) return `<div class="plan-reserve"><p><b>Extra time reserve:</b> unavailable.</p></div>`;
+  if (reserve.minutes <= 0) return `<div class="plan-reserve"><p><b>Extra time reserve:</b> none in this plan${Number.isFinite(reserve.percent) ? ` (${text3(reserve.percent)}% asked)` : ""}.${reserve.limitText ? ` ${text3(reserve.limitText)}` : ""}</p></div>`;
+  const asked = Number.isFinite(reserve.requestedMinutes) && reserve.requestedMinutes > reserve.minutes + 1e-6 ? ` of ${minutesText(reserve.requestedMinutes)} asked` : "";
+  const allowance = reserve.allowance;
+  return `<div class="plan-reserve"><p><b>Extra allowed time:</b> ${minutesText(reserve.minutes)}${asked}, shown inside the windows above.${explain}${reserve.limitText ? ` ${text3(reserve.limitText)}` : ""}</p><p><b>Potential extra allowed reserve:</b> up to ${energy(allowance?.energyKwh)} \xB7 ${money(allowance?.cost, currency)} \u2014 an upper allowance at plan power and prices, separate from the required baseline; not measured or expected use.</p></div>`;
+}
+function renderPlan(windows, assumptions = {}, stale = false, formatters, totals, reserve) {
   if (!formatters || typeof formatters.time !== "function" || typeof formatters.day !== "function") throw new TypeError("Plan time and day formatters are required");
   const time2 = (value2) => Number.isFinite(value2) ? escapeText2(formatters.time(value2)) : "Unknown";
   const day = (value2) => Number.isFinite(value2) ? escapeText2(formatters.day(value2)) : "Unknown";
@@ -52524,12 +52539,13 @@ function renderPlan(windows, assumptions = {}, stale = false, formatters, totals
     return Number.isFinite(actual) && typeof priceCurrency === "string" && /^[A-Z]{3}$/.test(priceCurrency) ? `${summaryPriceText(actual)} ${priceUnit(priceCurrency)}` : "Unknown";
   };
   const validAssumptions = assumptions.projectionSupported === true || validSocAssumptions(assumptions);
-  const rows = windows.map((w2, i7) => `<div class="plan-row ${i7 === 0 ? "next-window" : ""}"><span><b>${time2(w2.start)}\u2013${time2(w2.end)}</b><small>${day(w2.start)}${i7 === 0 ? " \xB7 NEXT" : ""}${w2.control === "minimum-exception" ? " \xB7 ABOVE-CAP MINIMUM" : ""}</small></span><span><b>${displayPrice2(w2.pricePerKwh, w2.centsPerKwh)}</b><small>weighted price</small></span><span><b>${energy(w2.energy)}</b><small>wall energy</small></span><span><b>${money(w2.cost, currency)}</b><small>cost</small></span><span><b>${soc(validAssumptions ? w2.projectedSoc : null)}</b><small>projected SOC</small></span></div>`).join("");
+  const rows = windows.map((w2, i7) => `<div class="plan-row ${i7 === 0 ? "next-window" : ""}"><span><b>${time2(w2.start)}\u2013${time2(w2.end)}</b><small>${day(w2.start)}${i7 === 0 ? " \xB7 NEXT" : ""}${w2.control === "minimum-exception" ? " \xB7 ABOVE-CAP MINIMUM" : ""}${Number.isFinite(w2.reserveMinutes) && w2.reserveMinutes > 0 ? ` \xB7 includes ${minutesText(w2.reserveMinutes)} reserve` : ""}</small></span><span><b>${displayPrice2(w2.pricePerKwh, w2.centsPerKwh)}</b><small>weighted price</small></span><span><b>${energy(w2.energy)}</b><small>wall energy</small></span><span><b>${money(w2.cost, currency)}</b><small>cost</small></span><span><b>${soc(validAssumptions ? w2.projectedSoc : null)}</b><small>projected SOC</small></span></div>`).join("");
+  const hasReserve = !!reserve && Number.isFinite(reserve.minutes) && reserve.minutes > 0;
   const start2 = soc(assumptions.startingSoc);
   const capacity = number(assumptions.capacityKwh, 0, " kWh", (n6) => n6 > 0);
   const efficiency = number(Number.isFinite(assumptions.efficiency) ? assumptions.efficiency * 100 : null, 0, "%", (n6) => n6 > 0 && n6 <= 100);
   const projectionBasis = assumptions.projectionSupported ? `${start2} start, ${number(assumptions.projectionKwhPerPercent, 3, " wall kWh per SOC point", (n6) => n6 > 0)}` : `${start2} start, ${capacity} usable capacity, ${efficiency} efficiency`;
-  return `<div class="plan-heading"><div><h3>Complete proposed plan${stale ? ` \xB7 ${escapeText2(formatters.staleLabel ?? "stale")}` : ""}</h3><p>Estimated, not measured or guaranteed \xB7 wall energy \xB7 ${escapeText2(currency === void 0 ? "EUR" : currency || "currency unknown")}${formatters.costBasis ? ` \xB7 ${escapeText2(formatters.costBasis)}` : ""}</p></div><wa-badge variant="neutral" pill>${windows.length} windows</wa-badge></div><div class="plan-label"><span>Window</span><span>Weighted price</span><span>Wall energy</span><span>Cost</span><span>SOC after</span></div>${rows || "<p>No proposed windows</p>"}<div class="plan-total"><div><small>WALL ENERGY</small><strong>${energy(summary.energy)}</strong></div><div><small>TOTAL COST</small><strong>${money(summary.cost, currency)}</strong></div><div><small>WEIGHTED AVERAGE</small><strong>${displayPrice2(summary.pricePerKwh, summary.centsPerKwh)}</strong></div></div><p class="projection-note">SOC projection: ${projectionBasis}. ${escapeText2(assumptions.projectionNote || "Battery energy = wall energy \xD7 efficiency; capped at 100%.")}</p>${formatters.detailsNote ? `<p class="projection-note">${escapeText2(formatters.detailsNote)}</p>` : ""}`;
+  return `<div class="plan-heading"><div><h3>Complete proposed plan${stale ? ` \xB7 ${escapeText2(formatters.staleLabel ?? "stale")}` : ""}</h3><p>Estimated, not measured or guaranteed \xB7 wall energy \xB7 ${escapeText2(currency === void 0 ? "EUR" : currency || "currency unknown")}${formatters.costBasis ? ` \xB7 ${escapeText2(formatters.costBasis)}` : ""}</p></div><wa-badge variant="neutral" pill>${windows.length} windows</wa-badge></div><div class="plan-label"><span>Window</span><span>Weighted price</span><span>Wall energy</span><span>Cost</span><span>SOC after</span></div>${rows || "<p>No proposed windows</p>"}<div class="plan-total"><div><small>${hasReserve ? "REQUIRED BASELINE ENERGY" : "WALL ENERGY"}</small><strong>${energy(summary.energy)}</strong></div><div><small>${hasReserve ? "REQUIRED BASELINE COST" : "TOTAL COST"}</small><strong>${money(summary.cost, currency)}</strong></div><div><small>WEIGHTED AVERAGE</small><strong>${displayPrice2(summary.pricePerKwh, summary.centsPerKwh)}</strong></div></div>${renderReserve(reserve, currency)}<p class="projection-note">SOC projection: ${projectionBasis}. ${escapeText2(assumptions.projectionNote || "Battery energy = wall energy \xD7 efficiency; capped at 100%.")}</p>${formatters.detailsNote ? `<p class="projection-note">${escapeText2(formatters.detailsNote)}</p>` : ""}`;
 }
 
 // shared-dashboard/vehicle-view.js
@@ -52674,7 +52690,7 @@ function mountDashboard(root, adapter) {
     const windows = knownPlan ? m4.windows.map((w2) => w2 && typeof w2 === "object" ? w2 : {}) : [];
     const chartWindows = windows.filter((w2) => Number.isFinite(w2.start) && Number.isFinite(w2.end) && w2.end > w2.start);
     const assumptions = m4.assumptions || {};
-    const plan = knownPlan ? renderPlan(windows, assumptions, !!(state.planStale ?? state.stale), f3, m4.totals) : '<p class="projection-note">Proposed plan unavailable.</p>';
+    const plan = knownPlan ? renderPlan(windows, assumptions, !!(state.planStale ?? state.stale), f3, m4.totals, m4.reserve) : '<p class="projection-note">Proposed plan unavailable.</p>';
     const summary = m4.totals === void 0 ? total(windows) : m4.totals || {}, next = m4.nextWindow === void 0 ? windows[0] : m4.nextWindow;
     const time2 = (x2) => Number.isFinite(x2) ? f3.time(x2) : "Unknown";
     const day = (x2) => Number.isFinite(x2) ? f3.day(x2) : "Unknown";
@@ -52701,12 +52717,12 @@ function mountDashboard(root, adapter) {
     const option = (s4) => `<option value="${escapeText(s4.value)}" ${s4.value === scenario.selected ? "selected" : ""}>${escapeText(s4.label)}</option>`;
     const capCurrency = m4.capCurrency === void 0 ? f3.currency === void 0 ? "EUR" : f3.currency : m4.capCurrency;
     const capUnit = priceUnit(capCurrency);
-    const fields = [["Target SOC (%)", "target", "number"], ["Minimum SOC (%)", "minimum", "number"], [`Soft cap (${capUnit})`, "cap", "number"], ["Ready by", "readyBy", "time"]].map(([label, key3, type]) => `<span ${m4.settingsEditor && key3 === "target" ? 'data-mode="target_soc"' : ""}><wa-input data-setting="${key3}" label="${escapeText(label)}" value="${escapeText(value(settings[key3]))}" type="${type}"${key3 === "cap" ? ' step="any"' : ""}${m4.canSave === true && !(m4.settingsEditor && (["minimum", "cap"].includes(key3) && !m4.policySupported)) ? "" : " disabled"}></wa-input></span>`).join("");
+    const fields = [["Target SOC (%)", "target", "number"], ["Minimum SOC (%)", "minimum", "number"], [`Soft cap (${capUnit})`, "cap", "number"], ["Ready by", "readyBy", "time"], ["Extra time reserve (%)", "reserve", "number"]].filter(([, key3]) => key3 !== "reserve" || settings.reserve !== void 0).map(([label, key3, type]) => `<span ${m4.settingsEditor && key3 === "target" ? 'data-mode="target_soc"' : ""}><wa-input data-setting="${key3}" label="${escapeText(label)}" value="${escapeText(value(settings[key3]))}" type="${type}"${key3 === "cap" ? ' step="any"' : ""}${key3 === "reserve" ? ' step="1" min="0" max="50"' : ""}${m4.canSave === true && !(m4.settingsEditor && (["minimum", "cap"].includes(key3) && !m4.policySupported)) ? "" : " disabled"}></wa-input></span>`).join("");
     const vehicles = m4.planVehicles || [], savedVehicle = settings.vehicleId || "";
     const vehicleOptions = vehicles.map((v2) => `<option value="${escapeText(v2.id)}" ${v2.id === savedVehicle ? "selected" : ""}>${escapeText(v2.name || v2.id)}</option>`).join("");
     const modeFields = m4.settingsEditor ? `<label>Charge by <select data-setting="driver" ${m4.canSave ? "" : "disabled"}><option value="manual_kwh" ${settings.driver === "manual_kwh" ? "selected" : ""}>Requested energy (kWh)</option><option value="target_soc" ${settings.driver === "target_soc" ? "selected" : ""}>Target SOC (%)</option></select></label><span data-mode="manual_kwh"><wa-input data-setting="energy" label="Requested energy (kWh)" type="number" step="any" value="${escapeText(value(settings.energy))}" ${m4.canSave ? "" : "disabled"}></wa-input></span><label data-mode="target_soc">Planning vehicle <select data-setting="vehicleId" ${m4.canSave ? "" : "disabled"}><option value="" ${!savedVehicle ? "selected" : ""}>No saved vehicle</option>${savedVehicle && !vehicles.some((v2) => v2.id === savedVehicle) ? `<option value="${escapeText(savedVehicle)}" selected>Saved vehicle unavailable${savedVehicle === "guest" ? " (guest)" : ""}</option>` : ""}${vehicleOptions}</select></label>` : "";
     const policyFields = m4.settingsEditor ? `<label><input type="checkbox" data-setting="capEnabled" ${settings.capEnabled ? "checked" : ""} ${m4.canSave && m4.policySupported ? "" : "disabled"}> Enable soft cap</label><label>Cap price basis <select data-setting="capBasis" ${m4.canSave && m4.policySupported ? "" : "disabled"}><option value="">Not set (suggested: Nord Pool)</option><option value="nord_pool" ${settings.capBasis === "nord_pool" ? "selected" : ""}>Nord Pool</option><option value="configured_variable_cost" ${settings.capBasis === "configured_variable_cost" ? "selected" : ""}>Configured variable cost</option></select></label><label><input type="checkbox" data-setting="deadlineEnabled" ${settings.deadlineEnabled ? "checked" : ""} ${m4.canSave ? "" : "disabled"}> Enable ready-by</label>` : "";
-    const policyHelp = m4.settingsEditor ? `<div class="settings-help"><p>${m4.proposedPlanDefaults ? "Proposed defaults, not saved" : "Saved Charge by"}: ${settings.driver === "target_soc" ? "target SOC" : "requested energy"}. ${m4.proposedPlanDefaults ? "Proposed target" : "Saved target"}: ${escapeText(settings.target == null ? "not set \u2014 enter a target for SOC planning" : `${settings.target}%`)}. Minimum ready-by SOC: ${escapeText(settings.minimum == null ? "not set (optional)" : `${settings.minimum}%`)}.</p><p data-mode="target_soc">${escapeText(m4.vehicleHelp || "")}</p><p>Soft cap: ${settings.capEnabled ? `enabled, ${escapeText(priceText(Number(settings.cap)))} ${escapeText(capUnit)}` : "off (no saved cap)"}. Enter a cap and choose its basis to enable it. The cap basis defines which price is compared; it does not select the price provider.</p><p>${m4.proposedPlanDefaults ? "Proposed ready-by" : "Ready-by"}: ${settings.deadlineEnabled ? `enabled at ${escapeText(settings.readyBy)}` : `off (saved time ${escapeText(settings.readyBy)})`}. Changes are saved only when you choose Save plan.</p></div>` : "";
+    const policyHelp = m4.settingsEditor ? `<div class="settings-help"><p>${m4.proposedPlanDefaults ? "Proposed defaults, not saved" : "Saved Charge by"}: ${settings.driver === "target_soc" ? "target SOC" : "requested energy"}. ${m4.proposedPlanDefaults ? "Proposed target" : "Saved target"}: ${escapeText(settings.target == null ? "not set \u2014 enter a target for SOC planning" : `${settings.target}%`)}. Minimum ready-by SOC: ${escapeText(settings.minimum == null ? "not set (optional)" : `${settings.minimum}%`)}.</p><p data-mode="target_soc">${escapeText(m4.vehicleHelp || "")}</p><p>Soft cap: ${settings.capEnabled ? `enabled, ${escapeText(priceText(Number(settings.cap)))} ${escapeText(capUnit)}` : "off (no saved cap)"}. Enter a cap and choose its basis to enable it. The cap basis defines which price is compared; it does not select the price provider.</p><p>${m4.proposedPlanDefaults ? "Proposed ready-by" : "Ready-by"}: ${settings.deadlineEnabled ? `enabled at ${escapeText(settings.readyBy)}` : `off (saved time ${escapeText(settings.readyBy)})`}. ${settings.reserve !== void 0 ? `Extra time reserve: ${escapeText(settings.reserve)}% of the charging time, at most 2 h. ` : ""}Changes are saved only when you choose Save plan.</p></div>` : "";
     const html = `<div class="shell"><header class="masthead"><div><div class="brand">SPOTNAV <span>ENHANCED</span></div><h1>Charging, in focus.</h1><p>A single view of your vehicle, plan and charger.</p></div>${labels.banner ? `<div class="sample-banner">${escapeText(labels.banner)}<br><span>${escapeText(labels.bannerDetail)}</span></div>` : ""}</header>
       ${scenario ? `<div class="scenario-picker"><label for="sample-state">${escapeText(scenario.label)}</label><select id="sample-state">${(scenario.options || []).map(option).join("")}</select><span>${escapeText(scenario.note)}</span></div>` : ""}
       <div id="critical-live" role="status" aria-live="polite">${m4.warning ? `<div class="alert"><div><strong>${escapeText(m4.warning.title)}</strong><p>${escapeText(m4.warning.detail)}</p></div><a href="#details">View details \u2193</a></div>` : ""}</div><div class="dashboard">
@@ -55852,6 +55868,11 @@ var en_default2 = {
   "daily.policy.within": "The proposal is within the soft cap.",
   "daily.policy.targetMet": "The target is already met.",
   "daily.policy.error": "The planner reported an error.",
+  "reserve.explain": "Extra allowed time to reach the target; the car\u2019s own limit stops it, so the reserve is not a higher SOC.",
+  "reserve.limit.two_hour_limit": "The reserve is capped at 2 hours.",
+  "reserve.limit.no_eligible_time": "No free cheap time before the deadline was left for the reserve.",
+  "reserve.limit.window_limit": "The charger\u2019s three-window limit left no room for the rest of the reserve.",
+  "reserve.limit.unknown": "The reserve is smaller than requested.",
   "daily.title": "Daily overview",
   "daily.unknown": "Unknown",
   "daily.offline": "Charger offline",
@@ -57617,6 +57638,7 @@ function copyCamera(camera) {
 }
 function formFromRecord(record3) {
   return {
+    ...record3.time_reserve_percent === void 0 ? {} : { timeReserve: String(record3.time_reserve_percent) },
     ...record3.soft_price_cap === void 0 ? {} : { capEnabled: record3.soft_price_cap !== null, capValue: record3.soft_price_cap === null ? "" : String(record3.soft_price_cap), capBasis: record3.cap_price_basis ?? "", minimumReadySoc: record3.minimum_ready_by_soc == null ? "" : String(record3.minimum_ready_by_soc) },
     energy: String(record3.requested_kwh),
     fill: record3.fill_to_limit === true,
@@ -57659,6 +57681,8 @@ function integer(text3, minimum, maximum) {
   }
   return { ok: true, value: value2 };
 }
+var TIME_RESERVE_MIN = 0;
+var TIME_RESERVE_MAX = 50;
 var TARGET_PERCENT_MIN = 0;
 var TARGET_PERCENT_MAX = 100;
 function checkTargetPercent(text3) {
@@ -57759,6 +57783,14 @@ function replacementFor(kind, record3, values, range = null, opened = null, days
     if (opened === null || basis !== base2.cap_price_basis) {
       next.cap_price_basis = basis;
       changed ||= basis !== record3.cap_price_basis;
+    }
+  }
+  if (kind === "plan" && record3.time_reserve_percent !== void 0 && values.timeReserve !== void 0) {
+    const reserve = integer(values.timeReserve, TIME_RESERVE_MIN, TIME_RESERVE_MAX);
+    if (!reserve.ok) return reserve;
+    if (opened === null || reserve.value !== opened.time_reserve_percent) {
+      next.time_reserve_percent = reserve.value;
+      changed ||= reserve.value !== record3.time_reserve_percent;
     }
   }
   if (kind === "plan" && driverOk && (opened === null || values.driver !== opened.driver)) {
@@ -59901,6 +59933,23 @@ function healthKey(state, observedAt, failed, busy, now) {
   return "daily.health.unavailable";
 }
 
+// shared-dashboard/reserve-model.js
+var finiteOrNull = (v2) => Number.isFinite(v2) && v2 >= 0 ? v2 : null;
+var reserveWindow = (detail, priced) => detail && detail.reserve_minutes !== void 0 ? { reserveMinutes: finiteOrNull(detail.reserve_minutes), reserveKwh: finiteOrNull(detail.reserve_kwh), reserveCost: priced && Number.isFinite(detail.reserve_cost) ? detail.reserve_cost : null } : {};
+function reserveModel(raw, currency, text3) {
+  if (!raw || typeof raw !== "object" || !Number.isFinite(raw.percent) || raw.percent <= 0) return null;
+  const allowance = raw.allowance && raw.allowance.kind === "upper_allowance" ? raw.allowance : null;
+  const limitText = typeof raw.limit === "string" ? text3.limits[raw.limit] || text3.limits.unknown : null;
+  return {
+    percent: raw.percent,
+    minutes: finiteOrNull(raw.minutes),
+    requestedMinutes: finiteOrNull(raw.requested_minutes),
+    limitText,
+    explain: text3.explain,
+    allowance: allowance ? { energyKwh: finiteOrNull(allowance.energy_kwh), cost: currency && allowance.cost && allowance.cost.currency === currency && Number.isFinite(allowance.cost.value) ? allowance.cost.value : null } : null
+  };
+}
+
 // sidebar/price-chart.js
 function publishedChart(raw, market, now, stale) {
   const rows = raw?.prices?.published_intervals;
@@ -60267,6 +60316,7 @@ function startOutcome(state, reason, { age, young, raw, waitNote, txn, guidance,
 
 // sidebar/adapter.js
 var U = "Unknown";
+var reserveText = () => ({ explain: translate2("en", "reserve.explain"), limits: Object.fromEntries(["two_hour_limit", "no_eligible_time", "window_limit", "unknown"].map((k2) => [k2, translate2("en", `reserve.limit.${k2}`)])) });
 var date = (value2, zone) => {
   const ms = typeof value2 === "number" ? value2 : Date.parse(value2 || "");
   if (!Number.isFinite(ms)) return U;
@@ -60361,7 +60411,8 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
       energy: detail?.energy_kwh,
       cost: pricedBasis ? detail?.cost : null,
       pricePerKwh: pricedBasis && detail?.energy_kwh > 0 && Number.isFinite(detail?.cost) ? displayPrice(detail.cost / detail.energy_kwh, planCurrency) : null,
-      projectedSoc: projectionValid ? detail?.projected_soc : null
+      projectedSoc: projectionValid ? detail?.projected_soc : null,
+      ...reserveWindow(detail, pricedBasis)
     };
   }) : null;
   const nextWindow = windows?.find((w2) => w2.end > now) || null;
@@ -60402,6 +60453,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
     model: {
       windows,
       nextWindow,
+      reserve: !planStale && proposal ? reserveModel(rawProposal?.reserve, pricedBasis ? planCurrency : null, reserveText()) : null,
       chart: published?.chart,
       totals: !planStale && proposal ? { energy: proposal.planned_kwh, cost: proposal.unpriced ? null : proposal.cost?.value, pricePerKwh: avg } : null,
       vehicle: { status: stale ? "Connection unavailable \xB7 stale dashboard" : d3.charger.available ? d3.connection?.state || U : "Charger unavailable", detail: `Dashboard observed ${date(d3.generated_at, zone)}${stale ? ` \xB7 stale: ${staleReason}` : ""}`, power: live.power, live: live.summary, liveMismatch: live.mismatch, soc: validPercent(soc2) ? soc2 : null, stale: socStale, planStale, socDetail, socEstimated: !useRaw && d3.soc?.estimated === true, policy: policyText },
@@ -60601,7 +60653,7 @@ function recoveryBanner(state, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.129";
+var CARD_VERSION = "2.5.130";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {
@@ -60907,7 +60959,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
         this.settingsNotice = "Price currency changed while editing. Reload settings before saving.";
       }
       adapter.model.capCurrency = currency;
-      adapter.model.settings = { driver: record3.driver, energy: record3.requested_kwh, vehicleId: record3.target.vehicle_id || "", target: record3.target.target_percent, minimum: record3.minimum_ready_by_soc, cap: capInput(record3.soft_price_cap, currency), readyBy: record3.departure_time, capEnabled: record3.soft_price_cap != null, capBasis: record3.cap_price_basis, deadlineEnabled: record3.departure_enabled };
+      adapter.model.settings = { driver: record3.driver, energy: record3.requested_kwh, vehicleId: record3.target.vehicle_id || "", target: record3.target.target_percent, minimum: record3.minimum_ready_by_soc, cap: capInput(record3.soft_price_cap, currency), readyBy: record3.departure_time, ...record3.time_reserve_percent === void 0 ? {} : { reserve: record3.time_reserve_percent }, capEnabled: record3.soft_price_cap != null, capBasis: record3.cap_price_basis, deadlineEnabled: record3.departure_enabled };
       adapter.model.planVehicles = dashboard ? chargerCarsOf(dashboard).filter((v2) => v2.id && v2.id !== "guest") : [];
       const discovered = dashboard?.soc?.vehicle_id, selected = record3.target.vehicle_id;
       const defaultVehicle = !selected && !dashboard?.guest?.active && adapter.model.planVehicles.length === 1 ? adapter.model.planVehicles[0] : null;
@@ -61298,7 +61350,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       this.paint();
       return;
     }
-    const form = { ...base2, driver, energy: values.energy ?? base2.energy, vehicleId, targetPercent: values.target ?? base2.targetPercent, minimumReadySoc: values.minimum, capValue: capForSave(values.cap, decoded.ok ? decoded.value.market?.currency : null, record3.soft_price_cap), capEnabled: values.capEnabled, capBasis: values.capBasis, deadlineEnabled: values.deadlineEnabled, deadlineTime: values.readyBy };
+    const form = { ...base2, driver, energy: values.energy ?? base2.energy, vehicleId, targetPercent: values.target ?? base2.targetPercent, minimumReadySoc: values.minimum, capValue: capForSave(values.cap, decoded.ok ? decoded.value.market?.currency : null, record3.soft_price_cap), capEnabled: values.capEnabled, capBasis: values.capBasis, deadlineEnabled: values.deadlineEnabled, deadlineTime: values.readyBy, ...base2.timeReserve === void 0 ? {} : { timeReserve: values.reserve ?? base2.timeReserve } };
     const check = replacementFor("plan", record3, form);
     if (!check.ok) {
       this.settingsNotice = translate2("en", check.errorKey);
