@@ -13,6 +13,7 @@ import json
 import functools
 import logging
 import math
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
@@ -740,6 +741,85 @@ def _compare_remaining(profile: dict[str, Any] | None, actual: dict[str, Any] | 
 def compare_schedule(profile: dict[str, Any] | None, actual: dict[str, Any] | None) -> dict[str, Any]:
     """A match requires reported coverage through one hour beyond the last stop."""
     return _compare_remaining(profile, actual, tolerance_s=VERIFY_TOLERANCE_S, require_coverage=True)
+
+
+CHECK_HEALTHY = "healthy"
+CHECK_UNKNOWN = "unknown"
+CHECK_DIFFERS = "differs_unconfirmed"
+CHECK_CLOCK_DOUBT_S = 30  # wall clock vs monotonic clock drift across one read that makes the comparison doubtful
+_DISPATCHED_KEY = "spotnav_morek_dispatched"
+
+
+def check_candidate(record: dict[str, Any] | None, now: datetime, *, sending: Any = None,
+                    verification_timer: bool = False, dispatched: str | None = None,
+                    data: dict[str, Any] | None = None) -> tuple[dict[str, Any] | None, str | None, str | None]:
+    """Stage 15.3: `(profile, acknowledged attempt id, why not)` for a read-only schedule check. No I/O.
+
+    Only the *latest acknowledged* intent that is still inside its coverage is a candidate: a routine plan, a
+    Pause hold or a Charge Now profile, each exactly as its accepted attempt sent it. An uncertain record, an
+    upload in flight, a newer attempt of any state, a verification that has not finished and an intent that is
+    over or replaced are never checked (the reason says what was not checked)."""
+    if not isinstance(record, dict):
+        return None, None, "no_intent"
+    ack, attempt = record.get("acknowledged"), record.get("attempt")
+    ack_id = ack.get("id") if isinstance(ack, dict) else None
+    if record.get("uncertain") is not False:
+        return None, ack_id, "outcome_uncertain"
+    if sending:
+        return None, ack_id, "upload_pending"
+    if not isinstance(ack, dict) or not ack_id or not ack.get("fingerprint"):
+        return None, ack_id, "no_acknowledged_intent"
+    if not isinstance(attempt, dict) or attempt.get("id") != ack_id or attempt.get("state") != "accepted":
+        return None, ack_id, "newer_attempt"
+    if verification_timer or (dispatched == ack_id and isinstance(data, dict) and not data.get("verified")
+                              and not (data.get("verification") or {}).get("attempts")):
+        return None, ack_id, "verification_pending"
+    profile = ack["profile"] if "profile" in ack else attempt.get("profile")
+    if not isinstance(profile, dict):
+        return None, ack_id, "profile_unavailable"
+    try:
+        now = _utc(now)
+        pause, override = record.get("schedule_pause"), record.get("charge_now")
+        pause_id, override_id = attempt.get("pause_id"), attempt.get("override_id")
+        if pause_id is not None:
+            if not isinstance(pause, dict) or pause.get("id") != pause_id:
+                return None, ack_id, "intent_changed"
+        elif pause is not None:
+            return None, ack_id, "intent_changed"
+        override_live = isinstance(override, dict) and _utc(datetime.fromisoformat(override["end"])) > now
+        if override_id is not None:
+            if not isinstance(override, dict) or override.get("id") != override_id:
+                return None, ack_id, "intent_changed"
+            if not override_live:
+                return None, ack_id, "intent_expired"
+        elif override_live:
+            return None, ack_id, "intent_changed"
+        schedule = profile["chargingSchedule"]
+        periods = schedule["chargingSchedulePeriod"]
+        start = _utc(datetime.fromisoformat(schedule["startSchedule"].replace("Z", "+00:00")))
+        held_off = len(periods) == 1 and periods[0]["limit"] == 0  # open-ended: its claim is bounded at read time
+        if not held_off and start + timedelta(seconds=periods[-1]["startPeriod"] + 3600) <= now:
+            return None, ack_id, "intent_expired"
+    except (KeyError, TypeError, ValueError, AttributeError, IndexError, OverflowError, ScheduleRefused):
+        return None, ack_id, "profile_unavailable"
+    return profile, ack_id, None
+
+
+def classify_check(comparison: dict[str, Any], effective: dict[str, Any] | None, *,
+                   clock_doubt: bool = False) -> tuple[str, str]:
+    """Class and reason of one read-only check, from the existing `compare_schedule` result (no new comparator).
+
+    Healthy needs a clean match; Differs-unconfirmed needs one clean `limits_or_transitions_differ` from an accepted
+    readback in amps; everything else (unavailable, coverage reasons, clock doubt) is Unknown and never promoted."""
+    if clock_doubt:
+        return CHECK_UNKNOWN, "clock_doubt"
+    reason = str(comparison.get("reason") or "readback_unavailable")
+    if comparison.get("matched"):
+        return CHECK_HEALTHY, reason
+    if (reason == "limits_or_transitions_differ" and isinstance(effective, dict)
+            and str(effective.get("status", "")).lower() == "accepted" and effective.get("rate_unit") == "A"):
+        return CHECK_DIFFERS, reason
+    return CHECK_UNKNOWN, reason
 
 
 def session_start_schedule_evidence(profile: dict[str, Any] | None, actual: dict[str, Any] | None,
@@ -1879,6 +1959,10 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
     if override_id is not None:
         record["attempt"]["override_id"] = override_id
     await ledger.write(record)
+    # Stage 15.3: a new attempt ends any read-only check episode (its finding no longer describes what is in force).
+    checker = hass.data.get("spotnav_morek_checker", {}).get(entry_id)
+    if checker is not None:
+        checker.note_new_attempt()
     # Evidence of the intent (the exact wire profile), kept after the durable attempt record and before dispatch.
     _evidence_plan(hass, entry_id, record["attempt"], wire_profile)
     # Recheck after persistence: a settings edit, new calculation, identity or
@@ -2088,9 +2172,12 @@ async def async_schedule_action(hass: HomeAssistant, entry_id: str, action: str,
                                 expected_sent_at: str | None = None,
                                 verification_attempt: int | None = None,
                                 expected_attempt_id: str | None = None,
-                                verification_handle: Any = None) -> dict[str, Any]:
-    """Manual operations share connector serialization without enabling owned mode."""
-    if action not in ("send", "fetch", "clear"):
+                                verification_handle: Any = None,
+                                check: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Manual operations share connector serialization without enabling owned mode.
+
+    `check` (Stage 15.3) turns a fetch into the writeless reconnect/startup check: see `_checked_readback`."""
+    if action not in ("send", "fetch", "clear") or (check is not None and action != "fetch"):
         raise ScheduleRefused("invalid_action")
     if action == "clear" and (type(confirm_profile_id) is not int or confirm_profile_id != PROFILE_ID):
         raise ScheduleRefused("cleanup_confirmation_required")
@@ -2121,7 +2208,8 @@ async def async_schedule_action(hass: HomeAssistant, entry_id: str, action: str,
                                                     verification_attempt=verification_attempt,
                                                     expected_attempt_id=expected_attempt_id,
                                                     verification_handle=verification_handle,
-                                                    validate_manual_generation=validate_manual_generation)
+                                                    validate_manual_generation=validate_manual_generation,
+                                                    check=check)
 
     admission = command_admission(hass)
     if action == "fetch":
@@ -2133,11 +2221,75 @@ async def async_schedule_action(hass: HomeAssistant, entry_id: str, action: str,
     return result.value
 
 
+def _composite_duration(profile: Any, query_at: datetime) -> int:
+    duration = 43200
+    if isinstance(profile, dict):
+        end = profile["chargingSchedule"]["chargingSchedulePeriod"][-1]["startPeriod"]
+        start = datetime.fromisoformat(profile["chargingSchedule"]["startSchedule"].replace("Z", "+00:00"))
+        duration = max(duration, min(172800, int((start + timedelta(seconds=end + 3600) - query_at).total_seconds())))
+    return duration
+
+
+async def _composite_readback(cp: Any, target: Any, duration: int, query_at: datetime, ocpp_call: Any) -> dict[str, Any]:
+    """The one GetCompositeSchedule read (no send): shared by Fetch, the verification reads and the 15.3 check."""
+    try:
+        response = await asyncio.wait_for(cp.call(ocpp_call.GetCompositeSchedule(
+            connector_id=target.connector_id, duration=duration, charging_rate_unit="A")), timeout=30)
+        effective = readback(response, datetime.now(timezone.utc), requested_at=query_at)
+        if getattr(response, "connector_id", target.connector_id) != target.connector_id:
+            effective["status"] = "wrong_connector"
+    except Exception:
+        effective = {"status": "unavailable", "fetched_at": datetime.now(timezone.utc).isoformat(), "periods": []}
+    return effective
+
+
+async def _checked_readback(hass: HomeAssistant, entry_id: str, lifecycle: dict[str, Any], cp: Any, target: Any,
+                            data: dict[str, Any], check: dict[str, Any], ocpp_call: Any) -> dict[str, Any]:
+    """Stage 15.3: connector lock and data lock held. One GetCompositeSchedule, a compare, **no write of any kind**.
+
+    Nothing in `data`, the ledger or the evidence store changes, so a newer attempt's `verified` fields, the
+    acknowledged/uncertain fields and the verification state are untouched. The intent is read from the ledger,
+    revalidated after the read and bound to the caller's `current()` (connection, attempt, owner generation); a
+    result that is no longer current raises `check_superseded` and is discarded by the caller."""
+    current = check["current"]
+    wanted = check.get("attempt_id")
+
+    async def candidate() -> tuple[dict[str, Any] | None, str | None, str | None]:
+        record = await _outcome_record(hass, entry_id, data)
+        return check_candidate(
+            record, datetime.now(timezone.utc), sending=hass.data.get("spotnav_morek_sending", {}).get(entry_id),
+            verification_timer=entry_id in hass.data.get(_VERIFY_KEY, {}),
+            dispatched=hass.data.get(_DISPATCHED_KEY, {}).get(entry_id), data=data)
+
+    profile, ack_id, reason = await candidate()
+    if (wanted is not None and ack_id != wanted) or not lifecycle["live"] or not current():
+        raise ScheduleRefused("check_superseded")
+    if reason is not None:
+        return {"check": {"class": CHECK_UNKNOWN, "reason": reason, "readback_at": None, "attempt_id": ack_id}}
+    wall0, mono0 = datetime.now(timezone.utc), time.monotonic()
+    try:
+        duration = _composite_duration(profile, wall0)
+    except (KeyError, TypeError, ValueError, AttributeError, IndexError, OverflowError):
+        return {"check": {"class": CHECK_UNKNOWN, "reason": "profile_unavailable", "readback_at": None,
+                          "attempt_id": ack_id}}
+    effective = await _composite_readback(cp, target, duration, wall0, ocpp_call)
+    drift = (datetime.now(timezone.utc) - wall0).total_seconds() - (time.monotonic() - mono0)
+    profile_after, ack_after, reason_after = await candidate()
+    if (reason_after is not None or ack_after != ack_id or profile_after != profile
+            or not lifecycle["live"] or not current()):
+        raise ScheduleRefused("check_superseded")
+    comparison = compare_schedule(profile, effective)
+    state, why = classify_check(comparison, effective, clock_doubt=abs(drift) > CHECK_CLOCK_DOUBT_S)
+    return {"check": {"class": state, "reason": why, "attempt_id": ack_id,
+                      "readback_at": effective.get("fetched_at") if str(effective.get("status")).lower() == "accepted" else None}}
+
+
 async def _async_schedule_action_locked(hass: HomeAssistant, entry_id: str, action: str,
                                         preview_id: str | None, confirm_profile_id: int | None, *,
                                         expected_sent_at: str | None,
                                         verification_attempt: int | None, expected_attempt_id: str | None,
-                                        verification_handle: Any, validate_manual_generation: Any) -> dict[str, Any]:
+                                        verification_handle: Any, validate_manual_generation: Any,
+                                        check: dict[str, Any] | None = None) -> dict[str, Any]:
     entry, failure = lookup_charger(hass, entry_id)
     if failure is not None or entry is None:
         raise ScheduleRefused(failure or "unknown_charger")
@@ -2159,6 +2311,8 @@ async def _async_schedule_action_locked(hass: HomeAssistant, entry_id: str, acti
         cp = _charge_point(hass, target)
         from ocpp.v16 import call as ocpp_call
         now = datetime.now(timezone.utc)
+        if check is not None:
+            return await _checked_readback(hass, entry_id, lifecycle, cp, target, data, check, ocpp_call)
         if action == "send":
             settings = domain_data(hass).auto_store.settings(entry_id)
             if settings.pause.choice != "until_resumed":
@@ -2246,12 +2400,8 @@ async def _async_schedule_action_locked(hass: HomeAssistant, entry_id: str, acti
                            status=str(data["cleanup"]["status"]).lower()[:32])
             await store.async_save(data)
         query_at = datetime.now(timezone.utc)
-        duration = 43200
         profile = data.get("profile")
-        if isinstance(profile, dict):
-            end = profile["chargingSchedule"]["chargingSchedulePeriod"][-1]["startPeriod"]
-            start = datetime.fromisoformat(profile["chargingSchedule"]["startSchedule"].replace("Z", "+00:00"))
-            duration = max(duration, min(172800, int((start + timedelta(seconds=end + 3600) - query_at).total_seconds())))
+        duration = _composite_duration(profile, query_at)
         worker = getattr(getattr(entry, "runtime_data", None), "morek_worker", None)
         serial = getattr(worker, "_serial", None)
         if expected_sent_at is not None:
@@ -2261,14 +2411,7 @@ async def _async_schedule_action_locked(hass: HomeAssistant, entry_id: str, acti
                     or (verification_handle is not None
                         and hass.data.get(_VERIFY_KEY, {}).get(entry_id) is not verification_handle)):
                 raise ScheduleRefused("verification_superseded")
-        try:
-            response = await asyncio.wait_for(cp.call(ocpp_call.GetCompositeSchedule(
-                connector_id=target.connector_id, duration=duration, charging_rate_unit="A")), timeout=30)
-            effective = readback(response, datetime.now(timezone.utc), requested_at=query_at)
-            if getattr(response, "connector_id", target.connector_id) != target.connector_id:
-                effective["status"] = "wrong_connector"
-        except Exception:
-            effective = {"status": "unavailable", "fetched_at": datetime.now(timezone.utc).isoformat(), "periods": []}
+        effective = await _composite_readback(cp, target, duration, query_at, ocpp_call)
         if expected_sent_at is not None and (entry_id not in hass.data.get(_VERIFY_KEY, {})
                 or (verification_handle is not None and hass.data[_VERIFY_KEY].get(entry_id) is not verification_handle)):
             raise ScheduleRefused("verification_superseded")
@@ -2479,6 +2622,7 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
                 outcomes = {**outcomes, "verified": None}
             preview = _preview(hass, entry.entry_id, target)
             link_monitor = getattr(worker, "link_monitor", None)
+            checker = getattr(worker, "checker", None)
             try:
                 _charge_point(hass, target)
                 online = worker is None or (not worker._suspended and worker._available() and not worker._closed)
@@ -2511,7 +2655,8 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
                       "link": link_monitor.status() if link_monitor is not None else None,
                       "readiness": readiness,
                       "schedule_pause": _owned_pause_status(outcomes, verification, verified, worker, stop_pending=stop_pending),
-                      "reconciliation": {"reason": worker.reason if worker is not None and
+                      "reconciliation": {"check": checker.status() if checker is not None else None,
+                                         "reason": worker.reason if worker is not None and
                                          getattr(worker, "reason_serial", -1) == worker._serial else "pending",
                                          "continuity": getattr(worker, "continuity", None),
                                          "recovery": {**recovery_status(outcomes, datetime.now(timezone.utc)),

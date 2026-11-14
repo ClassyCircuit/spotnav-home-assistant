@@ -152,6 +152,7 @@ class MorekLinkMonitor:
             self._point = point
             self._seq = 1
             self.connection_id = 1  # seeded: not a change, no edge
+            self._request_check("startup")  # HA startup with the link up: one read-only check (15.3), no edge
             return
         if previous == "down":
             self._new_connection(point, now)
@@ -159,11 +160,13 @@ class MorekLinkMonitor:
             self._down_ref = None
             self._deliver_reconnect()
             self._request_recovery(now)
+            self._request_check("link_up")
             return
         if point is not self._point:  # up -> up with a new object: a new connection, not a reboot
             self._new_connection(point, now)
             self._record_gap(last_up or now, now)
             self._request_recovery(now)
+            self._request_check("connection_change")
             return
         self._deliver_pending_recovery(now)
 
@@ -193,8 +196,25 @@ class MorekLinkMonitor:
                 note(boot)
             except Exception as err:  # noqa: BLE001 - never stop the edge deliveries that follow
                 _LOGGER.debug("Morek boot signal not delivered: %s", type(err).__name__)
+        self._request_check("boot")
+
+    def _request_check(self, trigger: str) -> None:
+        """Ask the read-only schedule checker (15.3) for one coalesced check; it sends nothing."""
+        checker = getattr(self._worker, "checker", None)
+        if checker is None:
+            return
+        try:
+            checker.request(trigger)
+        except Exception as err:  # noqa: BLE001 - never stop the edge deliveries that follow
+            _LOGGER.debug("Morek schedule check not requested: %s", type(err).__name__)
 
     def _deliver_offline(self, now: datetime) -> None:
+        checker = getattr(self._worker, "checker", None)
+        if checker is not None:
+            try:
+                checker.note_link_down()  # a link edge ends a check episode (15.3)
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.debug("Morek schedule check not ended: %s", type(err).__name__)
         session = getattr(self._worker, "session", None)
         if session is not None:
             session.offline()

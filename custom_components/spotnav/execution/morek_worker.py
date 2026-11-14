@@ -188,10 +188,16 @@ class MorekScheduleWorker:
             session = getattr(self, "session", None)
             if session is not None:
                 session.reconnect()
+            checker = getattr(self, "checker", None)
+            if checker is not None:
+                checker.request("availability_return")  # additional, read-only; never replaces the trigger above
 
     def close(self) -> None:
         """Unsubscribe and cancel pending work; an in-flight send remains uncertain."""
         self._closed = True
+        checker = getattr(self, "checker", None)
+        if checker is not None:
+            checker.close()
         self._evidence.clear()
         if self._evidence_task is not None:
             self._evidence_task.cancel()

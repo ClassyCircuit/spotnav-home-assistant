@@ -265,7 +265,7 @@ while offline”.
   `not_ready` causes no send, clear or second start; also rerun `test_morek_start_schedule_evidence.py`,
   `test_morek_readiness.py`. *Exclusions:* no retry loop, no start from unknown/stale status, no change to
   Morek’s authorization setting, no schedule send.
-- [ ] **15.3 Reconnect and startup read-only schedule check ◆.** *Scope:* a `ScheduleChecker` in the worker
+- [x] **15.3 Reconnect and startup read-only schedule check ◆.** *Locally implemented with mocked checks (2.5.133); mocked review pending (coordinator); not installed or live-verified. What the installed charger answers to `GetCompositeSchedule` after a reconnect is unverified.* Landed as `execution/morek_checker.py` (`MorekScheduleChecker`, `worker.checker`, created in `__init__.py` before the link monitor starts), `async_schedule_action(..., "fetch", check=...)` (a writeless branch `_checked_readback`; `check_candidate`/`classify_check` in `api/morek_schedule.py`), status `reconciliation.check`. Tests: `tests/test_stage_153_schedule_check.py`. *Scope:* a `ScheduleChecker` in the worker
   lifecycle running the existing read-only `fetch` path (`async_schedule_action(..., "fetch")`, `read_only`
   admission, `compare_schedule`: remaining intervals only) after a link-up/connection-change edge, the
   existing availability-return hook, a detected boot, and HA startup once the link is up. Only an acknowledged

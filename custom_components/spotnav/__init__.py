@@ -939,8 +939,20 @@ async def _async_setup_auto_preview(
     entry.async_on_unload(session.close)
     worker.start()
     entry.async_on_unload(worker.close)
+    from .execution.morek_checker import MorekScheduleChecker
     from .execution.morek_link import MorekLinkMonitor
 
+    # Stage 15.3: the read-only reconnect/startup schedule check. It exists before the monitor's first reading so
+    # that HA startup with the link up requests exactly one check; it never sends anything.
+    checker = worker.checker = MorekScheduleChecker(hass, entry_id, worker)
+    hass.data.setdefault("spotnav_morek_checker", {})[entry_id] = checker
+
+    def _drop_checker() -> None:
+        checker.close()
+        if hass.data.get("spotnav_morek_checker", {}).get(entry_id) is checker:
+            hass.data["spotnav_morek_checker"].pop(entry_id, None)
+
+    entry.async_on_unload(_drop_checker)
     worker.link_monitor = MorekLinkMonitor(hass, entry_id, worker)
     worker.link_monitor.start()  # one bounded poll timer; read-only, cancelled on unload
     entry.async_on_unload(worker.link_monitor.stop)
