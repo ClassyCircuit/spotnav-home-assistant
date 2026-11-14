@@ -368,7 +368,7 @@ while offline”.
   Default copy and who-acts rules: archive “Status wording”. *Acceptance:* each state has a wording test;
   nothing claims a repair or check proves charging; offline never reads as a charging failure; absent fields
   degrade; i18n parity in every language file; no new write path. *Exclusions:* no backend change.
-- [ ] **15.8 Late cumulative-register reconciliation of closed session totals ◆.** *Scope:* one bounded
+- [x] **15.8 Late cumulative-register reconciliation of closed session totals ◆.** *Locally implemented with mocked checks (2.5.139); coordinator reviewed (coordinator); not installed or live-verified. Corrected before commit: only the recorder's own open/close register pair counts as association proof; a later register rise has no session/transaction binding in the evidence store, so it is shown as `unassigned_register_kwh` on an `uncertain` record with no total (the overnight 20.9 kWh case is not automatically attributable). Whether the installed charger/HA replays register values is unverified; limits are in the handoff.* Landed as `sessions/reconcile.py`, the recorder's `register_pair` and `_reconcile_late`, `ChargeSession.late`, history `sessions[].reconciliation`. Tests: `tests/test_stage_158_late_reconciliation.py`. *Scope:* one bounded
   reconciliation when a session closes or a late register value arrives: total = register at close − register
   at open (the session recorder’s pair) versus energy already placed from observed samples; the remainder is
   stored as **unplaced late energy** with `placement: unknown` and a reason (gap, `link_down` once 15.2

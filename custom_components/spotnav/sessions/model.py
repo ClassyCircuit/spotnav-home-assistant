@@ -26,6 +26,7 @@ from homeassistant.util import dt as dt_util
 
 from ..planning.planner import FiscalChoice
 from .costing import price_slices, Slice, subtract_slices
+from .reconcile import clean_late, clean_pair
 
 #: Where a session's energy comes from: the charger's energy register, SpotNav's own integration of a
 #: smart plug's power, or an estimate from the current the charger was asked for (marked `estimated`).
@@ -72,6 +73,8 @@ _OPTIONAL_FIELDS: Final = frozenset(
         "vehicle_decided_by",
         "start_soc_percent",
         "register_entity",
+        "register_pair",
+        "late_reconciliation",
     }
 )
 #: How the session's vehicle was decided (`vehicles/identification.py`'s `METHODS`).
@@ -146,6 +149,22 @@ class ChargeSession:
     #: another origin, so a reading of it is never measured against this one's (`recorder._accrue`). An open record
     #: from before it was written is taken, when loaded, as the register the charger's entry names then.
     register_entity: str | None = None
+    #: A register-measured session's pair (`reconcile.new_pair`): the reading at open, the last one taken, the entity and
+    #: when it closed. Kept after the close; `None` for an older, imported or non-register session.
+    register_pair: dict[str, Any] | None = None
+    #: Stage 15.8: the late cumulative-register reconciliation of a finished session (`reconcile.reconcile`), additive
+    #: beside the energy, which it never changes. `None` until evaluated and for older records.
+    late: dict[str, Any] | None = None
+
+    @property
+    def unplaced_late_kwh(self) -> float | None:
+        """Energy the recorder's own register pair shows beyond what was placed, with no known placement (`None` when
+        none is proven). A later register rise with no session binding is *not* this: it is only
+        `late["unassigned_register_kwh"]` on an `uncertain` record, and a learner must treat such a session as unknown."""
+        late = self.late
+        if late is None or late["state"] != "reconciled":
+            return None
+        return late["unplaced_late_kwh"]
 
     @property
     def cost_basis(self) -> str:
@@ -247,6 +266,10 @@ class ChargeSession:
             record["start_soc_percent"] = self.start_soc_percent
         if self.register_entity is not None:
             record["register_entity"] = self.register_entity
+        if self.register_pair is not None:
+            record["register_pair"] = dict(self.register_pair)
+        if self.late is not None:
+            record["late_reconciliation"] = dict(self.late)
         return record
 
     @classmethod
@@ -346,6 +369,9 @@ class ChargeSession:
             vehicle_decided_by=decided_by,
             start_soc_percent=None if start_soc is None else _number(start_soc),
             register_entity=_text(raw.get("register_entity")),
+            # Additive blocks: one that is not exactly its shape is dropped, never the session that carries it.
+            register_pair=clean_pair(raw.get("register_pair")),
+            late=clean_late(raw.get("late_reconciliation")),
         )
 
     def public(self, zone: tzinfo | None = None) -> dict[str, Any]:

@@ -118,6 +118,7 @@ from .vehicles.identification import VehicleIdentifier
 from .vehicles.vehicle_target import async_adopt as async_adopt_vehicle_target, async_setup_vehicle_targets
 from .sessions.inputs import current_fiscal, price_book_for, session_facts, soc_percent_now
 from .sessions.history_import import HistoryImporter, START_DELAY_S as HISTORY_IMPORT_DELAY_S
+from .sessions.evidence import evidence_for
 from .sessions.recorder import SessionRecorder
 from .sessions.store import SessionStore
 from .site.site_join import (
@@ -690,6 +691,7 @@ def _async_start_session_recorder(
         consume_cause=controller.consume_start_cause,
         subscribe=controller.add_charge_state_listener,
         start_soc=lambda: soc_percent_now(hass, entry.entry_id),
+        evidence=lambda: evidence_for(hass),
     )
     entry.async_on_unload(recorder.async_shutdown)
     recorder.async_start()

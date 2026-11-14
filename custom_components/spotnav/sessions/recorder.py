@@ -33,7 +33,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Final
+from typing import Any, Final
 
 from homeassistant.core import callback, HomeAssistant
 from homeassistant.helpers.event import async_track_time_interval
@@ -51,6 +51,9 @@ from .model import (
     STARTED_PLAN_WINDOW,
     STARTED_SOLAR,
 )
+from .reconcile import (
+    break_pair, close_pair, comparable, new_pair, note_reading, read_evidence, reconcile, RESET_TOLERANCE_KWH,
+)
 from .store import SessionStore
 from ..util import finite_number
 
@@ -60,8 +63,6 @@ _LOGGER = logging.getLogger(__name__)
 END_DEBOUNCE_S: Final = 120.0
 #: How often an open session is sampled between the charger's own reports.
 TICK_S: Final = 60
-#: A register that falls to this or below is a reset to zero; its value is the energy since.
-RESET_TOLERANCE_KWH: Final = 0.5
 #: Less energy than this is not a charge (a charger that was started and never taken).
 MIN_ENERGY_KWH: Final = 0.01
 #: An estimated session shorter than this is not recorded.
@@ -162,6 +163,7 @@ class SessionRecorder:
         subscribe: Callable[[Callable[[], None]], Callable[[], None]] | None = None,
         now: Callable[[], datetime] = dt_util.utcnow,
         start_soc: Callable[[], float | None] | None = None,
+        evidence: Callable[[], Any] | None = None,
     ) -> None:
         self._hass = hass
         self._charger_id = charger_id
@@ -172,6 +174,8 @@ class SessionRecorder:
         self._subscribe = subscribe
         self._now = now
         self._start_soc = start_soc
+        #: The charging evidence store (or `None`), read for late register values of finished sessions (Stage 15.8).
+        self._evidence = evidence
         self._was_charging = False
         self._session: ChargeSession | None = None
         self._idle_since: datetime | None = None
@@ -226,6 +230,32 @@ class SessionRecorder:
         if self._shutdown:
             return
         now = now or self._now()
+        self._decide(now)
+        self._reconcile_late(now)
+
+    @callback
+    def _reconcile_late(self, now: datetime) -> None:
+        """Stage 15.8: compare each recently finished session's register pair and the retained late register values
+        with the energy it placed, and keep the remainder beside it. Read only; a session's own energy never changes,
+        nothing is sent, replanned or triggered, and a failure here never disturbs the recording."""
+        if self._evidence is None:
+            return
+        try:
+            waiting = self._store.late_pending(self._charger_id)
+            evidence = self._evidence() if waiting else None
+            if not waiting or evidence is None:
+                return
+            read = read_evidence(evidence, self._charger_id, since=min(item.start for item in waiting))
+            everyone = self._store.all_sessions(self._charger_id)
+            for item in waiting:
+                late = reconcile(item, read, everyone, now)
+                if late is not None and comparable(late) != comparable(item.late):
+                    self._store.set_late(self._charger_id, item.id, late)
+        except Exception as err:  # noqa: BLE001 - reconciliation is additive; the recording must go on
+            _LOGGER.debug("Late register reconciliation failed: %s", type(err).__name__)
+
+    @callback
+    def _decide(self, now: datetime) -> None:
         facts = self._facts()
         session = self._session
         if session is None:
@@ -340,6 +370,7 @@ class SessionRecorder:
             solar_known_kwh=0.0,
             last_register_kwh=facts.register_kwh,
             register_entity=facts.register_entity if facts.register_kwh is not None else None,
+            register_pair=None if source != SOURCE_REGISTER else new_pair(facts.register_kwh, facts.register_entity),
             last_sample_at=now,
             start_soc_percent=None if self._start_soc is None else finite_number(self._start_soc()),
         )
@@ -367,14 +398,19 @@ class SessionRecorder:
                 # Another register counts from another origin: measured on from its first reading, never against
                 # the last one's.
                 session.last_register_kwh = None
+                break_pair(session.register_pair, "identity")
             if reading is not None:
                 session.register_entity = facts.register_entity
                 baseline = session.last_register_kwh
                 if baseline is not None:
                     if reading >= baseline:
                         delivered = reading - baseline
-                    elif reading <= RESET_TOLERANCE_KWH:
-                        delivered = reading
+                    else:
+                        # Fell back: a reset (its value is the energy since) or a register that counts from elsewhere.
+                        break_pair(session.register_pair, "register_reset")
+                        if reading <= RESET_TOLERANCE_KWH:
+                            delivered = reading
+                note_reading(session.register_pair, reading)
                 session.last_register_kwh = reading
         if delivered > 0 or facts.charging or self._was_charging:
             # While the charge stands still the sample stays at its stop, so a restart in a long pause still knows
@@ -401,6 +437,7 @@ class SessionRecorder:
         self._session = None
         self._reset_idle()
         session.end = min(max(ended, session.start), now)
+        close_pair(session.register_pair, now)
         session.last_register_kwh = None
         session.register_entity = None
         session.last_sample_at = None

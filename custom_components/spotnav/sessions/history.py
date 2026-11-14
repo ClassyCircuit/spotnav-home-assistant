@@ -49,6 +49,7 @@ from .evidence import (
     _iso,
     _parse,
 )
+from .reconcile import public as reconcile_public
 
 HISTORY_API_VERSION: Final = 1
 #: A power sample at or above this is flow (assumed noise floor; unverified for the installed charger).
@@ -488,6 +489,9 @@ def charging_history(store: ChargingEvidenceStore, charger_id: str, *, since: da
             "price_slices": [{"start": _iso(s.start), "end": _iso(s.end), "kwh": round(s.kwh, 4),
                               "eur_per_kwh": s.eur_per_kwh, "fx": s.fx} for s in session.intervals[:MAX_ROWS]],
             "association": "time_overlap_only",
+            # Stage 15.8: the register's total against the energy placed above (`energy_kwh`, never changed), with its
+            # provenance; the remainder is unplaced late energy with no known time, never flow, power or progress.
+            "reconciliation": reconcile_public(session),
             "overlapping_observed_intervals": sum(1 for it in intervals if _parse(it["first_sample"]) < end
                                                   and _parse(it["last_sample"]) > session.start),
         })

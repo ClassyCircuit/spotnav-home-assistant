@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import dataclasses
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -262,6 +263,18 @@ class SessionStore:
         """The open session itself, the recorder's to accrue into."""
         return self._open.get(charger_id)
 
+    def late_pending(self, charger_id: str, limit: int = 10) -> tuple[ChargeSession, ...]:
+        """The charger's newest finished sessions that still await (or may still gain) a late reconciliation (15.8)."""
+        from .reconcile import pending
+
+        found = [item for item in reversed(self._closed.get(charger_id, ())) if not item.imported and pending(item)]
+        return tuple(found[:limit])
+
+    def all_sessions(self, charger_id: str) -> tuple[ChargeSession, ...]:
+        """Every finished session as stored, and the open one: the span a late value must be told apart within."""
+        opened = self._open.get(charger_id)
+        return (*self._closed.get(charger_id, ()), *(() if opened is None else (opened,)))
+
     def import_marker(self, charger_id: str) -> dict[str, Any] | None:
         """What the import of earlier charges recorded for the charger, or `None` before it ran."""
         marker = self._imports.get(charger_id)
@@ -310,6 +323,23 @@ class SessionStore:
         else:
             self._open[charger_id] = session
         self._changed(charger_id, opened=True)
+
+    @callback
+    def set_late(self, charger_id: str, session_id: str, late: dict[str, Any]) -> bool:
+        """Keep a finished session's late reconciliation record (Stage 15.8, additive: its energy never changes). The
+        session object is replaced, as a migration does, so a snapshot being written is never changed under it. `False`
+        when the session is gone (pruned, removed) or already holds exactly this record."""
+        changed = False
+        for items in (self._closed.get(charger_id, []), self._closing.get(charger_id, [])):
+            for index, item in enumerate(items):
+                if item.id == session_id and item.late != late:
+                    items[index] = dataclasses.replace(item, late=dict(late))
+                    changed = True
+        if not changed:
+            return False
+        self._closed_changed()
+        self._changed(charger_id, record=True, opened=True)
+        return True
 
     @callback
     def close(self, session: ChargeSession, now: datetime) -> None:
