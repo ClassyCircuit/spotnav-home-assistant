@@ -169,7 +169,7 @@ export interface Relation {
 }
 
 export interface Plan {
-  price_policy?: { explanations: string[]; provisional?: boolean; price_coverage_end?: string | null; tomorrow_pending?: boolean };
+  price_policy?: { explanations: string[]; provisional?: boolean; price_coverage_end?: string | null; tomorrow_pending?: boolean; fx_note?: string | null };
   proposal: Proposal | null;
   installed: Installed | null;
   relation: Relation;
@@ -1203,6 +1203,7 @@ function decodePlan(source: Record<string, unknown>): Plan {
   return {
     ...(Array.isArray(explanations) ? { price_policy: { provisional: (policy as Record<string, unknown>)["provisional"] === true,
       tomorrow_pending: (policy as Record<string, unknown>)["tomorrow_pending"] === true,
+      fx_note: typeof (policy as Record<string, unknown>)["fx_note"] === "string" ? (policy as Record<string, string>)["fx_note"] : null,
       price_coverage_end: typeof (policy as Record<string, unknown>)["price_coverage_end"] === "string" ? (policy as Record<string, string>)["price_coverage_end"] : null,
       explanations: explanations.flatMap((item: unknown) => {
       if (typeof item !== "object" || item === null || Array.isArray(item)) return [];

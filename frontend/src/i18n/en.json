@@ -200,7 +200,7 @@
   "status.departureShortfall.kwhNoTime": "Will not be ready by the departure: about {kwh} of {requested} kWh.",
   "issue.planningUnavailable.deadlineTooShort": "Not one whole quarter-hour is left before the departure, so nothing can be charged for it.",
   "issue.planningUnavailable.noPublishedPrices": "No prices are published for this price area today.",
-  "issue.planningUnavailable.missingFxRate": "The prices cannot be converted to the area's currency: the day's exchange rate is missing.",
+  "issue.planningUnavailable.missingFxRate": "The prices cannot be converted to the area's currency yet: waiting for the ECB exchange rate, which is asked for again automatically.",
   "issue.planningUnavailable.unexpectedFailure": "The charging plan could not be calculated because of an unexpected error. The log has the details.",
   "issue.solarUnavailable": "Solar charging is not available: this site cannot measure solar surplus.",
   "issue.priceHorizon": "Prices are missing for part of the required planning window. Set a deadline.",

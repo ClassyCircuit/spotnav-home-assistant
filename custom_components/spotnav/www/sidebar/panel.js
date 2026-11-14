@@ -56045,7 +56045,7 @@ var en_default2 = {
   "status.departureShortfall.kwhNoTime": "Will not be ready by the departure: about {kwh} of {requested} kWh.",
   "issue.planningUnavailable.deadlineTooShort": "Not one whole quarter-hour is left before the departure, so nothing can be charged for it.",
   "issue.planningUnavailable.noPublishedPrices": "No prices are published for this price area today.",
-  "issue.planningUnavailable.missingFxRate": "The prices cannot be converted to the area's currency: the day's exchange rate is missing.",
+  "issue.planningUnavailable.missingFxRate": "The prices cannot be converted to the area's currency yet: waiting for the ECB exchange rate, which is asked for again automatically.",
   "issue.planningUnavailable.unexpectedFailure": "The charging plan could not be calculated because of an unexpected error. The log has the details.",
   "issue.solarUnavailable": "Solar charging is not available: this site cannot measure solar surplus.",
   "issue.priceHorizon": "Prices are missing for part of the required planning window. Set a deadline.",
@@ -58339,6 +58339,7 @@ function decodePlan(source) {
     ...Array.isArray(explanations) ? { price_policy: {
       provisional: policy["provisional"] === true,
       tomorrow_pending: policy["tomorrow_pending"] === true,
+      fx_note: typeof policy["fx_note"] === "string" ? policy["fx_note"] : null,
       price_coverage_end: typeof policy["price_coverage_end"] === "string" ? policy["price_coverage_end"] : null,
       explanations: explanations.flatMap((item) => {
         if (typeof item !== "object" || item === null || Array.isArray(item)) return [];
@@ -60944,7 +60945,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.153";
+var CARD_VERSION = "2.5.154";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {

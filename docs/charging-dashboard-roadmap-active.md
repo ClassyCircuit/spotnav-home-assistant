@@ -567,7 +567,7 @@ input-evidence → recalculation → worker-compare path.
 | 3 | 17.2 Stale SOC with trustworthy estimates — **done locally (2.5.149), awaiting coordinator commit** | 17.1; after 16.2 (same `morek_plan_blocker`) |
 | 4 | 17.3 Missing-capacity fallback — **done locally (2.5.151), awaiting coordinator commit** | 17.2 (shares the capped-energy seam) |
 | 5 | 17.4 Automatic recovery on session finalization — **done locally (2.5.153), awaiting coordinator commit** | 17.1 |
-| 6 | 17.5 Exchange-rate freshness and truthful cap policy | 16.2 (one coverage judgement) |
+| 6 | 17.5 Exchange-rate freshness and truthful cap policy — **done locally (2.5.154), awaiting coordinator commit** | 16.2 (one coverage judgement) |
 | 7 | 17.6 Clear blockers and end-to-end automatic recovery | 17.2–17.5 |
 
 - [x] **17.1 Review and finish the 2.5.146 progress-uncertainty fallback ◆.** *Reviewed and finished locally at
@@ -660,7 +660,7 @@ input-evidence → recalculation → worker-compare path.
   a fresh calculation); Pause/Stop/uncertain outcome win; no send is caused by the listener itself.
   *Exclusions:* no new listener class, store or timer; no timeline backfill; 15.8’s reconciliation values are not
   read as attribution proof.
-- [ ] **17.5 Exchange-rate freshness and truthful cap policy ◆.** *Seam (verified):* producers attach the newest
+- [x] **17.5 Exchange-rate freshness and truthful cap policy ◆.** *Locally implemented with mocked checks (2.5.154; coordinator review/commit pending); not installed or live-verified. New pure `pricing/rate_label.py` is the one rate judgement (own / dated / undated / missing; a table after the day or older than `MAX_RATE_AGE`, a non-finite or non-positive number, or another currency is `missing`); `planner._rate_for` uses it; the controller leaves a rate-less day out of the plan and out of `morek_price_blocker` coverage (so it never invalidates the other day) and keeps the documents when none has a rate so the planner refuses `missing_fx_rate`; `price_policy` now carries `fx`, `fx_state`, `fx_waiting`, `fx_note` (rate, table date, source, age; “waiting for the ECB exchange rate; asked for again automatically”), shown by the daily overview; the English `missingFxRate` text says it waits. Rate arrival is the existing document-evidence change: one replan, no new retry/timer. EUR areas unchanged (labels `None`). Tests `tests/test_stage_175_fx_freshness.py` (6). Details in the handoff.* *Seam (verified):* producers attach the newest
   ECB table at most `MAX_RATE_AGE` (7 days) before the day with its date (`fx_src`, `fx_date`); a day built without
   a rate is asked again at most every `FX_RETRY` and rebuilt when one arrives (`wants_again`); the planner converts
   with the document’s own rate and refuses `missing_fx_rate` (`planner._rate_for`). *Scope:* (a) prove by test that

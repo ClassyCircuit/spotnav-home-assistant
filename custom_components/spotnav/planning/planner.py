@@ -22,6 +22,7 @@ from typing import Any, Final, Literal
 
 
 from .. import time_zones
+from ..pricing.rate_label import piece_rate, USABLE
 from ..pricing.relay_contract import PriceDocument
 
 
@@ -511,15 +512,15 @@ def _rate_for(document: PriceDocument, currency: str) -> float:
     """
     if currency.upper() == "EUR":
         return EUR_RATE
-    rate = document.fx_rate(currency)
-    if rate is None:
+    # Stage 17.5: the same judgement the labels use (`pricing/rate_label.py`). A rate that is absent, unusable,
+    # dated after the day or older than the ECB rule is refused, never replaced by another number.
+    label = piece_rate(document, currency)
+    if label["state"] not in USABLE:
         _refuse(
             "missing_fx_rate",
-            f"the {document.day.isoformat()} document has no {currency} rate",
+            f"the {document.day.isoformat()} document has no usable {currency} rate",
         )
-    if not math.isfinite(rate) or rate <= 0:
-        _refuse("missing_fx_rate", f"the {document.day.isoformat()} {currency} rate is not usable")
-    return rate
+    return label["rate"]
 
 
 @dataclass(frozen=True, slots=True)

@@ -4729,3 +4729,30 @@ Historical partial entry; superseded by the completed foundation above.
 - **Deferred, bounded retry of a held close.** `_note_finalization` still skips a close while a send is pending, Pause, person-Stop or another recovery runs, but now records the id in `_finalize_deferred` instead of losing it. `_retry_deferred_finalization` runs on two *existing* events, no timer or poll: `async_note_execution_change` (the executor's `_notify_change` after settlement/Resume/pause change) and the end of a running recovery. It re-checks the hold, acts once per closed id (`_finalized_seen`), sends nothing itself, and drops the deferral if a calculation made after the close already reset the watch (it counted the final energy), so settlement adds no extra calculation then.
 - **Limitation (stated, not claimed complete).** Releasing a person's Stop has no verified execution-change event, so a close deferred by Stop is picked up by the next ordinary calculation/execution event, not at the instant Stop is released. A recalculation that fails, or an ask that fails, is not retried by this code: the next ordinary calculation recovers it; there is no repeated request. Dispatched-unknown commands are never retried by this code (it never sends).
 - **Tests (`tests/test_stage_174_finalization_recovery.py`, now 18 incl. parametrized).** Preview neither erases nor writes the watch and a later close still recovers; close held by pending or Pause → no calculation, still-held retry silent, one calculation after release, never twice; person-Stop → no calculation or ask across repeated events; a calculation after the close drops the deferral; real Morek worker: close while pending → nothing, then settlement → one calculation and no extra send (an equal schedule is not resent). Windows form: `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -p pytest_asyncio.plugin -p no:cacheprovider --noconftest <file>`; this file plus `test_stage_145_progress_recovery.py` pass (50 total). Ruff clean; `npm run build`/`check-dist` pass at 2.5.153. Not run: other suites, browser, HA, hardware.
+
+
+## Stage 17.5 — exchange-rate freshness and truthful cap policy (manifest 2.5.154, local, coordinator review/commit pending)
+
+- Implementation sub-agent. Source basis HEAD `7fadb671`, manifest 2.5.153 → 2.5.154. No HA, charger, deployment, commit or push.
+- **One rate judgement:** new `pricing/rate_label.py` (`piece_rate`, `rate_usable`, `day_label`, `labels_for`; pure, no I/O). States
+  `own` (table dated the day), `dated` (earlier table, age in days, ≤ `MAX_RATE_AGE` 7), `undated` (usable rate, no date; legacy
+  documents still plan, labelled), `missing` (no rate, non-finite/≤0, table after the day or older than 7 days, other currency).
+  `planner._rate_for` now uses it, so a stored/relayed document with a too-old or future table is `missing_fx_rate`, never converted.
+- **Coverage (16.2 judgement, no second rule):** `AutoPlannerController._rate_covered` drops a day without a usable rate from the
+  plan's documents (like an unpublished day); if none has a rate the documents are kept and the planner refuses `missing_fx_rate`.
+  `morek_price_blocker` counts only rate-usable days as covering. EUR areas: `rate_usable` is always true, labels `None`.
+- **Labelling:** `AutoSnapshot.fx_provenance` (display only, not in `meaningful_key`); `encode_price_policy` adds `fx`, `fx_state`,
+  `fx_waiting`, `fx_note` (rate date, source, age; for a soft cap “the soft cap was compared with the price converted at that rate”;
+  missing → “Waiting for the ECB exchange rate; it is asked for again automatically”). `validate.ts` passes `fx_note`;
+  `daily-overview.ts` shows it. English `issue.planningUnavailable.missingFxRate` reworded; other languages not changed (still say the rate is missing).
+- **Arrival replans once:** unchanged mechanism — the rebuilt document is different `morek_price_evidence`, so the old calculation
+  cannot be sent (`price_inputs_changed`) and one recalculation plans; an unchanged repeat yields the same plan. No new retry, timer or FX source.
+- **Tests:** `tests/test_stage_175_fx_freshness.py` (6 passed, ~4 s). Focused reruns, each under 25 s, run with
+  `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -p pytest_asyncio.plugin -p no:cacheprovider --noconftest`: `test_planner` 61,
+  `test_planner_price_policy_guard` 29, `test_stage_162_safe_dispatch` 25 (22 s), `test_stage_172_stale_soc` 12,
+  `test_stage_173_missing_capacity` 21, `test_stage_174_finalization_recovery` 18, `test_relay_contract` 19, `test_session_costing` 12 — all pass.
+  `test_fx_rates.py` (20 fixture errors, identical on the stashed baseline), `test_dashboard_api.py` and `test_auto_controller.py`
+  need the HA conftest/plugin and cannot run here (not caused by this change). `ruff` clean on touched Python; `npm run build` and
+  `npm run check-dist` pass (no frontend unit suite run).
+- **Limits / unverified:** the cap decision itself is unchanged (the planner already compared the converted price); only its statement is new.
+  No browser/Playwright, installed behaviour, real ECB cadence, or HA-plugin suites. A day left out for a missing rate is not retried here (the existing `FX_RETRY` rebuild does it).

@@ -50,7 +50,33 @@ def encode_price_policy(settings: AutoSettings, snapshot: AutoSnapshot | None) -
             explanations.append({"code": "block_limit"})
     if current is not None and current.last_error_code is not None:
         explanations.append({"code": "error", "reason": current.last_error_code})
+    fx = None if current is None else current.fx_provenance
+    fx_states = [item.get("state") for item in fx or ()]
+    # Stage 17.5: a soft cap in local currency is compared with the *converted* price, so say which rate that was.
+    # `dated`: an earlier ECB table than the day's own (rate, date, age below); `missing`: the day cannot be priced
+    # and the plan waits for the ECB rate, which is asked for again automatically.
+    fx_state = None if not fx_states else (
+        "missing" if "missing" in fx_states else "undated" if "undated" in fx_states
+        else "dated" if "dated" in fx_states else "own")
+    note = None
+    if fx_state in ("dated", "undated", "missing"):
+        used = [item for item in fx or () if item.get("state") in ("dated", "undated")]
+        oldest = max(used, key=lambda item: item.get("age_days") or 0, default=None)
+        if fx_state == "missing":
+            note = ("Waiting for the ECB exchange rate; it is asked for again automatically. "
+                    "No other day's or currency's rate is used.")
+        elif fx_state == "dated" and oldest is not None:
+            note = (f"Prices converted with the {oldest.get('source') or 'ECB'} rate of {oldest.get('date')}, "
+                    f"{oldest.get('age_days')} day(s) before the priced day, not that day's own rate"
+                    + ("; the soft cap was compared with the price converted at that rate." if settings.soft_price_cap is not None
+                       else "."))
+        else:
+            note = "Prices converted with an exchange rate that carries no date."
     return {
+        "fx_note": note,
+        "fx": fx,
+        "fx_state": fx_state,
+        "fx_waiting": fx_state == "missing" or (current is not None and current.reason == "missing_fx_rate"),
         "basis": settings.cap_price_basis,
         # The cap may be based on raw Nord Pool; estimates always use the
         # planner's configured variable fees/taxes and are not measured costs.

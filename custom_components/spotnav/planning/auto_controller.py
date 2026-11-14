@@ -50,6 +50,7 @@ from ..execution.solar_execution import site_controller_for_charger, site_suppor
 from ..pricing.market_observation import MarketObservation
 from ..pricing.price_refresh import PriceRefreshManager
 from ..pricing.price_source import entry_source_for, PriceSource, SIGNAL_PRICE_SOURCES, with_source
+from ..pricing.rate_label import labels_for, rate_usable
 from ..pricing.relay_contract import AreaEntry
 from ..runtime import charger_data, domain_data
 from ..execution.controller import CONNECTION_PLUGGED_IN
@@ -806,6 +807,10 @@ class AutoSnapshot:
     # Process-local evidence for automatic Morek dispatch, never restored from storage.
     morek_price_evidence: Any = None
     morek_input_evidence: Any = None
+    #: Stage 17.5: the exchange rate each priced day used (`pricing/rate_label`), `None` for a euro area. A label for
+    #: the display only: never part of `meaningful_key` (a rate arriving rebuilds the day's document, which is the
+    #: price evidence that already replans once).
+    fx_provenance: Any = None
 
     def meaningful_key(self) -> tuple[Any, ...]:
         """What a listener hears about, and is not told twice.
@@ -1260,6 +1265,17 @@ class AutoPlannerController:
         except Exception:  # noqa: BLE001 - unknown evidence cannot authorize a write
             return "plan_input_provenance_unavailable"
 
+    @staticmethod
+    def _rate_covered(documents: tuple[Any, ...], currency: str) -> tuple[Any, ...]:
+        """Stage 17.5: a day without a usable exchange rate does not cover (one rule with `morek_price_blocker`).
+
+        Such a day is left out like an unpublished one, so a missing rate for one day never invalidates another
+        day's valid coverage. When no day has a rate the documents are kept and the planner refuses honestly with
+        `missing_fx_rate`: no other day's or currency's number, no zero.
+        """
+        usable = tuple(item for item in documents if rate_usable(item, currency))
+        return usable or documents
+
     def morek_price_blocker(self, snapshot: AutoSnapshot, now: datetime) -> str | None:
         """The one judgement of whether the plan's own prices may be dispatched (Stage 16.2), or why not.
 
@@ -1273,6 +1289,7 @@ class AutoPlannerController:
         try:
             settings = self._effective(self._store.settings(self._entry_id))
             area = self._manager.area_snapshot(settings.area_id)
+            currency = snapshot.currency or "EUR"
             if area is None or snapshot.morek_price_evidence is None or snapshot.proposal is None:
                 return "price_evidence_unavailable"
             if self._morek_price_evidence(area) != snapshot.morek_price_evidence:
@@ -1284,7 +1301,8 @@ class AutoPlannerController:
             intervals = []
             for state, authority, day in ((area.today_state, area.today_authority, area.today_snapshot),
                                           (area.tomorrow_state, area.tomorrow_authority, area.tomorrow_snapshot)):
-                if state == "ready" and authority == "listed" and day.document is not None:
+                if (state == "ready" and authority == "listed" and day.document is not None
+                        and rate_usable(day.document, currency)):
                     intervals.extend(day.document.intervals)
             intervals.sort(key=lambda item: item.utc_start)
             for start, end in snapshot.proposal.shown_periods:
@@ -1933,6 +1951,7 @@ class AutoPlannerController:
                     settings, "waiting_for_prices", "no_prices_yet", calculated_at,
                     entry=entry, price_snapshot=area_snapshot,
                 )
+        documents = self._rate_covered(documents, entry.currency)
         plan_request = PlanRequest(
             area_id=entry.id,
             timezone=entry.tz,
@@ -4586,6 +4605,13 @@ class AutoPlannerController:
             morek_prices = None if area_snapshot is None else self._morek_price_evidence(area_snapshot)
         except Exception:  # noqa: BLE001 - incomplete evidence must not break ordinary planning
             morek_prices = None
+        try:
+            fx_prov = None
+            if area_snapshot is not None and entry is not None:
+                fx_prov = labels_for(tuple(item.document for item in (area_snapshot.today_snapshot, area_snapshot.tomorrow_snapshot)
+                                           if item.document is not None), entry.currency)
+        except Exception:  # noqa: BLE001 - a label must never break planning
+            fx_prov = None
         return AutoSnapshot(
             state=state,
             reason=reason,
@@ -4620,6 +4646,7 @@ class AutoPlannerController:
             wait_rule=wait_rule,
             price_revision=self._price_revision,
             morek_price_evidence=morek_prices,
+            fx_provenance=fx_prov,
         )
 
     async def _state_only(self, state: AutoState, reason: AutoReason) -> AutoSnapshot:

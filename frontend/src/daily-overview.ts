@@ -136,6 +136,9 @@ export function dailyOverview(doc: Document, dashboard: Dashboard, language: Lan
       const key = policyKeys[code]; if (!key) continue;
       const line = doc.createElement("p"); line.textContent = t(key); content.append(line);
     }
+    if (dashboard.plan.price_policy?.fx_note) {
+      const line = doc.createElement("p"); line.textContent = dashboard.plan.price_policy.fx_note; content.append(line);
+    }
     if (dashboard.plan.price_policy?.provisional) {
       const line = doc.createElement("p");
       line.textContent = `${dashboard.plan.price_policy.tomorrow_pending ? "Planned using available published prices; tomorrow’s prices are pending or unusable, so this plan may change when they arrive. " : ""}Provisional: contiguous published prices end ${time(dashboard.plan.price_policy.price_coverage_end ?? "", language, zone) ?? unknown}. Future prices and readiness are unknown; this is not necessarily the cheapest complete plan.`;
