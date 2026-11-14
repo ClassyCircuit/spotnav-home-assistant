@@ -47,7 +47,8 @@ class Repair:
 
     def conf(self, attempt_id=None):
         return {"attempt_id": attempt_id or self.ledger["acknowledged"]["id"], "connection_id": 1,
-                "readback_at": real_now().isoformat(), "current": lambda: self.flag["ok"]}
+                "readback_at": real_now().isoformat(), "current": lambda: self.flag["ok"],
+                "facts": {"current_wrong": True, "diff_in_s": 0.0}}  # 15.4b: a wrong limit repairs at once
 
     def payload(self, index=-1):
         return self.w.point.call.await_args_list[index].args[0].payload["cs_charging_profiles"]
@@ -75,8 +76,11 @@ def held(payload):
     return len(periods) == 1 and periods[0]["limit"] == 0
 
 
-def test_the_shipped_gate_is_off():
-    assert morek_schedule.REPAIR_DISPATCH_ENABLED is False
+@pytest.fixture(autouse=True)
+def gate_off_unless_enabled(monkeypatch):
+    """15.4b enabled the shipped gate; these 15.4a tests keep exercising the gated path by patching it off
+    (and `enable()` patches it back on). The shipped value is asserted in test_stage_154b_repair_deferral.py."""
+    monkeypatch.setattr(morek_schedule, "REPAIR_DISPATCH_ENABLED", False)
 
 
 @pytest.mark.asyncio

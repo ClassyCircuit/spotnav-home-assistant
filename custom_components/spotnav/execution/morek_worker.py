@@ -28,6 +28,7 @@ _TRIGGER_RANK = ("plug_in", "sync", "settings", "control", "repair", "sensor", "
 _SETTLED = ("upload_accepted_unverified", "unchanged")  # outcomes that end a pending price decision
 _DECISION_HISTORY = 10
 _DECISION_REPAIR_SENT = ("upload_accepted_unverified", "upload_rejected", "upload_uncertain")
+_DECISION_REPAIR_WAITING = ("repair_deferred",)
 _SOC_CAUSE = "soc"  # the only planner cause that is routine and may use the SOC tolerance
 
 
@@ -432,8 +433,12 @@ class MorekScheduleWorker:
                 repaired, self._repair_run = self._repair_run, None
                 if serial == self._serial:
                     if repaired is not None and self.repair_confirmed is not None:
-                        self.repair_confirmed.update(state="sent" if self.reason in _DECISION_REPAIR_SENT else "refused",
-                                                     result=self.reason)
+                        self.repair_confirmed.update(
+                            state="sent" if self.reason in _DECISION_REPAIR_SENT
+                            else "deferred" if self.reason in _DECISION_REPAIR_WAITING else "refused", result=self.reason)
+                        checker = getattr(self, "checker", None)
+                        if self.reason == "upload_accepted_unverified" and checker is not None:
+                            checker.request_post_repair()  # one later read-only look at the repaired attempt
                     if repair_asked is not None:
                         self._repair_request = None
                     # a repair carries no price decision: its acceptance must not end a pending one
@@ -513,8 +518,27 @@ class MorekScheduleWorker:
         generation = admission.generation(connector)
 
         repair = self._repair_run
+        post_repair = False  # the confirmed attempt is itself a repair: the send path escalates instead of deferring
+
+        def repair_deferral() -> None:
+            """15.4b, at every validation up to the wire: a correct charge with only a distant future difference
+            waits. Flow is read fresh each time; the readback's age comes from the confirmation token."""
+            if repair is None or post_repair:
+                return
+            try:
+                flow = morek_schedule.measured_flow(morek_schedule._live_measurements(
+                    self._hass, controller_for(self._hass, self._entry_id), datetime.now(timezone.utc)))
+                elapsed = morek_schedule.readback_age_s(repair["readback_at"])
+            except Exception:  # noqa: BLE001 - unreadable evidence is unknown flow / unknown age: never permission
+                flow, elapsed = "unknown", 0.0
+            why = morek_schedule.repair_deferral(repair.get("facts"), flow, elapsed)
+            if why is not None:
+                if self.repair_confirmed is not None:
+                    self.repair_confirmed["defer_reason"] = why
+                raise morek_schedule.ScheduleRefused("repair_deferred")
 
         async def dispatch() -> tuple[str, str | None, str | None]:
+            nonlocal post_repair
             # Admission has checked identity, ownership and generation under the
             # physical connector lock. Do not await between this recheck and call.
             if self._closed or serial != self._serial:
@@ -534,7 +558,8 @@ class MorekScheduleWorker:
                 if self._suspended or not self._available():
                     raise morek_schedule.ScheduleRefused("charger_unavailable")
                 if repair is not None and not repair["current"]():
-                    raise morek_schedule.ScheduleRefused("repair_unconfirmed")  # reconnect / new attempt / unload
+                    raise morek_schedule.ScheduleRefused("repair_unconfirmed")  # reconnect / new attempt / unload / stale read
+                repair_deferral()
                 identity_now = self._identity()
                 if classify_morek_identity(identity_now) != "supported_morek" or physical_connector(identity_now) != connector:
                     raise morek_schedule.ScheduleRefused("identity_changed")
@@ -554,6 +579,8 @@ class MorekScheduleWorker:
 
             async with self._hass.data[morek_schedule._DATA_KEY][self._entry_id][2]:
                 record = await morek_schedule._outcome_record(self._hass, self._entry_id, data)
+                post_repair = repair is not None and (repair["attempt_id"] in morek_schedule.repaired_ids(record)
+                                                       or morek_schedule.repair_escalated(record, repair["attempt_id"]))
                 pause = record.get("schedule_pause")
                 sync = self._sync_serial == serial
                 if sync and pause is not None and pause.get("type") == "pause_until_resumed":

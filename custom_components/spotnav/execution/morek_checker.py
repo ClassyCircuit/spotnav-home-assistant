@@ -45,6 +45,9 @@ CHECK_MIN_INTERVAL_S: Final = 60  # a flapping link: at most one check start per
 CHECK_RECHECK_DELAYS: Final = (30, 60, 120, 300)  # the last repeats
 CHECK_RECHECK_LIMIT: Final = 12
 CHECK_EVENT_HISTORY: Final = 10
+POST_REPAIR_DELAY_S: Final = 150  # a repair's own verification reads run at about 30/75/120 s; check after them
+POST_REPAIR_WAIT_S: Final = 60  # while that verification is still pending, look again (bounded)
+POST_REPAIR_WAIT_LIMIT: Final = 4
 _DISCARDED: Final = ("check_superseded",)
 
 
@@ -69,6 +72,7 @@ class MorekScheduleChecker:
         self._observations: list[dict[str, Any]] = []  # clean covering mismatches of this episode (15.4a)
         self._confirmation: dict[str, Any] | None = None  # the token the worker's repair revalidates against
         self._rechecks = 0
+        self._post_waits = 0
         self._class: str | None = None
         self._status: dict[str, Any] = {"class": None, "at": None, "readback_at": None, "reason": None}
         self.events: deque[dict[str, Any]] = deque(maxlen=CHECK_EVENT_HISTORY)
@@ -85,7 +89,18 @@ class MorekScheduleChecker:
         self._episode_attempt = None
         self._forget_observations()
         self._trigger = trigger
+        self._post_waits = 0
         self._arm_first()
+
+    def request_post_repair(self) -> None:
+        """Stage 15.4b: a repair was accepted. After its own verification reads, one ordinary read-only check episode
+        looks at the repaired attempt; a *confirmed* mismatch of an attempt that is itself a repair escalates to a
+        person (the worker/send path decides) instead of repairing again. Nothing here sends."""
+        if self._closed:
+            return
+        self.request("post_repair")
+        if self._task is None:
+            self._arm(POST_REPAIR_DELAY_S, recheck=False)
 
     def note_new_attempt(self, repair: str | None = None) -> None:
         """A newer upload attempt exists: the episode and any in-flight read describe a superseded intent.
@@ -241,8 +256,17 @@ class MorekScheduleChecker:
     def repair_current(self, token: dict[str, Any]) -> bool:
         """The worker's pre-dispatch revalidation of a confirmation: still the live token, link up, same connection."""
         monitor = getattr(self._worker, "link_monitor", None)
-        return bool(not self._closed and token is self._confirmation and monitor is not None
-                    and monitor.state == "up" and monitor.connection_id == token["connection_id"])
+        if not (not self._closed and token is self._confirmation and monitor is not None
+                and monitor.state == "up" and monitor.connection_id == token["connection_id"]):
+            return False
+        # Stage 15.4b: the latest readback must STILL be fresh now, on the wall and the monotonic clock, at every
+        # boundary up to the wire call; storage/lock waits never carry an old read forward (only a newer check can).
+        try:
+            age = (datetime.now(timezone.utc) - datetime.fromisoformat(token["readback_at"])).total_seconds()
+            mono_age = self._mono() - token["mono"]
+        except (KeyError, TypeError, ValueError):
+            return False
+        return 0 <= age <= morek_schedule.REPAIR_FRESH_S and 0 <= mono_age <= morek_schedule.REPAIR_FRESH_S
 
     def _confirm(self, result: dict[str, Any], conn: Any, read_mono: float | None) -> bool:
         """Record this clean covering mismatch; True when it, with an earlier one, confirms the mismatch."""
@@ -271,8 +295,11 @@ class MorekScheduleChecker:
                 state = morek_schedule.CHECK_CONFIRMED
             self._record(state, reason, result.get("readback_at"), trigger)
             if confirmed:
+                # `mono` = the monotonic instant of the readback itself (the read finished `lag` wall seconds later)
+                lag = max(0.0, (datetime.now(timezone.utc) - datetime.fromisoformat(result["readback_at"])).total_seconds())
                 self._confirmation = {"attempt_id": result["attempt_id"], "connection_id": conn,
-                                      "readback_at": result["readback_at"]}
+                                      "readback_at": result["readback_at"], "mono": self._mono() - lag,
+                                      "facts": result.get("facts")}
                 token = self._confirmation
                 try:
                     self._worker.request_repair({**token, "current": lambda: self.repair_current(token)})
@@ -285,6 +312,10 @@ class MorekScheduleChecker:
         self._episode_attempt = None  # healthy or unknown ends the episode
         self._forget_observations()
         self._record(state, reason, result.get("readback_at"), trigger)
+        if (state == morek_schedule.CHECK_UNKNOWN and reason == "verification_pending" and self._trigger == "post_repair"
+                and self._post_waits < POST_REPAIR_WAIT_LIMIT):
+            self._post_waits += 1
+            self._arm(POST_REPAIR_WAIT_S, recheck=False)
 
     def _record(self, state: str, reason: Any, readback_at: Any, trigger: str) -> None:
         """Status always updates; one event and one INFO line per *changed* class, a repeat only counts."""

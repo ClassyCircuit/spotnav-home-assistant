@@ -749,12 +749,16 @@ CHECK_DIFFERS = "differs_unconfirmed"
 CHECK_CLOCK_DOUBT_S = 30  # wall clock vs monotonic clock drift across one read that makes the comparison doubtful
 _DISPATCHED_KEY = "spotnav_morek_dispatched"
 CHECK_CONFIRMED = "differs_confirmed"  # Stage 15.4a: a mismatch two clean readbacks agree on (see `confirm_mismatch`)
-#: Stage 15.4a feature gate. The repair dispatcher is production-wired but disabled: until 15.4b adds the
-#: active-charge deferral and post-repair escalation, a confirmed mismatch is classified and recorded and
-#: makes ZERO automatic writes. Only 15.4b flips it.
-REPAIR_DISPATCH_ENABLED = False
+#: Stage 15.4a feature gate, flipped on by 15.4b (last step) once the active-charge deferral, the final pre-wire
+#: freshness revalidation and the post-repair escalation exist and are tested. It does not by itself send anything:
+#: every send still needs a confirmation (two fresh covering readbacks), every existing guard and the repair budget.
+REPAIR_DISPATCH_ENABLED = True
 REPAIR_CONFIRM_GAP_S = 30  # the earlier observation is at least this much older than the latest
-REPAIR_FRESH_S = 30  # the latest observation is at most this old when the decision is made
+REPAIR_FRESH_S = 30  # the latest observation is at most this old when the decision is made AND at the final pre-wire check
+#: 15.4b: a correct current limit with fresh/unknown flow and a difference only this far in the future (or more) is
+#: deferred; the checker's recheck cadence (300 s, `CHECK_RECHECK_DELAYS`) is the 5-minute deferral recheck.
+REPAIR_DEFER_GAP_S = 600
+_REPAIR_ESCALATION_KEY = "repair_escalation"
 REPAIR_BUDGET_MAX = 2  # wire-reaching repairs per rolling window per charger
 REPAIR_BUDGET_WINDOW = timedelta(hours=24)
 REPAIR_MIN_SPACING = timedelta(minutes=30)
@@ -785,6 +789,105 @@ def confirm_mismatch(observations: list[dict[str, Any]], latest: dict[str, Any])
     except (KeyError, TypeError, ValueError, AttributeError, OverflowError, ScheduleRefused):
         return False
     return False
+
+
+def mismatch_facts(profile: dict[str, Any] | None, actual: dict[str, Any] | None) -> dict[str, Any]:
+    """Stage 15.4b: what a clean covering mismatch consists of, from the same readback. Pure; the comparison stays
+    `compare_schedule`'s. `{current_wrong, diff_in_s}`: `current_wrong` True when the limit in force at the readback
+    differs from the intended one (then `diff_in_s` is 0), False when it matches and only later transitions differ
+    (`diff_in_s` = seconds from the readback to the first differing future change), None/None when the readback does
+    not say (never treated as a wrong limit and never as a distant difference)."""
+    unknown: dict[str, Any] = {"current_wrong": None, "diff_in_s": None}
+    try:
+        schedule = profile["chargingSchedule"]
+        start = _utc(datetime.fromisoformat(schedule["startSchedule"].replace("Z", "+00:00")))
+        expected = [(start + timedelta(seconds=p["startPeriod"]), p["limit"]) for p in schedule["chargingSchedulePeriod"]]
+        observed = [(_utc(datetime.fromisoformat(p["at"])), p["amps"]) for p in actual["periods"]]
+        boundary = max(_utc(datetime.fromisoformat(actual["schedule_start"])),
+                       _utc(datetime.fromisoformat(actual["fetched_at"])), start)
+        wanted = next((amps for at, amps in reversed(expected) if at <= boundary), 0)
+        current = next(amps for at, amps in reversed(observed) if at <= boundary)
+        if current != wanted:
+            return {"current_wrong": True, "diff_in_s": 0.0}
+
+        def changes(items: list[tuple[datetime, Any]], base: Any) -> list[tuple[datetime, Any]]:
+            found = []
+            for at, amps in items:
+                if at > boundary and amps != base:
+                    found.append((at, amps))
+                    base = amps
+            return found
+
+        planned, seen = changes(expected, wanted), changes(observed, current)
+        moment = None
+        for (want_at, want_amps), (at, amps) in zip(planned, seen):
+            if amps != want_amps or abs((at - want_at).total_seconds()) > VERIFY_TOLERANCE_S:
+                moment = min(want_at, at)
+                break
+        else:
+            extra = planned[len(seen):] + seen[len(planned):]
+            moment = extra[0][0] if extra else None
+        if moment is None:
+            return unknown
+        return {"current_wrong": False, "diff_in_s": max(0.0, (moment - boundary).total_seconds())}
+    except (KeyError, TypeError, ValueError, AttributeError, OverflowError, StopIteration, IndexError, ScheduleRefused):
+        return unknown
+
+
+def measured_flow(live: dict[str, Any] | None) -> str:
+    """Stage 15.4b: `charging`, `idle` or `unknown` from *fresh measured* power/current only (the existing
+    `_live_measurements` readings and flow floors). Any fresh reading showing flow is charging; idle needs a fresh
+    reading and none showing flow; a missing/stale/unreadable one is unknown, never idle."""
+    from ..execution.charge_progress import ZERO_CURRENT_A
+    from ..sessions.history import MIN_FLOW_W
+
+    seen: list[bool] = []
+    for key, floor in (("power_w", MIN_FLOW_W), ("current_a", ZERO_CURRENT_A)):
+        reading = live.get(key) if isinstance(live, dict) else None
+        value = reading.get("value") if isinstance(reading, dict) else None
+        if (isinstance(reading, dict) and reading.get("fresh") is True and isinstance(value, (int, float))
+                and not isinstance(value, bool) and math.isfinite(value)):
+            seen.append(value >= floor)
+    if any(seen):
+        return "charging"
+    return "idle" if seen else "unknown"
+
+
+def repair_deferral(facts: Any, flow: str, elapsed_s: float) -> str | None:
+    """Stage 15.4b: why a confirmed repair waits (`future_difference`, `facts_unknown`) or None to proceed. Pure.
+
+    Proceeds at once when the car is measured idle or the current limit is wrong (the charge is not correct as it
+    runs), or when the first differing future change is `REPAIR_DEFER_GAP_S` or less away (`elapsed_s` = age of the
+    readback). Otherwise (flow charging OR unknown) it waits: unknown flow is never permission to interrupt, and facts
+    that do not say whether the limit is wrong are never permission to resend either."""
+    if flow == "idle":
+        return None
+    if not isinstance(facts, dict):
+        return "facts_unknown"
+    if facts.get("current_wrong") is True:
+        return None
+    gap = facts.get("diff_in_s")
+    if facts.get("current_wrong") is False and isinstance(gap, (int, float)) and not isinstance(gap, bool):
+        return None if gap - max(0.0, elapsed_s) <= REPAIR_DEFER_GAP_S else "future_difference"
+    return "facts_unknown"
+
+
+def readback_age_s(readback_at: Any) -> float:
+    """Seconds since an ISO readback timestamp (0 for a future one); raises on an unreadable timestamp."""
+    return max(0.0, (datetime.now(timezone.utc) - _utc(datetime.fromisoformat(readback_at))).total_seconds())
+
+
+def repaired_ids(record: dict[str, Any] | None) -> set[str]:
+    """Attempt ids the stored repair ledger names (read as untrusted; unreadable entries are skipped)."""
+    raw = record.get(_REPAIR_LIST_KEY) if isinstance(record, dict) else None
+    return {e["attempt_id"] for e in raw if isinstance(e, dict) and isinstance(e.get("attempt_id"), str)} \
+        if isinstance(raw, list) else set()
+
+
+def repair_escalated(record: dict[str, Any] | None, attempt_id: Any) -> bool:
+    """The persisted post-repair escalation names this (repaired) acknowledged attempt: a person must look."""
+    marker = record.get(_REPAIR_ESCALATION_KEY) if isinstance(record, dict) else None
+    return isinstance(marker, dict) and bool(attempt_id) and marker.get("attempt_id") == attempt_id
 
 
 def repair_budget(record: dict[str, Any] | None, now: datetime) -> dict[str, Any]:
@@ -1546,6 +1649,7 @@ DECISION_BLOCKERS.update({
     "repair_needs_person": "needs_person",  # 15.4a: repair budget used up or its record unreadable
     "repair_spacing": "wait_for_repair_spacing",
     "repair_unconfirmed": "wait_for_confirmation",
+    "repair_deferred": "wait_for_repair_deferral",  # 15.4b: a correct charge with only a distant future difference
 })
 #: Stage 9.5: blockers that clear on their own (a reconnect, prices, a fresh reading, a finished Stop). The worker
 #: re-evaluates them after a bounded backoff when no event arrives; every one is only a read-and-compare, a send
@@ -1629,7 +1733,8 @@ def repair_status(worker: Any, record: Any = None) -> dict[str, Any]:
             "confirmed": dict(confirmed) if isinstance(confirmed, dict) else None,
             "budget": {"state": budget["state"], "used": len(budget["recent"]), "limit": REPAIR_BUDGET_MAX,
                        "next_at": budget["next_at"]},
-            "needs_person": budget["state"] in ("exhausted", "invalid")}
+            "needs_person": budget["state"] in ("exhausted", "invalid") or (
+                isinstance(record, dict) and repair_escalated(record, (record.get("acknowledged") or {}).get("id")))}
 
 
 def decision_status(worker: Any, verification: dict[str, Any], verified: bool,
@@ -2040,6 +2145,14 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
                 or attempt.get("pause_id") != pause_id or attempt.get("override_id") != override_id
                 or bool(acknowledged.get("routine")) != (pause_id is None and override_id is None)):
             return "repair_unconfirmed"
+        if repair in repaired_ids(record) or repair_escalated(record, repair):
+            # Stage 15.4b: the attempt in force IS an earlier repair and a fresh confirmation says it still differs:
+            # a second automatic repair would be a blind loop. Persist the escalation (restart-proof, keyed to this
+            # attempt so a later normal plan starts clean) and send nothing; no clear, no retry.
+            if not repair_escalated(record, repair):
+                record[_REPAIR_ESCALATION_KEY] = {"at": datetime.now(timezone.utc).isoformat(), "attempt_id": repair}
+                await ledger.write(record)
+            return "repair_needs_person"
         budget = repair_budget(record, datetime.now(timezone.utc))
         if budget["state"] in ("exhausted", "invalid"):
             return "repair_needs_person"
@@ -2159,6 +2272,10 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
         record["attempt"]["state"] = "rejected"
         record["attempt"]["rejections"] = rejections + 1
         record["uncertain"] = False
+        if repair:
+            # Stage 15.4b: a charger that refuses the repair gets no blind second write (the 5/15 min rejection
+            # retries find the acknowledged intent unchanged): a person looks. Keyed to the repaired attempt.
+            record[_REPAIR_ESCALATION_KEY] = {"at": now, "attempt_id": repair}
     if automatic and migration_id and state in ("accepted", "rejected", "notsupported"):
         # Written only after a real ticket-checked wire call returned a response.
         # This proves the handover was live before dispatch, not charger behavior.
@@ -2394,6 +2511,7 @@ async def _checked_readback(hass: HomeAssistant, entry_id: str, lifecycle: dict[
     comparison = compare_schedule(profile, effective)
     state, why = classify_check(comparison, effective, clock_doubt=abs(drift) > CHECK_CLOCK_DOUBT_S)
     return {"check": {"class": state, "reason": why, "attempt_id": ack_id,
+                      **({"facts": mismatch_facts(profile, effective)} if state == CHECK_DIFFERS else {}),
                       "readback_at": effective.get("fetched_at") if str(effective.get("status")).lower() == "accepted" else None}}
 
 

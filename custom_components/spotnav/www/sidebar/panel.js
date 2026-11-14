@@ -60653,7 +60653,7 @@ function recoveryBanner(state, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.134";
+var CARD_VERSION = "2.5.135";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {
