@@ -404,7 +404,7 @@ while offline”.
   (keep this invariant under test); no feed into 14.5; existing learner tests (`planning` runner) pass.
   *Exclusions:* no rule change (15.9b), no power learner (15.10), no new store, no UI, no planner use of
   captured samples.
-- [ ] **15.9b Learner rules: exclusions, asymmetric trust, clamp ◆ (part 2).** *Scope* **(first: promotion/revalidation)** every stored `morek_capture` sample is revalidated under the rules
+- [x] **15.9b Learner rules: exclusions, asymmetric trust, clamp ◆ (part 2).** *Locally implemented with mocked checks (2.5.141); coordinator reviewed; not installed or live-verified. Landed in `planning/learned_energy.py` (`metadata_reason`, `LearnedEnergyStore.evaluate`/`checker`, `_promoted_learned`, persisted `promoted`/`rejected`/`rejection_counts`) and `AutoPlannerController._prove_capture` (proof against the retained session/evidence records) plus the minimum-SOC floor guard in `capped_vehicle_energy`; tests `tests/test_stage_159b_promotion.py`. Limits in the handoff: promotion proof depends on 15.8 session records and 3 days of evidence rows; no hardware proof; safety-stop/protection still not recorded; Stage 14 ◆ files not all re-run.* *Scope* **(first: promotion/revalidation)** every stored `morek_capture` sample is revalidated under the rules
   below before it can influence a plan; samples lacking the metadata the exclusions need (gaps, `link_down`,
   restarts, unplaced-energy flag, SOC basis) are **discarded with a counted reason, never promoted**, so
   contaminated 15.9a data keeps no influence; promotion is explicit and one-way, and only promoted samples

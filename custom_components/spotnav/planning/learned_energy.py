@@ -37,8 +37,20 @@ level before and after a stretch of charging only one number can be seen: wall k
 * **Captured** (Stage 15.9a, capture-only). Under Morek schedule ownership a bounded 60 s tick
   (`AutoPlannerController._capture_energy`) feeds `EnergySampler.observe_capture`, which writes stretches as
   `Capture` records (`origin: morek_capture`) with their provenance into the same store, apart from the samples. A
-  capture is **never read by `LearnedEnergyStore.learned()` or anything the planner uses**: Stage 15.9b revalidates
-  and promotes captures; until then they only accrue. The legacy path above is unchanged.
+  capture is read by the planner only once promoted (Stage 15.9b); until then it only accrues.
+* **Promoted** (Stage 15.9b). When a capture's plug-in has ended (and again at a later safe read, never while that
+  car's plug-in is open) every capture is revalidated by `metadata_reason` (what it recorded) and the store's
+  `checker` (the retained session and evidence records now; the stored `late_energy` is only a capture-time snapshot).
+  A capture lacking proof is not promoted, is counted once per reason (`rejections`) and the default stands. Only
+  promoted captures vote, one per plug-in: the last `PROMOTE_MAX_VOTES` ended plug-ins within `CAPTURE_MAX_AGE`, each a
+  rise of at least `PROMOTE_MIN_RISE` points ending at most `PROMOTE_MAX_END_PERCENT`. `PROMOTED` figure: trusted
+  when `PROMOTE_LENGTHEN_VOTES` votes lie within `TRUST_SPREAD` of their median (the figure is the median of those that
+  agree); a figure below the default `capacity / CHARGE_EFFICIENCY / 100` (shorter time) needs
+  `PROMOTE_SHORTEN_VOTES` agreeing; the used figure is clamped to `CLAMP_LOWER`..`CLAMP_UPPER` times the default.
+  Promotion is persisted and one-way except that a later conflicting record revokes it (failing closed at the next
+  safe read or restart). Morek schedule-owned planning (the caller says so: `learned(morek=True)`) uses only a trusted
+  promoted figure, else the default: the legacy samples are never read for it. Auto-owned (legacy) learning keeps its
+  own rules and ignores captures.
 """
 
 from __future__ import annotations
@@ -46,7 +58,7 @@ from __future__ import annotations
 import logging
 import math
 import statistics
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from typing import Any, Callable, Final
 
@@ -92,6 +104,30 @@ CAPTURE_MAX_AGE: Final = timedelta(days=120)
 #: Looks further apart than this (s) inside one stretch are counted as a gap in the provenance.
 CAPTURE_GAP_S: Final = 150.0
 _MAX_COUNT: Final = 1_000_000
+#: Stage 15.9b promotion/use rules for captures (the legacy sample path above keeps its own constants): the least
+#: rise (points), the ended plug-ins kept as votes (one per plug-in), the most level a stretch may end at (taper), how
+#: many agreeing votes lengthen / shorten the time, and how far from the default figure the used one may go.
+PROMOTE_MIN_RISE: Final = 15.0
+PROMOTE_MAX_VOTES: Final = 9
+PROMOTE_MAX_END_PERCENT: Final = 90.0
+PROMOTE_LENGTHEN_VOTES: Final = 3
+PROMOTE_SHORTEN_VOTES: Final = 5
+CLAMP_LOWER: Final = 0.90
+CLAMP_UPPER: Final = 1.25
+#: What the proof of a capture's energy must agree to (kWh), a report may lead the clock by (s), the battery size a
+#: capture may differ from today's by (kWh) and the voltage between phases (V).
+_ENERGY_TOLERANCE_KWH: Final = 0.05
+_FUTURE_TOLERANCE_S: Final = 60.0
+_CAPACITY_TOLERANCE_KWH: Final = 0.05
+VOLTAGE_TOLERANCE_V: Final = 5.0
+#: Why a capture is not (yet) a promoted vote; each is counted once per capture.
+REJECT_REASONS: Final = (
+    "missing_metadata", "soc_basis", "soc_time", "soc_future", "rise_below_15", "soc_above_90", "energy_inconsistent",
+    "implausible", "capacity_changed", "gap", "restart", "held", "paused", "unobserved", "late_unplaced",
+    "late_uncertain", "late_inconsistent", "late_unknown", "late_pending", "no_session", "session_vehicle",
+    "wiring_changed", "evidence_unavailable", "evidence_expired", "evidence_gap", "link_down", "replay",
+)
+_MAX_REJECTED: Final = 2 * MAX_CAPTURES
 
 
 def fits(kwh_per_percent: float, capacity_kwh: float | None) -> bool:
@@ -312,6 +348,11 @@ class LearnedEnergy:
     discarded: int = 0
     #: The open plug-in's own sample, not counted until the plug-in ends.
     pending: EnergySample | None = None
+    #: Stage 15.9b diagnostics (never part of what a plan or the input evidence compares): the promoted captures that
+    #: voted, whether the figure comes from them, and the rejected captures counted once per reason.
+    promoted: int = field(default=0, compare=False)
+    from_promoted: bool = field(default=False, compare=False)
+    rejections: dict[str, int] = field(default_factory=dict, compare=False)
 
     @property
     def use_kwh_per_percent(self) -> float | None:
@@ -335,6 +376,9 @@ class LearnedEnergy:
             },
             "trusted": self.trusted,
             "discarded": self.discarded,
+            "promoted": self.promoted,
+            "from_promoted": self.from_promoted,
+            "rejections": dict(self.rejections),
         }
 
 
@@ -369,6 +413,11 @@ class _Car:
     #: Stage 15.9a capture-only stretches: apart from `samples`, never read by `learned()`.
     captures: list[Capture] = field(default_factory=list)
     captures_discarded: int = 0
+    #: Stage 15.9b: the plug-ins (capture ids) promoted to votes, the reasons seen per rejected capture (counted once
+    #: each) and the totals by reason.
+    promoted: list[str] = field(default_factory=list)
+    rejected: dict[str, list[str]] = field(default_factory=dict)
+    rejection_counts: dict[str, int] = field(default_factory=dict)
 
 
 class LearnedEnergyStore:
@@ -383,6 +432,11 @@ class LearnedEnergyStore:
         #: The capture stretch's own start and open plug-in (Stage 15.9a): never the legacy `anchor`/`open`.
         self.capture_anchor: CaptureAnchor | None = None
         self.capture_open: tuple[str, str] | None = None
+        #: Stage 15.9b: how a capture is proven now against the retained records (`checker(vehicle_id, capture,
+        #: initial)` returns a `REJECT_REASONS` code, or `None` when proven; `initial` is the first promotion), and the
+        #: cars whose stored promotions this process has revalidated.
+        self.checker: Callable[[str, Capture, bool], str | None] | None = None
+        self._checked: set[str] = set()
 
     async def async_load(self) -> None:
         """Read what was stored; anything that is not exactly what this writes is dropped. A file that cannot be read
@@ -396,16 +450,21 @@ class LearnedEnergyStore:
             raw = None
         self._cars, self.anchor, self.open = parse_stored(raw)
         self.capture_anchor, self.capture_open = parse_captures(raw, self._cars)
+        self._checked = set()  # a stored promotion is believed only after this process proved it again
 
     @staticmethod
     async def async_remove_stored(hass: HomeAssistant, entry_id: str) -> None:
         """The charger is gone for good: what was learned at it goes too."""
         await Store(hass, _STORE_VERSION, f"{_STORE_PREFIX}.{entry_id}").async_remove()
 
-    def learned(self, vehicle_id: str | None, capacity_kwh: float | None, *, drop: bool = False) -> LearnedEnergy:
+    def learned(
+        self, vehicle_id: str | None, capacity_kwh: float | None, *, drop: bool = False, morek: bool = False
+    ) -> LearnedEnergy:
         """What is learned for this car, counting only the samples that fit today's battery size; nothing without an
         identified car. With `drop` (the planner's need) those that no longer fit are dropped for good and counted;
-        without it (the estimate, the dashboard, the diagnostics) this only looks."""
+        without it (the estimate, the dashboard, the diagnostics) this only looks. With `morek` (Morek schedule-owned
+        planning, decided by the caller) only the currently validated promoted captures count, else the default: the
+        legacy samples are never read. Without it the legacy samples keep their own rules and captures are ignored."""
         if not vehicle_id:
             return NOTHING_LEARNED
         car = self._cars.get(vehicle_id)
@@ -416,8 +475,20 @@ class LearnedEnergyStore:
         if drop and len(fitting) != len(car.samples):
             car.discarded, car.samples = discarded, fitting
             self._save()
-        open_session = self.open[1] if self.open is not None and self.open[0] == vehicle_id else None
-        return learned_from(vehicle_id, fitting, discarded, open_session)
+        if not morek:
+            open_session = self.open[1] if self.open is not None and self.open[0] == vehicle_id else None
+            return learned_from(vehicle_id, fitting, discarded, open_session)
+        none = learned_from(vehicle_id, [], discarded)
+        if not (car.captures or car.promoted or car.rejection_counts):
+            return none
+        if drop or vehicle_id not in self._checked:
+            self._revalidate(vehicle_id, capacity_kwh)
+        votes = self._votes(car, vehicle_id)
+        counts = dict(car.rejection_counts)
+        promoted = _promoted_learned(vehicle_id, votes, capacity_kwh, discarded)
+        if promoted is not None:
+            return replace(promoted, rejections=counts)
+        return replace(none, promoted=len(votes), rejections=counts)
 
     def put(self, vehicle_id: str, sample: EnergySample, capacity_kwh: float | None) -> bool:
         """Keep `sample` as its plug-in's sample (replacing that plug-in's shorter one), or, when it is out of
@@ -455,8 +526,98 @@ class LearnedEnergyStore:
             self._save()
             return False
         car.captures = [*others, capture][-MAX_CAPTURES:]
+        if capture.id in car.promoted:
+            car.promoted = [kept for kept in car.promoted if kept != capture.id]  # changed content: proven again
         self._save()
         return True
+
+    def rejection_counts(self, vehicle_id: str) -> dict[str, int]:
+        """The captures not promoted, counted once per capture and reason (for the display of Stage 15.11)."""
+        car = self._cars.get(vehicle_id)
+        return {} if car is None else dict(car.rejection_counts)
+
+    def _open_id(self, vehicle_id: str) -> str | None:
+        return self.capture_open[1] if self.capture_open is not None and self.capture_open[0] == vehicle_id else None
+
+    def _votes(self, car: _Car, vehicle_id: str) -> list[Capture]:
+        """The promoted captures of ended plug-ins, one per plug-in, newest `PROMOTE_MAX_VOTES`."""
+        open_id, promoted = self._open_id(vehicle_id), set(car.promoted)
+        latest: dict[str, Capture] = {}
+        for capture in car.captures:
+            if capture.id in promoted and capture.id != open_id and (
+                capture.id not in latest or capture.at >= latest[capture.id].at
+            ):
+                latest[capture.id] = capture
+        return sorted(latest.values(), key=lambda item: item.at)[-PROMOTE_MAX_VOTES:]
+
+    def _revalidate(self, vehicle_id: str, capacity_kwh: float | None) -> None:
+        """A safe read: revalidate while this car's plug-in is closed (a stored promotion also once after a restart), so
+        a late conflicting record revokes a promotion at the next planning decision and never mid-charge."""
+        if self._open_id(vehicle_id) is not None and vehicle_id in self._checked:
+            return
+        try:
+            self.evaluate(vehicle_id, capacity_kwh)
+        except Exception:  # noqa: BLE001 - promotion is a convenience, never worth a plan; nothing stays promoted
+            _LOGGER.debug("Revalidating the captures failed", exc_info=True)
+            car = self._cars.get(vehicle_id)
+            if car is not None and car.promoted:
+                car.promoted = []
+                self._save()
+
+    def evaluate(self, vehicle_id: str, capacity_kwh: float | None, now: datetime | None = None) -> None:
+        """Revalidate every capture of ended plug-ins (`metadata_reason`, then the `checker`): the proven ones are the
+        promoted ones (one-way unless a later record conflicts), the others are counted once per reason and never vote."""
+        car = self._cars.get(vehicle_id)
+        if car is None:
+            return
+        now = now or dt_util.utcnow()
+        open_id = self._open_id(vehicle_id)
+        latest: dict[str, Capture] = {}
+        for capture in car.captures:
+            if capture.id != open_id and (capture.id not in latest or capture.at >= latest[capture.id].at):
+                latest[capture.id] = capture
+        ended = sorted((c for c in latest.values() if c.at >= now - CAPTURE_MAX_AGE), key=lambda item: item.at)
+        was, keep, unavailable = set(car.promoted), [], False
+        for capture in ended:
+            reason = metadata_reason(capture, capacity_kwh, now)
+            if reason is None:
+                reason = self._proof(vehicle_id, capture, initial=capture.id not in was)
+            if reason is None:
+                keep.append(capture.id)
+            else:
+                unavailable = unavailable or reason == "evidence_unavailable"
+                self._reject(car, capture.id, reason)
+        changed = keep != car.promoted
+        car.promoted = keep
+        stored = {capture.id for capture in car.captures}
+        for stale in [ident for ident in car.rejected if ident not in stored]:
+            del car.rejected[stale]
+            changed = True
+        if not unavailable:
+            self._checked.add(vehicle_id)
+        if changed:
+            self._save()
+
+    def _proof(self, vehicle_id: str, capture: Capture, *, initial: bool) -> str | None:
+        if self.checker is None:
+            return "evidence_unavailable"
+        try:
+            reason = self.checker(vehicle_id, capture, initial)
+        except Exception:  # noqa: BLE001 - what cannot be proven is not proven
+            return "evidence_unavailable"
+        return None if reason is None else reason if reason in REJECT_REASONS else "evidence_unavailable"
+
+    def _reject(self, car: _Car, ident: str, reason: str) -> None:
+        seen = car.rejected.setdefault(ident, [])
+        if reason in seen:
+            return
+        if len(car.rejected) > _MAX_REJECTED:
+            for old in list(car.rejected)[: len(car.rejected) - _MAX_REJECTED]:
+                if old != ident:
+                    del car.rejected[old]
+        seen.append(reason)
+        car.rejection_counts[reason] = min(_MAX_COUNT, car.rejection_counts.get(reason, 0) + 1)
+        self._save()
 
     def set_capture_anchor(self, anchor: CaptureAnchor | None) -> None:
         if anchor != self.capture_anchor:
@@ -465,8 +626,15 @@ class LearnedEnergyStore:
 
     def set_capture_open(self, plug_in: tuple[str, str] | None) -> None:
         if plug_in != self.capture_open:
+            previous = self.capture_open
             self.capture_open = plug_in
             self._save()
+            if previous is not None:
+                # The previous plug-in ended: its captures are revalidated now and promoted when proven.
+                try:
+                    self.evaluate(previous[0], None)
+                except Exception:  # noqa: BLE001 - never worth the capture tick
+                    _LOGGER.debug("Promoting the captures failed", exc_info=True)
 
     def set_anchor(self, anchor: Anchor | None) -> None:
         if anchor != self.anchor:
@@ -489,8 +657,14 @@ class LearnedEnergyStore:
                     "discarded": car.discarded,
                     "discarded_session": car.discarded_session,
                     **(
-                        {"captures": [c.as_dict() for c in car.captures], "captures_discarded": car.captures_discarded}
-                        if car.captures or car.captures_discarded else {}
+                        {
+                            "captures": [c.as_dict() for c in car.captures],
+                            "captures_discarded": car.captures_discarded,
+                            "promoted": list(car.promoted),
+                            "rejected": {ident: list(seen) for ident, seen in car.rejected.items()},
+                            "rejection_counts": dict(car.rejection_counts),
+                        }
+                        if car.captures or car.captures_discarded or car.rejection_counts else {}
                     ),
                 }
                 for vehicle_id, car in self._cars.items()
@@ -832,6 +1006,7 @@ def parse_captures(
             car.captures = kept[-MAX_CAPTURES:]
             count = item.get("captures_discarded")
             car.captures_discarded = int(count) if _finite(count) and 0 <= count <= _MAX_DISCARDED else 0
+            _parse_promotion(car, item)
     block = raw.get("capture")
     if not isinstance(block, dict):
         return None, None
@@ -840,6 +1015,103 @@ def parse_captures(
     if isinstance(stored_open, dict) and _ident(stored_open.get("vehicle_id")) and _ident(stored_open.get("session")):
         plug_in = (stored_open["vehicle_id"], stored_open["session"])
     return CaptureAnchor.from_stored(block.get("anchor")), plug_in
+
+
+def _parse_promotion(car: _Car, item: dict[str, Any]) -> None:
+    """The promotion state read as untrusted: promoted ids that are not stored captures, unknown reasons and bad
+    counts are dropped (a dropped promotion is simply proven again)."""
+    ids = {capture.id for capture in car.captures}
+    promoted = item.get("promoted")
+    if isinstance(promoted, list):
+        car.promoted = list(dict.fromkeys(i for i in promoted if _ident(i) and i in ids))[:MAX_CAPTURES]
+    rejected = item.get("rejected")
+    if isinstance(rejected, dict):
+        for ident, seen in list(rejected.items())[:_MAX_REJECTED]:
+            if _ident(ident) and isinstance(seen, list):
+                reasons = list(dict.fromkeys(r for r in seen if isinstance(r, str) and r in REJECT_REASONS))
+                if reasons:
+                    car.rejected[ident] = reasons
+    counts = item.get("rejection_counts")
+    if isinstance(counts, dict):
+        for reason, number in counts.items():
+            if reason in REJECT_REASONS and _finite(number) and 0 <= number <= _MAX_COUNT and int(number) == number:
+                car.rejection_counts[reason] = int(number)
+
+
+def metadata_reason(capture: Capture, capacity_kwh: float | None, now: datetime) -> str | None:
+    """Why a capture is not a vote by what it recorded alone (`None`: nothing in it forbids it; the retained records
+    still decide in the store's `checker`): missing provenance, a level not stamped by the car's own report time, a rise
+    under `PROMOTE_MIN_RISE` or an end above `PROMOTE_MAX_END_PERCENT`, implausible energy, a changed battery size, a
+    gap, restart, held or paused look, an unobserved register, or a capture-time `unplaced`/`uncertain` late flag. An
+    `unknown` flag is not a rejection here (it is only an unevaluated snapshot); the retained session records decide."""
+    meta = capture.meta
+    if meta.get("missing"):
+        return "missing_metadata"
+    if meta.get("soc_time_basis") != "vehicle_timestamp":
+        return "soc_basis"
+    start_at, end_at = _when(meta.get("soc_start_at")), _when(meta.get("soc_end_at"))
+    if start_at is None or end_at is None or start_at >= end_at or abs((end_at - capture.at).total_seconds()) > 1.0:
+        return "soc_time"
+    if end_at > now + timedelta(seconds=_FUTURE_TOLERANCE_S):
+        return "soc_future"
+    soc_start, soc_end = meta["soc_start"], meta["soc_end"]
+    if abs((soc_end - soc_start) - capture.delta_percent) > 0.01:
+        return "energy_inconsistent"
+    if capture.delta_percent < PROMOTE_MIN_RISE:
+        return "rise_below_15"
+    if soc_end > PROMOTE_MAX_END_PERCENT:
+        return "soc_above_90"
+    if not 0 <= soc_start < soc_end <= 100 or abs(
+        (meta["register_end_kwh"] - meta["register_start_kwh"]) - capture.kwh
+    ) > _ENERGY_TOLERANCE_KWH:
+        return "energy_inconsistent"
+    if not fits(capture.kwh_per_percent, meta["capacity_kwh"]):
+        return "implausible"
+    if capacity_kwh is not None and (
+        not _finite_positive(capacity_kwh) or abs(capacity_kwh - meta["capacity_kwh"]) > _CAPACITY_TOLERANCE_KWH
+    ):
+        return "capacity_changed"
+    quality = meta["quality"]
+    for key, reason in (
+        ("gaps", "gap"), ("restarts", "restart"), ("held_looks", "held"), ("paused_looks", "paused"),
+        ("unposted_looks", "unobserved"),
+    ):
+        if quality[key]:
+            return reason
+    if quality["looks"] < 2:
+        return "unobserved"
+    late = meta.get("late_energy")
+    if late in ("unplaced", "uncertain"):
+        return "late_" + late
+    return None
+
+
+def _promoted_learned(
+    vehicle_id: str, votes: list[Capture], capacity_kwh: float | None, discarded: int
+) -> LearnedEnergy | None:
+    """The figure the promoted votes give for a battery of `capacity_kwh`, or `None` (the legacy samples then apply).
+    Trusted when `PROMOTE_LENGTHEN_VOTES` votes agree within `TRUST_SPREAD` of their median; a figure under the default
+    needs `PROMOTE_SHORTEN_VOTES`; the used figure is clamped to `CLAMP_LOWER`..`CLAMP_UPPER` of the default."""
+    if capacity_kwh is None or not _finite_positive(capacity_kwh):
+        return None
+    votes = [
+        vote for vote in votes
+        if fits(vote.kwh_per_percent, capacity_kwh)
+        and abs(vote.meta["capacity_kwh"] - capacity_kwh) <= _CAPACITY_TOLERANCE_KWH
+    ]
+    if len(votes) < PROMOTE_LENGTHEN_VOTES:
+        return None
+    default = capacity_kwh / CHARGE_EFFICIENCY / 100.0
+    median = statistics.median(vote.kwh_per_percent for vote in votes)
+    agreeing = [vote.kwh_per_percent for vote in votes if abs(vote.kwh_per_percent - median) <= TRUST_SPREAD * median]
+    if len(agreeing) < PROMOTE_LENGTHEN_VOTES:
+        return None
+    figure = statistics.median(agreeing)
+    if figure < default and len(agreeing) < PROMOTE_SHORTEN_VOTES:
+        return None  # four agreeing charges may lengthen the time, never shorten it
+    figure = min(max(figure, CLAMP_LOWER * default), CLAMP_UPPER * default)
+    samples = tuple(EnergySample(vote.id, vote.kwh, vote.delta_percent, vote.at) for vote in votes)
+    return LearnedEnergy(vehicle_id, figure, samples, True, discarded, None, promoted=len(votes), from_promoted=True)
 
 
 def with_learned(learned: LearnedEnergy, capacity_kwh: float | None) -> float | None:

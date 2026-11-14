@@ -53,6 +53,7 @@ from ..pricing.price_source import entry_source_for, PriceSource, SIGNAL_PRICE_S
 from ..pricing.relay_contract import AreaEntry
 from ..runtime import charger_data, domain_data
 from ..execution.controller import CONNECTION_PLUGGED_IN
+from ..sessions.evidence import KIND_REGISTER, MAX_POWER_GAP_S, evidence_for
 from ..sessions.model import STARTED_OTHER
 from ..sessions.recorder import RESET_TOLERANCE_KWH
 from ..vehicles.soc_estimate import (
@@ -85,12 +86,14 @@ from .auto_settings import (
 )
 from .grid_voltage import voltage_between_phases_v
 from .learned_energy import (
+    Capture,
     CaptureContext,
     EnergySampler,
     LearnedEnergy,
     LearnedEnergyStore,
     NOTHING_LEARNED,
     SocSeen,
+    VOLTAGE_TOLERANCE_V,
     target_need,
 )
 from .learned_power import (
@@ -141,6 +144,8 @@ OWNER_PREFIX: Final = "auto:"
 CONNECTION_DEBOUNCE_S: Final = 5.0
 #: Stage 15.9a: the capture-only energy tick under Morek schedule ownership (one appointment, while a car is known plugged in).
 CAPTURE_TICK_S: Final = 60.0
+#: A register row received this much later (s) than it was observed is a replay, not a live look (Stage 15.9b).
+CAPTURE_REPLAY_S: Final = 180.0
 
 #: What `note_connection` is told when a charger that cannot report a plug-in begins a new charge.
 CHARGE_BEGUN: Final = "charge_begun"
@@ -586,6 +591,16 @@ def capped_vehicle_energy(
         # wall energy instead so a fractional minimum is not rounded away.
         delta = max(0.0, target - soc)
         minimum_kwh = 0.0 if delta == 0 else target_kwh * max(0.0, minimum_percent - soc) / delta
+        if delta != 0 and learned.use_kwh_per_percent is not None:
+            # Stage 15.9b: a learned figure may lengthen the minimum-SOC need, never shorten it below the default's.
+            # The requested target need then also covers that protected minimum (never the minimum clipped down).
+            _, default_kwh = target_need(
+                NOTHING_LEARNED, soc_percent=soc, capacity_kwh=capacity, target_percent=target,
+                vehicle_max_percent=facts.max_percent,
+            )
+            if default_kwh is not None:
+                minimum_kwh = max(minimum_kwh, default_kwh * max(0.0, minimum_percent - soc) / delta)
+                target_kwh = max(target_kwh, minimum_kwh)
     return ("ok", target_kwh, minimum_kwh)
 
 
@@ -859,6 +874,9 @@ class AutoPlannerController:
         self._store = store
         self._manager = manager
         self._schedule_owned = schedule_owned
+        #: The last answer `_morek_owned` gave (`None`: not yet asked, or only failures); it selects the learned-energy
+        #: use mode for the synchronous readers (`_morek_learning`), never decided by what captures exist.
+        self._morek_energy: bool | None = None
         # The charger's display subscription, if any: it follows the area whatever the mode, and a
         # settings change is reconciled here. `None` for a controller used on its own (tests).
         self._observation = observation
@@ -947,6 +965,9 @@ class AutoPlannerController:
         self._capture_sampler = None if learned_energy is None else EnergySampler(learned_energy)
         self._capture_cancel: Callable[[], None] | None = None
         self._capture_running = False
+        if learned_energy is not None:
+            # Stage 15.9b: the store proves a capture against the records retained now (sessions, evidence).
+            learned_energy.checker = self._prove_capture
         self._watch_cancel: Callable[[], None] | None = None
         self._watch_due: datetime | None = None
 
@@ -1088,7 +1109,8 @@ class AutoPlannerController:
         return (settings.revision, self._key_of(source), effective.area_id, vehicle,
                 self._notification_vehicle(), self._connection_generation, self._connection_ready_generation,
                 effective_phases(self._hass, self._entry_id), voltage_between_phases_v(self._hass, self._entry_id),
-                self._plan_power_cap_kw(effective), self._learned_energy_for(facts), self._consumption_for(effective),
+                self._plan_power_cap_kw(effective), self._morek_learning(), self._learned_energy_for(facts),
+                self._consumption_for(effective),
                 None if controller is None else controller.plugged_in_for_count,
                 None if controller is None else controller.target_stop_record)
 
@@ -2200,7 +2222,7 @@ class AutoPlannerController:
             return NOTHING_LEARNED
         if vehicle_id != resolved_vehicle_id(self._hass, self._entry_id):
             return NOTHING_LEARNED
-        return self._learned_energy.learned(vehicle_id, capacity_kwh, drop=drop)
+        return self._learned_energy.learned(vehicle_id, capacity_kwh, drop=drop, morek=self._morek_learning())
 
     def _arm_watch(self) -> None:
         """Keep the one appointment to look at the plan's windows (`plan_watch.next_check_at`): an earlier one is
@@ -2380,11 +2402,17 @@ class AutoPlannerController:
         calculation's publication (which follows every plug-in, ownership change and settings change) restarts it. Arms
         nothing without a learned-energy store, an executor, a known connection or after shutdown; never sends."""
         try:
-            if self._shutdown or self._capture_sampler is None or self._capture_cancel is not None:
-                return
-            if self._capture_running:
+            if self._shutdown or self._capture_sampler is None:
                 return
             controller = self._charger_controller()
+            if controller is not None and controller.known_connected is False and self._learned_energy is not None:
+                # Affirmatively unplugged (a publication follows every unplug), possibly with no tick left to say so
+                # (e.g. after a restart): the plug-in has ended, so its captures are revalidated and promoted when
+                # proven (Stage 15.9b); nothing else happens.
+                self._learned_energy.set_capture_anchor(None)
+                self._learned_energy.set_capture_open(None)
+            if self._capture_cancel is not None or self._capture_running:
+                return
             if controller is None or controller.known_connected is not True:
                 return
             self._capture_cancel = self._manager.schedule_at(
@@ -2492,6 +2520,85 @@ class AutoPlannerController:
             charging=bool(controller.charging),
             context=context,
         )
+
+    def _prove_capture(self, vehicle_id: str, capture: Capture, initial: bool) -> str | None:
+        """Stage 15.9b: whether the records retained now prove a capture (`None`) or why not (a `REJECT_REASONS` code).
+        The capture-time `late_energy` snapshot is not used: every session overlapping the stretch must exist, belong to
+        this car and carry a reconciliation (15.8) that is `consistent` with no unplaced energy; the first promotion also
+        needs each such session closed and `final` and the retained evidence rows to show no gap, `link_down`, capture
+        restart or replayed (late-received) register row inside the stretch, and the capture's own register entity's rows to
+        reach both ends of the stretch with no hole beyond the recorder's continuity limit. A later revalidation (`initial` false)
+        revokes only on a conflicting session record. The wiring must still be the one the capture was made on."""
+        meta = capture.meta
+        start, end = dt_util.parse_datetime(meta["soc_start_at"]), dt_util.parse_datetime(meta["soc_end_at"])
+        if start is None or end is None:
+            return "missing_metadata"
+        if self._energy_register_entity_id() != meta.get("register_entity"):
+            return "wiring_changed"
+        phases, voltage = effective_phases(self._hass, self._entry_id), voltage_between_phases_v(self._hass, self._entry_id)
+        if phases != meta.get("phases") or voltage is None or meta.get("voltage_v") is None or abs(
+            voltage - meta["voltage_v"]
+        ) > VOLTAGE_TOLERANCE_V:
+            return "wiring_changed"
+        sessions = domain_data(self._hass).session_store
+        if sessions is None:
+            return "evidence_unavailable"
+        overlapping = [
+            session for session in sessions.all_sessions(self._entry_id)
+            if session.start <= end and (session.end is None or session.end >= start)
+        ]
+        if not overlapping:
+            return "no_session"
+        for session in overlapping:
+            if session.vehicle_id != vehicle_id:
+                return "session_vehicle"
+            late = session.late
+            state = None if late is None else late.get("state")
+            if state in ("uncertain", "inconsistent"):
+                return "late_" + state
+            if session.unplaced_late_kwh or state == "reconciled":
+                return "late_unplaced"
+            if state != "consistent":
+                return "late_pending" if initial and state is None else "late_unknown"
+            if initial and (session.end is None or not late.get("final")):
+                return "late_pending"
+        if not initial:
+            return None
+        evidence = evidence_for(self._hass)
+        if evidence is None:
+            return "evidence_unavailable"
+        now = self._now()
+        if start < now - timedelta(days=3):
+            return "evidence_expired"  # the retained rows no longer cover the stretch: nothing shows it was clean
+        margin = timedelta(seconds=MAX_POWER_GAP_S)
+        rows = [
+            row for row in evidence.samples(self._entry_id, KIND_REGISTER, since=start - margin, until=end + margin)
+            if row.get("e") == meta.get("register_entity")
+        ]
+        if not rows:
+            return "evidence_unavailable"
+        for gap in evidence.gaps(self._entry_id, KIND_REGISTER):
+            first = dt_util.parse_datetime(gap["r"]) if isinstance(gap.get("r"), str) else None
+            last = dt_util.parse_datetime(gap["r2"]) if isinstance(gap.get("r2"), str) else first
+            if first is not None and last is not None and first <= end and last >= start:
+                return "link_down" if gap.get("g") == "link_down" else "evidence_gap"
+        for at in evidence.capture_starts(self._entry_id):
+            moment = dt_util.parse_datetime(at)
+            if moment is not None and start <= moment <= end:
+                return "restart"
+        for row in rows:
+            seen, received = dt_util.parse_datetime(row.get("t", "")), dt_util.parse_datetime(row.get("r", ""))
+            if row.get("q") or seen is None or received is None or (received - seen).total_seconds() > CAPTURE_REPLAY_S:
+                return "replay"
+        # Retained rows of the capture's own register must reach both ends of the stretch and never be further apart
+        # than the evidence recorder's own continuity limit: a single row, or a hole, proves nothing about the middle.
+        times = sorted(moment for moment in (dt_util.parse_datetime(row.get("t", "")) for row in rows) if moment)
+        if (
+            not times or times[0] > start + margin or times[-1] < end - margin
+            or any((later - earlier) > margin for earlier, later in zip(times, times[1:]))
+        ):
+            return "evidence_gap"
+        return None
 
     def _capture_late_energy(self, start: datetime, end: datetime) -> str:
         """Whether the sessions that overlap a captured stretch are known clean of unplaced late energy (15.8): `clean`
@@ -2788,6 +2895,7 @@ class AutoPlannerController:
         capacity = None
         if facts is not None and facts.reported_capacity_kwh is not None:
             capacity = facts.reported_capacity_kwh
+        await self._morek_owned(settings)  # the learned figure is read the Morek way only while it is Morek-owned
         if settings.soft_price_cap is not None:
             learned = self._learned_energy_for(facts, drop=True)
             policy_reason, target_kwh, minimum_kwh = capped_vehicle_energy(
@@ -2895,11 +3003,20 @@ class AutoPlannerController:
         """Whether this is a Morek schedule-owned cheapest target-SOC plan (other chargers are unchanged)."""
         if (settings.driver != DRIVER_TARGET_SOC or settings.strategy != STRATEGY_CHEAPEST
                 or self._schedule_owned is None):
+            self._morek_energy = False
             return False
         try:
-            return bool(await self._schedule_owned())
+            owned = bool(await self._schedule_owned())
         except Exception:  # noqa: BLE001 - unavailable ownership never changes a legacy plan
             return False
+        self._morek_energy = owned
+        return owned
+
+    def _morek_learning(self) -> bool:
+        """Whether learned energy is read the Morek way (validated promoted captures or the default only). A charger with
+        no schedule ownership wiring is never Morek; otherwise the last ownership answer decides, and until one exists
+        the legacy samples are not trusted (the plan calculation asks before it reads any figure)."""
+        return self._schedule_owned is not None and self._morek_energy is not False
 
     def _progress_adjusted(
         self,

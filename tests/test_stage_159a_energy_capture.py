@@ -515,7 +515,11 @@ async def test_planner_input_is_identical_with_and_without_many_captures(monkeyp
     await world.run(70)
     assert world.captures()
     after = world.planner._learned_energy_for(facts, drop=True)  # noqa: SLF001
-    assert after == before and after.as_dict() == before.as_dict()
+    # 15.9b: only the diagnostics' rejection counts differ (never what a plan or the input evidence compares).
+    assert after == before and not after.from_promoted
+    assert {k: v for k, v in after.as_dict().items() if k != "rejections"} == {
+        k: v for k, v in before.as_dict().items() if k != "rejections"
+    }
     assert target_need(after, soc_percent=30.0, capacity_kwh=CAPACITY, target_percent=80.0) == need_before
     # No learned figure at all: the planner keeps the default, with captures present.
     empty = World(monkeypatch)
