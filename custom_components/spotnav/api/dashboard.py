@@ -2143,6 +2143,9 @@ def _proposal_section(capture: CapturedDashboard) -> dict[str, Any] | None:
                        "source": getattr(snapshot, "projection_source", None),
                        "estimated": getattr(snapshot, "projection_estimated", False),
                        "time_basis": getattr(snapshot, "projection_time_basis", None),
+                       # No battery size was known: the need came from the car's trusted learned wall kWh per
+                       # percent alone (an estimate; no capacity is stated or guessed).
+                       "capacity_unknown": getattr(snapshot, "projection_capacity_unknown", False) is True,
                        # Some measured energy since the reading could not be attributed to this car: the need was
                        # taken from the reading without it, so the planned energy may be too high. Never "measured".
                        "progress_unknown": getattr(snapshot, "progress_unknown", False) is True},

@@ -159,6 +159,9 @@ describe('actual sidebar read-only host', () => {
     expect(dashboardAdapter(raw,status,now,now).model.assumptions.projectionNote).not.toMatch(/progress since this reading is unknown/);
     raw.plan.proposal.projection.progress_unknown=true;{const note=dashboardAdapter(raw,status,now,now).model.assumptions.projectionNote;expect(note).toMatch(/progress since this reading is unknown.*overestimated.*minimum SOC.*Not measured/);}
     delete raw.plan.proposal.projection.progress_unknown;
+    expect(dashboardAdapter(raw,status,now,now).model.assumptions.projectionNote).not.toMatch(/Battery capacity is unknown/);
+    raw.plan.proposal.projection.capacity_unknown=true;{const note=dashboardAdapter(raw,status,now,now).model.assumptions.projectionNote;expect(note).toMatch(/Battery capacity is unknown.*estimate.*learned energy per percent.*not from a stated capacity/);}
+    delete raw.plan.proposal.projection.capacity_unknown;
     raw.market.currency='SEK';raw.plan.proposal.cost.currency='SEK';const sek=dashboardAdapter(raw,status,now,now);const sekHtml=renderPlan(sek.model.windows,sek.model.assumptions,false,sek.format,sek.model.totals);
     expect(sekHtml).toContain('0.15 SEK/kWh');expect(sekHtml).not.toContain('c/kWh');
     raw.plan.proposal.unpriced=true;raw.plan.proposal.cost=null;raw.plan.proposal.window_details.forEach(row=>row.cost=null);

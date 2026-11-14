@@ -357,6 +357,10 @@ class LearnedEnergy:
     #: `TRUST_SPREAD` of their median, and how many are valid for today's battery size. Never compared.
     agreeing: int = field(default=0, compare=False)
     valid: int = field(default=0, compare=False)
+    #: Stage 17.3 (Morek, no battery size known today): the capacity the agreeing votes were recorded with, used only
+    #: as the reference for the default floor and the clamp. A recorded fact of those charges, never a current or
+    #: guessed capacity. `None` whenever today's capacity validated the votes (or nothing is trusted).
+    reference_capacity_kwh: float | None = None
 
     @property
     def use_kwh_per_percent(self) -> float | None:
@@ -494,6 +498,8 @@ class LearnedEnergyStore:
         legacy samples are never read. Without it the legacy samples keep their own rules and captures are ignored."""
         if not vehicle_id:
             return NOTHING_LEARNED
+        if capacity_kwh is not None and not _finite_positive(capacity_kwh):
+            capacity_kwh = None  # an invalid battery size is a missing one, never a conflicting one
         car = self._cars.get(vehicle_id)
         if car is None:
             return learned_from(vehicle_id, [])
@@ -513,6 +519,16 @@ class LearnedEnergyStore:
         votes = self._votes(car, vehicle_id)
         counts = dict(car.rejection_counts)
         promoted = _promoted_learned(vehicle_id, votes, capacity_kwh, discarded)
+        if promoted is None and not _finite_positive(capacity_kwh):
+            # Stage 17.3: no battery size today. Votes already proven by their retained records stand on the capacity
+            # they were recorded with (the newest vote's; votes recorded with another size do not count).
+            # A capture once refuted by a known, different battery size (`capacity_changed`) stays refuted.
+            votes = [vote for vote in votes if "capacity_changed" not in car.rejected.get(vote.id, ())]
+            reference = _reference_capacity(votes)
+            if reference is not None:
+                promoted = _promoted_learned(vehicle_id, votes, reference, discarded)
+                if promoted is not None:
+                    promoted = replace(promoted, reference_capacity_kwh=reference)
         if promoted is not None:
             return replace(promoted, rejections=counts)
         valid, agreeing = _vote_counts(votes, capacity_kwh)
@@ -1146,6 +1162,14 @@ def _promoted_learned(
         vehicle_id, figure, samples, True, discarded, None, promoted=len(votes), from_promoted=True,
         agreeing=len(agreeing), valid=len(votes),
     )
+
+
+def _reference_capacity(votes: list[Capture]) -> float | None:
+    """The capacity the newest promoted vote was recorded with (finite, positive), or `None` without a vote."""
+    if not votes:
+        return None
+    recorded = votes[-1].meta.get("capacity_kwh")
+    return float(recorded) if _finite_positive(recorded) else None
 
 
 def _valid_votes(votes: list[Capture], capacity_kwh: float | None) -> list[Capture]:

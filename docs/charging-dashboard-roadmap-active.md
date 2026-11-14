@@ -553,7 +553,7 @@ input-evidence → recalculation → worker-compare path.
 | 2.5.146 unattributable measured progress plans from the reading, `progress_unknown`, `valid_energy_kwh` | Committed `d9ec44cc`; **17.1 review done locally (2.5.147), coordinator commit pending** | 17.1 |
 | 12.8 capped planning from a last-known *actual* reading of any age | Done (2.5.72) | 17.2 extends to estimates only |
 | Uncapped Morek path accepts an energy-derived estimate; `SocReader`/`soc_estimate` produce it | Done | 17.2 aligns capped path + admission |
-| Uncapped path works from a trusted learned wall kWh/% with no capacity (`with_learned`); capped path refuses first (`capped_vehicle_energy` → `target_capacity_unknown`) | Done / gap | 17.3 |
+| Uncapped path works from a trusted learned wall kWh/% with no capacity (`with_learned`); capped path now does too (`capped_vehicle_energy`) — **done locally (2.5.151), awaiting coordinator commit** | Done | 17.3 |
 | Price refresh/retry/backoff, ECB retry/backoff, `wants_again` rebuild when a rate arrives, ECB table ≤ 7 days before the day | Done | reused; 17.5 only labels/guards |
 | `SessionStore.add_listener`/`_notify` (close at `store.py:365`, second notify at `:443`) and recorder `_reconcile_late` | Done | 17.4 reuses; today `_on_sessions_changed` ignores target plans |
 | Degraded aggregate price state blocks automatic and manual dispatch (`morek_plan_blocker` area states; `_validated_proposal`) and the partial-plan indicator | **Done locally (2.5.148), commit pending** | 17.5/17.6 consume |
@@ -565,7 +565,7 @@ input-evidence → recalculation → worker-compare path.
 | 1 | 17.1 Review and finish the 2.5.146 progress-uncertainty fallback — **done locally (2.5.147), awaiting coordinator commit** | none (committed) |
 | 2 | **16.2** Safe dispatch, publication continuity, partial-plan UI (existing item, scope unchanged, above) | 16.1, 17.1 |
 | 3 | 17.2 Stale SOC with trustworthy estimates — **done locally (2.5.149), awaiting coordinator commit** | 17.1; after 16.2 (same `morek_plan_blocker`) |
-| 4 | 17.3 Missing-capacity fallback | 17.2 (shares the capped-energy seam) |
+| 4 | 17.3 Missing-capacity fallback — **done locally (2.5.151), awaiting coordinator commit** | 17.2 (shares the capped-energy seam) |
 | 5 | 17.4 Automatic recovery on session finalization | 17.1 |
 | 6 | 17.5 Exchange-rate freshness and truthful cap policy | 16.2 (one coverage judgement) |
 | 7 | 17.6 Clear blockers and end-to-end automatic recovery | 17.2–17.5 |
@@ -627,7 +627,7 @@ input-evidence → recalculation → worker-compare path.
   measured progress; stale **actual** reading still plans as in 12.8; Stop/Pause/uncertain outcome block as before.
   *Exclusions:* no new SOC source, no vehicle wake, no change to the protection floor, learner or Stage 14.5
   identity/order rules.
-- [ ] **17.3 Missing-capacity fallback ◆.** *Seam (verified):* `soc_source.capacity_kwh(vehicle_id)` feeds
+- [x] **17.3 Missing-capacity fallback ◆.** *Locally implemented with mocked checks (2.5.151; coordinator review/commit pending); not installed or live-verified. `capped_vehicle_energy` no longer refuses an unknown/invalid capacity when `learned.use_kwh_per_percent` is trusted (same `target_need`/`with_learned` arithmetic as the uncapped path; wall kWh = points × learned wall kWh/%); with neither it still holds as `target_capacity_unknown`. Plans are labelled (`projection_capacity_unknown` → `projection.capacity_unknown`, decision `inputs.capacity_unknown`, sidebar note). Tests `tests/test_stage_173_missing_capacity.py` (18). **Morek fallback (2.5.151, narrow learner change):** with no capacity today, promoted Morek votes (already proven by their retained session/evidence records) stand on the capacity they were *recorded* with (the newest vote's; votes of another size and any capture once refuted by a known different size do not count), with the unchanged 3/5-vote, spread and clamp rules; that recorded capacity (`LearnedEnergy.reference_capacity_kwh`) is only the reference for the clamp and the never-shorten minimum-SOC floor, never a current or guessed capacity. A learned figure with no capacity and no such reference (legacy samples) holds as `target_capacity_unknown` when a real minimum-SOC need exists, so the minimum allowance is never silently reduced. Without proven votes the plan still holds; not all missing capacity is recoverable. Not installed or live-verified.* *Seam (verified):* `soc_source.capacity_kwh(vehicle_id)` feeds
   `LiveVehicleFacts.reported_capacity_kwh`; the uncapped path calls `target_need` → `with_learned`, which already
   works from a **trusted learned wall kWh/%** without a capacity, but the capped path returns
   `target_capacity_unknown` before reaching it. *Scope:* make the capped path use the same `with_learned` figure

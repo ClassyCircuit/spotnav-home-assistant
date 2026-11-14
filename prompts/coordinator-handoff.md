@@ -10,9 +10,7 @@ Follow the actual request rather than automatically starting new work.
 
 ## Current handoff — 2026-11-14
 
-- Current source manifest is **2.5.147** (2.5.144 Stage 16.1; 2.5.146 planning-resilience fix: unattributable measured progress plans from the reading, marked `progress_unknown`; **committed `d9ec44cc` and pushed; Stage 17.1 review finished locally as 2.5.147 (adds `progress_unknown` to decision evidence + tests), uncommitted, coordinator commit pending**) after Stage 15 implementation. **Open queue, strict order: 17.1 → 16.2 → 17.2 → 17.3 → 17.4 → 17.5 → 17.6** (active roadmap, Stage 17). The coordinator committed and
-  pushed each reviewed substage under the user's authorization. Recheck `git log` and `git status` for the
-  exact current HEAD; a push does not install or restart Home Assistant.
+- Current source manifest is **2.5.151** (working tree: **Stage 17.3 missing-capacity fallback, local mocked, coordinator review/commit pending**). Committed and pushed before it, per `git log`: Stage 16.1 (2.5.144), the 2.5.146 progress-uncertainty fix and Stage 17.1 (2.5.147), Stage 16.2 safe dispatch (2.5.148) and Stage 17.2 stale SOC with trustworthy estimates (2.5.149, HEAD `cc321c71` at the start of 17.3). **Open queue, strict order: 17.3 (review/commit pending) → 17.4 → 17.5 → 17.6** (active roadmap, Stage 17). 17.3 limit to know before reviewing: a Morek-owned plan with no battery size still holds, because Morek learning (15.9b promoted votes) needs a capacity to validate votes and the learner was deliberately not changed; the fallback applies to non-Morek-learning (legacy-sample) trust. See the handoff entry and decide whether a follow-up should let validated promoted votes stand without today's capacity. Recheck `git log` and `git status` for the exact current HEAD; a push does not install or restart Home Assistant.
 - **Active roadmap items 1–15 (Stage 15) are locally implemented and coordinator-reviewed.** Stage 16
   (today-only published opportunities while tomorrow is missing) is now authorized and takes priority:
   16.1 planning, then 16.2 guarded dispatch/UI, each fresh Claude Sonnet 5.5 medium, review and commit/push.

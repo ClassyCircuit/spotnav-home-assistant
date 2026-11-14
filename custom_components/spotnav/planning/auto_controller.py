@@ -615,11 +615,12 @@ def capped_vehicle_energy(
                                 or not math.isfinite(age) or age < 0))
     ):
         return ("target_soc_stale", None, None)
-    if (
-        isinstance(capacity, bool) or not isinstance(capacity, (int, float))
-        or not math.isfinite(capacity) or capacity <= 0
-    ):
-        return ("target_capacity_unknown", None, None)
+    if not _finite(capacity) or capacity <= 0:
+        # Stage 17.3: an unknown (or invalid) battery size is not guessed. The plan may still be worked out from the
+        # car's own trusted learned wall kWh per percent (`with_learned` needs no capacity); with none it holds.
+        capacity = None
+        if learned.use_kwh_per_percent is None:
+            return ("target_capacity_unknown", None, None)
     try:
         if (target_percent is None or isinstance(target_percent, bool)
                 or not isinstance(target_percent, (int, float)) or not math.isfinite(target_percent)
@@ -652,13 +653,20 @@ def capped_vehicle_energy(
         if delta != 0 and learned.use_kwh_per_percent is not None:
             # Stage 15.9b: a learned figure may lengthen the minimum-SOC need, never shorten it below the default's.
             # The requested target need then also covers that protected minimum (never the minimum clipped down).
-            _, default_kwh = target_need(
-                NOTHING_LEARNED, soc_percent=soc, capacity_kwh=capacity, target_percent=target,
-                vehicle_max_percent=facts.max_percent,
-            )
-            if default_kwh is not None:
-                minimum_kwh = max(minimum_kwh, default_kwh * max(0.0, minimum_percent - soc) / delta)
-                target_kwh = max(target_kwh, minimum_kwh)
+            # With no battery size today the default comes from the capacity the learned votes were recorded with
+            # (17.3); with neither there is no default to protect, so a real minimum-SOC need is not planned.
+            floor_capacity = capacity if capacity is not None else learned.reference_capacity_kwh
+            if floor_capacity is None:
+                if minimum_kwh > 0:
+                    return ("target_capacity_unknown", None, None)
+            else:
+                _, default_kwh = target_need(
+                    NOTHING_LEARNED, soc_percent=soc, capacity_kwh=floor_capacity, target_percent=target,
+                    vehicle_max_percent=facts.max_percent,
+                )
+                if default_kwh is not None:
+                    minimum_kwh = max(minimum_kwh, default_kwh * max(0.0, minimum_percent - soc) / delta)
+                    target_kwh = max(target_kwh, minimum_kwh)
     return ("ok", target_kwh, minimum_kwh)
 
 
@@ -778,6 +786,9 @@ class AutoSnapshot:
     projection_source: str | None = None
     projection_estimated: bool = False
     projection_time_basis: str | None = None
+    #: Stage 17.3: no battery size was known; the need was worked out from the car's trusted learned wall kWh per
+    #: percent alone (an estimate, never a stated capacity).
+    projection_capacity_unknown: bool = False
     #: The plan's need was taken from the reading without some measured energy that could not be attributed to this
     #: car (`vehicle_update_wait.Progress.unknown`): the planned energy, and a minimum-SOC exception, may be too high.
     progress_unknown: bool = False
@@ -834,6 +845,7 @@ class AutoSnapshot:
             self.fill,
             self.departure_at,
             self.progress_unknown,
+            self.projection_capacity_unknown,
             None if self.proposal is None else self._proposal_key(self.proposal),
         )
 
@@ -2043,7 +2055,8 @@ class AutoPlannerController:
                 snapshot = replace(snapshot, projection_soc=resolved.soc_percent,
                     projection_kwh_per_percent=ratio, projection_age_s=resolved.soc_age_s,
                     projection_source=resolved.soc_source, projection_estimated=resolved.soc_estimated,
-                    projection_time_basis=resolved.soc_time_basis)
+                    projection_time_basis=resolved.soc_time_basis,
+                    projection_capacity_unknown=resolved.capacity_kwh is None and ratio is not None)
         if result.short_of_deadline:
             # Best effort: the departure leaves too little time for the need, so every slot up to it is
             # planned and charged. A warning, not a refusal; the status says what the car will reach.
@@ -2440,8 +2453,12 @@ class AutoPlannerController:
             kwargs = dict(target_percent=target_percent, minimum_percent=minimum_percent)
             reason, need, _ = capped_vehicle_energy(facts, learned=learned, **kwargs)
             default_reason, default_need, _ = capped_vehicle_energy(facts, learned=NOTHING_LEARNED, **kwargs)
-            if reason != "ok" or default_reason != "ok":
-                need = default_need = None
+            # Without a battery size only the learned figure can give a need (17.3): the default stays unknown, so
+            # no effect is claimed against it.
+            if reason != "ok":
+                need = None
+            if default_reason != "ok":
+                default_need = None
         elif soc_percent is not None and target_percent is not None:
             kwargs = dict(soc_percent=soc_percent, capacity_kwh=capacity_kwh, target_percent=target_percent,
                           vehicle_max_percent=vehicle_max_percent)
@@ -3400,8 +3417,8 @@ class AutoPlannerController:
                 missing=("live_soc",), entry=entry, price_snapshot=price_snapshot,
             )
         capacity = None
-        if facts is not None and facts.reported_capacity_kwh is not None:
-            capacity = facts.reported_capacity_kwh
+        if facts is not None and _finite(facts.reported_capacity_kwh) and facts.reported_capacity_kwh > 0:
+            capacity = facts.reported_capacity_kwh  # an invalid figure is no capacity (17.3), never a guess
         await self._morek_owned(settings)  # the learned figure is read the Morek way only while it is Morek-owned
         if settings.soft_price_cap is not None:
             learned = self._learned_energy_for(facts, drop=True)
