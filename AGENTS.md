@@ -6,12 +6,16 @@ implementation, hardware limits, outstanding work, deployment/version difference
 and the verified (and unverified) local access paths. The user-facing test procedure is in
 [docs/morek-schedule.md](docs/morek-schedule.md).
 For the approved future direction and prioritized LLM work blocks, read
-[docs/charging-dashboard-roadmap.md](docs/charging-dashboard-roadmap.md): one HA
-charging sidebar panel sharing its UI with the local preview, ECharts, and autonomous
-Morek schedule-only execution. Guarded automatic upload code exists; consult the latest
-handoff and roadmap for open recovery work and do not assume deployed behavior is verified.
-It also specifies soft-cap/minimum-SOC planning and genuine measured charging
-history. Hardware testing is user-directed, not a separate roadmap stage.
+[docs/charging-dashboard-roadmap-active.md](docs/charging-dashboard-roadmap-active.md) — the
+**only work queue**: one HA charging sidebar panel sharing its UI with the local preview, ECharts,
+and autonomous Morek schedule-only execution. Guarded automatic upload code exists; consult the
+latest handoff and the active roadmap for open recovery work and do not assume deployed behavior
+is verified. It also specifies soft-cap/minimum-SOC planning and genuine measured charging
+history. Hardware testing is user-directed, not a separate roadmap stage. The old large roadmap
+is frozen as a historical reference in
+[docs/archive/charging-dashboard-roadmap-2026-11-14.md](docs/archive/charging-dashboard-roadmap-2026-11-14.md)
+(`docs/charging-dashboard-roadmap.md` is now only a redirect); never assign work from the archive.
+Every Stage 15 (◆) substage must meet the active roadmap's **Stage 14 non-regression contract**.
 
 - This is the user's `SpotNav Enhanced` fork. Keep the Home Assistant integration domain
   `spotnav` unchanged, including the `custom_components/spotnav/` directory.

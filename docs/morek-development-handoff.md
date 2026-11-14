@@ -1,6 +1,6 @@
 # SpotNav Enhanced / Morek development handoff
 
-Last updated: 2026-11-13. This file is a **public-repository handoff**, not a place for
+Last updated: 2026-11-14. This file is a **public-repository handoff**, not a place for
 passwords, access tokens, HA configuration exports, logs, or private household information.
 Re-check the live system and Git state before acting; observations below may become stale.
 
@@ -50,19 +50,26 @@ are superseded as product requirements, not as permission to bypass safety evide
 
 **BMW limit and current monitoring:** the user relies on the BMW's own configured
 charge limit to stop charging at its target, not a second SpotNav live SOC-stop
-controller. The car's setting and SpotNav's planning target are separate; their
-agreement and actual behavior are not verified here. The app must still show useful
+controller. The user confirmed (2026-11-14) the BMW will stop at its configured 80%
+limit: an agreed operating assumption, user-confirmed and not agent hardware-verified,
+and not a blocker. The car's setting and SpotNav's planning target are separate and the
+app does not set the BMW limit. Stage 15 reserve is extra allowed time to reach the
+target, not intended energy beyond it; its allowance energy/cost is labelled separately
+and only measured cost is actual. The app must still show useful
 current charging and execution health: use genuine available status and measured
 power/energy, label freshness and source, distinguish reported state from measured
 flow, and show unknown/offline/mismatch/errors honestly. Basic monitoring belongs in
 5.7, not only later history or Stage 11; no source or physical behavior is assumed.
 
-**Stage 11 — adaptive Morek estimates:** the user wants future charging-time and
-target-SOC estimates to improve from actual charging and a shortfall to trigger safe
-replanning. Existing learned-power, learned-energy and plan-watch code is groundwork,
-but its Morek-owned wiring and usable measurement sources are not established. Reuse
-and verify it rather than build a second learner; do not infer measurements from a
-schedule. This is post-installation work, not a new 5.8 prerequisite.
+**Stage 11 — adaptive Morek estimates (superseded 2026-11-14, NOT implemented):** the user's wish stands:
+charging-time and target-SOC estimates should improve from actual charging and a shortfall should trigger
+safe replanning, reusing the existing learned-power, learned-energy and plan-watch code. That scope was
+migrated, with no loss, to roadmap Stage 15.9 (energy-per-SOC learner on the Morek path), 15.10 (behind-plan
+check and power feed, deferrable) and 15.11 (display and reset); the roadmap's Stage 11 section holds the
+exact mapping and is closed `[>]`. Source fact (reading only): nothing is sampled by the learners under Morek
+schedule ownership, while the stores already feed the Morek planner's input evidence. Do not infer
+measurements from a schedule; do not assign 11.1/11.2 or call them done. Post-installation work, not a 5.8
+prerequisite.
 
 **Stage 5 deployment clarification:** once development is complete and reviewed,
 the user intends to merge the current branch to `main`, install it in HA and test
@@ -167,7 +174,8 @@ incomplete/unarmed. The proposed additional unwired durable
 pre-dispatch helper was never assigned and is not the next task. Detailed historical
 versions/deployment facts below must not override current Git or the new checklist.
 
-Read [charging-dashboard-roadmap.md](charging-dashboard-roadmap.md) for the user's
+Read [charging-dashboard-roadmap-active.md](charging-dashboard-roadmap-active.md) (the only work queue;
+historical stage text is in [archive/charging-dashboard-roadmap-2026-11-14.md](archive/charging-dashboard-roadmap-2026-11-14.md)) for the user's
 latest requirements and prioritized, bounded LLM tasks. The user wants **one HA
 charging dashboard with multiple cards**, not a second stock-card dashboard;
 evcc-inspired styling and Apache ECharts; no solar UI. Crucially, daily operation
@@ -193,6 +201,76 @@ the cheapest feasible periods. Higher normal targets use below-cap slots only.
 Changes to ready-by time, cap or minimum SOC must trigger backend recalculation
 and automatic resending when the resulting schedule changes. These are future
 requirements, not features claimed implemented in the manual baseline below.
+
+**2026-11-14 — Stage 15 finalized (docs only; no code, version, deployment, HA access or
+charger command; supersedes the three earlier same-day Stage 15 planning entries):** the
+roadmap's Stage 15 is rewritten as start-ready substages 15.1–15.11 plus optional evidence
+tasks E1/E2, with order and status in the roadmap. Settled with the user: a 10% configurable
+time reserve (soft-cap rules unchanged; rounded only to dispatch resolution, no mandatory slot); guarded **automatic schedule repair** after repeated
+confirming readbacks of a materially wrong effective schedule (a single odd readback only
+rechecks; a correct active charge is left alone); a guarded **start after a confirmed reboot**
+that leaves a plugged-in car clearly unauthorized, after *affirmative* no-session evidence and no
+unresolved previous request (a reconnect is not a reboot; changed point object/link edges are
+connection evidence only); and the user's repeated requirement that **charging must be enabled**:
+SpotNav establishes it through the existing guarded start path on plug-in/recovery and verifies
+evidence, never toggles the switch blindly, an accepted start is not proof, and off/unconfirmed
+shows as not yet ready (backend 15.5, UI 15.7; the switch is a derived OCPP entity, independent
+authorization unverified). Corrections same day: repair needs a fresh latest readback plus an
+earlier valid same-connection observation ≥30 s older (not both ≤30 s old), preserves Pause/Stop,
+wire continuity is not a physical guarantee, brief 16 A unverified; no mandatory periodic OCPP
+readback (optional future monitor, default off); new **15.8** reconciles late cumulative register
+totals of closed sessions against timeline placement (old 15.8–15.10 are now 15.9–15.11);
+engineering defaults are not labelled user decisions. These replace the earlier "reconnect is read-only, never
+resends" and "manual restore only / ask the person to replug" recommendations.
+
+Source-only audit (manifest 2.5.128, **not live-verified**; the roadmap's audit table has the
+classification): Stage 14 stability, the session coordinator's per-connection-token start
+(including `boot:`/`offline:` tokens and its tests), the read-only `fetch` readback and compare,
+the Stage 6.2 evidence store with unobserved/unknown-placement energy, and both learned stores
+are reused. Gaps found: no link-level signal (reconnect handling is only the control-entity
+availability edge and the connector sensor; `morek_offline` has no timer; `charger_generation`
+is read with `getattr` and only the test fake sets it, so the installed integration exposing it is
+unverified); no readback at reconnect, startup or periodically and no confirmed-mismatch notion;
+`force_sync` cannot repair under Pause/Charge Now; fixed 180 s/90 s freshness bounds; **nothing is
+sampled by the learners under Morek schedule ownership** (`_check_plan` runs only from `_arm_watch`
+on Auto-owned windows); learner trust is symmetric and has no gap/age exclusion, display or reset;
+no reserve exists. Research verdict kept: no supported OCPP history retrieval was found and no
+on-demand Morek history storage is assumed; one earlier outage showed roughly 120 replayed
+readings, otherwise buffering is uncharacterised (E2, optional). HA OCPP stamps readings at
+receipt. Nothing here guarantees charging; "accepted", "reported" and "measured" stay separate.
+
+**2026-11-14 — Roadmap audit and consolidation (docs only; no code, version, test run, HA access or
+charger command; Git: edits uncommitted at HEAD `6a50a7ae`, manifest 2.5.128):** (1) The roadmap gained a
+**"Canonical remaining work queue"** (A implementation, B outstanding local review/acceptance, C user-owned,
+D later features, E closed) and a **"Stage 14 non-regression contract"** that binds every Stage 15 substage
+to the existing worker, session coordinator and Stage 14 mechanisms (protected active windows, 14.4 price/cap
+interruption, 5-minute SOC tolerance and 2 s coalescing, dedup, uncertainty and rejection retry, Stop/Pause/
+Charge Now ownership, 14.5 progress accounting, 14.6 evidence), with the Stage 14 test files each ◆ substage
+must rerun. (2) Three regression traps in the earlier Stage 15 text were corrected after reading
+`window_release`, `connector_evidence`, `_send_profile_shared` and the learner seams: the 15.1 reserve is kept
+out of `window_release`'s energy/cost/slack arithmetic and plan totals; the 15.6 freshness change does not
+widen the evidence that gates 14.2/14.4; 15.8 does not alter the session energy that 14.5 reads. 15.4 now
+states exactly which guards `repair` may and may not bypass. (3) Stage 15 queue order is
+15.1 → 15.2 → 15.5 → 15.3 → 15.4 → 15.6 → 15.7 → 15.8 → 15.9 → 15.11 → 15.10 and unnecessary
+prerequisites were removed (15.8 and 15.9 no longer wait for 15.2). (4) Stage 11 is closed as superseded and
+migrated (see above); umbrellas 5.4 and 5.6 are closed as locally implemented because all children are
+`[x]` (review and the unrun 5.4c suite stay open in 5.7b3); 9.6/9.7 are checked; 5.1 stays open only for
+the user's visual approval; 5.7b3 stays open (browser, full worker/planning and 5.4c suites are unrun).
+Nothing was marked live- or physically verified; no unrun mandatory acceptance was closed.
+Follow-up correction (docs only): 15.4a keeps the repair dispatcher disabled (zero writes) until 15.4b
+completes; 15.9a is capture-only with promotion/revalidation in 15.9b; 15.5's confirmed reboot requires a
+boot signal (connection restoration is read-only validation).
+
+**2026-11-14 — Roadmap split (docs only; no code, version, test run, HA access, charger command or commit):**
+the ~3,800-line roadmap was moved unchanged (plus a historical banner and one corrected link) to
+`docs/archive/charging-dashboard-roadmap-2026-11-14.md`; `docs/charging-dashboard-roadmap.md` is now a
+redirect and **`docs/charging-dashboard-roadmap-active.md` is the only work queue** (ordered queue of 30
+substages, migration map, Stage 14 non-regression contract with source and test references, approved policy,
+verification ledger). 15.1, 15.4, 15.7 and 15.9 were split into a/b halves (parent numbers are the stable
+ids); Stage 7 and 8 were audited against the shared sidebar, ECharts chart, `get_charging_history` (no
+frontend consumer yet), the thin shared `history`/`insights` contracts and the existing `day_average_price`
+savings basis, and re-cut (7.3 → 7.3a/b, 8.2 → 8.2a/b, 8.3 → 8.3a/b) with open decisions D1–D3 recorded rather
+than assumed. Older entries below that say "the roadmap" mean the archived text. Edits are uncommitted.
 
 ## Repository and deployment
 
@@ -508,7 +586,7 @@ requirements, not features claimed implemented in the manual baseline below.
   `unknown`. `_energy` returns `null` (with per-basis `coverage`) when no segment lies in the window; a measured zero
   stays 0.0. External writers and restarts are not detectable (restarts only counted); readback is never inventory.
   Frontend does not consume these fields; the bump only rebuilds the artifacts.
-- Unverified/limits: see the roadmap's 6.3 entry (thresholds, real entities/cadence, storage size, no UI, no session link).
+- Unverified/limits: see the archived roadmap's 6.3 entry (thresholds, real entities/cadence, storage size, no UI, no session link).
 
 ### 2026-11-13 — Stage 6.2 capture and provenance (2.5.121; local mocked; coordinator review pending)
 
@@ -519,7 +597,7 @@ requirements, not features claimed implemented in the manual baseline below.
   change a send, ACK, ownership or uncertainty outcome. `_live_measurements` gained an optional `entities` sink for
   provenance; the status payload is unchanged.
 - Sent-plan versions are immutable and keyed by attempt id; ACK/readback/removal are separate events; measurements are
-  a separate list. See the roadmap's 6.2 entry for the data model, bounds and 6.3 seam (`plan_versions`, `events`,
+  a separate list. See the archived roadmap's 6.2 entry for the data model, bounds and 6.3 seam (`plan_versions`, `events`,
   `samples`, `gaps`, `capture_starts`, `derive_energy`).
 - Review corrections (2.5.121): `derive_energy` no longer drops gap rows or ignores restart marks; callers must use
   `ChargingEvidenceStore.energy_segments` (or pass gap rows and `restarts`) to get that coverage. Recorded gaps,
@@ -541,7 +619,7 @@ requirements, not features claimed implemented in the manual baseline below.
 ### 2026-11-13 — Stage 6.1 source inventory (docs only; no version change)
 
 - Repository inspection only; no live HA, Recorder, charger or BMW access and no code change (manifest stays 2.5.119;
-  no build needed). The roadmap's "6.1 source inventory" section lists each source (session store/recorder, energy
+  no build needed). The archived roadmap's "6.1 source inventory" section lists each source (session store/recorder, energy
   register, integrated power, live connector reading, Morek outcomes, debug day, Recorder statistics, BMW SOC and the
   BavarianData fixture) with evidence kind, timestamp, resolution, provenance, retention, association and limits.
 - For 6.2/6.3: reuse `SessionStore`; genuine measurements are only HA entity states; no code reads Recorder state
@@ -610,7 +688,7 @@ requirements, not features claimed implemented in the manual baseline below.
   (added `seq`, `boot_id`, `query()`); sidebar `frontend/sidebar/log-viewer.js` mounted in `panel.js` for
   administrators. New INFO/WARNING lines: `_logged_action` on `async_record_owned_pause` /
   `async_charge_now_action`, `MorekSessionCoordinator._log_state`. Details, API findings and limitations are in the
-  roadmap's 9.4 entry. Polling only; no stream; no live HA access.
+  archived roadmap's 9.4 entry. Polling only; no stream; no live HA access.
 - Tests: `tests/test_stage_94_logs.py` (20, run with `python tools/run_isolated_logs_tests.py`, which also
   accepts other test paths) and `frontend/test/log-viewer.test.ts` (7). No individual tests were removed. With the
   isolated runner `tests/test_morek_session.py` has 6 pre-existing harness failures (its fixtures patch
@@ -620,7 +698,7 @@ requirements, not features claimed implemented in the manual baseline below.
 ### 2026-11-13 — Stage 14.6 decision evidence (2.5.111; local mocked)
 
 - Worker `_record_decision` (called when a run completes, never raises) + `morek_schedule.decision_event`,
-  `decision_blocker`, `decision_status`; see the roadmap entry for fields and bounds. Logging goes through
+  `decision_blocker`, `decision_status`; see the archived roadmap entry for fields and bounds. Logging goes through
   `_LOGGER` (INFO per new decision, WARNING for `upload_rejected`/`upload_uncertain`/`worker_unavailable`), so the
   existing SpotNav log buffer and debug bundle carry it; status `reconciliation.decision` / `.blocker`.
   Thresholds are unchanged (14.1-14.5); intent/ACK/readback/physical are separate stages and `physical` is
@@ -719,7 +797,7 @@ requirements, not features claimed implemented in the manual baseline below.
   `calculate_plan`; `AutoSnapshot.departure_at` supplies ready-by. Missing = unknown = keep.
 - Thresholds (constants `RELEASE_*`, not settings): EUR 0.50 and 10% of the baseline (same energy, chronological
   through the preserved windows, configured fees via effective prices), baseline > 0, gap >= 30 min,
-  slack >= 15 min beyond the minimum-energy time before ready-by; EUR areas only. Cap rule as in the roadmap.
+  slack >= 15 min beyond the minimum-energy time before ready-by; EUR areas only. Cap rule as in the archived roadmap.
   No loop: the replacement becomes the accepted profile, a repeated event is `unchanged`, and a flip between
   the two intent calculations yields `stale_work` then a non-price retrigger that preserves.
 - Tests: `tests/test_stage_144_interruption_policy.py` (36: exact thresholds, negative/zero baseline, gap,

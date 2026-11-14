@@ -89,7 +89,7 @@ Every dialog is described in [Set up SpotNav](docs/setup.md), including pairing 
 - [Apps and API](docs/api.md): pairing, webhook and WebSocket contracts.
 
 **For developers**
-- [Charging dashboard and autonomy roadmap](docs/charging-dashboard-roadmap.md): prioritized work blocks for Morek schedule-only execution and one modern HA charging dashboard.
+- [Charging dashboard and autonomy roadmap](docs/charging-dashboard-roadmap-active.md): prioritized work blocks for Morek schedule-only execution and one modern HA charging dashboard (the previous large roadmap is archived under [docs/archive/](docs/archive/charging-dashboard-roadmap-2026-11-14.md)).
 - [Charge ownership: the session model](docs/architecture-state.md): how charger control is structured.
 - [Translating SpotNav](docs/translating.md): where the texts are, and the glossary for each language.
 

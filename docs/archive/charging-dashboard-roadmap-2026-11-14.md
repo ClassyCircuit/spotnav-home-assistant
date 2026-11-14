@@ -1,0 +1,3794 @@
+> **ARCHIVED — HISTORICAL REFERENCE, NOT A WORK QUEUE.** Frozen on 2026-11-14 when the roadmap was
+> split. All remaining and future work is in the concise
+> [active roadmap](../charging-dashboard-roadmap-active.md); assign nothing from this file's checklists or
+> queue. Its stage text keeps the implementation history, source facts, research findings and detailed
+> acceptance wording that the active roadmap links to. Statuses below describe 2026-11-14 and some
+> substage ids were later split (for example 15.1 → 15.1a/15.1b); the active roadmap wins on any conflict.
+> Nothing here proves installed or physical behavior.
+
+# Morek autonomous charging and dashboard roadmap
+
+Status: **in progress; Stages 10 and 14 locally complete (mocked); Stage 15 is the next implementation work; live validation is user-owned and open**.
+Updated 2026-11-14 (Stage 15 finalized, then audited against Stage 14, Stage 11 closed as migrated and
+checklists reconciled with source/tests; docs only, no code, version or hardware change). The
+**"Canonical remaining work queue"** below is the single ordered list; the checklists and detailed substages
+carry each item's requirements and status. Historical status notes below describe their versions, not
+necessarily current behavior.
+
+This is the forward-looking plan for SpotNav Enhanced. Implement **one work block
+at a time**, not a dashboard rewrite and controller rewrite in one release.
+For existing code, HA access, hardware observations and credentials handling, read
+[the development handoff](../morek-development-handoff.md) and `AGENTS.md` first.
+This document is not permission to deploy, restart HA, or issue hardware commands.
+
+## Initial working-release goal
+
+The user wants a usable installed dashboard and automatic charging, not a permanent
+unarmed demo. Complete Stage 5 with the core daily frontend and backend connected to
+real data, reactive planning and a safely migrated Morek schedule executor.
+Historical charging comparisons, monthly analytics, savings and other later features
+may remain explicitly unavailable; they are not prerequisites for this initial release.
+The optional **Charge Now** override in Stage 10 is locally implemented and is not a
+prerequisite for the initial release or its 5.8 live validation.
+
+**Frontend decision:** the user chose an integration-provided HA custom sidebar panel,
+using the same UI components, styling and stepped-area ECharts chart as the local sample
+preview. The preview supplies fixtures and the panel supplies real HA/backend data;
+they are not two independently maintained UIs. Preserve the existing integration domain
+and working backend/card compatibility without requiring the old card as a second daily
+interface. Comparable viewport/fixture parity is required; actual HA/mobile rendering
+and its sidebar/header remain subject to integration testing, not assumed pixel-identical.
+
+The current source contains guarded automatic Morek dispatch and session-start paths;
+their deployed behavior is not established by local mocks. Recovery and visibility
+gaps remain, particularly Stage 9.5. Preserve existing ownership, identity, Stop,
+uncertainty and protection boundaries, and do not treat a profile ACK as charging.
+
+**2026-11-12 clarification:** the user says Morek handles household load protection
+natively. SpotNav's requested role is scheduling fixed on/off charging windows, not
+household load balancing or dynamically changing amps in response to house load.
+The schedule's 0 A/allowed-current limits express those windows; they are not a
+load-management algorithm. The reported native protection has not been independently
+verified in this development session. Do not change or disable existing protections,
+electrical limits, regulator configuration or code without explicit authorization.
+Existing regulator conflicts remain an activation concern, not an instruction to
+build a second load controller. Hardware checks are user-directed.
+
+**Agreed charging controls:** the final daily sidebar has two simple controls:
+**Pause / Resume Auto**, and **Charge Now**, which becomes **Return to Auto**
+while its temporary override is active. Pause requests charging be held until
+the person explicitly resumes; Resume returns to a fresh valid automatic plan.
+Charge Now defaults to one hour with other durations. Return to Auto ends that
+override early; charging may continue if the automatic plan selects the current
+time. These controls are locally implemented; installed and physical behavior must
+be verified separately.
+
+**BMW target and monitoring:** the user intends the BMW's own configured charge
+limit to stop the car at its target (for example 80%); the user confirmed (2026-11-14) the BMW
+will stop at its configured 80% limit, an agreed operating assumption (user-confirmed, not agent
+hardware-verified, not a blocker). Morek's schedule controls
+allowed charging windows; do not require a second live SOC-stop controller or
+re-enable competing legacy commands. The SpotNav planning target and the limit
+actually configured in the car are separate settings: do not assume they match,
+that SpotNav changes the BMW limit, or that a stale SOC proves the target was met.
+The app must still show whether charging and execution appear healthy using available
+genuine observations, with unknown clearly shown where evidence is absent or stale.
+
+**Complete the necessary development in order before installation.** After development
+and review, the user plans to merge the branch to `main`, install it in HA and perform
+deployed testing personally. 5.8 records that user-owned milestone, not an LLM task
+to merge, install, activate or operate the charger. An LLM may help interpret logs or
+diagnose problems if asked; HA access and live actions still require specific approval.
+Local automated and mocked tests remain LLM development work. Development completion
+does not prove deployed operation: real planning, schedule operation and measured
+charging remain unverified until observed. ACK/readback alone is not physical-flow
+evidence; never bypass an unresolved safety blocker or describe an unarmed installation
+as verified automatic operation.
+
+## Task overview — start here
+
+One **substage** is one implementation session followed by coordinator review.
+Substages are intended to be comparable reviewable changes, not equal line counts.
+Do not assign a whole stage in one prompt. Each substage includes its own focused
+tests, documentation and required version/build checks; these are not extra stages.
+
+`[x]` = implemented locally with mocked checks (not proof of live hardware behavior; a
+"coordinator review pending" or "unrun" note beside it is outstanding acceptance, not open work).
+`[ ]` = remaining. Do not repeat checked tasks or replace working foundations.
+`[>]` = **superseded and migrated** into another item named beside it. It is *not* implemented;
+its scope lives only at the destination (no second queue).
+Detailed requirements and acceptance cases follow outside this checklist.
+
+| Stage | Outcome | Dependency / status |
+| --- | --- | --- |
+| 0 | Existing functionality and groundwork | Complete; reuse it |
+| 1 | Price cap and minimum ready-by SOC planning | 1.1–1.3 implemented; review pending |
+| 2 | Isolate Morek from legacy control | Unarmed lifecycle groundwork complete; activation blocked |
+| 3 | Automatically send changed schedules | Stages 1 and 2 before activation |
+| 4 | Recover and report execution health | Stage 3 |
+| 5 | Installable real-data daily dashboard and safe route to charging | 5.2–5.4, 5.5–5.7a and 5.7b1–b2 locally implemented (umbrellas 5.4 and 5.6 closed 2026-11-14, all children `[x]`); 5.7b3 acceptance partial (browser, full worker/planning and 5.4c suites unrun); 5.1 visual approval and 5.8 user-owned validation remain open |
+| 6 | Genuine charging history | 6.1–6.3 locally implemented (capture + history API, no UI); installed sources unverified; UI is Stages 7–8 |
+| 7 | Extended charts, tracks and price insights | After initial real-data chart; actual track uses Stage 6 |
+| 8 | Yesterday, costs and savings | Later; depends on genuine data |
+| 9 | Recovery and diagnostics | 9.4–9.7 locally complete with mocked checks; the user accepts a fresh Resume after an ambiguous interrupted Resume; deployed behavior unverified |
+| 10 | Charge Now and partial-price planning | 10.1–10.3 locally complete; deployed behavior unverified |
+| 11 | Adaptive charging estimates for Morek | **Superseded (`[>]`), migrated to 15.9–15.11 with an exact mapping in Stage 11; not implemented** |
+| 12 | Fix real sidebar usability, price presentation and evidence | Prioritize before 5.8; implement bounded 12.1–12.8 separately alongside remaining 5.7b work |
+| 13 | Migrate useful old-card configuration into the sidebar | Follow the related Stage 12 work; 13.1–13.4 are separate, bounded tasks |
+| 14 | Predictable planning and stable Morek schedule updates | 14.1–14.6 locally implemented and mock-tested; 14.6 review corrections through 2.5.112; deployed behavior unverified. **Binding contract for Stage 15** (see "Stage 14 non-regression contract") |
+| 15 | Charging resilience, connection-aware status and trustworthy learning (also carries the former Stage 11) | Finalized 2026-11-14 and Stage-14-audited, nothing implemented; start-ready bounded substages 15.1–15.11 (order in the queue below); optional evidence tasks E1/E2 block nothing |
+
+### Canonical remaining work queue (2026-11-14) — the one ordered list
+
+Derived from the checklists, current source (manifest 2.5.128) and the test files named in each stage.
+Nothing here is implemented unless a checklist says `[x]`, and `[x]` never means live-verified.
+One substage per session, run one at a time in the shared worktree. ◆ = changes a path that Stage 14
+protects: that substage's **Stage 14 regression acceptance** (see "Stage 14 non-regression contract")
+is mandatory and meaningful, not a formality.
+
+**A. Implementation, in this order** (the only dependencies are the ones shown; nothing else gates a step)
+
+| Order | Item | Why this position | Needs |
+| --- | --- | --- | --- |
+| 1 | 15.1 Planner time reserve ◆ | User-agreed 10% default; smallest change; touches 14.4 evidence (trap fixed in 15.1) | none |
+| 2 | 15.2 Link monitor and offline/reconnect signals ◆ | Evidence source for 15.3, 15.5, 15.6 | none |
+| 3 | 15.5 Guarded start after a confirmed reboot + backend "charging must be enabled" ◆ | The user's repeatedly stated requirement; uses 15.2 evidence only | 15.2 |
+| 4 | 15.3 Reconnect/startup read-only schedule check ◆ | Read-only; classification needed by 15.4 | 15.2 |
+| 5 | 15.4 Guarded automatic schedule repair ◆ | The only new sender besides 15.5; most Stage 14 risk, so after its inputs exist | 15.3 |
+| 6 | 15.6 Connection-aware freshness (backend) ◆ | Display/readiness judgement; Stage 14 call sites keep their strict bound | 15.2 |
+| 7 | 15.7 Plug-in authorization UI, status wording, freshness adoption | UI only; absent backend fields degrade to today's text | 15.6 (shows 15.3–15.5 fields when present) |
+| 8 | 15.8 Late cumulative-register reconciliation ◆ (14.5 progress accounting) | History/evidence only | none (`link_down` reason is used when 15.2 exists) |
+| 9 | 15.9 Energy-per-SOC learner on the Morek path ◆ | Absorbs former 11.1; does not change dispatch | none (existing Stage 6.2 gap rows; 15.2/15.8 flags are used when present) |
+| 10 | 15.11 Learned-estimate display and reset | Needs the learner to exist | 15.9 |
+| 11 | 15.10 Morek behind-plan check and power-learner feed ◆ (former 11.2) | Deferrable; user may skip without blocking anything | 15.9 |
+
+**B. Outstanding local review and acceptance (not feature work; none blocks A)**
+- **5.7b3** (`[ ]`, partial): rerun the mocked browser check (desktop and emulated mobile), the full
+  worker/planning suites and the 5.4c HA-plugin dashboard suite on a supported host. The user excluded
+  browser and long-running suites, so these are **unrun, not passed**; run them only if the user asks.
+- **Coordinator review pending** on the `[x]` items so annotated (5.x, 6.2/6.3, 9.x, 10.x, 12.x, 14.x).
+  Review is independent of order A; each A item additionally reruns the Stage 14 regression files.
+- Known unverified-by-design limits stay attached to their stages (for example 9.5's accepted fresh-Resume
+  exception, 6.x thresholds, 5.7b2 sources). Do not restate them as open tasks.
+
+**C. User-owned (never an LLM task; any HA access needs specific approval, read-only first)**
+- **5.1** visual approval; **5.8** merge, install and deployed validation (including whether the 2.5.126
+  plug-in fix, the 2.5.127/128 session card, Stage 14 stability and Stage 10 controls work on hardware);
+  optional evidence tasks **E1** and **E2**; any hardware test.
+
+**D. Later features (independent of A; order by the user's priority; none is a prerequisite for A or 5.8)**
+- **13.1 → 13.4** (finish the daily interface without the old card), **7.1–7.5** (chart navigation,
+  tracks, price insights; 7.3 reuses Stage 6), **8.1–8.3** (yesterday, costs, savings; coordinate with
+  7.3/7.5). Suggested default order if the user has no preference: Stage 13, then 7, then 8.
+
+**E. Closed or superseded in this audit (do not reassign)**
+- Stage 11 → superseded and migrated to 15.9–15.11 (mapping in Stage 11); umbrellas 5.4 and 5.6 → closed
+  as locally implemented (children all `[x]`); Stage 9.6/9.7 recorded as `[x]`. Nothing else was closed.
+
+### Stage 0 — Completed baseline: preserve and reuse
+
+- [x] **0.1 Manual Morek workflow:** exact displayed-window preview/send, selective
+  removal, bounded readback, drift/coverage reporting and shortened final blocks.
+- [x] **0.2 Writer audit:** mapped ordinary, safety, startup and handback writers;
+  documented unresolved authorization/transition decisions.
+- [x] **0.3 Ownership groundwork:** persisted unarmed metadata, physical connector
+  admission locks, identity classification and serialized late initialization.
+- [x] **0.4 Uncertainty groundwork:** partial start extraction/characterization and
+  standalone durable attempt evidence. These are unwired, not isolation or recovery.
+
+Evidence: `docs/morek-execution-audit.md`; source through **2.5.13**. Isolated
+tests are documented there; full HA collection is still blocked on Windows.
+
+### Stage 1 — Price policy (old A2P)
+
+- [x] **1.1 Settings and API**
+  - Persist optional cap and distinct minimum ready-by SOC in existing settings.
+  - Validate units/minimum/target; expose price basis and preserve old behavior.
+  - The saved inputs are consumed by the Stage 1.2 cheapest-price planner.
+- [x] **1.2 Planner policy**
+  - Use cheap slots toward target; add cheapest above-cap energy only for minimum.
+  - Handle partial blocks, period limits, stale inputs and infeasible deadlines.
+  - **1.2a complete:** the pure planner can select cheap-only capped intervals,
+    including partial durations and shortfalls.
+  - **1.2b complete:** a caller-supplied minimum wall-energy deficit permits only
+    necessary above-cap energy in the pure planner.
+  - **1.2c complete:** cheapest-price Auto resolves fresh vehicle facts, plans and
+    reconciles strict capped windows. Capped solar/hybrid strategies are refused.
+    The separate immediate SOC floor and manual actions are not governed by the cap.
+- [x] **1.3 Reactive planning and explanation**
+  - Replan on cap/minimum/target/SOC/ready-by changes without a browser.
+  - Expose policy reasons and consistent plan energy/cost; test API-to-plan flow.
+
+### Stage 2 — Actual Morek isolation (remaining old A2)
+
+- [x] **2.1 Reuse the legacy execution boundary** (implemented for review; not full isolation)
+  - Extend the existing Auto execution gate with explicit Morek ownership: no
+    ordinary legacy starts OR stops, plan installation, retries or automatic resume.
+  - Reject conflicting manual/API actions before preparation effects; keep planning,
+    metering and status. Reuse pause infrastructure, not its stop-on-pause semantics.
+  - Auto-boundary admission is not a final physical-writer or transition guard; see 2.2–2.3.
+- [x] **2.2 Close bypasses with shared guards** (implemented for review; lifecycle remains 2.3)
+  - Guard the few direct write boundaries that bypass Auto (current/phase writes,
+    restore and deletion handback); reuse guards rather than gate every caller.
+  - Keep protection unchanged; expose an activation blocker if live site regulation
+    conflicts with schedule-only control. Do not redesign the regulator here.
+  - Shared adapter admission covers ordinary dispatch, not regulator protection or
+    external integrations. Durable unarmed transition evidence was later added;
+    active ownership transitions remain unimplemented.
+- [x] **2.3 Mode lifecycle and end-to-end regression** (unarmed scope; review required)
+  - Establish and consult ownership before ordinary startup/restore writes. A process-local
+    drain is a future handover seam, not a completed handover or producer shutdown.
+  - Combined mocked regressions exercise startup, restore, aliases, conflicting/missing
+    metadata, queued writes, ordinary adapters, deletion handback and other chargers;
+    regulator protection remains an explicit exception and activation blocker.
+  - A wholly missing document still migrates as legacy in this unarmed release. Resolving
+    lost-document ambiguity, durable transitions, safe recovery and retained-profile exit
+    is mandatory before any activation-capable release. Offline identity remains conservative.
+
+### Stage 3 — Autonomous schedule updates (old A3)
+
+- [x] **3.1 Shared schedule intent** (implemented for review; no worker or activation)
+  - Manual preview/Send and future backend callers reuse the builder/fingerprint for
+    current fixed-time intent, including the remainder of active displayed windows.
+  - Expired/no-plan/unpriced/stale or unavailable prices and invalid inputs refuse
+    without releasing retained limits. Active-window readback verification remains 4.2.
+- [x] **3.2 Backend worker and triggers** (unarmed groundwork; review required)
+  - Planner publications trigger coalesced reconciliation without a browser;
+    connector admission serializes and rejects stale work, with process-local
+    deduplication and an uncertainty latch. Production owned-profile admission
+    still refuses all sends; later unarmed transition groundwork is not activation.
+- [x] **3.3 Shared manual actions and persisted outcomes** (unarmed; review required)
+  - Manual actions and the worker serialize on the physical connector and share
+    persisted intent/attempt/ACK/readback evidence; Refresh sends only a read.
+  - An uncertain attempt blocks further sends without automatic retries; no
+    activation, complete recovery or safe retained-profile exit is implied.
+
+### Stage 4 — Recovery and health (old A4)
+
+- [x] **4.1 Restart and reconnect** (unarmed groundwork; review required)
+  - Startup and control-entity availability transitions reconcile the current valid
+    planner intent and identity, not cached profiles; offline work waits for reconnect.
+  - Connector admission and durable uncertainty remain in force. Simulated-authority
+    tests cover stale work and duplicate identities; production dispatch stays unarmed.
+- [x] **4.2 Verification** (unarmed groundwork; review required)
+  - Compare the observable remaining effective schedule for active and future windows,
+    including delayed replies, with bounded read-only checks and explicit coverage.
+  - Attempt-bound evidence, freshness checks and conservative ambiguous-boundary
+    refusals prevent a superseded readback from verifying a newer proposal.
+- [x] **4.3 Operator state and unresolved actions** (unarmed scope; review required)
+  - The existing status API and panel report current evidence and waiting, manual-preview
+    ready, sending, checking, mismatch, offline and intervention states. Uncertain
+    outcomes remain latched; no general recovery or uncertainty reset exists.
+    Later unarmed transition/abort groundwork is not active ownership recovery.
+  - Explain activation blockers, person Stop, protection, retained 0 A and supervised
+    recovery/downgrade; neither readback nor selective removal resolves an unknown upload.
+
+### Stage 5 — Single dashboard and daily controls (old A5 + B2)
+
+- [ ] **5.1 Layout and shared components** (open only for the **user-owned visual approval**; all
+  5.1a–5.1e implementation sub-items are `[x]` and the user chose the stepped-area chart. No LLM work
+  remains here; do not infer approval from the later sidebar work.)
+  - Build desktop/mobile browser prototype with sample data; get visual approval.
+  - Local sample prototype is available in `frontend/prototype/`; browser checks
+    and HA integration limitations are recorded in the development handoff. Visual
+    approval remains pending; this does not complete 5.1.
+  - Start with Web Awesome Core for polished shared controls and tokens; the selected
+    production host is now the HA sidebar panel, not a Sections composition. Validate visual quality and HA
+    compatibility. If it does not work, stop and reevaluate alternatives with the user.
+- [x] **5.1a Initial prototype refinement** (sample groundwork; overall visual approval pending)
+  - Refined local prototype and example ECharts are available; verification and
+    unresolved limitations are in the development handoff. The user requested further
+    refinement in later Stage 5 substages; don't repeat completed groundwork.
+  - Balance desktop columns and eliminate unused chart-column space; review the same
+    cards stacked on mobile. Improve visual hierarchy and polish without decoration.
+  - Make current charging state, measured power, next window start–end, reason for
+    waiting, SOC/target/minimum/deadline, plan feasibility and urgent health clear at
+    a glance. Replace duplicated protocol jargon with a plain-language health summary;
+    keep critical warnings visible and technical evidence and debug actions accessible.
+  - Show the **entire proposed plan**, including multiple start–end windows, estimated
+    energy and cost per window, and the estimated total energy, total cost and
+    energy-weighted average price in c/kWh for this charge. Label estimate, currency
+    and price basis; show unavailable inputs honestly. Keep the complete plan easy to
+    inspect on mobile, not just the next window.
+  - Demonstrate a populated, genuinely measurement-labelled sample history and separate
+    missing/error examples; keep proposal, sent ACK, effective limits and measurements
+    distinguishable. Make all sample values and policy explanations internally coherent,
+    and distinguish measured zero from unavailable and deadline from predicted readiness.
+  - Add locally bundled **ECharts** sample visualizations: a source-interval price bar
+    chart with labelled units, cap, proposed-window shading and basic tooltips; and at
+    least one additional useful chart concept, exploring a gradient-filled stepped area
+    line. The second can illustrate recent measured power with explicit sample data and
+    gaps; do not imply continuous measurements where none exist. Present the chart roles
+    and visual choices for user approval, without adding charts merely as decoration.
+    Preserve actual interval widths, including negative values where illustrated.
+  - The work remains sample-only; final visual approval follows the remaining Stage 5 design work.
+- [x] **5.1b Initial dark price-chart comparison** (sample groundwork; revision required)
+  - Local comparison was implemented in `frontend/prototype/`; the user reviewed and
+    rejected its small chart, layout gaps, monochromatic palette and visual treatment.
+    Its implementation is complete as groundwork, not visually approved; revise in 5.1b1.
+  - Present two Prices & Plan card variants using the same coherent sample data and
+    features: interval-width bars versus a gradient-filled stepped price line/area,
+    inspired by the user's example. These are temporary visual alternatives within
+    one prototype, not two required live dashboards or duplicate final cards.
+  - Make the whole prototype dark as the preferred visual direction. Use locally bundled
+    ECharts and Web Awesome; ensure readable contrast, labels and non-colour cues.
+  - Both variants show yesterday, today and all sample published future prices, without
+    assuming tomorrow is always available; unknown future is not zero. Include negative
+    and variable-duration intervals, cap, now, ready-by, selected windows, day boundaries,
+    current and next planned prices, exact tooltips, zoom/pan and overview/reset; test
+    desktop and mobile interaction. Label cap and price basis with explicit units.
+  - Preserve time-interval truth in the step chart, including final interval and missing
+    data gaps. Both variants show the complete multi-window plan, per-window price,
+    energy and cost, plus this-charge totals and weighted average. Reuse shared sample
+    data/components; the user subsequently chose the stepped-area chart for production.
+- [x] **5.1b1 Initial full-width comparison** (implemented groundwork; not visually approved)
+  - Both full-width comparison cards and the reference-derived fictional fixture exist;
+    local ECharts and sample-data groundwork are in place. Review identified visually
+    inadequate step rendering, undersized plot, contiguous windows wrongly presented as
+    separate, and Ctrl-only wheel zoom. Corrective work began in 5.1b2, with outstanding
+    visual/interaction requirements carried forward to 5.1b3–5.1b4. Synthetic fluctuations and
+    the hand-authored plan are not verified market data or optimizer output.
+  - Show both bar and gradient stepped-area Prices & Plan alternatives concurrently,
+    one below the other, each on a full-width row with a substantially larger plot;
+    remove the A/B switch. These are comparison-only, not duplicate final dashboards.
+  - Use `samples/bar-chart.js` and `samples/stepline-chart.js` as direct visual and
+    sample-data inspiration: neutral dark surfaces, expressive price colors, clear now
+    and soft-cap markers, low/high callouts, useful window shading and overview slider.
+    Reuse one shared, labelled illustrative dataset, scales and features for a fair
+    comparison. The bar sample's 15-minute fluctuations are synthetic; do not present
+    sample data as verified Nord Pool Latvia prices or as a calculated optimal plan.
+  - Include accurate interval boundaries, negative-price and missing-data test cases,
+    the full proposed plan, per-window price/energy/cost and coherent totals. Distinguish
+    price opportunities from proposed windows; explain price-band thresholds and avoid
+    hard-coded sample thresholds masquerading as universal real-world judgments.
+  - Use gesture/slider navigation and compact accessible zoom/reset alternatives; avoid
+    redundant buttons or verbose chart instructions. Check wheel scrolling versus page
+    scroll, keyboard access and touch; report unverified physical-touch behavior.
+  - Restructure the surrounding layout to eliminate grid-induced gaps and accommodate
+    full-width charts. Improve readable contrast and introduce restrained semantic color
+    and locally bundled icons; retain Web Awesome and a consistent dark design. Leave
+    broader dashboard polish and alternate states to 5.1d.
+  - Browser-review desktop and mobile, provide screenshots of both complete charts and
+    ask the user to choose a direction. No live data, HA connection or charger actions.
+- [x] **5.1b2 Initial chart, plan and layout corrections** (implemented groundwork; not visually approved)
+  - Local corrections and focused checks are in place, including adjacent-window grouping,
+    a plan modal, wheel zoom and the desktop two-column overview. User review identified
+    remaining visual/interaction work in 5.1b3–5.1b4; this is not visually approved.
+    Simulated pinch did not change zoom and touch targeting remains unreliable; see handoff.
+  - Place overview and plan controls side by side at equal desktop widths, stack on
+    mobile; retain both large, full-width comparison cards below and avoid empty gaps.
+  - Make the step variant a visually continuous stepped line with a subtle gradient
+    area, not per-interval filled bars. Preserve actual price interval boundaries,
+    negative values, gaps and final interval. Bring both chart variants closer to the
+    user's samples in size, visual clarity, price colors, min/max callouts, cap, now,
+    window shading and overview; use truthful, labelled sample thresholds and data.
+    On both charts clearly overlay the exact proposed charging windows with a distinct
+    color and non-colour cue, separate from price coloring and cheap opportunities;
+    match the complete plan and explain the overlay in the legend/tooltip.
+  - Enable ordinary mouse-wheel zoom as requested (without Ctrl), plus slider, touch and
+    keyboard-accessible navigation/reset. Test real wheel events and document the page
+    scroll tradeoff; do not equate simulated touch with physical touchscreen validation.
+  - Present contiguous charging intervals as one continuous window when there is no
+    stop; separate windows when charging actually pauses. Do not merge across gaps,
+    change planner behavior or erase genuinely different control semantics. Calculate
+    per-window estimated energy/cost and energy-weighted price across tariff intervals,
+    including partial intervals, and keep chart shading, next window, totals and text
+    consistent. Sample fixtures should show both continuous and separated windows.
+  - Make the next proposed window open an accessible modal with the same complete plan
+    and cost details that remain visible in both chart cards. Provide keyboard/focus,
+    close and mobile behavior; sample controls cannot contact HA or control charging.
+  - Browser-review both charts, modal and desktop/mobile layouts; verify tests, local
+    dependencies and reported limitations. Overall 5.1 visual approval remains pending;
+    the user subsequently chose the stepped-area chart. No live data or hardware actions.
+- [x] **5.1b3 Chart fidelity and interval navigation** (sample groundwork; visual approval pending)
+  - Proposal windows now use a bottom-bright green gradient and an aligned pale plan
+    track instead of dashed borders; window boundaries remain exact. Visual approval
+    remains pending; see handoff.
+  - Both charts now have a viewport-aligned fictional day/date band, midnight lines
+    and dated interval tooltips; missing intervals are hatched. Desktop and emulated
+    mobile checks are documented in the handoff. User visual approval remains pending.
+    Production must verify available historical and published future prices and use the
+    configured local timezone, including midnight and 23/25-hour DST days.
+  - Local implementation uses anchored responsive labels, future-focused default and
+    snapped navigation. Headless emulated pinch and taps worked; physical touch and
+    visual approval remain unverified. 5.1b4 and 5.1b4a subsequently added plan work.
+  - Bring BOTH full-width price charts much closer to `samples/bar-chart.js` and
+    `samples/stepline-chart.js`: meaningful price-dependent colors on bars and stepped
+    line/area, clearly visible plotted min/max callouts and a legible proposed-window
+    overlay distinct from the price colors. Retain exact intervals, gaps, negative prices,
+    final boundaries and a truthful legend; do not apply arbitrary sample price bands
+    as real-world judgments. Place callouts at actual extrema, clarify whether they
+    refer to the visible range or entire horizon, and handle offscreen extrema honestly.
+    Callout pins show only the numerical price, not LOW/HIGH text; explain their meaning
+    accessibly elsewhere. Use black for past plot background, dark blue for present/future,
+    green for exact proposed-window background and a solid blue Now line as in the sample;
+    preserve contrast, price readability and non-colour differentiation of plan windows.
+  - On initial load focus on the relevant future: start approximately one or two hours
+    before Now, within available data, and show the published future where feasible.
+    Allow zooming out/panning to older data using the overview. Handle little/no future
+    data and Now outside coverage without inventing prices or hiding known gaps. Define
+    a clear full-horizon reset and preserve separate user-chosen views on updates.
+  - Snap the viewed time range to 15-minute boundaries on wheel/pinch zoom, drag/pan,
+    overview slider and keyboard/reset actions for the 15-minute sample; clamp at horizon
+    edges, avoid feedback loops and test repeated movement. This is viewport navigation,
+    NOT rounding published data, the current-time marker or partial charging windows.
+    For future real data use source interval boundaries and timezone/DST-aware timestamps
+    rather than assuming every dataset or charging stop is aligned to 15 minutes.
+  - Anchor time ticks to even two-hour boundaries (e.g. 14:00, 16:00, 18:00) for the
+    normal chart view, including after panning; keep date/midnight context. Use 5 or 10
+    c/kWh price-axis increments when legible. Handle responsive widths and zoom without
+    overlapping or misleading labels. Exact interval tooltips remain available.
+  - Browser-test both variants with real wheel/drag and zoom/reset, boundary snapping,
+    initial focus, even-hour alignment, plot coloring, visible callouts, overlay contrast
+    and desktop/mobile screenshots. Investigate simulated pinch/tooltip targeting and
+    improve mobile card density; report real-touch versus emulated-touch limitations.
+    Keep charts and plan sample-only; ask for feedback before choosing a final chart.
+- [x] **5.1b4 Compact controls and plan presentation** (sample-only; coordinator and visual review pending)
+  - Implemented locally with shared cumulative SOC projections and modal backdrop dismissal;
+    see handoff for checks and limitations. Review identified missing-value rendering and
+    card-balance follow-up in 5.1b4a. Overall 5.1 visual approval remains pending;
+    the user subsequently chose the stepped-area chart.
+  - Make Plan Controls more compact and place a readable complete proposed plan below
+    them within the right-hand desktop column; keep the overview beside them. Avoid
+    blank gaps and preserve responsive stacking. Retain the complete plan in the chart
+    cards and the existing next-window modal using a shared sample representation.
+  - Show an estimated battery SOC after each proposed window where the sample starting
+    SOC, usable capacity, wall energy and efficiency support it. Clearly identify it as
+    a projection, not a measurement or guarantee; account for cumulative energy and
+    battery-versus-wall basis, cap at feasible bounds, and show unknown if inputs are
+    missing. Do not infer SOC changes from a plan as actual observed charging.
+  - Clicking outside a modal closes it as well as its close button and Escape, without
+    closing on clicks inside. Preserve focus trapping/return and test keyboard and mobile
+    behavior. This does not authorize new charger actions or live bindings.
+- [x] **5.1b4a Balanced cards and unknown-value rendering** (sample-only; coordinator and visual review pending)
+  - Shared rendering, independent unknown totals, balanced desktop cards and local
+    missing/invalid/long-plan scenarios are implemented; see handoff for checks and limits.
+  - Keep overview and controls/plan at 50% desktop width with aligned top and bottom and
+    naturally similar visual weight. Stretch the shorter card without fixed heights or
+    filler; preserve natural mobile stacking and accommodate longer plans accessibly.
+  - Make the right-hand plan list concise, label estimates once, and retain all windows,
+    projected SOC and totals; keep full per-window price, energy and cost readily
+    accessible in the existing plan modal and chart cards. Do not hide important windows
+    or duplicate business logic. The richer battery overview remains 5.1e.
+  - Render unknown/invalid prices, window energy, costs, totals, projected SOC and other
+    required inputs as unknown throughout controls, charts and modal without exceptions,
+    false zeroes or fabricated estimates. Exercise a rendered missing-data fixture, not
+    only the calculation helper; preserve the existing shared sample representation.
+  - Test desktop/mobile layout, long plans, missing data and modal accessibility; retain
+    sample-only safety and await user visual approval. No live or charger changes.
+- [x] **5.1c Sample price insights and monthly statistics** (sample-only; coordinator and visual review pending)
+  - Local fictional insights use duration-weighted historical quartiles, a complete
+    one-hour known-price opportunity and an October summary; see handoff for coverage,
+    checks and limitations. The opportunity searches only Now and interval starts;
+    its 5.1d label explicitly qualifies this restriction. Overall 5.1 visual
+    approval remains pending; the user subsequently chose the stepped-area chart.
+  - Prototype concise, explainable assessments of current/upcoming prices against a
+    stated illustrative longer-term baseline, plus best upcoming price windows and
+    useful monthly statistics. Clearly distinguish cheapest opportunities from the
+    actual proposed charging plan, cap exceptions and user deadline feasibility.
+  - Use deterministic, labelled fictional price/history fixtures; show basis, lookback,
+    coverage and missing-data states. Do not invent live data, market forecasts,
+    universal cheap/high thresholds, savings or unsupported day-of-week claims.
+  - Explore a useful comparison method, including same-day-of-week only if sample
+    coverage supports it; make assumptions and limitations easy to inspect. Obtain
+    feedback on which insights are useful, without implementing the live pipeline.
+- [x] **5.1d Daily dashboard polish and visual review** (sample-only; coordinator and user visual review pending)
+  - Local daily hierarchy, explicitly simulated scenarios and independent illustrative
+    sent-versus-measured history are available; see handoff for checks and limitations.
+    This historical comparison preceded the user's selection of the stepped-area
+    chart; overall 5.1 visual approval remains pending.
+  - Refine the full dark dashboard around the selected stepped-area direction: strengthen
+    hierarchy, legibility and card balance; remove duplicated cost/status content;
+    keep important warnings visible and technical evidence accessible. Distinguish a
+    schedule mismatch from measured charging state in clear, actionable wording. Use
+    neutral dark surfaces, purposeful semantic colors and a restrained set of local
+    icons instead of an overwhelmingly green interface; avoid large layout gaps.
+  - Show recent sent-versus-measured history, explicit gaps and useful alternate
+    scenarios: charging, normal waiting, unavailable data/prices, infeasible minimum,
+    partial final window and above-cap exception. Include date/session selection,
+    coverage and out-of-plan flow in the design; do not invent observations.
+  - Reconcile control units/cap enablement and sample explanations, and review desktop,
+    mobile and HA-like constrained widths. Coordinate final visual review with 5.1e;
+    overall 5.1 remains pending user approval. No live bindings or hardware actions.
+- [x] **5.1e Vehicle and plan-evidence design** (sample-only; coordinator and user visual review pending)
+  - Local battery estimates, separately defined low-SOC warning sample and fictional
+    proposal/sent/readback/measurement freshness views are implemented; see handoff for
+    checks and 5.2 source-verification needs. Overall 5.1 visual approval remains pending;
+    the user subsequently chose the stepped-area chart.
+  - Enrich and polish the vehicle overview without visual clutter. Show current SOC,
+    target marker and, only when a separately defined valid value is available, a
+    clearly labelled low-SOC warning threshold. Do not equate that threshold with the
+    ready-by minimum SOC or immediate protection floor, infer battery damage, or invent
+    a default. Demonstrate unknown and potentially stale values honestly.
+  - Explore a compact battery visual and readable supporting values for estimated kWh
+    presently in the battery, energy needed to reach target and estimated active charge
+    duration, as inputs permit. Distinguish battery-side energy from wall energy and
+    estimates from measurements; label assumptions and never imply a guaranteed finish.
+  - Design a concise plan activity and freshness view: when and why the current proposal
+    was calculated, last send/ACK, effective readback time/coverage and key measurement
+    freshness as available. Present useful summaries by default; keep detailed evidence
+    and less important technical explanations accessible without burying warnings.
+  - Distinguish current proposal, known last sent plan and acknowledgement, effective
+    current-limit readback and actual measured charging. A composite readback is NOT an
+    inventory of installed plans, and ACK/readback cannot prove physical charging; show
+    unknown/stale/superseded evidence rather than claiming what profile is installed.
+  - Use coherent labelled sample scenarios, preserving the complete-plan modal and chart
+    overlay. Review desktop/mobile visual hierarchy and ask the user to approve. No live
+    bindings, new telemetry, protective behavior changes or charger actions; verify any
+    eventual live source availability during 5.2 rather than assuming it exists.
+- [x] **5.2 Overview and operation status** (implemented locally; coordinator review pending)
+  - The existing card now shows an English real-dashboard overview and read-only Morek
+    health, using separate, timestamped requests rather than claiming an atomic snapshot.
+    Measurements without a trustworthy Morek power source are explicitly unavailable;
+    sent ACK, effective readback and physical charging remain distinct. See the 2.5.31
+    handoff for freshness, source and testing limitations. Planning remains backend-owned.
+  - Focused lifecycle/race and action-safety tests and local desktop/mobile browser checks
+    use mocked HA/OCPP boundaries. No live HA or physical charging was checked. Overall
+    5.1 visual approval remains pending; the user selected the stepped-area chart.
+- [x] **5.3 Plan controls and actions** (implemented locally; coordinator review pending)
+  - The user chose English-only card presentation regardless of HA language; do not
+    translate the 5.3 strings. The 2.5.33 work implements this and improves open-modal
+    health updates and save coverage. Card tests now use English expectations while
+    independent translation utility tests remain. The full suite passes; see the
+    2.5.33 handoff for mocked-boundary results and limitations.
+  - Bind target/minimum/cap/ready-by controls, complete windows, per-window/total
+    estimated costs and policy explanations to existing backend settings/planner APIs.
+  - Preserve manual Send/Refresh and their existing interlocks; do not present unimplemented
+    suspension, charging pause, selective removal or mode exit as equivalent or operational.
+  - Regression-test settings save → backend trigger → replan → coherent dashboard update,
+    without browser-dependent planning; preserve uncapped and safety behavior.
+- [x] **5.3a Phone notifications for plug-in and plan** (local implementation; coordinator review pending)
+  - 2.5.34 associates notifications with the debounced connection generation, calculation
+    start, current attempt/settings and resolved vehicle; a current unchanged publication
+    is accepted. A persisted owed notice waits rather than using a restored proposal.
+    Waiting and proposed-window updates use the existing phone choices, limits and tag.
+    Mocked tests and remaining limitations are recorded in the handoff; no phone or
+    charger was contacted. Morek mismatch/uncertainty phone events remain future work.
+  - Reuse the existing per-charger HA mobile notification service, phone selection,
+    event tracker, rate limiting and restart-safe deduplication. Inspect current
+    `plan_installed` and plug-in/quiet-after-write behavior before changing it; do not
+    add a parallel notifier or assume the existing message is already delivered.
+  - After a recognized plug-in and settled replan, notify selected phones of the next
+    proposed charging start–end with local date/time, and compactly show useful known
+    estimates such as target/ready-by and total plan cost. Include estimated SOC by the
+    ready-by deadline when a fresh, validated backend projection is available, clearly
+    labelled as an estimate rather than a measured value or guarantee; distinguish it
+    from the target and warn of a projected shortfall where supported. Reuse backend
+    assumptions, account for battery versus wall energy and show unknown/omit the SOC
+    estimate when inputs are missing or stale. If no valid plan or prices are available,
+    give a concise truthful waiting/blocked reason rather than a stale time.
+    Avoid duplicate or contradictory plug-in/plan notices; make timing bounded and test
+    missed connection events, stale/replanned results, delayed inputs and restart.
+  - Include high-value, bounded notices for material plan changes, minimum/deadline
+    shortfall or schedule mismatch/uncertain outcome when supported; preserve existing
+    person Stop, protection and phone opt-in semantics. Avoid notification storms and
+    do not promise unsupported signals. No charger action is caused by notification.
+  - Clearly distinguish proposed times and estimated costs from sent/ACK, effective
+    readback and measured flow; never say charging has started without genuine flow
+    evidence. Test actual notifier modules with mocked HA/phone delivery, unavailable
+    fields, identity changes, retries/races, no phones and rate-limiting. Physical phone
+    delivery and live actions require the user's separate approval and validation.
+- [x] **5.4 Shared sidebar UI and production price chart** (umbrella; closed 2026-11-14 as locally
+  implemented: 5.4a, 5.4b1, 5.4b2 and 5.4c are all `[x]`)
+  - One maintained dashboard UI, hosted by an HA custom sidebar panel and by the local
+    sample preview. The stepped-area chart is selected; no second daily dashboard is
+    required. Preserve existing 5.2/5.3 backend contracts, interlocks and compatibility.
+  - Closing the umbrella is not acceptance: coordinator review and the unrun 5.4c HA-plugin dashboard
+    suite remain outstanding and are carried, not dropped, in **5.7b3** (queue item B). Actual HA
+    rendering and physical touch remain user-owned (5.8).
+- [x] **5.4a Extract the tested UI into shared components** (local visual foundation; coordinator review pending)
+  - The preview mounts `frontend/shared-dashboard/dashboard.js` through an explicit
+    sample adapter; shared styles, dialog, stepped chart and views have lifecycle
+    cleanup. Local browser checks and baseline comparisons are recorded in the handoff.
+    The bar chart is an optional comparison only. No sidebar or real data is connected.
+    Updates currently remount, resetting chart zoom, closing dialogs and losing drafts;
+    sample-oriented EUR/cents and global CSS assumptions also need live-host adaptation.
+    Real-data timestamp/DST,
+    HA CSS isolation, registration and integration are 5.4b/5.4c work.
+  - Refactor the existing prototype layout, styles, Web Awesome controls, modal and
+    selected stepped-area chart into one production-ready shared UI code path. Local
+    preview uses explicit sample fixtures via an adapter; no sample data or simulated
+    actions can leak into the real adapter. Reuse the same UI source in both hosts.
+  - Preserve the tested desktop/mobile appearance, dark design, interaction and English
+    wording; bundle assets locally with notices. Test fixture rendering, responsive
+    behavior, accessible controls, safe untrusted text and component cleanup. Compare
+    old prototype and shared preview at equivalent widths; no HA deployment or commands.
+- [x] **5.4b HA sidebar host and live overview/controls** (local implementation and mocked verification; coordinator review pending)
+  - 5.4b1–5.4b2 are complete locally. Actual HA integration, physical touch and
+    hardware behavior remain unverified; 5.4c remains a separate substage.
+  - Register one integration-provided HA custom sidebar panel and mount the shared UI,
+    with a practical non-destructive setup/update path. Use HA's supported panel interface;
+    handle sidebar/mobile navigation, safe areas, lifecycle, access and CSS isolation.
+  - Connect existing 5.2/5.3 real dashboard/settings/Morek read-only paths through a real
+    adapter. Reuse revision checks, permissions, race guards and manual interlocks; never
+    render mock values or cause a charger write when opening the panel. Missing measured
+    power, historical data and unsupported fields remain visibly unavailable.
+  - Fix the shared UI's full-remount update behavior before wiring frequent HA updates:
+    preserve open dialog/focus, unsaved settings drafts, scroll and chart zoom across
+    routine updates, while delivering critical health changes immediately. Handle
+    lifecycle/config changes and explicit save/conflict safely without stale writes.
+    Replace hardcoded sample currency/basis assumptions with authoritative values or
+    Unknown; do not recalculate unavailable per-window costs in the UI.
+  - Test actual-module contracts, mock HA panel lifecycle, action safety and visual parity
+    with preview under identical fixture/viewport, desktop and mobile. HA-host behavior
+    is not proven until installation; don't overwrite user views or remove the old card.
+- [x] **5.4b1 Sidebar host and real read-only data** (local mocked-boundary implementation; coordinator review pending, not an installable final release)
+  - Register an integration-provided sidebar panel and locally bundle/mount the existing
+    shared UI. Connect real, decoded 5.2 dashboard and read-only Morek status data via a
+    lifecycle-safe adapter with explicit selected charger and no sample fallback. Missing
+    real fields and the 5.4c price chart remain unavailable; all settings/charger actions
+    remain disabled in this slice. Preserve the old card and protect HA styles/assets.
+  - Test actual integration registration/cleanup and panel adapter with mocked HA
+    boundaries, out-of-order responses, missing data, local asset packaging, read-only
+    safety and desktop/mobile mock-host parity with the shared preview. No live HA access.
+- [x] **5.4b2 Real controls and stable interactive updates** (local implementation and mocked verification; coordinator review pending)
+  - Local continuation adds canonical revision-checked saves, guarded Morek debug and
+    admitted Pause/Resume, single Send/Clear confirmation and in-place shared/debug
+    reconciliation. Bounded closure testing is documented in the handoff and matrix;
+    actual HA, physical touch and charging remain unverified.
+  - Verification continuation bounded stalled settings writes without retry and fixed
+    read-slot overlap after actions; `frontend/sidebar/verification-matrix.md` lists
+    the representative closure cases and their mocked evidence.
+  - Build on 5.4b1 to wire existing 5.3 revision-checked settings and permitted manual
+    debug controls, preserving all admin/interlock checks. Implement stable updates that
+    preserve modal/focus, selection, draft, scroll and zoom while delivering warnings;
+    invalidate stale charger/revision actions and handle save/conflict/teardown safely.
+  - Coordinator review found that 5.4b1 passes epoch-millisecond windows into a sample
+    hour-based active-duration calculation: a one-hour plan renders as 216,000,000 min.
+    Define and test explicit time units end to end; correct real and preview durations
+    without changing exact window times. Also replace the age-only timer with bounded,
+    coalesced recurring real dashboard/status reads and reconnect handling: fresh backend
+    changes must appear without manual Refresh or destructive UI remounts. Test slow,
+    failed, stale and out-of-order requests and stop timers on teardown.
+  - Test successful/rejected saves, admin/non-admin, lifecycle/races and no charger writes
+    except explicitly requested and authorized existing actions. No deployment or live
+    charger operation; coordinator review of both slices remains pending.
+- [x] **5.4c Real stepped-area price chart and install preparation** (local implementation and mocked checks; full backend suite deferred)
+  - 2.5.39 includes the published-interval binding and a coarse-interval wheel
+    zoom correction. Built-panel mocked desktop and emulated-mobile pointer-tooltip,
+    wheel and reset checks pass; see handoff for evidence. The full HA-plugin
+    dashboard API/contract/golden suite has not run and remains a validation item,
+    not a reason to halt implementation of 5.5–5.7. WSL Python 3.12 lacks
+    ensurepip and the pinned HA pytest plugin requires Python 3.14 or newer; the
+    isolated WSL setup attempt failed before tests ran. On a supported host with the HA
+    test dependencies installed, run `python -m pytest tests/test_dashboard_api.py -q`.
+    Future installation guidance is in `sidebar-installation-preparation.md`.
+  - Bind the shared ECharts chart to real available prices and proposed windows, with
+    correct units/basis, timezone/DST, missing/negative prices and source resolution.
+    Show unavailable history honestly; defer historical tracks and monthly insights.
+  - Bundle ECharts and all needed assets/notices locally, test render/interactions and
+    API contracts, and document panel installation/update. Don't reimplement a second UI
+    or assume local preview proves actual HA integration.
+- [x] **5.5 Durable Morek ownership and recovery** (unarmed local implementation and mocked verification; coordinator review pending)
+  - This completes the unarmed groundwork only. Retained-profile resolution,
+    first-use versus lost-state provenance, transaction authorization, protection
+    conflicts and activation remain blockers in 5.6–5.7; the full 5.4c HA-plugin
+    dashboard suite is still unrun. No live behavior is claimed.
+  - Umbrella only: assign 5.5a–5.5f individually, not all of 5.5 in one session.
+    The checked groundwork is not active ownership or permission to send a profile.
+  - **Unarmed-entry abort (2.5.43; coordinator review pending):** an internal
+    explicit abort removes only a verified unarmed marker when the existing Auto
+    pause is durably `until_resumed`, identity is unique, and known profile outcomes
+    are not uncertain. It does not clear or claim absence of retained profiles,
+    resume Auto, or recover actual Morek ownership; see handoff for crash limits.
+  - **Durable unarmed entry evidence (2.5.41; coordinator review pending):** the
+    internal entry path persists a versioned requested/interrupted/drained marker
+    on the existing legacy binding before reporting a drain. Startup and manual
+    profile admission consult it; all markers remain unarmed and block ordinary
+    writes. Existing legacy records remain readable. Failure before the first marker
+    lands cannot be distinguished after restart from the previous legacy document;
+    lost-document and unknown-outcome recovery remain open. See the handoff.
+  - **Historical person-Stop foundation (2.5.40):** an
+    internal, process-local unarmed drain is interrupted by a separately classified
+    Stop reservation before the Auto lock. Ordinary admission remains closed; no
+    entry or owner was persisted or activated in that slice. Later 5.5b–5.5f add
+    durable unarmed transition/recovery groundwork; activation remains open.
+  - **Historical entry/drain blocker (2026-11-12):** the existing
+    quiesce latch refuses a person's Stop at the ordinary controller guard. The
+    separately classified regulator-protection path bypasses that guard. Making
+    quiesce durable or wiring it into entry would therefore change person-Stop
+    behavior; keep the latch unwired and production dispatch unarmed pending a
+    reviewed compatible design. An actual-module mocked characterization records
+    the conflict; the newer internal coordination above does not use the old latch.
+  - Resolve and implement safe ownership entry/exit, producer drain and durable transitions,
+    lost-document versus first-use ambiguity, uncertain in-flight outcomes, restart/reconnect
+    and retained-profile handling. Do not bypass existing uncertainty or identity guards.
+  - Test actual modules with mocked HA/OCPP/storage across crashes, races, migration,
+    rollback and competing ordinary writers. Keep production dispatch unarmed until the
+    full activation path is reviewed and all remaining blockers are resolved.
+- [x] **5.5a Person-Stop and unarmed drain foundation** (2.5.40; mocked review pending)
+  - Process-local drain, generation checks and a distinct reserved person-Stop path;
+    no durable ownership, autonomous dispatch or physical-stop guarantee.
+- [x] **5.5b Durable unarmed entry evidence** (2.5.41; mocked review pending)
+  - Requested/interrupted/drained markers block ordinary and manual profile writes
+    across restart. First-marker and lost-document ambiguity remain explicitly open.
+- [x] **5.5c Abort of an unarmed entry** (2.5.43; mocked review pending)
+  - Explicit, evidence-checked abort returns to the prior legacy binding only with
+    a disk-verified until-resumed Auto pause. No profile, charger or resume action.
+- [x] **5.5d Persisted ownership handover foundation** (2.5.45, unarmed; coordinator review pending)
+  - The internal handover now has a mocked success case and Stop-wins save
+    compensation. An uncertain save remains blocked; a later Stop stores intent
+    without bypassing the owner. Coordinator review remains pending.
+  - **Historical 2.5.44 partial:** legacy manual Send/Clear admission was made to
+    require a valid unarmed legacy owner, including after reload. At that point the
+    handover and Stop-wins protocol were not complete; 2.5.45 supersedes that state.
+  - Wire and test a durable, connector-bound handover from the existing entry/drain
+    evidence to a Morek-owned **unarmed** record. Prove conflicting legacy and manual
+    profile writers remain excluded through persistence and restart; keep production
+    owned-profile dispatch refused. This internal record does not enable schedule-mode
+    operation or imply an actionable person-Stop policy for retained profiles; preserve
+    the existing Stop path during entry and leave that later policy to 5.6b.
+  - Model and refuse incomplete/uncertain writes and Stop races; no activation,
+    automatic profile sends, clears, or user-facing mode switch. A drained connector
+    alone is not proof that producers or unknown external operations are settled.
+- [x] **5.5e Missing and uncertain evidence recovery** (2.5.46; unarmed, coordinator review pending)
+  - Startup and control-availability recovery inspect connector-bound ownership and
+    profile outcomes, report specific blocked states and may invoke the existing
+    evidence-checked unarmed abort only with a disk-verified indefinite Auto pause.
+    Missing/lost versus first-use provenance remains unverified and activation blocked;
+    no profile inventory or physical charging is inferred. See handoff for limits.
+  - Handle interrupted handovers, lost/malformed ownership documents, stale attempts
+    and unknown outcomes using existing durable evidence. First use and lost state
+    must not be silently conflated for activation. Expose bounded, explicit refusal
+    or recovery reasons; do not add generic journaling as an automatic prerequisite.
+  - Mock restart/reconnect, delayed responses, persistence failures and duplicate
+    identity; do not retry uncertain writes or infer profile inventory from readback.
+- [x] **5.5f Safe ownership exit and handback** (2.5.47; unarmed/mocked, coordinator review pending)
+  - The internal exit persists a legacy-owned `exit_held_unarmed` interlock; ordinary
+    legacy, manual profile, Resume and deletion handback stay blocked, even after
+    restart. The interlock cannot be removed by entry recovery. Known profile evidence
+    stays intact; a stored schedule or final 0 A is neither removed nor assumed absent.
+  - Implement/test a guarded exit transition and legacy handback without silently
+    removing or releasing an owned profile or its persistent 0 A limit. Keep known
+    sent/unknown evidence and person Stop distinct; expose unresolved decisions rather
+    than making unsafe assumptions. No live profile action or activation.
+  - Include the combined actual-module crash/race and regression tests for 5.5 in
+    this slice; do not add a separate test-only substage unless a real defect requires it.
+- [x] **5.6 Authorization and safe schedule-only operation** (umbrella; closed 2026-11-14 as locally
+  implemented: 5.6a, 5.6b, 5.6c and 5.6d are all `[x]`, plus 9.6/9.7 follow-ups; 5.6d review and live
+  validation remain outstanding: installed authorization behavior, native protection and external
+  writers are unverified and user-owned in 5.8. Stage 15 refines, and does not reopen, this scope.)
+  - Umbrella only: assign 5.6a–5.6d individually. Preserve protection and person Stop;
+    Morek's reported native load protection is not a SpotNav load-management task.
+  - Resolve how a new charging transaction is authorized, how person Stop and
+    competing writers are respected, and how retained 0 A, invalid/no-price plans
+    and leaving the mode are handled. Address any existing regulator conflict
+    without implementing household load management or dynamic amp regulation.
+  - The user reports Morek provides native household load protection; do not build
+    a SpotNav replacement or add a load-balancing feature. Preserve existing safety
+    and fail-closed activation safeguards; establish the applicable protection and
+    configuration before changing any dependency or enabling a conflicting mode.
+    Do not require a separate hardware-testing stage.
+  - Implement only an explicitly reviewed, fail-closed policy; identify any user or
+    installation-specific decisions and stop for them rather than assuming safety.
+    A stored current limit cannot start or authorize charging by itself.
+- [x] **5.6a Transaction authorization and connection readiness** (2.5.48 local, mocked; coordinator review pending)
+  - Read-only status uses uniquely resolved OCPP connection, control availability and
+    fresh connector-scoped status. Missing/stale facts remain unknown; the HA state
+    timestamp can age out an unchanged but still valid status. Authorization and
+    measured flow remain unknown: existing integration paths do not establish a
+    trustworthy active transaction or Morek power measurement. No new active-session
+    requirement was added to future schedule admission; dispatch stays unarmed.
+  - The 2.5.48 work is read-only groundwork, not a completed new-session solution.
+    The user subsequently requested automatic session authorization; implement the
+    bounded continuation in 5.6d rather than deferring its design to 5.8. Profile
+    ACK, limits and plug-in do not prove authorization or flow. Live validation
+    remains user-directed and is not claimed.
+  - The 2.5.48 local implementation and mocked checks were reported; coordinator
+    review remains pending. They do not establish live authorization or flow.
+  - Reuse observed charger/transaction facts to report and gate what can actually
+    be known about a new charging session. Do not change authorization settings or
+    infer that a stored schedule authorizes charging. Test unknown/offline/refused
+    cases with mocked boundaries; surface installation-specific decisions for the user.
+- [x] **5.6d Automatic Morek session authorization and recovery** (2.5.89 local mocked; review and live validation pending)
+  - **2.5.90 review fixes, local mocked:** an accepted normal plug-in record now
+    deduplicates initial Preparing after HA restart, including existing records;
+    pending/unknown remains blocked. Finishing and observed unplug are durably
+    recorded in event order, and an unconsumed unplug enables a later new connection
+    without deleting an uncertain outcome. For an old non-restored HA Preparing
+    state, setup can use the matching resolved online OCPP 1.6 connector's in-process
+    last-known Preparing metric for bounded ambiguous recovery. That metric has no
+    report timestamp and is not proof of a live vehicle or active transaction;
+    missing, conflicting, offline, restored or unsupported evidence is not promoted.
+    This remains dependent on the OCPP version's internal metric shape and is not
+    proof of physical charging. Completion/unplug event persistence interrupted by
+    a crash before its write cannot be reconstructed. Focused actual-module mocked
+    checks, Ruff, build and check-dist passed; live validation remains user-directed.
+  - The user accepts a possible immediate start if the retained schedule is absent
+    or ineffective, and one bounded request for ambiguous Preparing. The earlier
+    pre-start composite-confirmation requirement below is superseded by this decision;
+    ownership, Stop, identity, uncertainty and protection guards remain.
+  - A real resolved OCPP offline-to-online edge now creates one recovery generation
+    even without a boot counter. A transaction-bound switch being unavailable is
+    not by itself such an edge. Duplicate callbacks and HA restart reuse durable
+    outcomes; pending or unknown requests remain blocked. A new physical plug-in,
+    explicit Resume, observed reconnect or in-process boot-counter increase can
+    create a new opportunity. A reboot with no observable offline or boot evidence
+    cannot be distinguished from duplicates; explicit Resume or a later observable
+    reconnect can provide another opportunity. Completion holds remain in force.
+  - Mocked actual coordinator, command admission, outcome and Resume paths plus
+    availability callback, late-ACK/Stop, logging and restart cases were checked.
+    Runtime INFO for `custom_components.ocpp` or the charge point's OCPP logger,
+    or DEBUG for its websocket logger, blocks the start path; unsupported OCPP
+    logger/interface shapes also block. An ACK is not an established session or
+    measured charging, and readback is not profile inventory. Live behavior,
+    installed integration compatibility and physical charging remain unverified.
+  - **2.5.88 partial:** the user accepts one additional request for an ambiguous
+    initial/reconnected Preparing state. Fresh initial observations and Resume now
+    enter the coordinator, and a stable recovery generation deduplicates an ACK
+    across repeated events and HA restart; pending/unknown remains blocked. A
+    reported Finishing state is recorded as a completion hold. A new physical
+    Available-to-Preparing event or explicit Resume can establish a new generation.
+    This is not proof the prior session ended or that a car charged. The full
+    requested event/admission/restart and logging acceptance matrix remains open.
+    A reported boot counter increase within one process supplies another generation;
+    versions without that evidence cannot distinguish another reboot from a duplicate.
+    Review and complete before calling 5.6d locally complete.
+  - **2.5.87 partial production path; not complete:** the user accepts that
+    requesting a session can allow immediate charging when the retained schedule
+    is absent or ineffective. A fresh composite or exact match is not a start
+    prerequisite. An event-driven coordinator now requests a connector-bound
+    start after an observed Available-to-Preparing transition under schedule-owner
+    admission, records the attempt first, and retains unknown outcomes across
+    unplug/replug. Runtime logging compatibility can block a request. The UI warns
+    of immediate charging; ACK is not transaction or measured-power evidence.
+    Recovery of a vehicle connected while HA was offline, known-ended restart
+    evidence, and the full production admission/race/logging matrix remain open;
+    do not consider 5.6d complete or physically verified.
+  - **2.5.86 partial; no coordinator or start:** the read-only schedule diagnostic
+    can compare up to 90 seconds of drift, but blocks within that interval of an
+    expected or observed transition and checks current limits agree. The default
+    helper still requires exact matching. This diagnostic does not associate a
+    checked plan/attempt or give dispatch authority. The public OCPP library 2.1.0
+    logs serialized OCPP messages at INFO, and websockets 14.1 can log text frames
+    at DEBUG, in addition to the integration's tag log. A scoped redaction adapter
+    and its asynchronous logging tests remain unimplemented; do not call the start
+    method on the strength of this diagnostic. The production coordinator and full
+    acceptance matrix remain open.
+  - **2.5.85 partial, not a start coordinator:** public OCPP v0.12.3 source was
+    inspected; its switch uses connector status for state, delegates start to the
+    charge point, and `start_transaction` returns an ACK boolean. It logs its
+    configured remote ID tag at INFO before sending. The task prohibits logging the
+    tag, so calling that method as-is cannot meet that requirement when INFO is
+    enabled. Preparing does not establish that a transaction ended; transaction
+    recovery and runtime interface/version checks still need implementation. A new
+    diagnostic checks a same-preview readback at most 30 seconds old with exact
+    transition comparison and bounded coverage; it is not dispatch authority and
+    cannot rule out external writers. The requested production event-to-start path,
+    persistent deduplication and race/restart tests remain unimplemented.
+  - **2.5.84 partial, read-only:** status and sidebar explicitly say automatic
+    session start is unimplemented or offline; no session request is dispatched.
+    The checkout contains only the screenshot-demo OCPP switch, not installed OCPP
+    source. SpotNav's generic switch path calls HA `switch.turn_on`/`turn_off` and
+    receives no OCPP response; its success is not a transaction ACK. The installed
+    integration's actual command, switch state and response semantics, transaction-ID
+    lifecycle after reconnect/restart, and sufficiently fresh effective schedule and
+    electrical evidence before authorization remain unestablished. The full start,
+    deduplication, persistence, race/recovery and requested test matrix remain open.
+    Do not use the demo switch as installed integration evidence or treat status as
+    permission to start. No live access or charger operation occurred.
+  - **Priority:** implement and review after inspecting the actual installed OCPP
+    integration's charge-control semantics and existing guarded executor paths,
+    before calling schedule-only daily operation complete. A user-reported overnight
+    failure showed the OCPP charge-control switch off during a scheduled window;
+    a manually initiated switch-on later changed charger state. The observed
+    `Preparing` status and schedule ACK suggest missing session authorization as a
+    possible cause, but do not prove it. User-directed read-only inspection is not a
+    command or proof of charger behavior; never embed household data in the repo.
+  - The user's desired behavior is for SpotNav to request the appropriate OCPP
+    session start/authorization automatically when a car plugs in, so the stored
+    Morek schedule can control when current flows. Verify whether the installed HA
+    OCPP switch actually sends a remote start, represents transaction state, or has
+    other semantics. Reuse the existing OCPP integration, connector identity and
+    command admission, rather than adding a second OCPP server or reviving the
+    competing legacy window-by-window start/stop/current loop.
+  - A session-start request is a physical control operation, not a harmless UI
+    toggle. Design a single schedule-owned, connector-bound authorization path that
+    respects a person's Stop/Pause and retained 0 A, current limits and native
+    protection. Before any request, require an eligible active Auto intent and the
+    verified scheduling/electrical conditions needed to avoid accidentally allowing
+    immediate or unrestricted charging. An upload ACK alone and an old composite
+    readback cannot establish those conditions; define fresh evidence and block
+    honestly when it is insufficient. Do not clear or weaken existing profiles.
+  - Monitor genuine connector, transaction and charger availability observations
+    without assuming the switch is a reliable session inventory. Distinguish a
+    successful request/ACK, an authorized session, reported charging and measured
+    flow. Handle unplug/replug, a normal car-completed charge, session termination,
+    HA/OCPP reconnect and an autonomous charger restart: detect whether a session
+    actually needs reauthorization and safely reconcile only when permitted, rather
+    than continuously forcing the switch on. No unsolicited restart after a person
+    Stop, explicit pause, fault, disconnected vehicle or ambiguous/unknown outcome.
+  - Define bounded attempts, deduplication and recovery; a timeout or uncertain
+    remote-start outcome must not cause rapid or blind retries. Preserve lifecycle
+    generation and Stop ordering through disconnect/reconnect, even when the previous
+    request may still complete. Keep the BMW's own charge limit separate. Explain
+    pending/offline/refused/unknown states and any retained limit in the sidebar;
+    coordinate with 5.7b2 and 12.4/12.7 rather than duplicating status machinery.
+  - Use focused actual-module tests with mocked HA/OCPP/storage for plug-in,
+    valid/invalid schedule evidence, no plan, successful/rejected/unknown start,
+    duplicate events, unplug, car completion, person Stop/Pause, power/charger restart,
+    HA restart/reconnect, race/late response and non-Morek regression. Test that
+    opening the UI does not start charging. Implement local development only: no
+    live switch action, profile send/clear, restart or deployment without separate
+    approval. The user determines any physical test; ACK is not measured charging.
+- [x] **5.6b Person Stop and retained-schedule policy** (2.5.52 local, unarmed, mocked; quick coordinator review)
+  - Quick review found no blocker to proceeding to 5.6c; the isolated planning and
+    lifecycle suites were independently rerun (522 passed, 1 deselected; 256 passed).
+    This is not a comprehensive safety audit or evidence of deployed behavior.
+  - Auto's existing Stop/Pause and Resume boundaries route a unique schedule owner
+    to connector-bound durable intent; the worker requests a held-off profile or the
+    latest valid plan under its existing admission and uncertainty guards. Offline
+    intent requires an exact physical ID or one unambiguous retained alias mapping,
+    plus matching durable ownership. A persisted Resume after a process restart
+    requires explicit reconfirmation before dispatch; it is never reported as done.
+  - Production dispatch remains unarmed and schedule-owned sidebar controls remain
+    disabled. Mock tests cover generation races, pending/rejected/uncertain outcomes,
+    bounded readback and restart; ACK/readback do not prove physical flow. The held
+    exit has no release path, and live validation remains user-directed in 5.8.
+  - **2.5.51 partial:** the sidebar explicitly disables schedule-owned Pause/Resume
+    while dispatch is unarmed and distinguishes reported intent, request, ACK,
+    readback and unknown physical charging. The person-facing action, durable Resume,
+    offline recording and complete mocked race verification remain unimplemented.
+  - **2.5.50 partial:** an internal, versioned connector-bound pause record in the
+    existing outcome ledger selects a held-off worker profile under simulated authority;
+    it is not derived from legacy `until_resumed`. It is not exposed as a person-facing
+    action, and Resume is not implemented. Offline pause, durable Stop/Resume races,
+    bounded readback end-to-end and sidebar presentation still need work. Production
+    dispatch is unarmed and this substage remains open.
+  - **2.5.49 partial:** a Stop reservation invalidates older connector work and the
+    worker rechecks after persistence awaits. Flat 0 A readback can match only a
+    bounded one-hour interval. The held-off builder is not wired to Pause; durable
+    schedule-owned Pause/Resume and its operator status remain unimplemented.
+    Production dispatch remains unarmed; this substage is not complete.
+  - Implement the user's agreed **Pause / Resume Auto** control under schedule
+    ownership. Pause requests charging stop and remain held until explicit Resume;
+    Resume returns control to the latest valid automatic plan. A failed, offline or
+    unknown update is not a confirmed physical stop. Do not silently release a
+    retained 0 A limit when the plan or a safe replacement is unavailable.
+  - Define the necessary fail-closed behavior for person Stop and a future stored
+    profile. Keep a Stop/pause, upload suspension, profile removal and mode exit
+    distinct; no automatic blanket clear. Test persistence, races, restart, unknown
+    outcomes and measurements without claiming physical stopping from ACK/readback.
+    The optional Stage 10 **Return to Auto** cancels only Charge Now; it is not
+    Pause and may allow charging immediately if the automatic plan calls for it.
+- [x] **5.6c Invalid-plan and competing-writer policy** (2.5.54 local, mocked; quick coordinator review)
+  - Quick review found no blocker to proceeding to 5.7a; independently reran the
+    isolated planning suite (544 passed, 1 deselected) and listed lifecycle suite
+    (270 passed). This is not a comprehensive safety audit or deployed verification.
+  - The unarmed worker now checks process-local planner provenance against current
+    selected source and revisions, authoritative per-day documents and UTC window
+    coverage, relevant vehicle/settings/connection facts and the existing SOC freshness
+    rules at every pre-dispatch validation. Invalid evidence leaves retained limits and
+    pending Resume untouched; Pause's held-off intent is independent of prices. Manual
+    preview retains its previous contract. The existing unarmed gate is unchanged.
+  - Conservative scope: only target-SOC cheapest-price plans have checked provenance;
+    manual-kWh and solar/hybrid proposals are blocked as `plan_input_provenance_unavailable`.
+    Do not activate those cases without implementing and reviewing their energy/forecast
+    evidence. This is a refusal, not a claim that such plans are intrinsically invalid.
+  - Manual Send/Clear now also honor Stop generation across persistence waits; ordinary
+    admission refuses work while a Stop is reserved. The separate regulator protection
+    path remains unchanged. External writers and installation protection cannot be
+    inventoried or controlled here; they and held-exit resolution remain 5.7 blockers.
+    Tests are mocked and no physical behavior or operational mode is claimed.
+  - **2.5.53 partial; not complete:** manual profile admission now rechecks the
+    connector generation after the awaited ownership lookup, refusing a Stop that
+    superseded it there. Existing worker and admission tests pass, but this is not
+    the full invalid-plan/competing-writer policy or its requested test matrix.
+    In particular, dispatch-time freshness independent of a new planner publication
+    and actionable conflict reporting still need investigation and coverage.
+    External/OCPP writers and installation-specific regulator interactions cannot
+    be ruled out locally; composite readback is not a profile inventory.
+  - Handle no/stale/invalid prices or plan and existing conflicting writers without
+    silently releasing a stored limit or disabling protection. Report blockers and
+    test mocked reconnection, person Stop and regulator exceptions. Do not implement
+    household load balancing or dynamically adjust amps for house load.
+  - Reuse 5.6b's durable Pause/Resume intent, generation checks and uncertainty
+    handling. Keep the unarmed production gate; a restarted pending Resume requires
+    fresh confirmation. The held-exit interlock has no release path and must not be
+    bypassed; resolve or explicitly carry it as an activation blocker into 5.7.
+- [ ] **5.7 Activation implementation and pre-install automated validation**
+  - Assign 5.7a or the focused 5.7b1–5.7b3 continuations individually; deployed
+    activation and testing are the user's own 5.8 milestone, not LLM tasks.
+  - Replace legacy execution for the supported Morek connector with the existing
+    guarded schedule worker and planner triggers, using a safe migration and durable
+    evidence. Do not build a runtime switch back to the old controller. Preserve
+    protections, do not retry unknown outcomes, and do not silently arm an unsafe
+    migration on update. The user installs and decides when to operate it.
+  - Test changed and unchanged settings/prices/SOC → backend replan → guarded schedule
+    reconciliation, startup/reconnect and conflict/uncertainty cases. Show proposal,
+    sent ACK, effective readback and real measured flow separately on the live dashboard.
+  - Provide practical current charging and execution-health monitoring in the sidebar:
+    reuse available genuine charger/vehicle status and fresh measured power or energy,
+    identify the source and freshness, and show offline, waiting, mismatch, failure or
+    uncertain states when supported. Distinguish a charger-reported charging state from
+    measured flow; never label an ACK, offered current or proposed window as charging.
+    If a trustworthy source is unavailable, show unknown and the limitation rather
+    than inventing a reading or blocking development on a live hardware test.
+  - Verify restart/reconnect and safe person Stop/protection behavior with automated
+    coverage. Summarize useful manual checks and known limitations for the user;
+    ACK or matching effective limits are not proof of physical flow. No overnight
+    test is mandatory, and no live contact or operation is implied.
+  - Carry forward the unrun 5.4c HA-plugin dashboard API/contract/golden suite;
+    run it on a supported local host if available. If not, report the exact gap
+    and evidence to the user before installation; do not claim it passed or halt
+    unrelated implementation just to provision the test environment.
+- [x] **5.7a Replace Morek execution with the schedule owner** (local mocked implementation; coordinator review pending)
+  - **Reading note (2026-11-14):** the "partial / stays open / remains unarmed" bullets below are dated
+    history from 2.5.55–2.5.66. Current status is this checkbox plus the later guarded automatic
+    dispatch, recovery and session-start entries (5.6d, 9.5, 9.6, 10.x, Stage 14); AGENTS.md states that
+    guarded automatic upload code exists. The deployed behavior is unverified (5.8).
+  - **2.5.66:** a minimal connector/migration-bound non-profile recovery proof is
+    stored in the existing outcome document after completed handover checks or an
+    explicit admin reconfirmation of an eligible older owner. Startup rereads the
+    owner, settled outcome and durable intent before recovering. Under the user's
+    landed-write policy, a valid proof is usable after restart even if its save
+    raised or was cancelled. A Stop never durably recorded before a crash may be
+    lost; a durable Pause is preserved. Old owners without proof need one eligible
+    admin reconfirmation; unknown outcomes and unverified owners remain blocked.
+    No proof establishes physical charging, protection or profile inventory.
+  - **Non-profile proof boundary:** a proof save that landed before raising or
+    cancellation has the same durable bytes as a successful save. A Stop that
+    occurs after those bytes land and is never durably recorded is likewise absent
+    after restart. The actual-module regression
+    `test_clean_handover_and_possibly_landed_completion_are_restart_indistinguishable`
+    exercises the existing completion boundary. Requiring automatic recovery from
+    the successful bytes while requiring a block for identical interrupted bytes
+    needs an additional persistence/ordering guarantee or a product decision about
+    the latter case; adding another ordinary marker does not supply that guarantee.
+    The existing response-bound recovery remains in place; 5.7a stays open.
+  - **2.5.65 partial restart recovery:** a settled response from a worker request
+    admitted with the completed migration's current process ticket is now stored
+    as connector/migration-bound dispatch evidence. A later startup can recover
+    automatically after rechecking that evidence, owner, ledger, lifecycle and
+    Stop generation. This evidence records a software ordering, not profile
+    inventory or physical charging. Old records and a migration that has not yet
+    produced such a response remain ambiguous and require explicit recovery;
+    unchanged old acknowledgements cannot safely be converted into the new proof.
+    Thus automatic recovery is not universal and 5.7a remains open. See handoff.
+  - **User correction:** routine HA restarts must not require a reconfirm button.
+    Automatic recovery is the desired daily behavior. The current 2.5.64 process
+    ticket requires reconfirmation after restart, so this is an outstanding gap,
+    not accepted final behavior. Implement automatic recovery for safely evidenced
+    states with actual-module restart/Stop-race tests; keep interrupted or uncertain
+    states blocked and explain them. Do not simply invoke the manual confirmation
+    on startup or claim an unrecorded Stop can be reconstructed after a crash.
+  - **2.5.64 local verification:** a clean reconnect can revalidate
+    a ticket known in the same process; Stop, identity changes, uncertain outcomes and
+    stale lifecycle events fail closed. Process restart still requires an administrator
+    to reconfirm completed ownership; an interrupted completion write can have landed
+    and an unrecorded Stop cannot be reconstructed. Real-admission planner input
+    races at both persistence boundaries and late ACK/composite readback after Stop
+    have new tests. Real-admission Resume/Stop during pause-intent persistence and
+    cancellation/newer-barrier contention during reconnect revalidation are covered.
+    This is local mocked evidence, not proof of deployed or physical behavior.
+  - **2.5.63 wired, full matrix/review outstanding:** connector-bound completion,
+    a generation/lifecycle-bound process ticket, explicit admin reconfirmation after
+    restart/reconnect, production owned admission and final worker persistence checks
+    now have local mocked coverage. Real setup → restart/reconfirmation → real
+    admission → worker → mocked OCPP succeeds. Reconfirmation itself sends nothing.
+    The complete requested actual-admission safety/provenance race matrix is not yet
+    established; do not mark this substage complete on the strength of that one path.
+    A Stop not durably recorded before a crash cannot be recovered. Native protection,
+    external writers and the present physical charger state are not established.
+  - **2.5.62 safety correction, not completion:** startup/reconnect no longer
+    releases its barrier for an old or unconfirmed owner. No completed evidence is
+    produced yet, and production admission remains unarmed. The completion-save,
+    crash/Stop recovery, actual dispatch and full mocked race matrix remain open;
+    see the current handoff. External-writer absence and native protection are
+    limitations to report, not universal machine-proof prerequisites.
+  - **2.5.61 partial:** new unarmed entry transitions carry a versioned migration
+    ID; the owner save carries the same ID as `owner_written_unconfirmed`. This
+    survives a possibly-landed owner save but is deliberately not completion evidence.
+    Old records remain readable and unverified. Production dispatch remains
+    unconditionally unarmed. A crash/Stop-safe completion protocol and real admission
+    remain to be implemented and tested; see handoff. External-writer absence need
+    not be machine-proven, per the user's decision, but uncertainty is not proof of
+    retained-profile safety or permission to clear a charger.
+  - **2.5.60 partial:** startup now reserves the same lifecycle barrier before
+    ownership initialization, and a handover is interrupted by any newer lifecycle
+    revision even if an identity changes away and back. Wired reconnect tests cover
+    additional Stop, duplicate callback, identity, cancellation and save-failure
+    boundaries. Production dispatch stays unconditionally unarmed: an owner record
+    alone does not prove handover completed after an interrupted save, and external
+    writer/protection evidence is not established. Full invariants remain open.
+  - **2.5.59 partial:** reconnect may release its generation-bound barrier only
+    after unique schedule ownership is compared against the durable document and
+    the settled outcome ledger, with lifecycle, connector and Stop rechecked under
+    admission. Existing owner admission still excludes ordinary writers and
+    production owned-profile admission remains unconditionally unarmed. Stale,
+    uncertain, cancelled or ambiguous release attempts stay closed. This is mocked
+    groundwork; the full wired migration race matrix and 5.7a remain open.
+  - **2.5.58 partial:** availability callbacks synchronously reserve a target
+    writer barrier before scheduling initialization. A barrier remains closed for
+    the process lifetime, including failed or stale recovery; person Stop and the
+    separately classified protection path retain their existing treatment. Mocked
+    lifecycle tests cover the pre-task gap, a pre-admitted writer and a real setup
+    path through the unarmed owner. The full requested lifecycle/race matrix and
+    production admission remain open; see handoff before treating this as complete.
+  - **2.5.57 partial:** charger setup now starts the existing unarmed connector
+    drain before Auto startup and invokes the existing producer-locked handover.
+    A unique durable legacy binding and settled connector-ledger attempt are required;
+    missing ownership is not initialized on this path. Missing or uncertain ledger
+    evidence leaves the entry interlocked. This is not active schedule dispatch.
+    Full setup/reconnect race and failure coverage, restart provenance, and the
+    remaining production admission invariants still need review; see handoff.
+  - **2.5.56 partial, not complete:** startup/reconnect no longer automatically
+    aborts interrupted unarmed entry markers back to legacy. It preserves the marker
+    and existing held-exit interlock; owned dispatch remains unconditionally refused.
+    Legacy-owned records and missing-document compatibility still need a reviewed
+    safe migration, including person Stop and uncertain prior writes. The interrupted
+    5.7a enable/disable draft remains in the working tree for review but its WebSocket
+    actions are refused and it grants no dispatch authority; no mode switch is offered.
+    The full single-owner migration and its admission/race matrix remain open.
+  - **2.5.55 partial, not complete:** read-only readiness and sidebar evidence now
+    explicitly report first-use/lost-state ambiguity, unresolved retained profiles,
+    held handback, external writers, protection and authorization. No enable or
+    disable operation was added; production admission remains unconditionally unarmed.
+    An enablement intent or acknowledgement cannot establish physical facts. The
+    safe migration, final-dispatch checks and their race/persistence test matrix remain.
+    This historical partial predates the decision below; a dynamic legacy handback or
+    separate runtime enable/disable mode is no longer a product requirement.
+  - Make schedule ownership the single execution path for the supported Morek
+    connector, reusing existing guarded worker and planner code. Preserve shared legacy
+    behavior for other chargers and independent protection. Assess existing ownership
+    and held-exit records before changing them; safely migrate known states and refuse
+    ambiguous or uncertain states rather than deleting or bypassing their safeguards.
+    Do not automatically restore the competing legacy controller for Morek.
+  - Replace the unconditional owned-profile refusal only if the complete applicable
+    admission, durable ownership, migration, restart and safety invariants are
+    implemented and tested; otherwise retain it and report the exact blocker. Target-SOC
+    cheapest-price plans are the only currently provenance-checked scope; do not silently
+    enable manual-kWh or solar/hybrid modes. Surface supported scope and refusal reasons.
+  - Disabling the HA integration is the user's chosen way to stop SpotNav; it may
+    leave a schedule or 0 A limit on the charger. Explain this honestly; no automatic
+    clear or runtime legacy handback is required. Resolve or retain blockers for
+    unknown profile outcomes, retained-profile consequences, first-use/lost-state
+    ambiguity, external writers and installation protection; do not treat the removal
+    of a mode switch as evidence that the charger is in a safe state.
+- [ ] **5.7b End-to-end local regression and release handoff**
+  - Include the 5.6d schedule-owned new-session authorization path before claiming
+    automatic plug-in operation is complete; schedule ACK alone cannot start a session.
+  - 2.5.67 is a partial local continuation, not a reviewed release candidate.
+    Failed dashboard refreshes now withdraw cached connection, SOC and proposal
+    observations immediately. The practical reported-charging and measured-power
+    binding and the full requested wired regression matrix remain unfinished. The
+    broad worker run fails on timezone initialization, and the mocked browser check
+    fails its pause-status assertion; resolve and rerun before completion. The full
+    HA-plugin suite cannot start on this Windows host (`fcntl` missing). See handoff.
+  - Exercise settings/price/SOC → plan → guarded reconciliation, stable-plan
+    deduplication, restart/reconnect, uncertainty and operator status with mocks;
+    include the deferred 5.4c suite if a supported local host is available.
+    Report exact unrun tests, known blockers and useful manual checks to the user;
+    do not install or access the deployed system as part of this substage.
+  - Mock-test the actual monitoring path for charging/not charging where supported,
+    unavailable/stale data, offline status, errors and schedule mismatch; show what is
+    known and what is not without treating status alone as measured power. Document
+    available source limitations for the user's own deployed checks.
+
+  **Focused continuations:** preserve all in-progress work and assign these in order;
+  5.7b is complete only when their applicable local checks and review are complete.
+
+- [x] **5.7b1 Sidebar custom-element collision**
+  - The user reports the sidebar is no longer blank. The local 2.5.68 fix and
+    registry/coexistence browser checks are recorded in the handoff; the exact
+    deployed version and cause of the improvement were not independently checked.
+  - The user observed installed 2.5.66's sidebar blank with a duplicate `wa-icon`
+    registration exception; the sampled HA Core log also contained the error. Top-level
+    Web Awesome registration guards do not necessarily cover transitive dependencies.
+    A separate scoped-registry source-map 404 may be non-fatal; investigate independently.
+  - Inspect and preserve the existing in-progress registration fix and browser fixtures.
+    Verify the built panel mounts with a clean registry and with `wa-icon` and relevant
+    components already registered, including use alongside the existing card where
+    applicable. Do not globally weaken HA's custom-element registry or conceal real
+    import errors. Local browser tests do not prove the installed HA fix.
+- [x] **5.7b2 Live charging and health binding** (2.5.119, local mocked tests only; not
+  deployed or verified against a real charger. Which of the sources below exist on the user's
+  installation is unknown.)
+  - Implemented: Morek status `readiness.live` (backend `_live_measurements`) reads, read-only
+    and bound to the OCPP connector target, the connector's reported status, `current_import`
+    (A), power (W) and the cumulative energy register (kWh; not session energy). Power has no assumed
+    entity: it is the user-configured power entity, else the one enabled OCPP registry sensor whose
+    unique id names `Power.Active.Import` of exactly this connector; none or two candidates read as
+    unknown (`live.sources`). The energy register uses the same strict identity match. Each carries its own
+    HA timestamp and a `fresh` flag (180 s). Missing, unavailable, non-finite, negative-energy,
+    unknown-unit or untimestamped values are null; a real 0 stays 0. Power is never derived from
+    current or a schedule. The sidebar's `live-charging.js` shows reported state, measured power
+    or current, and the register separately, requires matching connector ids, withdraws
+    everything on a stale/failed status refresh (2.5.67 handling), and raises a warning on a
+    reported-vs-measured disagreement without resolving it. Sent ACK/effective limits remain
+    separate evidence. Not done: session energy/history (Stages 6–8), a power source for
+    chargers that expose none, per-connector selection beyond the Morek connector.
+  - The existing sidebar adapter still reports measured power as unavailable. Inspect
+    the backend's existing reported charger state, measured-power, energy-register
+    and integration paths; bind only evidence with an appropriate source, connector
+    association and freshness. Show unknown when unavailable; distinguish reported
+    charging, measured power, actual zero, stale data, sent ACK and effective limits.
+  - Include mocked backend/frontend tests for normal, unavailable, stale, offline,
+    error and mismatch states. No rendering-triggered charger writes, invented readings
+    or assumed installed measurement source. Reuse 2.5.67's failed-refresh handling.
+- [ ] **5.7b3 Local acceptance and release handoff** (PARTIAL, 2026-11-13, local mocked only; the
+  user excluded browser and long-running suites, so those acceptance items are unrun, not passed.
+  Done: worker timezone harness fix, stale unit-test fixture fix, stale browser-check wording
+  fix; see the handoff entry "5.7b3 partial local acceptance". Open: browser rerun
+  (desktop/emulated mobile), full worker/planning suites, 5.4c on a supported host,
+  installed-HA/physical observations. 2026-11-14 audit: this is the **only** remaining
+  checklist item that is local acceptance rather than a feature; it stays `[ ]` because those runs
+  are unrun, is optional unless the user asks, and blocks neither Stage 15 nor 5.8. Later stages
+  ran focused isolated runners only (for example Stage 14 and 9.x test files); that is not these suites.)
+  - Investigate the mocked browser check's failed Pause-status assertion against the
+    current UI/fixture; fix the real defect or stale test, not just its expectation.
+    Rerun it through desktop and emulated mobile and all remaining interactions.
+  - Fix the local worker-suite timezone initialization and rerun the full worker suite;
+    complete real-module mocked plan → admission → worker regressions including Stop,
+    restart, stale inputs and unknown outcomes. Run the 5.4c HA-plugin dashboard suite
+    on a supported host if available; its Windows `fcntl` import failure means unrun,
+    not a pass or an application failure. Report any remaining test gap precisely.
+  - Prepare a concise handoff for the user's own installation and manual testing;
+    do not deploy or contact HA. Actual HA rendering, external writers, protection
+    and physical charging remain unverified until separately observed.
+
+### 5.8 — User-owned installation and deployed validation milestone
+
+This is **not an LLM implementation substage**. After 5.2–5.7 and 5.3a are
+complete and reviewed, the user plans to merge the current branch to `main`, install
+the release in HA, and perform deployed testing themselves. The LLM must not merge,
+push, deploy, restart HA, enable charging or operate the charger as part of this plan.
+The user can ask for help interpreting logs or diagnosing a problem; access or any
+live operation still requires specific approval, with read-only diagnostics first.
+Do not expose credentials or private household data.
+
+Useful observations for the user's own testing include the loaded version, real
+prices and vehicle/charger data, settings and notifications, replanning without an
+open dashboard, and safe behavior on reconnect or errors. When the user chooses to
+enable the reviewed automatic mode, distinguish the calculated proposal, sent ACK,
+effective readback, transaction authorization and actual measured charging. Changed
+valid intent should reconcile; unchanged or unsafe intent must not cause duplicate
+or unsafe dispatch. A request, ACK or readback alone does not prove charging.
+
+Record deployed operation as unverified until the relevant observations are actually
+available; report blockers or gaps honestly. This does not make Stage 6–9 history or
+optional polish a prerequisite for initial installation. The user's merge and test
+plans do not themselves authorize an LLM to perform those actions.
+
+### Stage 6 — Real history data (old B1)
+
+Stage 6 remains open and is **not required for the initial 5.8 release**. The
+repository already has `sessions/store.py`, `sessions/recorder.py`, session APIs,
+energy-register discovery and `execution/power_energy.py`; inspect and reuse these
+before adding storage or an importer. `debug_day.py` retains limited diagnostic
+rows for debug use, not an established production charging-history source. The
+existing Morek outcome record is not a complete versioned history. None of these
+facts proves which historical or live measurements this installation exposes.
+Use the source inventory to improve the current charging/health view as well as
+history; do not defer the basic honest status and unknown indicators in 5.7 to
+historical analytics.
+
+- [x] **6.1 Source inventory** (repository inspection only, 2026-11-13; see "6.1 source inventory" below. No live HA, Recorder, charger or BMW access; installed availability of every source is unverified.)
+  - Inventory existing session, energy-register, integrated-power, OCPP and Recorder
+    paths first; identify exactly what is genuinely measured, derived or unavailable,
+    along with timestamps, resolution, retention, freshness and connector association.
+    The 5.6a readiness view did not establish a trustworthy Morek power or active-
+    transaction source; do not assume either exists from status or offered current.
+  - Consider Bavarian CarData as fallback/cross-check; verify home-session association,
+    battery versus wall energy, coverage and gaps before use. Repository/mock inspection
+    can start locally; installed HA/Recorder or hardware checks require the user's
+    specific approval and remain user-directed, not a separate hardware-testing stage.
+- [x] **6.2 Capture and provenance** (2.5.121, local mocked; no live HA/charger/BMW check; coordinator review pending)
+  - Implemented in `sessions/evidence.py` (new bounded store `spotnav_charging_evidence`, separate from the session
+    store, which it does not change): immutable sent-plan versions written from the real `_send_profile_shared`
+    path (the exact profile of the attempt, id, fingerprint, source, intent kind, settings revision, time zone).
+    A version is recorded before dispatch, so it is **not** proof of sending, and neither is the `dispatch_started`
+    marker written synchronously just before the OCPP call (a crash, cancellation or lost write between marker and
+    call sends nothing): it means "possibly dispatched". A received `ack` (status other than `unknown`) is separate
+    evidence that the charger answered; `dispatch_aborted` (with a reason) means nothing was sent. `dispatch_state`
+    returns `ack_received`, `dispatch_started`, `aborted_before_dispatch`, `conflicting` or `unknown` (no events or
+    only an unanswered ACK); absent or conflicting events are never read as sent. `readback` and `removal` are further events. Readbacks are tied to
+    a version only when published as its current readback. Measurements are captured for the Morek connector
+    only, once a minute, through the existing `_live_measurements` reader: `power_w`, `current_a`,
+    `energy_register_kwh` and, as status-only evidence, connector `status`, each with source entity, HA state time
+    (`t`), receipt time (`r`), unit, source rule and quality flags. Unreadable sources are explicit gap rows,
+    capture restarts are marked, duplicates are dropped, conflicting duplicates, out-of-order arrivals, counter
+    decreases, future timestamps and stale sources are kept and flagged. `derive_energy` / `energy_segments` is the
+    6.3 seam. It reads gap rows and restart marks and never bridges them: power is integrated only across an
+    observed, trustworthy pair (no recorded gap or capture restart between, no stale/future/out-of-order/
+    conflicting endpoint, source and unit unchanged, <= 660 s); otherwise the segment is `unknown` with `kwh: null`
+    and `reasons`. A meter-register difference across a gap, restart or stale endpoint stays a `meter_counter`
+    amount but is labelled `coverage: "unobserved"`, `placement: "unknown"` (how much, not when); a counter
+    decrease, source change or conflicting duplicate is `unknown`. Plans, limits, ACKs and status never create samples.
+  - Bounds (whichever is hit first, oldest dropped): age 7 days; 4320 rows per measurement kind per charger (exactly
+    3.0 days at one row per 60 s tick, so at full rate the count binds, and slower-reporting entities last up to
+    7 days); 120 plan versions, 600 events, 100 restart marks. Worst case about 2.6 MB of JSON for the four kinds
+    (estimate from a ~150 B row, not measured on an installation). The earlier "60 days / 4000 rows" claim was wrong:
+    4000 rows is 2.8 days at full rate. Coverage between ticks is only known through recorded gaps and restarts.
+  - **Not done / limits:** no query API, no observed-charging-interval or noise-threshold definition, no per-session
+    link, no tariff snapshot (6.3); settings/mode changes are only captured as the plan versions they cause;
+    the 60 s tick keeps the latest state, so changes between ticks are lost and a down HA leaves a gap; the shared
+    power reader reads exported (negative) power as 0; the entity set, cadence and Recorder coverage of the
+    installation, and Bavarian CarData, remain unverified and unused; the readback hook has no actual-boundary
+    test (store-level only).
+  - Extend/reuse verified existing stores as appropriate to retain immutable sent-plan
+    versions and genuine measured power/energy or validated source events. Existing
+    aggregate/session/debug records must not be assumed to contain a complete trace.
+  - Label measurement-derived energy estimates separately from meter counters; handle
+    resets, duplicates and gaps. Never substitute plans, offered limits, ACKs or
+    schedule windows for observations; unknown is not zero.
+- [x] **6.3 Queries and retention** (2.5.124, local mocked; no live HA/charger/BMW check; coordinator review pending)
+  - Implemented: `sessions/history.py` (`charging_history`, `compact_days`), command `spotnav/get_charging_history`
+    (`api/sessions.py`), see `docs/api.md`. Plan versions now keep the tariff and published prices in force when they were
+    made (`plan_tariff_snapshot`, stored once per distinct content as `blobs`, referenced by digest, dropped with their
+    versions); an unreadable tariff is `unknown`, never a default and never today's tariff. A version is only the **last acknowledged
+    intent** (accepted ACK), never proof of the effective profile: it is known until the next accepted ACK, a recorded
+    removal, or the first retained uncertain write (unanswered dispatch marker, conflict, ACK of `unknown`, dispatch
+    events of a pruned version, a version whose events are gone); then the plan is `unknown` (`unknown_plan_spans`,
+    flow there is `plan_unknown`), not carried forward. Writers outside SpotNav and restarts leave no event: only
+    `restarts_after_ack` is reported. Effective-limit readbacks never restore knowledge or act as inventory. Observed charging intervals use only
+    trustworthy measured `power_w` pairs (>= 100 W, 2 consecutive samples; the 100 W/2-sample thresholds are assumptions,
+    unverified on the Morek); an edge beside a gap, restart or the data edge is unbounded. Planned blocks (known spans only; `intent_uncertain_after`
+    flags one cut short) are `flow_observed`, `no_flow_observed` (only when measured samples cover the whole block and it
+    starts inside retained evidence) or `unknown`; flow outside an
+    applying plan (120 s tolerance) is `outside_plan`, flow with no applying version is `no_plan_evidence`. Energy bases are
+    never summed and a basis with no segment in the window is `null` with `coverage`, not 0 (a measured zero is 0.0); unobserved meter energy has no placement. Windows are UTC instants (a DST day is 23/25 h); max 7 days,
+    200 rows per list. Finished local days are digested once (capture tick, first tick per day), kept up to 62 days, never
+    replaced, and keep the fiscal choice but not price rows.
+  - Tests (`tests/test_stage_63_history.py`, 19, isolated runner): midnight + restart, gap inside a block, in-plan flow and
+    an isolated spike, unacknowledged/rejected versions, replaced/removed plans with their own tariffs, unreadable tariff,
+    blob sharing/retention, counter reset and unobserved energy, empty/partial retention, digests, DST/windows/timestamps,
+    API refusals and non-admin read, send-path tariff wiring; 2.5.124 review fixes: ACK then unknown upload, later ACK, pruned/orphan events with restarts and readback, block before retained evidence, absent energy versus measured zero. A review-time bug was fixed: same-zone aware datetimes
+    subtract by wall clock, so windows are normalised to UTC.
+  - **Not done / limits:** no per-session link (sessions overlap by time only, cost is not recomputed here); no card/panel UI;
+    digests rely on the capture tick running; only Morek is captured; what the real entities, cadence and noise floor look
+    like, readback against the real fetch path and storage size are unverified; Bavarian CarData unused.
+  - Extend existing session/history APIs where suitable with bounded retention and
+    queries carrying original tariff, plan, source and coverage context. Do not use
+    today's plan or changed tariff to silently reconstruct older sessions.
+  - Test restart/midnight, gaps, charging outside the sent plan and a planned block
+    with no observed flow using deterministic fixtures and mocked boundaries.
+
+### 6.1 source inventory (repository evidence at manifest 2.5.119)
+
+Scope: what the code can read or store, not what this installation exposes. Nothing
+below was checked against live HA, the Recorder database, the charger or the BMW.
+"Observed" means seen in source or tests; installed availability is unverified.
+
+| # | Source | Evidence kind | Timestamp / resolution | Provenance and association | Retention | Limits / unknowns |
+|---|--------|---------------|------------------------|----------------------------|-----------|-------------------|
+| S1 | Closed/open charge sessions: `sessions/store.py`, `model.py`, `recorder.py` (stores `spotnav_sessions`, `spotnav_sessions_open`) | **Derived** energy per session, split into per-price-interval `Slice` kWh with the raw spot price (`costing.split_energy`) | Session `start`/`end`; energy accrues per sample (60 s tick plus charger events); no power trace and no sample list kept | `energy_source` = `register` / `integrated_power` / `estimated` (estimate = requested current x phases x time, not a measurement); `charger_id` = config entry id; `started_by`, strategy, vehicle id and `vehicle_decided_by`; `register_entity` only while open | Closed: 730 days and at most 5000 per charger; 24 h `closing` copy; written 15 s after a change | Cost is recomputed from the *current* fiscal settings (`cost_basis: current_settings`) unless a legacy stored cost; no sent-plan version, ACK or readback; sessions under 0.01 kWh are dropped; end = last time seen charging after a 120 s debounce. Whether the Morek entry's recorder has a real register is **not established** (the generic `_async_start_session_recorder` runs for charger entries; Morek-specific behavior is untested). |
+| S2 | Energy register: `energy_register.py`, `vehicles/ocpp_identity.py` (`ENERGY_REGISTER_KEY`, `connector_measurand_entity`), `soc_estimate.read_energy_register_kwh` | **Measured** cumulative kWh counter (`Energy.Active.Import.Register`; needs Wh/kWh and `total_increasing`) | HA state time only (`last_updated`/`last_reported`); cadence is the OCPP integration's MeterValues interval, unknown here | Strict registry-identity match for exactly one connector (charge point + connector); two matches or none -> unknown; a flat unique id counts only on a single-connector point | None in SpotNav; HA Recorder statistics only if the entity has them | Cumulative, not per session; resets handled in the recorder (`RESET_TOLERANCE_KWH` 0.5); a register appearing mid-charge never adds earlier energy; cloud registers may lag. Installed entity unverified. |
+| S3 | Integrated power to energy: `execution/power_energy.py` | **Derived** (trapezoid of a `device_class: power` sensor, W/kW) | Per sample; an interval counts only if both ends are fresh and within `max_age_s` (660 s for a charger's own sensor); negative power reads as 0 | Only when a smart plug or charger has no register (`CONF_POWER_ENTITY`, sensor `{entry}_integrated_energy`) | Counter restored across restart; a restart begins with no previous sample | Gaps are never filled. Relevant to Morek only if a power entity is configured. |
+| S4 | Live connector reading: `api/morek_schedule.py:_live_measurements` (5.7b2) | **Measured/reported, instantaneous**: status, `Current.Import` (A), power (W), register (kWh) | Per-reading HA time; `fresh` = within 180 s; no history | Bound to the OCPP connector target; power = configured entity, else the one enabled registry sensor naming `Power.Active.Import` of exactly this connector (`sources.power`) | None (status payload only, not stored) | 5.6a/5.7b2 did **not** establish a trustworthy power or transaction source; `transaction` stays `unknown`. A fresh measurement never implies authorization, plan or session. |
+| S5 | Morek records: `execution/morek_outcomes.py` (`spotnav.morek_schedule.connector_outcomes`), `api/morek_schedule.py` store, `execution_ownership.py` | **Command/ACK/readback evidence**, not charging | Per operation | Morek station and connector 1; desired / attempt / acknowledged / verified / removal | One current record per connector (overwritten); not versioned | Not a history. ACK or readback is not flow (AGENTS.md); must never feed "measured". |
+| S6 | `debug_day.py` (`DayStore`, `ChargerDay`) | **Diagnostic** minute rows and the last 5 plug-ins with bounded logs | One text row per minute; debounced write every 300 s | Per charger entry; "nothing in it is read back by a decision" | Rows 24 h, 5 plug-ins, 150-300 entries per log | Not a production history feed. At most a cross-check; do not promote. |
+| S7 | Recorder long-term statistics: `sessions/history_import.py` (`recorder_hours`), `site/hour_statistics.py` | **Measured, hourly-aggregated** `change` of a register or `mean` of power/current | Hour (UTC start); 5-minute statistics only about 10 days (HA default) | Entity level only, no connector or session identity; `history_import` groups consecutive hours >= 0.1 kWh into synthetic sessions (`imported_hourly`, `started_by: unknown`) | HA purge settings; import reaches 730 days and only before the first live session | Hour resolution cannot give window edges; a 15-minute price split is an average. Needs `state_class` statistics: whether Morek's register or power sensor has them is **unverified**. Read-only, executor/background only. |
+| S8 | Recorder raw state history of the OCPP sensors | Would be **measured** at the integration's cadence | State change time | Same registry identity as S2/S4 | HA `purge_keep_days` | **No code path reads Recorder state history for charging** (statistics only). Using it in 6.2 is new code; an installed check needs the user's approval. |
+| S9 | Raw OCPP MeterValues / StatusNotification / transactions | **Not available to SpotNav** | n/a | SpotNav reaches OCPP only through the HA `ocpp` integration's entities and the charge-point object used by `morek_session.py` for StartTransaction and profile calls | n/a | No subscription to MeterValues, transaction ids or events was found. Do not invent one. |
+| S10 | Vehicle SOC (BMW): `vehicles/soc_estimate.py` (`SocReader`, store `spotnav.soc_anchor.<entry>`), `vehicle_discovery`, `identification_sources` | **Vehicle-reported level** plus a register-based estimate (flagged `estimated`) | `last_updated` or the car's own report time (`time_basis`: `vehicle_timestamp` / `last_updated` / `anchor`), checked by `check_report_time` | Per vehicle id; one anchor per charger entry | Latest anchor only, no series | A level, not wall energy; needs capacity and efficiency; cloud polls can arrive late (field case: 15 min, 2.7 kWh). |
+| S11 | BMW integration `bavariandata` (BMW CarData): fixture `tests/fixtures/cars/bavariandata.json` (JustChr/BavarianData at c05403f2, 82 entities) | **Catalogue snapshot only**, not live | Unknown per entity | Entities per VIN: SOC displayed/target, charging status/method/AC amps and volts, `charging.power` (W, measurement), `isPlugged`, charging-port status, location lat/lon, `charged_energy_session` (`total`) and `charged_energy_total` (`total_increasing`) | Unknown (HA Recorder as configured) | Naming mismatch to resolve: fixture domain is `bavariandata`, `docs/supported.md` says "BMW CarData (`cardata`)". No code reads `charging.power` or `charged_energy_*` for history. Battery-side values, not wall energy; home-session association (plug and location entities exist, unused for this), coverage and gaps are unverified. Cross-check candidate only. |
+| S12 | Price/plan context: `pricing/price_store`, `price_history`, `market_observation`, planner preview | Published prices and the *current* plan | Price interval (15 min or hour) | `area_id` on sessions; tariff via the current `FiscalChoice` | Provider dependent (Nord Pool about two months of day files) | Today's plan and tariff are not stored per session; plan versions are not retained (6.2). |
+
+#### Findings for 6.2 and 6.3
+
+1. **Reuse, do not add stores.** `SessionStore`/`ChargeSession` already hold energy per price interval for 730 days. Gaps for 6.2: no per-session sent-plan version, no measured power trace, no sample cadence or provenance, no coverage/gap field, and cost follows current settings.
+2. **Genuine measurements exist only as HA entity states** (S2, S4, and S3 when configured). `Power.Active.Import` is optional: the code never builds its id and treats none or ambiguous as unknown. 6.2 must label meter-counter energy (S2) separately from integrated (S3) and estimated energy.
+3. **Existing timestamps are HA state times, not meter times.** The 180 s freshness bound is a presentation limit; an unchanged state can look stale. Store source entity, `observed_at` and gap state with each captured value.
+4. **S5 and S6 are not measured history.** They are command and diagnostic evidence.
+5. **Recorder state history (S8) and raw OCPP events (S9) have no code path.** Prefer capturing from live states into a bounded store; Recorder statistics (S7) are hourly with no connector association.
+6. **BMW (S11) is fallback/cross-check only.** Prove association, units and coverage before any use.
+
+#### Unverified on the installation (any live check needs the user's specific approval)
+
+Which of S2, S3, S4 power, S7, S8 and S11 entities exist for the Morek connector or the BMW; their cadence and Recorder coverage; whether the Morek entry's session recorder opens sessions and with which register; whether `transaction_id` and `Power.Active.Import` sensors are enabled; the BMW integration's actual domain and entities; home-session association; gaps and retention.
+
+### Stage 7 — ECharts prices and schedule tracks (old B3)
+
+The real-data stepped-area price chart and proposal overlay, source boundaries,
+negative/missing/DST mocked cases, wheel zoom, pointer tooltips, reset, snapping
+and zoom-preserving updates are **already implemented locally in 5.4c**. Reuse
+them; do not rebuild, rebind or repeat that work. The full HA-plugin dashboard
+suite remains unrun and is tracked in 5.7b; actual HA and physical-touch behavior
+remain unverified and any live checks are user-directed, not a new test stage.
+
+- [ ] **7.1 Available-day navigation**
+  - Add Yesterday/Today/available future/All shortcuts only for periods the real
+    price source can actually provide. Clearly report missing history or future
+    prices; do not synthesize days or assume tomorrow is always published. Reuse
+    5.4c's existing horizon and source-boundary zoom behavior.
+- [ ] **7.2 Practical chart interaction**
+  - Fix actual usability or responsive-resize problems in the real chart, including
+    source-resolution and timezone/DST changes. Preserve existing zoom, tooltip,
+    wheel and reset features; no separate accessibility-polish project is needed.
+    Physical touch remains unverified until the user chooses to test it.
+- [ ] **7.3 Aligned tracks**
+  - Distinguish proposal/sent/effective/measured tracks and minimum-SOC exceptions.
+  - Show mismatches and missing observations honestly; reuse Stage 6 provenance.
+- [ ] **7.4 Price insight sources and methods**
+  - Inventory available historical/published price data and its basis, resolution,
+    retention and coverage; define and test explainable comparisons and upcoming
+    opportunities. Missing history or future prices must be reported, not invented.
+- [ ] **7.5 Live price insights and monthly statistics**
+  - Bind validated 7.4 price sources to current/upcoming assessments, best available
+    windows and monthly summaries, reusing 5.1c design. Show baseline, coverage,
+    price basis and assumptions; do not describe opportunities as the charging plan.
+
+### Stage 8 — Yesterday and financial summaries (old B4 + C1)
+
+This is later work, not a prerequisite for the initial 5.8 installation. Reuse the
+existing session store, recorder, history and savings APIs and Stage 6's genuine
+measurement/plan evidence; extend them only where needed. Existing session costs
+use current settings or a stored legacy cost, so do not assume historical tariffs
+were preserved. Coordinate chart tracks with 7.3 and monthly insights with 7.5
+rather than implementing the same feature twice.
+
+- [ ] **8.1 Yesterday comparison**
+  - Default to yesterday with date selection; show measured charging against the
+    plan actually sent, price context, actual energy, timing differences and
+    out-of-plan charging where evidence exists. Reuse the shared chart.
+  - Show gaps and unknown coverage separately from confirmed absence of flow;
+    never use a plan or readback as a substitute for measured charging.
+- [ ] **8.2 Costs**
+  - Extend existing calculations for plan energy and estimated cost, per-window
+    costs and measured/estimated session, day and month totals. Preserve the tariff
+    context available at the time and label estimates and missing historical rates;
+    do not silently price past charging using today's tariff. Test missing and
+    negative prices and fee/tax changes.
+- [ ] **8.3 Savings and summary cards**
+  - Extend existing savings calculations using an explicit comparable baseline for
+    the same energy, such as charging immediately after plugging in at comparable
+    power. Distinguish forecasts from historical estimates, show coverage and
+    assumptions, and report unknown when evidence is insufficient, not zero.
+  - Keep totals consistent across dashboard cards and reuse 7.5 monthly insights.
+
+### Stage 9 — Recovery and diagnostics
+
+No separate themes, light/dark modes or extra accessibility-polish project is
+needed for this single-user dashboard. Keep the interface usable on desktop and
+mobile, with readable warnings and working essential controls. Installation and
+user-directed testing belong to 5.8; this stage is not another prerequisite.
+
+Substages 9.1–9.3 were removed as open-ended catch-all work; 9.4 retains its
+number to avoid changing existing references. Specific defects can be assigned
+when identified, rather than remaining indefinite roadmap tasks.
+- [x] **9.4 SpotNav activity and diagnostic logs (2.5.113 local, mocked; see "Implemented" below):** use native Home Assistant Core
+  logging and add useful SpotNav log messages for investigating planning, price
+  availability, SOC/inputs, schedule reconciliation and outcomes, session starts,
+  charger availability, Pause/Resume and Charge Now. Include actionable refusal and
+  error reasons and distinguish intent, ACK, reported session and measured charging.
+  Do not log credentials, authentication identifiers or raw OCPP payloads.
+  - Provide a SpotNav menu view of recent and live Core logs filtered to the SpotNav
+    namespace, with practical text/severity filters, reusing HA's existing log
+    facilities rather than creating a separate log store. First verify stream/API
+    availability, authorization, retained history and compatibility for the installed
+    HA environment; report unsupported access or history limitations rather than
+    claiming a native per-integration app log exists. SpotNav is an integration, not
+    a separate HA app/container. Do not expose unrelated Core logs to unauthorized
+    users or enable verbose OCPP/websocket logging.
+  - Test normal events, errors, filtering, permissions, unavailable streams and
+    reconnect/history behavior with mocks. Avoid excessive repeated messages, and
+    document the normal HA Core logs fallback. No live HA access is authorized by
+    this roadmap item.
+  - Implemented (2.5.113, local, mocked only; not deployed, not verified in a live HA):
+    - API check from the installed HA 2026.9.2 source: Core's `system_log` offers an admin-only
+      `system_log/list` websocket command (50 deduplicated warning/error entries by default, no text/namespace
+      filter, no history of INFO lines) and an optional `system_log_event` bus event; there is no per-integration
+      log, no subscription stream for ordinary records, and the full file (`/api/error_log`) is an unfiltered admin
+      download. None of these is a SpotNav-filtered view, so they were not used. The viewer reads SpotNav's
+      existing `SpotNavLogBuffer` (a handler on the `custom_components.spotnav` logger tree, already kept for the
+      debug bundle: INFO+ 300, DEBUG 200 only if enabled, WARNING+ 24 h/500 across restarts); no new store.
+    - `spotnav/get_logs` (`api/logs.py`, administrators only, stable `spotnav_not_admin`): severity and text
+      filters, newest-N limit, `after_seq`/`boot_id` incremental polling (a restart is detected and reloaded),
+      records scrubbed with the debug bundle's `Scrubber`. Sidebar panel: a "SpotNav logs" section
+      (`frontend/sidebar/log-viewer.js`) visible to administrators, filters, Refresh and a Live switch that polls
+      every 5 s only while the section is open, keeps what was shown when a poll fails and stops when closed;
+      text is rendered with `textContent`.
+    - New lines (each INFO unless noted, codes only, no ids or payloads): a person's Pause/Resume/Return to Auto
+      and Charge Now recorded as an *intent* or refused with its code; Morek session-start state changes (WARNING
+      for rejected/uncertain), logged once per change and worded as a request outcome, not measured charging.
+      Earlier lines already cover schedule decisions (14.6), planning refusals, readback and Auto/charger events.
+    - Limitations: polling, not streaming; history is only what the buffer holds (lost INFO lines before a
+      restart; older or other-integration records need HA's own log: Settings > System > Logs); the DEBUG filter
+      shows records only if DEBUG is enabled for SpotNav (the viewer never changes a level); price-availability
+      and charger-availability changes are covered by the existing 14.6 decision line (blocker codes), not by
+      separate new lines; the viewer has no browser test. A stored warning from before a restart has no sequence
+      number, so it appears only on a fresh (non-incremental) load.
+- [x] **9.5 Automatic Morek recovery and visible failures (2.5.117 local, mocked; user accepted the interrupted-Resume exception):** make the existing Auto
+  schedule and session paths recover from ordinary failures without requiring repeated
+  manual Resume or sync. This is a focused reliability task, not a new controller.
+  - Audit and fix restart/reconnect, offline charger, unavailable prices and other
+    transient blockers: re-evaluate automatically when the condition clears, including
+    after HA restart, and use a bounded backoff where no suitable event exists. Avoid
+    rapid loops and duplicate commands. The 2.5.98 local settled-Resume recovery is
+    partial groundwork, not proof that all restart and Resume cases recover.
+  - Apply the user's approved one-time clean-start policy to missing historical
+    evidence, while preserving genuinely recorded pending/unknown operations. Handle
+    definite rejections with bounded cooldown retries; do not blindly repeat a
+    timeout or possibly applied write. Read-only checks can inform recovery but an
+    effective composite schedule is not an inventory of profiles and cannot alone
+    establish whether an uncertain upload applied.
+  - Automatically re-evaluate schedule mismatches and reconcile the latest intended
+    plan where permitted; retain a clear, actionable recovery path when evidence
+    remains genuinely uncertain. Do not clear profiles or remove an uncertainty
+    record merely to unblock dispatch.
+  - Surface current blockers, retry timing and outcomes prominently in the sidebar;
+    never silently show a queued sync as a successful upload or treat ACK/readback
+    as measured charging. Coordinate diagnostic details with 9.4, without making
+    log-viewer implementation a prerequisite for clear status.
+  - Preserve explicit Pause/Stop, electrical protection, unique connector identity,
+    ownership and existing generation/race guards. Test real mocked production wiring
+    for reconnect/restart, delayed prices, settled versus interrupted Resume, rejected
+    and unknown uploads, mismatch, Stop races, session start and Charge Now, including
+    bounded retries and visible failure states. No live operation is authorized.
+  - Implemented (2.5.115, local, mocked only; not deployed, not verified in a live HA, no browser run). Reuses the
+    14.5 rejection retry, the 14.6 decision/blocker evidence, the reconnect/availability hook in `__init__.py` and
+    planner price/SOC events; no new controller or store:
+    - **Transient blockers** (`morek_schedule.TRANSIENT_BLOCKERS`: charger/identity unavailable, prices
+      stale/unavailable/incomplete, plan inputs changed, stale or missing vehicle input, a finished Stop's
+      `stale_generation`, worker error) are re-evaluated by `MorekScheduleWorker._arm_blocker_timer` when no event
+      arrives: 60 s, 180 s, 600 s, then every 900 s, at most 12 timer-driven re-evaluations per blocked episode
+      (about 2.5 h; counting continues across unrelated triggers and resets only when the blocker ends). Events
+      (reconnect, price publication, SOC, plug-in) still re-evaluate at any time, also after the timed checks stop.
+      A re-evaluation only runs the normal guarded read-and-compare path; a send still passes ownership, identity,
+      generation, person-Stop and protection checks. In memory: a restart re-arms from the first run.
+    - **Never timer-retried:** an uncertain/unknown write, a person pause/Stop, Charge Now, ownership or protection
+      conflicts, settings problems. A definite rejection keeps its own 14.5 cooldown (300 s, 900 s, then stops).
+    - **Interrupted Resume - automatic restart recovery NOT delivered (2.5.117):** after a restart a durable
+      `resume_requested` continues only when this process holds its ticket or the pre-existing 2.5.98 evidence
+      matches (settled accepted attempt carrying the Resume's id, matching acknowledgement and fingerprint). A Resume
+      that was never dispatched, was rejected, or was aborted before dispatch is **not** recovered automatically; the
+      person must press Resume again. Reason: a person Stop can be reserved in memory while the Resume is being made
+      durable and the process can die before the Stop's own record or the `resume_interrupted` marker is written; the
+      ledger cannot distinguish that from an ordinary interrupted Resume, and no write ordering closes the window (the
+      2.5.115 evidence-based recovery and the 2.5.116 `resume_unsettled` two-write marker only narrowed it, and were
+      removed). Still protected: a Resume that a person Stop pre-empted in this process (`worker.resume_interrupted`) or
+      durably (ledger `resume_interrupted` id, written under the connector lock when a Stop pre-empts a committed Resume;
+      a new person Resume uses a fresh id), an unknown outcome, and a recorded Stop (it replaces the Resume record).
+      Applies to the session-start coordinator's use of `_resume_authorized` too.
+      **User decision:** the fresh Resume required in this ambiguous case is acceptable; this completes 9.5 with
+      that explicit exception. Do not claim the Stop race is eliminated or that deployed behavior is verified.
+    - **Sidebar:** a prominent `#recovery-banner` (`frontend/sidebar/recovery-banner.js`, shown only from a fresh
+      status) states the blocker, what SpotNav does next (next automatic check time, remaining rejection retries,
+      timed checks stopped) or that a person is needed; an unknown write is shown as an error that is not retried and
+      not cleared, and no accepted request or readback is called charging. Status adds
+      `reconciliation.recovery.blocker_retry` (code, attempts, limit, next_retry_at, exhausted) and more blocker codes
+      mapped to actions.
+    - Tests: `tests/test_stage_95_recovery.py` (real worker and send path, mocked HA/OCPP/admission, including a crash
+      after the Resume commit with an unrecorded Stop) and `frontend/test/recovery-banner.test.ts` (5, including the
+      real panel). The two `test_morek_worker` tests keep their original "requires confirmation after restart" results.
+    - Limits: timed re-evaluation state and the in-process `resume_interrupted` mark are memory only; a Stop whose
+      request was lost by a crash before its record was written cannot be seen; the 12-check cap means a very long
+      outage relies on the reconnect/price events; the status route is not exercised end to end; layout is unchecked
+      in a browser; physical charging and the deployed version remain unverified.
+
+### [x] Stage 9.6 — Plug-in activation fix (2.5.126, local mocked; not deployed or live-verified)
+
+- Installed 2.5.124 failed to authorize on plug-in: an undecorated state listener ran in the executor and
+  `note_plug_in` -> `async_create_task` raised before the connection token was set. Fixed with `@callback`, an
+  exception-safe `observe`, individual blocker reasons, bounded timer recovery of transient blockers, flap handling
+  that never creates a duplicate connection, plan/SOC freshness no longer gating the start, and a visible
+  `accepted / no_transaction_observed` state. Details, limits and the unchanged earlier-unknown-start interlock are in
+  the handoff entry "Plug-in session activation fix". 2.5.126 review: a flap-created connection now yields exactly
+  one plug-in recalculation, and the start no longer calls `worker._intent` (side effects, swallowed refusals).
+
+### [x] Stage 9.7 — Charge-session status and plugged-in warning (2.5.127, local mocked; not deployed or live-verified)
+
+- The existing sidebar now says whether a plugged-in car will charge: a `#charge-session` card above the recovery
+  banner (`frontend/sidebar/charge-session.js`, pure) and the same wording in the dashboard readiness evidence (the old
+  "transaction / authorization unknown" text is replaced). States: unknown/stale, offline, fault, unplugged, pending
+  (grace), accepted-awaiting-charger, observed transaction, normal scheduled wait, Pause/Stop, suspended, reported
+  charging, measured charging, finished, and prominent warnings (accepted without a transaction, rejected, start not sent,
+  start blocked, outcome unknown). Off switch / no transaction in Preparing before authorization is shown as normal (**current 2.5.128 behaviour; superseded by Stage 15 decision 5 / 15.5 / 15.7: off or unconfirmed will show as not yet ready to charge**);
+  an ACK is never shown as a transaction or as charging; only fresh measured power or current says "Charging".
+- Backend evidence added (read-only, additive): `readiness.session_start_at` (when the request state last changed, memory
+  only), `readiness.live.control_state` (charge-control switch on/off) and `readiness.live.transaction` (present/absent
+  only, never the id, with `changed_at`). `readiness.transaction` stays `unknown`. Details and limits are in the handoff
+  entry "Charge-session status and warning".
+
+- 2.5.128 hardening: scheduled-wait and "Authorized" wording needs fresh transaction evidence; the hold needs a fresh
+  readback or an accepted, unexpired sent plan (shown as planned, not proof); no text promises power; an unmatched
+  transaction never suppresses an accepted-no-transaction, rejected or blocked warning; protection conflicts are to be
+  resolved, not bypassed. Still local mocked and unverified on hardware.
+
+### Stage 10 — Optional Charge Now (after initial installation)
+
+This is a user-requested **nice-to-have after 5.8**, not a prerequisite for the
+initial working release, its installation or live validation. It can be prioritized
+after 5.8 independently of Stages 6–9. The backend and sidebar control are locally
+implemented with mocked tests, pending review. Deployment or hardware actions
+require specific approvals; this roadmap grants none.
+
+**User decisions for Stage 10:** Charge Now defaults to one hour; offer 30 minutes,
+1 hour, 2 hours, 3 hours and a custom end time. A new request replaces the existing
+end time, calculated from now. It may be set before the car is plugged in: the end
+time stays fixed, and an eligible later plug-in uses the remaining time. Show the
+current price and whether it exceeds the user's cap in a single confirmation; an
+unknown price is shown as unavailable and does not block Charge Now. Missing SOC or
+other Auto-planning data does not by itself block this explicit request. An existing
+person Pause/Stop does block it: ask the user to Resume Auto first. Charge Now's
+price-cap override does not override electrical protection or execution interlocks.
+On expiry or Return to Auto, follow the latest valid Auto plan; if Auto selects now,
+charging may continue. The override has a fixed scheduled end; when no valid Auto
+plan can be applied, end its charging window at that time and let Auto resume when
+it can. Pause/Stop during an active override cancels Charge Now and applies the
+pause; a later Resume returns to normal Auto, not the canceled override.
+
+- [x] **10.1 Bounded override and return to Auto** (2.5.93 local mocked implementation; review pending)
+  - Accepted override attempts now bind verification to the connector, lifecycle,
+    exact override ID and current intended schedule. Replacement, cancellation,
+    expiry and Stop invalidate old verification; a match is only effective-limit
+    evidence, not installed-profile inventory or proof of physical charging. The
+    focused actual-module and mocked-OCPP checks and their limits are in the handoff.
+  - **Historical 2.5.92 production-path draft:** connector-bound persisted
+    requests and early return now trigger the existing worker; the worker restores a
+    fixed expiry and uses the existing admission/outcome and session coordinator paths.
+    Status includes price/cap where available and separate intended/attempt evidence.
+    Focused mocked action-to-real-admission dispatch and several lifecycle cases pass.
+    At that point override verification and additional race tests remained open;
+    2.5.93 addresses the local checks listed above. Stage 10.2 remains open.
+  - **Partial groundwork only (2.5.91):** an unwired profile-construction helper
+    combines a fixed override window with valid subsequent Auto windows and refuses
+    existing block/horizon limits. It does not validate plan provenance or authorize
+    or dispatch anything. Durable intent, action/status API, worker/session integration,
+    expiry, restart, Stop races and the requested end-to-end tests remain open.
+  - Implement a deliberate temporary **Charge Now** override, defaulting to one
+    hour and accepting other user-selected durations/end times. Make any price-cap
+    override explicit and show the current price or honestly report it unavailable;
+    an unknown price does not block the explicit request.
+  - Reuse the same Morek schedule owner, fixed-current on/off schedule builder and
+    durable execution evidence as Auto. Do not use a competing legacy start/stop
+    loop, household load management or dynamic amp regulation.
+  - On expiry, return to the latest valid automatic plan and reconcile the schedule.
+    Include the override end and feasible subsequent automatic windows in the owned
+    schedule when possible, so the intended handback does not depend solely on HA
+    being online at that instant. Respect actual charger block/horizon limits; never
+    silently drop or broaden plan windows. Define honest degraded behavior when the
+    latest plan or an upload is unavailable.
+  - **Cancel Charge Now** ends the override early, recalculates the automatic plan and
+    sends the new automatic schedule through the same owner. Auto's normal rules then
+    control charging. If Auto selects the current time, charging may continue or
+    restart immediately; do not suppress a valid current window or promise a distinct
+    zero-current pulse. Cancelling Charge Now is not a persistent person Stop/pause.
+  - Preserve person Stop and explicit pause as separate existing semantics. Define
+    override behavior on Stop, concurrent edits, restart, disconnect, stale prices,
+    missing SOC, unknown upload outcome and charger/vehicle authorization without
+    weakening interlocks or automatically retrying uncertain writes. A schedule does
+    not itself authorize a transaction or prove physical flow.
+  - Use focused mocked actual-module tests for expiry, early cancellation, an active
+    automatic window, changed plans, offline/reconnect, unknown outcomes, price/cap
+    basis, selected durations, charger limits and concurrent Stop/pause. No live
+    operation is authorized by these tests.
+- [x] **10.2 Dashboard controls** (2.5.95 local mocked implementation; review pending)
+  - The existing sidebar has one Charge Now / Return to Auto control and a duration
+    disclosure for custom ends and replacement. The activation confirmation includes
+    the exact requested fixed end, known price/cap comparison and price-plan override.
+    Intent, upload ACK, effective limits, session-start request and measured charging
+    remain distinct. Stale, paused, unauthorized and uncertain cases are blocked or
+    explained. No charger action occurs when opening or refreshing the panel.
+  - Focused mocked sidebar checks passed; jsdom cannot validate actual layout or
+    touch. HA installation, mobile/desktop interaction and physical charging remain
+    unverified. The user-directed live review remains subject to separate approval.
+  - Add one **Charge Now** control with duration choices to the existing sidebar;
+    while active, the same control becomes **Return to Auto**. The other daily
+    control is **Pause / Resume Auto** from 5.6b, not an extra cancellation button.
+    Show override status/end, cap implications,
+    proposal versus sent/readback versus measured state, and explicitly explain that
+    cancelling may leave charging active if the automatic plan selects now.
+    While explicitly paused, ask the user to Resume Auto before Charge Now;
+    do not silently override a person Stop/pause.
+  - Test desktop/mobile interaction, confirmation, permission, race, stale and
+    unavailable states, and document the user-directed procedure. Show failed or
+    unknown schedule updates as unconfirmed, not as proof that charging stopped.
+    Any later deployment, restart, profile operation or physical test requires the
+    user's specific approval; do not claim mocked checks verify live behavior.
+- [x] **10.3 Plan with a partial published price horizon** (local mocked verification)
+  - Ready-by capped plans retain known cheap windows and add above-cap minimum energy
+    only when the derated remaining time and selected cheap energy make it urgent.
+    The controller rechecks partial capped plans at least every 15 minutes and on
+    publication, SOC and settings events. Partial results show the first missing
+    interval, unresolved energy and uncertainty. Uncapped waiting policy is retained;
+    Morek-owned urgent purchases use the exact estimated stop time.
+  - Actual planner/controller, real admission and mocked OCPP tests cover a provisional
+    plan and later price publication, bounded profile and deduplication; existing focused
+    guard, read-only status and deadline regressions also run. The original installed
+    system's cause, deployed operation and physical charging remain unverified. See the
+    handoff for limitations; these results are not permission for live operations.
+  - When the ready-by time extends beyond published prices, do not discard useful
+    known-price charging opportunities merely because the rest of the horizon is
+    unpublished. For example, plan a suitable cheap window today even if prices for
+    tomorrow morning have not yet arrived. This is an Auto planning fix, independent
+    of the optional Charge Now override; its placement here does not make it depend
+    on 10.1 or 10.2.
+  - Inspect the existing partial-horizon, price-wait and soft-cap paths first. Use
+    actual published prices only, mark the result provisional and show where price
+    coverage ends; never invent future prices or claim global optimality. Respect the
+    target SOC, soft cap and minimum-SOC policy, and explain any above-cap minimum
+    exception and unresolved energy shortfall honestly.
+  - Recalculate when the missing prices are published or relevant SOC, settings or
+    ready-by inputs change. Keep plans bounded to valid evidence and the supported
+    charger schedule horizon; do not create unlimited charging in unpriced periods.
+    Preserve connector, ownership, protection and uncertain-outcome guards.
+  - Test both planning and the actual guarded Morek worker path with mocked inputs:
+    today's cheap period with tomorrow unpublished, publication-triggered replanning,
+    no qualifying known-price window, minimum-SOC/cap behavior, price gaps or stale
+    data, and deadline and schedule boundaries. Distinguish a displayed proposal
+    from a sent schedule and measured charging. No live operation is authorized.
+
+### Stage 11 — Adaptive charging estimates for Morek — **SUPERSEDED, migrated to Stage 15.9–15.11 (2026-11-14); NOT implemented**
+
+`[>]` Stage 11 is closed as a *separate work queue*. It was **not** implemented: the Morek path does not
+currently feed the samplers; consuming existing stored estimates is already wired (source-verified 2026-11-14, manifest 2.5.128,
+below). Every still-useful requirement was moved to a bounded Stage 15 substage with its own
+acceptance; nothing was dropped. Do not assign 11.1 or 11.2 as such, and do not mark them done. The
+original intent is unchanged: charging-time and target-SOC estimates should improve from actual charging and
+a car that falls behind should cause a safe replan, reusing `planning/learned_power.py`,
+`planning/learned_energy.py` and `planning/plan_watch.py` (no new AI or duplicate learner). The BMW's own
+configured limit still stops the car at its target; estimates never replace or prove it. It is later work and
+not a prerequisite for 5.8.
+
+**Source facts behind the mapping** (reading only; mocked tests exist for the reused parts and prove no live
+behavior): `AutoPlannerController._arm_watch` arms a check only when `plan.auto_owned` has windows, and
+`_check_plan` (the only caller of `_sample_energy` and of the power sampler) runs only from it, so under Morek
+schedule ownership nothing is sampled. Both stores are already consumed by planning: `_morek_input_evidence`
+includes `_plan_power_cap_kw` and `_learned_energy_for`, so a changed learned figure already replans through the
+guarded owner. So the missing part is *feeding* the learners and safe behind-plan use, not wiring them to the planner.
+
+| Former Stage 11 requirement | Destination | State |
+| --- | --- | --- |
+| 11.1 Inspect how the samplers receive genuine power/energy and fresh SOC; find whether the Morek-owned path feeds them | Stage 15 audit table, "Learning stores" row (answer: it does not) | **Done as a source audit**; the connection itself is 15.9/15.10 |
+| 11.1 Extend the smallest existing seam; use only trustworthy measured sources and vehicle association; never learn from scheduled current, ACK/readback, estimated SOC presented as measured, or missing data | 15.9 Scope (60 s tick calling `_sample_energy`; first prove which controller facts are live under Morek; non-estimated SOC; register samples) | Open (15.9) |
+| 11.1 Reuse sample-quality, trust, bounds and persistence rules | 15.9 Reuse/Delta (existing store, trust, report-time pairing, bounds; constants changed only as listed) | Open (15.9) |
+| 11.1 Until evidence is sufficient keep the normal estimates and show learned values as unavailable | 15.9 fallback acceptance ("nothing learned"); display in 15.11 | Open (15.9, 15.11) |
+| 11.2 Connect learned power and wall energy per SOC to the Morek planner | Already consumed (`_morek_input_evidence`); only the data feed is missing: energy 15.9, power 15.10 | **Existing**; feed open |
+| 11.2 Slower-than-expected charge gets more time within windows and the deadline | Lengthening by learned energy: 15.9 (trust rule); by learned power (lengthen-only cap): 15.10 | Open (15.9, 15.10) |
+| 11.2 Use the existing behind-plan checks to trigger a fresh plan, reconciled only through the guarded owner | 15.10 (PlanWatch on the acknowledged active window; strict recalc; Stage 14 contract) | Open (15.10, deferrable) |
+| 11.2 Respect Pause/Stop, price and minimum-SOC policy, unavailable inputs, charger limits, unknown writes; report infeasible; never promise the target | 15.10 Exclusions/acceptance and the Stage 14 non-regression contract; infeasibility reporting is the existing planner's and is unchanged | Open (15.10) |
+| 11.2 Tests: reliable/insufficient samples, incorrect initial estimates, slow or interrupted charging, stale readings, restart, vehicle changes, safe replans | 15.9 acceptance (reliable/insufficient, incorrect initial estimate via the clamp, interrupted charging via exclusions, stale or estimated SOC, restart via the anchor, vehicle/capacity/guest changes) and 15.10 acceptance (slow charge, safe replan, send counts) | Open (15.9, 15.10); the restart and incorrect-estimate cases were made explicit in this audit |
+| "Deployed testing remains the user's decision"; BMW limit separate | Stage 15 settled decisions 9 and 10, "Learning rules" and queue item C | Preserved |
+
+New in Stage 15 beyond Stage 11 (user-agreed direction, not lost scope): asymmetric trust (a figure that
+would *shorten* the time needs 5 agreeing samples), gap/replay/taper exclusions, a −10%/+25% clamp and the
+display/reset in 15.11.
+
+### Stage 12 — Real sidebar usability and data clarity
+
+**Priority:** address the user's observed HA sidebar problems before the initial
+5.8 installation milestone, alongside—not instead of—the remaining 5.7b work.
+This stage covers the existing shared dashboard and real adapter, not a rewrite or
+a new hardware-testing stage. The screenshots are observations of an installed
+system. A subsequent user-authorized read-only HA investigation found an update
+entity reporting installed commit `dc7a8b4` (repository manifest 2.5.68), while
+the local checkout was 2.5.66 with subsequent uncommitted 12.1 work. The update
+entity is not independent proof of running code or deployed bundle contents; recheck
+Git and installed/running versions before making version-specific assumptions.
+Source inspection identified likely or confirmed defects; verify each fix with
+representative tests rather than assuming deployment parity.
+Assign one bounded substage at a time and stop for review. No deployment, HA access,
+restart or charger operation is authorized by this stage.
+
+**Backend is in scope:** these are functional fixes, not just visual polish. Trace
+each issue through the real settings, provider, planner and dashboard API paths;
+fix the underlying backend or contract where it causes incorrect, missing, stale or
+misleading data. Add actual-module backend tests and frontend-to-API regression tests
+as appropriate. Preserve existing valid settings and safe scheduling behavior. Do
+not fabricate data, force a source, change charging policy without explicit user
+action, weaken admission/safety checks, or claim physical behavior is verified.
+
+- [x] **12.1 Charger selection and understandable plan controls** (local implementation; coordinator review pending)
+  - 2.5.67 adds sole-charger selection and session-scoped selection restoration,
+    guarded reconnect/list races and retained drafts with revision-conflict blocking.
+    Shared dark controls and saved-value/mode guidance are updated; an absent SOC
+    target no longer blocks an unrelated supported settings edit. Nord Pool is a
+    suggestion, not a persisted default or provider selection. Local mocked tests
+    pass; actual HA shadow-root appearance and physical touch remain unverified.
+  - Automatically select and load the sole available charger when opening the
+    sidebar. Preserve an existing valid choice on reload/reconnect, handle no
+    chargers and list errors clearly, and retain explicit selection when multiple
+    chargers exist; opening the panel must not issue a charger write. Test loading,
+    reconnect, changed lists, stale responses and teardown.
+  - Fix the dark-theme contrast of the charger label, Web Awesome input labels,
+    checkboxes and other plan-control text in the actual shadow-root sidebar, not
+    just the preview. Keep labels and enabled/disabled states legible on desktop
+    and mobile. Preserve accessibility and the shared UI.
+  - Explain each control, its units, saved value and enabled state. In particular,
+    explain why target SOC is disabled in manual energy mode and how to configure
+    SOC-based planning using supported existing settings; fix any underlying settings
+    or API defect that prevents a supported mode/value from loading or being saved.
+    Make absent optional
+    minimum/cap values and ready-by enablement understandable.
+  - Offer sensible, explicitly identified initial values where supported, including
+    Nord Pool as the proposed cap basis when appropriate. Do not silently overwrite
+    existing choices, invent a target or minimum, enable a cap, change plan mode,
+    or persist a policy merely by displaying defaults. Distinguish the cap's price
+    basis from the actual price provider; preserve revision checks and draft safety.
+
+- [x] **12.2 Price provenance, cents and consistent formatting** (local implementation; review pending)
+  - 2.5.69 reports the current provider route separately from the actual held
+    market-day file providers, states and fetch times, including mixed and unknown
+    provenance. Existing routing already prefers loaded Nord Pool for supported
+    areas; no provider preference is overwritten. EUR chart and cap displays use
+    c/kWh at the UI boundary while settings remain major currency/kWh. Focused
+    mocked tests pass; browser, actual HA rendering and physical touch were not run.
+  - Trace the real published-price pipeline and show the actual available provider,
+    market/area, applicable data day, price basis and fetch freshness. Make missing,
+    stale, mixed or unavailable source information explicit. Verify whether and how
+    Nord Pool can be preferred by default without overriding an existing provider;
+    the cap-basis dropdown is not provider selection. Do not label a source Nord
+    Pool based solely on a dropdown, nor substitute sample data. Correct defects in
+    source selection, published data, freshness or API attribution where found,
+    with backend tests; do not restrict this work to changing the displayed label.
+    A read-only dashboard observation reported Nord Pool as market source; this is
+    attribution, not independent verification of each interval, and may change.
+  - Present EUR prices in **c/kWh** throughout the chart, price summaries, tooltips,
+    extrema, plan price and soft-cap input/line. Convert at a clearly defined display
+    boundary and convert edited caps back to the backend's existing currency/kWh
+    contract exactly once. Preserve saved settings, planner behavior and price-basis
+    semantics; never silently reinterpret a saved cap. Handle non-EUR currencies
+    honestly and do not label them euro cents.
+  - Apply consistent human-readable rounding to axes, tooltips, badges, extrema and
+    cap labels without changing underlying prices or window boundaries. Exercise
+    floating-point artifacts, negative prices, fractional cents, unavailable values,
+    non-EUR currencies, cap round trips, source intervals, gaps and DST. Test actual
+    shared chart/sidebar rendering and backend contract compatibility.
+
+- [x] **12.3 Useful plan details and honest missing data** (local implementation; review pending)
+  - **2.5.83 local follow-up:** battery estimates can use labelled last-known SOC,
+    including old/restored values; Morek schedule-owned uncapped target plans use an
+    estimated shortened final window. It is not a measurement or a physical stop.
+  - 2.5.73 exposes the calculation's ready-by instant and reconciled per-window
+    estimates from selected planner slots, with configured-variable cost basis and
+    unrounded weighted totals. Calculation-time SOC inputs support explicitly
+    labelled projections even when old. Unpriced or inconsistent details remain
+    unavailable. Focused mocked checks pass; actual HA/browser remains unverified.
+  - **Scope after 12.6 and 12.8:** 12.6 already displays last-known SOC, its
+    provenance/age and available capacity/efficiency (local implementation;
+    review pending). Reuse those paths rather than reimplementing them. 12.8's
+    flexible last-known-SOC planning policy is locally implemented for review;
+    do not revert its agreed no-age-cutoff policy or claim live operation.
+  - Investigate each prominent Unknown using the real dashboard contract. Bind
+    available deadline and planning information; provide the total weighted average
+    when valid priced total cost, positive wall energy, currency and cost basis support
+    it. Label estimates and basis consistently. Avoid calculating from rounded
+    display totals where authoritative unrounded values are available. Correct or
+    extend backend calculation and serialization when the required reliable data
+    exists but is not exposed correctly; verify settings-to-planner-to-API flow.
+  - Supply per-window estimated energy, cost and weighted price only from authoritative
+    planner output or a verified calculation consistent with the actual planner,
+    tariff basis, partial windows and total; extend the existing contract if needed.
+    Explain missing inputs instead of fabricating results. Test consistency across
+    the compact plan, full plan, modal and chart, including partial and unpriced plans.
+  - For SOC projections, identify missing or invalid usable capacity, efficiency,
+    SOC or mode and guide the user to supported configuration. Once 12.8 is
+    implemented, do not suppress an otherwise supported projection solely because
+    its valid SOC is old: label it as an estimate based on the last-known value,
+    including age/source when available, and make clear it may be inaccurate.
+    Never invent assumptions or report estimates as measured. Preserve the
+    distinction between the car's own target and SpotNav's planning target; do not
+    change planner or execution admission rules as a shortcut for display.
+  - Keep measured power, genuine history and price insights unavailable where reliable
+    sources or sufficient coverage do not exist. Reuse 5.7b and later Stages 6–8;
+    do not infer measured charging from planned windows or duplicate those stages.
+
+- [x] **12.4 Clear Morek status and evidence** (2.5.75 local; review pending)
+  - **2.5.83 local follow-up:** comparison coverage is bound to its readback timestamp;
+    older records without this association are unverified. Uncapped policy and summary
+    price formatting are explicit. Local mocks do not validate deployed behavior.
+  - The daily view separates proposal, sent/ACK, effective readback and measured
+    charging, with freshness and reported coverage; diagnostics and transitions
+    remain expandable. Missing or historical evidence is not confirmation.
+    Backend verification now expires outside its bounded coverage and identifies
+    held-pause versus plan comparisons. Focused mocks pass; mobile rendering,
+    live HA and physical behavior remain unverified.
+  - Replace the confusing wall of repeated warnings with a concise, actionable daily
+    status and expandable technical details. Clearly separate the current proposal,
+    last upload and ACK, effective readback with coverage/freshness, and genuinely
+    measured charging. Show each timestamp and explain stale or superseded evidence
+    in plain language, including why an old accepted readback does not verify a new
+    proposal. Do not present a historical comparison as current charger state.
+  - Explain ownership/migration or reconfirmation blockers only when supported by
+    actual status and show when the reason is unknown. Preserve material warnings:
+    retained final 0 A, uncertain outcomes, Stop and protection, readback not being
+    profile inventory, and ACK/readback not proving physical charging. Keep detailed
+    transitions, drift and diagnostics accessible without overwhelming the daily view.
+    Trace and fix any incorrect backend status, freshness, attempt association or
+    verification logic found, with mocked actual-module regressions; do not merely
+    hide an erroneous status or relax a legitimate blocker.
+  - Preserve all existing authorization, identity, revision, pause, uncertainty,
+    ownership and confirmation interlocks. No automatic send, reconfirmation, clear,
+    Resume or recovery may result from opening or simplifying the panel. Test current,
+    stale, superseded, mismatched, missing, offline and uncertain evidence, as well
+    as mobile rendering and no-write behavior.
+
+- [x] **12.5 Plan-mode selection in the shared sidebar** (2.5.80 local; review pending)
+  - Explicit revision-checked energy/target-SOC mode, requested energy and discovered
+    vehicle controls reuse the existing settings contract. Saved values and drafts
+    remain separate; missing prerequisites and potential guarded reconciliation are
+    explained. Focused mocks include actual settings-to-planner mode changes with an
+    old SOC. Browser, live HA and physical behavior remain unverified.
+  - The real settings observation reported `manual_kwh`, which plans a requested
+    energy amount rather than an SOC target. The existing card has a revision-checked
+    **Charge by** mode choice, but the sidebar only explains that the card must be
+    used. Let the user explicitly select manual energy or target SOC in the shared
+    sidebar, reusing the canonical settings contract and validation; this is not a
+    new controller or an instruction to switch automatically. Explain the difference,
+    the requested kWh, the selected vehicle and the independent car-side limit.
+  - For target SOC, present the discovered vehicle, target and missing prerequisites;
+    make stale SOC and unavailable capacity understandable. Preserve an existing
+    vehicle/target and other settings, enforce valid target/minimum relationships,
+    revision conflicts, permission checks and unsaved drafts. Do not invent a target,
+    wake the car or change BMW settings. Switching can replan and, when a legitimately
+    armed executor exists, trigger its normal guarded reconciliation; explicitly
+    explain this before saving rather than pretending the change is display-only.
+  - Test explicit mode changes in both directions, manual and SOC settings round
+    trips, stale/missing inputs, guest/ambiguous vehicles, permissions, failed and
+    concurrent saves, unchanged drafts and settings-to-planner flow. Opening or
+    editing without saving must not write. Keep existing execution interlocks.
+
+- [x] **12.6 BavarianData SOC provenance and freshness** (local implementation; review pending)
+  - 2.5.71 retains last-known SOC and exposes the reading's time basis, source
+    integration, retained/restored status and separate energy-derived estimate.
+    The sidebar distinguishes a vehicle report from an HA state write and keeps
+    stale/unknown-age values out of its energy estimates. Planner and execution
+    thresholds are unchanged. Fast mocked checks pass; actual HA/vehicle and
+    browser rendering remain unverified.
+  - A read-only HA observation established that the selected vehicle came from the
+    loaded `bavariandata` integration and the dashboard API contained an SOC reading
+    roughly 23 minutes old; the sidebar hid it under its 180-second freshness rule.
+    This is a time-specific observation, not proof of current data or update cadence.
+    Trace vehicle selection, report-time versus HA-state timestamp, freshness and
+    estimates end to end. Fix incorrect source/timestamp handling if found; do not
+    assume an unchanged value or entity refresh is a new vehicle measurement.
+  - Show a valid last-reported SOC with its age, source and clear stale/estimated
+    label instead of replacing it with Unknown. Show truly missing/unavailable data
+    honestly and identify the missing prerequisite. Separate presentation freshness
+    from planner/execution freshness: never treat the old reading as current or
+    relax the existing safety threshold merely to populate the UI. Do not wake or
+    poll the vehicle without an explicitly designed and approved action.
+  - Surface available capacity/efficiency and why SOC projections are unavailable,
+    sharing the relevant 12.3 work rather than duplicating calculation. Test real
+    adapter/backend contracts with fresh, stale, absent, restored and estimated SOC,
+    old report versus newer HA timestamps, source changes and updates over time.
+
+- [x] **12.7 Resume outcomes and ownership/evidence diagnosis** (2.5.74 local; review pending)
+  - **2.5.78 local follow-up:** the sidebar no longer prints an uninitialized
+    notice, uses fresh schedule-owned pause evidence for Resume rather than only
+    the legacy control axis, and explains unavailable controls without guessing the
+    cause of the reported incident. Mocked tests pass; live behavior is unverified.
+  - **Follow-up implemented locally in 2.5.77; review pending:** one-time automatic
+    missing-ownership clean start preserves an existing durable active pause, records
+    missing history without a fake attempt, and reuses completion on clean restarts.
+    Explicit Resume routes through schedule ownership. Focused mocked interruption,
+    Stop and restart tests pass; actual HA and charger behavior remain unverified.
+    The user explicitly accepts that absent history could conceal an earlier action;
+    missing history alone is eligible, not evidence that no profile exists. Recorded
+    uncertain or pending actions and other safety blockers must still block dispatch.
+  - 2.5.76 recognizes `legacy_execution_ownership_blocked` as a pre-effect refusal,
+    not an unknown action, and displays a fresh read-only legacy admission diagnosis.
+    A missing owner remains blocked: first use and lost records are indistinguishable
+    without further evidence. The reported code alone does not identify which current
+    barrier or record caused it; supervised investigation is still required.
+  - Manual-action feedback now preserves codes and distinguishes refusal, committed
+    follow-up failure and unknown outcome. A Stop racing a saved Resume invalidates
+    its ticket and reports the committed request, not an unchanged-state refusal.
+    Status distinguishes missing, unsettled, uncertain and unavailable outcome
+    evidence without changing admission. `pause_stop_failed` is not physical proof.
+    The earlier uncaptured Resume error remains unknown; 12.4's broader evidence
+    redesign and live verification remain open.
+  - The observed Resume request returned only a generic rejection in the sidebar;
+    its exact backend code was not captured and must not be guessed. Preserve and
+    translate stable action error codes into actionable messages. Distinguish a
+    refusal before effect, a durable action whose follow-up failed, and an unknown
+    transport outcome; never assert the prior state is unchanged for all failures.
+    Display recorded `pause_stop_failed` as a failed stop request, not proof of
+    physical stopping or charging, and show fresh state after an action when available.
+  - The read-only status observation reported a manual pause, missing ownership and
+    no recorded outcome attempt; `uncertain` was false while the blocker said
+    `profile_outcome_uncertain`. Investigate the real ownership/outcome migration,
+    admission and status logic in actual modules. Distinguish a missing or unsettled
+    record from a confirmed uncertain action in backend codes and UI; establish why
+    Resume is refused using mocked reproduction or future authorized diagnostics,
+    without falsely claiming these observations prove its cause. Reuse 5.7b and
+    12.4; fix genuine backend defects instead of just relabeling them.
+  - Provide only evidence-supported, supervised next steps. Never automatically
+    reconfirm ownership, clear profiles, erase records, retry Resume or infer an
+    absent retained schedule. Preserve person Stop, pending/unknown outcomes,
+    final 0 A and protection interlocks. Test missing/settled/uncertain records,
+    migration, restart, refusal, committed-follow-up failure, transport uncertainty,
+    stale responses and no automatic writes using mocked HA/OCPP boundaries.
+
+- [x] **12.8 Flexible last-known SOC for planning and Morek reconciliation** (local implementation; review pending)
+  - 2.5.72 accepts valid old actual SOC for capped and uncapped target plans and
+    Morek plan provenance without an age or plug-in cutoff. Capped planning still
+    refuses estimated SOC; uncapped estimate handling is unchanged. A genuinely
+    newer vehicle timestamp invalidates the prior proposal and triggers replanning;
+    unchanged HA writes do not imply a new report or force another schedule send.
+    Other safety, identity and price checks remain. Mocked tests are not live proof.
+  - The user explicitly wants the old uncapped planner's flexibility: a valid
+    last-known BMW/vehicle SOC may be used for target-SOC planning regardless of
+    age, including soft-cap/minimum-SOC planning. Do not introduce a fixed age
+    cutoff or reject solely because the reading predates the current plug-in.
+    Preserve its actual age, source and stale/estimated status in the UI and label
+    calculated energy, projected SOC and cost as estimates based on the last-known
+    value. Old data may be inaccurate after driving; do not claim otherwise.
+  - Trace the actual uncapped and capped planning and Morek worker provenance paths;
+    align the age-only admission checks so a valid older reading used for a current
+    plan can also support guarded reconciliation. Replan when a genuinely newer SOC
+    arrives. Do not conflate an unchanged HA refresh or restored value with a new
+    vehicle report, trigger a wake, or repeatedly send unchanged schedules.
+  - Preserve validation of SOC range, vehicle/connector identity, capacity, target,
+    minimum, price source and coverage, settings revision, lifecycle, person Stop,
+    protection, uncertain outcomes and all other admission safeguards. A missing,
+    invalid or unavailable SOC is not a valid old reading; handle estimates and
+    stale-versus-unavailable evidence explicitly. Do not assume an old value proves
+    current SOC or physical charging. This change does not authorize a profile send,
+    live operation, or bypass ownership and recovery blockers.
+  - Test actual backend planner and worker/admission paths for fresh and hours/days
+    old valid SOC, pre-plug readings, missing/invalid data, price-cap/minimum policy,
+    newer reports triggering replanning, unchanged refreshes, source/vehicle/settings
+    changes, pause/Stop and uncertain outcomes. Verify that normal uncapped behavior
+    is not regressed and estimates and age are accurately exposed in the sidebar.
+    Coordinate with 12.6 rather than duplicating its display or source-provenance work.
+
+Each substage includes focused automated tests and documentation. For integration or
+card changes, bump the manifest, build the frontend and verify `npm run check-dist`
+as required by `AGENTS.md`. Report any unrun HA-plugin suite and distinguish mocked
+tests from actual HA rendering or physical charging; never claim live validation from
+these changes.
+
+### Stage 13 — Useful configuration without the old card
+
+The user wants the new sidebar to be the practical daily interface, including the
+useful setup currently reachable only through the old card. Add a compact, organized
+advanced-settings area to the existing shared sidebar UI; do not recreate the old
+card or duplicate settings already provided. Reuse its canonical backend APIs,
+validation and saved configuration. Inspect current source before each substage:
+Stage 12.5 handles target-SOC/manual mode and vehicle selection, 12.2 price
+provenance, 12.3 plan details, and 12.4/12.7 Morek evidence and action errors.
+Implement and review one substage at a time. This is not authorization to access
+HA, deploy, restart, change electrical protection or operate the charger.
+
+- [ ] **13.1 Vehicle sources and planning properties**
+  - Provide a focused vehicle settings view for inspecting the selected vehicle's
+    actual SOC source and integration, choosing among ambiguous suitable sensors,
+    configuring usable battery capacity when not reported, and choosing the car's
+    onboard charging phases where supported by existing settings. Reuse existing
+    discovery/confirmation, validation and vehicle-property APIs; distinguish
+    reported values from user overrides and show missing or unavailable inputs.
+  - Coordinate with 12.5's vehicle selection and target mode and 12.6/12.8's
+    last-known SOC handling. Never silently choose an ambiguous source, invent
+    capacity, overwrite a saved selection or treat an old reading as new. Avoid
+    unnecessary options for the user's single-vehicle daily workflow.
+  - Test ambiguous/missing/removed sensors, reported versus overridden capacity,
+    phases, permissions, saves, errors, revisions and stale observations. Show when
+    a change can recalculate the plan; opening the view must not wake the car or
+    write anything.
+
+- [ ] **13.2 Market and charging-cost settings**
+  - Expose relevant existing market/price-area selection and tariff settings in
+    the sidebar: applicable VAT, energy tax and grid fees, including existing
+    supported time-dependent or percentage fee options where relevant. Reuse the
+    old card's backend contracts and fiscal calculations rather than building a
+    second tariff model. Keep the current provider route, held data provenance,
+    selected market, raw source price and configured variable cost distinct.
+  - Preserve existing values and explicit user choices; never silently switch price
+    provider, enable fees or assume Nord Pool prices exclude all charges. Show
+    currency/units, price inclusions, missing data and when a save affects planning
+    or cost estimates. Keep 12.2's c/kWh display and saved-unit conversions intact.
+  - Test supported/missing providers, area changes, variable and negative prices,
+    fee/tax basis, currencies, revision conflicts, permissions and resulting
+    settings-to-plan/cost updates. Do not invent historical tariffs; history remains
+    in Stages 6–8.
+
+- [ ] **13.3 Practical plan and charger parameters**
+  - Add relevant existing plan settings not already covered by 12.5: maximum
+    charging periods, planned current, and supported departure date/weekday options.
+    Preserve stored values and the same canonical validation/revision checks; show
+    defaults, limitations and when edits affect replanning. Avoid duplicating the
+    existing ready-by, cap, minimum or target controls.
+  - Explain that planned current is a schedule/planning input, not a household
+    load-balancing control; respect existing charger/electrical bounds and Morek
+    schedule transition/period limits. Never raise current or change protection
+    automatically, bypass Morek admission, or present unavailable modes as working.
+  - Test valid/invalid period counts and currents, date/weekday/deadline changes,
+    DST, permissions, conflicting revisions, unchanged saves and backend replanning.
+    Explicitly warn that a saved change can lead to normal guarded reconciliation
+    when the schedule owner is armed; opening/editing alone must not write.
+
+- [ ] **13.4 Notification settings and concise setup diagnostics**
+  - Reuse existing per-charger phone/recipient and event settings to let the user
+    select available HA mobile-app recipients and relevant plug-in, plan and
+    charging/problem events. Show no-recipient, unavailable, permission and save
+    failures clearly. Existing notification delivery and evidence limitations must
+    remain honest; do not claim a plan was sent or charging measured from a notice.
+  - Provide a compact, actionable view of existing capability/setup warnings,
+    including missing or ambiguous vehicle/charger measurement sources, pricing
+    configuration and execution blockers where actually exposed. Link to relevant
+    sidebar settings and reuse 12.4/12.7 instead of duplicating Morek debug text.
+    Preserve real warnings and distinguish reported states from measurements.
+  - Test missing phones, selected events, opt-in, notification persistence and
+    permissions, unavailable capabilities, stale data and concurrent changes with
+    mocked boundaries. Opening these views must not send a notification or command.
+
+**Intentionally excluded:** solar/hybrid and home-energy flows, site load balancing
+or dynamic household-current controls, the legacy immediate minimum-SOC start
+controller, direct legacy Start/Stop, automatic BMW wake or BMW charge-limit writes,
+and external debug upload. Keep existing protections intact. Temporary Charge Now
+remains Stage 10; genuine history/export and financial analysis remain Stages 6–8;
+live measured charging remains 5.7b2. Do not copy these features from the old card
+as part of Stage 13 or imply their backend behavior disappears when its UI is hidden.
+
+Each substage needs focused fast tests and accurate documentation, including real
+backend validation and settings-to-plan behavior where applicable. Preserve drafts,
+permissions, conflict handling and user settings. Follow `AGENTS.md` for manifest
+version, frontend build and check-dist; mock tests are not proof of installed HA or
+physical behavior. Any deployment or hardware action requires separate approval.
+
+### Stage 14 — Predictable planning and stable charging
+
+**User direction:** recalculate when inputs warrant it, but send only when the
+remaining effective schedule needs a meaningful change. Plug-in must cause a fresh
+calculation and a guarded comparison with the last accepted schedule, even if that
+comparison decides not to send. Routine sensor updates must not interrupt an active
+charging window. A reported charger state is not proof of measured power: distinguish
+charging, plugged-in/waiting, unplugged and unknown using existing trustworthy,
+fresh evidence; ambiguous or stale state is unknown, never silently assumed idle.
+This stage refines the existing planner and Morek owner, not a second controller.
+
+Implement one substage per session, in order, including production wiring, focused
+tests and documentation. Each is a comparable reviewable unit, not an equal line
+count. Reuse 9.4 logging, 9.5 recovery and existing observation/learning code where
+available; do not require those broad stages to be completed first. Preserve Pause,
+Stop, Charge Now, protection, identity, ownership and uncertain-write guards. No
+live commands, deployment or HA restart are authorized by this roadmap. Update the
+handoff and checklist truthfully; follow AGENTS.md version/build requirements.
+
+**Decisions for this stage:**
+
+- For an active window, routine changes preserve permission through its existing
+  end. An explicit Pause/Stop or protection action takes precedence immediately;
+  Charge Now and Return to Auto retain their existing semantics. User planning edits
+  recalculate immediately: a lowered cap may end the window if its price exceeds the
+  cap and the minimum can still be met by ready-by; continue above cap only for energy
+  needed for that minimum. Raising the cap or a cap still covering now does not stop it.
+- A newly published or materially changed price may interrupt an active window only
+  when the proposed alternative saves at least EUR 0.50 **and** 10% of the comparable
+  remaining estimated variable cost, yields a gap of at least 30 minutes, and leaves
+  at least 15 minutes of extra time beyond the estimated minimum-SOC requirement before
+  ready-by. Compare the same remaining energy using known prices and configured fees;
+  if cost, currency conversion, state or feasibility is uncertain, preserve the active
+  window. Negative or zero baseline cost cannot satisfy the percentage test. These are
+  conservative internal defaults, not new settings or promises of actual savings.
+- For routine SOC-driven updates, ignore end-time differences under five minutes if
+  all other future transitions and current permission match. Settings edits, plug-in,
+  price changes, safety and recovery are not suppressed by this tolerance. Coalesce
+  bursts for two seconds; explicit controls and protection must not wait for it. Compare
+  absolute future limits, not a moving profile creation timestamp; elapsed transitions
+  and equivalent representations must not generate writes. Never suppress a required
+  recovery sync merely because the prior ACK matches.
+- A fresh SOC report can trigger calculation; use existing freshness, source and
+  vehicle association rules. Missing, stale or ambiguous inputs must not replace a
+  valid schedule with a speculative one. A plan, ACK or limit is never measured flow.
+  The BMW's own limit remains separate; no new live SOC-stop or household load control.
+
+- [x] **14.1 Partial current price interval and Morek block limit** (2.5.101 local, mocked; reviewed and corrected twice)
+  - Local implementation applies only to a schedule-owned Morek cheapest target-SOC plan
+    (`include_current_interval`, `max_blocks`); other chargers keep the next-boundary,
+    configured-period behavior. The rest of the current published interval is a candidate
+    starting now at proportional energy and cost, in the cap-aware exact planner (any
+    position, shared run budget, deadline inside the interval, minimum exceptions) and in
+    the whole-slot planner (a seeded first window in the run-limit search: continued into
+    the next slot, a window of its own, or alone when it covers the need; compared with the
+    plan without it by energy first, then cost, plus the start cost in automatic mode).
+    It is also used by a best-effort plan short of its deadline, and alone when a deadline
+    falls inside the interval, and, at planner level, when later prices are missing; the controller still sends such a
+    fragment-only plan through the existing price-wait policy (wait, buy what cannot wait,
+    or guarantee) rather than charging now, counting the published fragment as known
+    capacity for a purchase. There is no
+    minimum length (seconds left are a candidate); only an unpublished current interval is
+    never priced from a neighbour. A daily departure inside the current interval now means
+    today's, not tomorrow's, for these plans. Morek plans use at most three
+    windows, also in automatic-period mode; the plan reports `block_limit`,
+    `unrestricted_blocks`, extra cost and shortfall when the limit forced a compromise,
+    surfaced as a `block_limit` price-policy explanation in the sidebar. Not done: the
+    unpriced fallback, history-wait estimates and the display chart rows are unchanged.
+    Mocked tests only; deployed behavior and physical charging are unverified.
+  - Include the remainder of the current known price interval as a candidate starting
+    now, with proportional energy and cost, alongside future periods. Respect price
+    cap, minimum, ready-by, existing window constraints and missing prices. Update
+    shared horizon/deadline helpers and displayed periods consistently; do not count
+    elapsed time. Ensure Morek planning selects at most three executable blocks even
+    in automatic-period mode; report any resulting shortfall or compromise. Preserve
+    other chargers' existing limits and behavior.
+  - Test mid-interval and exact-boundary starts, partial deadline, cap exceptions,
+    negative prices, missing horizon, midnight/DST and fragmented cheap periods;
+    verify displayed windows, energy, cost and generated Morek profile agree.
+
+- [x] **14.2 State-aware active-window continuity** (2.5.103 local, mocked)
+  - Implemented in the Morek worker's routine intent path only. The last accepted,
+    routine (no pause, no Charge Now) profile, stored durably in the ledger's
+    `acknowledged` entry and surviving settings revisions, definitely rejected newer
+    attempts and restarts (uncertain writes never continue), defines the acknowledged window allowed now; it is unioned with the replanned
+    windows from now to its existing end (`continue_active_window`), so a SOC/price replan
+    cannot drop or shorten it and the generated profile has no 0 A gap. Evidence is the
+    fresh (180 s) connector status only (`connector_evidence`): charging, waiting
+    (connected/paused/finished), unplugged, or unknown (missing, stale, faulted, unmapped).
+    Only fresh unplugged releases the window; unknown keeps it and is exposed as
+    `reconciliation.continuity.reason = active_window_state_unknown`. Pause/Stop, Charge Now,
+    protection, identity/ownership/generation and uncertain-write guards run as before and
+    win; a raised cap keeps the window; 14.4 (below) decides which edits or price changes may release it. If keeping
+    the window would exceed three windows the update is refused (`active_window_block_limit`)
+    and the accepted schedule stays. A timer replans just after a preserved window ends.
+    Not done: no sidebar text for `continuity` yet, no measured-power evidence, manual
+    Send/preview do not continue (only the worker and its verification).
+  - Wire existing charger/session evidence into Morek reconciliation, with explicit
+    freshness and unknown state. Preserve the acknowledged currently allowed window
+    through its end across routine replans, including when updating future periods.
+    If state is unknown, avoid an automatic interruption and expose the reason; retain
+    immediate controls, protection and uncertainty guards. Do not infer actual power
+    from the allowed window or replace the existing session coordinator.
+  - Test charging, waiting, unplugged, stale/unknown, active-to-idle transitions,
+    SOC updates during charging, pause/protection races and future-window changes.
+    Verify the production-generated profile has no unintended 0 A gap.
+
+- [x] **14.3 Recalculation triggers and guarded send deduplication** (2.5.105 local, mocked)
+  - Implemented in the existing Morek worker, no new controller. Planner publications already
+    carry SOC, price, settings, deadline/departure and wake recalculations. The worker now
+    classifies each: unchanged settings and price revision AND a planner cause of exactly
+    `soc` = routine (2 s coalescing, SOC end-time tolerance allowed); any other same-revision
+    publication (deadline rollover, unlabeled) = `recalc`, coalesced but strict, and mixed causes
+    are strict; price change = coalesced, no tolerance; settings change,
+    first sighting, direct calls (controls, recovery sync, availability/reconnect, stale-work
+    retry) = no wait, no tolerance. A plug-in observed by the session coordinator
+    (Available to Preparing/Charging) always runs a planner recalculation and then a compared
+    reconcile (`note_plug_in`); an equal schedule is skipped as `unchanged`. A connector
+    sensor going unknown/unavailable or returning (`note_sensor`) also recalculates and compares;
+    it is never treated as a plug-in.
+    `reconciliation.last_trigger` exposes the last consumed trigger.
+  - Send deduplication (`same_effective_schedule` in `_send_profile_shared`): a routine
+    candidate is skipped when the last accepted routine profile, planned under the same settings
+    revision, says the same from now on: same current permission, same future absolute
+    transitions and attributes (profile creation time, elapsed transitions and repeated equal
+    limits ignored). For routine SOC-only runs a switch-off instant may differ by under five
+    minutes; starts, plug-in, price, settings and sync runs never use that tolerance. Never
+    suppressed: pause/Stop, Charge Now (non-routine candidates), forced sync, uncertain
+    records (still `upload_uncertain`), identity/ownership/generation guards.
+  - Not done / limits: a settings edit with an equal schedule is still sent once (keeps the
+    readback/verification association); the 14.2 settings-edit conservatism and 14.4
+    interruption policy are unchanged; no measured-power evidence; no sidebar text for
+    `last_trigger`. Mocked tests only; deployed behavior and physical charging are unverified.
+  - Wire plug-in, meaningful fresh SOC progress, price publication/change, planning
+    settings, deadline rollover, charger reconnect and important sensor loss/return
+    to re-evaluation. Plug-in always recalculates and compares the result even if no
+    upload follows. Coalesce routine bursts as specified above; do not wake the car
+    solely for a routine update. Implement the stated semantic comparison and SOC
+    end-time tolerance against the last acknowledged intent, without defeating a
+    required guarded sync or suppressing explicit actions.
+  - Test plug-in with equal and changed schedules, repeated SOC and price events,
+    elapsed transitions, tolerance boundaries, changed settings, reconnect, unknown
+    outcomes and controls racing a queued update. Assert actual send counts.
+
+- [x] **14.4 Meaningful active-window interruption policy** (2.5.107 local, mocked)
+  - 2.5.107 review corrections: the cap rule needs a cap strictly lower than the one stored with the
+    accepted profile (older records: preserve); the price rule verifies the minimum is delivered by
+    ready-by minus 15 minutes from the proposed periods and a real 30-minute gap (no-resume included);
+    a pending price event survives stale/refused/rejected/unavailable runs until decided. See the handoff.
+  - Implemented in the existing worker/planner path: `morek_schedule.window_release` is called from the
+    worker's `_continued_profile` with the planner's current proposal; a release means the acknowledged
+    window is not unioned in, so the replanned schedule replaces it (existing guarded send path, same
+    owner/Pause/Stop/Charge Now/identity/uncertain-write guards, which run before and win). Only two
+    events can release: a settings revision newer than the accepted profile's (cap rule) or a run whose
+    triggers include a price change (price rule); routine SOC/recalc/plug-in/sensor runs never do.
+    Cap rule: needs a cap, the published price of now above it, and (when a minimum SOC is set) a plan
+    that meets the minimum (`minimum_shortfall_kwh` 0); a raised cap or one still covering now keeps the
+    window; a plan that still needs the current interval for the minimum replaces the window (only that
+    energy). Price rule (EUR only): saving >= EUR 0.50 AND >= 10% of the cost of the same energy
+    through the preserved windows (chronological), baseline > 0, gap >= 30 min, and ready-by minus
+    resumption minus minimum-energy time >= 15 min. Unknown or stale state/evidence, missing price,
+    non-EUR currency, missing ready-by or minimum, or any error keeps the window; the reason is exposed
+    in `reconciliation.continuity.reason` (`cap_lowered`, `price_improvement`, `release_*`). Not done:
+    no sidebar text, no per-window cost history, non-EUR areas never interrupt on price, a missed event
+    (refused/stale run) is not re-evaluated until the next price/settings event. Mocked tests only.
+  - Implement the explicit cap-edit and price-improvement decisions above using the
+    existing cost, deadline and minimum-SOC calculation. Keep the current window for
+    routine changes or uncertain evidence; allow guarded interruption only when the
+    stated conditions hold. Apply the same owner and safety boundaries, explain the
+    decision, and avoid interrupt/restart loops. Do not introduce extra user settings.
+  - Test cap raised, lowered above/below current price and minimum exception; price
+    improvement below/at thresholds, short gaps, negative prices, insufficient slack,
+    missing data and repeated events. Check that controls and protection remain immediate.
+
+- [x] **14.5 Fresh progress inputs and bounded recovery** (2.5.109 local, mocked)
+  - 2.5.109 corrections: the identity/order guards and the progress accounting below now also run on the
+    **uncapped** Morek-owned target-SOC path (`_morek_owned`: cheapest strategy and schedule ownership;
+    other chargers unchanged), not only the capped one. Measured partial progress is counted once
+    (`vehicle_update_wait.measured_progress`, via `_progress_adjusted`): only measured (register/integrated)
+    sessions of this plug-in and car that began after the reading are subtracted from the need (and the
+    minimum), so a newer reading rebases at once; energy covering the need holds the plan
+    (`waiting_for_vehicle_update`); measured energy that cannot be attributed (a session recorded for no car,
+    or one that began before the reading and carries on while the reading is older than 300 s) keeps the
+    accepted plan with `planning_unavailable`/`target_progress_uncertain`. Unmeasured (estimated-source)
+    sessions are not evidence: no meter, no known plug-in, or no charger controller plans from the reading
+    unchanged, as before. The rejection-retry timer is now armed from the durable record at the start of
+    every reconcile (so it survives a restart even when that run sends nothing), never for an uncertain write
+    or exhausted retries, and a due retry does not re-arm in a loop; Stop/ownership guards still gate the
+    send.
+  - Implemented (capped Morek target-SOC path, `AutoPlannerController._energy_for`): a reading is refused
+    as `planning_unavailable`/`target_soc_stale` (no proposal, so the accepted schedule stands and nothing
+    is sent) when it is for another car than the charger identified, has no vehicle id, is dated more than
+    120 s ahead of the clock, or is older (>5 s) than the newest one already planned from for that car and
+    plug-in (in memory; reset by a new plug-in or restart). `live_vehicle_facts` drops a reading whose own
+    vehicle differs from the resolved one. Estimated readings were already refused. The existing
+    `vehicle_update_wait` guard now also runs on the capped path: measured (register/integrated) session
+    energy since the reading that already covers the need holds the plan (`waiting_for_vehicle_update`)
+    instead of planning it again; without trustworthy measurement the plan is made from the reading as
+    before (conservative, nothing is subtracted, no learner). Reading age still has no cutoff (existing
+    decision); the age/source are exposed.
+  - Recovery: a definitely rejected automatic intent is re-sent at most twice more (after 5 and 15
+    minutes, `REJECTION_RETRY_DELAYS`; count kept in the durable attempt) by a worker timer or any later
+    trigger; an uncertain write is never retried, a forced sync/person action behaves as before, Stop and
+    ownership guards run first, a changed plan starts fresh. Status `reconciliation.recovery` shows the last
+    accepted intent (`accepted_at`, `accepted_age_s`, "acknowledged, not measured"), rejections, retries
+    left, next retry, exhausted; `reconciliation.inputs` labels the SOC basis/uncertainty. Restored inputs
+    and reconnect use the existing triggers (reading arrival, sensor, availability resume). No sidebar
+    text yet; mocked tests only.
+  - Review and fix the existing Morek planning path's SOC freshness, vehicle identity,
+    timestamp ordering and genuinely measured energy handling. Prevent stale inputs
+    from replacing a good plan and prevent energy already reflected in a new SOC from
+    being counted twice. If trustworthy measurements are unavailable, use existing
+    conservative estimates and label uncertainty; do not build adaptive learning here.
+  - Reuse 9.5 recovery: re-evaluate on restored inputs/reconnect, bound retries of
+    definite failures, and preserve pending/unknown writes without blind retries or
+    clearing profiles. Show the last known accepted intent, its age and current blocker;
+    it is not proof of physical charging or of installed-profile inventory.
+  - Test stale/out-of-order SOC, fresh SOC after measured energy, unavailable meters,
+    restart, reconnect, definite rejection, timeout/unknown outcome and Stop races.
+
+- [x] **14.6 Decision evidence and end-to-end regression** (2.5.112 local, mocked; review corrections applied)
+  - Implemented: after each finished worker run `MorekScheduleWorker._record_decision` builds one
+    non-sensitive event (`morek_schedule.decision_event`): trigger (+ coalesced kinds), planner input state
+    (plan state/reason, SOC source, age, estimated, uncertain), connector evidence (fresh 180 s status or
+    `unknown`), changed (`unchanged` skip = false, a send = true, blocked = unknown), continuity
+    (preserved/interrupted + reason), action (`sent`/`skipped`/`blocked`), result code and a `blocker`
+    (`decision_blocker`: code + stable action key such as `wait_for_charger_connection`). The stages are
+    separate: `intent` (a profile was handed to the charger), `ack` (accepted/rejected/unknown, or
+    `accepted_earlier` for a skip), `readback` (filled live by status from the existing verification, never
+    stored) and `physical` (always `not_measured`). Reuse: one INFO line per *new* decision through the
+    native logger (WARNING for rejected/uncertain/worker failure), so it lands in the existing 9.4
+    log buffer/debug bundle; a repeat of the same decision only increments `repeat`/`last_at` (a burst of
+    sensor updates while charging is one line). Status: `reconciliation.decision` (`latest` + last 5) and
+    `reconciliation.blocker` (current worker reason) on the existing Morek status; same permissions as that
+    status. No new store, log viewer, setting or sidebar text.
+  - Bounds: 10 events in memory on the worker (lost on restart), one log line per changed decision, lines
+    capped by the log buffer (1000 chars; 300 INFO records). Excluded: profiles, prices, entity/station ids,
+    payloads. Not done: no per-run history across restarts beyond the log buffer, no sidebar rendering, no
+    live/physical verification.
+  - Accuracy correction (2.5.112 local, mocked): a sent-type result (`upload_rejected`/`upload_uncertain`) with no
+    wire call in that run (cooldown, exhausted retries, unresolved earlier outcome) is now action `held`,
+    intent `none`, ack `rejected_earlier`/`unknown_earlier`, logged at INFO (the earlier attempt already warned);
+    only a run that reached the wire call is `sent`. The dispatch is read from a diagnostic marker
+    (`hass.data["spotnav_morek_dispatched"]`) set just before the call, not inferred from the result.
+    `continuity` is reported only when the run itself evaluated it (early exits such as `charger_unavailable`
+    report none instead of an earlier run's preserve/interrupt). Events carry the attempt id; the status readback
+    is `superseded` when the current verification belongs to another attempt. No safety/send behavior changed.
+  - Extend existing diagnostics with concise, bounded events: trigger, state/evidence
+    freshness, material plan change, preserve/interrupt reason, send/skip and outcome.
+    Reuse native SpotNav logging and existing status surfaces; no separate log store,
+    sensitive household payloads or duplicate 9.4 log viewer. Show actionable reasons
+    when the new plan cannot be applied and distinguish intent, ACK and readback.
+  - Add focused production-wiring tests spanning plug-in through calculation and
+    guarded send, repeated sensor updates while charging, price-driven interruption,
+    recovery and unchanged-plan skips. Include bounded event volume and permissions.
+    Document thresholds, known limitations and local test results; do not claim live
+    or physical verification from mocked tests.
+
+### Stage 15 — Charging resilience, connection-aware status and trustworthy learning
+
+**Status: finalized for implementation 2026-11-14; nothing implemented, no code, no
+deployment, no hardware action.** Every claim about current behaviour below is from
+**source reading only** (manifest 2.5.128, no HA access, no log, no charger command);
+mocked tests exist for the reused parts but establish no live behaviour. This stage
+refines the existing planner, Morek worker, session coordinator and Stage 6 evidence; it is
+not a second controller and reimplements nothing from Stages 6, 9, 11 or 14. It preserves
+every earlier decision (the BMW's own limit, native Morek load protection, Pause/Stop,
+ownership, identity, uncertainty latches, no `clear_profile`). One substage per session,
+in the order given under "Order and status"; each includes focused fast tests, truthful
+docs and the AGENTS.md manifest/build checks. A roadmap-only edit needs none of them.
+
+**2026-11-14 Stage 14 audit (source reading of `api/morek_schedule.py`, `execution/morek_worker.py`,
+`execution/morek_session.py`, `planning/auto_controller.py`, `planning/learned_energy.py`; no code changed).** Stage 15
+now also carries the former Stage 11. The audit found three places where a literal implementation of the
+earlier Stage 15 text would have weakened Stage 14, and corrected them: (1) the 15.1 reserve would have
+entered `window_release`'s energy, cost and slack arithmetic and made price interruptions easier;
+(2) 15.6 would have widened the freshness of the connector evidence that gates `window_release` and the
+unplugged release; (3) 15.8's wording could be read as changing the session energy that 14.5's measured-progress
+accounting subtracts. Each fix is in its substage below and in the contract. This is a design
+correction, not a claim that the sources already behave as described after implementation.
+
+**No guarantee.** A retained schedule improves the odds that a window is honoured while
+Home Assistant is unreachable; it cannot be proven effective without measured power and
+depends on the charger's clock, firmware and authorization state. Say "planned",
+"accepted", "reported", "measured"; never "will charge". A mock test establishes none of it.
+
+#### Settled decisions (items marked *user* were agreed by the user on 2026-11-14; items marked *engineering default* are proposed constants the user has not specifically chosen and stay adjustable; implement, do not reopen the *user* items)
+
+1. **Time reserve** (*user*: 10% default, configurable; *engineering default*: whole percent
+   0–50, 0 = off, plus the rounding in 15.1). Default **10% of the estimated active charging time**.
+   It lengthens time only, never SOC or price tolerance:
+   the **soft-cap rules are retained exactly** (no new above-cap exception; above-cap energy
+   stays only for the minimum-SOC need as today), so the reserve is placed only in
+   within-cap slots, never past the deadline, and is dropped (not reported as infeasible)
+   when it does not fit. Details in 15.1.
+2. **Schedule must survive connection loss** (*user*). The schedule on the charger (profile `42001`,
+   absolute times, final 0 A) is meant to keep governing an already authorized session while
+   HA/network/OCPP is down. Offline is shown as an expected state with the last known facts,
+   never as "charging" and never as a failure of charging.
+3. **Guarded automatic schedule repair** (*user*; the thresholds in 15.4 are *engineering defaults*). *Repeated* checks that confirm a
+   *materially wrong* effective schedule may trigger an automatic repair through the existing
+   guarded owner. A single odd readback only causes a recheck. A correct active charge is
+   left alone. Exact rule in 15.4.
+4. **Guarded start after a confirmed reboot** (*user*). A confirmed charger reboot that
+   leaves the plugged-in car clearly unauthorized may trigger one guarded start request,
+   after *affirmative* evidence of no active session and no unresolved previous request. A
+   mere reconnect is not a confirmed reboot. Mostly existing behaviour; deltas in 15.5.
+5. **Charging must be enabled; SpotNav establishes it through the existing guarded start
+   path** (*user*, stated repeatedly). The charger's charge-control switch must be *on* (enabled
+   charging/session) before the car is treated as ready to charge. SpotNav never toggles that
+   switch blindly: on plug-in and on recovery it establishes enabled charging only through the
+   existing guarded start path (`MorekSessionCoordinator`, one request per connection token) and
+   then verifies evidence. An *accepted* start request is not proof. Switch off or unconfirmed is
+   shown as **not yet ready to charge** (naming who must act where a request is blocked), never as
+   normal-and-ready. Backend work: 15.5; card wording and prominence: 15.7. The switch is a
+   *derived* OCPP entity: whether it independently proves authorization, or only reflects a
+   session/transaction, is **unverified** for the installed integration. Treat it as evidence
+   read together with connector status and transaction evidence, not as a separate authorization
+   source. 9.6/9.7 stay (an ACK is not a transaction, a transaction is not flow, only fresh
+   measured power says "Charging", unknown/pending outcomes block duplicates).
+6. **Freshness is connection-aware** (*user*), not a 3-minute alarm. Silence alone proves neither
+   health nor failure; quiet alarms never fire on age alone.
+7. **Accurate energy, replay-safe** (*user*; bounded work in 15.8). Energy comes from the cumulative register and
+   independent measurement, never from a schedule, ACK or readback. **No on-demand charger
+   history is assumed** (see the research verdict): SpotNav keeps its own Stage 6 record and
+   treats any spans it did not observe as unobserved with unknown placement.
+8. **Wording** (*engineering default*, adjustable). Casual, specific sentences that say what a
+   request is waiting for ("Status wording" below). Vocabulary: Waiting, Starting, Authorized,
+   Unknown; the user-facing deadline stays labelled **"Ready by"** (the existing term, no rename);
+   a merely plugged-in car is never "Ready". Charge-control requirement: decision 5, 15.5, 15.7.
+9. **Learning** (*user*: soft cap, stability and the median approach are kept; the numeric
+   constants are *engineering defaults*). Robust median learning with conservative constants kept as named, documented
+   module constants (adjustable by editing code, no new settings). It may *shorten* time
+   only with reliable data and outlier resilience. Rules and constants in "Learning rules".
+10. **Routine engineering defaults** (adjustable; not user decisions): a new plug-in while HA
+    is down may not authorize, and SpotNav never edits the Morek charger's own authorization
+    *configuration* (separate from decision 5, which concerns the guarded start path, not
+    switch toggling); the reconnect
+    check never lets one reading, age, or SOC change cause a send; a status/age/SOC change
+    on screen is never a reason to dispatch; an interrupted/unknown outcome is never blind-
+    retried; optional hardware experiments are evidence tasks and **block nothing**.
+
+Preserved without change: protected active windows (14.2), the Stage 14 price/cap
+interruption rules (14.4), 5-minute SOC end tolerance, 2 s coalescing, Stop/Pause/protection
+precedence, physical identity/ownership/generation checks, uncertain/pending write latches,
+the rejection retry bounds (5 and 15 minutes), readback is not an inventory of profiles.
+
+#### Stage 14 non-regression contract (binding on every Stage 15 substage)
+
+Stage 15 **extends the existing worker, session coordinator, planner and stores; it adds no second
+controller, no second sender and no parallel dedup or freshness path.** Every send still goes through
+`MorekScheduleWorker` → `_send_profile_shared` under connector admission. The new triggers are inputs to
+that path (`repair`, link `recovery`), never a bypass of it. The table lists each Stage 14 mechanism, who may
+touch it and the regression that proves it unchanged. A substage marked ◆ in the queue must add the listed
+checks to its own acceptance and run the existing Stage 14 files (below) before it is called complete.
+
+| Stage 14 mechanism (source) | Rule for Stage 15 | Touched by | Required regression |
+| --- | --- | --- | --- |
+| Protected active window (14.2 `continue_active_window`, `connector_evidence`, unknown keeps, only fresh unplugged releases) | Unchanged. Repair and reserve resends carry the acknowledged window to its end; 15.6 never makes `connector_evidence` *more* willing to say `waiting` or `unplugged` at Stage 14 call sites (they keep the 180 s bound as a named constant). Unknown still never releases. | 15.1, 15.4, 15.6, 15.10 | Active window survives a reserve change, a repair, a behind-plan replan and a stale/unknown status; generated profile has no 0 A gap (assert the wire profile) |
+| Material triggers (14.3 trigger classes; 14.4 cap rule and price rule via `window_release`) | Unchanged thresholds (EUR 0.50, 10%, 30 min gap, 15 min slack, strictly lower cap). Reserve minutes are **excluded** from every `window_release` quantity (energy, baseline, alternative cost, gap, slack). A `repair`, link-`recovery` or behind-plan run never carries a price-change trigger and so can never release a window. | 15.1, 15.4, 15.10 | `window_release` outcome table identical for reserve 0% and 10% on the same fixtures; a repair/recovery/behind-plan run never returns `price_improvement` or `cap_lowered` |
+| SOC end tolerance (5 min, SOC cause only) and 2 s coalescing | Unchanged. `repair` is strict (no tolerance) and not coalesced away; routine SOC runs keep the tolerance. A reserve must not turn a sub-5-minute SOC drift into a resend. | 15.1, 15.4 | Repeated SOC-only updates with reserve 10% give the same send count as reserve 0% in the existing 14.3 fixtures |
+| Dedup (`same_effective_schedule`, fingerprint skip, elapsed transitions, creation time ignored) | Unchanged for every non-repair run. `repair` bypasses **only** the two `unchanged` returns, and only when the 15.4 confirmation holds; it does **not** bypass the uncertain-record return or the rejection cooldown. | 15.4 | Send counts asserted: equal schedule, no repair → 0 sends; confirmed repair → exactly 1; cooldown/uncertain → 0 |
+| Uncertainty and recovery (uncertain latch, 5/15 min rejection retry, 9.5 blocker timers) | Unchanged. Checks and repairs never retry an unknown outcome and never clear one; `morek_offline` joining `TRANSIENT_BLOCKERS` adds a **non-sending** timer inside the same 12-check cap. | 15.2, 15.3, 15.4 | Unknown/pending record → no check-driven or repair send; timer re-evaluation sends nothing by itself |
+| Stop/Pause/Charge Now ownership (reserved person Stop, generation rechecks, durable pause intent) | Unchanged and wins over every Stage 15 trigger. A repair runs under normal admission and re-checks the generation after each persistence await; it resends the *current* hold/override intent, never turns a hold into a run. A Stop racing a repair/start refuses it; a refused attempt does not consume the 24 h repair budget (only a run that reached the wire call does, as in 14.6's dispatch marker). | 15.4, 15.5 | Stop races at each await boundary for repair and for the start; Pause hold repaired only as a hold; Charge Now repaired as its own intent |
+| Recovery sync (14.3: never suppress a required sync because the prior ACK matches) | The read-only check is **additional**; it does not replace the existing availability-return/startup reconcile, which can still send when the schedule differs from the acknowledged one. A Healthy check never suppresses that reconcile; the check never sends. | 15.2, 15.3 | Availability return with a changed plan still sends once; with an equal plan sends none; the check adds zero sends either way |
+| Measured-progress accounting (14.5 `measured_progress`, `vehicle_update_wait`) | Unchanged inputs. 15.8 adds additive history fields only and must not alter the session energy that accounting reads; 15.9/15.10 never feed learning samples into it. | 15.8, 15.9 | 14.5 progress outcomes identical before/after 15.8; a learned figure changes only when a plug-in ends (existing pending-sample rule), never mid-charge |
+| Decision evidence (14.6 events, bounded log volume) | Reuse the decision shape; new causes are new `trigger`/result codes, not a second log. A repeat increments, never adds a line. | 15.3, 15.4, 15.5 | Event volume stays bounded under a flapping link and repeated mismatches |
+
+**Existing Stage 14 test files to rerun for every ◆ substage** (isolated runners under `tools/` or the
+documented `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 … --noconftest` harness in the handoff; report unrun files
+precisely): `tests/test_stage_141_current_interval.py`, `test_stage_142_active_continuity.py`,
+`test_stage_143_recalculation_triggers.py`, `test_stage_144_interruption_policy.py`,
+`test_stage_145_fresh_inputs_recovery.py`, `test_stage_145_progress_recovery.py`,
+`test_stage_146_decision_evidence.py`, `test_morek_worker.py`, `test_morek_schedule.py`,
+`test_morek_session.py`, `test_morek_session_activation.py`, `test_stage_95_recovery.py` and
+`test_stage_103_partial.py`. A substage that cannot run one of them must say so and **must not be called
+complete on the strength of new tests alone**. These checks reduce regression risk; they do not guarantee
+zero defects or any physical behavior, and passing mocks never verify the deployed system.
+
+#### Existing behaviour audit (source, 2.5.128; **not live-verified**) — reuse, gap, targeted change
+
+| Area | What exists (source) | Class | Delta this stage |
+| --- | --- | --- | --- |
+| Stable updates | `same_effective_schedule` compare, 5 min SOC tolerance, 2 s coalescing, active-window continuity, cap/price interruption rules, plug-in recalculation and compare, decision events (14.1–14.6) | **Reuse as is** | None. Any resend caused by 15.x goes through this path. |
+| Plug-in authorization | `MorekSessionCoordinator` (`execution/morek_session.py`): one start request per connection token, tokens `plug-in`/`recovery`/`offline:`/`boot:`/`unplug:`/`resume:`; blockers, rejection retried once after 60 s, 120 s accepted-without-transaction display, bounded recheck 5/15/30/60/120/300 s ×12; pending/unknown earlier request blocks; ledger-persisted. Tests: `test_morek_session*.py`, including repeated disconnects and a second genuine boot | **Reuse** | Only the confirmation sources and one veto (15.2, 15.5). |
+| Reboot start | `reconnect()` mints an `offline:` token when an offline loss was observed, a `boot:` token when `point.charger_generation` rises **within the process**; a prior accepted/rejected request under another token does not block; completion, Pause/Stop, protection, pending/unknown do | **Mostly exists** | Gaps: confirmation signals are only (a) the control entity going unavailable *and* `_charge_point` failing, (b) `charger_generation`, which the code reads with `getattr` and which only the test fake sets (that the installed OCPP integration exposes it is **unverified**); a drop with stale-available entities is invisible; Charging/Suspended→Preparing without a reconnect signal keeps the old token (`already_requested`); no affirmative "no session" veto (a missing transaction field is not evidence of absence); memory only across HA restart. A reconnect is not a confirmed reboot. |
+| Link/offline | `availability_lost()` + `offline_observed` (memory); `_charge_point()` raises `morek_offline` unless the one point's `status == "ok"`; session code already treats a *changed point object* as a changed connection (`charger_connection_changed`) | **Reuse signals** | New small in-process link monitor (15.2). A changed point object or link edge is connection evidence only, never reboot evidence. `morek_offline` is not in `TRANSIENT_BLOCKERS`, so no timer retries it. |
+| Readback | `async_schedule_action("fetch")`: read-only, under `read_only` admission, `GetCompositeSchedule` + `compare_schedule` (remaining intervals only), stores `verified`/`verification`, records readback evidence; run after an accepted upload at 0/30/75/120 s; `session_start_schedule_evidence` (≤30 s old) | **Reuse the read path** | Gaps: no readback at reconnect or startup; no notion of a *confirmed* mismatch; reason `limits_or_transitions_differ` is the one clean mismatch (coverage/unavailable reasons are "unknown"). |
+| Repair / resend | `_send_profile_shared` skips as `unchanged` when the record matches; `force_sync` (the `recalculate_sync` action) bypasses that but the worker returns `paused_until_resume` / `charge_now_active` early under Pause or Charge Now | **Gap** | A `repair` trigger kind (15.4) that bypasses only the unchanged skip, through all existing guards. |
+| Freshness | Fixed bounds: `connector_evidence` and `_session_readiness` 180 s, `LIVE_MAX_AGE_S` 180, `observe_initial` 180; frontend `LIVE_MAX_AGE_MS` 180 s (`charge-session.js`, `live-charging.js`), `GRACE_MS` 120 s (matches the backend's accepted-without-transaction wait, kept as a request wait), `OBSERVATION_MAX_AGE_MS` 90 s | **Targeted change** | One backend judgement per quantity (15.6), adopted by the UI (15.7). |
+| Measurement record | Stage 6.2 `ChargingEvidenceStore`: 60 s tick of power/current/register/status, explicit gap rows, capture-restart marks, `derive_energy` (`unobserved` + `placement: unknown` across any recorded gap/restart, never bridged), 7-day/count retention, history API | **Reuse** | Add `link_down` gap rows from the monitor (15.2) so outage spans are unobserved. Gap: only gap flags and learning exist; a late cumulative register is not reconciled against a closed session total (e.g. a timeline placing 0.103 kWh against a 20.9 kWh session total), see 15.8. |
+| Learning stores | `LearnedEnergyStore` (median, trusted at 3 samples within 10%, last 5 plug-ins, rise ≥10 points, bounded efficiency, anchor survives restart), `LearnedPowerStore` (lengthen-only cap), both consumed by the Morek planner (`_learned_energy_for`, `_plan_power_cap_kw` in the input evidence); removed on entry removal | **Reuse** | Gaps: sampled **only** from `AutoPlannerController._check_plan`, which runs only from `_arm_watch` on Auto-owned plan windows, so **nothing is sampled under Morek schedule ownership** (source-verified here; the former Stage 11.1, now 15.9); trust is symmetric (shorten = lengthen); no age limit found; no gap/replay exclusion; only a `discarded` count; no display; no user reset. |
+| Behind-plan | `PlanWatch` → `async_recalculate()` (Auto windows only) | **Gap (optional)** | Morek-window use is the former Stage 11.2, now 15.10. |
+| Reserve | None (no reserve concept in code) | **New** | 15.1 |
+| UI | `frontend/sidebar/charge-session.js` (pure state→text), `recovery-banner.js`, readiness evidence | **Reuse** | Wording, prominence, link/check/repair lines (15.7). |
+
+#### Reconnect and schedule-check model (settles the reconnect questions)
+
+A reconnect, restart, availability edge, link edge or detected boot triggers a **read-only
+check** of what the charger reports, compared with SpotNav's *acknowledged* intent. The check
+itself never sends. Classes (one per check; recorded and shown in plain words):
+
+| Class | When | Action |
+| --- | --- | --- |
+| **Healthy** | Fresh readback, clean compare matches (Stage 14 semantics: elapsed periods, creation time, equal representation and the 5-minute tolerance ignored) | Retain. No send, no clear. Show "checked at {time}". |
+| **Unknown** | Readback unavailable/timed out, coverage reasons, link unproven, uncertain or pending record, replay burst, clock doubt | No send, no clear. Say what was not checked. Bounded read-only rechecks only. Never promoted to healthy or to a fault. |
+| **Differs, unconfirmed** | One fresh clean `limits_or_transitions_differ` | **Recheck only** (30 s, 60 s, 120 s, then every 300 s, at most 12). A single odd reading never acts. |
+| **Confirmed material** | Rule in 15.4 satisfied | Automatic guarded repair through the existing worker, bounded; otherwise "needs a person". |
+
+Never counted as a mismatch: an elapsed transition, an unchanged-by-Stage-14-semantics plan,
+SOC-driven end drift under 5 minutes, a replayed or stale update, a recomputed plan that only
+moved because SOC advanced. Progress is confirmation, not a trigger: ordinary SOC increases
+and small sensor updates never cause a send. Calculating, showing and refreshing numbers is
+always allowed; **dispatch is a separate decision** that needs a Stage 14 major trigger, a
+confirmed repair, or a recovery action, plus every guard.
+
+#### Order and status
+
+The **queue order** (see "Canonical remaining work queue", section A) is: 15.1 → 15.2 → 15.5 → 15.3 → 15.4 →
+15.6 → 15.7 → 15.8 → 15.9 → 15.11 → 15.10. The numbers are stable identifiers, not the order. The
+"Needs" column lists the *only* real dependencies; an item whose earlier neighbour is not listed does not
+wait for it. ◆ = Stage 14 regression acceptance is mandatory (see the contract above).
+
+| # | Substage | Needs | Status |
+| --- | --- | --- | --- |
+| 15.1 ◆ | Planner time reserve | none | [ ] not started |
+| 15.2 ◆ | Link monitor and offline/reconnect signals | none | [ ] not started |
+| 15.3 ◆ | Reconnect and startup read-only schedule check | 15.2 | [ ] not started |
+| 15.4 ◆ | Guarded automatic schedule repair | 15.3 | [ ] not started |
+| 15.5 ◆ | Guarded session start after a confirmed reboot, plus backend "charging must be enabled" | 15.2 | [ ] not started |
+| 15.6 ◆ | Connection-aware freshness (backend) | 15.2 | [ ] not started |
+| 15.7 | Plug-in authorization UI, status wording and freshness adoption | 15.6; shows 15.3–15.5 fields when present (absent fields degrade to today's text) | [ ] not started |
+| 15.8 ◆ | Late cumulative-register reconciliation (closed session total versus timeline placement) | none (uses `link_down` reasons when 15.2 exists) | [ ] not started |
+| 15.9 ◆ | Energy-per-SOC learner on the Morek path, with exclusions and bounds (former 11.1) | none (uses the existing Stage 6.2 gap rows; 15.2/15.8 flags when present) | [ ] not started |
+| 15.10 ◆ | Morek behind-plan check and power-learner feed (former 11.2; deferrable) | 15.9 | [ ] not started |
+| 15.11 | Learned-estimate display and reset (former 11.1/11.2 display) | 15.9 | [ ] not started |
+| E1 | Brief 16 A investigation (evidence, user-directed, read-only) | none | [ ] optional, blocks nothing |
+| E2 | Controlled outage/replay test (evidence, user-run) | none | [ ] optional, blocks nothing |
+
+Dependency notes (settled 2026-11-14 to avoid needless chains): the earlier text made 15.8 and 15.9 wait for
+15.2. They do not: the Stage 6.2 evidence store already records capture-restart marks and gap rows, so
+15.8/15.9 work without the link monitor and simply gain the `link_down` reason once 15.2 exists. 15.5 comes
+before 15.3/15.4 because the user repeatedly required that charging be enabled and it needs only 15.2.
+15.1, 15.2, 15.8 and 15.9 share `planning/auto_controller.py` or the worker's wiring, so run them one
+session at a time in the shared worktree. E1/E2 are run whenever the user chooses; their results only tighten
+constants and never gate a substage. 15.10 may be skipped without blocking 15.11.
+
+#### Bounded substages
+
+Every substage: production wiring (no groundwork-only or mock-only helper), focused fast
+tests at the real module boundary (isolated runners under `tools/` where the HA plugin cannot
+run), failure/restart/race cases for the change, no live command, and, for **any integration or
+card change** (not only frontend), the manifest bump, `npm run build` and `npm run check-dist`
+from `frontend/` per AGENTS.md, and a truthful
+roadmap/handoff update. Constants are named, documented module constants and tests reference
+them. Exclusions listed are binding.
+
+- [ ] **15.1 Planner time reserve**
+  - **Scope.** New `AutoSettings` field `time_reserve_percent` (integer, default 10, valid
+    0–50) with validation, storage/migration of old records (absent = 10), the settings API and
+    its sidebar control (planning settings next to the cap/minimum SOC). The planner converts
+    the *target-need* energy into active time at the planned power; the reserve multiplies that
+    **time** by `1 + p/100` at that one conversion seam. It uses the planner's *existing
+    partial-window time precision*, so the actual 10% reserve is kept (a 20-minute need gets a
+    2-minute reserve, not a slot); it is rounded **upward only to the dispatch resolution** of the
+    generated profile (name that constant; if a window boundary cannot be placed finer, round up
+    to that boundary and no further). There is **no mandatory whole planning slot and no minimum
+    slot**: a positive reserve below the dispatch resolution rounds to one resolution step, never
+    to a full slot that could massively inflate the 10%. At most **2 hours** of reserve (an
+    *engineering default*). Reserve time is placed in the cheapest eligible **within-cap**
+    periods by the existing selection and only before the deadline; if the full reserve does not fit, the plan keeps the part
+    that fits and **feasibility reporting is judged without the reserve** (the reserve alone
+    never makes a plan infeasible or short). It does not apply to above-cap minimum-SOC energy
+    and creates no new above-cap exception. The plan explanation and plan modal state the
+    reserve minutes and where they were placed; Morek still sends fixed windows (reserve
+    lengthens the final block) and the BMW's own limit stops the car at its target.
+  - **Stage 14 interaction (binding; found in the 2026-11-14 audit).** `window_release` (14.4) computes
+    the price-rule energy, baseline and alternative cost, gap and 15-minute slack from the proposal's
+    `shown_periods` at the plan's power. If reserve minutes sit in those periods they inflate the energy
+    and the deliverable-by-ready-by test and make an interruption *easier*. Therefore: the planner exposes the
+    reserve **separately** (`reserve_minutes` and its periods, additive on the proposal), `shown_periods` and
+    the Morek profile include them so the sent windows are real, but every `window_release` quantity, the
+    minimum-SOC time test and the "same remaining energy" comparison use the **reserve-free** periods (the
+    *required* energy/cost baseline). **Reserve is extra allowed time to reach the target, not intended energy
+    beyond it.** It compensates lower power/loss. The user confirmed (2026-11-14) that the BMW **will** stop at
+    its configured 80% limit, and this is the agreed operating assumption (user-confirmed, **not** verified by
+    the agent on hardware), so it is no longer a product blocker or a pending confirmation. SpotNav's target and
+    the car's configured limit remain separate settings and the app does not set the BMW limit. The allowance
+    energy/cost stays separately labelled as an upper allowance; the reserve's actual energy is not assumed zero
+    (reserve may be consumed compensating lower power/loss), and only **measured** energy/cost is reported as actual.
+    The UI/plan shows the required baseline and, separately, the **potential extra allowed reserve
+    energy/cost**, labelled an estimate / upper allowance (reserve minutes at the plan's power and the
+    period prices), never as measured or expected use. Every complete scheduled allowance window and its cost
+    stays visible, with reserve periods identified inside it: no double counting (the allowance is the
+    reserve periods only, never added again to the baseline) and no silently hidden possible cost. This
+    display split never feeds the `window_release` arithmetic. The reserve may not create a fourth window (14.1's three-block limit): it may extend a selected
+    window or use a cheap within-cap period only while the plan stays within three windows; otherwise only the
+    part that fits is kept (and, per the scope above, never reported as a shortfall). Placement is deterministic and stable: the same inputs give the same
+    reserve periods, and a SOC-only update must not move reserve minutes across a slot boundary beyond the
+    existing 5-minute tolerance (otherwise the reserve would add resends).
+  - **Reuse.** Settings revision/compare-and-set, `_morek_input_evidence` (settings revision
+    already invalidates stale plans), the exact cap-aware planner and the 14.x worker rules.
+  - **Delta.** The field, the one seam, the explanation line, the control. A reserve edit is an
+    explicit user planning edit (recalculates at once under the existing settings-revision rule;
+    14.2 continuity still protects an active window, 14.4 cap/price rules unchanged).
+    Defaulting existing installs to 10% changes the next plan once; it is a routine future-only
+    update through the usual compare, never an active-window interruption.
+  - **Acceptance.** 0% is byte-identical to today; 10% adds the reserve rounded only to the
+    dispatch resolution (a short need gets a proportionally short reserve, asserted against a
+    whole-slot inflation);  maximum
+    2 h clamp; reserve never crosses the deadline; reserve not placed above the cap; minimum-SOC
+    above-cap energy unchanged; unknown inputs leave the plan unchanged and say so; partial
+    current interval, three-block limit and DST cases keep working; generated Morek profile
+    agrees with the displayed windows; old stored settings load as 10.
+  - **Stage 14 regression acceptance.** `window_release` returns identical decisions (including
+    `release_slack_too_small`, `release_gap_too_short`, `release_saving_too_small`) for reserve 0% and 10% on
+    the same 14.4 fixtures; reserve minutes never appear in its energy/cost/slack arithmetic (decision
+    baseline unchanged); plan displays show the required baseline and the separately labelled potential
+    reserve energy/cost allowance, with complete windows/costs visible, no double counting and no claim of
+    zero reserve use; no fourth window; an active window is preserved (14.2) when the reserve changes the
+    replanned final block; a reserve edit is a settings-revision trigger (no wait, no tolerance) but cannot
+    satisfy the cap rule (cap not lowered); repeated SOC-only updates with 10% produce the same send count as 0%;
+    first load of an old install changes the plan once through the normal compare and never interrupts an
+    active window; the existing Stage 14 files pass.
+  - **Exclusions.** No change to soft-cap rules, the Stage 1 minimum floor, Stage 14 triggers
+    or the SOC target; no learner change.
+
+- [ ] **15.2 Link monitor and offline/reconnect signals**
+  - **Scope.** A small in-process monitor owned by the Morek session setup (one per Morek
+    entry): every 30 s (constant) and on the existing entity/connector events it reads, without
+    any OCPP traffic, the one Morek point's connection state exactly as `_charge_point` judges
+    it (`status == "ok"`), the **point object identity** (a new object = a new connection), and
+    the boot counter when the integration exposes it. It keeps `link` (`up`/`down`/`unknown`,
+    `since`), `connection_id` (changes on a new connection) and `boot_generation`, all in memory,
+    and publishes edges to (a) the existing `session.offline()` / `reconnect()` paths and the
+    worker `trigger(kind="recovery")`, (b) the evidence store as `link_down` gap rows for each
+    down span (so Stage 6.3 reports it `unobserved`, placement unknown), (c) the Morek status
+    as `link {state, since, connection_changed_at}` and (d) the check scheduler of 15.3.
+    `morek_offline` is added to `TRANSIENT_BLOCKERS` (bounded timer, non-sending, same 12 cap).
+    A cold start seeds the monitor as `unknown` until the first read; **HA restart is not a
+    charger reboot**: the boot counter is compared only within one process, as today.
+  - **Reuse.** `_charge_point`, `availability_lost`, `offline_observed`, the 9.5 blocker timer,
+    the Stage 6.2 `record_gap`, the status builder.
+  - **Delta.** The monitor class and wiring, the gap rows, the transient-blocker entry, the
+    status field. No change to any send path.
+  - **Acceptance.** Link up→down→up with the control entity staying "available" (stale) is
+    detected once and each edge is delivered once; a fast reconnect shown only by a new point
+    object is an edge; a drop shorter than the poll interval without a new object is a stated
+    limit; `link_down` spans appear as unobserved energy; restart starts `unknown`; the monitor
+    never calls the charger; no timer storm (single timer, cancelled on unload).
+  - **Stage 14 regression acceptance.** The monitor's edges reuse the existing recovery trigger
+    (no wait, no tolerance, deduplicated by the equal-schedule compare); a flapping link produces a bounded,
+    coalesced number of recovery runs and **zero sends when the schedule is unchanged**; availability return
+    with a changed plan still sends exactly once through the existing reconcile (the monitor does not replace
+    or delay it); adding `morek_offline` to `TRANSIENT_BLOCKERS` adds only a non-sending timer within the shared
+    12-check cap and never retries an uncertain write, person Stop, Charge Now, ownership or protection
+    conflict; a changed point object never creates a plug-in or a recalculation-as-plug-in (14.3's `note_sensor`
+    rule); the existing Stage 14 and 9.5 files pass.
+  - **Exclusions.** No readback, no start, no UI beyond the status field, no persistence of the
+    boot counter across HA restart.
+
+- [ ] **15.3 Reconnect and startup read-only schedule check**
+  - **Scope.** A `ScheduleChecker` in the worker's lifecycle that runs the existing read-only
+    `fetch` path (`async_schedule_action(..., "fetch")` under `read_only` admission) and
+    classifies the result with the table above (Healthy / Unknown / Differs-unconfirmed /
+    Confirmed-material input). Triggers: link-up or connection-change edge (15.2), the existing
+    availability-return hook, a detected boot, and HA startup once the link is up.
+    **No mandatory periodic OCPP readback**: event-driven checks plus the bounded rechecks below
+    are sufficient and avoid unsolicited charger traffic. An optional low-rate periodic monitor is
+    a possible future setting, **disabled by default** and out of scope here. Only an acknowledged intent that is
+    still inside its coverage is checked; Pause hold and Charge Now profiles are checked too.
+    Rechecks of a Differs result follow 30 s, 60 s, 120 s, then 300 s repeating, at most 12
+    per episode, stopped by any link edge or a new attempt. Results are held in memory and in
+    the status (`reconciliation.check {class, at, readback_at, reason, rechecks}`) plus one INFO
+    decision line per *changed* class (reuse the 14.6 logging; counts, no payload).
+  - **Reuse.** The `fetch` action and `compare_schedule`, admission `read_only`, Stage 14
+    semantic compare for the Healthy test, the 9.4 log buffer, the 14.6 decision record shape.
+  - **Delta.** The checker, triggers, classification, status fields. The check **never sends,
+    clears or modifies the ledger's acknowledged/uncertain state**; it must not make an
+    in-flight attempt's `verified` fields inconsistent (read the 2.5.x verification lifecycle
+    first and use the `expected_sent_at` association where it exists).
+  - **Acceptance.** Matching schedule → Healthy and no send; readback unavailable, coverage or
+    uncertain record → Unknown and no send; one mismatch → Differs-unconfirmed, recheck, no
+    send; elapsed transitions and equivalent representations never differ; checks do not run
+    while an upload/verification of a newer attempt is pending; no check storm after a flapping
+    link; HA restart seeds one check after the link is up; send count asserted zero throughout.
+  - **Stage 14 regression acceptance.** The check is not a trigger: it does not change
+    `reconciliation.last_trigger`, continuity (`reason`), the trigger classification or the 14.6 `repeat`
+    counters except through its own one changed-class line; it never alters the ledger's
+    acknowledged/uncertain fields, and in particular never overwrites or re-associates the `verified` fields of
+    a newer attempt (assert with a pending upload); a Healthy result does not suppress the existing
+    availability-return reconcile or a required recovery sync; matching, equivalent-representation and
+    elapsed-transition cases use the existing 4.2 readback comparison (`compare_schedule`, remaining
+    intervals only, with its existing coverage reasons), not a new comparator; the existing Stage 14 files pass.
+  - **Exclusions.** No resend (15.4), no session start (15.5), no new settings, no
+    `clear_profile`, no `get_configuration`, no `TriggerMessage`.
+
+- [ ] **15.4 Guarded automatic schedule repair**
+  - **Scope.** A new worker trigger kind `repair` raised by the checker when a mismatch is
+    **confirmed**: (a) the **latest** readback is fresh (fetched ≤ 30 s before the decision, as
+    `session_start_schedule_evidence` requires) and an **earlier** valid observation from the same
+    connection and the same intent attempt exists at least 30 s before it. The earlier one is *not*
+    required to be ≤ 30 s old (requiring both ≤ 30 s while also ≥ 30 s apart could never hold), (b)
+    both with exactly reason `limits_or_transitions_differ` on a covering readback, (c) the link
+    continuously up and `connection_id` unchanged between them, (d) the same acknowledged attempt
+    id, no `uncertain`/pending record and no active rejection cooldown. The worker then
+    recalculates the *current* guarded intent (routine plan, Pause hold or Charge Now, exactly
+    as `_intent` builds it) and resends it, bypassing **only** the `unchanged` skip in
+    `_send_profile_shared` (new `repair` flag beside `force_sync`, which stays untouched and
+    still refuses under Pause/Charge Now). It does not use `clear_profile`, never repeats an
+    unknown outcome, **preserves Pause/Stop** (a repair never turns a hold into a run: it resends the
+    current hold, never a run profile, and no hold→run transition is created), makes **no repair
+    from an unknown** result, and passes every existing guard (identity, ownership, generation, Stop,
+    protection, uncertain latch, rejection retry).
+  - **Leave a correct charge alone.** When fresh measured power shows the car charging, the
+    readback's *current* limit equals the intended current limit and the differing part is only
+    a future transition more than **10 minutes** away (constant), the repair is deferred and
+    rechecked every 5 minutes; it proceeds when that gap falls to 10 minutes, when charging or
+    the current limit no longer matches, or immediately when the charger is idle or the current
+    limit is wrong. A repair resend always carries the acknowledged active window to its end
+    (14.2 `continue_active_window`), so the wire profile has no 0 A gap. Wire continuity is all this
+    claims: physical uninterrupted charging is **not guaranteed** (the charger's clock, firmware and
+    evaluation may still differ), and the earlier 16 A brief behaviour (E1) is **unverified**.
+  - **Bounds.** At most **2 automatic repairs per rolling 24 h** per charger, the second at
+    least 30 minutes after the first, counts and times persisted in the outcome record (small
+    bounded list, read as untrusted); after the cap or after a repair that is accepted but
+    still reads back as differing, the status says "the charger keeps reporting a different
+    schedule; a person needs to check" and nothing further is sent automatically.
+  - **Reuse.** 15.3 checker, `_intent`, `continue_active_window`, `_send_profile_shared`,
+    14.6 decision events (`trigger=repair`, result codes), 9.5 recovery banner (add the
+    "needs a person" blocker mapping).
+  - **Acceptance.** One odd readback never sends; a fresh latest readback plus an earlier valid
+    same-connection observation ≥ 30 s older (the earlier one itself stale by the 30 s test) sends
+    exactly one profile; two readbacks both ≤ 30 s old but under 30 s apart do not;
+    a Pause hold repairs only as a hold;  unknown/coverage/unavailable/uncertain/rejection-cooldown/Stop/ownership/identity
+    failures send nothing; correct active charging with a distant future-only difference defers
+    then repairs at 10 minutes; resent profile has no gap and the same active window; cap and
+    spacing enforced across restart; repair after a rejection follows the 5/15 minute bounds;
+    Pause hold and Charge Now repair resend their own intent; send counts asserted.
+  - **Stage 14 implementation constraints (binding).** (1) `repair` bypasses exactly the two
+    `unchanged` returns in `_send_profile_shared` (fingerprint match and `same_effective_schedule`) and
+    **not** the uncertain-record return or the rejection cooldown/retry bound; (2) a `repair` run is strict:
+    no SOC end tolerance, and it never carries a price-change or cap-lowered trigger, so `window_release`
+    cannot release the window in that run; (3) it resends via `_intent`, so Pause hold, Charge Now and routine
+    intent are each repaired as themselves and the acknowledged active window is carried (14.2); (4) the 24 h budget
+    and spacing count only runs that reached the wire call (14.6 dispatch marker), are stored as an
+    additive bounded field in the outcome record (old records load unchanged, read as untrusted), and a
+    Stop-refused, stale-generation or admission-refused repair consumes none; (5) a repair run is a normal
+    decision event (`trigger=repair`), bounded like any other.
+  - **Stage 14 regression acceptance.** In addition to the acceptance above: a confirmed repair
+    sends one profile whose wire form has no 0 A gap and the same active window; a repair never returns
+    `price_improvement`; an equal schedule without confirmation sends none; repair does not alter 14.4
+    outcomes for non-repair runs; Stop racing a repair at each await boundary sends nothing and consumes no
+    budget; the outcome-record migration keeps `acknowledged`, `attempt`, `uncertain` and the 14.5 retry count
+    intact; the existing Stage 14 files pass.
+  - **Exclusions.** No change to the Stage 14 triggers or the 14.4 price/cap rules; no
+    `clear_profile`; no repair from age, SOC delta or a replayed update; no start request.
+
+- [ ] **15.5 Guarded session start after a confirmed reboot**
+  - **Scope.** Make the existing `boot:`/`offline:` token path reachable from reliable
+    evidence and add the explicit vetoes. **Reconnect is not a confirmed reboot.** A changed point object or link edge (15.2) is
+    connection evidence only. **Confirmed reboot** requires a reboot signal: the boot counter rose
+    within this process (15.2), or an observed offline loss with `_charge_point`/control entity
+    having failed (existing `offline_observed`) *and* a connection change, *and in every case* a
+    fresh connector report of `Preparing` observed after that edge. Distinguish a **reboot** from a
+    **read-only check** (15.3): a check, a reconnect, a point-object change or a link edge alone
+    never starts anything. A Charging/Suspended→Preparing change **without** a reboot signal stays
+    the existing "session ended or completion ambiguous" state (shown, no start). The guarded start (unchanged
+    `_reconcile`: Stop/Pause/protection/identity/ownership/generation, uncertain/pending prior
+    request, completion record, 60 s rejection retry, at most one request per token) additionally
+    requires: connector status fresh and observed after the edge as `Preparing`, an
+    **affirmative no-session observation** after the edge (`readiness.live.transaction` explicitly
+    reported absent, or a fresh report that replaced a prior transaction with none; a *missing*
+    or unknown transaction field is **not** treated as absence and blocks), no
+    Charging/Suspended observed after the edge, and no start already requested under the new
+    token. The existing 5–300 s recheck covers a status that has not yet arrived. One request
+    per confirmed reboot; HA restart without boot evidence keeps the existing single `recovery`
+    behaviour. **Enabled-charging requirement (decision 5):** this is also the backend home of
+    "charging must be enabled": on plug-in and on recovery the coordinator's existing guarded start
+    establishes the enabled charging/session; SpotNav never toggles the charge-control switch
+    blindly; the switch (a derived OCPP entity) and the transaction are verified as evidence after
+    the request, an accepted request is not proof, and switch off/unconfirmed is exposed in the
+    readiness evidence as `not_ready` (additively) for 15.7 to show.
+  - **Reuse.** `MorekSessionCoordinator` (`reconnect`, tokens, ledger, blockers), 9.7 states,
+    15.2 signals; existing tests are the regression base.
+  - **Delta.** Evidence plumbing from 15.2, the transaction/after-edge veto, the
+    Charging→Preparing classification, status/log text for "reboot confirmed, car not
+    authorized, asked once".
+  - **Acceptance.** Reconnect or point-object change alone, with a successful read-only check →
+    no request; transaction field missing/unknown after the edge → no request;
+    switch off after an accepted start → `not_ready`, no second request;
+    Reboot with car in Preparing and no transaction → exactly one request;
+    reboot while charging that reports Preparing → one request; second reboot → second request
+    (existing generation rule); transaction present, Charging seen, completion record,
+    pending/unknown previous request, Stop/Pause/protection, rejected-then-final → no request;
+    stale-available entity drop is now detected; accepted-without-transaction remains shown,
+    never repeated; unplug/replug unchanged; restart behaviour unchanged.
+  - **Stage 14 regression acceptance.** The start stays inside `MorekSessionCoordinator`'s existing
+    guards: Stop/Pause/protection/identity/ownership/generation checks win (a Stop racing the request refuses
+    it, as in the 9.6 tests), a pending/unknown earlier request and a completion record still block, and a
+    plug-in still triggers exactly one planner recalculation and compared reconcile (`note_plug_in`, 14.3);
+    a start request never triggers a schedule send by itself and never changes `continuity`; a `not_ready`
+    status does not cause a send, a clear or a second start; the 9.6/9.7 files (`test_morek_session*.py`,
+    `test_morek_start_schedule_evidence.py`, `test_morek_readiness.py`) and the Stage 14 files pass.
+  - **Exclusions.** No retry loop, no repeated attempts for one token, no start from unknown or
+    stale status, no change to Morek's authorization setting, no schedule send.
+
+- [ ] **15.6 Connection-aware freshness (backend)**
+  - **Scope.** One shared backend judgement per quantity returning `{state: current|last_known|
+    idle|unknown, basis, reported_at, age_s, link, reason}` and replacing the fixed bounds in
+    `_session_readiness`, `LIVE_MAX_AGE_S` (display use) and `observe_initial`; `connector_evidence`
+    keeps its Stage 14 bound (constraint below) (the
+    120 s accepted-without-transaction wait and the 9.5/14.5 timers are request/recovery waits and
+    stay). Rules (constants): **event-driven** quantities (connector status, transaction) are
+    `current` while the link has been continuously up since the report (shown "unchanged since
+    {time}", no age cap) and `last_known` with age when the link is down/unknown; **sampled**
+    quantities (power, current, register) are `current` when younger than
+    `max(180 s, 3 × the median interval of the last 10 observed posts, capped at 900 s)` while a
+    transaction or flow is expected, `idle` (not stale) when no transaction is expected, and
+    `unknown` when the link is not up. Cadence is learned from observed post times in the
+    evidence store; no `get_configuration` call is required. Status exposes the judgement
+    additively.
+  - **Stage 14 constraint (binding; found in the 2026-11-14 audit).** `connector_evidence` gates 14.2's
+    unplugged release and 14.4's `window_release` (`evidence not in ("charging","waiting")` → preserve). Letting
+    an old event-driven report stay `current` while the link is up would make those decisions act on an old
+    status. So the **Stage 14 call sites keep their present strict 180 s bound**, kept as a named constant, and
+    may adopt the new judgement only where it is stricter or equal (more `unknown`, never more
+    `waiting`/`unplugged`). The replacement of fixed bounds applies to the **display/readiness** call sites
+    (`_session_readiness`, `LIVE_MAX_AGE_S` display use) and to the session coordinator's `observe_initial`.
+    For any start-affecting use, `current` additionally requires a report observed by this process after
+    the monitor seeded its link state (a memory-only link never lets a pre-restart report count). Unknown at
+    a Stage 14 site still keeps the active window; only a fresh unplugged releases it.
+  - **Reuse.** 15.2 link state, `_live_measurements`, the evidence store, `connector_evidence`
+    callers (14.2 continuity, 14.6 decisions), `observationFreshness` semantics for the frontend.
+  - **Delta.** Judgement function, replacement at the *display/readiness and coordinator* call sites (not
+    the Stage 14 gates, per the constraint above), status fields, notification use only where an age bound
+    exists today.
+  - **Acceptance.** Idle healthy connector → current/unchanged, not stale; silent sampled values
+    in a transaction → unknown after the adaptive bound; link loss → last known; reconnect →
+    current again only after a new report or by continuous link; restart (memory-only link)
+    → unknown until seeded; clock skew; 14.2 continuity keeps its semantics (unknown never
+    releases an active window, only fresh unplugged does) and tests prove it; no alert fires on
+    age alone; only fresh measured power says "Charging".
+  - **Stage 14 regression acceptance.** A connector status 10 minutes old with the link up is
+    `current` for display but still `unknown` at the 14.2/14.4 sites (an old "unplugged" never releases a
+    window; an old "waiting" never lets `window_release` run); a fresh unplugged still releases; 14.2/14.4
+    outcomes are byte-identical to today's on the existing fixtures; a pre-restart report never authorizes a start;
+    the 14.6 decision evidence keeps its `connector` field semantics; the existing Stage 14 files pass.
+  - **Exclusions.** No frontend change (15.7), no change to the Stage 14 thresholds, no new
+    OCPP calls.
+
+- [ ] **15.7 Plug-in authorization UI, status wording and freshness adoption**
+  - **Scope.** In `frontend/sidebar/charge-session.js`, `live-charging.js`, `recovery-banner.js`
+    and the readiness evidence: use the 15.6 judgement instead of the local 180 s/90 s limits,
+    apply the sentences in "Status wording" (including the new check/repair/reboot states and
+    "last known" offline text), and make *authorized / waiting on purpose / at risk of not
+    charging* the most prominent element while a car is plugged in, with each blocked reason
+    paired with who acts. Show the reconnect check result ("checked at {time}, nothing needed
+    changing" / "couldn't check") and the repair state. **Charge-control requirement (settled, decision 5):**
+    the card says charging must be enabled: the charge-control switch must exist, be available and
+    be on. "Missing, disabled or unavailable" → "can't start or schedule charging"; **off or
+    unconfirmed is shown as "not yet ready to charge"** (with who acts, and "asking the charger to
+    enable it" while the guarded start of 15.5 is pending), never as normal or ready. The card
+    shows the backend's `not_ready`/evidence from 15.5 and does not itself toggle, request or infer
+    anything; it distinguishes the derived switch from independent authorization evidence
+    (transaction/status) in its wording. No blind switch toggling anywhere.
+  - **Reuse.** The pure state mapping and its tests, the recovery banner, i18n parity tooling,
+    the committed distribution.
+  - **Delta.** Strings and state mapping, prominence, additive fields from 15.3–15.6 (absent
+    fields degrade to today's text), i18n entries in every shipped language file.
+  - **Acceptance.** Every 9.7 evidence rule holds; no sentence promises power; offline versus
+    unknown distinct; idle connector not shown stale; wording tests per state; i18n parity;
+    fixture review in the local preview (no browser/Playwright suite required unless asked).
+    UI only: Pause/Resume, Charge Now/Return to Auto and Send/Refresh behavior and their action safety tests
+    are unchanged, opening or refreshing the panel causes no write, and the existing sidebar/frontend tests
+    pass (no Stage 14 backend change here, so the Stage 14 Python files are not required for this substage).
+  - **Exclusions.** No new backend behaviour (the enabled-charging backend is 15.5), no rename of
+    "Ready by", no theme work.
+
+- [ ] **15.8 Late cumulative-register reconciliation of closed session totals**
+  - **Scope.** Today the evidence store only flags gaps (`unobserved`, `placement: unknown`) and
+    the learners only skip such spans; a closed session's *total* from the cumulative register is
+    not reconciled against how energy was placed in the timeline (observed failure: a timeline
+    placing 0.103 kWh while the session total was 20.9 kWh). Add one bounded reconciliation, run
+    when a session closes or a late register value arrives: total = register at close minus register
+    at open (the existing session recorder's pair), compared with the energy already placed from
+    observed samples; the remainder is recorded as **unplaced late energy** for that session with
+    `placement: unknown` and a stated reason (gap, `link_down` once 15.2 exists, restart, replay). It is
+    reported beside the session total as an **additive history field**, never placed into the current-flow
+    timeline and never counted as current power or measured progress. It does **not** change the session
+    energy that the session recorder computes today or that 14.5's `measured_progress` /
+    `vehicle_update_wait` read (Stage 14 constraint, found in the 2026-11-14 audit: those read the
+    existing fields, so a reconciliation must not alter them); a replayed burst (many updates at one receipt time) is never
+    treated as live flow. Reads the register only (no OCPP traffic).
+  - **Cases that must be handled.** Register reset or decrease (the existing `RESET_TOLERANCE_KWH`
+    rule: no negative energy, the reconciliation is skipped with reason `register_reset`);
+    identity mismatch (different connector/entity/charger: no reconciliation, reason
+    `identity`); duplicate or repeated late updates (idempotent by session id and register value; a
+    second delivery changes nothing); register absent at open or close (`unknown`, not zero); late
+    value arriving after the session was already closed and after restart (persisted pair, one
+    reconciliation); closed-session total below the placed energy (keep the placed value, flag
+    `inconsistent`).
+  - **Reuse.** Stage 6.2 `ChargingEvidenceStore` and `derive_energy`, the session recorder's
+    register pair, the history API and its unobserved-energy fields, `record_gap`/`link_down` rows
+    from 15.2.
+  - **Delta.** The reconciliation function and its stored result fields (additive), the history/
+    session API field, the reason codes. No UI beyond an existing additive display field.
+  - **Acceptance.** A 20.9 kWh register total against 0.103 kWh placed yields 20.797 kWh
+    unplaced late energy, session total 20.9, timeline unchanged, no current-flow or SOC-progress
+    effect; replay burst not counted as live; reset, identity, duplicate, missing-register and
+    restart cases as above; learners (15.9) treat a reconciled-unplaced session as gap-affected.
+  - **Stage 14 regression acceptance.** The 14.5 progress outcomes (`vehicle_update_wait`,
+    `target_progress_uncertain`, the counted-once rule) are identical before and after on the existing
+    fixtures, with and without a reconciled session; no replan, trigger or send is produced by a
+    reconciliation; the session store/API stays backward compatible (old records load); the 14.5 files pass.
+  - **Exclusions.** No timeline backfill from guessed shapes, no new charger command, no new store
+    beyond additive fields, no claim of when the late energy occurred.
+
+- [ ] **15.9 Energy-per-SOC learner on the Morek path**
+  - **Scope.** Feed the *existing* `EnergySampler`/`LearnedEnergyStore` under Morek schedule
+    ownership (today only `_check_plan` under Auto-owned windows samples), by a bounded 60 s
+    tick tied to a known plug-in that calls `_sample_energy` (the energy path does not need plan
+    windows). First prove with a test which controller facts (`plugged_in_at`, `known_connected`,
+    `charging`) are live under Morek ownership; where one is not trustworthy use the session
+    coordinator's connection token and the evidence-store register samples instead, and say so.
+    Targeted rule changes to the learner (constants in `learned_energy.py`): rise **≥ 15 points**
+    (was 10); keep the last **9** ended plug-ins (was 5) and drop samples older than **120 days**;
+    exclude a stretch whose register span overlaps recorded gaps, `link_down`, capture restarts or
+    unobserved/replay-affected segments or sessions with unplaced late energy (15.8), and one ending above **90%** SOC (taper); count every
+    rejection by reason (extend `discarded`). **Use:** keep the existing trust rule for
+    lengthening (≥3 samples within 10% of the median, median of those that agree); a figure that
+    would *shorten* the time needs **≥5 agreeing samples**; direction is judged against the default figure at the point of use (`use_kwh_per_percent` has
+    no direction today); the used figure is clamped to
+    **−10% / +25%** of the default `capacity ÷ efficiency ÷ 100`, applied before the 15.1 reserve
+    (never reduced by it) and never below the Stage 1 minimum floor. No per-sample step limit (the
+    median window already damps), no temperature buckets.
+  - **Reuse.** Everything in `learned_energy.py` including report-time pairing (the register is
+    interpolated to the SOC report's made-at time, which already handles cloud lag), vehicle
+    association, bounds, persistence, guest exclusion, `morek_input_evidence` replanning on a
+    changed learned figure, the evidence store gaps.
+  - **Delta.** The Morek-path sampling tick, the exclusion and clamp rules, asymmetric trust,
+    reason counters. Do not reimplement the sampler, store or trust computation.
+  - **Stage 14 constraints (binding).** The new tick calls only `_sample_energy` (the learner feed); it never
+    runs PlanWatch, `async_recalculate()` or any send (the behind-plan use is 15.10). The figure the planner
+    uses changes only when a plug-in ends (the store's existing pending-sample rule), so learning cannot change
+    `_morek_input_evidence`, and thus cannot cause a replan or resend, in the middle of a charge; keep that
+    invariant under test. A figure that changes at plug-in end reaches the guarded owner only as the
+    normal `recalc`/plug-in comparison, so an equal schedule is skipped and an active window is protected (14.2).
+    Shortening is clamped to −10% and never below the Stage 1 minimum floor, so it cannot weaken the
+    minimum-SOC need that 14.4's slack test relies on.
+  - **Acceptance.** Samples accrue under Morek ownership from a mocked plug-in with two fresh
+    non-estimated SOC readings; lagged report pairs by report time; gap/link-down/restart spans
+    and >90% stretches rejected with counted reasons; four agreeing samples may lengthen but not
+    shorten; five may shorten, clamped; one odd charge cannot move the median; guest car, changed
+    capacity, identity or wiring discards; fallback to the default with the existing "nothing
+    learned" result; a learner error never blocks planning or sending.
+    Former Stage 11.2 test cases, made explicit here: an incorrect initial estimate (default efficiency far
+    from reality) moves the figure only through trusted samples and never beyond the clamp; a charge
+    interrupted by a gap, `link_down`, restart or unplug yields no sample (counted reason); stale or estimated
+    SOC yields no sample; HA restart keeps the anchor and does not turn a half-observed stretch into a sample;
+    vehicle, capacity or wiring change discards.
+  - **Stage 14 regression acceptance.** Samples accruing never produce a recalculation, trigger or send
+    before the plug-in ends; at plug-in end a changed figure produces at most one compared reconcile and an
+    equal schedule sends nothing; the 14.5 progress and 14.2 continuity outcomes are unchanged on the
+    existing fixtures; a learner exception leaves planning and sending unchanged; the existing Stage 14 files
+    and the existing learner tests (`planning` runner) pass.
+  - **Exclusions.** No power-learner change (15.10), no new store, no UI (15.11), no ML.
+
+- [ ] **15.10 Morek behind-plan check and power-learner feed (Stage 11.2; deferrable)**
+  - **Scope.** Run the existing `PlanWatch` and `PowerSampler` against the *acknowledged active
+    window* of the Morek schedule (`morek_schedule.active_window`) instead of `plan.windows` of
+    an Auto plan: the clean-minute conditions use measured power/register, the planned current
+    and `START_GRACE_S`; a confirmed "behind" decision calls the existing
+    `async_recalculate()`, whose changed plan reaches only the guarded worker as a strict
+    recalculation (never tolerance, 14.2 continuity keeps the active window, 14.4 rules and all
+    guards unchanged). The power learner remains **lengthen-only**.
+  - **Reuse.** `plan_watch.py`, `learned_power.py`, the worker's recalc path, 14.5 measured
+    progress accounting.
+  - **Delta.** A Morek window source and sampling tick; nothing in the decision rules.
+  - **Acceptance.** Slow charge inside an acknowledged window yields one replan through the
+    guarded owner (and no more than the existing `PlanWatch` backoff allows); a healthy charge,
+    held window, unknown evidence or Pause yields none; power samples accrue only from clean
+    minutes and can only lengthen; send counts asserted; no 0 A gap.
+    Former Stage 11.2 cases made explicit: a window held by Pause/Stop or Charge Now, or with unknown
+    connector evidence, produces no behind-plan decision; an infeasible target is reported by the existing
+    planner and is never promised; stale readings and a changed vehicle produce no decision; a restart does
+    not turn a half-observed window into a decision.
+  - **Stage 14 regression acceptance.** The behind-plan replan arrives at the worker as the existing
+    strict `recalc` (unlabeled same-revision publication: no tolerance), carries no price-change or
+    cap-lowered trigger and so cannot release a window (`window_release` is never reached with
+    `price_event`), keeps the acknowledged active window (14.2, no 0 A gap), is deduplicated by the equal
+    compare, and is bounded by the existing PlanWatch backoff; Pause, Stop, Charge Now, ownership, identity
+    and the uncertain latch run first and win; 14.5 measured-progress accounting is not double-counted by the
+    replan; send counts asserted; the existing Stage 14 files pass.
+  - **Exclusions.** No new threshold, no shortening from power, may be deferred without
+    blocking 15.11.
+
+- [ ] **15.11 Learned-estimate display and reset**
+  - **Scope.** Show, where the plan and its time/energy explanation are shown, whether the
+    estimate is learned or default, the sample count ("n of 5 needed to shorten"), the effect in
+    minutes and "estimate; no guarantee"; show rejection reasons in diagnostics; add an
+    administrator action that resets learned energy and power data for the charger (reusing the
+    stores' own removal) and the matching sidebar control. Replanning after a reset happens
+    through the existing input-evidence path.
+  - **Reuse.** `plan_watch_facts` (already returns learned power/energy), stores, existing admin-action
+    patterns, i18n tooling.
+  - **Acceptance.** Default and learned displays correct; "learned values unavailable, using the
+    default" is shown while nothing trusted exists (former 11.1); reset restores the default and
+    replans once through the existing input-evidence path (an equal schedule sends nothing, an active window is
+    protected, 14.2); non-admin refused; i18n parity; stale display never claims precision; opening the view
+    writes nothing. Stage 14 backend files are required only for the reset action (the one
+    behavior-changing part).
+  - **Exclusions.** No new learning rule; user-provided summaries to retune constants are a
+    separate optional review, not part of this substage.
+
+- [ ] **E1 Brief 16 A investigation (evidence only, user-directed, read-only first)** —
+  determine, from the 9.4 log viewer, the 6.2 evidence and read-only readbacks the user
+  approves, whether an effective 16 A period around a reconnect or restart comes from the
+  charger's retained-profile evaluation, the HA OCPP integration's own profiles, or SpotNav.
+  Output: a written finding. A mitigation is a separate bounded task. It does not gate 15.3
+  or 15.4 (their bounds already prevent loops); a finding may tighten the 15.4 constants.
+- [ ] **E2 Controlled outage and replay test (evidence only, user-run)** — the "Safe user test"
+  below. Outcome informs how much buffered data the unit replays; nothing depends on it
+  because the design already treats unobserved spans as unknown-placement energy.
+
+#### Learning rules (settled defaults; constants, not settings)
+
+Two quantities stay apart. **Energy per SOC** (wall kWh per percent) can lengthen *or*
+shorten the time; **charging power** is a cap and can only lengthen (planned power is the
+ceiling; a fast session above it is ignored). Time can therefore be shortened only through
+energy per SOC. Both stay per vehicle and wiring, ignore guests and unidentified cars, and are
+discarded when charger, vehicle, capacity or wiring change. Existing behaviour that is kept:
+independent register and SOC endpoints, report-time pairing for lagged cloud SOC, efficiency
+0.70–1.0 bounds, anchor surviving restart, trust computed as the median of samples that agree
+within 10%. The settled changes are exactly those in 15.9; nothing here is a second learner.
+Whole-percent SOC means a rise has up to ±1 point of error, hence the 15-point floor (6.7%
+worst case, roughly unbiased and shrinking in a median). Still unknown and never claimed:
+temperature effects, preconditioning and auxiliary loads inside the register energy, battery
+degradation over months, taper above the cap level, and whether the displayed percent matches
+true energy. Display always says "estimate; no guarantee". User-provided summaries of accepted/
+rejected counts may later retune the constants (optional review; not a gate).
+
+#### Status wording (settled defaults for 15.7; concise, casual, specific)
+
+Facts come from `execution/morek_session.py`, the 15.3–15.6 status fields and
+`frontend/sidebar/charge-session.js`. Evidence rules are unchanged (an accepted request is not a
+transaction, a transaction is not charging, only fresh measured power says "Charging"). Every
+sentence that offers an action names who acts.
+
+| State | Sentence | Waiting for, precisely |
+| --- | --- | --- |
+| Not sent yet (`waiting`) | "I've seen the car but haven't asked the charger to start yet. I'm checking a few things first." | SpotNav's own checks; names the blocker when there is one. |
+| Preparing to start (`blocked`, transient) | "I'd like to start the charge but can't just yet: {reason in words}. I'll look again in a moment." | The named condition; rechecks 5, 15, 30, 60, 120, 300 s (up to 12) and on any event. |
+| Starting (`starting`) | "Asking the charger to start now…" | The charger's reply, at most 30 s; no reply becomes "outcome unknown". |
+| Request accepted (`accepted`) | "The charger said yes to the start request. Now I'm waiting for it to open a charging session and move on from Preparing." | The connector leaving Preparing or a new transaction report. |
+| Accepted, nothing opened | "The charger said yes {n} min ago, but it still hasn't opened a charging session. I won't ask again on my own." | Nothing automatic; the person checks the Morek app or replugs. |
+| Rejected (retry) | "The charger said no. I'll try once more in about a minute." | A 60 s timer, at most two attempts per connection. |
+| Rejected (final) | "The charger said no twice, so I've stopped trying. The car won't start by itself." | Nothing automatic. |
+| Outcome unknown | "I asked the charger but never got a clear answer, so I can't tell if it started. I won't ask again in case it did." | A person checking the Morek app/logs. |
+| Reboot, asked once | "The charger restarted and the car wasn't authorized, so I asked it to start once." | The reply; same states as above. |
+| Waiting for the schedule | "The car is authorized, but your schedule holds charging back until about {time}. It starts then if the car and charger allow it." | The next window; evidence is the charger's readback or SpotNav's acknowledged plan, said which. |
+| Authorized, waiting for power | "The charger has a charging session open. The car hasn't started drawing power yet." | Measured power or current above the flow threshold. |
+| Paused / Stopped | "Auto is paused (or Stopped) because you asked. Nothing will start until you Resume." | The person's Resume. |
+| Checking the schedule | "I'm double-checking what the charger actually has. One odd reading isn't enough to act on." | Rechecks at 30 s, 60 s, 120 s, then 5 min. |
+| Schedule repaired | "The charger was holding a different schedule than the one I sent, so I sent it again at {time}. I'll confirm it took." | The follow-up readback; never proof of charging. |
+| Needs a person | "The charger keeps reporting a different schedule than I sent. I've stopped resending; please check it." | The person. |
+| Offline | "I can't reach the charger right now. A schedule already on it may keep working, but I can't confirm that or start anything. Last known: {state}, {age}." | The connection returning and the check that follows. |
+| Idle, connected | "The charger is connected and idle. Last report: {state}, unchanged since {time}." | A new plug-in. |
+| Unknown | "I don't know the charger's state at the moment, so I won't guess." | A fresh report. |
+| Session ended | "The car says this charge is finished. Unplug and plug in again to start a new one." | A new plug-in. |
+| Charge control not usable | "The charger's charge-control switch is missing, disabled or unavailable in Home Assistant, so I can't start or schedule charging." | The person fixing the entity. |
+| Charging not enabled yet | "Charging isn't switched on for this car yet, so it isn't ready to charge. {I've asked the charger to start; waiting for its answer. / I can't ask right now: {reason}.}" | The guarded start (15.5) or the named blocker; never a blind toggle. Off/unconfirmed is never shown as ready. |
+
+#### Research findings (2026-11-14; sources are public, installed facts are read-only observations)
+
+| Question | Finding | Evidence | Confidence |
+| --- | --- | --- | --- |
+| Does the Morek expose a permanent, timestamped charging history through OCPP? | **No supported OCPP retrieval was found.** The OCPP 1.6 messages that carry history are charger-initiated (`StartTransaction`, `StopTransaction`, `MeterValues`); there is no standard "list past transactions" request from the central system. | Morek's published OCPP 1.6J list ([Morek function list](https://morek.freshdesk.com/en/support/solutions/articles/204000012312-supported-ocpp1-6-function-list), modified 2024-11-03) lists the central-system requests it accepts: core set, `GetDiagnostics`, Local Auth List, Reservation, Smart Charging (`ClearChargingProfile`, `SetChargingProfile`, `GetCompositeSchedule`), `TriggerMessage`. No history/log request. | High for the listed set; the list is a vendor page for the product family and may not match this unit's firmware. |
+| Morek's own app/documentation | Public docs describe live values for the **current** session only (energy, power, elapsed time, cost, "refreshed every 60 seconds"), a schedule, off-peak, and "Charge Authorization" (off = plug and go). **No history or log feature is documented.** | [Morek EV app guide](https://morek.freshdesk.com/en/support/solutions/articles/204000070719-morek-ev-app-guide), [smart charger configuration guide](https://morek.freshdesk.com/en/support/solutions/articles/204000001150-smart-charger-configuration-guide) | Medium: absence in public text is not proof that the cloud or app stores nothing. |
+| Cumulative register | The Morek reports `Energy.Active.Import.Register` in its `MeterValuesSampledData` when that key is configured to include it (check the actual charger value). It is a **running total in the charger's meter**, meaningful as differences, with no per-session boundaries or timestamps stored by SpotNav's source. | `GetConfiguration` (read-only); [Morek configuration-key sheet](https://morek.freshdesk.com/helpdesk/attachments/204000385140) | High for the key; meter-versus-session behaviour on this firmware unverified. |
+| Per-transaction data in `StopTransaction` | The keys that would put sampled/aligned values in the `StopTransaction` payload (`StopTxnSampledData`, `StopTxnAlignedData`) and `ClockAlignedDataInterval` are listed **read-only by the Morek sheet**; their values on a given unit must be checked, and a bundled interval trace should not be assumed. `meterStop` and the stop timestamp still arrive. | Morek configuration-key sheet (accessibility `R`) | Medium; "read-only" is the vendor sheet's claim, not tested (a `ChangeConfiguration` test is forbidden here). |
+| Offline replay | OCPP 1.6 expects transaction-related messages to be delivered after reconnect and secondary sources say they are queued in order; **one earlier investigation observed a replay of roughly 120 buffered readings after an overnight outage**, so some offline buffering did occur. **Still unverified:** how long the charger stores data, whether the replayed timestamps are the charger's clock, whether the replay was complete, queue depth, retention across power loss, and whether old sessions can be retrieved on demand. The standard `TransactionMessageAttempts` and `TransactionMessageRetryInterval` keys govern retries when the *central system fails to process* a message, not an outage. | [OCPP 1.6 edition 2, sections 3.5 and 3.7](https://openchargealliance.org/protocols/open-charge-point-protocol/) (normative text **not read in this session**; spec PDF not retrieved), secondary summaries, Morek key sheet, one earlier observation | Low-medium: replay seen once; extent and limits unknown. This is the main unknown. |
+| What the installed HA OCPP integration does with timestamps | The installed `ocpp` integration (source reviewed) does not use the `MeterValues` message timestamp for sensor readings; metrics carry no observation time (an existing comment in its API code says so). A replayed batch would therefore appear as a burst of updates at **receipt** time. `StopTransaction` receives a `timestamp` argument that the handler does not use for ordering. | Source read, `ocppv16.py` and `sensor.py` | High for the source reviewed. Hence "do not assume replay timestamps are accurate". |
+| On-demand retrieval commands | `GetCompositeSchedule` = effective limits, not an inventory and not history. `GetConfiguration` = configuration only. `TriggerMessage` (supported) asks the charger to send **one current** `MeterValues`/`StatusNotification`/`Heartbeat`; it returns *current* values, not past ones. `GetDiagnostics` (supported, via HTTP upload) asks the charger to upload a **vendor-defined diagnostics file**; its content, whether it holds charging records, and whether it could expose private data are undocumented, and it requires an upload URL (outward data flow). `DataTransfer` is vendor-defined; no Morek message was found. | Morek function list; HA ocpp integration service definitions | High for definitions; unknown for diagnostics content. |
+| Services offered by the HA OCPP integration | `configure`, `get_configuration`, `data_transfer`, `trigger_custom_message`, `clear_profile`, `set_charge_rate`, `update_firmware`, `get_diagnostics`. Only `get_configuration` is genuinely read-only on the charger. `trigger_custom_message` is not a settings change but causes extra traffic and HA state updates; `get_diagnostics` sends data to a server; the rest change the charger. | HA ocpp `services.yaml` | High. |
+| Local retained measurements | HA's own Recorder keeps the register/power rows it received (sampled at the charger's configured MeterValues cadence, typically only during a transaction, with possible gaps). That is HA's history, not Morek's, and has receipt-time stamps. | Recorder history; no values recorded here | Medium; existence and completeness must be checked per installation. |
+| BMW | BavarianData entities include displayed SOC, charging status, `charged_energy_session`/`total` and plug/location (6.1 S11). Cloud-polled, battery-side, possibly late (field case: 15 min). It can provide an independent **post-window SOC** after the car's own report. Entity availability on the installation is unverified. | 6.1 inventory | Medium. |
+
+**Verdict:** the Morek exposes a cumulative register and live samples; a **supported,
+documented way to retrieve a permanent timestamped history of past charging from the
+charger over OCPP was not found**, and none was exercised. Offline buffering is **partly
+observed but uncharacterised**: an earlier investigation saw a replay of roughly 120
+buffered readings after an overnight outage, but storage duration, timestamps,
+completeness and on-demand retrieval of old sessions remain unverified (see E2 and
+"Safe user test"). **Working assumption (settled): the Morek offers no on-demand history
+storage.** SpotNav keeps capturing its own record (Stage 6) and treats spans it did not
+observe as unobserved with unknown placement; nothing in Stage 15 depends on E2's outcome.
+
+**Live checks.** Read-only checks were made with the user's authorization and no
+state-changing call. Installation-specific values, identifiers and metadata are
+deliberately not recorded in the repository. Generic notes: the OCPP configuration keys
+that govern offline authorization, retries, sampling and heartbeat cadence should be
+read from the charger when needed, and the charger's clock source and accuracy are
+**unverified**, which matters because an absolute schedule is interpreted on that clock.
+
+#### Terminology: "ready" versus "waiting" (audit of current source)
+
+The words are overloaded; the dashboard must not use one word for different facts.
+
+| Where | "ready" / "waiting" means |
+| --- | --- |
+| Planner/pricing | `reason: "ready"`, price-area state `ready`: data/plan available; `waiting_for_prices`, `waiting_for_publication`, `waiting_for_vehicle_update`: planner has no usable input yet. |
+| Settings | "ready-by" / `minimum_ready_by_soc`: the user's **deadline** and floor, not a state. |
+| Morek status | `readiness` object (9.7 card): connection/session **evidence**; `session_start.state` includes `waiting` = request not sent yet. |
+| 9.7 card | "Plugged in - waiting for the schedule" (transaction confirmed, hold by plan), "Authorized - waiting for power", "Request accepted - waiting for the charger", "Preparing to start charging". |
+| Notifications | proposal events use `waiting` (no plan) versus `ready` (plan available). |
+| Other chargers | vendor status such as Wallbox `ready` and Easee `ready_to_charge` map to a *connected* state. |
+| OCPP | actual connector statuses are Available, Preparing, Charging, SuspendedEVSE, SuspendedEV, Finishing, Faulted; there is no "ready"/"waiting" status. |
+
+Vocabulary (settled, decision 8): **Waiting**
+only for a deliberate, explained hold with a stated reason and expected time
+(schedule, price, missing prices); **Starting** for an accepted request awaiting the
+transaction; **Authorized** only where the authorization itself is evidenced (a transaction's existence or status alone does not prove it);
+**Unknown** when evidence is stale for the *connection state*, never for age alone;
+keep the label **"Ready by"** for the deadline (no rename). Do not say "Ready" for a car
+that has only been plugged in.
+
+#### Active charge control while offline (what is and is not understood)
+
+- Intended: an accepted `TxDefaultProfile` (id `42001`, absolute periods, final 0 A)
+  stays on the charger and applies to a transaction while HA is unreachable.
+- Earlier user experiments showed transitions inside an *already authorized* session
+  without HA; they did not establish behaviour across charger reboot, power loss, an
+  edited clock, or authorization of a **new** transaction while offline.
+- A new transaction while offline needs local authorization. Relevant settings:
+  the offline-authorization configuration keys (read the actual values; not recorded
+  here); Morek's "Charge Authorization off" turns the unit into plug and go. Settled: SpotNav does not
+  depend on it and never changes a Morek setting; a new plug-in while HA is down may not
+  authorize, and the UI says so.
+- A schedule's end-of-window 0 A and timing are only as accurate as the charger clock.
+  A stored schedule is not proof of effective limits; readback proves only the last
+  reachable moment; measured power is the only physical evidence. While offline SpotNav
+  has none of these, so its state must be "offline: last known" with age, not "charging".
+- SpotNav's own plug-in start request and schedule updates need the OCPP connection and
+  cannot work offline at all; do not imply they can.
+
+#### Safe user test: does the Morek store charging data, and how to find out
+
+This is evidence task **E2**: optional, user-run, blocks no substage. None of it is
+authorized for an LLM and none of it changes Morek settings or schedules.
+
+1. **Cumulative register (works now):** note the `Energy.Active.Import.Register` sensor
+   value in HA before and after a charge; the difference is the energy, regardless of
+   timing. Compare with the car's reported energy and the Morek app's session energy
+   (the app shows current-session values, refreshed every 60 s).
+2. **Morek app:** after a completed session, look at whether the Morek EV app keeps a
+   list of past sessions. Public docs do not describe one; record what you see.
+3. **Controlled outage (answers the replay question):** choose a charge you do not mind
+   having an unreliable record of. During charging, stop the charger reaching HA for
+   about ten minutes (for example unplug only the charger's network cable or switch its
+   Wi-Fi/uplink off at the router; do not power off the charger or the car). Restore it,
+   then in HA History compare the register and power sensors: a **burst of many updates
+   within a few seconds after reconnection** with register values spanning the outage
+   would suggest the charger buffered `MeterValues` (their timestamps will show the HA
+   *receipt* time, not the time measured). No burst does **not** prove that only the
+   running total is stored: the data may have been dropped, limited by queue depth or
+   duration, rejected, or not recorded by HA. A register step spanning the outage shows
+   the total only. Also note whether the
+   session continued or ended at the reconnect.
+4. **Report back:** outage length, register before/after, number of HA state rows after
+   reconnect, and whether charging continued. No screenshots of private pages.
+
+Do not use `ocpp.clear_profile`, `configure`, `set_charge_rate`, `update_firmware` or
+`data_transfer` for any of this. `ocpp.get_configuration` is safe for reading keys.
+`ocpp.trigger_custom_message` gets one *current* sample only and does not retrieve history.
+
+**Sources:** [OCPP 1.6 protocol page](https://openchargealliance.org/protocols/open-charge-point-protocol/),
+[Morek supported OCPP 1.6 function list](https://morek.freshdesk.com/en/support/solutions/articles/204000012312-supported-ocpp1-6-function-list),
+[Morek configuration keys PDF](https://morek.freshdesk.com/helpdesk/attachments/204000385140),
+[Morek EV app guide](https://morek.freshdesk.com/en/support/solutions/articles/204000070719-morek-ev-app-guide),
+[Home Assistant OCPP integration guide](https://home-assistant-ocpp.readthedocs.io/en/stable/user-guide.html),
+[OASIS OCPP list: transactionData in StopTransaction](https://lists.oasis-open.org/archives/ocpp/201611/msg00250.html),
+[AmpControl StopTransaction guide](https://www.ampcontrol.io/ocpp-guide/how-to-stop-a-charging-session-with-stoptransaction),
+[Zaptec OCPP 1.6J release notes (offline queueing)](https://docs.zaptec.com/changelog/zaptec-go-ocpp-native-release-notes).
+Secondary and vendor sources are marked as such above; the normative OCPP 1.6 text on
+offline behaviour was not read; nothing in 15.1–15.11 relies on it, but read it before
+interpreting E2.
+
+### Execution boundaries — avoid another prerequisite spiral
+
+- Stage 1 and the unarmed scope of Stage 2 are implemented for coordinator review.
+  Reuse the planner and Auto execution boundary; Stage 2 activation questions
+  remain open. Stage 1 does not automatically upload Morek schedules.
+- The previously proposed durable pre-dispatch callback wrapper was **not assigned**
+  and is **not a required task**. Do not implement it automatically.
+- Reuse the completed evidence store if the selected execution path needs it.
+  Do not expand generic legacy-command recovery as a prerequisite for planner/UI work.
+- Stage 2 uses three implementation slices, not a per-caller gating project. Reuse
+  the audited writer inventory and existing execution/admission boundaries. Full
+  writer coverage is a test requirement, not a requirement to scatter checks through
+  every function. No new standalone design/audit session is required first.
+- Code can be reviewed with mode unarmed. Actual activation requires completed
+  isolation and resolved electrical/authorization blockers; do not weaken those.
+- Source inventory (6.1) and sample-data layout (5.1) may start early. Hardware
+  testing remains user-directed, never a separate delivery gate.
+
+## Detailed requirements and acceptance reference
+
+The sections below explain policy and test cases. Legacy A/B/C identifiers are
+retained for links/history only; the numbered checklist above controls task scope
+and progress. Do not treat an old broad block as a single implementation session.
+
+## 1. What the user wants
+
+- **One charging dashboard in a Home Assistant custom sidebar panel.** Use the same
+  UI code in the local sample preview and HA, with different data adapters. Existing
+  card compatibility may remain but is not a second required daily interface.
+- A comprehensive, modern, evcc-inspired charging overview: clear large values,
+  useful charts, polished controls, compact status badges and tables—not long
+  paragraphs or an initially hidden Morek section.
+- Important information visible on opening the page. On smaller screens the same
+  dashboard scrolls vertically; “visible by default” does not mean cramming every
+  historical row or raw protocol detail into the first viewport.
+- Nord Pool prices, cheap periods, SpotNav's proposed plan, the schedule sent to
+  Morek, Morek's effective readback, and measured charging clearly distinguished.
+- Car connection, battery/target, energy needed, estimated active charging time,
+  elapsed time until ready, next start/stop, planned costs and savings.
+- Yesterday's planned-versus-actual charging and costs, so the user can check
+  whether charging actually followed the schedule. **Actual history must come
+  from Morek measurements/events, never be guessed from calculated windows.**
+- **Autonomous daily operation:** planning, schedule updates, verification and
+  reconnect recovery without clicking Send. Keep manual Send/Refresh for debugging.
+- **Schedule-only execution for the Morek connector:** SpotNav must not also run
+  its legacy live start/stop/current-setting control against the same connector.
+- **Soft price limit + minimum ready-by SOC:** normally exclude prices above a
+  configurable cap (example: 10 cents/kWh). Override it only for the energy needed
+  to reach a configurable minimum SOC (typically 40%) by the ready-by deadline,
+  choosing the cheapest feasible periods. The ordinary target can be higher.
+- Saving a changed ready-by time, price cap or minimum SOC must automatically
+  recalculate; if the effective charging schedule changes, automatically resend
+  it. No manual Send or browser refresh should be required.
+- **No separate overnight/hardware-testing stage.** The goal is a great dashboard
+  with an improved backend. The user decides when to test hardware; uncertainty
+  must be documented, not made a prerequisite blocking dashboard development.
+- No solar panels: do not spend this project's effort on solar, battery-storage
+  flows or decorative whole-home energy diagrams.
+
+The user accepted Apache ECharts after comparing it with ApexCharts. ECharts is
+the selected chart library; visual similarity to evcc does not require running
+evcc or another controller alongside SpotNav.
+
+## 2. Historical manual baseline, not the finished product
+
+The baseline below describes **2.5.7**, not the current implementation. The local
+manifest was 2.5.44 during this roadmap review; check Git and the handoff for ongoing
+uncommitted work. Source, installed HA version and charger state are separate facts.
+
+- The manual Morek API can preview, send, fetch and selectively clear profile
+  `42001`, station `3020002509120029`, connector `1`, through HA OCPP.
+- The real schedule is an absolute `TxDefaultProfile`, stack level **1**, using
+  0/16 A periods and a persistent final 0 A limit. Level 5 was rejected by Morek;
+  level 4 was accepted during a diagnostic probe. Stack 1 also eventually matched.
+  **Do not escalate priority or automatically clear profiles to hide a mismatch.**
+- Send currently requires the old Auto control paused “Until I resume”. That is a
+  temporary experimental interlock, **not** the intended autonomous UX. Replace
+  it only after exclusive execution ownership is implemented and tested.
+- 2.5.7 sends the displayed windows, including a shortened energy-estimated final
+  block. These are fixed times, not a guarantee of stopping at a measured kWh/SOC.
+- 2.5.6 adds immediate + bounded delayed readback checks, reported coverage and
+  visible timing drift. A match currently allows up to 90 seconds' drift and
+  requires reported coverage through one hour after the final stop.
+- Morek has returned Accepted uploads with a flat 16 A readback, later returning
+  the expected transitions with varying seconds. There is no isolated, proven
+  firmware/root-cause fix. Physical charging behavior is not established by those
+  readbacks; hardware testing is user-directed, not a roadmap stage.
+- The user reported the car unplugged during those investigations. This is not a
+  permanent fact; check its current state before a future supervised test.
+- Session totals/cost/savings APIs exist. A reliable historical comparison also
+  needs retained schedule versions, readback snapshots and detailed measurements;
+  the current last-upload record cannot reconstruct every previous night.
+
+## 3. Architecture and non-negotiable rules
+
+### One plan, one execution owner
+
+Retain SpotNav's planner; create a dedicated Morek schedule executor. A shared
+backend snapshot feeds all dashboard cards. Frontend rendering must not be needed
+for automation, and must never itself trigger uploads just by opening the page.
+
+For the connector in Morek schedule mode:
+
+1. **Plan -> validate -> SetChargingProfile -> read back -> compare -> report.**
+2. Time boundaries are enforced by Morek's stored profile, not HA timers sending
+   RemoteStart/RemoteStop or number/current writes at each boundary.
+3. Disable/gate all conflicting SpotNav legacy execution paths for that connector:
+   timed start/stop, direct current writes, normal action buttons, session runner
+   side effects, reconnect/bootstrap writes and applicable site-control writes.
+   Inspect actual paths; hiding buttons alone does not establish ownership.
+4. Preserve read-only status, metering, planning and diagnostics. Do not remove
+   unrelated integrations or globally break legacy support for other chargers.
+5. Do not run another charger controller (including evcc/Gridio) against the same
+   connector during tests. They are UI references, not additional executors.
+
+### Safety and authorization
+
+- Do not implement household load balancing or dynamic amp changes in SpotNav's
+  Morek schedule-only mode. The user reports that Morek handles protection natively;
+  this report is not independent verification of the installation. Do not disable
+  existing protection, raise electrical limits or assume that gating a software
+  actuator leaves equivalent protection. Resolve any actual dependency or conflict
+  before activation, without implementing a replacement load-management system.
+- OCPP current limits **do not authorize a charging transaction**. Establish how
+  a newly plugged-in car becomes authorized without legacy start commands. Do not
+  silently change charger authorization mode, credentials, RFID or vehicle settings.
+  If this requires another configuration decision, surface it and get approval.
+- Keep the physical station/connector identity guard. Never use blanket profile
+  clears; removal targets only the owned ID. Keep stack 1 unless a separately
+  justified, approved change is made.
+- Same-ID updates are intended to replace the owned schedule, not all charger
+  profiles. Persistent final 0 A, rollback/removal and leaving schedule mode need
+  deliberate behavior; do not assume Resume or HA restart clears them.
+- No stale/unpriced/invalid plan upload and no unbounded retries. Unknown upload
+  outcome means “may have applied”, not permission for a rapid resend loop.
+- Make unavailable SoC/metering explicit. Never show missing data as zero or claim
+  a precise completion estimate without sufficient inputs.
+
+### Soft price limit and minimum SOC policy
+
+These are **planning inputs**, not another live charger controller. Persist them
+and use the same backend policy for chart proposals, cost estimates, automatic
+uploads and manual Send.
+
+- Settings: optional soft price cap in the configured currency/kWh, minimum
+  ready-by SOC (suggested initial default 40%, editable), normal target SOC, and
+  ready-by time. Validate `0 <= minimum SOC <= normal target SOC <= 100`.
+  Represent 10 cents/kWh explicitly as 0.10 currency units/kWh, not 10 units/kWh.
+- Price **at or below** the cap is allowed for ordinary charging toward the
+  normal target. Price **above** it is excluded unless the minimum-SOC exception
+  is needed. The cap is a maximum per interval, not an average-price threshold.
+- First determine whether available below-cap periods before departure can
+  deliver enough energy to meet the minimum. If they cannot, add only the
+  necessary above-cap energy using the cheapest feasible remaining intervals.
+  Continue toward the normal target only in below-cap periods. Do not waive the
+  cap for the entire plan merely because the minimum is not yet reached.
+- Optimize the combined plan under real power/energy estimates and charger
+  period/block constraints. Do not independently select two conflicting plans,
+  silently drop periods, or broaden an expensive period to fill a whole slot
+  when a partial block suffices. Preserve the shortened final stop behavior.
+- If SOC is already at/above minimum, expensive slots stay excluded even when
+  the normal target cannot be reached. Say “minimum met; target limited by
+  price cap”, rather than quietly charging expensively to the higher target.
+- If there is insufficient time/known data to reach the minimum, calculate a
+  bounded best-effort feasible plan and clearly report the shortfall. Never
+  imply the ready-by minimum is guaranteed, use unknown future prices as cheap,
+  or extend beyond departure without a separately approved policy.
+- Missing/stale SOC, usable capacity or charging-power data must produce an
+  explicit degraded/refused-policy state. Do not invent the energy deficit or
+  silently grant the expensive-price exception without adequate information.
+- Use and label one consistent cap price basis (Nord Pool-only or configured
+  variable cost including fees/taxes). Confirm the default with the user. The
+  price chart, cap marker, optimizer and explanation must agree on that basis;
+  negative prices and currency/unit conversions must work correctly.
+- Explain exception windows in the UI: **“Above price cap: needed for 40% by
+  07:00”**, with the actual configured SOC/deadline and extra cost. Distinguish
+  minimum SOC from the normal target everywhere.
+
+Example: SOC 25%, minimum 40%, normal target 80%, cap 10 cents/kWh, ready 07:00.
+If all known periods before 07:00 are above the cap, select the cheapest feasible
+time needed for **40%, not 80%**. If cheap periods suffice for 40%, no expensive
+override is allowed; use additional eligible cheap time toward 80% if available.
+If SOC is already 45% and everything is expensive, schedule no extra charging.
+
+Saving a new deadline must recompute the eligible horizon, minimum-energy
+feasibility, selected windows and cost immediately through the normal backend
+update path. The executor replaces the owned schedule when those windows change,
+including removing no-longer-needed future blocks. Coalesce rapid edits; unchanged
+wire intent must not cause upload spam. Do not assume this reactive behavior
+already exists in the current manual experiment.
+
+### Separate operational meanings
+
+Do not conflate these in APIs, UI, history or tests:
+
+| Data | Meaning |
+| --- | --- |
+| Prices / cheap slots | Published tariff data and selectable low-cost opportunities |
+| Proposal | What SpotNav calculates now; may not be installed |
+| Last sent | The exact outgoing profile and its version/time |
+| Upload ACK | Morek's response; Accepted alone does not verify behavior |
+| Effective readback | Composite limits returned at a particular time and horizon |
+| Actual charging | Measured current/power/energy; not inferred from a 16 A limit |
+
+`GetCompositeSchedule` is not a profile inventory. “Configured in Morek” must be
+presented as the known sent schedule plus effective readback, not invented proof
+of every stored profile or its absence.
+
+## 4. Detailed backend, dashboard and history acceptance
+
+Use these descriptions to implement the corresponding numbered substage above,
+not as a second work queue. The first autonomous release requires price policy,
+actual isolation, automatic updates, recovery and daily controls. No overnight run
+is a prerequisite for software development or dashboard work.
+
+### A1 — Audit the existing execution paths (documentation + tests/design)
+
+Inspect the planner, `execution/session_runner.py`, OCPP adapter/actions, Auto
+pause/resume, direct current/number writes, startup/reconnect and site-control
+paths. Inspect—not assume—current charger transaction authorization behavior.
+
+Deliver a short implementation map listing every writer and where Morek ownership
+guards belong. Specify migration to the single schedule owner, what may remain
+stored on the charger, and what must be approved before hardware testing.
+
+**Done when:** there is an explicit ownership/transition design, an authorization
+plan, and a test matrix showing how conflicting writes will be detected.
+No live commands, mode changes or file deployment are needed for this audit.
+
+### A2 — Enforce exclusive schedule-only mode
+
+Use a single schedule execution path for the supported Morek connector with safe
+migration from the current manual experiment. Do not silently arm unsafe control
+on an integration update. Legacy live execution cannot also own that connector;
+retain shared legacy support for other chargers and the ownership safeguards.
+
+Keep **disable the integration**, **pause charging**, and **remove stored schedule**
+distinct: disabling SpotNav may leave a profile installed, and removing a 0 A limit
+may allow charging. Pause and Charge Now use the same schedule owner, never a hidden
+return to legacy RemoteStart/RemoteStop. No runtime switch back is required.
+
+**Done when:** automated tests prove that all applicable legacy writers emit no
+conflicting commands in Morek mode, including at scheduled boundaries and reload.
+Read-only diagnostics and independent protections still work. Migration and any
+known or uncertain retained limits are explicit to the operator.
+
+### A2P — Soft price cap, minimum ready-by SOC and reactive planning
+
+Implement the policy in section 3 in the existing planner/settings system. Audit
+existing price/target/departure support before adding parallel settings or a
+second optimizer. Price cap and minimum SOC are **P0 backend requirements**, not
+late cosmetic chart options.
+
+Expose cap on/off and value, minimum SOC, normal target and ready-by time as
+distinct persisted inputs. Confirm and label the cap's cost basis. A disabled cap
+retains normal optimization behavior; an enabled cap filters expensive intervals
+except for the explicitly calculated minimum-SOC deficit.
+
+Choose the cheapest feasible plan before departure, respecting both the minimum
+exception and the charger's period capacity. Surface why a target cannot be met;
+do not silently relax the cap for extra energy above the minimum. Keep estimated
+energy/cost and the shown/sent times consistent, including partial final windows.
+
+**Done when:** deterministic tests cover all prices above cap, all below cap,
+price exactly equal to cap, enough/insufficient cheap energy for minimum, SOC
+already at minimum, minimum below the normal target, disabled cap, negative
+prices, currency/fee basis, missing/stale SOC, infeasible departure, partial slots,
+and charger block limits. Saving deadline/cap/minimum changes produces a fresh
+plan event without requiring a browser or charger state change. A3 tests prove
+that a changed plan is then automatically resent, rather than only redrawn.
+
+### A3 — Autonomous, idempotent schedule reconciliation
+
+Implement one backend worker that sends the latest valid plan when needed, not
+on every HA state update. Triggers include published prices, relevant saved
+settings/target/departure/**soft-cap/minimum-SOC** changes, material changes in the planned windows, and
+the charger becoming available. Include a deliberate initial reconciliation.
+
+- Use the same displayed-window builder for automatic and manual Send.
+- A saved ready-by/departure change must trigger planning and reconciliation
+  even if no charger entity changed. Apply the same rule to cap/minimum/target
+  edits and relevant SOC updates. If selected windows change, replace the owned
+  schedule automatically; if identical, report the new plan state without a
+  duplicate upload. No dashboard-open dependency or extra Send click.
+- Fingerprint absolute ON/OFF windows, amperage, relevant profile attributes and
+  revision/ownership; exclude the moving initial 0 A timestamp. Debounce/coalesce
+  changes and serialize per connector. Ignore stale generations/results.
+- Keep Send/Refresh as debugging tools using that same worker and state machine.
+  Manual Send cannot bypass identity, ownership, electrical or freshness checks.
+- Bound retries/backoff and keep desired, attempted, acknowledged and verified
+  versions separate. A refresh or dashboard reload never forces an upload.
+- Continue only the remainder of **currently active windows** (3.1), without
+   extending the original end. Never resend an old expired plan on reconnect.
+- Define expired/no-plan/unpriced-data behavior and how pending 0 A limits are
+  handled. Do not silently release all limits when tomorrow's prices are absent.
+
+**Done when:** deterministic tests cover stable-plan deduplication, concurrent
+triggers, changed plans, refusal, unknown upload outcomes, active-window updates,
+stale responses, manual debugging, deadline moved earlier/later, cap/minimum edits,
+and finite retry behavior. Persist enough
+version/event metadata to explain which schedule was supposed to run overnight.
+
+### A4 — Recovery and truthful execution health
+
+Extend verification/recovery for autonomous ownership. Recheck on HA restart and
+charger reconnect; decide whether to reapply only from current valid intent, not
+from stale cached ACK. Keep readback retries bounded and independent of open UI.
+
+Compare the relevant remaining schedule when a charging window is already active;
+the current experimental comparator cannot reconstruct past behavior from a
+composite reply. Do not label that a verified historical session. Retain reported
+duration, timing drift, data freshness and last attempt/error reason.
+
+Provide states such as disabled, waiting for prices, ready, sending, checking,
+matched, mismatch, offline and intervention needed. Persistent mismatch must be
+prominent, with bounded notifications—not silent priority escalation or clears.
+
+**Done when:** tests simulate restart, disconnect/reconnect, missing/short
+coverage, delayed activation, drift, malformed replies, missing measurements and
+an active transaction. Recovery cannot revive a cancelled/older upload or enable
+the legacy controller. A user can understand what remains installed while HA is
+offline and what has not been proved.
+
+### A5 — Minimum daily operations UI (before the big redesign)
+
+Make the existing Morek overview visible without opening “schedule details”.
+Use a small set of compact panels/status chips and a window table, not another
+wall of explanation. Keep it on the path toward the **single** final dashboard.
+
+Always show: current execution owner/mode, plugged-in/charging state, measured
+kW/current, next start/end, proposed versus sent version, upload/readback health,
+last checked time, and a visible reason when any action is disabled. Keep target,
+minimum SOC, soft cap, departure and estimated plan energy/cost visible where
+supported. Show whether the price cap is active and why any expensive window
+is required to meet minimum SOC. Distinguish
+time spent charging from elapsed time until ready.
+
+Keep manual Send and Refresh accessible for debugging. Removal has a separate
+confirmation and clear consequences. Critical mismatches cannot hide in a menu.
+
+**Done when:** operators can tell whether the car is charging, why it is waiting,
+when it will next charge, who controls it, and whether the schedule matches
+without opening settings. This block need not include a new chart library.
+
+### B1 — Durable plan, event and measurement history
+
+**First find out what Morek actually reports.** Make a read-only source inventory
+of the installed HA OCPP integration, entity history/Recorder/statistics, and any
+existing SpotNav stores. Document exact entity/message fields, connector binding,
+units, sample frequency, timestamps, freshness, reset behavior and retained
+history. Do not assume session start/end equals continuous charging.
+
+Candidate evidence, to validate against this station:
+
+- OCPP **MeterValues**: measured `Power.Active.Import`, `Current.Import` and
+  cumulative `Energy.Active.Import.Register`, if this charger exposes them.
+  Power/current samples support observed flow; meter-counter increments support
+  delivered energy. `Current.Offered` and configured limits are **not** flow.
+- **StatusNotification** (Charging, SuspendedEV/EVSE, Available, etc.) explains
+  charger/session state, but a Charging label alone is not an accurate kWh trace.
+- **StartTransaction/StopTransaction** delimit a session and may carry meter
+  start/stop values. One transaction can span several scheduled pauses; do not
+  paint its entire duration as physical charging.
+- HA OCPP measurement entities and Recorder can supply historical samples if
+  those entities were recorded. Existing SpotNav measured-energy/session stores
+  may already supply some data. Verify quality/provenance before reuse.
+- **BMW CarData through the user's Bavarian CarData HA integration** is an
+  alternative/complementary source to investigate, especially if Morek provides
+  no retrievable history. Audit the installed integration/API rather than assuming
+  BMW exposes historical charging intervals. Check for genuine charging-history
+  records, timestamped charging-state transitions, measured charging power/energy,
+  and whether available live telemetry can be retained in HA going forward.
+  Distinguish remotely retrievable past history from data collected only after
+  Recorder/SpotNav starts storing it. Sparse SOC changes or a predicted finish
+  time alone cannot establish exact charging periods.
+
+Compare the coverage and timestamp precision of Morek/OCPP and BMW observations
+before choosing the history source. Prefer fresh, connector-specific charger
+metering for home charging when available; use validated BMW charging records as
+a fallback or cross-check, with source/confidence visible in the UI. BMW sessions
+can include public/other-location charging, and battery-side energy is not
+necessarily grid-side energy. Verify the vehicle and home-charger association,
+do not double-count overlapping sources, and do not silently use battery energy
+as exact billed electricity consumption. Respect API rate limits and use the
+existing authenticated integration rather than embedding BMW credentials in
+SpotNav or adding aggressive vehicle polling.
+
+Prefer the existing OCPP ingestion/HA data paths; do not parse permanently enabled
+debug logs as the production history feed, invent a Morek cloud API, or install a
+second OCPP server. If useful telemetry is missing, explicitly document the gap
+and any proposed configuration change for approval rather than fabricating it.
+
+Retain immutable versions of the plan actually sent, upload ACK, readback samples,
+mode/setting changes and execution failures with timestamps. Record/retrieve
+charger power/energy at useful resolution through the existing HA data paths;
+do not invent past measurements or wake vehicle APIs at excessive frequency.
+
+Define observed charging intervals from fresh measured flow/energy evidence,
+with an explicit noise threshold/debounce and sample-resolution uncertainty.
+Keep status-only evidence labelled separately. Integrating sampled measured power
+is a **measurement-derived estimate**, not meter-exact energy; label it and prefer
+valid meter-counter deltas where available. Preserve gaps instead of bridging
+them with the proposed/sent schedule or interpolating an entire offline session.
+Handle delayed/out-of-order messages, duplicate samples, counter resets/rollovers,
+and charger clock drift; preserve measurement and HA receipt times where possible.
+
+Keep meter provenance, gaps, quality flags, price/tariff context and timezone.
+Check existing session/price/history stores before adding duplicate storage.
+Add retention/aggregation and an API that can reconstruct a specific night's
+plan-versus-actual story after HA restart. Storage size must remain bounded.
+
+**Done when:** tests reconstruct an overnight session across midnight and a
+restart, preserving the original plan despite later replanning, and render gaps
+as unknown. This uses recorded/synthetic measurement fixtures; it does **not**
+require the user to run an overnight test before development proceeds. Include a
+case where charging occurs **outside** the plan and one where a planned block has
+no observed flow. The history must show the measured behavior in both cases.
+Older days cannot silently use today's plan or changed tariff. Deliver the source
+inventory alongside the implementation so future LLMs know what is real evidence.
+Include BMW fallback/cross-check availability, source disagreements and
+location/energy-basis limitations; missing Morek history is not permission to
+substitute the calculated plan for actual observations.
+
+### B2 — Dashboard prototype and visual building blocks
+
+Build a browser-rendered prototype with sample data first, then obtain visual
+approval. Do not require HA update/restart for every spacing adjustment. Use
+desktop and mobile layouts with the same cards and shared design tokens.
+
+Use the HA custom sidebar panel as the intended responsive host; Sections references
+in historical notes are superseded. Bundle ECharts locally with
+licence/notice files; load heavy chart code only where needed. Start with Web Awesome
+**Core** as the primary library for polished ready-made controls, rather than styling
+all controls from scratch. Verify the selected package version, licence, bundled assets,
+theme integration, dialogs/popovers, responsive behavior and compatibility with the HA
+panel host. HA-native components may be used selectively where appropriate; avoid
+depending on undocumented internals. Do not require paid Pro components or runtime
+CDN access. If Web Awesome does not work technically or visually, stop and reevaluate
+alternatives with the user, including React-based libraries if appropriate, rather than
+silently falling back to hand-built controls or undertaking a framework rewrite.
+
+**Done when:** the single-dashboard composition, responsive layout, controls,
+status vocabulary, chart colours/patterns and empty/error states are approved.
+No second stock-card dashboard is introduced.
+
+### B3 — Interactive Nord Pool prices and schedule tracks
+
+Implement ECharts in the approved Prices & Plan card. Show the entire day and all
+available published data, with Today/Tomorrow/All available, drag/touch zoom,
+overview slider, reset, “now” and departure markers, and exact tooltip values.
+Include a labelled soft-cap line and visually distinguish ordinary below-cap
+windows from above-cap minimum-SOC exception windows, with the reason on tap/hover.
+
+Use source-resolution bars/steps, including negative prices; do not smooth away
+price changes. Mark unavailable future prices honestly. Support local timezone,
+midnight and DST days with 23/25 hours. Preserve zoom across routine updates.
+
+Align labelled tracks for proposal, last sent, effective readback and actual
+charging with the price time axis. Shade planned windows lightly on the chart
+without making prices unreadable. Suggested cheap opportunities are not the
+same thing as a selected plan. Never imply a reported 16 A limit is measured kW.
+
+**Done when:** essential interactions are usable, axes/units are clear,
+plan/readback mismatches remain legible, and browser tests cover resize, zoom,
+missing prices, repeated updates and time-boundary cases. Do not rely solely on
+jsdom for visual or layout acceptance.
+
+### B4 — Yesterday and planned-versus-actual review
+
+Add an always-visible recent-history section with a date selector defaulting to
+yesterday. Show measured power against the plan sent that day, price context,
+actual energy, start/stop differences, and charging outside intended windows.
+Keep latest readback separate from historical measured charging. Missing meter
+data means unknown, not “did not charge”. Use shared ECharts components.
+Use only the genuine observed data established in B1 for the actual-charging
+track; a calculated schedule or Accepted upload may never populate that track.
+
+**Done when:** the next morning the user can answer “did it charge when intended,
+how much, what did it cost, and where did it differ?” without reading raw logs.
+
+### C1 — Costs, savings and summaries
+
+Show estimated total plan cost and energy-weighted price, per-window costs, and
+measured/estimated session/day/month totals. Extend existing session/savings APIs
+rather than recalculating business rules separately in each card.
+
+Suggested savings baseline: charging the **same energy** immediately after
+plugging in at comparable power. Label the baseline, coverage, tariff basis and
+whether the value is an estimate. Distinguish future estimated savings from
+historical results; unknown cost/savings must not become a fabricated zero.
+
+**Done when:** consistent inputs produce consistent totals across cards, and
+tests cover partial data, fee/tax changes, negative prices and missing baseline.
+
+### C2 — Finish the product, not another interface
+
+Refine the vehicle/target panel, inline plan controls, clear feedback for actions,
+session table and lightweight diagnostic event list. Raw OCPP/JSON, rare setup
+and destructive actions may use a details drawer; everyday information may not.
+
+Keep the dashboard practically usable on desktop and mobile, with readable warnings
+and essential controls. Separate theme modes and extra accessibility polish are not
+required. Avoid CSS overrides depending on another card's private DOM. Reuse the
+Stage 5 installation guidance without overwriting the user's HA views; update it
+only where a real gap is found.
+
+**Done when:** the full dashboard works as one coherent, responsive product with
+no solar clutter, no duplicate charging dashboard, no hidden critical status and
+no accidental controller competition.
+
+## 5. Intended final page layout
+
+This is information architecture, not a pixel-approved design:
+
+1. **Overview / vehicle:** connection, battery -> target, measured power, next
+   action, minimum ready-by SOC, charge-time needed, estimated ready time,
+   execution health and missing-data indicators.
+2. **Prices & plan (largest panel):** zoomable Nord Pool graph and aligned tracks;
+   compact per-block energy/price/cost table.
+3. **Plan controls + Morek status:** inline target/minimum SOC/soft price cap/
+   ready-by/current settings,
+   autonomous status, manual debugging controls, ACK/readback freshness and drift.
+4. **Yesterday / recent charging:** measured-versus-sent chart and session rows.
+5. **Costs & savings:** estimated plan totals plus historical summaries.
+
+Desktop can place smaller panels beside the chart. Mobile stacks the same
+sections in this order. No essential Morek section is collapsed by default.
+
+## 6. Decisions still to settle, without blocking A1
+
+- Primary screen/device sizes and final visual mockup approval.
+- Default cost display: suggested full configured variable cost (fees/taxes)
+  with a Nord Pool-only option; confirm available inputs and the user's preference.
+- History retention: proposed 90 days detailed traces plus longer-term aggregates;
+  confirm storage impact and preference before treating that as agreed policy.
+- New-transaction authorization, active-window update policy, invalid/no-price
+  policy, charging pause/boost behavior and safe retained-profile migration must be resolved in
+  A1–A4/A2P. The soft-cap/minimum-SOC requirement is agreed; only precise cost
+  basis/defaults, missing-data and infeasible-case behavior remain to specify.
+  Do not improvise these while drawing widgets.
+- The extent to which parts of the original stock card are repurposed inside the
+  one dashboard. Backward compatibility can be retained without making a second
+  dashboard a required user workflow.
+
+## 7. Instructions for the LLM executing a block
+
+1. Read `AGENTS.md`, this roadmap, the handoff and applicable existing architecture
+   docs. Inspect Git state; preserve unrelated user work.
+2. State the single block being implemented and its dependencies. Do not assume
+   the existence of an entity, sensor, API field or authorization behavior.
+3. Add regression tests, including failure/race/restart cases for executor work.
+   Use browser-rendered tests for chart interaction/layout. State any unrun tests.
+4. Keep planner and executor semantics separate; do not reimplement cost/planning
+   logic in JavaScript or grant unrestricted raw OCPP requests to a browser.
+5. Record changed files, checks/results, known limits and next block in this file
+   or the handoff. Update the progress checklist truthfully.
+6. Follow version/build rules for integration/frontend changes. Publish/deploy or
+   perform a hardware test only within the user's current authorization. Never
+   copy credentials/raw household logs into documentation or commits.
+7. A task is not complete merely because a button renders or OCPP says Accepted.
+   Meet its acceptance criteria before calling it operational.
+
+### Progress updates
+
+Update the numbered checklist at the top; do not maintain a duplicate checklist.
+Record detailed implementation/test evidence in `morek-execution-audit.md` or the
+relevant handoff. Completing groundwork is not completing actuator isolation.
+
+## 8. Research references
+
+- [evcc dynamic prices and charging-plan UI](https://docs.evcc.io/en/features/dynamic-prices)
+  — price bars, cheap periods and goal/departure planning.
+- [Gridio](https://www.gridio.io/) and [FAQ](https://www.gridio.io/faq)
+  — charging overview and savings comparison inspiration; do not copy marketing
+  savings percentages or assume their tariff treatment matches this household.
+- [HA custom-card API](https://contributors.home-assistant.io/frontend/custom-ui/card/)
+  — coordinated cards within a dashboard, not a new standalone controller.
+- [Apache ECharts](https://echarts.apache.org/) and
+  [licence](https://github.com/apache/echarts/blob/master/LICENSE)
+  — chosen chart engine, Apache-2.0 plus applicable notices.
+- [Web Awesome Core](https://webawesome.com/) — candidate UI widgets; check the
+  exact package licence/assets and avoid a paid-Pro dependency.
+- [ApexCharts licensing](https://apexcharts.com/license/)
+  — not the chosen engine; do not assume the current library is unrestricted MIT
+  merely because the HA ApexCharts wrapper has an MIT licence.
