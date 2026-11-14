@@ -227,7 +227,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     el.hidden=!info;
     if(!info){el.replaceChildren();return;}
     const colors={ok:['#12391f','#7ee2a0'],info:['#1c2a3b','#8db8e6'],unknown:['#2a2f38','#a9b4c2'],warning:['#4a3200','#ffb938'],error:['#5a1717','#ff8a8a']}[info.level]||['#2a2f38','#a9b4c2'];
-    el.dataset.kind=info.kind;el.dataset.level=info.level;
+    el.dataset.kind=info.kind;el.dataset.level=info.level;el.dataset.posture=info.posture;
     el.setAttribute('role',info.warning?'alert':'status');el.setAttribute('aria-label','Charging status');
     el.style.cssText=`padding:${info.warning?'16px 18px':'10px 16px'};background:${colors[0]};color:#f4f7fb;border-left:${info.warning?10:5}px solid ${colors[1]};line-height:1.4`;
     const title=document.createElement('div');title.style.cssText=`font-weight:700;font-size:${info.warning?'1.25em':'1.05em'};color:${colors[1]}`;title.textContent=(info.warning?'⚠ ':'')+info.title;

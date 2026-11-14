@@ -37,7 +37,7 @@ describe('sidebar charge-session card', () => {
     expect(card.hidden).toBe(false);
     expect(card.getAttribute('role')).toBe('alert');
     expect(card.dataset.kind).toBe('accepted_no_transaction');
-    expect(card.textContent).toMatch(/accepted the request, but no transaction is confirmed/);
+    expect(card.textContent).toMatch(/said yes, but charging isn’t confirmed/);
     expect(card.textContent).toMatch(/Morek app|plug in again/);
     expect(card.textContent).not.toMatch(/no_transaction_observed/);
     // transient: no alarm role
@@ -50,6 +50,16 @@ describe('sidebar charge-session card', () => {
     // unsupported charger: nothing shown
     panel.statusAt = Date.now(); panel.rawStatus = {api_version: 1, schedule: {...make({state: 'waiting', reason: 'x'}).schedule, supported: false}}; panel.paint();
     expect(card.hidden).toBe(true);
+    // 15.7a: a quiet connector the backend judges current is shown (with its posture), and painting still writes nothing
+    const quiet = make({state: 'accepted', reason: 'request_accepted'});
+    const old = new Date(Date.now() - 600000).toISOString();
+    quiet.schedule.readiness.live = {...live, status: {...live.status, observed_at: old, fresh: false}, transaction: {...live.transaction, observed_at: old, fresh: false}};
+    quiet.schedule.readiness.session_start_at = new Date(Date.now() - 30000).toISOString();
+    const judged = at => ({state: 'current', basis: 'link_continuous_since_report', reported_at: at, age_s: 600, link: {state: 'up'}, reason: 'unchanged_since_report'});
+    quiet.schedule.readiness.freshness = {expected: false, link: {state: 'up'}, quantities: {status: judged(old), transaction: judged(old)}};
+    panel.rawStatus = quiet; panel.statusAt = Date.now(); panel.paint();
+    expect(card.dataset.kind).toBe('accepted_waiting'); expect(card.dataset.posture).toBe('pending');
+    expect(card.textContent).toMatch(/We asked the charger to enable charging/); expect(card.textContent).toMatch(/unchanged since/);
     // painting only ever reads: no write-type calls from rendering the card
     const writes = hass.callWS.mock.calls.filter(([m]) => !['spotnav/list_chargers', 'spotnav/get_dashboard', 'spotnav/get_settings', 'spotnav/morek_schedule'].includes(m.type) ||
       (m.type === 'spotnav/morek_schedule' && m.action && m.action !== 'status'));

@@ -55799,7 +55799,7 @@ function zoneClock(timeZone) {
     timeZoneName: "shortOffset",
     hour: "2-digit"
   });
-  const clock3 = {
+  const clock4 = {
     timeZone: requested,
     msOfDay(instantMs2) {
       const parts = partsOf(instantMs2);
@@ -55814,19 +55814,19 @@ function zoneClock(timeZone) {
       return parts.find((part2) => part2.type === "timeZoneName")?.value ?? "";
     }
   };
-  clocks.set(requested, clock3);
-  return clock3;
+  clocks.set(requested, clock4);
+  return clock4;
 }
 function localDayKey(instantMs2, timeZone) {
   return zoneClock(timeZone).dayKey(instantMs2);
 }
 function localMidnightAt(instantMs2, timeZone) {
-  const clock3 = zoneClock(timeZone);
-  const estimate = instantMs2 - clock3.msOfDay(instantMs2);
+  const clock4 = zoneClock(timeZone);
+  const estimate = instantMs2 - clock4.msOfDay(instantMs2);
   let best = estimate;
   let bestDistance = Number.POSITIVE_INFINITY;
   for (const candidate of [estimate - HOUR_MS, estimate, estimate + HOUR_MS]) {
-    const reading = clock3.msOfDay(candidate);
+    const reading = clock4.msOfDay(candidate);
     const distance2 = Math.min(reading, 24 * HOUR_MS - reading);
     if (distance2 < bestDistance) {
       best = candidate;
@@ -59745,9 +59745,9 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
     conflict.textContent = "A local site regulator is linked and may independently write to this charger. Its protection remains in place; effective limits may conflict with the schedule.";
     section.append(conflict);
   }
-  const evidence = doc.createElement("p");
-  evidence.textContent = "Proposal is not sent; an upload ACK is not effective readback. A verified remaining effective schedule is not profile inventory, transaction authorization, or measured physical charging. Measured charging is not established here; check separate live measurements.";
-  section.append(evidence);
+  const evidence2 = doc.createElement("p");
+  evidence2.textContent = "Proposal is not sent; an upload ACK is not effective readback. A verified remaining effective schedule is not profile inventory, transaction authorization, or measured physical charging. Measured charging is not established here; check separate live measurements.";
+  section.append(evidence2);
   const recovery = doc.createElement("p");
   recovery.textContent = "A retained final 0 A may persist through restart or downgrade. Preserve any person Stop and household protection; do not blindly resume legacy control. For uncertain actions, keep the outcome unresolved and seek a supervised ownership and electrical recovery decision. Refresh is read-only, not inventory or recovery. Selective removal can increase allowed current and cannot resolve an earlier unknown upload; do not use a blanket profile clear.";
   section.append(recovery);
@@ -60018,23 +60018,54 @@ function publishedChart(raw, market, now, stale) {
   return { chart: { prices, now, horizon, cap: null, bands: null, unit: priceUnit(currency) }, format: { chartTime: time2, date: date2, tooltipDate: date2, days, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks } };
 }
 
-// sidebar/live-charging.js
-var LIVE_MAX_AGE_MS = 18e4;
+// sidebar/evidence-freshness.js
+var STRICT_MAX_AGE_MS = 18e4;
 var CLOCK_SKEW_MS = 5e3;
+var JUDGED = {
+  status: "status",
+  transaction: "transaction",
+  control_state: "charging_control",
+  power_w: "power_w",
+  current_a: "current_a",
+  energy_register_kwh: "energy_register_kwh"
+};
+var STATES2 = /* @__PURE__ */ new Set(["current", "last_known", "idle", "unknown"]);
+function judgementFor(ready, key3, observedAtMs) {
+  const block = ready?.freshness;
+  if (block === void 0 || block === null) return null;
+  const unknown = { state: "unknown", link: null };
+  if (typeof block !== "object" || Array.isArray(block)) return unknown;
+  const quantities = block.quantities;
+  if (!quantities || typeof quantities !== "object" || Array.isArray(quantities)) return unknown;
+  const item = quantities[JUDGED[key3]];
+  if (!item || typeof item !== "object" || !STATES2.has(item.state)) return unknown;
+  const reported = Date.parse(item.reported_at || "");
+  if (!Number.isFinite(reported) || reported !== observedAtMs) return unknown;
+  if (item.age_s != null && !(typeof item.age_s === "number" && Number.isFinite(item.age_s) && item.age_s >= 0)) return unknown;
+  const link = item.link && typeof item.link === "object" && typeof item.link.state === "string" ? item.link.state : null;
+  return { state: item.state, link };
+}
+function evidence(ready, key3, reading, now, accept) {
+  if (!reading || typeof reading !== "object") return null;
+  const at = Date.parse(reading.observed_at || "");
+  if (!Number.isFinite(at) || !Number.isFinite(now) || !accept(reading)) return null;
+  const age = now - at;
+  if (age < -CLOCK_SKEW_MS) return null;
+  const strict = age <= STRICT_MAX_AGE_MS && reading.fresh !== false;
+  const judgement = judgementFor(ready, key3, at);
+  const fresh2 = judgement === null ? strict : judgement.state === "current";
+  return { value: reading.value, at, age: Math.max(0, age), fresh: fresh2, strict, judged: judgement ? judgement.state : null, reading };
+}
+
+// sidebar/live-charging.js
 var NOT_CHARGING = /* @__PURE__ */ new Set(["disconnected", "connected", "paused", "finished"]);
 var POWER_FLOW_W = 100;
 var CURRENT_FLOW_A = 1;
-function read(reading, now, unitCheck) {
-  if (!reading || typeof reading !== "object") return null;
-  const at = Date.parse(reading.observed_at || "");
-  if (!Number.isFinite(at) || !Number.isFinite(now)) return null;
-  const value2 = reading.value;
-  if (unitCheck ? !unitCheck(reading) : !(typeof value2 === "number" && Number.isFinite(value2))) return null;
-  const age = now - at;
-  if (age < -CLOCK_SKEW_MS) return null;
-  return { value: value2, at, age: Math.max(0, age), fresh: age <= LIVE_MAX_AGE_MS && reading.fresh !== false };
+function read(ready, key3, now, unitCheck) {
+  return evidence(ready, key3, ready?.live?.[key3], now, (r7) => unitCheck ? unitCheck(r7) : typeof r7.value === "number" && Number.isFinite(r7.value));
 }
 var ago = (ms) => ms < 6e4 ? `${Math.floor(ms / 1e3)} s ago` : ms < 36e5 ? `${Math.floor(ms / 6e4)} min ago` : `${Math.floor(ms / 36e5)} h ago`;
+var clock2 = (ms) => new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 var num = (value2, digits) => Number(value2.toFixed(digits)).toString();
 function liveCharging(status, observedAt, failed, now = Date.now()) {
   const fresh2 = observationFreshness(observedAt, now, failed) === "fresh";
@@ -60047,15 +60078,15 @@ function liveCharging(status, observedAt, failed, now = Date.now()) {
   const own = Number.isInteger(live.connector_id) ? live.connector_id : null;
   const expected = Number.isInteger(status?.connector_id) ? status.connector_id : null;
   if (own === null || expected === null || own !== expected) return unknown("The live readings are not confirmed to belong to this connector.");
-  const reported = read(live.status, now, (r7) => typeof r7.value === "string" && r7.value !== "");
+  const reported = read(ready, "status", now, (r7) => typeof r7.value === "string" && r7.value !== "");
   const reportedFresh = reported?.fresh ? reported : null;
-  const power = read(live.power_w, now);
-  const current = read(live.current_a, now);
-  const energy2 = read(live.energy_register_kwh, now, (r7) => typeof r7.value === "number" && Number.isFinite(r7.value) && r7.value >= 0);
+  const power = read(ready, "power_w", now);
+  const current = read(ready, "current_a", now);
+  const energy2 = read(ready, "energy_register_kwh", now, (r7) => typeof r7.value === "number" && Number.isFinite(r7.value) && r7.value >= 0);
   const flow = [power && { kind: "power", ...power }, current && { kind: "current", ...current }].filter(Boolean).find((item) => item.fresh) || null;
   const normalized = reportedFresh && typeof live.status.normalized === "string" ? live.status.normalized : null;
   const parts = [];
-  parts.push(reportedFresh ? `Charger reports \u201C${reportedFresh.value}\u201D for connector ${own}, ${ago(reportedFresh.age)}; a reported state is not measured power.` : reported ? `Last reported connector state \u201C${reported.value}\u201D is stale (${ago(reported.age)}); current state unknown.` : `Connector ${own} reported state unknown.`);
+  parts.push(reportedFresh ? `Charger reports \u201C${reportedFresh.value}\u201D for connector ${own}, ${reportedFresh.judged === "current" && reportedFresh.age > STRICT_MAX_AGE_MS ? `unchanged since ${clock2(reportedFresh.at)}` : ago(reportedFresh.age)}; a reported state is not measured power.` : reported ? `Last reported connector state \u201C${reported.value}\u201D ${reported.judged === "last_known" ? `is last known (${ago(reported.age)}); the charger connection is not confirmed now` : `is stale (${ago(reported.age)})`}; current state unknown.` : `Connector ${own} reported state unknown.`);
   let powerText = "Unknown";
   if (power?.fresh) {
     powerText = power.value === 0 ? "0 W measured" : `${power.value >= 1e3 ? num(power.value / 1e3, 2) + " kW" : num(power.value, 0) + " W"} measured`;
@@ -60066,7 +60097,8 @@ function liveCharging(status, observedAt, failed, now = Date.now()) {
   } else if (power || current) {
     const old = power || current;
     powerText = "Unknown";
-    parts.push(`Last measured ${power ? "power" : "current"} is stale (${ago(old.age)}); not shown as current.`);
+    const why = old.judged === "idle" ? "; no reading is expected while nothing is charging" : old.judged === "last_known" ? "; the charger connection is not confirmed now" : "";
+    parts.push(`Last measured ${power ? "power" : "current"} is ${why ? "old" : "stale"} (${ago(old.age)}${why}); not shown as current.`);
   } else parts.push("No measured power or current source is available for this connector.");
   if (energy2) parts.push(`Cumulative energy register ${num(energy2.value, 2)} kWh${energy2.fresh ? "" : " (stale)"}, ${ago(energy2.age)}; this is not this session\u2019s energy.`);
   else parts.push("Energy register unavailable.");
@@ -60084,7 +60116,6 @@ function liveCharging(status, observedAt, failed, now = Date.now()) {
 
 // sidebar/charge-session.js
 var GRACE_MS = 12e4;
-var LIVE_MAX_AGE_MS2 = 18e4;
 var CLOCK_SKEW_MS2 = 5e3;
 var POWER_FLOW_W2 = 100;
 var CURRENT_FLOW_A2 = 1;
@@ -60111,15 +60142,17 @@ var FINISHED = /* @__PURE__ */ new Set(["session_completed", "car_completion_rep
 var DISAGREES = /* @__PURE__ */ new Set(["limits_or_transitions_differ", "verification_superseded"]);
 var LOGGING = /* @__PURE__ */ new Set(["ocpp_sensitive_logging_enabled", "unsupported_ocpp_logging_or_interface"]);
 var ago2 = (ms) => ms < 6e4 ? `${Math.max(0, Math.floor(ms / 1e3))} s ago` : ms < 36e5 ? `${Math.floor(ms / 6e4)} min ago` : `${Math.floor(ms / 36e5)} h ago`;
-var clock2 = (ms) => new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+var clock3 = (ms) => new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 var num2 = (value2, digits) => Number(value2.toFixed(digits)).toString();
-function stamped(reading, now, accept) {
-  if (!reading || typeof reading !== "object") return null;
-  const at = Date.parse(reading.observed_at || "");
-  if (!Number.isFinite(at) || !Number.isFinite(now) || !accept(reading.value)) return null;
-  const age = now - at;
-  if (age < -CLOCK_SKEW_MS2) return null;
-  return { value: reading.value, age: Math.max(0, age), fresh: age <= LIVE_MAX_AGE_MS2 && reading.fresh !== false, reading };
+var stamped = (ready, key3, reading, now, accept) => evidence(ready, key3, reading, now, (r7) => accept(r7.value));
+function chargingEnabled(ready) {
+  const value2 = ready?.charging_enabled;
+  if (value2 === void 0 || value2 === null) return null;
+  if (typeof value2 !== "object" || Array.isArray(value2)) return { state: "not_ready", reason: "control_unconfirmed" };
+  if (value2.state === "unknown") return null;
+  const reason = typeof value2.reason === "string" ? value2.reason : "";
+  if (value2.state === "enabled" && reason === "control_on") return { state: "enabled", reason };
+  return { state: "not_ready", reason: ["control_off", "control_unavailable"].includes(reason) ? reason : "control_unconfirmed" };
 }
 var isNumber2 = (v2) => typeof v2 === "number" && Number.isFinite(v2);
 function scheduleLimit(status, now) {
@@ -60149,8 +60182,8 @@ function scheduleLimit(status, now) {
   const next = points2.find((p4) => p4.at > now && p4.amps > 0);
   return { amps: current.amps, nextStart: next ? next.at : null, source };
 }
-function transactionEvidence(live, now, norm, startAt) {
-  const r7 = stamped(live?.transaction, now, (v2) => typeof v2 === "boolean");
+function transactionEvidence(ready, now, norm, startAt) {
+  const r7 = stamped(ready, "transaction", ready?.live?.transaction, now, (v2) => typeof v2 === "boolean");
   if (!r7 || !r7.fresh) return { kind: "unknown" };
   if (r7.value === false) return { kind: "none", age: r7.age };
   if (norm === "charging" || norm === "paused") return { kind: "observed", age: r7.age };
@@ -60158,7 +60191,33 @@ function transactionEvidence(live, now, norm, startAt) {
   if (Number.isFinite(startAt) && Number.isFinite(changed) && changed >= startAt - CLOCK_SKEW_MS2) return { kind: "observed", age: r7.age };
   return { kind: "unmatched", age: r7.age };
 }
-var result = (kind, level, title, detail, extra = {}) => ({ kind, level, warning: level === "warning" || level === "error", title, detail, action: "", facts: [], summary: `${title}. ${detail}`, ...extra });
+var POSTURE = {
+  transaction_observed: "authorized",
+  charging: "authorized",
+  reported_charging: "authorized",
+  scheduled_wait: "waiting_on_purpose",
+  paused: "waiting_on_purpose",
+  pending: "pending",
+  accepted_waiting: "pending",
+  transaction_unmatched: "pending",
+  not_ready: "pending"
+};
+var result = (kind, level, title, detail, extra = {}) => {
+  const warning = level === "warning" || level === "error";
+  return {
+    kind,
+    level,
+    warning,
+    title,
+    detail,
+    action: "",
+    facts: [],
+    summary: `${title}. ${detail}`,
+    posture: warning ? "at_risk" : POSTURE[kind] || "unknown",
+    ...extra
+  };
+};
+var when = (item) => item.judged === "current" && item.age > STRICT_MAX_AGE_MS ? `unchanged since ${clock3(item.at)}` : ago2(item.age);
 function chargeSession(status, observedAt, failed, now = Date.now()) {
   if (status && status.supported === false) return null;
   const fresh2 = observationFreshness(observedAt, now, failed) === "fresh";
@@ -60170,32 +60229,43 @@ function chargeSession(status, observedAt, failed, now = Date.now()) {
   const ss = ready.session_start || {};
   const startAt = Date.parse(ready.session_start_at || "");
   const age = Number.isFinite(startAt) ? Math.max(0, now - startAt) : null;
-  const reported = stamped(live?.status, now, (v2) => typeof v2 === "string" && v2 !== "");
+  const reported = stamped(ready, "status", live?.status, now, (v2) => typeof v2 === "string" && v2 !== "");
   const reportedFresh = reported && reported.fresh ? reported : null;
   const normRaw = reportedFresh && typeof reportedFresh.reading.normalized === "string" ? reportedFresh.reading.normalized : null;
   const norm = normRaw === "unknown" ? null : normRaw;
   const raw = reportedFresh ? reportedFresh.value : null;
-  const power = stamped(live?.power_w, now, isNumber2), current = stamped(live?.current_a, now, isNumber2);
+  const power = stamped(ready, "power_w", live?.power_w, now, isNumber2), current = stamped(ready, "current_a", live?.current_a, now, isNumber2);
   const flow = [power && { kind: "power", ...power }, current && { kind: "current", ...current }].filter(Boolean).find((item) => item.fresh) || null;
   const flowing = !!flow && (flow.kind === "power" ? flow.value > POWER_FLOW_W2 : flow.value > CURRENT_FLOW_A2);
-  const txn = transactionEvidence(live, now, norm, startAt);
-  const control = stamped(live?.control_state, now, (v2) => v2 === "on" || v2 === "off");
+  const txn = transactionEvidence(ready, now, norm, startAt);
+  const control = stamped(ready, "control_state", live?.control_state, now, (v2) => v2 === "on" || v2 === "off");
   const paused = status.schedule_pause?.intent === "pause_until_resumed" || PAUSED.has(ss.reason);
   const hold = scheduleLimit(status, now);
   const facts = [];
-  if (raw) facts.push(`Connector: ${raw}${reportedFresh ? ` (${ago2(reportedFresh.age)})` : ""}`);
+  if (raw) facts.push(`Connector: ${raw}${reportedFresh ? ` (${when(reportedFresh)}${reportedFresh.strict ? "" : "; too old for automatic actions"})` : ""}`);
   if (ss.state && ss.reason !== "authorization_path_unimplemented") {
-    const when = age !== null ? `, ${ago2(age)}` : "";
-    facts.push(`Start request: ${ss.state === "accepted" ? "accepted by the charger" : ss.state === "starting" ? "being sent" : ss.state === "waiting" ? "not sent yet" : ss.state === "rejected" ? "rejected" : ss.state === "uncertain" ? "outcome unknown" : ss.state}${when}`);
+    const when2 = age !== null ? `, ${ago2(age)}` : "";
+    facts.push(`Start request: ${ss.state === "accepted" ? "accepted by the charger" : ss.state === "starting" ? "being sent" : ss.state === "waiting" ? "not sent yet" : ss.state === "rejected" ? "rejected" : ss.state === "uncertain" ? "outcome unknown" : ss.state}${when2}`);
   }
   facts.push(txn.kind === "observed" ? "Transaction: reported by the charger" : txn.kind === "none" ? "Transaction: none reported" : txn.kind === "unmatched" ? "Transaction: a number is reported but is not tied to this plug-in" : "Transaction: unknown");
-  if (control?.fresh) facts.push(`Charge-control switch: ${control.value}${control.value === "off" && txn.kind !== "observed" ? " (normal before authorization)" : ""}`);
-  if (flow?.fresh) facts.push(`Measured ${flow.kind === "power" ? flow.value >= 1e3 ? `${num2(flow.value / 1e3, 2)} kW` : `${num2(flow.value, 0)} W` : `${num2(flow.value, 1)} A`} (${ago2(flow.age)})`);
+  const enabled = chargingEnabled(ready);
+  if (enabled) facts.push(`Charging enabled: ${enabled.state === "enabled" ? "switch is on (not proof of authorization)" : enabled.reason === "control_off" ? "switch is off" : enabled.reason === "control_unavailable" ? "switch missing or unavailable" : "not confirmed"}`);
+  else if (control?.fresh) facts.push(`Charge-control switch: ${control.value}${control.value === "off" && txn.kind !== "observed" ? " (normal before authorization)" : ""}`);
+  if (flow?.fresh) facts.push(`Measured ${flow.kind === "power" ? flow.value >= 1e3 ? `${num2(flow.value / 1e3, 2)} kW` : `${num2(flow.value, 0)} W` : `${num2(flow.value, 1)} A`} (${when(flow)})`);
   else facts.push("Measured power: unknown");
   const done = (r7) => {
     r7.facts = facts;
     return r7;
   };
+  if (enabled?.reason === "control_unavailable" && ss.state !== "offline") {
+    return done(result(
+      "control_unavailable",
+      "warning",
+      "Charging can\u2019t be started or scheduled",
+      "The charger\u2019s charge-control switch is missing, disabled or unavailable in Home Assistant, so SpotNav can\u2019t enable charging.",
+      { action: "You: check that the charger\u2019s charge-control switch is enabled in Home Assistant." }
+    ));
+  }
   if (ready.control === "unavailable" || ss.state === "offline") {
     return done(result(
       "offline",
@@ -60204,6 +60274,9 @@ function chargeSession(status, observedAt, failed, now = Date.now()) {
       "Home Assistant cannot reach the charger or its control, so it cannot start or follow a charge.",
       { action: "Check the charger\u2019s power and network connection. SpotNav re-checks automatically." }
     ));
+  }
+  if (reported && !reportedFresh && reported.judged === "last_known") {
+    return done(result("last_known", "unknown", "Charger status last known", `The last report (\u201C${reported.value}\u201D, ${clock3(reported.at)}) is old and the connection to the charger is not confirmed now, so whether the car is charging is not known.`));
   }
   if (!norm) {
     return done(result("unknown", "unknown", "Charging status unknown", "The charger\u2019s connector state is not currently known, so whether the car will charge cannot be told."));
@@ -60223,16 +60296,45 @@ function chargeSession(status, observedAt, failed, now = Date.now()) {
   }
   if (flowing) {
     const agrees = norm === "charging";
-    return done(result("charging", "ok", "Charging", `${flow.kind === "power" ? "Measured power" : "Measured current"} confirms the car is drawing energy${agrees ? "" : `, although the charger reports \u201C${raw}\u201D`}.`));
+    const conflict = enabled?.state === "not_ready";
+    return done(result("charging", conflict ? "info" : "ok", "Charging", `${flow.kind === "power" ? "Measured power" : "Measured current"} confirms the car is drawing energy${agrees ? "" : `, although the charger reports \u201C${raw}\u201D`}.${conflict ? " Note: the charge-control switch is off or not confirmed, which does not match this." : ""}`, { conflict }));
   }
   if (norm === "finished") return done(result("finished", "info", "Charge finished", "The car reports the session as finished; plug in again to start a new one."));
-  if (norm === "charging") {
+  if (norm === "charging" && !(enabled?.state === "not_ready" && !paused)) {
     return done(result("reported_charging", "info", "Charger reports charging", flow ? "The charger reports charging but measures no power at the moment. This is normal while it ramps up or between windows." : "The charger reports charging; power is not measured, so the actual flow is not confirmed."));
   }
-  const waitNote = hold && hold.amps === 0 ? hold.source === "readback" ? `The charger\u2019s schedule holds charging back${hold.nextStart ? ` until about ${clock2(hold.nextStart)}` : ""}.` : `The plan sent to the charger holds charging back${hold.nextStart ? ` until about ${clock2(hold.nextStart)}` : ""} (acknowledged by the charger, not confirmed by a readback).` : "";
+  const waitNote = hold && hold.amps === 0 ? hold.source === "readback" ? `The charger\u2019s schedule holds charging back${hold.nextStart ? ` until about ${clock3(hold.nextStart)}` : ""}.` : `The plan sent to the charger holds charging back${hold.nextStart ? ` until about ${clock3(hold.nextStart)}` : ""} (acknowledged by the charger, not confirmed by a readback).` : "";
   const notPromised = "Charging may begin then if the car and charger allow it; that is not guaranteed.";
   if (paused) {
     return done(result("paused", "info", "Plugged in \u2014 Auto is paused", "Charging will not start until you Resume Auto. This is your pause, not a fault."));
+  }
+  const guidance = "The car may not charge. Start the charge from the Morek app, or unplug and plug in again so SpotNav can retry. SpotNav will not repeat the request on its own.";
+  const retryPending = "SpotNav will retry once by itself. If it is rejected again, start the charge from the Morek app, or unplug and plug in again.";
+  const young = age !== null && age < GRACE_MS;
+  const reason = ss.reason || "";
+  const hasStart = !!ss.state && reason !== "authorization_path_unimplemented";
+  const outcome = hasStart ? startOutcome(ss.state, reason, { age, young, raw, waitNote, txn, guidance, retryPending }) : null;
+  if (enabled?.state === "not_ready") {
+    const note2 = " The charger\u2019s charge-control switch is also off or not confirmed.";
+    if (norm === "connected" && outcome?.warning) {
+      outcome.detail += note2;
+      outcome.summary += note2;
+      return done(outcome);
+    }
+    const startPending = !outcome || outcome.kind === "pending" || outcome.kind === "accepted_waiting";
+    if (norm !== "connected" || txn.kind === "observed" || startPending) {
+      const boot = ready.boot_start?.state;
+      const asked = ss.state === "starting" || ss.state === "accepted" || boot === "requested";
+      const off = enabled.reason === "control_off" ? "off" : "not confirmed";
+      const detail = norm !== "connected" || txn.kind === "observed" ? `The charger reports ${norm === "connected" ? "a transaction" : `\u201C${raw}\u201D`}, but the charge-control switch is ${off}, so charging and any schedule wait are not confirmed. A transaction number may be left over from an earlier session.` : asked ? "We asked the charger to enable charging. Waiting for the charger to confirm." : boot === "waiting" ? "Charging isn\u2019t enabled on the charger yet. SpotNav will ask the charger once its checks pass." : "Charging isn\u2019t enabled on the charger yet, so it can\u2019t start.";
+      return done(result(
+        "not_ready",
+        "info",
+        "Not yet ready to charge",
+        detail,
+        { action: asked || boot === "waiting" ? "" : "SpotNav asks the charger to enable it when it can. If that doesn\u2019t happen, enable charging in the Morek app." }
+      ));
+    }
   }
   if (norm === "paused") {
     if (waitNote && txn.kind === "observed") {
@@ -60249,14 +60351,9 @@ function chargeSession(status, observedAt, failed, now = Date.now()) {
       waitNote ? `The charger reports a charging transaction. ${waitNote} Power flow is not yet measured; ${notPromised.charAt(0).toLowerCase()}${notPromised.slice(1)}` : "The charger reports a charging transaction; the car has not started drawing measured power yet."
     ));
   }
-  const guidance = "The car may not charge. Start the charge from the Morek app, or unplug and plug in again so SpotNav can retry. SpotNav will not repeat the request on its own.";
-  const retryPending = "SpotNav will retry once by itself. If it is rejected again, start the charge from the Morek app, or unplug and plug in again.";
-  const young = age !== null && age < GRACE_MS;
-  const reason = ss.reason || "";
-  if (!ss.state || reason === "authorization_path_unimplemented") {
+  if (!outcome) {
     return done(result("unknown", "unknown", "Plugged in \u2014 start status unknown", "SpotNav does not report whether a charge request was made, so whether the car will charge is not known."));
   }
-  const outcome = startOutcome(ss.state, reason, { age, young, raw, waitNote, txn, guidance, retryPending });
   if (txn.kind !== "unmatched") return done(outcome);
   const note = " The charger also shows a transaction number that cannot be tied to this plug-in, so it is not counted as confirmation.";
   if (outcome.warning) {
@@ -60272,19 +60369,19 @@ function chargeSession(status, observedAt, failed, now = Date.now()) {
 function startOutcome(state, reason, { age, young, raw, waitNote, txn, guidance, retryPending }) {
   switch (state) {
     case "starting":
-      return result("pending", "info", "Starting charge\u2026", "SpotNav is sending the charge request to the charger. Nothing is confirmed yet.");
+      return result("pending", "info", "We\u2019re asking the charger to enable charging", "The request is being sent. Waiting for the charger to confirm; nothing is confirmed yet.");
     case "accepted":
       if (reason === "no_transaction_observed" || age !== null && !young) {
         const seen = txn.kind === "none" ? "the charger reports no charging transaction" : "no charging transaction has been confirmed";
         return result(
           "accepted_no_transaction",
           "warning",
-          "Charger accepted the request, but no transaction is confirmed",
+          "The charger said yes, but charging isn\u2019t confirmed",
           `The charger said yes${age !== null ? ` ${ago2(age)}` : ""}, yet ${seen}${raw ? ` (still \u201C${raw}\u201D)` : ""}. ${waitNote ? "The schedule alone does not explain this. " : ""}A request being accepted is not charging.`,
           { action: guidance }
         );
       }
-      return result("accepted_waiting", "info", "Request accepted \u2014 waiting for the charger", "The charger accepted the start request. Waiting for it to open a transaction; this usually takes a few seconds. Charging is not confirmed yet.");
+      return result("accepted_waiting", "info", "We asked the charger to enable charging", "Waiting for the charger to confirm. It accepted the request, but a transaction usually opens within a few seconds; charging is not confirmed yet.");
     case "rejected": {
       const retrying = reason === "request_rejected";
       return result(
@@ -60299,7 +60396,7 @@ function startOutcome(state, reason, { age, young, raw, waitNote, txn, guidance,
       if (FINISHED.has(reason)) return result("session_ended", "info", "Previous session ended", "The car reported its last session as finished. Unplug and plug in again to start a new one.");
       if (reason === "person_stop_active") return result("paused", "info", "Plugged in \u2014 stopped", "A Stop is in progress, so charging is not being started. Resume Auto when you want charging again.");
       if (TRANSIENT.has(reason)) {
-        if (young || age === null) return result("pending", "info", "Preparing to start charging", "SpotNav is waiting briefly before it asks the charger to start. It re-checks automatically.");
+        if (young || age === null) return result("pending", "info", "Getting ready to ask the charger", "SpotNav is waiting briefly before it asks the charger to start. It re-checks automatically.");
         return result("start_not_sent", "warning", "Charging has not been started", "SpotNav has not been able to ask the charger to start for a while, so the car may not charge.", { action: "SpotNav keeps re-checking. If this stays, check the charger connection and the SpotNav logs, or start the charge from the Morek app." });
       }
       if (reason === "protection_conflict_unresolved") return result("start_blocked", "warning", "Charging start is blocked", "Another controller or site protection may also limit this charger, so SpotNav does not start it. The car may not charge.", { action: "Resolve the protection conflict first; SpotNav will not start the charge while it is unresolved. Do not work around it by starting the charge elsewhere." });
@@ -60309,7 +60406,7 @@ function startOutcome(state, reason, { age, young, raw, waitNote, txn, guidance,
     case "waiting":
     case "session_observed":
     default:
-      if (young || age === null) return result("pending", "info", "Plugged in \u2014 checking", "SpotNav has just seen the car and is deciding whether to request charging. Nothing is confirmed yet.");
+      if (young || age === null) return result("pending", "info", "Plugged in \u2014 deciding whether to ask for charging", "SpotNav has just seen the car and is deciding whether to request charging. Nothing is confirmed yet.");
       return result("start_not_sent", "warning", "Plugged in, but charging has not been requested", "The car is connected and no charge request has been sent for a while, so it may not charge.", { action: "Unplug and plug in again so SpotNav can retry, or check the SpotNav logs." });
   }
 }
@@ -60385,7 +60482,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
   const status = decodeMorekState(statusRaw);
   const health = translate2("en", healthKey(status, observedAt, failed, false, now));
   const statusFresh = observationFreshness(observedAt, now, failed) === "fresh";
-  const evidence = morekEvidence(status, observedAt, failed, now);
+  const evidence2 = morekEvidence(status, observedAt, failed, now);
   const ready = statusFresh ? status?.readiness : null;
   const control = ready?.control === "available" ? "available" : ready?.control === "unavailable" ? "unavailable" : "unknown";
   const vehicleAt = Date.parse(ready?.vehicle_observed_at || "");
@@ -60463,7 +60560,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
       untilDeadline,
       targetNote: d3.settings?.driver === "target_soc" && d3.soc?.value != null ? `Plan energy, projected SOC and cost are estimates based on the last-known SOC${d3.soc.estimated ? " and an energy-derived SOC estimate" : ""}; an old reading may not reflect driving since then.` : "",
       warning: warning ? { title: "Morek health requires attention", detail: `${health}${status?.outcomes?.uncertain && (status?.operator?.state === "mismatch" || status?.verification?.reason === "limits_or_transitions_differ") ? " \xB7 Effective limits mismatch the sent schedule." : ""}${live.mismatch ? " \xB7 Reported charger state and measured flow disagree." : ""}` } : null,
-      evidence: { status: evidence.summary, context: `Morek status observed ${date(observedAt, zone)}${statusFresh ? "" : " \xB7 stale or unavailable"}`, readiness, proposal: evidence.proposal, sent: evidence.sent, readback: evidence.readback, measurement: live.summary, dispatch: `${statusFresh && status?.reconciliation?.reason === "plan_input_provenance_unavailable" ? "Plan input provenance unavailable: review mode, target, vehicle, SOC and capacity. The checked schedule path requires a cheapest-price target-SOC plan; switching does not guarantee Resume or charging. " : ""}${status?.outcomes?.uncertain && status?.outcomes?.state !== "storage_unavailable" ? "A recorded uncertain action may have applied; do not retry blindly. " : ""}A final 0 A limit may remain. Readback is not profile inventory; ACK or readback does not prove physical charging. Preserve person Stop and household protection.` },
+      evidence: { status: evidence2.summary, context: `Morek status observed ${date(observedAt, zone)}${statusFresh ? "" : " \xB7 stale or unavailable"}`, readiness, proposal: evidence2.proposal, sent: evidence2.sent, readback: evidence2.readback, measurement: live.summary, dispatch: `${statusFresh && status?.reconciliation?.reason === "plan_input_provenance_unavailable" ? "Plan input provenance unavailable: review mode, target, vehicle, SOC and capacity. The checked schedule path requires a cheapest-price target-SOC plan; switching does not guarantee Resume or charging. " : ""}${status?.outcomes?.uncertain && status?.outcomes?.state !== "storage_unavailable" ? "A recorded uncertain action may have applied; do not retry blindly. " : ""}A final 0 A limit may remain. Readback is not profile inventory; ACK or readback does not prove physical charging. Preserve person Stop and household protection.` },
       labels: { settingsNote: "Read-only preview. Plan controls are unavailable in this slice.", saveLabel: "Save plan \xB7 unavailable", powerNote: live.reported ? `Charger reports \u201C${live.reported}\u201D${live.mismatch ? " \xB7 mismatch with measurement" : ""}` : "Reported state unknown; not measured power", deadlineNote: d3.settings?.departure_enabled === false ? "Ready-by is off" : deadlineCurrent && Number.isFinite(deadline) ? `Ready by ${date(deadline, zone)}; not a predicted finish` : "Ready-by time or current plan unavailable", planLabel: "Backend policy:", chartIntro: "Published source price before configured fiscal additions; source-included charges may apply.", chartNote: `Held published intervals only. ${priceFreshness} Unpublished future and history are unavailable. Cap is omitted if its basis differs or is unknown.`, bands: "", dialogNote: "Proposal only; not necessarily sent.", footer: "Dashboard and Morek status are separate observations." }
     },
     actions: {}
@@ -60500,8 +60597,8 @@ function decodeLogs(raw) {
   };
 }
 function formatLine(e9) {
-  const when = Date.parse(e9.time);
-  const time2 = Number.isFinite(when) ? new Date(when).toLocaleString() : "-";
+  const when2 = Date.parse(e9.time);
+  const time2 = Number.isFinite(when2) ? new Date(when2).toLocaleString() : "-";
   return `${time2} ${e9.level} ${e9.logger}: ${e9.message}${e9.exception ? `
 ${e9.exception}` : ""}`;
 }
@@ -60645,15 +60742,15 @@ function recoveryBanner(state, now = Date.now()) {
   const retry = recovery.blocker_retry;
   if (AUTOMATIC.has(blocker.action)) {
     const next = retry && !retry.exhausted ? time(retry.next_retry_at) : null;
-    const when = next ? ` SpotNav re-checks automatically at ${next}, and as soon as something changes.` : retry?.exhausted ? " Timed re-checks stopped; SpotNav re-checks when something changes. Use Recalculate/sync to check now." : " SpotNav re-checks when something changes.";
-    return { level: "warning", code: blocker.code, text: `${what}${when}${suffix}` };
+    const when2 = next ? ` SpotNav re-checks automatically at ${next}, and as soon as something changes.` : retry?.exhausted ? " Timed re-checks stopped; SpotNav re-checks when something changes. Use Recalculate/sync to check now." : " SpotNav re-checks when something changes.";
+    return { level: "warning", code: blocker.code, text: `${what}${when2}${suffix}` };
   }
   const paused = blocker.action === "resume_schedule" || blocker.action === "wait_for_charge_now_end";
   return { level: paused ? "info" : "error", code: blocker.code, text: `${what}${paused ? "" : " Needs your attention; it does not clear by itself."}${suffix}` };
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.136";
+var CARD_VERSION = "2.5.137";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {
@@ -60702,12 +60799,12 @@ function chargeNowStatus(state, fresh2) {
   const transitions2 = info.intended?.chargingSchedule?.chargingSchedulePeriod;
   const intended = active ? `Intended schedule: ${Array.isArray(transitions2) ? `${transitions2.length} current-limit transitions` : "unavailable"}.` : "";
   const attempt = info.outcome;
-  const evidence = info.uncertain ? "A schedule outcome is uncertain and may have applied." : attempt?.state === "accepted" ? `Schedule sent; ACK ${attempt.ack || "accepted"}.` : attempt?.state === "rejected" ? `Schedule rejected (${attempt.ack || "rejected"}).` : active ? "Schedule request pending or not confirmed." : "Auto reconciliation may still be pending.";
+  const evidence2 = info.uncertain ? "A schedule outcome is uncertain and may have applied." : attempt?.state === "accepted" ? `Schedule sent; ACK ${attempt.ack || "accepted"}.` : attempt?.state === "rejected" ? `Schedule rejected (${attempt.ack || "rejected"}).` : active ? "Schedule request pending or not confirmed." : "Auto reconciliation may still be pending.";
   const readback = state.verified && state.verification_target === "charge_now" ? "Effective limits matched within reported coverage." : "Effective limits not confirmed for this override.";
   const describe = (code) => ({ too_many_blocks: "Too many windows for the charger profile; change the plan or override end.", invalid_plan: "Windows cannot be represented within the charger horizon; review the plan and end time.", charger_unavailable: "Charger unavailable; reconciliation waits for reconnect.", upload_rejected: "The charger rejected the schedule; review Morek status.", upload_uncertain: "The upload may have applied; do not retry blindly.", current_must_be_16: "The configured Morek plan current must be 16 A; review settings.", protection_conflict_unresolved: "A protection conflict blocks dispatch; review Morek diagnostics.", no_current_plan: "No usable Auto plan; the override has a bounded end and Auto will retry." })[code] || code;
   const reason = info.reason || state.reconciliation?.reason;
   const degraded = info.degraded ? ` Auto handback degraded: ${describe(info.degraded)} (${info.degraded}).` : "";
-  return `${intent} ${intended} ${evidence} ${readback} ${reason ? `Reconciliation: ${describe(reason)} (${reason}).` : ""}${degraded} Session-start request: ${state.readiness?.session_start?.state || "unknown"}; reported session and measured charging: unknown. ACK or readback does not prove charging.`;
+  return `${intent} ${intended} ${evidence2} ${readback} ${reason ? `Reconciliation: ${describe(reason)} (${reason}).` : ""}${degraded} Session-start request: ${state.readiness?.session_start?.state || "unknown"}; reported session and measured charging: unknown. ACK or readback does not prove charging.`;
 }
 
 // sidebar/panel.js
@@ -61004,6 +61101,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     const colors = { ok: ["#12391f", "#7ee2a0"], info: ["#1c2a3b", "#8db8e6"], unknown: ["#2a2f38", "#a9b4c2"], warning: ["#4a3200", "#ffb938"], error: ["#5a1717", "#ff8a8a"] }[info.level] || ["#2a2f38", "#a9b4c2"];
     el.dataset.kind = info.kind;
     el.dataset.level = info.level;
+    el.dataset.posture = info.posture;
     el.setAttribute("role", info.warning ? "alert" : "status");
     el.setAttribute("aria-label", "Charging status");
     el.style.cssText = `padding:${info.warning ? "16px 18px" : "10px 16px"};background:${colors[0]};color:#f4f7fb;border-left:${info.warning ? 10 : 5}px solid ${colors[1]};line-height:1.4`;

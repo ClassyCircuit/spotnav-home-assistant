@@ -347,7 +347,7 @@ while offline”.
   releases; 14.2/14.4 outcomes are byte-identical on the existing fixtures; a pre-restart report never
   authorizes a start; 14.6 `connector` field semantics unchanged. *Exclusions:* no frontend (15.7), no change
   to Stage 14 thresholds, no new OCPP calls.
-- [ ] **15.7a Plug-in authorization UI and freshness adoption.** *Scope:* in `frontend/sidebar/charge-session.js`,
+- [x] **15.7a Plug-in authorization UI and freshness adoption.** *Locally implemented with fast mocked tests (2.5.137); coordinator reviewed; not installed, browser-checked or live-verified. Shared `sidebar/evidence-freshness.js` adopts `readiness.freshness` (fails closed on a malformed or mismatched judgement; an absent block keeps the strict 180 s display); `charge-session.js` adds `posture`, the casual asked/waiting/at-risk copy, 15.5 `charging_enabled` states (`not_ready`, `control_unavailable`) and `last_known`; `live-charging.js` uses the same judgement; `recovery-banner.js` has no age limit and is unchanged (banner copy is 15.7b). Tests: `frontend/test/charge-session-freshness.test.ts`.* *Scope:* in `frontend/sidebar/charge-session.js`,
   `live-charging.js`, `recovery-banner.js` and the readiness evidence use the 15.6 judgement instead of the
   local `LIVE_MAX_AGE_MS`/`OBSERVATION_MAX_AGE_MS` limits (`GRACE_MS` stays: it matches the backend
   accepted-without-transaction wait); make *authorized / waiting on purpose / at risk of not charging* the most

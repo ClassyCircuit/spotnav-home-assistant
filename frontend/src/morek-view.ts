@@ -12,7 +12,11 @@ export interface MorekState {
     recovery?: { next_retry_at?: string | null; retries_left?: number | null; exhausted?: boolean;
       blocker_retry?: { code: string; attempts: number; limit: number; next_retry_at: string | null; exhausted: boolean } | null } };
   schedule_pause?: { intent?: string; request?: string; ack?: string | null; readback?: string; measured?: string; coverage_start?: string | null; coverage_end?: string | null };
-  readiness?: { control?: string; vehicle?: string; transaction?: string; measurement?: string; vehicle_observed_at?: string | null; live?: unknown; session_start?: { state: string; reason: string }; session_start_at?: string | null };
+  readiness?: { control?: string; vehicle?: string; transaction?: string; measurement?: string; vehicle_observed_at?: string | null; live?: unknown; session_start?: { state: string; reason: string }; session_start_at?: string | null;
+    // Stage 15.5/15.6, additive: absent on an older backend. The sidebar treats malformed values as unknown.
+    freshness?: { expected?: boolean | null; link?: unknown; quantities?: Record<string, { state: string; basis?: string; reported_at?: string | null; age_s?: number | null; link?: unknown; reason?: string }> } | null;
+    charging_enabled?: { state: string; reason?: string; observed_at?: string | null };
+    boot_start?: { state: string; reason?: string } };
   ownership?: { recorded_owner?: string | null; blockers?: string[]; schedule_mode_available?: boolean; completion_authorized?: boolean; reconfirmation_required?: boolean; local_regulator?: string; recovery?: { state?: string; migration_result?: string } };
   reason?: string | null;
   configured_id?: string | null;
