@@ -2249,7 +2249,7 @@ var init_chunk_M45NRQFW = __esm({
       selectAllRows: "Select all rows",
       selected: "Selected",
       selectedDateLabel: (date2) => `Selected: ${date2}`,
-      selectedRangeLabel: (range) => `Selected range: ${range}`,
+      selectedRangeLabel: (range2) => `Selected range: ${range2}`,
       selectGroup: "Select group",
       selectionCleared: "Selection cleared",
       selectRow: "Select row",
@@ -7314,11 +7314,11 @@ function getWheelDeltaMayPolyfill(e9) {
   var sign = deltaY > 0 ? -1 : deltaY < 0 ? 1 : deltaX > 0 ? -1 : 1;
   return 3 * delta * sign;
 }
-function addEventListener(el, name, handler, opt2) {
-  el.addEventListener(name, handler, opt2);
+function addEventListener(el, name, handler, opt3) {
+  el.addEventListener(name, handler, opt3);
 }
-function removeEventListener(el, name, handler, opt2) {
-  el.removeEventListener(name, handler, opt2);
+function removeEventListener(el, name, handler, opt3) {
+  el.removeEventListener(name, handler, opt3);
 }
 var stop = function(e9) {
   e9.preventDefault();
@@ -7692,15 +7692,15 @@ var BoundingRect = (function() {
   BoundingRect2.prototype.calculateTransform = function(b3) {
     return boundingRectCalculateTransform(create2(), this, b3);
   };
-  BoundingRect2.prototype.intersect = function(b3, mtv, opt2) {
-    return BoundingRect2.intersect(this, b3, mtv, opt2);
+  BoundingRect2.prototype.intersect = function(b3, mtv, opt3) {
+    return BoundingRect2.intersect(this, b3, mtv, opt3);
   };
-  BoundingRect2.intersect = function(a4, b3, mtv, opt2) {
+  BoundingRect2.intersect = function(a4, b3, mtv, opt3) {
     if (mtv) {
       Point_default.set(mtv, 0, 0);
     }
-    var outIntersectRect = opt2 && opt2.outIntersectRect || null;
-    var clamp2 = opt2 && opt2.clamp;
+    var outIntersectRect = opt3 && opt3.outIntersectRect || null;
+    var clamp2 = opt3 && opt3.clamp;
     if (outIntersectRect) {
       outIntersectRect.x = outIntersectRect.y = outIntersectRect.width = outIntersectRect.height = NaN;
     }
@@ -7714,7 +7714,7 @@ var BoundingRect = (function() {
       b3 = boundingRectSet(_tmpIntersectB, b3.x, b3.y, b3.width, b3.height);
     }
     var useMTV = !!mtv;
-    _intersectCtx.reset(opt2, useMTV);
+    _intersectCtx.reset(opt3, useMTV);
     var touchThreshold = _intersectCtx.touchThreshold;
     var ax0 = a4.x + touchThreshold;
     var ax1 = a4.x + a4.width - touchThreshold;
@@ -7899,10 +7899,10 @@ function createIntersectContext() {
     touchThreshold: 0,
     bidirectional: true,
     negativeSize: false,
-    reset: function(opt2, useMTV) {
+    reset: function(opt3, useMTV) {
       _ctx.touchThreshold = 0;
-      if (opt2 && opt2.touchThreshold != null) {
-        _ctx.touchThreshold = mathMax(0, opt2.touchThreshold);
+      if (opt3 && opt3.touchThreshold != null) {
+        _ctx.touchThreshold = mathMax(0, opt3.touchThreshold);
       }
       _ctx.negativeSize = false;
       if (!useMTV) {
@@ -7911,12 +7911,12 @@ function createIntersectContext() {
       _ctx.minTv.set(Infinity, Infinity);
       _ctx.maxTv.set(0, 0);
       _ctx.useDir = false;
-      if (opt2 && opt2.direction != null) {
+      if (opt3 && opt3.direction != null) {
         _ctx.useDir = true;
         _ctx.dirMinTv.copy(_ctx.minTv);
         _dirTmp.copy(_ctx.minTv);
-        _direction = opt2.direction;
-        _ctx.bidirectional = opt2.bidirectional == null || !!opt2.bidirectional;
+        _direction = opt3.direction;
+        _ctx.bidirectional = opt3.bidirectional == null || !!opt3.bidirectional;
         if (!_ctx.bidirectional) {
           _dirCheckVec.set(Math.cos(_direction), Math.sin(_direction));
         }
@@ -11186,10 +11186,10 @@ function mountGlobalDOMEventListeners(instance, scope) {
     mountSingleDOMEventListener(scope, nativeEventName, nativeEventListener, { capture: true });
   }
 }
-function mountSingleDOMEventListener(scope, nativeEventName, listener, opt2) {
+function mountSingleDOMEventListener(scope, nativeEventName, listener, opt3) {
   scope.mounted[nativeEventName] = listener;
-  scope.listenerOpts[nativeEventName] = opt2;
-  addEventListener(scope.domTarget, nativeEventName, listener, opt2);
+  scope.listenerOpts[nativeEventName] = opt3;
+  addEventListener(scope.domTarget, nativeEventName, listener, opt3);
 }
 function unmountDOMEventListeners(scope) {
   var mounted2 = scope.mounted;
@@ -13005,14 +13005,14 @@ var ZRender = (function() {
       refreshHover: false
     });
   };
-  ZRender2.prototype._refresh = function(opt2) {
-    if (opt2.animUpdate) {
+  ZRender2.prototype._refresh = function(opt3) {
+    if (opt3.animUpdate) {
       this.animation.update(true);
     }
     this._needsRefresh = this._needsRefreshHover = false;
     this.painter.refresh({
-      refresh: opt2.refresh,
-      refreshHover: opt2.refreshHover
+      refresh: opt3.refresh,
+      refreshHover: opt3.refreshHover
     });
     this._needsRefresh = this._needsRefreshHover = false;
   };
@@ -13192,11 +13192,11 @@ var mathLog = Math.log;
 var mathLN10 = Math.LN10;
 var mathPI = Math.PI;
 var mathRandom = Math.random;
-function linearMap(val, domain, range, clamp2) {
+function linearMap(val, domain, range2, clamp2) {
   var d0 = domain[0];
   var d1 = domain[1];
-  var r0 = range[0];
-  var r1 = range[1];
+  var r0 = range2[0];
+  var r1 = range2[1];
   var subDomain = d1 - d0;
   var subRange = r1 - r0;
   if (subDomain === 0) {
@@ -13533,15 +13533,15 @@ var INTERNAL_COMPONENT_ID_PREFIX = "\0_ec_\0";
 function normalizeToArray(value2) {
   return value2 instanceof Array ? value2 : value2 == null ? [] : [value2];
 }
-function defaultEmphasis(opt2, key3, subOpts) {
-  if (opt2) {
-    opt2[key3] = opt2[key3] || {};
-    opt2.emphasis = opt2.emphasis || {};
-    opt2.emphasis[key3] = opt2.emphasis[key3] || {};
+function defaultEmphasis(opt3, key3, subOpts) {
+  if (opt3) {
+    opt3[key3] = opt3[key3] || {};
+    opt3.emphasis = opt3.emphasis || {};
+    opt3.emphasis[key3] = opt3.emphasis[key3] || {};
     for (var i7 = 0, len2 = subOpts.length; i7 < len2; i7++) {
       var subOptName = subOpts[i7];
-      if (!opt2.emphasis[key3].hasOwnProperty(subOptName) && opt2[key3].hasOwnProperty(subOptName)) {
-        opt2.emphasis[key3][subOptName] = opt2[key3][subOptName];
+      if (!opt3.emphasis[key3].hasOwnProperty(subOptName) && opt3[key3].hasOwnProperty(subOptName)) {
+        opt3.emphasis[key3][subOptName] = opt3[key3][subOptName];
       }
     }
   }
@@ -13684,23 +13684,23 @@ function makeIdAndName(mapResult) {
     existing && idMap.set(existing.id, item);
   });
   each(mapResult, function(item) {
-    var opt2 = item.newOption;
-    assert(!opt2 || opt2.id == null || !idMap.get(opt2.id) || idMap.get(opt2.id) === item, "id duplicates: " + (opt2 && opt2.id));
-    opt2 && opt2.id != null && idMap.set(opt2.id, item);
+    var opt3 = item.newOption;
+    assert(!opt3 || opt3.id == null || !idMap.get(opt3.id) || idMap.get(opt3.id) === item, "id duplicates: " + (opt3 && opt3.id));
+    opt3 && opt3.id != null && idMap.set(opt3.id, item);
     !item.keyInfo && (item.keyInfo = {});
   });
   each(mapResult, function(item, index) {
     var existing = item.existing;
-    var opt2 = item.newOption;
+    var opt3 = item.newOption;
     var keyInfo = item.keyInfo;
-    if (!isObject(opt2)) {
+    if (!isObject(opt3)) {
       return;
     }
-    keyInfo.name = opt2.name != null ? makeComparableKey(opt2.name) : existing ? existing.name : DUMMY_COMPONENT_NAME_PREFIX + index;
+    keyInfo.name = opt3.name != null ? makeComparableKey(opt3.name) : existing ? existing.name : DUMMY_COMPONENT_NAME_PREFIX + index;
     if (existing) {
       keyInfo.id = makeComparableKey(existing.id);
-    } else if (opt2.id != null) {
-      keyInfo.id = makeComparableKey(opt2.id);
+    } else if (opt3.id != null) {
+      keyInfo.id = makeComparableKey(opt3.id);
     } else {
       var idNum = 0;
       do {
@@ -13819,25 +13819,25 @@ function makeInner() {
   };
 }
 var innerUniqueIndex = getRandomIdBase();
-function parseFinder(ecModel, finderInput, opt2) {
-  var _a2 = preParseFinder(finderInput, opt2), mainTypeSpecified = _a2.mainTypeSpecified, queryOptionMap = _a2.queryOptionMap, others = _a2.others;
+function parseFinder(ecModel, finderInput, opt3) {
+  var _a2 = preParseFinder(finderInput, opt3), mainTypeSpecified = _a2.mainTypeSpecified, queryOptionMap = _a2.queryOptionMap, others = _a2.others;
   var result2 = others;
-  var defaultMainType = opt2 ? opt2.defaultMainType : null;
+  var defaultMainType = opt3 ? opt3.defaultMainType : null;
   if (!mainTypeSpecified && defaultMainType) {
     queryOptionMap.set(defaultMainType, {});
   }
   queryOptionMap.each(function(queryOption, mainType) {
     var queryResult = queryReferringComponents(ecModel, mainType, queryOption, {
       useDefault: defaultMainType === mainType,
-      enableAll: opt2 && opt2.enableAll != null ? opt2.enableAll : true,
-      enableNone: opt2 && opt2.enableNone != null ? opt2.enableNone : true
+      enableAll: opt3 && opt3.enableAll != null ? opt3.enableAll : true,
+      enableNone: opt3 && opt3.enableNone != null ? opt3.enableNone : true
     });
     result2[mainType + "Models"] = queryResult.models;
     result2[mainType + "Model"] = queryResult.models[0];
   });
   return result2;
 }
-function preParseFinder(finderInput, opt2) {
+function preParseFinder(finderInput, opt3) {
   var finder;
   if (isString(finderInput)) {
     var obj = {};
@@ -13857,7 +13857,7 @@ function preParseFinder(finderInput, opt2) {
     var parsedKey = key3.match(/^(\w+)(Index|Id|Name)$/) || [];
     var mainType = parsedKey[1];
     var queryType = (parsedKey[2] || "").toLowerCase();
-    if (!mainType || !queryType || opt2 && opt2.includeMainTypes && indexOf(opt2.includeMainTypes, mainType) < 0) {
+    if (!mainType || !queryType || opt3 && opt3.includeMainTypes && indexOf(opt3.includeMainTypes, mainType) < 0) {
       return;
     }
     mainTypeSpecified = mainTypeSpecified || !!mainType;
@@ -13880,8 +13880,8 @@ var MULTIPLE_REFERRING = {
   enableAll: true,
   enableNone: true
 };
-function queryReferringComponents(ecModel, mainType, userOption, opt2) {
-  opt2 = opt2 || SINGLE_REFERRING;
+function queryReferringComponents(ecModel, mainType, userOption, opt3) {
+  opt3 = opt3 || SINGLE_REFERRING;
   var indexOption = userOption.index;
   var idOption = userOption.id;
   var nameOption = userOption.name;
@@ -13891,11 +13891,11 @@ function queryReferringComponents(ecModel, mainType, userOption, opt2) {
   };
   if (!result2.specified) {
     var firstCmpt = void 0;
-    result2.models = opt2.useDefault && (firstCmpt = ecModel.getComponent(mainType)) ? [firstCmpt] : [];
+    result2.models = opt3.useDefault && (firstCmpt = ecModel.getComponent(mainType)) ? [firstCmpt] : [];
     return result2;
   }
   if (indexOption === "none" || indexOption === false) {
-    if (opt2.enableNone) {
+    if (opt3.enableNone) {
       result2.models = [];
       return result2;
     } else {
@@ -13906,7 +13906,7 @@ function queryReferringComponents(ecModel, mainType, userOption, opt2) {
     }
   }
   if (indexOption === "all") {
-    if (opt2.enableAll) {
+    if (opt3.enableAll) {
       indexOption = idOption = nameOption = null;
     } else {
       if (true) {
@@ -19466,13 +19466,13 @@ var OrientedBoundingRect = (function() {
       this._origin[i7] = axes[i7].dot(corners[0]);
     }
   };
-  OrientedBoundingRect2.prototype.intersect = function(other, mtv, opt2) {
+  OrientedBoundingRect2.prototype.intersect = function(other, mtv, opt3) {
     var overlapped = true;
     var noMtv = !mtv;
     if (mtv) {
       Point_default.set(mtv, 0, 0);
     }
-    _intersectCtx2.reset(opt2, !noMtv);
+    _intersectCtx2.reset(opt3, !noMtv);
     if (!this._intersectCheckOneSide(this, other, noMtv, 1)) {
       overlapped = false;
       if (noMtv) {
@@ -19991,10 +19991,10 @@ function clipRectByRect(targetRect, rect) {
     };
   }
 }
-function createIcon(iconStr, opt2, rect) {
+function createIcon(iconStr, opt3, rect) {
   var innerOpts = extend({
     rectHover: true
-  }, opt2);
+  }, opt3);
   var style = innerOpts.style = {
     strokeNoScale: true
   };
@@ -20087,10 +20087,10 @@ function expandRectOnOneDimension(rect, delta, xy, wh, ltIdx, rbIdx, minSize) {
     rect[xy] -= delta[ltIdx];
   }
 }
-function setTooltipConfig(opt2) {
-  var itemTooltipOption = opt2.itemTooltipOption;
-  var componentModel = opt2.componentModel;
-  var itemName = opt2.itemName;
+function setTooltipConfig(opt3) {
+  var itemTooltipOption = opt3.itemTooltipOption;
+  var componentModel = opt3.componentModel;
+  var itemName = opt3.itemName;
   var itemTooltipOptionObj = isString(itemTooltipOption) ? {
     formatter: itemTooltipOption
   } : itemTooltipOption;
@@ -20102,7 +20102,7 @@ function setTooltipConfig(opt2) {
     $vars: ["name"]
   };
   formatterParams[mainType + "Index"] = componentIndex;
-  var formatterParamsExtra = opt2.formatterParamsExtra;
+  var formatterParamsExtra = opt3.formatterParamsExtra;
   if (formatterParamsExtra) {
     each(keys(formatterParamsExtra), function(key3) {
       if (!hasOwn(formatterParams, key3)) {
@@ -20111,7 +20111,7 @@ function setTooltipConfig(opt2) {
       }
     });
   }
-  var ecData = getECData(opt2.el);
+  var ecData = getECData(opt3.el);
   ecData.componentMainType = mainType;
   ecData.componentIndex = componentIndex;
   ecData.tooltipConfig = {
@@ -20277,10 +20277,10 @@ function setLabelText(label2, labelTexts) {
   });
   label2.useStates(oldStates, true);
 }
-function getLabelText(opt2, stateModels, interpolatedValue) {
-  var labelFetcher = opt2.labelFetcher;
-  var labelDataIndex = opt2.labelDataIndex;
-  var labelDimIndex = opt2.labelDimIndex;
+function getLabelText(opt3, stateModels, interpolatedValue) {
+  var labelFetcher = opt3.labelFetcher;
+  var labelDataIndex = opt3.labelDataIndex;
+  var labelDimIndex = opt3.labelDimIndex;
   var normalModel = stateModels.normal;
   var baseText;
   if (labelFetcher) {
@@ -20289,7 +20289,7 @@ function getLabelText(opt2, stateModels, interpolatedValue) {
     } : null);
   }
   if (baseText == null) {
-    baseText = isFunction(opt2.defaultText) ? opt2.defaultText(labelDataIndex, opt2, interpolatedValue) : opt2.defaultText;
+    baseText = isFunction(opt3.defaultText) ? opt3.defaultText(labelDataIndex, opt3, interpolatedValue) : opt3.defaultText;
   }
   var statesText = {
     normal: baseText
@@ -20301,8 +20301,8 @@ function getLabelText(opt2, stateModels, interpolatedValue) {
   }
   return statesText;
 }
-function setLabelStyle(targetEl, labelStatesModels, opt2, stateSpecified) {
-  opt2 = opt2 || EMPTY_OBJ;
+function setLabelStyle(targetEl, labelStatesModels, opt3, stateSpecified) {
+  opt3 = opt3 || EMPTY_OBJ;
   var isSetOnText = targetEl instanceof Text_default;
   var needsCreateText = false;
   for (var i7 = 0; i7 < DISPLAY_STATES.length; i7++) {
@@ -20323,13 +20323,13 @@ function setLabelStyle(targetEl, labelStatesModels, opt2, stateSpecified) {
         textContent.stateProxy = targetEl.stateProxy;
       }
     }
-    var labelStatesTexts = getLabelText(opt2, labelStatesModels);
+    var labelStatesTexts = getLabelText(opt3, labelStatesModels);
     var normalModel = labelStatesModels.normal;
     var showNormal = !!normalModel.getShallow("show");
-    var normalStyle = createTextStyle(normalModel, stateSpecified && stateSpecified.normal, opt2, false, !isSetOnText);
+    var normalStyle = createTextStyle(normalModel, stateSpecified && stateSpecified.normal, opt3, false, !isSetOnText);
     normalStyle.text = labelStatesTexts.normal;
     if (!isSetOnText) {
-      targetEl.setTextConfig(createTextConfig(normalModel, opt2, false));
+      targetEl.setTextConfig(createTextConfig(normalModel, opt3, false));
     }
     for (var i7 = 0; i7 < SPECIAL_STATES.length; i7++) {
       var stateName = SPECIAL_STATES[i7];
@@ -20340,11 +20340,11 @@ function setLabelStyle(targetEl, labelStatesModels, opt2, stateSpecified) {
         if (stateShow !== showNormal) {
           stateObj.ignore = !stateShow;
         }
-        stateObj.style = createTextStyle(stateModel, stateSpecified && stateSpecified[stateName], opt2, true, !isSetOnText);
+        stateObj.style = createTextStyle(stateModel, stateSpecified && stateSpecified[stateName], opt3, true, !isSetOnText);
         stateObj.style.text = labelStatesTexts[stateName];
         if (!isSetOnText) {
           var targetElEmphasisState = targetEl.ensureState(stateName);
-          targetElEmphasisState.textConfig = createTextConfig(stateModel, opt2, true);
+          targetElEmphasisState.textConfig = createTextConfig(stateModel, opt3, true);
         }
       }
     }
@@ -20358,9 +20358,9 @@ function setLabelStyle(targetEl, labelStatesModels, opt2, stateSpecified) {
     textContent.ignore = !showNormal;
     textContent.useStyle(normalStyle);
     textContent.dirty();
-    if (opt2.enableTextSetter) {
+    if (opt3.enableTextSetter) {
       labelInner(textContent).setLabelText = function(interpolatedValue) {
-        var labelStatesTexts2 = getLabelText(opt2, labelStatesModels, interpolatedValue);
+        var labelStatesTexts2 = getLabelText(opt3, labelStatesModels, interpolatedValue);
         setLabelText(textContent, labelStatesTexts2);
       };
     }
@@ -20380,21 +20380,21 @@ function getLabelStatesModels(itemModel, labelName) {
   }
   return statesModels;
 }
-function createTextStyle(textStyleModel, specifiedTextStyle, opt2, isNotNormal, isAttached) {
+function createTextStyle(textStyleModel, specifiedTextStyle, opt3, isNotNormal, isAttached) {
   var textStyle = {};
-  setTextStyleCommon(textStyle, textStyleModel, opt2, isNotNormal, isAttached);
+  setTextStyleCommon(textStyle, textStyleModel, opt3, isNotNormal, isAttached);
   specifiedTextStyle && extend(textStyle, specifiedTextStyle);
   return textStyle;
 }
-function createTextConfig(textStyleModel, opt2, isNotNormal) {
-  opt2 = opt2 || {};
+function createTextConfig(textStyleModel, opt3, isNotNormal) {
+  opt3 = opt3 || {};
   var textConfig = {};
   var labelPosition;
   var labelRotate = textStyleModel.getShallow("rotate");
   var labelDistance = retrieve2(textStyleModel.getShallow("distance"), isNotNormal ? null : 5);
   var labelOffset = textStyleModel.getShallow("offset");
   labelPosition = textStyleModel.getShallow("position") || (isNotNormal ? null : "inside");
-  labelPosition === "outside" && (labelPosition = opt2.defaultOutsidePosition || "top");
+  labelPosition === "outside" && (labelPosition = opt3.defaultOutsidePosition || "top");
   if (labelPosition != null) {
     textConfig.position = labelPosition;
   }
@@ -20408,17 +20408,17 @@ function createTextConfig(textStyleModel, opt2, isNotNormal) {
   if (labelDistance != null) {
     textConfig.distance = labelDistance;
   }
-  textConfig.outsideFill = textStyleModel.get("color") === "inherit" ? opt2.inheritColor || null : "auto";
-  if (opt2.autoOverflowArea != null) {
-    textConfig.autoOverflowArea = opt2.autoOverflowArea;
+  textConfig.outsideFill = textStyleModel.get("color") === "inherit" ? opt3.inheritColor || null : "auto";
+  if (opt3.autoOverflowArea != null) {
+    textConfig.autoOverflowArea = opt3.autoOverflowArea;
   }
-  if (opt2.layoutRect != null) {
-    textConfig.layoutRect = opt2.layoutRect;
+  if (opt3.layoutRect != null) {
+    textConfig.layoutRect = opt3.layoutRect;
   }
   return textConfig;
 }
-function setTextStyleCommon(textStyle, textStyleModel, opt2, isNotNormal, isAttached) {
-  opt2 = opt2 || EMPTY_OBJ;
+function setTextStyleCommon(textStyle, textStyleModel, opt3, isNotNormal, isAttached) {
+  opt3 = opt3 || EMPTY_OBJ;
   var ecModel = textStyleModel.ecModel;
   var globalTextStyle = ecModel && ecModel.option.textStyle;
   var richItemNames = getRichItemNames(textStyleModel);
@@ -20430,7 +20430,7 @@ function setTextStyleCommon(textStyle, textStyleModel, opt2, isNotNormal, isAtta
     for (var name_1 in richItemNames) {
       if (richItemNames.hasOwnProperty(name_1)) {
         var richTextStyle = textStyleModel.getModel(["rich", name_1]);
-        setTokenTextStyle(richResult[name_1] = {}, richTextStyle, globalTextStyle, textStyleModel, richInheritPlainLabel, opt2, isNotNormal, isAttached, false, true);
+        setTokenTextStyle(richResult[name_1] = {}, richTextStyle, globalTextStyle, textStyleModel, richInheritPlainLabel, opt3, isNotNormal, isAttached, false, true);
       }
     }
   }
@@ -20458,7 +20458,7 @@ function setTextStyleCommon(textStyle, textStyleModel, opt2, isNotNormal, isAtta
       labelTextStyle.__marginType = LabelMarginType.textMargin;
     }
   }
-  setTokenTextStyle(textStyle, textStyleModel, globalTextStyle, null, null, opt2, isNotNormal, isAttached, true, false);
+  setTokenTextStyle(textStyle, textStyleModel, globalTextStyle, null, null, opt3, isNotNormal, isAttached, true, false);
 }
 function getRichItemNames(textStyleModel) {
   var richItemNameMap;
@@ -20479,9 +20479,9 @@ function getRichItemNames(textStyleModel) {
 var TEXT_PROPS_WITH_GLOBAL = ["fontStyle", "fontWeight", "fontSize", "fontFamily", "textShadowColor", "textShadowBlur", "textShadowOffsetX", "textShadowOffsetY"];
 var TEXT_PROPS_SELF = ["align", "lineHeight", "width", "height", "tag", "verticalAlign", "ellipsis"];
 var TEXT_PROPS_BOX = ["padding", "borderWidth", "borderRadius", "borderDashOffset", "backgroundColor", "borderColor", "shadowColor", "shadowBlur", "shadowOffsetX", "shadowOffsetY"];
-function setTokenTextStyle(textStyle, textStyleModel, globalTextStyle, plainTextModel, richInheritPlainLabel, opt2, isNotNormal, isAttached, isBlock, inRich) {
+function setTokenTextStyle(textStyle, textStyleModel, globalTextStyle, plainTextModel, richInheritPlainLabel, opt3, isNotNormal, isAttached, isBlock, inRich) {
   globalTextStyle = !isNotNormal && globalTextStyle || EMPTY_OBJ;
-  var inheritColor = opt2 && opt2.inheritColor;
+  var inheritColor = opt3 && opt3.inheritColor;
   var fillColor = textStyleModel.getShallow("color");
   var strokeColor = textStyleModel.getShallow("textBorderColor");
   var opacity = retrieve2(textStyleModel.getShallow("opacity"), globalTextStyle.opacity);
@@ -20532,14 +20532,14 @@ function setTokenTextStyle(textStyle, textStyleModel, globalTextStyle, plainText
     textStyle.lineDashOffset = textBorderDashOffset;
   }
   if (!isNotNormal && opacity == null && !inRich) {
-    opacity = opt2 && opt2.defaultOpacity;
+    opacity = opt3 && opt3.defaultOpacity;
   }
   if (opacity != null) {
     textStyle.opacity = opacity;
   }
   if (!isNotNormal && !isAttached) {
-    if (textStyle.fill == null && opt2.inheritColor) {
-      textStyle.fill = opt2.inheritColor;
+    if (textStyle.fill == null && opt3.inheritColor) {
+      textStyle.fill = opt3.inheritColor;
     }
   }
   for (var i7 = 0; i7 < TEXT_PROPS_WITH_GLOBAL.length; i7++) {
@@ -20562,7 +20562,7 @@ function setTokenTextStyle(textStyle, textStyleModel, globalTextStyle, plainText
       textStyle.verticalAlign = baseline;
     }
   }
-  if (!isBlock || !opt2.disableBox) {
+  if (!isBlock || !opt3.disableBox) {
     for (var i7 = 0; i7 < TEXT_PROPS_BOX.length; i7++) {
       var key3 = TEXT_PROPS_BOX[i7];
       var val = textStyleModel.getShallow(key3);
@@ -20592,14 +20592,14 @@ function setTokenTextStyle(textStyle, textStyleModel, globalTextStyle, plainText
     }
   }
 }
-function getFont(opt2, ecModel) {
+function getFont(opt3, ecModel) {
   var gTextStyleModel = ecModel && ecModel.getModel("textStyle");
   return trim([
     // FIXME in node-canvas fontWeight is before fontStyle
-    opt2.fontStyle || gTextStyleModel && gTextStyleModel.getShallow("fontStyle") || "",
-    opt2.fontWeight || gTextStyleModel && gTextStyleModel.getShallow("fontWeight") || "",
-    (opt2.fontSize || gTextStyleModel && gTextStyleModel.getShallow("fontSize") || 12) + "px",
-    opt2.fontFamily || gTextStyleModel && gTextStyleModel.getShallow("fontFamily") || "sans-serif"
+    opt3.fontStyle || gTextStyleModel && gTextStyleModel.getShallow("fontStyle") || "",
+    opt3.fontWeight || gTextStyleModel && gTextStyleModel.getShallow("fontWeight") || "",
+    (opt3.fontSize || gTextStyleModel && gTextStyleModel.getShallow("fontSize") || 12) + "px",
+    opt3.fontFamily || gTextStyleModel && gTextStyleModel.getShallow("fontFamily") || "sans-serif"
   ].join(" "));
 }
 var labelInner = makeInner();
@@ -21182,10 +21182,10 @@ var _impl = null;
 function getScaleBreakHelper() {
   return _impl;
 }
-function simplyParseBreakOption(scale3, opt2) {
+function simplyParseBreakOption(scale3, opt3) {
   var scaleBreakHelper = getScaleBreakHelper();
-  var breakOption = opt2.breakOption;
-  var breakParsed = opt2.breakParsed;
+  var breakOption = opt3.breakOption;
+  var breakParsed = opt3.breakParsed;
   if (!breakParsed && scaleBreakHelper) {
     breakParsed = scaleBreakHelper.parseAxisBreakOption(breakOption, scale3);
   }
@@ -21516,21 +21516,21 @@ function formatTpl(tpl, paramsList, encode) {
   return tpl;
 }
 function getTooltipMarker(inOpt, extraCssText) {
-  var opt2 = isString(inOpt) ? {
+  var opt3 = isString(inOpt) ? {
     color: inOpt,
     extraCssText
   } : inOpt || {};
-  var color3 = opt2.color;
-  var type = opt2.type;
-  extraCssText = opt2.extraCssText;
-  var renderMode = opt2.renderMode || "html";
+  var color3 = opt3.color;
+  var type = opt3.type;
+  extraCssText = opt3.extraCssText;
+  var renderMode = opt3.renderMode || "html";
   if (!color3) {
     return "";
   }
   if (renderMode === "html") {
     return type === "subItem" ? '<span style="display:inline-block;vertical-align:middle;margin-right:8px;margin-left:3px;border-radius:4px;width:4px;height:4px;background-color:' + encodeHTML(color3) + ";" + (extraCssText || "") + '"></span>' : '<span style="display:inline-block;margin-right:4px;border-radius:10px;width:10px;height:10px;background-color:' + encodeHTML(color3) + ";" + (extraCssText || "") + '"></span>';
   } else {
-    var markerId = opt2.markerId || "markerX";
+    var markerId = opt3.markerId || "markerX";
     return {
       renderMode,
       content: "{" + markerId + "|}  ",
@@ -21664,8 +21664,8 @@ function decideCoordSysUsageKind(model, printError) {
     kind
   };
 }
-function injectCoordSysByOption(opt2) {
-  var targetModel = opt2.targetModel, coordSysType = opt2.coordSysType, coordSysProvider = opt2.coordSysProvider, isDefaultDataCoordSys = opt2.isDefaultDataCoordSys, allowNotFound = opt2.allowNotFound;
+function injectCoordSysByOption(opt3) {
+  var targetModel = opt3.targetModel, coordSysType = opt3.coordSysType, coordSysProvider = opt3.coordSysProvider, isDefaultDataCoordSys = opt3.isDefaultDataCoordSys, allowNotFound = opt3.allowNotFound;
   if (true) {
     assert(!!coordSysType);
   }
@@ -21836,7 +21836,7 @@ var BoxLayoutReferenceType = {
   rect: 1,
   point: 2
 };
-function createBoxLayoutReference(model, api, opt2) {
+function createBoxLayoutReference(model, api, opt3) {
   var refContainer;
   var refPoint;
   var layoutRefType;
@@ -21849,7 +21849,7 @@ function createBoxLayoutReference(model, api, opt2) {
       boxCoordFrom = from;
       var result2 = boxCoordSys.dataToLayout(coord);
       refContainer = result2.contentRect || result2.rect;
-    } else if (opt2 && opt2.enableLayoutOnlyByCenter && boxCoordSys.dataToPoint) {
+    } else if (opt3 && opt3.enableLayoutOnlyByCenter && boxCoordSys.dataToPoint) {
       layoutRefType = BoxLayoutReferenceType.point;
       boxCoordFrom = from;
       refPoint = boxCoordSys.dataToPoint(coord);
@@ -21880,10 +21880,10 @@ function createBoxLayoutReference(model, api, opt2) {
     boxCoordFrom
   };
 }
-function positionElement(el, positionInfo, containerRect, margin, opt2, out2) {
-  var h3 = !opt2 || !opt2.hv || opt2.hv[0];
-  var v2 = !opt2 || !opt2.hv || opt2.hv[1];
-  var boundingMode = opt2 && opt2.boundingMode || "all";
+function positionElement(el, positionInfo, containerRect, margin, opt3, out2) {
+  var h3 = !opt3 || !opt3.hv || opt3.hv[0];
+  var v2 = !opt3 || !opt3.hv || opt3.hv[1];
+  var boundingMode = opt3 && opt3.boundingMode || "all";
   out2 = out2 || el;
   out2.x = el.x;
   out2.y = el.y;
@@ -21925,8 +21925,8 @@ function fetchLayoutMode(ins) {
     type: layoutMode
   } : null;
 }
-function mergeLayoutParam(targetOption, newOption, opt2) {
-  var ignoreSize = opt2 && opt2.ignoreSize;
+function mergeLayoutParam(targetOption, newOption, opt3) {
+  var ignoreSize = opt3 && opt3.ignoreSize;
   !isArray(ignoreSize) && (ignoreSize = [ignoreSize, ignoreSize]);
   var hResult = merge2(HV_NAMES[0], 0);
   var vResult = merge2(HV_NAMES[1], 1);
@@ -22031,8 +22031,8 @@ var ComponentModel = (
         var optList = [];
         var clz = ctor;
         while (clz) {
-          var opt2 = clz.prototype.defaultOption;
-          opt2 && optList.push(opt2);
+          var opt3 = clz.prototype.defaultOption;
+          opt3 && optList.push(opt3);
           clz = clz.superClass;
         }
         var defaultOption3 = {};
@@ -22043,13 +22043,13 @@ var ComponentModel = (
       }
       return fields.defaultOption;
     };
-    ComponentModel2.prototype.getReferringComponents = function(mainType, opt2) {
+    ComponentModel2.prototype.getReferringComponents = function(mainType, opt3) {
       var indexKey = mainType + "Index";
       var idKey = mainType + "Id";
       return queryReferringComponents(this.ecModel, mainType, {
         index: this.get(indexKey, true),
         id: this.get(idKey, true)
-      }, opt2);
+      }, opt3);
     };
     ComponentModel2.prototype.getBoxLayoutParams = function() {
       return getBoxLayoutParams(this, false);
@@ -22635,10 +22635,10 @@ var GlobalModel = (
       this._optionManager.setOption(option, optionPreprocessorFuncs2, innerOpt);
       this._resetOption(null, innerOpt);
     };
-    GlobalModel2.prototype.resetOption = function(type, opt2) {
-      return this._resetOption(type, normalizeSetOptionInput(opt2));
+    GlobalModel2.prototype.resetOption = function(type, opt3) {
+      return this._resetOption(type, normalizeSetOptionInput(opt3));
     };
-    GlobalModel2.prototype._resetOption = function(type, opt2) {
+    GlobalModel2.prototype._resetOption = function(type, opt3) {
       var optionChanged = false;
       var optionManager = this._optionManager;
       if (!type || type === "recreate") {
@@ -22650,7 +22650,7 @@ var GlobalModel = (
           initBase(this, baseOption);
         } else {
           this.restoreData();
-          this._mergeOption(baseOption, opt2);
+          this._mergeOption(baseOption, opt3);
         }
         optionChanged = true;
       }
@@ -22661,7 +22661,7 @@ var GlobalModel = (
         var timelineOption = optionManager.getTimelineOption(this);
         if (timelineOption) {
           optionChanged = true;
-          this._mergeOption(timelineOption, opt2);
+          this._mergeOption(timelineOption, opt3);
         }
       }
       if (!type || type === "recreate" || type === "media") {
@@ -22669,7 +22669,7 @@ var GlobalModel = (
         if (mediaOptions.length) {
           each(mediaOptions, function(mediaOption) {
             optionChanged = true;
-            this._mergeOption(mediaOption, opt2);
+            this._mergeOption(mediaOption, opt3);
           }, this);
         }
       }
@@ -22678,13 +22678,13 @@ var GlobalModel = (
     GlobalModel2.prototype.mergeOption = function(option) {
       this._mergeOption(option, null);
     };
-    GlobalModel2.prototype._mergeOption = function(newOption, opt2) {
+    GlobalModel2.prototype._mergeOption = function(newOption, opt3) {
       var option = this.option;
       var componentsMap = this._componentsMap;
       var componentsCount = this._componentsCount;
       var newCmptTypes = [];
       var newCmptTypeMap = createHashMap();
-      var replaceMergeMainTypeMap = opt2 && opt2.replaceMergeMainTypeMap;
+      var replaceMergeMainTypeMap = opt3 && opt3.replaceMergeMainTypeMap;
       resetSourceDefaulter(this);
       each(newOption, function(componentOption, mainType) {
         if (componentOption == null) {
@@ -23117,7 +23117,7 @@ var OptionManager = (
       this._currentMediaIndices = [];
       this._api = api;
     }
-    OptionManager2.prototype.setOption = function(rawOption, optionPreprocessorFuncs2, opt2) {
+    OptionManager2.prototype.setOption = function(rawOption, optionPreprocessorFuncs2, opt3) {
       if (rawOption) {
         each(normalizeToArray(rawOption.series), function(series) {
           series && series.data && isTypedArray(series.data) && setAsPrimitive(series.data);
@@ -23296,8 +23296,8 @@ var OptionManager_default = OptionManager;
 var each3 = each;
 var isObject2 = isObject;
 var POSSIBLE_STYLES = ["areaStyle", "lineStyle", "nodeStyle", "linkStyle", "chordStyle", "label", "labelLine"];
-function compatEC2ItemStyle(opt2) {
-  var itemStyleOpt = opt2 && opt2.itemStyle;
+function compatEC2ItemStyle(opt3) {
+  var itemStyleOpt = opt3 && opt3.itemStyle;
   if (!itemStyleOpt) {
     return;
   }
@@ -23309,11 +23309,11 @@ function compatEC2ItemStyle(opt2) {
       if (true) {
         deprecateReplaceLog("itemStyle.normal." + styleName, styleName);
       }
-      opt2[styleName] = opt2[styleName] || {};
-      if (!opt2[styleName].normal) {
-        opt2[styleName].normal = normalItemStyleOpt[styleName];
+      opt3[styleName] = opt3[styleName] || {};
+      if (!opt3[styleName].normal) {
+        opt3[styleName].normal = normalItemStyleOpt[styleName];
       } else {
-        merge(opt2[styleName].normal, normalItemStyleOpt[styleName]);
+        merge(opt3[styleName].normal, normalItemStyleOpt[styleName]);
       }
       normalItemStyleOpt[styleName] = null;
     }
@@ -23321,57 +23321,57 @@ function compatEC2ItemStyle(opt2) {
       if (true) {
         deprecateReplaceLog("itemStyle.emphasis." + styleName, "emphasis." + styleName);
       }
-      opt2[styleName] = opt2[styleName] || {};
-      if (!opt2[styleName].emphasis) {
-        opt2[styleName].emphasis = emphasisItemStyleOpt[styleName];
+      opt3[styleName] = opt3[styleName] || {};
+      if (!opt3[styleName].emphasis) {
+        opt3[styleName].emphasis = emphasisItemStyleOpt[styleName];
       } else {
-        merge(opt2[styleName].emphasis, emphasisItemStyleOpt[styleName]);
+        merge(opt3[styleName].emphasis, emphasisItemStyleOpt[styleName]);
       }
       emphasisItemStyleOpt[styleName] = null;
     }
   }
 }
-function convertNormalEmphasis(opt2, optType, useExtend) {
-  if (opt2 && opt2[optType] && (opt2[optType].normal || opt2[optType].emphasis)) {
-    var normalOpt = opt2[optType].normal;
-    var emphasisOpt = opt2[optType].emphasis;
+function convertNormalEmphasis(opt3, optType, useExtend) {
+  if (opt3 && opt3[optType] && (opt3[optType].normal || opt3[optType].emphasis)) {
+    var normalOpt = opt3[optType].normal;
+    var emphasisOpt = opt3[optType].emphasis;
     if (normalOpt) {
       if (true) {
         deprecateLog("'normal' hierarchy in " + optType + " has been removed since 4.0. All style properties are configured in " + optType + " directly now.");
       }
       if (useExtend) {
-        opt2[optType].normal = opt2[optType].emphasis = null;
-        defaults(opt2[optType], normalOpt);
+        opt3[optType].normal = opt3[optType].emphasis = null;
+        defaults(opt3[optType], normalOpt);
       } else {
-        opt2[optType] = normalOpt;
+        opt3[optType] = normalOpt;
       }
     }
     if (emphasisOpt) {
       if (true) {
         deprecateLog(optType + ".emphasis has been changed to emphasis." + optType + " since 4.0");
       }
-      opt2.emphasis = opt2.emphasis || {};
-      opt2.emphasis[optType] = emphasisOpt;
+      opt3.emphasis = opt3.emphasis || {};
+      opt3.emphasis[optType] = emphasisOpt;
       if (emphasisOpt.focus) {
-        opt2.emphasis.focus = emphasisOpt.focus;
+        opt3.emphasis.focus = emphasisOpt.focus;
       }
       if (emphasisOpt.blurScope) {
-        opt2.emphasis.blurScope = emphasisOpt.blurScope;
+        opt3.emphasis.blurScope = emphasisOpt.blurScope;
       }
     }
   }
 }
-function removeEC3NormalStatus(opt2) {
-  convertNormalEmphasis(opt2, "itemStyle");
-  convertNormalEmphasis(opt2, "lineStyle");
-  convertNormalEmphasis(opt2, "areaStyle");
-  convertNormalEmphasis(opt2, "label");
-  convertNormalEmphasis(opt2, "labelLine");
-  convertNormalEmphasis(opt2, "upperLabel");
-  convertNormalEmphasis(opt2, "edgeLabel");
+function removeEC3NormalStatus(opt3) {
+  convertNormalEmphasis(opt3, "itemStyle");
+  convertNormalEmphasis(opt3, "lineStyle");
+  convertNormalEmphasis(opt3, "areaStyle");
+  convertNormalEmphasis(opt3, "label");
+  convertNormalEmphasis(opt3, "labelLine");
+  convertNormalEmphasis(opt3, "upperLabel");
+  convertNormalEmphasis(opt3, "edgeLabel");
 }
-function compatTextStyle(opt2, propName) {
-  var labelOptSingle = isObject2(opt2) && opt2[propName];
+function compatTextStyle(opt3, propName) {
+  var labelOptSingle = isObject2(opt3) && opt3[propName];
   var textStyle = isObject2(labelOptSingle) && labelOptSingle.textStyle;
   if (textStyle) {
     if (true) {
@@ -23385,11 +23385,11 @@ function compatTextStyle(opt2, propName) {
     }
   }
 }
-function compatEC3CommonStyles(opt2) {
-  if (opt2) {
-    removeEC3NormalStatus(opt2);
-    compatTextStyle(opt2, "label");
-    opt2.emphasis && compatTextStyle(opt2.emphasis, "label");
+function compatEC3CommonStyles(opt3) {
+  if (opt3) {
+    removeEC3NormalStatus(opt3);
+    compatTextStyle(opt3, "label");
+    opt3.emphasis && compatTextStyle(opt3.emphasis, "label");
   }
 }
 function processSeries(seriesOpt) {
@@ -23429,8 +23429,8 @@ function processSeries(seriesOpt) {
         compatEC3CommonStyles(edgeData[i7]);
       }
     }
-    each(seriesOpt.categories, function(opt2) {
-      removeEC3NormalStatus(opt2);
+    each(seriesOpt.categories, function(opt3) {
+      removeEC3NormalStatus(opt3);
     });
   }
   if (data && !isTypedArray(data)) {
@@ -23463,8 +23463,8 @@ function processSeries(seriesOpt) {
     compatTextStyle(seriesOpt, "detail");
   } else if (seriesOpt.type === "treemap") {
     convertNormalEmphasis(seriesOpt.breadcrumb, "itemStyle");
-    each(seriesOpt.levels, function(opt2) {
-      removeEC3NormalStatus(opt2);
+    each(seriesOpt.levels, function(opt3) {
+      removeEC3NormalStatus(opt3);
     });
   } else if (seriesOpt.type === "tree") {
     removeEC3NormalStatus(seriesOpt.leaves);
@@ -23557,9 +23557,9 @@ function globalCompatStyle(option, isTheme) {
 }
 
 // node_modules/echarts/lib/preprocessor/backwardCompat.js
-function get(opt2, path) {
+function get(opt3, path) {
   var pathArr = path.split(",");
-  var obj = opt2;
+  var obj = opt3;
   for (var i7 = 0; i7 < pathArr.length; i7++) {
     obj = obj && obj[pathArr[i7]];
     if (obj == null) {
@@ -23568,9 +23568,9 @@ function get(opt2, path) {
   }
   return obj;
 }
-function set2(opt2, path, val, overwrite) {
+function set2(opt3, path, val, overwrite) {
   var pathArr = path.split(",");
-  var obj = opt2;
+  var obj = opt3;
   var key3;
   var i7 = 0;
   for (; i7 < pathArr.length - 1; i7++) {
@@ -24603,8 +24603,8 @@ var iterator = /* @__PURE__ */ (function() {
 })();
 
 // node_modules/echarts/lib/data/helper/dataValueHelper.js
-function parseDataValue(value2, opt2) {
-  var dimType = opt2 && opt2.type;
+function parseDataValue(value2, opt3) {
+  var dimType = opt3 && opt3.type;
   if (dimType === "ordinal") {
     return value2;
   }
@@ -25399,13 +25399,13 @@ var DataStore = (
       newStore._updateGetRawIdx();
       return newStore;
     };
-    DataStore2.prototype.selectRange = function(range) {
+    DataStore2.prototype.selectRange = function(range2) {
       var newStore = this.clone();
       var len2 = newStore._count;
       if (!len2) {
         return this;
       }
-      var dims = keys(range);
+      var dims = keys(range2);
       var dimSize = dims.length;
       if (!dimSize) {
         return this;
@@ -25415,8 +25415,8 @@ var DataStore = (
       var newIndices = new Ctor(originalCount);
       var offset = 0;
       var dim0 = dims[0];
-      var min3 = range[dim0][0];
-      var max3 = range[dim0][1];
+      var min3 = range2[dim0][0];
+      var max3 = range2[dim0][1];
       var storeArr = newStore._chunks;
       var quickFinished = false;
       if (!newStore._indices) {
@@ -25434,8 +25434,8 @@ var DataStore = (
         } else if (dimSize === 2) {
           var dimStorage = storeArr[dims[0]];
           var dimStorage2 = storeArr[dims[1]];
-          var min23 = range[dims[1]][0];
-          var max23 = range[dims[1]][1];
+          var min23 = range2[dims[1]][0];
+          var max23 = range2[dims[1]][1];
           for (var i7 = 0; i7 < len2; i7++) {
             var val = dimStorage[i7];
             var val2 = dimStorage2[i7];
@@ -25463,7 +25463,7 @@ var DataStore = (
             for (var k2 = 0; k2 < dimSize; k2++) {
               var dimk = dims[k2];
               var val = storeArr[dimk][rawIndex];
-              if (val < range[dimk][0] || val > range[dimk][1]) {
+              if (val < range2[dimk][0] || val > range2[dimk][1]) {
                 keep = false;
               }
             }
@@ -26301,10 +26301,10 @@ var TooltipMarkupStyleCreator = (
 );
 
 // node_modules/echarts/lib/component/tooltip/seriesFormatTooltip.js
-function defaultSeriesFormatTooltip(opt2) {
-  var series = opt2.series;
-  var dataIndex = opt2.dataIndex;
-  var multipleSeries = opt2.multipleSeries;
+function defaultSeriesFormatTooltip(opt3) {
+  var series = opt3.series;
+  var dataIndex = opt3.dataIndex;
+  var multipleSeries = opt3.multipleSeries;
   var data = series.getData();
   var tooltipDims = data.mapDimensionsAll("defaultedTooltip");
   var tooltipDimLen = tooltipDims.length;
@@ -27356,14 +27356,14 @@ var Scheduler = (
       var ecModel = this.api.getModel();
       var api = this.api;
       each(this._allHandlers, function(handler) {
-        var record4 = stageTaskMap.get(handler.uid) || stageTaskMap.set(handler.uid, {});
+        var record5 = stageTaskMap.get(handler.uid) || stageTaskMap.set(handler.uid, {});
         var errMsg = "";
         if (true) {
           errMsg = '"reset" and "overallReset" must not be both specified.';
         }
         assert(!(handler.reset && handler.overallReset), errMsg);
-        handler.reset && this._createSeriesStageTask(handler, record4, ecModel, api);
-        handler.overallReset && this._createOverallStageTask(handler, record4, ecModel, api);
+        handler.reset && this._createSeriesStageTask(handler, record5, ecModel, api);
+        handler.overallReset && this._createOverallStageTask(handler, record5, ecModel, api);
       }, this);
     };
     Scheduler2.prototype.prepareView = function(view, model, ecModel, api) {
@@ -27380,15 +27380,15 @@ var Scheduler = (
         block: true
       });
     };
-    Scheduler2.prototype.performVisualTasks = function(ecModel, payload, opt2) {
-      this._performStageTasks(this._visualHandlers, ecModel, payload, opt2);
+    Scheduler2.prototype.performVisualTasks = function(ecModel, payload, opt3) {
+      this._performStageTasks(this._visualHandlers, ecModel, payload, opt3);
     };
-    Scheduler2.prototype._performStageTasks = function(stageHandlers, ecModel, payload, opt2) {
-      opt2 = opt2 || {};
+    Scheduler2.prototype._performStageTasks = function(stageHandlers, ecModel, payload, opt3) {
+      opt3 = opt3 || {};
       var unfinished = false;
       var scheduler = this;
       each(stageHandlers, function(stageHandler, idx) {
-        if (opt2.visualType && opt2.visualType !== stageHandler.visualType) {
+        if (opt3.visualType && opt3.visualType !== stageHandler.visualType) {
           return;
         }
         var stageHandlerRecord = scheduler._stageTaskMap.get(stageHandler.uid);
@@ -27398,14 +27398,14 @@ var Scheduler = (
           var overallNeedDirty_1;
           var agentStubMap = overallTask.agentStubMap;
           agentStubMap.each(function(stub) {
-            if (needSetDirty(opt2, stub)) {
+            if (needSetDirty(opt3, stub)) {
               stub.dirty();
               overallNeedDirty_1 = true;
             }
           });
           overallNeedDirty_1 && overallTask.dirty();
           scheduler.updatePayload(overallTask, payload);
-          var performArgs_1 = scheduler.getPerformArgs(overallTask, opt2.block);
+          var performArgs_1 = scheduler.getPerformArgs(overallTask, opt3.block);
           agentStubMap.each(function(stub) {
             stub.perform(performArgs_1);
           });
@@ -27414,10 +27414,10 @@ var Scheduler = (
           }
         } else if (seriesTaskMap) {
           seriesTaskMap.each(function(task, pipelineId) {
-            if (needSetDirty(opt2, task)) {
+            if (needSetDirty(opt3, task)) {
               task.dirty();
             }
-            var performArgs = scheduler.getPerformArgs(task, opt2.block);
+            var performArgs = scheduler.getPerformArgs(task, opt3.block);
             performArgs.skip = !stageHandler.performRawSeries && ecModel.isSeriesFiltered(task.context.model);
             scheduler.updatePayload(task, payload);
             if (task.perform(performArgs)) {
@@ -27426,8 +27426,8 @@ var Scheduler = (
           });
         }
       });
-      function needSetDirty(opt3, task) {
-        return opt3.setDirty && (!opt3.dirtyMap || opt3.dirtyMap.get(task.__pipeline.id));
+      function needSetDirty(opt4, task) {
+        return opt4.setDirty && (!opt4.dirtyMap || opt4.dirtyMap.get(task.__pipeline.id));
       }
       this.unfinished = unfinished || this.unfinished;
     };
@@ -29995,14 +29995,14 @@ var ECharts = (
         return this.getDataURL(opts);
       }
     };
-    ECharts2.prototype.convertToPixel = function(finder, value2, opt2) {
-      return doConvertPixel(this, "convertToPixel", finder, value2, opt2);
+    ECharts2.prototype.convertToPixel = function(finder, value2, opt3) {
+      return doConvertPixel(this, "convertToPixel", finder, value2, opt3);
     };
-    ECharts2.prototype.convertToLayout = function(finder, value2, opt2) {
-      return doConvertPixel(this, "convertToLayout", finder, value2, opt2);
+    ECharts2.prototype.convertToLayout = function(finder, value2, opt3) {
+      return doConvertPixel(this, "convertToLayout", finder, value2, opt3);
     };
-    ECharts2.prototype.convertFromPixel = function(finder, value2, opt2) {
-      return doConvertPixel(this, "convertFromPixel", finder, value2, opt2);
+    ECharts2.prototype.convertFromPixel = function(finder, value2, opt3) {
+      return doConvertPixel(this, "convertFromPixel", finder, value2, opt3);
     };
     ECharts2.prototype.containPixel = function(finder, value2) {
       if (this._disposed) {
@@ -30230,14 +30230,14 @@ var ECharts = (
       payload.type = connectionEventRevertMap[eventObj.type];
       return payload;
     };
-    ECharts2.prototype.dispatchAction = function(payload, opt2) {
+    ECharts2.prototype.dispatchAction = function(payload, opt3) {
       if (this._disposed) {
         disposedWarning(this.id);
         return;
       }
-      if (!isObject(opt2)) {
-        opt2 = {
-          silent: !!opt2
+      if (!isObject(opt3)) {
+        opt3 = {
+          silent: !!opt3
         };
       }
       if (!actions[payload.type]) {
@@ -30250,9 +30250,9 @@ var ECharts = (
         this._pendingActions.push(payload);
         return;
       }
-      var silent = opt2.silent;
+      var silent = opt3.silent;
       doDispatchAction.call(this, payload, silent);
-      var flush = opt2.flush;
+      var flush = opt3.flush;
       if (flush) {
         this._zr.flush();
       } else if (flush !== false && env_default.browser.weChat) {
@@ -30548,7 +30548,7 @@ var ECharts = (
           updateMethods.update.call(this, payload);
         }
       };
-      function doConvertPixelImpl(ecIns, methodName, finder, value2, opt2) {
+      function doConvertPixelImpl(ecIns, methodName, finder, value2, opt3) {
         if (ecIns._disposed) {
           disposedWarning(ecIns.id);
           return;
@@ -30559,7 +30559,7 @@ var ECharts = (
         var parsedFinder = parseFinder(ecModel, finder);
         for (var i7 = 0; i7 < coordSysList.length; i7++) {
           var coordSys = coordSysList[i7];
-          if (coordSys[methodName] && (result2 = coordSys[methodName](ecModel, parsedFinder, value2, opt2)) != null) {
+          if (coordSys[methodName] && (result2 = coordSys[methodName](ecModel, parsedFinder, value2, opt3)) != null) {
             return result2;
           }
         }
@@ -31590,10 +31590,10 @@ function mayLabelDimType(dimType) {
 var SeriesDimensionDefine = (
   /** @class */
   /* @__PURE__ */ (function() {
-    function SeriesDimensionDefine2(opt2) {
+    function SeriesDimensionDefine2(opt3) {
       this.otherDims = {};
-      if (opt2 != null) {
-        extend(this, opt2);
+      if (opt3 != null) {
+        extend(this, opt3);
       }
     }
     return SeriesDimensionDefine2;
@@ -31613,12 +31613,12 @@ var dimTypeShort = {
 var SeriesDataSchema = (
   /** @class */
   (function() {
-    function SeriesDataSchema2(opt2) {
-      this.dimensions = opt2.dimensions;
-      this._dimOmitted = opt2.dimensionOmitted;
-      this.source = opt2.source;
-      this._fullDimCount = opt2.fullDimensionCount;
-      this._updateDimOmitted(opt2.dimensionOmitted);
+    function SeriesDataSchema2(opt3) {
+      this.dimensions = opt3.dimensions;
+      this._dimOmitted = opt3.dimensionOmitted;
+      this.source = opt3.source;
+      this._fullDimCount = opt3.fullDimensionCount;
+      this._updateDimOmitted(opt3.dimensionOmitted);
     }
     SeriesDataSchema2.prototype.isDimensionOmitted = function() {
       return this._dimOmitted;
@@ -31932,8 +31932,8 @@ var SeriesData = (
       this.userOutput = this._dimSummary.userOutput;
     };
     SeriesData2.prototype.appendData = function(data) {
-      var range = this._store.appendData(data);
-      this._doInit(range[0], range[1]);
+      var range2 = this._store.appendData(data);
+      this._doInit(range2[0], range2[1]);
     };
     SeriesData2.prototype.appendValues = function(values, names) {
       var _a2 = this._store.appendValues(values, names && names.length), start2 = _a2.start, end2 = _a2.end;
@@ -32130,15 +32130,15 @@ var SeriesData = (
       this._store = this._store.filter(dimIndices, fCtx ? bind(cb, fCtx) : cb);
       return this;
     };
-    SeriesData2.prototype.selectRange = function(range) {
+    SeriesData2.prototype.selectRange = function(range2) {
       "use strict";
       var _this = this;
       var innerRange = {};
-      var dims = keys(range);
+      var dims = keys(range2);
       var dimIndices = [];
       each(dims, function(dim) {
         var dimIdx = _this._getStoreDimIndex(dim);
-        innerRange[dimIdx] = range[dim];
+        innerRange[dimIdx] = range2[dim];
         dimIndices.push(dimIdx);
       });
       this._store = this._store.selectRange(innerRange);
@@ -32399,22 +32399,22 @@ var SeriesData = (
 var SeriesData_default = SeriesData;
 
 // node_modules/echarts/lib/data/helper/createDimensions.js
-function prepareSeriesDataSchema(source, opt2) {
+function prepareSeriesDataSchema(source, opt3) {
   if (!isSourceInstance(source)) {
     source = createSourceFromSeriesDataOption(source);
   }
-  opt2 = opt2 || {};
-  var sysDims = opt2.coordDimensions || [];
-  var dimsDef = opt2.dimensionsDefine || source.dimensionsDefine || [];
+  opt3 = opt3 || {};
+  var sysDims = opt3.coordDimensions || [];
+  var dimsDef = opt3.dimensionsDefine || source.dimensionsDefine || [];
   var coordDimNameMap = createHashMap();
   var resultList = [];
-  var dimCount = getDimCount(source, sysDims, dimsDef, opt2.dimensionsCount);
-  var omitUnusedDimensions = opt2.canOmitUnusedDimensions && shouldOmitUnusedDimensions(dimCount);
+  var dimCount = getDimCount(source, sysDims, dimsDef, opt3.dimensionsCount);
+  var omitUnusedDimensions = opt3.canOmitUnusedDimensions && shouldOmitUnusedDimensions(dimCount);
   var isUsingSourceDimensionsDef = dimsDef === source.dimensionsDefine;
   var dataDimNameMap = isUsingSourceDimensionsDef ? ensureSourceDimNameMap(source) : createDimNameMap(dimsDef);
-  var encodeDef = opt2.encodeDefine;
-  if (!encodeDef && opt2.encodeDefaulter) {
-    encodeDef = opt2.encodeDefaulter(source, dimCount);
+  var encodeDef = opt3.encodeDefine;
+  if (!encodeDef && opt3.encodeDefaulter) {
+    encodeDef = opt3.encodeDefaulter(source, dimCount);
   }
   var encodeDefMap = createHashMap(encodeDef);
   var indicesMap = new CtorInt32Array(dimCount);
@@ -32522,8 +32522,8 @@ function prepareSeriesDataSchema(source, opt2) {
       coordDimNameMap.set(coordDim2, true);
     }
   }
-  var generateCoord = opt2.generateCoord;
-  var generateCoordCount = opt2.generateCoordCount;
+  var generateCoord = opt3.generateCoord;
+  var generateCoordCount = opt3.generateCoordCount;
   var fromZero = generateCoordCount != null;
   generateCoordCount = generateCoord ? generateCoordCount || 1 : 0;
   var extra = generateCoord || "value";
@@ -32717,10 +32717,10 @@ function isCategory(axisModel) {
 }
 
 // node_modules/echarts/lib/data/helper/dataStackHelper.js
-function enableDataStack(seriesModel, dimensionsInput, opt2) {
-  opt2 = opt2 || {};
-  var byIndex = opt2.byIndex;
-  var stackedCoordDimension = opt2.stackedCoordDimension;
+function enableDataStack(seriesModel, dimensionsInput, opt3) {
+  opt3 = opt3 || {};
+  var byIndex = opt3.byIndex;
+  var stackedCoordDimension = opt3.stackedCoordDimension;
   var dimensionDefineList;
   var schema;
   var store;
@@ -32874,8 +32874,8 @@ function injectOrdinalMeta(dimInfoList, createInvertedIndices, coordSysInfo) {
   }
   return firstCategoryDimIndex;
 }
-function createSeriesData(sourceRaw, seriesModel, opt2) {
-  opt2 = opt2 || {};
+function createSeriesData(sourceRaw, seriesModel, opt3) {
+  opt3 = opt3 || {};
   var sourceManager = seriesModel.getSourceManager();
   var source;
   var isOriginalSource = false;
@@ -32888,17 +32888,17 @@ function createSeriesData(sourceRaw, seriesModel, opt2) {
   }
   var coordSysInfo = getCoordSysInfoBySeries(seriesModel);
   var coordSysDimDefs = getCoordSysDimDefs(seriesModel, coordSysInfo);
-  var useEncodeDefaulter = opt2.useEncodeDefaulter;
+  var useEncodeDefaulter = opt3.useEncodeDefaulter;
   var encodeDefaulter = isFunction(useEncodeDefaulter) ? useEncodeDefaulter : useEncodeDefaulter ? curry(makeSeriesEncodeForAxisCoordSys, coordSysDimDefs, seriesModel) : null;
   var createDimensionOptions = {
     coordDimensions: coordSysDimDefs,
-    generateCoord: opt2.generateCoord,
+    generateCoord: opt3.generateCoord,
     encodeDefine: seriesModel.getEncode(),
     encodeDefaulter,
     canOmitUnusedDimensions: !isOriginalSource
   };
   var schema = prepareSeriesDataSchema(source, createDimensionOptions);
-  var firstCategoryDimIndex = injectOrdinalMeta(schema.dimensions, opt2.createInvertedIndices, coordSysInfo);
+  var firstCategoryDimIndex = injectOrdinalMeta(schema.dimensions, opt3.createInvertedIndices, coordSysInfo);
   var store = !isOriginalSource ? sourceManager.getSharedDataStore(schema) : null;
   var stackCalculationInfo = enableDataStack(seriesModel, {
     schema,
@@ -32956,12 +32956,12 @@ var uidBase = 0;
 var OrdinalMeta = (
   /** @class */
   (function() {
-    function OrdinalMeta2(opt2) {
-      this.categories = opt2.categories || [];
-      this._needCollect = opt2.needCollect;
-      this._deduplication = opt2.deduplication;
+    function OrdinalMeta2(opt3) {
+      this.categories = opt3.categories || [];
+      this._needCollect = opt3.needCollect;
+      this._deduplication = opt3.deduplication;
       this.uid = ++uidBase;
-      this._onCollect = opt2.onCollect;
+      this._onCollect = opt3.onCollect;
     }
     OrdinalMeta2.createByAxisModel = function(axisModel) {
       var option = axisModel.option;
@@ -33203,8 +33203,8 @@ function getIntervalPrecision(niceInterval) {
 function logScaleLogTick(val, base2) {
   return mathLog(val) / mathLog(base2);
 }
-function logScalePowTick(linearTickVal, base2, opt2) {
-  var lookup = opt2 && opt2.lookup;
+function logScalePowTick(linearTickVal, base2, opt3) {
+  var lookup = opt3 && opt3.lookup;
   if (lookup) {
     for (var i7 = 0; i7 < lookup.from.length; i7++) {
       if (linearTickVal === lookup.from[i7]) {
@@ -33392,11 +33392,11 @@ var OrdinalScale = (
       scale: function(val) {
         return this.getRawOrdinalNumber(mathRound(this._mapper.scale(val)));
       },
-      transformIn: function(val, opt2) {
-        return this._mapper.transformIn(this._getTickNumber(val), opt2);
+      transformIn: function(val, opt3) {
+        return this._mapper.transformIn(this._getTickNumber(val), opt3);
       },
-      transformOut: function(val, opt2) {
-        return this.getRawOrdinalNumber(this._mapper.transformOut(val, opt2));
+      transformOut: function(val, opt3) {
+        return this.getRawOrdinalNumber(this._mapper.transformOut(val, opt3));
       },
       getExtent: function() {
         return this._mapper.getExtent();
@@ -33505,8 +33505,8 @@ var IntervalScale = (
         cfg.intervalPrecision = getIntervalPrecision(cfg.interval);
       }
     };
-    IntervalScale2.prototype.getTicks = function(opt2) {
-      opt2 = opt2 || {};
+    IntervalScale2.prototype.getTicks = function(opt3) {
+      opt3 = opt3 || {};
       var cfg = this._cfg;
       var interval = cfg.interval;
       var extent = getScaleExtentForTickUnsafe(this);
@@ -33519,7 +33519,7 @@ var IntervalScale = (
       if (!interval) {
         return ticks;
       }
-      if (opt2.breakTicks === "only_break" && brkAvailable) {
+      if (opt3.breakTicks === "only_break" && brkAvailable) {
         scaleBreakHelper.addBreaksToTicks(ticks, brk.breaks, extent);
         return ticks;
       }
@@ -33529,7 +33529,7 @@ var IntervalScale = (
       var safeLimit = 3e3;
       if (extent[0] < niceExtent[0]) {
         ticks.push({
-          value: opt2.expandToNicedExtent ? round(niceExtent[0] - interval, intervalPrecision) : extent[0]
+          value: opt3.expandToNicedExtent ? round(niceExtent[0] - interval, intervalPrecision) : extent[0]
         });
       }
       var estimateNiceMultiple = function(tickVal, targetTick) {
@@ -33573,15 +33573,15 @@ var IntervalScale = (
       var lastNiceTick = ticks.length ? ticks[ticks.length - 1].value : niceExtent[1];
       if (extent[1] > lastNiceTick) {
         ticks.push({
-          value: opt2.expandToNicedExtent ? round(lastNiceTick + interval, intervalPrecision) : extent[1]
+          value: opt3.expandToNicedExtent ? round(lastNiceTick + interval, intervalPrecision) : extent[1]
         });
       }
       if (brkAvailable) {
-        scaleBreakHelper.pruneTicksByBreak(opt2.pruneByBreak, ticks, brk.breaks, function(item) {
+        scaleBreakHelper.pruneTicksByBreak(opt3.pruneByBreak, ticks, brk.breaks, function(item) {
           return item.value;
         }, cfg.interval, extent);
       }
-      if (brkAvailable && opt2.breakTicks !== "none") {
+      if (brkAvailable && opt3.breakTicks !== "none") {
         scaleBreakHelper.addBreaksToTicks(ticks, brk.breaks, extent);
       }
       return ticks;
@@ -33589,11 +33589,11 @@ var IntervalScale = (
     IntervalScale2.prototype.getMinorTicks = function(splitNumber) {
       return getMinorTicks(this, splitNumber, getBreaksUnsafe(this), this._cfg.interval);
     };
-    IntervalScale2.prototype.getLabel = function(tick, opt2) {
+    IntervalScale2.prototype.getLabel = function(tick, opt3) {
       if (tick == null) {
         return "";
       }
-      var precision = opt2 && opt2.precision;
+      var precision = opt3 && opt3.precision;
       if (precision == null) {
         precision = getPrecision(tick.value) || 0;
       } else if (precision === "auto") {
@@ -33643,8 +33643,8 @@ var TimeScale = (
     TimeScale2.prototype.getFormattedLabel = function(tick, idx, labelFormatter) {
       return leveledFormat(tick, idx, labelFormatter, this._locale, this._useUTC);
     };
-    TimeScale2.prototype.getTicks = function(opt2) {
-      opt2 = opt2 || {};
+    TimeScale2.prototype.getTicks = function(opt3) {
+      opt3 = opt3 || {};
       var interval = this._interval;
       var extent = getScaleExtentForTickUnsafe(this);
       var scaleBreakHelper = getScaleBreakHelper();
@@ -33655,7 +33655,7 @@ var TimeScale = (
         return ticks;
       }
       var useUTC = this._useUTC;
-      if (brkAvailable && opt2.breakTicks === "only_break") {
+      if (brkAvailable && opt3.breakTicks === "only_break") {
         getScaleBreakHelper().addBreaksToTicks(ticks, brk.breaks, extent);
         return ticks;
       }
@@ -33669,11 +33669,11 @@ var TimeScale = (
         }
       });
       if (brkAvailable) {
-        getScaleBreakHelper().pruneTicksByBreak(opt2.pruneByBreak, ticks, brk.breaks, function(item) {
+        getScaleBreakHelper().pruneTicksByBreak(opt3.pruneByBreak, ticks, brk.breaks, function(item) {
           return item.value;
         }, this._approxInterval, extent);
       }
-      if (brkAvailable && opt2.breakTicks !== "none") {
+      if (brkAvailable && opt3.breakTicks !== "none") {
         getScaleBreakHelper().addBreaksToTicks(ticks, brk.breaks, extent, function(trimmedBrk) {
           var lowerBrkUnitIndex = Math.max(indexOf(primaryTimeUnits, getUnitFromValue(trimmedBrk.vmin, useUTC)), indexOf(primaryTimeUnits, getUnitFromValue(trimmedBrk.vmax, useUTC)));
           var upperBrkUnitIndex = 0;
@@ -33697,10 +33697,10 @@ var TimeScale = (
     TimeScale2.prototype.getMinorTicks = function(splitNumber) {
       return getMinorTicks(this, splitNumber, getBreaksUnsafe(this), this._interval);
     };
-    TimeScale2.prototype.setTimeInterval = function(opt2) {
-      this._interval = opt2.interval;
-      this._approxInterval = opt2.approxInterval;
-      this._minLevelUnit = opt2.minLevelUnit;
+    TimeScale2.prototype.setTimeInterval = function(opt3) {
+      this._interval = opt3.interval;
+      this._approxInterval = opt3.approxInterval;
+      this._minLevelUnit = opt3.minLevelUnit;
     };
     TimeScale2.parse = function(val) {
       return isNumber(val) ? Math.round(val) : +parseDate(val);
@@ -33971,7 +33971,7 @@ function createIntervalTicks(bottomUnitName, approxInterval, isUTC, extent, inne
   }
   return ticks;
 }
-var calcNiceForTimeScale = function(scale3, opt2) {
+var calcNiceForTimeScale = function(scale3, opt3) {
   var extent = scale3.getExtent();
   if (extent[0] === extent[1]) {
     extent[0] -= ONE_DAY;
@@ -33983,10 +33983,10 @@ var calcNiceForTimeScale = function(scale3, opt2) {
     extent[0] = extent[1] - ONE_DAY;
   }
   scale3.setExtent(extent[0], extent[1]);
-  var splitNumber = ensureValidSplitNumber(opt2.splitNumber, 10);
+  var splitNumber = ensureValidSplitNumber(opt3.splitNumber, 10);
   var approxInterval = getScaleLinearSpanEffective(scale3) / splitNumber;
-  var minInterval = opt2.minInterval;
-  var maxInterval = opt2.maxInterval;
+  var minInterval = opt3.minInterval;
+  var maxInterval = opt3.maxInterval;
   if (minInterval != null && approxInterval < minInterval) {
     approxInterval = minInterval;
   }
@@ -34046,7 +34046,7 @@ var LogScale = (
       enableScaleMapperFreeze(_this, _this.intervalStub);
       return _this;
     }
-    LogScale2.prototype.getTicks = function(opt2) {
+    LogScale2.prototype.getTicks = function(opt3) {
       var base2 = this.base;
       var powStub = this.powStub;
       var scaleBreakHelper = getScaleBreakHelper();
@@ -34059,7 +34059,7 @@ var LogScale = (
           to: powExtent
         }
       };
-      return map(intervalStub.getTicks(opt2 || {}), function(tick) {
+      return map(intervalStub.getTicks(opt3 || {}), function(tick) {
         var val = tick.value;
         var powVal = logScalePowTick(val, base2, powOpt);
         var vBreak;
@@ -34085,8 +34085,8 @@ var LogScale = (
         this.intervalStub.getConfig().interval
       );
     };
-    LogScale2.prototype.getLabel = function(data, opt2) {
-      return this.intervalStub.getLabel(data, opt2);
+    LogScale2.prototype.getLabel = function(data, opt3) {
+      return this.intervalStub.getLabel(data, opt3);
     };
     LogScale2.type = "log";
     LogScale2.mapperMethods = {
@@ -34099,12 +34099,12 @@ var LogScale = (
       scale: function(val) {
         return logScalePowTick(this.intervalStub.scale(val), this.base, null);
       },
-      transformIn: function(val, opt2) {
+      transformIn: function(val, opt3) {
         val = logScaleLogTick(val, this.base);
-        return opt2 && opt2.depth === SCALE_MAPPER_DEPTH_OUT_OF_BREAK ? val : this.intervalStub.transformIn(val, opt2);
+        return opt3 && opt3.depth === SCALE_MAPPER_DEPTH_OUT_OF_BREAK ? val : this.intervalStub.transformIn(val, opt3);
       },
-      transformOut: function(val, opt2) {
-        var depth = opt2 ? opt2.depth : null;
+      transformOut: function(val, opt3) {
+        var depth = opt3 ? opt3.depth : null;
         tmpTransformOutOpt1.depth = depth;
         tmpTransformOutOpt2.lookup = this._lookup;
         return logScalePowTick(depth === SCALE_MAPPER_DEPTH_OUT_OF_BREAK ? val : this.intervalStub.transformOut(val, tmpTransformOutOpt1), this.base, tmpTransformOutOpt2);
@@ -34319,11 +34319,11 @@ function updateIntervalOrLogScaleForNiceOrAligned(scale3, fixMinMax, oldInterval
   intervalStub.setExtent(newIntervalExtent[0], newIntervalExtent[1]);
   if (isTargetLogScale) {
     var powStub = scale3.powStub;
-    var opt2 = {
+    var opt3 = {
       depth: SCALE_MAPPER_DEPTH_OUT_OF_BREAK
     };
-    var minPow = scale3.transformOut(newIntervalExtent[0], opt2);
-    var maxPow = scale3.transformOut(newIntervalExtent[1], opt2);
+    var minPow = scale3.transformOut(newIntervalExtent[0], opt3);
+    var maxPow = scale3.transformOut(newIntervalExtent[1], opt3);
     var extentChanged = extentDiffers(oldIntervalExtent, newIntervalExtent);
     if (fixMinMax[0] && !extentChanged[0]) {
       minPow = oldOutermostExtent[0];
@@ -34405,9 +34405,9 @@ function eachKeyEachAxis(ecModel, cb) {
     });
   });
 }
-function wrapStatResult(record4) {
+function wrapStatResult(record5) {
   return {
-    liPosMinGap: record4 ? record4.liPosMinGap : void 0
+    liPosMinGap: record5 ? record5.liPosMinGap : void 0
   };
 }
 function eachSeriesOnAxis(axis2, cb) {
@@ -34672,8 +34672,8 @@ function parseBoundaryGapOption(scale3, model) {
   }
   return [parseBoundaryGapOptionItem(boundaryGapOptionArr[0]), parseBoundaryGapOptionItem(boundaryGapOptionArr[1])];
 }
-function parseBoundaryGapOptionItem(opt2) {
-  return parsePercent(typeof opt2 === "boolean" ? 0 : opt2, 1) || 0;
+function parseBoundaryGapOptionItem(opt3) {
+  return parsePercent(typeof opt3 === "boolean" ? 0 : opt3, 1) || 0;
 }
 function ensureScaleStore(axisLike) {
   var store = scaleInner(axisLike.scale);
@@ -34822,19 +34822,19 @@ function adoptScaleExtentKindMapping(axis2, scale3, rawExtentResult, ecModel) {
 }
 
 // node_modules/echarts/lib/coord/axisNiceTicks.js
-function calcNiceForIntervalOrLogScale(scale3, opt2) {
+function calcNiceForIntervalOrLogScale(scale3, opt3) {
   var isTargetLogScale = isLogScale(scale3);
   var intervalStub = isTargetLogScale ? scale3.intervalStub : scale3;
-  var fixMinMax = opt2.fixMinMax || [];
+  var fixMinMax = opt3.fixMinMax || [];
   var oldOutermostExtent = isTargetLogScale ? scale3.getExtent() : null;
   var oldIntervalExtent = intervalStub.getExtent();
-  var newIntervalExtent = intervalScaleEnsureValidExtent(oldIntervalExtent, fixMinMax, opt2.rawExtentResult);
+  var newIntervalExtent = intervalScaleEnsureValidExtent(oldIntervalExtent, fixMinMax, opt3.rawExtentResult);
   intervalStub.setExtent(newIntervalExtent[0], newIntervalExtent[1]);
   newIntervalExtent = intervalStub.getExtent();
-  var config = isTargetLogScale ? logScaleCalcNiceTicks(intervalStub, opt2) : intervalScaleCalcNiceTicks(intervalStub, opt2);
+  var config = isTargetLogScale ? logScaleCalcNiceTicks(intervalStub, opt3) : intervalScaleCalcNiceTicks(intervalStub, opt3);
   var autoIntervalPrecision = config.intervalPrecision;
   var autoInterval = config.interval;
-  var userInterval = opt2.userInterval;
+  var userInterval = opt3.userInterval;
   if (userInterval != null) {
     config.interval = userInterval;
     config.intervalPrecision = getIntervalPrecision(userInterval);
@@ -34850,14 +34850,14 @@ function calcNiceForIntervalOrLogScale(scale3, opt2) {
   }
   updateIntervalOrLogScaleForNiceOrAligned(scale3, fixMinMax, oldIntervalExtent, newIntervalExtent, oldOutermostExtent, config);
 }
-function intervalScaleCalcNiceTicks(scale3, opt2) {
-  var splitNumber = ensureValidSplitNumber(opt2.splitNumber, 5);
+function intervalScaleCalcNiceTicks(scale3, opt3) {
+  var splitNumber = ensureValidSplitNumber(opt3.splitNumber, 5);
   var span = getScaleLinearSpanEffective(scale3);
   if (true) {
     assert(isFinite(span) && span > 0);
   }
-  var minInterval = opt2.minInterval;
-  var maxInterval = opt2.maxInterval;
+  var minInterval = opt3.minInterval;
+  var maxInterval = opt3.maxInterval;
   var interval = nice(span / splitNumber, true);
   if (minInterval != null && interval < minInterval) {
     interval = minInterval;
@@ -34874,8 +34874,8 @@ function intervalScaleCalcNiceTicks(scale3, opt2) {
     niceExtent
   };
 }
-function logScaleCalcNiceTicks(intervalStub, opt2) {
-  var splitNumber = ensureValidSplitNumber(opt2.splitNumber, 10);
+function logScaleCalcNiceTicks(intervalStub, opt3) {
+  var splitNumber = ensureValidSplitNumber(opt3.splitNumber, 10);
   var intervalExtent = intervalStub.getExtent();
   var span = getScaleLinearSpanEffective(intervalStub);
   if (true) {
@@ -34922,8 +34922,8 @@ function scaleCalcNice2(scale3, model, axis2, ecModel, externalDataExtent) {
     scale3.freeze();
   }
 }
-function scaleCalcNiceDirectly(scale3, opt2) {
-  scaleCalcNiceMethods[scale3.type](scale3, opt2);
+function scaleCalcNiceDirectly(scale3, opt3) {
+  scaleCalcNiceMethods[scale3.type](scale3, opt3);
 }
 var scaleCalcNiceMethods = {
   interval: calcNiceForIntervalOrLogScale,
@@ -35063,7 +35063,7 @@ function createAxisLabels(axis2, ctx) {
   }
   return axis2.type === "category" ? makeCategoryLabels(axis2, ctx) : makeRealNumberLabels(axis2);
 }
-function createAxisTicks(axis2, tickModel, opt2) {
+function createAxisTicks(axis2, tickModel, opt3) {
   var scale3 = axis2.scale;
   var custom = axis2.getTickModel().get("customValues");
   if (custom) {
@@ -35072,7 +35072,7 @@ function createAxisTicks(axis2, tickModel, opt2) {
     };
   }
   return axis2.type === "category" ? makeCategoryTicks(axis2, tickModel) : {
-    ticks: scale3.getTicks(opt2)
+    ticks: scale3.getTicks(opt3)
   };
 }
 function parseTickLabelCustomValues(customValues, scale3) {
@@ -35303,15 +35303,15 @@ function makeTicksLabelsByCategoryIntervalNumOrCb(axis2, categoryInterval, onlyT
 
 // node_modules/echarts/lib/coord/axisBand.js
 var FALLBACK_BAND_WIDTH_RATIO = 0.8;
-function calcBandWidth(axis2, opt2) {
-  opt2 = opt2 || {};
+function calcBandWidth(axis2, opt3) {
+  opt3 = opt3 || {};
   var out2 = {
     w: NaN,
     w2: NaN
   };
   var scale3 = axis2.scale;
-  var fromStat = opt2.fromStat;
-  var min3 = opt2.min;
+  var fromStat = opt3.fromStat;
+  var min3 = opt3.min;
   var scaleLinearSpan = getScaleLinearSpanForMapping(scale3);
   if (!isNullableNumberFinite(scaleLinearSpan)) {
     scaleLinearSpan = NaN;
@@ -35410,12 +35410,12 @@ var Axis = (
     Axis2.prototype.pointToData = function(point, clamp2) {
       return;
     };
-    Axis2.prototype.getTicksCoords = function(opt2) {
-      opt2 = opt2 || {};
-      var tickModel = opt2.tickModel || this.getTickModel();
+    Axis2.prototype.getTicksCoords = function(opt3) {
+      opt3 = opt3 || {};
+      var tickModel = opt3.tickModel || this.getTickModel();
       var result2 = createAxisTicks(this, tickModel, {
-        breakTicks: opt2.breakTicks,
-        pruneByBreak: opt2.pruneByBreak
+        breakTicks: opt3.breakTicks,
+        pruneByBreak: opt3.pruneByBreak
       });
       var preTicksCoords = map(result2.ticks, function(tick) {
         return {
@@ -35534,15 +35534,15 @@ function ensureLabelLayoutWithGeometry(labelLayout) {
   }
   return labelLayout;
 }
-function computeLabelGeometry(out2, label2, opt2) {
+function computeLabelGeometry(out2, label2, opt3) {
   var rawTransform = label2.getComputedTransform();
   out2.transform = ensureCopyTransform(out2.transform, rawTransform);
   var outLocalRect = out2.localRect = ensureCopyRect(out2.localRect, label2.getBoundingRect());
   var labelStyleExt = label2.style;
   var margin = labelStyleExt.margin;
-  var marginForce = opt2 && opt2.marginForce;
-  var minMarginForce = opt2 && opt2.minMarginForce;
-  var marginDefault = opt2 && opt2.marginDefault;
+  var marginForce = opt3 && opt3.marginForce;
+  var minMarginForce = opt3 && opt3.minMarginForce;
+  var marginDefault = opt3 && opt3.marginDefault;
   var marginType = labelStyleExt.__marginType;
   if (marginType == null && marginDefault) {
     margin = marginDefault;
@@ -35696,21 +35696,21 @@ var LineSeriesModel = (
         useEncodeDefaulter: true
       });
     };
-    LineSeriesModel2.prototype.getLegendIcon = function(opt2) {
+    LineSeriesModel2.prototype.getLegendIcon = function(opt3) {
       var group = new Group_default();
-      var line = createSymbol("line", 0, opt2.itemHeight / 2, opt2.itemWidth, 0, opt2.lineStyle.stroke, false);
+      var line = createSymbol("line", 0, opt3.itemHeight / 2, opt3.itemWidth, 0, opt3.lineStyle.stroke, false);
       group.add(line);
-      line.setStyle(opt2.lineStyle);
+      line.setStyle(opt3.lineStyle);
       var visualType = this.getData().getVisual("symbol");
       var visualRotate = this.getData().getVisual("symbolRotate");
       var symbolType = visualType === "none" ? "circle" : visualType;
-      var size = opt2.itemHeight * 0.8;
-      var symbol = createSymbol(symbolType, (opt2.itemWidth - size) / 2, (opt2.itemHeight - size) / 2, size, size, opt2.itemStyle.fill);
+      var size = opt3.itemHeight * 0.8;
+      var symbol = createSymbol(symbolType, (opt3.itemWidth - size) / 2, (opt3.itemHeight - size) / 2, size, size, opt3.itemStyle.fill);
       group.add(symbol);
-      symbol.setStyle(opt2.itemStyle);
-      var symbolRotate = opt2.iconRotate === "inherit" ? visualRotate : opt2.iconRotate || 0;
+      symbol.setStyle(opt3.itemStyle);
+      var symbolRotate = opt3.iconRotate === "inherit" ? visualRotate : opt3.iconRotate || 0;
       symbol.rotation = symbolRotate * Math.PI / 180;
-      symbol.setOrigin([opt2.itemWidth / 2, opt2.itemHeight / 2]);
+      symbol.setOrigin([opt3.itemWidth / 2, opt3.itemHeight / 2]);
       if (symbolType.indexOf("empty") > -1) {
         symbol.style.stroke = symbol.style.fill;
         symbol.style.fill = tokens_default.color.neutral00;
@@ -36009,12 +36009,12 @@ var Symbol2 = (
     Symbol3.prototype.setSymbolScale = function(scale3) {
       this.scaleX = this.scaleY = scale3;
     };
-    Symbol3.prototype.fadeOut = function(cb, seriesModel, opt2) {
+    Symbol3.prototype.fadeOut = function(cb, seriesModel, opt3) {
       var symbolPath = this.childAt(0);
       var dataIndex = getECData(this).dataIndex;
-      var animationOpt = opt2 && opt2.animation;
+      var animationOpt = opt3 && opt3.animation;
       this.silent = symbolPath.silent = true;
-      if (opt2 && opt2.fadeLabel) {
+      if (opt3 && opt3.fadeLabel) {
         var textContent = symbolPath.getTextContent();
         if (textContent) {
           removeElement(textContent, {
@@ -36059,16 +36059,16 @@ function driftSymbol(dx, dy) {
 var Symbol_default = Symbol2;
 
 // node_modules/echarts/lib/chart/helper/SymbolDraw.js
-function symbolNeedsDraw(data, point, idx, opt2) {
-  return point && !isNaN(point[0]) && !isNaN(point[1]) && !(opt2 && opt2.isIgnore && opt2.isIgnore(idx)) && !(opt2 && opt2.clipShape && !opt2.clipShape.contain(point[0], point[1])) && data.getItemVisual(idx, "symbol") !== "none";
+function symbolNeedsDraw(data, point, idx, opt3) {
+  return point && !isNaN(point[0]) && !isNaN(point[1]) && !(opt3 && opt3.isIgnore && opt3.isIgnore(idx)) && !(opt3 && opt3.clipShape && !opt3.clipShape.contain(point[0], point[1])) && data.getItemVisual(idx, "symbol") !== "none";
 }
-function normalizeUpdateOpt(opt2) {
-  if (opt2 != null && !isObject(opt2)) {
-    opt2 = {
-      isIgnore: opt2
+function normalizeUpdateOpt(opt3) {
+  if (opt3 != null && !isObject(opt3)) {
+    opt3 = {
+      isIgnore: opt3
     };
   }
-  return opt2 || {};
+  return opt3 || {};
 }
 function makeSeriesScope(data) {
   var seriesModel = data.hostModel;
@@ -36099,19 +36099,19 @@ var SymbolDraw = (
       this.group = new Group_default();
       this._SymbolCtor = SymbolCtor || Symbol_default;
     }
-    SymbolDraw2.prototype.updateData = function(data, opt2) {
+    SymbolDraw2.prototype.updateData = function(data, opt3) {
       this._progressiveEls = null;
-      opt2 = normalizeUpdateOpt(opt2);
+      opt3 = normalizeUpdateOpt(opt3);
       var group = this.group;
       var seriesModel = data.hostModel;
       var oldData = this._data;
       var SymbolCtor = this._SymbolCtor;
-      var disableAnimation = opt2.disableAnimation;
+      var disableAnimation = opt3.disableAnimation;
       var seriesScope = this._seriesScope = makeSeriesScope(data);
       var symbolUpdateOpt = {
         disableAnimation
       };
-      var getSymbolPoint = opt2.getSymbolPoint || function(idx) {
+      var getSymbolPoint = opt3.getSymbolPoint || function(idx) {
         return data.getItemLayout(idx);
       };
       if (!oldData) {
@@ -36119,13 +36119,13 @@ var SymbolDraw = (
       }
       data.diff(oldData).add(function(newIdx) {
         var point = getSymbolPoint(newIdx);
-        if (symbolNeedsDraw(data, point, newIdx, opt2)) {
+        if (symbolNeedsDraw(data, point, newIdx, opt3)) {
           createEl(SymbolCtor, data, newIdx, seriesScope, symbolUpdateOpt, point, group);
         }
       }).update(function(newIdx, oldIdx) {
         var symbolEl = oldData.getItemGraphicEl(oldIdx);
         var point = getSymbolPoint(newIdx);
-        if (!symbolNeedsDraw(data, point, newIdx, opt2)) {
+        if (!symbolNeedsDraw(data, point, newIdx, opt3)) {
           group.remove(symbolEl);
           return;
         }
@@ -36155,7 +36155,7 @@ var SymbolDraw = (
       this._data = data;
     };
     ;
-    SymbolDraw2.prototype.updateLayout = function(opt2) {
+    SymbolDraw2.prototype.updateLayout = function(opt3) {
       var data = this._data;
       if (!data) {
         return;
@@ -36165,7 +36165,7 @@ var SymbolDraw = (
       for (var idx = 0, len2 = store.count(); idx < len2; idx++) {
         var el = data.getItemGraphicEl(idx);
         var point = symbolDraw._getSymbolPoint(idx);
-        if (symbolNeedsDraw(data, point, idx, opt2)) {
+        if (symbolNeedsDraw(data, point, idx, opt3)) {
           el = el || createEl(symbolDraw._SymbolCtor, data, idx, symbolDraw._seriesScope, {
             disableAnimation: true
           }, point, symbolDraw.group);
@@ -36185,9 +36185,9 @@ var SymbolDraw = (
       this.group.removeAll();
     };
     ;
-    SymbolDraw2.prototype.incrementalUpdate = function(taskParams, data, incrementalId, opt2) {
+    SymbolDraw2.prototype.incrementalUpdate = function(taskParams, data, incrementalId, opt3) {
       this._progressiveEls = [];
-      opt2 = normalizeUpdateOpt(opt2);
+      opt3 = normalizeUpdateOpt(opt3);
       function updateIncrementalAndHover(el2) {
         if (!el2.isGroup) {
           el2.incremental = incrementalId;
@@ -36196,7 +36196,7 @@ var SymbolDraw = (
       }
       for (var idx = taskParams.start; idx < taskParams.end; idx++) {
         var point = data.getItemLayout(idx);
-        if (symbolNeedsDraw(data, point, idx, opt2)) {
+        if (symbolNeedsDraw(data, point, idx, opt3)) {
           var el = new this._SymbolCtor(data, idx, this._seriesScope);
           el.traverse(updateIncrementalAndHover);
           el.setPosition(point);
@@ -37776,7 +37776,7 @@ var LineView = (
             inheritColor,
             labelFetcher: seriesModel,
             labelDataIndex: dataIndex,
-            defaultText: function(dataIndex2, opt2, interpolatedValue) {
+            defaultText: function(dataIndex2, opt3, interpolatedValue) {
               return interpolatedValue != null ? getDefaultInterpolatedLabel(data_2, interpolatedValue) : getDefaultLabel(data_2, dataIndex2);
             },
             enableTextSetter: true
@@ -38191,7 +38191,7 @@ var AxisBuilderSharedContext = (
 );
 function resetOverlapRecordToShared(cfg, shared, axisModel, labelLayoutList) {
   var axis2 = axisModel.axis;
-  var record4 = shared.ensureRecord(axisModel);
+  var record5 = shared.ensureRecord(axisModel);
   var labelInfoList = [];
   var stOccupiedRect;
   var useStOccupiedRect = hasAxisName(cfg.axisName) && isNameLocationCenter(cfg.nameLocation);
@@ -38201,7 +38201,7 @@ function resetOverlapRecordToShared(cfg, shared, axisModel, labelLayoutList) {
       return;
     }
     labelInfoList.push(layoutInfo);
-    var transGroup = record4.transGroup;
+    var transGroup = record5.transGroup;
     if (useStOccupiedRect) {
       transGroup.transform ? invert(_stTransTmp, transGroup.transform) : identity(_stTransTmp);
       if (layoutInfo.transform) {
@@ -38212,8 +38212,8 @@ function resetOverlapRecordToShared(cfg, shared, axisModel, labelLayoutList) {
       stOccupiedRect ? stOccupiedRect.union(_stLabelRectTmp) : BoundingRect_default.copy(stOccupiedRect = new BoundingRect_default(0, 0, 0, 0), _stLabelRectTmp);
     }
   });
-  var sortByDim = Math.abs(record4.dirVec.x) > 0.1 ? "x" : "y";
-  var sortByValue = record4.transGroup[sortByDim];
+  var sortByDim = Math.abs(record5.dirVec.x) > 0.1 ? "x" : "y";
+  var sortByValue = record5.transGroup[sortByDim];
   labelInfoList.sort(function(info1, info2) {
     return Math.abs(info1.label[sortByDim] - sortByValue) - Math.abs(info2.label[sortByDim] - sortByValue);
   });
@@ -38223,8 +38223,8 @@ function resetOverlapRecordToShared(cfg, shared, axisModel, labelLayoutList) {
     var axisLineWidth = Math.max(extent[0], extent[1]) - axisLineX;
     stOccupiedRect.union(new BoundingRect_default(axisLineX, 0, axisLineWidth, 1));
   }
-  record4.stOccupiedRect = stOccupiedRect;
-  record4.labelInfoList = labelInfoList;
+  record5.stOccupiedRect = stOccupiedRect;
+  record5.labelInfoList = labelInfoList;
 }
 var _stTransTmp = create2();
 var _stLabelRectTmp = new BoundingRect_default(0, 0, 0, 0);
@@ -38260,23 +38260,23 @@ function moveIfOverlapByLinearLabels(baseLayoutInfoList, baseDirVec, movableLayo
 var AxisBuilder = (
   /** @class */
   (function() {
-    function AxisBuilder2(axisModel, api, opt2, shared) {
+    function AxisBuilder2(axisModel, api, opt3, shared) {
       this.group = new Group_default();
       this._axisModel = axisModel;
       this._api = api;
       this._local = {};
       this._shared = shared || new AxisBuilderSharedContext(resolveAxisNameOverlapDefault);
-      this._resetCfgDetermined(opt2);
+      this._resetCfgDetermined(opt3);
     }
-    AxisBuilder2.prototype.updateCfg = function(opt2) {
+    AxisBuilder2.prototype.updateCfg = function(opt3) {
       if (true) {
         var ready = this._shared.ensureRecord(this._axisModel).ready;
         assert(!ready.axisLine && !ready.axisTickLabelDetermine);
         ready.axisName = ready.axisTickLabelEstimate = false;
       }
       var raw = this._cfg.raw;
-      raw.position = opt2.position;
-      raw.labelOffset = opt2.labelOffset;
+      raw.position = opt3.position;
+      raw.labelOffset = opt3.labelOffset;
       this._resetCfgDetermined(raw);
     };
     AxisBuilder2.prototype.__getRawCfg = function() {
@@ -38317,9 +38317,9 @@ var AxisBuilder = (
       });
       transformGroup.updateTransform();
       this._transformGroup = transformGroup;
-      var record4 = this._shared.ensureRecord(axisModel);
-      record4.transGroup = this._transformGroup;
-      record4.dirVec = new Point_default(Math.cos(-cfg.rotation), Math.sin(-cfg.rotation));
+      var record5 = this._shared.ensureRecord(axisModel);
+      record5.transGroup = this._transformGroup;
+      record5.dirVec = new Point_default(Math.cos(-cfg.rotation), Math.sin(-cfg.rotation));
     };
     AxisBuilder2.prototype.build = function(axisPartNameMap, extraParams) {
       var _this = this;
@@ -38608,11 +38608,11 @@ var builders = {
     group.add(textEl);
     textEl.decomposeTransform();
     if (cfg.shouldNameMoveOverlap && nameLayout) {
-      var record4 = shared.ensureRecord(axisModel);
+      var record5 = shared.ensureRecord(axisModel);
       if (true) {
-        assert(record4.labelInfoList);
+        assert(record5.labelInfoList);
       }
-      shared.resolveAxisNameOverlap(cfg, shared, axisModel, nameLayout, nameMoveDirVec, record4);
+      shared.resolveAxisNameOverlap(cfg, shared, axisModel, nameLayout, nameMoveDirVec, record5);
     }
   }
 };
@@ -39038,8 +39038,8 @@ function adjustBreakLabels(axisModel, axisRotation, labelLayoutList) {
 var AxisBuilder_default = AxisBuilder;
 
 // node_modules/echarts/lib/coord/cartesian/cartesianAxisHelper.js
-function layout(rect, axisModel, opt2) {
-  opt2 = opt2 || {};
+function layout(rect, axisModel, opt3) {
+  opt3 = opt3 || {};
   var axis2 = axisModel.axis;
   var layout2 = {};
   var otherAxisOnZeroOf = axis2.getAxesOnZeroOf()[0];
@@ -39073,7 +39073,7 @@ function layout(rect, axisModel, opt2) {
   if (axisModel.get(["axisTick", "inside"])) {
     layout2.tickDirection = -layout2.tickDirection;
   }
-  if (retrieve(opt2.labelInside, axisModel.get(["axisLabel", "inside"]))) {
+  if (retrieve(opt3.labelInside, axisModel.get(["axisLabel", "inside"]))) {
     layout2.labelDirection = -layout2.labelDirection;
   }
   var labelRotate = axisModel.get(["axisLabel", "rotate"]);
@@ -39189,23 +39189,23 @@ var GridModel_default = GridModel;
 // node_modules/echarts/lib/layout/barGrid.js
 var callOnlyOnce2 = makeCallOnlyOnce();
 var STACK_PREFIX = "__ec_stack_";
-function computeBarLayoutForCustomSeries(opt2) {
-  if (!isOrdinalScale(opt2.axis.scale)) {
+function computeBarLayoutForCustomSeries(opt3) {
+  if (!isOrdinalScale(opt3.axis.scale)) {
     return;
   }
-  var bandWidthResult = calcBandWidth(opt2.axis);
+  var bandWidthResult = calcBandWidth(opt3.axis);
   var params = [];
-  for (var i7 = 0; i7 < opt2.count || 0; i7++) {
+  for (var i7 = 0; i7 < opt3.count || 0; i7++) {
     params.push(defaults({
       stackId: STACK_PREFIX + i7
-    }, opt2));
+    }, opt3));
   }
   var widthAndOffsets = calcBarWidthAndOffset({
     bandWidthResult,
     seriesInfo: params
   });
   var result2 = [];
-  for (var i7 = 0; i7 < opt2.count; i7++) {
+  for (var i7 = 0; i7 < opt3.count; i7++) {
     var item = widthAndOffsets[STACK_PREFIX + i7];
     item.offsetCenter = item.offset + item.width / 2;
     result2.push(item);
@@ -41134,13 +41134,13 @@ var RoamController = (
       return this._pinching;
     };
     RoamController2.prototype._checkPointer = function(e9, x2, y3) {
-      var opt2 = this._opt;
-      var zInfoParsed = opt2.zInfoParsed;
-      if (onIrrelevantElement(e9, opt2.api, zInfoParsed.component)) {
+      var opt3 = this._opt;
+      var zInfoParsed = opt3.zInfoParsed;
+      if (onIrrelevantElement(e9, opt3.api, zInfoParsed.component)) {
         return false;
       }
       ;
-      var triggerInfo = opt2.triggerInfo;
+      var triggerInfo = opt3.triggerInfo;
       var roamTrigger = triggerInfo.roamTrigger;
       var inArea = false;
       if (roamTrigger === "global") {
@@ -42640,11 +42640,11 @@ function matrixPrepareCustom(coordSys) {
       height: rect.height
     },
     api: {
-      coord: function(data, opt2) {
-        return coordSys.dataToPoint(data, opt2);
+      coord: function(data, opt3) {
+        return coordSys.dataToPoint(data, opt3);
       },
-      layout: function(data, opt2) {
-        return coordSys.dataToLayout(data, opt2);
+      layout: function(data, opt3) {
+        return coordSys.dataToLayout(data, opt3);
       }
     }
   };
@@ -43502,13 +43502,13 @@ function makeRenderItem(customSeries, data, ecModel, api) {
     var itemStyle = getItemStyleModel(dataIndexInside, NORMAL).getItemStyle();
     visualColor != null && (itemStyle.fill = visualColor);
     opacity != null && (itemStyle.opacity = opacity);
-    var opt2 = {
+    var opt3 = {
       inheritColor: isString(visualColor) ? visualColor : tokens_default.color.neutral99
     };
     var labelModel = getLabelModel(dataIndexInside, NORMAL);
-    var textStyle = createTextStyle(labelModel, null, opt2, false, true);
+    var textStyle = createTextStyle(labelModel, null, opt3, false, true);
     textStyle.text = labelModel.getShallow("show") ? retrieve2(customSeries.getFormattedLabel(dataIndexInside, NORMAL), getDefaultLabel(data, dataIndexInside)) : null;
-    var textConfig = createTextConfig(labelModel, opt2, false);
+    var textConfig = createTextConfig(labelModel, opt3, false);
     preFetchFromExtra(userProps, itemStyle);
     itemStyle = convertToEC4StyleForCustomSerise(itemStyle, textStyle, textConfig);
     userProps && applyUserPropsAfter(itemStyle, userProps);
@@ -43554,19 +43554,19 @@ function makeRenderItem(customSeries, data, ecModel, api) {
       return data.getItemVisual(dataIndexInside, visualType);
     }
   }
-  function barLayout(opt2) {
+  function barLayout(opt3) {
     if (coordSys.type === "cartesian2d") {
       var baseAxis = coordSys.getBaseAxis();
       return computeBarLayoutForCustomSeries(defaults({
         axis: baseAxis
-      }, opt2));
+      }, opt3));
     }
   }
   function currentSeriesIndices() {
     return ecModel.getCurrentSeriesIndices();
   }
-  function font(opt2) {
-    return getFont(opt2, ecModel);
+  function font(opt3) {
+    return getFont(opt3, ecModel);
   }
 }
 function wrapEncodeDef(data) {
@@ -44166,16 +44166,16 @@ function confineInContainer(position, width, height, api) {
   position[0] = Math.max(position[0], 0);
   position[1] = Math.max(position[1], 0);
 }
-function getValueLabel(value2, axis2, ecModel, seriesDataIndices, opt2) {
+function getValueLabel(value2, axis2, ecModel, seriesDataIndices, opt3) {
   value2 = axis2.scale.parse(value2);
   var text4 = axis2.scale.getLabel({
     value: value2
   }, {
     // If `precision` is set, width can be fixed (like '12.00500'), which
     // helps to debounce when when moving label.
-    precision: opt2.precision
+    precision: opt3.precision
   });
-  var formatter = opt2.formatter;
+  var formatter = opt3.formatter;
   if (formatter) {
     var params_1 = {
       value: getAxisRawValue(axis2, {
@@ -44313,9 +44313,9 @@ var CartesianAxisPointer = (
   })(BaseAxisPointer_default)
 );
 function getCartesian(grid, axis2) {
-  var opt2 = {};
-  opt2[axis2.dim + "AxisIndex"] = axis2.index;
-  return grid.getCartesian(opt2);
+  var opt3 = {};
+  opt3[axis2.dim + "AxisIndex"] = axis2.index;
+  return grid.getCartesian(opt3);
 }
 var pointerShapeBuilder = {
   line: function(axis2, pixelValue, thisExtent, otherExtent) {
@@ -44419,8 +44419,8 @@ function register(key3, api, handler) {
   var zr = api.getZr();
   inner10(zr).records || (inner10(zr).records = {});
   initGlobalListeners(zr, api);
-  var record4 = inner10(zr).records[key3] || (inner10(zr).records[key3] = {});
-  record4.handler = handler;
+  var record5 = inner10(zr).records[key3] || (inner10(zr).records[key3] = {});
+  record5.handler = handler;
 }
 function initGlobalListeners(zr, api) {
   if (inner10(zr).initialized) {
@@ -44434,8 +44434,8 @@ function initGlobalListeners(zr, api) {
   function useHandler(eventType, cb) {
     zr.on(eventType, function(e9) {
       var dis = makeDispatchAction(api);
-      each5(inner10(zr).records, function(record4) {
-        record4 && cb(record4, e9, dis.dispatchAction);
+      each5(inner10(zr).records, function(record5) {
+        record5 && cb(record5, e9, dis.dispatchAction);
       });
       dispatchTooltipFinally(dis.pendings, api);
     });
@@ -44455,11 +44455,11 @@ function dispatchTooltipFinally(pendings, api) {
     api.dispatchAction(actuallyPayload);
   }
 }
-function onLeave(record4, e9, dispatchAction2) {
-  record4.handler("leave", null, dispatchAction2);
+function onLeave(record5, e9, dispatchAction2) {
+  record5.handler("leave", null, dispatchAction2);
 }
-function doEnter(currTrigger, record4, e9, dispatchAction2) {
-  record4.handler(currTrigger, e9, dispatchAction2);
+function doEnter(currTrigger, record5, e9, dispatchAction2) {
+  record5.handler(currTrigger, e9, dispatchAction2);
 }
 function makeDispatchAction(api) {
   var pendings = {
@@ -44485,8 +44485,8 @@ function unregister(key3, api) {
     return;
   }
   var zr = api.getZr();
-  var record4 = (inner10(zr).records || {})[key3];
-  if (record4) {
+  var record5 = (inner10(zr).records || {})[key3];
+  if (record5) {
     inner10(zr).records[key3] = null;
   }
 }
@@ -45220,21 +45220,21 @@ var DataZoomModel = (
         return this.ecModel.getComponent(getAxisMainType(axisDim), axisIndex);
       }
     };
-    DataZoomModel2.prototype.setRawRange = function(opt2) {
+    DataZoomModel2.prototype.setRawRange = function(opt3) {
       var thisOption = this.option;
       var settledOption = this.settledOption;
       each([["start", "startValue"], ["end", "endValue"]], function(names) {
-        if (opt2[names[0]] != null || opt2[names[1]] != null) {
-          thisOption[names[0]] = settledOption[names[0]] = opt2[names[0]];
-          thisOption[names[1]] = settledOption[names[1]] = opt2[names[1]];
+        if (opt3[names[0]] != null || opt3[names[1]] != null) {
+          thisOption[names[0]] = settledOption[names[0]] = opt3[names[0]];
+          thisOption[names[1]] = settledOption[names[1]] = opt3[names[1]];
         }
       }, this);
-      this._updateRangeUse(opt2);
+      this._updateRangeUse(opt3);
     };
-    DataZoomModel2.prototype.setCalculatedRange = function(opt2) {
+    DataZoomModel2.prototype.setCalculatedRange = function(opt3) {
       var option = this.option;
       each(["start", "startValue", "end", "endValue"], function(name) {
-        option[name] = opt2[name];
+        option[name] = opt3[name];
       });
     };
     DataZoomModel2.prototype.getPercentRange = function() {
@@ -45360,7 +45360,7 @@ var AxisProxy = (
     AxisProxy2.prototype.getMinMaxSpan = function() {
       return clone(this._minMaxSpan);
     };
-    AxisProxy2.prototype.calculateDataWindow = function(opt2) {
+    AxisProxy2.prototype.calculateDataWindow = function(opt3) {
       var dataExtent = this._extent;
       var axis2 = this.getAxisModel().axis;
       var scale3 = axis2.scale;
@@ -45372,8 +45372,8 @@ var AxisProxy = (
       var hasPropModeValue;
       var needRound = [false, false];
       each(["start", "end"], function(prop, idx) {
-        var boundPercent = opt2[prop];
-        var boundValue = opt2[prop + "Value"];
+        var boundPercent = opt3[prop];
+        var boundValue = opt3[prop + "Value"];
         if (rangePropMode[idx] === "percent") {
           boundPercent == null && (boundPercent = percentExtent[idx]);
           boundValue = linearMap(boundPercent, percentExtent, dataExtent);
@@ -45446,14 +45446,14 @@ var AxisProxy = (
       var rawExtentInfo = axis2.scale.rawExtentInfo;
       this._extent = rawExtentInfo.makeNoZoom();
       this._updateMinMaxSpan();
-      var opt2 = dataZoomModel.settledOption;
+      var opt3 = dataZoomModel.settledOption;
       if (alignToPercentInverted) {
-        opt2 = defaults({
+        opt3 = defaults({
           start: alignToPercentInverted[0],
           end: alignToPercentInverted[1]
-        }, opt2);
+        }, opt3);
       }
-      var _a2 = this._window = this.calculateDataWindow(opt2), percent2 = _a2.percent, value2 = _a2.value;
+      var _a2 = this._window = this.calculateDataWindow(opt3), percent2 = _a2.percent, value2 = _a2.value;
       if (percent2[0] !== 0) {
         rawExtentInfo.setZoomMM(0, value2[0]);
       }
@@ -45508,9 +45508,9 @@ var AxisProxy = (
                 return !isInWindow(value2) ? NaN : value2;
               }));
             } else {
-              var range = {};
-              range[dim] = valueWindow;
-              seriesData.selectRange(range);
+              var range2 = {};
+              range2[dim] = valueWindow;
+              seriesData.selectRange(range2);
             }
           });
         }
@@ -45886,7 +45886,7 @@ function makeStyleCoord(out2, zr, container, zrX, zrY) {
 var TooltipHTMLContent = (
   /** @class */
   (function() {
-    function TooltipHTMLContent2(api, opt2) {
+    function TooltipHTMLContent2(api, opt3) {
       this._show = false;
       this._styleCoord = [0, 0, 0, 0];
       this._enterable = true;
@@ -45900,7 +45900,7 @@ var TooltipHTMLContent = (
       el.domBelongToZr = true;
       this.el = el;
       var zr = this._zr = api.getZr();
-      var appendTo = opt2.appendTo;
+      var appendTo = opt3.appendTo;
       var container = appendTo && (isString(appendTo) ? document.querySelector(appendTo) : isDom(appendTo) ? appendTo : isFunction(appendTo) && appendTo(api.getDom()));
       makeStyleCoord(this._styleCoord, zr, container, api.getWidth() / 2, api.getHeight() / 2);
       (container || api.getDom()).appendChild(el);
@@ -47025,8 +47025,8 @@ function checkMarkerInSeries(seriesOpts, markerType) {
 }
 
 // node_modules/echarts/lib/component/marker/MarkerModel.js
-function fillLabel(opt2) {
-  defaultEmphasis(opt2, "label", ["show"]);
+function fillLabel(opt3) {
+  defaultEmphasis(opt3, "label", ["show"]);
 }
 var inner12 = makeInner();
 var MarkerModel = (
@@ -47513,9 +47513,9 @@ var MarkPointView_default = MarkPointView;
 function install7(registers) {
   registers.registerComponentModel(MarkPointModel_default);
   registers.registerComponentView(MarkPointView_default);
-  registers.registerPreprocessor(function(opt2) {
-    if (checkMarkerInSeries(opt2.series, "markPoint")) {
-      opt2.markPoint = opt2.markPoint || {};
+  registers.registerPreprocessor(function(opt3) {
+    if (checkMarkerInSeries(opt3.series, "markPoint")) {
+      opt3.markPoint = opt3.markPoint || {};
     }
   });
 }
@@ -47841,9 +47841,9 @@ var MarkLineView_default = MarkLineView;
 function install8(registers) {
   registers.registerComponentModel(MarkLineModel_default);
   registers.registerComponentView(MarkLineView_default);
-  registers.registerPreprocessor(function(opt2) {
-    if (checkMarkerInSeries(opt2.series, "markLine")) {
-      opt2.markLine = opt2.markLine || {};
+  registers.registerPreprocessor(function(opt3) {
+    if (checkMarkerInSeries(opt3.series, "markLine")) {
+      opt3.markLine = opt3.markLine || {};
     }
   });
 }
@@ -48180,9 +48180,9 @@ var MarkAreaView_default = MarkAreaView;
 function install9(registers) {
   registers.registerComponentModel(MarkAreaModel_default);
   registers.registerComponentView(MarkAreaView_default);
-  registers.registerPreprocessor(function(opt2) {
-    if (checkMarkerInSeries(opt2.series, "markArea")) {
-      opt2.markArea = opt2.markArea || {};
+  registers.registerPreprocessor(function(opt3) {
+    if (checkMarkerInSeries(opt3.series, "markArea")) {
+      opt3.markArea = opt3.markArea || {};
     }
   });
 }
@@ -48264,11 +48264,11 @@ function createCoordSysRecord(api, coordSysModel) {
           return;
         }
         var method = (dzInfo.getRange || {})[eventName];
-        var range = method && method(dzInfo.dzReferCoordSysInfo, coordSysRecord.model.mainType, coordSysRecord.controller, event);
-        !dzInfo.model.get("disabled", true) && range && batch.push({
+        var range2 = method && method(dzInfo.dzReferCoordSysInfo, coordSysRecord.model.mainType, coordSysRecord.controller, event);
+        !dzInfo.model.get("disabled", true) && range2 && batch.push({
           dataZoomId: dzInfo.model.id,
-          start: range[0],
-          end: range[1]
+          start: range2[0],
+          end: range2[1]
         });
       });
       batch.length && coordSysRecord.dispatchAction(batch);
@@ -48418,45 +48418,45 @@ var InsideZoomView = (
 var getRangeHandlers = {
   zoom: function(coordSysInfo, coordSysMainType, controller, e9) {
     var lastRange = this.range;
-    var range = lastRange.slice();
+    var range2 = lastRange.slice();
     var axisModel = coordSysInfo.axisModels[0];
     if (!axisModel) {
       return;
     }
     var directionInfo = getDirectionInfo[coordSysMainType](null, [e9.originX, e9.originY], axisModel, controller, coordSysInfo);
-    var percentPoint = (directionInfo.signal > 0 ? directionInfo.pixelStart + directionInfo.pixelLength - directionInfo.pixel : directionInfo.pixel - directionInfo.pixelStart) / directionInfo.pixelLength * (range[1] - range[0]) + range[0];
+    var percentPoint = (directionInfo.signal > 0 ? directionInfo.pixelStart + directionInfo.pixelLength - directionInfo.pixel : directionInfo.pixel - directionInfo.pixelStart) / directionInfo.pixelLength * (range2[1] - range2[0]) + range2[0];
     var scale3 = Math.max(1 / e9.scale, 0);
-    range[0] = (range[0] - percentPoint) * scale3 + percentPoint;
-    range[1] = (range[1] - percentPoint) * scale3 + percentPoint;
+    range2[0] = (range2[0] - percentPoint) * scale3 + percentPoint;
+    range2[1] = (range2[1] - percentPoint) * scale3 + percentPoint;
     var minMaxSpan = this.dataZoomModel.findRepresentativeAxisProxy().getMinMaxSpan();
-    sliderMove(0, range, [0, 100], 0, minMaxSpan.minSpan, minMaxSpan.maxSpan);
-    this.range = range;
-    if (lastRange[0] !== range[0] || lastRange[1] !== range[1]) {
-      return range;
+    sliderMove(0, range2, [0, 100], 0, minMaxSpan.minSpan, minMaxSpan.maxSpan);
+    this.range = range2;
+    if (lastRange[0] !== range2[0] || lastRange[1] !== range2[1]) {
+      return range2;
     }
   },
-  pan: makeMover(function(range, axisModel, coordSysInfo, coordSysMainType, controller, e9) {
+  pan: makeMover(function(range2, axisModel, coordSysInfo, coordSysMainType, controller, e9) {
     var directionInfo = getDirectionInfo[coordSysMainType]([e9.oldX, e9.oldY], [e9.newX, e9.newY], axisModel, controller, coordSysInfo);
-    return directionInfo.signal * (range[1] - range[0]) * directionInfo.pixel / directionInfo.pixelLength;
+    return directionInfo.signal * (range2[1] - range2[0]) * directionInfo.pixel / directionInfo.pixelLength;
   }),
-  scrollMove: makeMover(function(range, axisModel, coordSysInfo, coordSysMainType, controller, e9) {
+  scrollMove: makeMover(function(range2, axisModel, coordSysInfo, coordSysMainType, controller, e9) {
     var directionInfo = getDirectionInfo[coordSysMainType]([0, 0], [e9.scrollDelta, e9.scrollDelta], axisModel, controller, coordSysInfo);
-    return directionInfo.signal * (range[1] - range[0]) * e9.scrollDelta;
+    return directionInfo.signal * (range2[1] - range2[0]) * e9.scrollDelta;
   })
 };
 function makeMover(getPercentDelta) {
   return function(coordSysInfo, coordSysMainType, controller, e9) {
     var lastRange = this.range;
-    var range = lastRange.slice();
+    var range2 = lastRange.slice();
     var axisModel = coordSysInfo.axisModels[0];
     if (!axisModel) {
       return;
     }
-    var percentDelta = getPercentDelta(range, axisModel, coordSysInfo, coordSysMainType, controller, e9);
-    sliderMove(percentDelta, range, [0, 100], "all");
-    this.range = range;
-    if (lastRange[0] !== range[0] || lastRange[1] !== range[1]) {
-      return range;
+    var percentDelta = getPercentDelta(range2, axisModel, coordSysInfo, coordSysMainType, controller, e9);
+    sliderMove(percentDelta, range2, [0, 100], "all");
+    this.range = range2;
+    if (lastRange[0] !== range2[0] || lastRange[1] !== range2[1]) {
+      return range2;
     }
   };
 }
@@ -49064,9 +49064,9 @@ var SliderZoomView = (
       });
     };
     SliderZoomView2.prototype._resetInterval = function() {
-      var range = this._range = this.dataZoomModel.getPercentRange();
+      var range2 = this._range = this.dataZoomModel.getPercentRange();
       var viewExtent = this._getViewExtent();
-      this._handleEnds = [linearMap(range[0], [0, 100], viewExtent, true), linearMap(range[1], [0, 100], viewExtent, true)];
+      this._handleEnds = [linearMap(range2[0], [0, 100], viewExtent, true), linearMap(range2[1], [0, 100], viewExtent, true)];
     };
     SliderZoomView2.prototype._updateInterval = function(handleIndex, delta) {
       var dataZoomModel = this.dataZoomModel;
@@ -49076,8 +49076,8 @@ var SliderZoomView = (
       var percentExtent = [0, 100];
       sliderMove(delta, handleEnds, viewExtend, dataZoomModel.get("zoomLock") ? "all" : handleIndex, minMaxSpan.minSpan != null ? linearMap(minMaxSpan.minSpan, percentExtent, viewExtend, true) : null, minMaxSpan.maxSpan != null ? linearMap(minMaxSpan.maxSpan, percentExtent, viewExtend, true) : null);
       var lastRange = this._range;
-      var range = this._range = asc([linearMap(handleEnds[0], viewExtend, percentExtent, true), linearMap(handleEnds[1], viewExtend, percentExtent, true)]);
-      return !lastRange || lastRange[0] !== range[0] || lastRange[1] !== range[1];
+      var range2 = this._range = asc([linearMap(handleEnds[0], viewExtend, percentExtent, true), linearMap(handleEnds[1], viewExtend, percentExtent, true)]);
+      return !lastRange || lastRange[0] !== range2[0] || lastRange[1] !== range2[1];
     };
     SliderZoomView2.prototype._updateView = function(nonRealtime) {
       var displaybles = this._displayables;
@@ -49140,12 +49140,12 @@ var SliderZoomView = (
         var axisProxy = dataZoomModel.findRepresentativeAxisProxy();
         var scale3 = axisProxy.getAxisModel().axis.scale;
         if (axisProxy) {
-          var range = this._range;
+          var range2 = this._range;
           var window_1;
           if (nonRealtime) {
             var calcWinInput = {
-              start: range[0],
-              end: range[1]
+              start: range2[0],
+              end: range2[1]
             };
             var alignTo = getAlignTo(dataZoomModel, axisProxy);
             if (alignTo) {
@@ -49300,14 +49300,14 @@ var SliderZoomView = (
       });
     };
     SliderZoomView2.prototype._dispatchZoomAction = function(realtime) {
-      var range = this._range;
+      var range2 = this._range;
       this.api.dispatchAction({
         type: "dataZoom",
         from: this.uid,
         dataZoomId: this.dataZoomModel.id,
         animation: realtime ? REALTIME_ANIMATION_CONFIG : null,
-        start: range[0],
-        end: range[1]
+        start: range2[0],
+        end: range2[1]
       });
     };
     SliderZoomView2.prototype._findCoordRect = function() {
@@ -49746,16 +49746,16 @@ var ContinuousModel = (
     };
     ContinuousModel2.prototype._resetRange = function() {
       var dataExtent = this.getExtent();
-      var range = this.option.range;
-      if (!range || range.auto) {
+      var range2 = this.option.range;
+      if (!range2 || range2.auto) {
         dataExtent.auto = 1;
         this.option.range = dataExtent;
-      } else if (isArray(range)) {
-        if (range[0] > range[1]) {
-          range.reverse();
+      } else if (isArray(range2)) {
+        if (range2[0] > range2[1]) {
+          range2.reverse();
         }
-        range[0] = Math.max(range[0], dataExtent[0]);
-        range[1] = Math.min(range[1], dataExtent[1]);
+        range2[0] = Math.max(range2[0], dataExtent[0]);
+        range2[1] = Math.min(range2[1], dataExtent[1]);
       }
     };
     ContinuousModel2.prototype.completeVisualOption = function() {
@@ -49781,18 +49781,18 @@ var ContinuousModel = (
       return dataInterval;
     };
     ContinuousModel2.prototype.getValueState = function(value2) {
-      var range = this.option.range;
+      var range2 = this.option.range;
       var dataExtent = this.getExtent();
       var unboundedRange = retrieve2(this.option.unboundedRange, true);
-      return (unboundedRange && range[0] <= dataExtent[0] || range[0] <= value2) && (unboundedRange && range[1] >= dataExtent[1] || value2 <= range[1]) ? "inRange" : "outOfRange";
+      return (unboundedRange && range2[0] <= dataExtent[0] || range2[0] <= value2) && (unboundedRange && range2[1] >= dataExtent[1] || value2 <= range2[1]) ? "inRange" : "outOfRange";
     };
-    ContinuousModel2.prototype.findTargetDataIndices = function(range) {
+    ContinuousModel2.prototype.findTargetDataIndices = function(range2) {
       var result2 = [];
       this.eachTargetSeries(function(seriesModel) {
         var dataIndices = [];
         var data = seriesModel.getData();
         data.each(this.getDataDimensionIndex(data), function(value2, dataIndex) {
-          range[0] <= value2 && value2 <= range[1] && dataIndices.push(dataIndex);
+          range2[0] <= value2 && value2 <= range2[1] && dataIndices.push(dataIndex);
         }, this);
         result2.push({
           seriesId: seriesModel.id,
@@ -50678,15 +50678,15 @@ function visualMapPreprocessor(option) {
   if (!isArray(visualMap)) {
     visualMap = visualMap ? [visualMap] : [];
   }
-  each9(visualMap, function(opt2) {
-    if (!opt2) {
+  each9(visualMap, function(opt3) {
+    if (!opt3) {
       return;
     }
-    if (has(opt2, "splitList") && !has(opt2, "pieces")) {
-      opt2.pieces = opt2.splitList;
-      delete opt2.splitList;
+    if (has(opt3, "splitList") && !has(opt3, "pieces")) {
+      opt3.pieces = opt3.splitList;
+      delete opt3.splitList;
     }
-    var pieces = opt2.pieces;
+    var pieces = opt3.pieces;
     if (pieces && isArray(pieces)) {
       each9(pieces, function(piece) {
         if (isObject(piece)) {
@@ -50700,7 +50700,7 @@ function visualMapPreprocessor(option) {
       });
     }
     if (true) {
-      var seriesTargets = opt2.seriesTargets;
+      var seriesTargets = opt3.seriesTargets;
       if (seriesTargets && isArray(seriesTargets)) {
         each9(seriesTargets, function(target) {
           if (!isObject(target) || target.dimension == null) {
@@ -51671,14 +51671,14 @@ var CanvasPainter = (function() {
     }
   };
   CanvasPainter2.prototype.refresh = function(optOrPaintAll) {
-    var opt2;
+    var opt3;
     if (optOrPaintAll && !isObject(optOrPaintAll)) {
-      opt2 = { paintAll: !!optOrPaintAll };
+      opt3 = { paintAll: !!optOrPaintAll };
     } else {
-      opt2 = optOrPaintAll || {};
+      opt3 = optOrPaintAll || {};
     }
-    var refresh = retrieve2(opt2.refresh, true);
-    var refreshHover = retrieve2(opt2.refreshHover, false);
+    var refresh = retrieve2(opt3.refresh, true);
+    var refreshHover = retrieve2(opt3.refreshHover, false);
     if (refreshHover) {
       this._hoverLayerDirty = HOVER_LAYER_DIRTY_REPAINT;
     }
@@ -51689,7 +51689,7 @@ var CanvasPainter = (function() {
       return this;
     }
     var list3 = this.storage.getDisplayList(true);
-    this._updateLayerStatus(list3, opt2.paintAll);
+    this._updateLayerStatus(list3, opt3.paintAll);
     this._redrawId = Math.random();
     var prevList = this._prevDisplayList;
     this._paintList(list3, prevList, this._redrawId);
@@ -52442,8 +52442,8 @@ ${sampleDate(h3)}` : time2(h3);
     root.querySelector(`[data-zoom="${mode}"]`).addEventListener("click", () => {
       const z2 = priceChart.getOption().dataZoom[0];
       const middle = (z2.start + z2.end) / 2;
-      const range = (z2.end - z2.start) / 4;
-      priceChart.dispatchAction({ type: "dataZoom", start: Math.max(0, middle - range), end: Math.min(100, middle + range) });
+      const range2 = (z2.end - z2.start) / 4;
+      priceChart.dispatchAction({ type: "dataZoom", start: Math.max(0, middle - range2), end: Math.min(100, middle + range2) });
     }, { signal });
   }
   const powerChart = readings && sentHistory ? init2(root.querySelector("#power-chart")) : null;
@@ -52622,12 +52622,54 @@ function renderVehicleSources(m4) {
   return `<details id="vehicle-sources-details"><summary>Advanced: vehicle sources &amp; properties</summary><div class="vs-body">${picker}${sensor}${props}<p class="vs-help">Saving only stores your choice and may recalculate plans for this car, followed by normal guarded schedule reconciliation if Morek owns the schedule. It never wakes the car, sends a notification or proves charging. A saved sensor is never replaced by detection.</p><div role="status" id="vehicle-sources-notice">${notes}</div>${reload}</div></details>`;
 }
 
+// shared-dashboard/market-costs-view.js
+var opt2 = (value2, text4, selected) => `<option value="${escapeText(value2)}" ${selected ? "selected" : ""}>${escapeText(text4)}</option>`;
+var DAYS = [["all", "Every day"], ["weekdays", "Monday\u2013Friday"], ["mon_sat", "Monday\u2013Saturday"]];
+var MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+var range = (a4, b3) => Array.from({ length: b3 - a4 + 1 }, (_2, i7) => a4 + i7);
+function summaryBlock(m4) {
+  const link = m4.url ? ` <span class="mc-url">${escapeText(m4.url)}</span>` : "";
+  return `<div class="mc-block" data-mc="provenance"><h3>Price provider &amp; held data</h3><p class="mc-line">${escapeText(m4.provider)}${link}</p>${m4.providerNote ? `<p class="mc-note">${escapeText(m4.providerNote)}</p>` : ""}<p class="mc-line">${escapeText(m4.held)}</p><p class="mc-line">${escapeText(m4.text)}</p>${m4.shared ? `<p class="mc-line">${escapeText(m4.shared)}</p>` : ""}${m4.noEntryNote ? `<p class="mc-note">${escapeText(m4.noEntryNote)}</p>` : ""}</div>`;
+}
+function sourceBlock(m4) {
+  const s4 = m4.source;
+  if (!s4 || s4.choices.length < 2) return "";
+  return `<div class="mc-block" data-mc="source"><h3>Electricity price entry</h3><p class="mc-line">Using \u201C${escapeText(s4.title)}\u201D (${escapeText(s4.count)} charger${s4.count === 1 ? "" : "s"}). Choosing another entry changes the price route for every charger on it; SpotNav never does this on its own.</p><label>Price entry <select data-msetting="entry" ${s4.canEdit ? "" : "disabled"}>${s4.choices.map((c5) => opt2(c5.value, c5.text, c5.value === s4.base)).join("")}</select></label><wa-button id="save-price-entry" size="small" ${s4.canEdit ? "" : "disabled"}>Use this price entry</wa-button></div>`;
+}
+function feeRow(f3) {
+  if (f3.included) return `<div class="mc-row" data-fee="${escapeText(f3.key)}" data-included="true"><b>${escapeText(f3.label)}</b><p class="mc-line">${escapeText(f3.hint)}</p></div>`;
+  const lock = f3.canEdit ? "" : "disabled";
+  return `<div class="mc-row" data-fee="${escapeText(f3.key)}"><b>${escapeText(f3.label)} <span class="mc-unit">${escapeText(f3.unit)}</span></b><label>Mode <select data-msetting="${escapeText(f3.key)}-mode" ${lock}>${f3.modes.map((o9) => opt2(o9.value, o9.text, o9.value === f3.mode)).join("")}</select></label><label>My figure (${escapeText(f3.unit)}) <input type="number" step="any" min="0" data-msetting="${escapeText(f3.key)}-figure" value="${escapeText(f3.figure)}" ${lock}></label><p class="mc-line">${escapeText(f3.hint)}</p></div>`;
+}
+function marketBlock(m4) {
+  const a4 = m4.area;
+  const lock = a4.canEdit ? "" : "disabled";
+  return `<div class="mc-block" data-mc="market"><h3>Price area, VAT, energy tax &amp; grid fee</h3><p class="mc-line">Saved area: ${escapeText(a4.savedText)}. ${escapeText(m4.currencyText)}</p><label>Price area <select data-msetting="area" ${lock}>${a4.options.map((o9) => opt2(o9.value, o9.text, o9.value === a4.value)).join("")}</select></label>${m4.fees.map(feeRow).join("")}<wa-button id="save-market" size="small" ${m4.canEdit ? "" : "disabled"}>Save area &amp; taxes</wa-button></div>`;
+}
+function tariffBlock(m4) {
+  const t6 = m4.tariff;
+  if (!t6) return "";
+  const lock = t6.canEdit ? "" : "disabled";
+  const hl = t6.high.unitKnown ? lock : "disabled";
+  const w2 = t6.window;
+  const hours = (id, from, to, v2) => `<select data-msetting="${id}" ${hl}>${range(from, to).map((h3) => opt2(h3, `${String(h3 % 24).padStart(2, "0")}:00`, h3 === v2)).join("")}</select>`;
+  return `<div class="mc-block" data-mc="tariff"><h3>Grid tariff</h3>${t6.summary.map((x2) => `<p class="mc-line">${escapeText(x2)}</p>`).join("")}${t6.included ? "" : `<div class="mc-row"><b>Grid fee as % of the raw price</b><label>Mode <select data-msetting="percent-mode" ${lock}>${opt2("off", "Off \u2014 not added", t6.percent.mode === "off")}${opt2("custom", "My percentage", t6.percent.mode === "custom")}</select></label><label>Percentage (%) <input type="number" step="any" min="0" data-msetting="percent-figure" value="${escapeText(t6.percent.figure)}" ${lock}></label></div><div class="mc-row"><b>High-load grid fee <span class="mc-unit">${escapeText(t6.high.unit)}</span></b><label>Mode <select data-msetting="high-mode" ${hl}>${opt2("off", "Off \u2014 not added", t6.high.mode === "off")}${opt2("custom", "My fee inside the hours below", t6.high.mode === "custom")}</select></label><label>Fee (${escapeText(t6.high.unit)}) <input type="number" step="any" min="0" data-msetting="high-figure" value="${escapeText(t6.high.figure)}" ${hl}></label><label>Days <select data-msetting="win-days" ${hl}>${DAYS.map(([v2, text4]) => opt2(v2, text4, v2 === w2.days)).join("")}</select></label><label>From month <select data-msetting="win-from-month" ${hl}>${MONTHS.map((n6, i7) => opt2(i7 + 1, n6, i7 + 1 === w2.from_month)).join("")}</select></label><label>To month (included) <select data-msetting="win-to-month" ${hl}>${MONTHS.map((n6, i7) => opt2(i7 + 1, n6, i7 + 1 === w2.to_month)).join("")}</select></label><label>From hour <select data-msetting="win-from-hour" ${hl}>${range(0, 23).map((h3) => opt2(h3, `${String(h3).padStart(2, "0")}:00`, h3 === w2.from_hour)).join("")}</select></label><label>To hour <select data-msetting="win-to-hour" ${hl}>${range(1, 24).map((h3) => opt2(h3, `${String(h3 % 24).padStart(2, "0")}:00`, h3 === w2.to_hour)).join("")}</select></label>${w2.suggested ? '<p class="mc-note">No hours are stored. The hours shown are only a common suggestion and are saved only if you switch the fee on and press Save.</p>' : ""}</div>`}${t6.notes.map((x2) => `<p class="mc-line">${escapeText(x2)}</p>`).join("")}<wa-button id="save-tariff" size="small" ${t6.canEdit ? "" : "disabled"}>Save grid tariff</wa-button></div>`;
+}
+function renderMarketCosts(m4) {
+  if (!m4) return "";
+  const notes = [m4.notice, ...m4.notes || []].filter(Boolean).map((t6) => `<p class="mc-note">${escapeText(t6)}</p>`).join("");
+  const reload = m4.state === "forbidden" ? "" : '<button type="button" id="reload-market-costs">Reload market &amp; costs</button>';
+  if (m4.state !== "ready") return `<details id="market-costs-details"><summary>Advanced: market &amp; charging costs</summary><div class="mc-body" role="status">${notes}${summaryBlock(m4)}${reload}</div></details>`;
+  return `<details id="market-costs-details"><summary>Advanced: market &amp; charging costs</summary><div class="mc-body">${summaryBlock(m4)}${sourceBlock(m4)}${marketBlock(m4)}${tariffBlock(m4)}<div class="mc-block" data-mc="basis"><h3>How costs are built</h3><p class="mc-line">${escapeText(m4.basis)}</p></div><p class="mc-help">Saving only stores your choice. It may recalculate plans and cost estimates for every charger using this price entry, followed by normal guarded schedule reconciliation if Morek owns the schedule. It never changes the provider on its own, sends a notification, wakes the car or proves charging. Historical tariffs are not reconstructed or invented.</p><div role="status" id="market-costs-notice">${notes}</div>${reload}</div></details>`;
+}
+
 // shared-dashboard/reconcile.js
 var key2 = (node) => {
   if (node.nodeType !== 1) return null;
   if (node.id) return `id:${node.id}`;
   if (node.dataset.setting) return `setting:${node.dataset.setting}`;
   if (node.dataset.vsetting) return `vsetting:${node.dataset.vsetting}`;
+  if (node.dataset.msetting) return `msetting:${node.dataset.msetting}`;
   if (node.dataset.vselect) return `vselect:${node.dataset.vselect}`;
   if (node.dataset.morekAction) return `morek-action:${node.dataset.morekAction}`;
   if (node.hasAttribute("data-morek-actions")) return "morek-actions";
@@ -52763,11 +52805,12 @@ function mountDashboard(root, adapter) {
       ${card("Plan activity & freshness", labels.evidenceEyebrow || "EVIDENCE", renderEvidence(m4.evidence, state.power, knownPlan ? windows.length : null), "morek", tag)}
       ${card("Recent charging", labels.historyEyebrow || "HISTORY", renderHistory(m4.history, historyReady), "history", tag)}
       ${m4.vehicleSources ? card("Vehicle sources & properties", "ADVANCED", renderVehicleSources(m4.vehicleSources), "vehicle-sources", tag) : ""}
+      ${m4.marketCosts ? card("Market & charging costs", "ADVANCED", renderMarketCosts(m4.marketCosts), "market-costs", tag) : ""}
       </div><dialog id="plan-dialog" aria-labelledby="dialog-title"><div class="dialog-head"><div><div class="eyebrow">${escapeText(labels.dialogEyebrow || "PROPOSAL")}</div><h2 id="dialog-title">Proposed charging plan</h2></div><button id="close-plan" type="button" aria-label="Close proposed plan">\u2715</button></div><p class="subtext">${escapeText(labels.dialogNote)}</p><div role="status" aria-live="polite">${m4.warning ? `<strong>${escapeText(m4.warning.title)}</strong><p>${escapeText(m4.warning.detail)}</p>` : ""}${m4.evidence?.status ? `<p>${escapeText(m4.evidence.status)}</p>` : ""}</div>${plan}</dialog><footer>${escapeText(labels.footer)}</footer></div>`;
     const template = document.createElement("template");
     template.innerHTML = html;
     if (!root.firstChild) root.append(template.content);
-    else reconcile(root.firstChild, template.content.firstChild, (node) => drafts.has(node.dataset?.setting) || node.dataset?.vsetting && drafts.has(`v:${node.dataset.vsetting}`) || root.getRootNode().activeElement === node);
+    else reconcile(root.firstChild, template.content.firstChild, (node) => drafts.has(node.dataset?.setting) || node.dataset?.vsetting && drafts.has(`v:${node.dataset.vsetting}`) || node.dataset?.msetting && drafts.has(`m:${node.dataset.msetting}`) || root.getRootNode().activeElement === node);
     listeners ||= new AbortController();
     const signal = listeners.signal;
     const bind3 = (node, fn) => {
@@ -52866,6 +52909,50 @@ function mountDashboard(root, adapter) {
     vsave("#save-vehicle-props", "saveVehicleProperties");
     const vreload = root.querySelector("#reload-vehicle-sources");
     bind3(vreload, () => vreload.addEventListener("click", () => current.actions?.reloadVehicleSources?.(), { signal }));
+    const syncMarket = () => {
+      for (const prefix of ["vat", "tax", "transfer", "percent", "high"]) {
+        const mode = root.querySelector(`[data-msetting="${prefix}-mode"]`);
+        if (!mode) continue;
+        const custom = mode.value === "custom";
+        const figure = root.querySelector(`[data-msetting="${prefix}-figure"]`);
+        if (figure) figure.disabled = mode.disabled || !custom;
+        if (prefix === "high") root.querySelectorAll('[data-msetting^="win-"]').forEach((n6) => {
+          n6.disabled = mode.disabled || !custom;
+        });
+      }
+    };
+    root.querySelectorAll("[data-msetting]").forEach((input) => {
+      const key3 = `m:${input.dataset.msetting}`;
+      if (drafts.has(key3)) {
+        if (input.value !== drafts.get(key3)) input.value = drafts.get(key3);
+      } else if (input.tagName === "SELECT") {
+        const base2 = input.querySelector("option[selected]");
+        if (base2 && input.value !== base2.value) input.value = base2.value;
+      }
+      bind3(input, () => {
+        const on = () => {
+          drafts.set(key3, input.value);
+          syncMarket();
+          current.actions?.editCosts?.(input.dataset.msetting);
+        };
+        input.addEventListener("input", on, { signal });
+        input.addEventListener("change", () => {
+          on();
+          if (input.dataset.msetting === "area") current.actions?.selectMarketArea?.(input.value);
+        }, { signal });
+      });
+    });
+    syncMarket();
+    const mget = (name) => root.querySelector(`[data-msetting="${name}"]`)?.value;
+    const mvalues = () => ({ area: mget("area"), entry: mget("entry"), vat: { mode: mget("vat-mode"), figure: mget("vat-figure") }, tax: { mode: mget("tax-mode"), figure: mget("tax-figure") }, transfer: { mode: mget("transfer-mode"), figure: mget("transfer-figure") }, percent: { mode: mget("percent-mode"), figure: mget("percent-figure") }, high: { mode: mget("high-mode"), figure: mget("high-figure") }, window: { days: mget("win-days"), fromMonth: mget("win-from-month"), toMonth: mget("win-to-month"), fromHour: mget("win-from-hour"), toHour: mget("win-to-hour") } });
+    for (const [id, fn] of [["#save-market", "saveMarket"], ["#save-tariff", "saveTariff"], ["#save-price-entry", "savePriceEntry"]]) {
+      const b3 = root.querySelector(id);
+      bind3(b3, () => b3.addEventListener("click", () => {
+        if (current.model.marketCosts?.canEdit === true && typeof current.actions?.[fn] === "function") current.actions[fn](mvalues());
+      }, { signal }));
+    }
+    const mreload = root.querySelector("#reload-market-costs");
+    bind3(mreload, () => mreload.addEventListener("click", () => current.actions?.reloadMarketCosts?.(), { signal }));
     const saveButton = root.querySelector("#save-plan");
     bind3(saveButton, () => saveButton.addEventListener("click", () => {
       if (current.model.canSave === true && typeof current.actions?.save === "function") current.actions.save(Object.fromEntries([...root.querySelectorAll("[data-setting]")].map((input) => [input.dataset.setting, input.type === "checkbox" ? input.checked : input.value])));
@@ -52907,6 +52994,10 @@ function mountDashboard(root, adapter) {
     drafts.clear();
   }, resetVehicleDrafts() {
     for (const key3 of [...drafts.keys()]) if (key3.startsWith("v:")) drafts.delete(key3);
+  }, setMarketDraft(name, value2) {
+    drafts.set(`m:${name}`, value2);
+  }, resetMarketDrafts(keepArea = false) {
+    for (const key3 of [...drafts.keys()]) if (key3.startsWith("m:") && !(keepArea && key3 === "m:area")) drafts.delete(key3);
   }, get charts() {
     return chartMount?.priceCharts || {};
   }, dispose() {
@@ -52951,8 +53042,14 @@ var SETTINGS_DRIVER_TARGET_SOC = "target_soc";
 var SETTINGS_STRATEGY_CHEAPEST = "cheapest";
 var SETTINGS_STRATEGY_SOLAR = "solar";
 var SETTINGS_STRATEGY_HYBRID = "hybrid";
+var SETTINGS_REVISION_CONFLICT = "revision_conflict";
+var SETTINGS_RECONCILE_FAILED = "spotnav_settings_reconcile_failed";
+var SETTINGS_NOT_COMMITTED = "spotnav_settings_not_committed";
 var IF_NOT_READY = ["ask", "release", "hold"];
 var IDENTIFY_MODES = ["automatic", "ask", "off"];
+var MARKET_API_VERSION = 1;
+var MARKET_STATES = ["loading", "ready", "stale", "unavailable", "invalid"];
+var MARKET_REASONS = ["offline", "invalid"];
 
 // src/visual-styles.ts
 var VISUAL_CLASSES = {
@@ -57213,22 +57310,22 @@ function decodeActionResult(raw) {
   if (source === null) {
     throw new SpotnavApiError(null);
   }
-  const record4 = source;
+  const record5 = source;
   const keys2 = ["api_version", "ok", "error", "action", "choice"];
   for (const key3 of keys2) {
-    if (!(key3 in record4)) {
+    if (!(key3 in record5)) {
       throw new SpotnavApiError(null);
     }
   }
-  if (Object.keys(record4).length !== keys2.length) {
+  if (Object.keys(record5).length !== keys2.length) {
     throw new SpotnavApiError(null);
   }
-  const version = record4.api_version;
-  const ok2 = record4.ok;
-  const error2 = record4.error;
-  const answered = record4.action;
-  const answeredChoice = record4.choice;
-  if (typeof version !== "number" || typeof ok2 !== "boolean") {
+  const version = record5.api_version;
+  const ok3 = record5.ok;
+  const error2 = record5.error;
+  const answered = record5.action;
+  const answeredChoice = record5.choice;
+  if (typeof version !== "number" || typeof ok3 !== "boolean") {
     throw new SpotnavApiError(null);
   }
   for (const value2 of [error2, answered, answeredChoice]) {
@@ -57238,7 +57335,7 @@ function decodeActionResult(raw) {
   }
   return {
     api_version: version,
-    ok: ok2,
+    ok: ok3,
     error: error2 ?? null,
     action: answered ?? null,
     choice: answeredChoice ?? null
@@ -57251,6 +57348,13 @@ async function getSettings(hass, chargerId) {
     charger_id: chargerId
   });
 }
+async function getMarketOptions(hass, chargerId) {
+  return await call(hass, {
+    type: "spotnav/get_market_options",
+    api_version: MARKET_API_VERSION,
+    charger_id: chargerId
+  });
+}
 async function updateSettings(hass, chargerId, expectedRevision, body) {
   return await call(hass, {
     type: "spotnav/update_settings",
@@ -57258,6 +57362,21 @@ async function updateSettings(hass, chargerId, expectedRevision, body) {
     charger_id: chargerId,
     expected_revision: expectedRevision,
     settings: body
+  });
+}
+async function choosePriceSource(hass, chargerId, priceEntryId) {
+  return await call(hass, {
+    type: "spotnav/choose_price_source",
+    entry_id: chargerId,
+    price_entry_id: priceEntryId
+  });
+}
+async function updateGridTariff(hass, chargerId, expectedWriteRevision, gridTariff) {
+  return await call(hass, {
+    type: "spotnav/update_grid_tariff",
+    charger_id: chargerId,
+    expected_write_revision: expectedWriteRevision,
+    grid_tariff: gridTariff
   });
 }
 async function getLogs(hass, options = {}) {
@@ -57607,13 +57726,13 @@ function decodeSettingsAnswer(raw) {
     if (version !== SETTINGS_API_VERSION) {
       return malformed();
     }
-    const ok2 = booleanValue(raw, "ok");
+    const ok3 = booleanValue(raw, "ok");
     const error2 = textOrNull(raw, "error");
     const rawSettings = raw["settings"];
     const rawPause = raw["pause"];
     const settings = rawSettings === null ? null : decodeSettingsRecord(rawSettings);
     const pause = rawPause === null ? null : decodePauseObservation(rawPause);
-    if (ok2) {
+    if (ok3) {
       if (error2 !== null || settings === null || pause === null) {
         return malformed();
       }
@@ -57630,56 +57749,56 @@ function decodeSettingsAnswer(raw) {
     throw error2;
   }
 }
-function encodeBody(record4) {
+function encodeBody(record5) {
   return {
-    ...record4.soft_price_cap === void 0 ? {} : { soft_price_cap: record4.soft_price_cap },
-    ...record4.minimum_ready_by_soc === void 0 ? {} : { minimum_ready_by_soc: record4.minimum_ready_by_soc },
-    ...record4.cap_price_basis === void 0 ? {} : { cap_price_basis: record4.cap_price_basis },
-    ...record4.time_reserve_percent === void 0 ? {} : { time_reserve_percent: record4.time_reserve_percent },
-    area_id: record4.area_id,
-    overrides: record4.overrides.map((item) => ({
+    ...record5.soft_price_cap === void 0 ? {} : { soft_price_cap: record5.soft_price_cap },
+    ...record5.minimum_ready_by_soc === void 0 ? {} : { minimum_ready_by_soc: record5.minimum_ready_by_soc },
+    ...record5.cap_price_basis === void 0 ? {} : { cap_price_basis: record5.cap_price_basis },
+    ...record5.time_reserve_percent === void 0 ? {} : { time_reserve_percent: record5.time_reserve_percent },
+    area_id: record5.area_id,
+    overrides: record5.overrides.map((item) => ({
       area_id: item.area_id,
       vat: { ...item.vat },
       tax: { ...item.tax },
       transfer: { ...item.transfer }
     })),
-    phases: record4.phases,
-    amps: record4.amps,
-    requested_kwh: record4.requested_kwh,
-    ...record4.fill_to_limit === void 0 ? {} : { fill_to_limit: record4.fill_to_limit },
-    max_periods: record4.max_periods,
-    departure_enabled: record4.departure_enabled,
-    departure_time: record4.departure_time,
-    departure_date: record4.departure_date,
-    departure_weekdays: [...record4.departure_weekdays],
-    strategy: record4.strategy,
-    driver: record4.driver,
-    target: { ...record4.target },
-    ...record4.vehicle_ids === void 0 ? {} : { vehicle_ids: record4.vehicle_ids === null ? null : [...record4.vehicle_ids] },
-    ...record4.identify_mode === void 0 ? {} : { identify_mode: record4.identify_mode },
-    ...record4.identify_camera === void 0 ? {} : { identify_camera: copyCamera(record4.identify_camera) },
-    ...record4.users_change_plan === void 0 ? {} : { users_change_plan: record4.users_change_plan },
-    ...record4.if_not_ready === void 0 ? {} : { if_not_ready: record4.if_not_ready }
+    phases: record5.phases,
+    amps: record5.amps,
+    requested_kwh: record5.requested_kwh,
+    ...record5.fill_to_limit === void 0 ? {} : { fill_to_limit: record5.fill_to_limit },
+    max_periods: record5.max_periods,
+    departure_enabled: record5.departure_enabled,
+    departure_time: record5.departure_time,
+    departure_date: record5.departure_date,
+    departure_weekdays: [...record5.departure_weekdays],
+    strategy: record5.strategy,
+    driver: record5.driver,
+    target: { ...record5.target },
+    ...record5.vehicle_ids === void 0 ? {} : { vehicle_ids: record5.vehicle_ids === null ? null : [...record5.vehicle_ids] },
+    ...record5.identify_mode === void 0 ? {} : { identify_mode: record5.identify_mode },
+    ...record5.identify_camera === void 0 ? {} : { identify_camera: copyCamera(record5.identify_camera) },
+    ...record5.users_change_plan === void 0 ? {} : { users_change_plan: record5.users_change_plan },
+    ...record5.if_not_ready === void 0 ? {} : { if_not_ready: record5.if_not_ready }
   };
 }
 function copyCamera(camera) {
   return camera === null ? null : { ...camera, frame: camera.frame === null ? null : { ...camera.frame } };
 }
-function formFromRecord(record4) {
+function formFromRecord(record5) {
   return {
-    ...record4.time_reserve_percent === void 0 ? {} : { timeReserve: String(record4.time_reserve_percent) },
-    ...record4.soft_price_cap === void 0 ? {} : { capEnabled: record4.soft_price_cap !== null, capValue: record4.soft_price_cap === null ? "" : String(record4.soft_price_cap), capBasis: record4.cap_price_basis ?? "", minimumReadySoc: record4.minimum_ready_by_soc == null ? "" : String(record4.minimum_ready_by_soc) },
-    energy: String(record4.requested_kwh),
-    fill: record4.fill_to_limit === true,
-    deadlineEnabled: record4.departure_enabled,
-    deadlineTime: record4.departure_time,
-    departureDate: record4.departure_date ?? "",
-    departureWeekdays: record4.departure_weekdays.join(""),
-    current: record4.amps === null ? "" : String(record4.amps),
-    driver: record4.driver,
-    targetPercent: record4.target.target_percent === null ? "" : String(record4.target.target_percent),
-    vehicleId: record4.target.vehicle_id ?? "",
-    ...record4.if_not_ready === void 0 ? {} : { ifNotReady: record4.if_not_ready }
+    ...record5.time_reserve_percent === void 0 ? {} : { timeReserve: String(record5.time_reserve_percent) },
+    ...record5.soft_price_cap === void 0 ? {} : { capEnabled: record5.soft_price_cap !== null, capValue: record5.soft_price_cap === null ? "" : String(record5.soft_price_cap), capBasis: record5.cap_price_basis ?? "", minimumReadySoc: record5.minimum_ready_by_soc == null ? "" : String(record5.minimum_ready_by_soc) },
+    energy: String(record5.requested_kwh),
+    fill: record5.fill_to_limit === true,
+    deadlineEnabled: record5.departure_enabled,
+    deadlineTime: record5.departure_time,
+    departureDate: record5.departure_date ?? "",
+    departureWeekdays: record5.departure_weekdays.join(""),
+    current: record5.amps === null ? "" : String(record5.amps),
+    driver: record5.driver,
+    targetPercent: record5.target.target_percent === null ? "" : String(record5.target.target_percent),
+    vehicleId: record5.target.vehicle_id ?? "",
+    ...record5.if_not_ready === void 0 ? {} : { ifNotReady: record5.if_not_ready }
   };
 }
 function decimal(text4, minimum, maximum) {
@@ -57743,12 +57862,12 @@ function checkDepartureDate(text4, days, moved) {
 function checkCurrent(text4) {
   return integer(text4, AMPS_MIN, AMPS_MAX);
 }
-function checkCurrentInRange(text4, range) {
+function checkCurrentInRange(text4, range2) {
   const amps = checkCurrent(text4);
   if (!amps.ok) {
     return amps;
   }
-  return amps.value < range.minA || amps.value > range.maxA ? { ok: false, errorKey: "settings.error.outOfRange" } : amps;
+  return amps.value < range2.minA || amps.value > range2.maxA ? { ok: false, errorKey: "settings.error.outOfRange" } : amps;
 }
 var ENERGY_MIN_KWH = 0.1;
 var ENERGY_MAX_KWH = 1e3;
@@ -57756,13 +57875,13 @@ var PERIODS_MIN = 1;
 var PERIODS_MAX = 8;
 var AMPS_MIN = 1;
 var AMPS_MAX = 80;
-function replacementFor(kind, record4, values, range = null, opened = null, days = null) {
-  const body = encodeBody(record4);
+function replacementFor(kind, record5, values, range2 = null, opened = null, days = null) {
+  const body = encodeBody(record5);
   const energy2 = kind === "energy" || kind === "plan" ? checkEnergy(values.energy) : null;
   if (energy2 !== null && !energy2.ok) {
     return energy2;
   }
-  const amps = kind === "current" || kind === "plan" ? currentCheck(values, record4, range) : null;
+  const amps = kind === "current" || kind === "plan" ? currentCheck(values, record5, range2) : null;
   if (amps !== null && !amps.ok) {
     return amps;
   }
@@ -57770,7 +57889,7 @@ function replacementFor(kind, record4, values, range = null, opened = null, days
   if (time2 !== null && !time2.ok) {
     return time2;
   }
-  const dateBase = opened === null ? record4 : opened;
+  const dateBase = opened === null ? record5 : opened;
   const dateMoved = values.departureDate !== (dateBase.departure_date ?? "");
   const date2 = kind === "deadline" || kind === "plan" ? checkDepartureDate(values.deadlineEnabled ? values.departureDate : "", days, dateMoved) : null;
   if (date2 !== null && !date2.ok) {
@@ -57785,14 +57904,14 @@ function replacementFor(kind, record4, values, range = null, opened = null, days
     return { ok: false, errorKey: "settings.error.invalid" };
   }
   const soc2 = kind === "plan" && values.driver === SETTINGS_DRIVER_TARGET_SOC;
-  const targetPercent = soc2 && (values.targetPercent.trim() !== "" || record4.target.target_percent !== null) ? checkTargetPercent(values.targetPercent) : null;
+  const targetPercent = soc2 && (values.targetPercent.trim() !== "" || record5.target.target_percent !== null) ? checkTargetPercent(values.targetPercent) : null;
   if (targetPercent !== null && !targetPercent.ok) {
     return targetPercent;
   }
   let changed = false;
   const next = { ...body };
-  if (kind === "plan" && record4.soft_price_cap !== void 0 && values.capEnabled !== void 0) {
-    const base2 = opened ?? record4;
+  if (kind === "plan" && record5.soft_price_cap !== void 0 && values.capEnabled !== void 0) {
+    const base2 = opened ?? record5;
     const cap = values.capEnabled ? decimal(values.capValue ?? "", -1e9, 1e9) : null;
     if (cap !== null && !cap.ok) return cap;
     const minimum = (values.minimumReadySoc ?? "").trim() === "" ? null : decimal(values.minimumReadySoc ?? "", 0, 100);
@@ -57803,39 +57922,39 @@ function replacementFor(kind, record4, values, range = null, opened = null, days
     if (capValue !== null && basis === null) return { ok: false, errorKey: "settings.error.invalid" };
     if (opened === null || capValue !== base2.soft_price_cap) {
       next.soft_price_cap = capValue;
-      changed ||= capValue !== record4.soft_price_cap;
+      changed ||= capValue !== record5.soft_price_cap;
     }
     if (opened === null || minValue !== base2.minimum_ready_by_soc) {
       next.minimum_ready_by_soc = minValue;
-      changed ||= minValue !== record4.minimum_ready_by_soc;
+      changed ||= minValue !== record5.minimum_ready_by_soc;
     }
     if (opened === null || basis !== base2.cap_price_basis) {
       next.cap_price_basis = basis;
-      changed ||= basis !== record4.cap_price_basis;
+      changed ||= basis !== record5.cap_price_basis;
     }
   }
-  if (kind === "plan" && record4.time_reserve_percent !== void 0 && values.timeReserve !== void 0) {
+  if (kind === "plan" && record5.time_reserve_percent !== void 0 && values.timeReserve !== void 0) {
     const reserve = integer(values.timeReserve, TIME_RESERVE_MIN, TIME_RESERVE_MAX);
     if (!reserve.ok) return reserve;
     if (opened === null || reserve.value !== opened.time_reserve_percent) {
       next.time_reserve_percent = reserve.value;
-      changed ||= reserve.value !== record4.time_reserve_percent;
+      changed ||= reserve.value !== record5.time_reserve_percent;
     }
   }
   if (kind === "plan" && driverOk && (opened === null || values.driver !== opened.driver)) {
     next.driver = values.driver;
-    changed = changed || values.driver !== record4.driver;
+    changed = changed || values.driver !== record5.driver;
   }
-  const target = { ...record4.target };
+  const target = { ...record5.target };
   let targetMoved = false;
   if (targetPercent !== null && targetPercent.ok && (opened === null || targetPercent.value !== opened.target.target_percent)) {
     target.target_percent = targetPercent.value;
-    targetMoved = targetMoved || targetPercent.value !== record4.target.target_percent;
+    targetMoved = targetMoved || targetPercent.value !== record5.target.target_percent;
   }
   const vehicleId = values.vehicleId.trim();
   if (soc2 && vehicleId !== "" && (opened === null || vehicleId !== (opened.target.vehicle_id ?? ""))) {
     target.vehicle_id = vehicleId;
-    targetMoved = targetMoved || vehicleId !== record4.target.vehicle_id;
+    targetMoved = targetMoved || vehicleId !== record5.target.vehicle_id;
   }
   if (targetMoved) {
     next.target = target;
@@ -57843,22 +57962,22 @@ function replacementFor(kind, record4, values, range = null, opened = null, days
   }
   if (energy2 !== null && energy2.ok && (opened === null || energy2.value !== opened.requested_kwh)) {
     next.requested_kwh = energy2.value;
-    changed = changed || energy2.value !== record4.requested_kwh;
+    changed = changed || energy2.value !== record5.requested_kwh;
   }
-  const fillShown = opened === null ? record4.fill_to_limit === true : opened.fill_to_limit === true;
-  if (energy2 !== null && energy2.ok && record4.fill_to_limit !== void 0 && values.fill !== fillShown) {
+  const fillShown = opened === null ? record5.fill_to_limit === true : opened.fill_to_limit === true;
+  if (energy2 !== null && energy2.ok && record5.fill_to_limit !== void 0 && values.fill !== fillShown) {
     next.fill_to_limit = values.fill;
-    changed = changed || values.fill !== record4.fill_to_limit;
+    changed = changed || values.fill !== record5.fill_to_limit;
   }
   if (amps !== null && amps.ok && (opened === null || amps.value !== opened.amps)) {
     next.amps = amps.value;
-    changed = changed || amps.value !== record4.amps;
+    changed = changed || amps.value !== record5.amps;
   }
   const deadlineMoved = opened === null || time2 !== null && time2.ok && (values.deadlineEnabled !== opened.departure_enabled || time2.value !== opened.departure_time || date2 !== null && date2.ok && date2.value !== opened.departure_date);
-  const weekdaysMoved = dayList !== null && (opened === null ? dayList.join("") !== record4.departure_weekdays.join("") : dayList.join("") !== opened.departure_weekdays.join(""));
+  const weekdaysMoved = dayList !== null && (opened === null ? dayList.join("") !== record5.departure_weekdays.join("") : dayList.join("") !== opened.departure_weekdays.join(""));
   if (weekdaysMoved && dayList !== null) {
     next.departure_weekdays = dayList;
-    changed = changed || dayList.join("") !== record4.departure_weekdays.join("");
+    changed = changed || dayList.join("") !== record5.departure_weekdays.join("");
   }
   if (time2 !== null && time2.ok && deadlineMoved) {
     next.departure_enabled = values.deadlineEnabled;
@@ -57866,13 +57985,13 @@ function replacementFor(kind, record4, values, range = null, opened = null, days
     if (date2 !== null && date2.ok) {
       next.departure_date = date2.value;
     }
-    changed = changed || values.deadlineEnabled !== record4.departure_enabled || time2.value !== record4.departure_time || date2 !== null && date2.ok && date2.value !== record4.departure_date;
+    changed = changed || values.deadlineEnabled !== record5.departure_enabled || time2.value !== record5.departure_time || date2 !== null && date2.ok && date2.value !== record5.departure_date;
   }
-  if (kind === "plan" && record4.if_not_ready !== void 0 && IF_NOT_READY.includes(values.ifNotReady ?? "")) {
-    const shown = opened === null ? record4.if_not_ready : opened.if_not_ready;
+  if (kind === "plan" && record5.if_not_ready !== void 0 && IF_NOT_READY.includes(values.ifNotReady ?? "")) {
+    const shown = opened === null ? record5.if_not_ready : opened.if_not_ready;
     if (values.ifNotReady !== shown) {
       next.if_not_ready = values.ifNotReady;
-      changed = changed || values.ifNotReady !== record4.if_not_ready;
+      changed = changed || values.ifNotReady !== record5.if_not_ready;
     }
   }
   return { ok: true, body: next, changed };
@@ -57881,12 +58000,39 @@ function weekdaysFromText(text4) {
   const days = [...new Set([...text4].map(Number))].filter((day) => day >= 1 && day <= 7).sort((a4, b3) => a4 - b3);
   return days.length === 0 ? "invalid" : days;
 }
-function currentCheck(values, record4, range) {
+function currentCheck(values, record5, range2) {
   const amps = checkCurrent(values.current);
-  if (!amps.ok || range === null || amps.value === record4.amps) {
+  if (!amps.ok || range2 === null || amps.value === record5.amps) {
     return amps;
   }
-  return checkCurrentInRange(values.current, range);
+  return checkCurrentInRange(values.current, range2);
+}
+function settingsErrorKey(code) {
+  if (code === null) {
+    return "settings.error.generic";
+  }
+  if (code === SETTINGS_NOT_COMMITTED) {
+    return "settings.error.notCommitted";
+  }
+  if (code === SETTINGS_RECONCILE_FAILED) {
+    return "settings.error.reconcileFailed";
+  }
+  if (code === "spotnav_settings_unavailable") {
+    return "settings.error.unavailable";
+  }
+  if (code.startsWith("invalid_")) {
+    return "settings.error.invalid";
+  }
+  if (code === "unauthorized") {
+    return "settings.error.readOnly";
+  }
+  if (code === "spotnav_unsupported_api_version") {
+    return "settings.error.version";
+  }
+  if (code.endsWith("charger") || code === "spotnav_charger_unloaded") {
+    return "settings.error.charger";
+  }
+  return "settings.error.generic";
 }
 
 // src/validate.ts
@@ -60145,7 +60291,7 @@ function decodeEnvelope(raw, extra) {
   if (version !== ENTITY_CONFIG_API_VERSION) {
     return "malformed";
   }
-  const ok2 = flag(raw, "ok");
+  const ok3 = flag(raw, "ok");
   const error2 = textOrNull3(raw, "error");
   const rawConfig = raw["config"];
   const config = rawConfig === null ? null : decodeConfig(rawConfig);
@@ -60158,14 +60304,14 @@ function decodeEnvelope(raw, extra) {
     exactKeys3(item, ["field", "code"]);
     return { field: text3(item, "field"), code: text3(item, "code") };
   });
-  if (ok2) {
+  if (ok3) {
     if (error2 !== null || config === null || fieldErrors.length > 0) {
       return "malformed";
     }
   } else if (error2 === null || error2 === "") {
     return "malformed";
   }
-  return { ok: ok2, error: error2, config, fieldErrors };
+  return { ok: ok3, error: error2, config, fieldErrors };
 }
 function decodeEntityAnswer(raw) {
   try {
@@ -60403,6 +60549,955 @@ function propertyWritePlan(props, values) {
   }
   return Object.keys(changes).length ? { ok: true, changed: true, changes, expected, clearsCapacity: changes.capacity_kwh === null } : { ok: true, changed: false };
 }
+
+// src/market.ts
+var MalformedPayload3 = class extends Error {
+};
+function bad4() {
+  throw new MalformedPayload3("malformed");
+}
+function isRecord4(value2) {
+  return typeof value2 === "object" && value2 !== null && !Array.isArray(value2);
+}
+function record4(value2) {
+  return isRecord4(value2) ? value2 : bad4();
+}
+function exactKeys4(source, keys2) {
+  if (Object.keys(source).length !== keys2.length) {
+    return bad4();
+  }
+  for (const key3 of keys2) {
+    if (!Object.prototype.hasOwnProperty.call(source, key3)) {
+      return bad4();
+    }
+  }
+}
+function identity2(source, key3) {
+  const value2 = source[key3];
+  return typeof value2 === "string" && value2.length > 0 ? value2 : bad4();
+}
+function identityOrNull(source, key3) {
+  const value2 = source[key3];
+  if (value2 === null) {
+    return null;
+  }
+  return typeof value2 === "string" && value2.length > 0 ? value2 : bad4();
+}
+function figureOrNull(source, key3) {
+  const value2 = source[key3];
+  if (value2 === null) {
+    return null;
+  }
+  return typeof value2 === "number" && Number.isFinite(value2) ? value2 : bad4();
+}
+function oneOf3(source, key3, allowed) {
+  const value2 = source[key3];
+  if (typeof value2 !== "string" || !allowed.includes(value2)) {
+    return bad4();
+  }
+  return value2;
+}
+var OPTIONS_KEYS = ["api_version", "state", "reason", "areas", "configured_area"];
+var AREA_KEYS = [
+  "area_id",
+  "name",
+  "countries",
+  "timezone",
+  "currency",
+  "major_unit",
+  "minor_unit",
+  "suggestions"
+];
+var SUGGESTION_KEYS = ["vat_percent", "tax_minor", "transfer_minor"];
+var AREA_V2_KEYS = ["market_timezone", "included", "source"];
+function decodeSuggestions(source) {
+  exactKeys4(source, SUGGESTION_KEYS);
+  return {
+    vat_percent: figureOrNull(source, "vat_percent"),
+    tax_minor: figureOrNull(source, "tax_minor"),
+    transfer_minor: figureOrNull(source, "transfer_minor")
+  };
+}
+function decodeIncluded(raw) {
+  if (!Array.isArray(raw)) {
+    return bad4();
+  }
+  const seen = /* @__PURE__ */ new Set();
+  return raw.map((item) => {
+    if (typeof item !== "string" || !FISCAL_COMPONENTS.includes(item) || seen.has(item)) {
+      return bad4();
+    }
+    seen.add(item);
+    return item;
+  });
+}
+function decodeArea(source) {
+  const v2 = Object.prototype.hasOwnProperty.call(source, "market_timezone");
+  exactKeys4(source, v2 ? [...AREA_KEYS, ...AREA_V2_KEYS] : AREA_KEYS);
+  const countries = source["countries"];
+  if (!Array.isArray(countries)) {
+    return bad4();
+  }
+  const rawSource = v2 ? source["source"] : null;
+  const attribution = rawSource === null ? null : priceSource(rawSource);
+  if (rawSource !== null && attribution === null) {
+    return bad4();
+  }
+  return {
+    area_id: identity2(source, "area_id"),
+    name: identity2(source, "name"),
+    // The list may be empty; that is a fact about the area, not a reason to invent a value.
+    countries: countries.map(
+      (country) => typeof country === "string" && country.length > 0 ? country : bad4()
+    ),
+    timezone: identity2(source, "timezone"),
+    currency: identity2(source, "currency"),
+    major_unit: identity2(source, "major_unit"),
+    minor_unit: identity2(source, "minor_unit"),
+    suggestions: decodeSuggestions(record4(source["suggestions"])),
+    market_timezone: v2 ? identity2(source, "market_timezone") : identity2(source, "timezone"),
+    included: v2 ? decodeIncluded(source["included"]) : [],
+    source: attribution
+  };
+}
+function decodeMarketOptions(raw) {
+  try {
+    if (!isRecord4(raw)) {
+      return { ok: false, failure: "malformed" };
+    }
+    const version = raw["api_version"];
+    if (typeof version === "number" && version !== MARKET_API_VERSION) {
+      return { ok: false, failure: "unsupported" };
+    }
+    exactKeys4(raw, OPTIONS_KEYS);
+    if (version !== MARKET_API_VERSION) {
+      return { ok: false, failure: "malformed" };
+    }
+    const state = oneOf3(raw, "state", MARKET_STATES);
+    const reasonValue = raw["reason"];
+    const reason = reasonValue === null ? null : oneOf3(raw, "reason", MARKET_REASONS);
+    if (state === "ready" && reason !== null) {
+      return { ok: false, failure: "malformed" };
+    }
+    if (state === "invalid" && reason !== "invalid") {
+      return { ok: false, failure: "malformed" };
+    }
+    const rawAreas = raw["areas"];
+    if (!Array.isArray(rawAreas)) {
+      return { ok: false, failure: "malformed" };
+    }
+    const areas = rawAreas.map((area) => decodeArea(record4(area)));
+    const seen = /* @__PURE__ */ new Set();
+    for (const area of areas) {
+      if (seen.has(area.area_id)) {
+        return { ok: false, failure: "malformed" };
+      }
+      seen.add(area.area_id);
+    }
+    return {
+      ok: true,
+      value: {
+        state,
+        reason,
+        areas,
+        // An id the catalogue no longer lists is still a valid configured area: `areas` is what the relay
+        // publishes, the id is what the person stored.
+        configured_area: identityOrNull(raw, "configured_area")
+      }
+    };
+  } catch (error2) {
+    if (error2 instanceof MalformedPayload3) {
+      return { ok: false, failure: "malformed" };
+    }
+    throw error2;
+  }
+}
+var FISCAL_COMPONENTS = ["vat", "tax", "transfer"];
+function fiscalFormFrom(row, component) {
+  const fiscal = row === null ? null : row[component];
+  const stored = fiscal === null ? null : fiscal.value;
+  return {
+    enabled: fiscal !== null && fiscal.enabled,
+    value: stored === null ? "" : String(stored),
+    intent: stored === null ? "suggested" : "custom"
+  };
+}
+function marketIncluded(options, areaId) {
+  const area = areaId === null ? null : options.areas.find((item) => item.area_id === areaId) ?? null;
+  return area === null ? [] : area.included ?? [];
+}
+function marketSuggestion(options, areaId, component) {
+  const area = areaId === null ? null : options.areas.find((item) => item.area_id === areaId) ?? null;
+  if (area === null) {
+    return null;
+  }
+  if (component === "vat") {
+    return area.suggestions.vat_percent;
+  }
+  return component === "tax" ? area.suggestions.tax_minor : area.suggestions.transfer_minor;
+}
+function fiscalUnit(options, areaId, component) {
+  if (component === "vat") {
+    return "%";
+  }
+  const area = areaId === null ? null : options.areas.find((item) => item.area_id === areaId) ?? null;
+  return area === null ? "" : area.minor_unit;
+}
+function marketAreaIsKnown(options, base2, areaId) {
+  return areaId === base2.area_id || options.areas.some((area) => area.area_id === areaId);
+}
+function checkCustomFigure(text4) {
+  const trimmed = text4.trim().replace(",", ".");
+  if (trimmed === "") {
+    return { ok: false, errorKey: "settings.error.required" };
+  }
+  const stated = Number(trimmed);
+  if (!Number.isFinite(stated)) {
+    return { ok: false, errorKey: "settings.error.invalidNumber" };
+  }
+  if (stated < 0) {
+    return { ok: false, errorKey: "settings.error.outOfRange" };
+  }
+  return { ok: true, value: stated };
+}
+function retainedFigure(text4) {
+  const trimmed = text4.trim().replace(",", ".");
+  if (trimmed === "") {
+    return null;
+  }
+  const kept = Number(trimmed);
+  return Number.isFinite(kept) ? kept : null;
+}
+function fiscalStated(options, areaId, component, value2) {
+  if (value2.intent === "suggested") {
+    if (!value2.enabled) {
+      return { ok: true, value: { enabled: false, value: null } };
+    }
+    if (marketSuggestion(options, areaId, component) === null) {
+      const typed2 = checkCustomFigure(value2.value);
+      return typed2.ok ? { ok: true, value: { enabled: true, value: typed2.value } } : typed2;
+    }
+    return { ok: true, value: { enabled: true, value: null } };
+  }
+  if (!value2.enabled) {
+    return { ok: true, value: { enabled: false, value: retainedFigure(value2.value) } };
+  }
+  const typed = checkCustomFigure(value2.value);
+  return typed.ok ? { ok: true, value: { enabled: true, value: typed.value } } : typed;
+}
+function sameFiscal(left, right) {
+  return left.enabled === right.enabled && left.value === right.value;
+}
+function sameRow(left, right) {
+  return left.area_id === right.area_id && sameFiscal(left.vat, right.vat) && sameFiscal(left.tax, right.tax) && sameFiscal(left.transfer, right.transfer);
+}
+function rowStatesNothing(row) {
+  for (const component of FISCAL_COMPONENTS) {
+    const fiscal = row[component];
+    if (fiscal.enabled || fiscal.value !== null) {
+      return false;
+    }
+  }
+  return true;
+}
+function marketReplacement(base2, values, options) {
+  const areaId = values.areaId;
+  if (areaId === null) {
+    return { ok: false, errorKey: "market.error.areaRequired" };
+  }
+  if (!marketAreaIsKnown(options, base2, areaId)) {
+    return { ok: false, errorKey: "market.error.areaUnknown" };
+  }
+  const components = {
+    vat: { enabled: false, value: null },
+    tax: { enabled: false, value: null },
+    transfer: { enabled: false, value: null }
+  };
+  const stored = base2.overrides.find((item) => item.area_id === areaId) ?? null;
+  const included = marketIncluded(options, areaId);
+  for (const component of FISCAL_COMPONENTS) {
+    if (included.includes(component)) {
+      components[component] = stored === null ? { enabled: false, value: null } : { ...stored[component] };
+      continue;
+    }
+    const stated = fiscalStated(options, areaId, component, values[component]);
+    if (!stated.ok) {
+      return stated;
+    }
+    components[component] = stated.value;
+  }
+  const row = {
+    area_id: areaId,
+    vat: components.vat,
+    tax: components.tax,
+    transfer: components.transfer
+  };
+  const existing = base2.overrides.find((item) => item.area_id === areaId) ?? null;
+  const changed = areaId !== base2.area_id ? true : existing === null ? !rowStatesNothing(row) : !sameRow(existing, row);
+  const overrides = existing === null && rowStatesNothing(row) ? base2.overrides : existing === null ? [...base2.overrides, row] : base2.overrides.map((item) => item.area_id === areaId ? row : item);
+  return {
+    ok: true,
+    body: { ...encodeBody(base2), area_id: areaId, overrides },
+    changed
+  };
+}
+var MARKET_EDITABLE_STATES = ["ready", "stale"];
+function marketEditable(state, isAdmin) {
+  return isAdmin && MARKET_EDITABLE_STATES.includes(state);
+}
+function marketAreaLabel(language, name, id) {
+  const hasName = name !== null && name !== "";
+  const hasId = id !== null && id !== "";
+  if (!hasName && !hasId) {
+    return translate2(language, "market.unset");
+  }
+  if (!hasName) {
+    return id;
+  }
+  if (!hasId || name.includes(id) || namesItsId(name, id)) {
+    return name;
+  }
+  return `${name} \xB7 ${id}`;
+}
+function namesItsId(name, id) {
+  const spelled = id.replace(/-/g, " ");
+  return spelled !== id && (name === spelled || name.startsWith(`${spelled} `));
+}
+function marketStateKey(state, reason) {
+  if (state === "ready") {
+    return null;
+  }
+  if (state === "stale") {
+    return reason === "invalid" ? "market.state.staleInvalid" : "market.state.staleOffline";
+  }
+  if (state === "invalid") {
+    return "market.state.invalid";
+  }
+  if (state === "unavailable") {
+    return "market.state.offline";
+  }
+  return "market.state.loading";
+}
+
+// src/grid-tariff.ts
+var GRID_TARIFF_CONFLICT = "revision_conflict";
+var SUGGESTED_WINDOW = { days: "weekdays", from_month: 11, to_month: 3, from_hour: 7, to_hour: 19 };
+function sameWindow(a4, b3) {
+  return a4.days === b3.days && a4.from_month === b3.from_month && a4.to_month === b3.to_month && a4.from_hour === b3.from_hour && a4.to_hour === b3.to_hour;
+}
+function gridTariffIncluded(block) {
+  return block.transfer_percent.policy === "included" || block.transfer_high.policy === "included";
+}
+function feeBody(fee) {
+  return { enabled: fee.policy === "manual", value: fee.explicit_value };
+}
+function copyComponent(component) {
+  return {
+    window: component.window === null ? null : { ...component.window },
+    top_n: component.top_n,
+    price_per_kw: { ...component.price_per_kw }
+  };
+}
+function storedBody(block) {
+  const body = {
+    transfer_percent: feeBody(block.transfer_percent),
+    transfer_high: feeBody(block.transfer_high),
+    high_load_window: block.high_load_window === null ? null : { ...block.high_load_window }
+  };
+  return block.demand === null ? body : { ...body, demand_components: block.demand.components.map(copyComponent) };
+}
+function sameComponent(a4, b3) {
+  const window2 = a4.window === null || b3.window === null ? a4.window === b3.window : sameWindow(a4.window, b3.window);
+  return window2 && a4.top_n === b3.top_n && a4.price_per_kw.winter === b3.price_per_kw.winter && a4.price_per_kw.summer === b3.price_per_kw.summer;
+}
+function sameBody(left, right) {
+  const fee = (a4, b3) => a4.enabled === b3.enabled && a4.value === b3.value;
+  const window2 = (a4, b3) => a4 === null || b3 === null ? a4 === b3 : sameWindow(a4, b3);
+  const components = (a4, b3) => a4 === void 0 || b3 === void 0 ? a4 === b3 : a4.length === b3.length && a4.every((component, index) => sameComponent(component, b3[index]));
+  return fee(left.transfer_percent, right.transfer_percent) && fee(left.transfer_high, right.transfer_high) && window2(left.high_load_window, right.high_load_window) && components(left.demand_components, right.demand_components);
+}
+var HIGH_LOAD_MAX = 1e5;
+
+// sidebar/market-costs.js
+var OPTIONS_REFRESH_MS = 6e5;
+var OPTIONS_MAX_AGE_MS = 12e5;
+var ok2 = (n6) => Number.isFinite(n6);
+var LABELS = { vat: "VAT", tax: "Energy tax", transfer: "Grid fee (flat)" };
+var DAY_CHOICES = [["all", "Every day"], ["weekdays", "Monday\u2013Friday"], ["mon_sat", "Monday\u2013Saturday"]];
+var MONTHS2 = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+var BASIS_TEXT = "How a configured variable cost is built: the raw published price, plus energy tax, plus the grid fee (the flat fee, or the high-load fee inside its hours), plus the grid fee as a percentage of the raw price (it follows the raw price\u2019s sign), then multiplied by (1 + VAT). VAT therefore applies to the tax and fees as well. A raw price can be negative; configured fees may make the final cost positive. A price that the area list says already includes a charge is not charged for it again.";
+var areaOf = (options, id) => options && id ? options.areas.find((a4) => a4.area_id === id) || null : null;
+var figureText = (n6) => ok2(n6) ? String(n6) : "";
+var modeOf = (form) => !form.enabled ? "off" : form.intent === "suggested" ? "suggested" : "custom";
+function costSignature(record5, options, block, areaId) {
+  const id = areaId ?? record5?.area_id ?? null;
+  const row = record5 ? record5.overrides.find((o9) => o9.area_id === id) || null : null;
+  return JSON.stringify([
+    record5?.area_id ?? null,
+    row,
+    options ? options.state : null,
+    options && id ? marketIncluded(options, id) : null,
+    block ? [block.write_revision, block.transfer_percent.policy, block.transfer_percent.explicit_value, block.transfer_high.policy, block.transfer_high.explicit_value, block.high_load_window] : null
+  ]);
+}
+function providerLines(dashboard) {
+  if (!dashboard) return { provider: "Price provider unknown: no dashboard observation yet.", providerNote: "", url: "" };
+  const p4 = dashboard.prices?.provider ?? null;
+  if (!p4) return { provider: "Price provider unknown (not reported by this backend).", providerNote: "", url: "" };
+  const named = p4.name || p4.key;
+  return {
+    provider: named ? `Price provider: ${named}.` : "No price provider is configured for the saved area.",
+    providerNote: p4.notice ? `Provider note: ${p4.notice.code.replace(/_/g, " ")}.` : "",
+    url: p4.url || ""
+  };
+}
+function heldLine(dashboard) {
+  const pr = dashboard?.prices;
+  if (!pr) return "Held price data: unknown.";
+  const bits = [`state ${pr.state || "unknown"}${pr.reason ? ` (${pr.reason})` : ""}`];
+  bits.push(pr.interval_count > 0 ? `${pr.interval_count} held intervals${ok2(pr.resolution_minutes) ? ` at ${pr.resolution_minutes} min` : ""}` : "no held intervals");
+  if (pr.waiting_for_tomorrow === true) bits.push("tomorrow not yet published");
+  if (pr.unpriced === true) bits.push("some slots have no price");
+  const cat = dashboard?.market?.catalogue_state;
+  if (cat) bits.push(`area list ${cat}`);
+  return `Held price data: ${bits.join("; ")}. These are held values, not proof the provider answered just now.`;
+}
+function nowLine(dashboard, now) {
+  const m4 = dashboard?.market;
+  const currency = m4?.currency || null;
+  const unit = priceUnit(currency);
+  const hit = (dashboard?.prices?.intervals || []).find((i7) => ok2(i7.startMs) && ok2(i7.endMs) && i7.startMs <= now && now < i7.endMs);
+  if (!hit) return { text: `Current interval: no held price for this moment (unknown, not zero). Unit ${unit}.`, unit };
+  const fmt = (x2) => ok2(x2) ? `${priceText(displayPrice(x2, currency))} ${unit}` : "unknown";
+  return { text: `Current interval: raw published price ${fmt(hit.raw_price)} \xB7 configured variable cost ${fmt(hit.effective_price)}. They are different figures and are shown separately.`, unit };
+}
+function currencyLine(dashboard, area) {
+  const m4 = dashboard?.market;
+  const cur = area?.currency ?? m4?.currency ?? null;
+  const major = area?.major_unit ?? m4?.major_unit ?? null;
+  const minor = area?.minor_unit ?? m4?.minor_unit ?? null;
+  if (!cur) return "Currency unknown for the selected area.";
+  return `Currency ${cur}${major ? ` (${major}${minor ? `, minor unit ${minor}` : ""})` : ""}. Prices and the chart show ${priceUnit(cur)}; flat fees are entered in ${minor ? `${minor}/kWh` : "the area\u2019s minor unit (unknown)"} exactly as stored, and VAT and the grid fee percentage in %.`;
+}
+function feeRows(record5, options, areaId, canEdit) {
+  const row = record5.overrides.find((o9) => o9.area_id === areaId) || null;
+  const included = marketIncluded(options, areaId);
+  const rows = [];
+  for (const key3 of FISCAL_COMPONENTS) {
+    const form = fiscalFormFrom(row, key3);
+    const suggestion = marketSuggestion(options, areaId, key3);
+    const unit = fiscalUnit(options, areaId, key3) ? key3 === "vat" ? "%" : `${fiscalUnit(options, areaId, key3)}/kWh` : key3 === "vat" ? "%" : "unit unknown";
+    const stored = row ? row[key3] : null;
+    const base2 = modeOf(form);
+    if (included.includes(key3)) {
+      rows.push({ key: key3, label: LABELS[key3], included: true, unit, mode: "included", figure: figureText(stored?.value ?? null), modes: [], hint: `Already included in this area\u2019s published price \u2014 nothing is added${stored && stored.value !== null ? ` (a stored figure of ${stored.value} ${unit} is kept but not used)` : ""}.`, canEdit: false });
+      continue;
+    }
+    const modes = [{ value: "off", text: "Off \u2014 not added" }];
+    if (suggestion !== null || base2 === "suggested") modes.push({ value: "suggested", text: suggestion !== null ? `Use the area\u2019s suggestion (${suggestion} ${unit})` : "Area suggestion (none published \u2014 nothing is added)" });
+    modes.push({ value: "custom", text: "My own figure" });
+    const hint = base2 === "off" ? "Not added to prices." : base2 === "suggested" ? suggestion !== null ? `Adds the area\u2019s suggestion, ${suggestion} ${unit} (kept as \u201Csuggested\u201D, not copied).` : "Set to the suggestion, but this area publishes none, so nothing is added." : `Adds your figure, ${figureText(stored?.value)} ${unit}.`;
+    rows.push({ key: key3, label: LABELS[key3], included: false, unit, mode: base2, figure: form.intent === "custom" ? form.value : "", modes, hint, canEdit });
+  }
+  return rows;
+}
+function tariffModel(block, canEdit) {
+  if (!block) return null;
+  const included = gridTariffIncluded(block);
+  const high = block.transfer_high, pct = block.transfer_percent;
+  const stored = block.high_load_window;
+  const win = stored || SUGGESTED_WINDOW;
+  const highUnit = high.unit;
+  const edit = canEdit && block.writable === true && !included;
+  const demandCount = block.demand ? block.demand.components.length : 0;
+  return {
+    included,
+    canEdit: edit,
+    writable: block.writable === true,
+    percent: { mode: pct.policy === "manual" ? "custom" : "off", figure: figureText(pct.explicit_value), unit: "%", policy: pct.policy },
+    high: { mode: high.policy === "manual" ? "custom" : "off", figure: figureText(high.explicit_value), unit: highUnit ? highUnit : "unit unknown", unitKnown: !!highUnit, policy: high.policy },
+    window: { ...win, stored: !!stored, suggested: !stored },
+    notes: [
+      included ? "The area\u2019s published price already includes the grid fee, so these rows are locked and nothing is added." : "Switching a row off keeps its stored figure. The high-load fee needs its hours; with none stored, common hours are only suggested and are saved only when you press Save.",
+      demandCount ? `${demandCount} demand-charge component${demandCount === 1 ? "" : "s"} are kept exactly as stored (this area does not edit them).` : ""
+    ].filter(Boolean),
+    summary: [
+      `Grid fee as % of the raw price: ${pct.policy === "included" ? "included in the published price" : pct.policy === "manual" ? `${pct.explicit_value}%` : "off"}.`,
+      `High-load grid fee: ${high.policy === "included" ? "included in the published price" : high.policy === "manual" ? `${high.explicit_value} ${highUnit || "unit unknown"}` : "off"}${stored ? ` \xB7 hours stored (${DAY_CHOICES.find((d3) => d3[0] === stored.days)?.[1] || stored.days}, ${MONTHS2[stored.from_month - 1]}\u2013${MONTHS2[stored.to_month - 1]}, ${String(stored.from_hour).padStart(2, "0")}:00\u2013${String(stored.to_hour % 24).padStart(2, "0")}:00)` : " \xB7 no hours stored"}.`
+    ]
+  };
+}
+function marketCostsModel(input) {
+  const base2 = { notice: input.notice || "", conflict: !!input.conflict, busy: !!input.busy };
+  const dashboard = input.dashboard || null;
+  const summary = { ...providerLines(dashboard), held: heldLine(dashboard), basis: BASIS_TEXT, ...nowLine(dashboard, input.now) };
+  const reloadNote = (text4) => ({ ...base2, ...summary, state: input.loading ? "loading" : "unavailable", canEdit: false, notice: base2.notice || text4 });
+  if (!input.record) return reloadNote(input.loading ? "Loading market and cost settings\u2026" : "Market and cost settings unavailable. Use Reload to try again.");
+  if (!input.options) return reloadNote(input.loading ? "Loading the area list\u2026" : "The area list is unavailable, so area and fees cannot be shown or changed. Use Reload to try again.");
+  const optionsFresh = ok2(input.optionsAt) && input.now - input.optionsAt <= OPTIONS_MAX_AGE_MS && !input.failed;
+  const record5 = input.record, options = input.options;
+  const editableState = marketEditable(options.state, input.admin === true);
+  const dashFresh2 = input.dashboardFresh !== false && !!dashboard;
+  const baseEdit = input.admin === true && !input.blocked && !input.conflict && !input.busy && !input.awaitingRead;
+  const canEdit = baseEdit && editableState && optionsFresh && dashFresh2;
+  const notes = [];
+  if (!input.admin) notes.push("Administrator permission is required to change the market, taxes and fees. Everything here is read-only.");
+  const stateKey = marketStateKey(options.state, options.reason);
+  if (stateKey) notes.push(translate2("en", stateKey));
+  if (!editableState && input.admin) notes.push("The area list is not held, so the saved area is shown but nothing can be changed.");
+  if (input.admin && !optionsFresh) notes.push("The area list is stale or its refresh failed; changes are disabled until it is read again.");
+  if (input.admin && !dashFresh2) notes.push("The dashboard observation is stale; changes are disabled until it is read again.");
+  if (input.awaitingRead && input.admin) notes.push("Waiting for a fresh dashboard read after the last save before another change.");
+  const savedId = record5.area_id;
+  const areaId = input.areaDraft ?? savedId;
+  const area = areaOf(options, areaId);
+  const savedListed = !savedId || !!areaOf(options, savedId);
+  if (savedId && !savedListed) notes.push(`The saved area ${savedId} is no longer in the area list; it is kept until you choose another.`);
+  const areaOptions = [];
+  if (!savedId) areaOptions.push({ value: "", text: "No area saved \u2014 choose one\u2026" });
+  if (savedId && !savedListed) areaOptions.push({ value: savedId, text: `${savedId} (no longer listed)` });
+  for (const a4 of options.areas) areaOptions.push({ value: a4.area_id, text: `${marketAreaLabel("en", a4.name, a4.area_id)} \xB7 ${a4.currency}` });
+  const changedArea = areaId !== savedId;
+  if (changedArea) notes.push(`The selected area differs from the saved one (${savedId || "none"}). The prices, currency and provider above are for the saved area until you save. Fees start from what is stored for the new area; nothing carries over.`);
+  const model = { ...base2, ...summary, state: "ready", canEdit, notes, areaDraft: changedArea, currencyText: currencyLine(dashboard, area || areaOf(options, savedId)) };
+  model.area = { value: areaId || "", options: areaOptions, canEdit: canEdit && options.areas.length > 0, savedId: savedId || "", savedText: savedId ? marketAreaLabel("en", areaOf(options, savedId)?.name ?? dashboard?.market?.area_name ?? null, savedId) : "none" };
+  model.fees = areaId && area ? feeRows(record5, options, areaId, canEdit) : [];
+  if (!model.fees.length) model.notes.push("Choose an area to see its taxes and fees.");
+  const ps = dashboard?.price_source ?? null;
+  model.source = ps ? { title: ps.title, count: ps.charger_count, writable: ps.writable === true, base: ps.entry_id, choices: ps.choices.map((c5) => ({ value: c5.entry_id, text: c5.title })), canEdit: canEdit && ps.writable === true && ps.choices.length > 1 } : null;
+  model.tariff = tariffModel(dashboard?.grid_tariff ?? null, canEdit);
+  model.noEntryNote = dashboard && !ps ? "This charger prices with its own settings (no electricity price entry), so the price-source and grid-tariff controls are not offered here." : "";
+  model.shared = ps ? `Area and fees belong to the price entry \u201C${ps.title}\u201D, used by ${ps.charger_count} charger${ps.charger_count === 1 ? "" : "s"}; a change applies to all of them.` : "";
+  return model;
+}
+function marketWritePlan(record5, options, values, admin) {
+  if (!admin) return { ok: false, notice: "Administrator permission is required." };
+  if (!record5 || !options) return { ok: false, notice: "Reload market and cost settings first." };
+  const areaId = values?.area ? values.area : null;
+  const form = { areaId, vat: null, tax: null, transfer: null };
+  for (const key3 of FISCAL_COMPONENTS) {
+    const v2 = values?.[key3] || { mode: "off", figure: "" };
+    const text4 = typeof v2.figure === "string" ? v2.figure : "";
+    if (v2.mode === "suggested") form[key3] = { enabled: true, value: "", intent: "suggested" };
+    else if (v2.mode === "custom") form[key3] = { enabled: true, value: text4, intent: "custom" };
+    else form[key3] = { enabled: false, value: text4, intent: text4.trim() === "" ? "suggested" : "custom" };
+  }
+  const check = marketReplacement(record5, form, options);
+  if (!check.ok) return { ok: false, notice: translate2("en", check.errorKey) };
+  if (!check.changed) return { ok: true, changed: false };
+  return { ok: true, changed: true, body: check.body, areaChanged: areaId !== record5.area_id, fromArea: record5.area_id, toArea: areaId };
+}
+function tariffWritePlan(block, values) {
+  if (!block) return { ok: false, notice: "This charger has no electricity price entry, so there is no grid tariff to change." };
+  if (block.writable !== true) return { ok: false, notice: "Administrator permission is required." };
+  if (gridTariffIncluded(block)) return { ok: false, notice: "The published price already includes the grid fee; nothing can be added." };
+  const body = storedBody(block);
+  const num3 = (t6) => {
+    const s4 = typeof t6 === "string" ? t6.trim().replace(",", ".") : "";
+    return s4 === "" ? null : Number(s4);
+  };
+  const p4 = values?.percent || { mode: "off", figure: "" };
+  if (p4.mode === "custom") {
+    const n6 = num3(p4.figure);
+    if (n6 === null) return { ok: false, notice: "Enter the grid fee percentage, or switch it off." };
+    if (!ok2(n6) || n6 < 0 || n6 > 1e3) return { ok: false, notice: "The grid fee percentage must be a number from 0 to 1000." };
+    body.transfer_percent = { enabled: true, value: n6 };
+  } else body.transfer_percent = { enabled: false, value: block.transfer_percent.explicit_value };
+  const h3 = values?.high || { mode: "off", figure: "" };
+  if (h3.mode === "custom") {
+    if (!block.transfer_high.unit) return { ok: false, notice: "The area\u2019s unit is unknown, so the high-load fee cannot be set." };
+    const n6 = num3(h3.figure);
+    if (n6 === null) return { ok: false, notice: "Enter the high-load fee, or switch it off." };
+    if (!ok2(n6) || n6 < 0 || n6 > HIGH_LOAD_MAX) return { ok: false, notice: `The high-load fee must be a number from 0 to ${HIGH_LOAD_MAX}.` };
+    const w2 = values?.window || {};
+    const win = { days: w2.days, from_month: Number(w2.fromMonth), to_month: Number(w2.toMonth), from_hour: Number(w2.fromHour), to_hour: Number(w2.toHour) };
+    if (!DAY_CHOICES.some((d3) => d3[0] === win.days) || ![win.from_month, win.to_month].every((x2) => Number.isInteger(x2) && x2 >= 1 && x2 <= 12) || !Number.isInteger(win.from_hour) || win.from_hour < 0 || win.from_hour > 23 || !Number.isInteger(win.to_hour) || win.to_hour < 1 || win.to_hour > 24) return { ok: false, notice: "Choose valid high-load days, months and hours." };
+    if (win.from_hour === win.to_hour) return { ok: false, notice: "The high-load window must not start and end at the same hour." };
+    body.transfer_high = { enabled: true, value: n6 };
+    body.high_load_window = win;
+  } else body.transfer_high = { enabled: false, value: block.transfer_high.explicit_value };
+  return sameBody(body, storedBody(block)) ? { ok: true, changed: false } : { ok: true, changed: true, body, expected: block.write_revision };
+}
+function sourceWritePlan(source, values) {
+  if (!source) return { ok: false, notice: "This charger has no electricity price entry." };
+  const id = typeof values?.entry === "string" ? values.entry : "";
+  if (id === source.base) return { ok: true, changed: false };
+  if (!source.choices.some((c5) => c5.value === id)) return { ok: false, notice: "Choose one of the offered electricity price entries." };
+  return { ok: true, changed: true, entryId: id, from: source.base, count: source.count };
+}
+
+// sidebar/market-costs-panel.js
+var REFUSED = (code) => typeof code === "string" && (code === "spotnav_not_admin" || code === "spotnav_unknown_charger" || code === "spotnav_unsupported_api_version" || code === "spotnav_no_price_entry" || code === "spotnav_unknown_price_entry" || code === "spotnav_invalid_value" || code === "revision_conflict" || code.startsWith("invalid_"));
+var SAVED_NOTE = "Plans and cost estimates for every charger using this price entry may recalculate and, if Morek owns the schedule, go through normal guarded reconciliation; this does not change the provider, send a notification, wake the car or confirm charging.";
+var dashFresh = (dashboard, failed) => observationFreshness(Date.parse(dashboard?.generated_at || ""), Date.now(), failed) === "fresh";
+var costWritesByConnection = /* @__PURE__ */ new WeakMap();
+var marketCostMethods = {
+  initCosts() {
+    this.pendingCostWrites = /* @__PURE__ */ new Map();
+    this.unknownCostWrites = /* @__PURE__ */ new Set();
+    this.marketOptions = null;
+    this.marketOptionsAt = null;
+    this.marketOptionsFailed = false;
+    this.marketLoading = false;
+    this.marketArea = null;
+    this.costDirty = false;
+    this.costFeeEdited = false;
+    this.costBase = null;
+    this.costBusy = false;
+    this.costConflict = false;
+    this.costNotice = "";
+    this.costAwaitingRead = false;
+  },
+  bindCostContext(value2) {
+    if (this.costWriteContext || !value2) return;
+    const key3 = value2.connection || value2;
+    if (!costWritesByConnection.has(key3)) costWritesByConnection.set(key3, { pending: /* @__PURE__ */ new Map(), unknown: /* @__PURE__ */ new Set() });
+    this.costWriteContext = costWritesByConnection.get(key3);
+    this.pendingCostWrites = this.costWriteContext.pending;
+    this.unknownCostWrites = this.costWriteContext.unknown;
+  },
+  resetCosts() {
+    this.view?.resetMarketDrafts(false);
+    this.costDirty = false;
+    this.costFeeEdited = false;
+    this.costBase = null;
+    this.costConflict = false;
+    this.costNotice = "";
+    this.marketArea = null;
+  },
+  paintMarketCosts(adapter, dashboard) {
+    const admin = this._hass?.user?.is_admin === true, charger = this.charger;
+    const unknown = this.unknownCostWrites.has(charger) || this.pendingCostWrites.has(charger);
+    const block = dashboard?.grid_tariff ?? null;
+    if (this.costDirty && this.costBase && !this.costConflict && this.settingsRecord && this.marketOptions && costSignature(this.settingsRecord, this.marketOptions, block, this.costBase.areaId) !== this.costBase.signature) {
+      this.costConflict = true;
+      this.costNotice = "Market or cost settings changed while editing. Reload before saving again.";
+    }
+    const staleRecord = this.settingsConflict && !this.costBusy;
+    adapter.model.marketCosts = marketCostsModel({
+      admin,
+      loading: this.settingsLoading || this.marketLoading,
+      failed: this.marketOptionsFailed,
+      record: this.settingsRecord,
+      options: this.marketOptions,
+      optionsAt: this.marketOptionsAt,
+      now: Date.now(),
+      dashboard,
+      dashboardFresh: !!dashboard && dashFresh(dashboard, this.dashboardFailed),
+      areaDraft: this.marketArea,
+      blocked: this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || staleRecord || unknown,
+      conflict: this.costConflict || unknown,
+      busy: this.costBusy,
+      awaitingRead: this.costAwaitingRead,
+      notice: this.costNotice || (unknown ? "A previous market/cost save has an unknown outcome. Reload to confirm it." : staleRecord ? "Settings changed elsewhere or the record is stale. Reload before changing market or costs." : "")
+    });
+    adapter.actions.editCosts = (name) => this.editCosts(name);
+    adapter.actions.selectMarketArea = (id) => this.selectMarketArea(id);
+    adapter.actions.saveMarket = (values) => this.saveMarket(values);
+    adapter.actions.saveTariff = (values) => this.saveTariff(values);
+    adapter.actions.savePriceEntry = (values) => this.savePriceEntry(values);
+    adapter.actions.reloadMarketCosts = () => this.reloadMarketCosts();
+  },
+  editCosts(name) {
+    if (name && name !== "area") this.costFeeEdited = true;
+    if (this.costDirty) return;
+    const decoded = decodeDashboard(this.rawDashboard);
+    const record5 = this.settingsRecord;
+    this.costBase = record5 && this.marketOptions ? { areaId: record5.area_id, signature: costSignature(record5, this.marketOptions, decoded.ok ? decoded.value.grid_tariff : null, record5.area_id) } : null;
+    this.costDirty = true;
+  },
+  selectMarketArea(id) {
+    const saved = this.settingsRecord?.area_id || "";
+    const target = !id || id === saved ? null : id;
+    if (target === this.marketArea) {
+      this.paint();
+      return;
+    }
+    if (this.costFeeEdited && !window.confirm("Changing the price area discards your unsaved tax and fee edits for the current one; fees for the new area start from what is stored for it. Continue?")) {
+      this.view?.setMarketDraft("area", this.marketArea || saved);
+      this.paint();
+      return;
+    }
+    this.view?.resetMarketDrafts(true);
+    this.costFeeEdited = false;
+    this.marketArea = target;
+    this.costNotice = "";
+    this.paint();
+  },
+  reloadMarketCosts() {
+    const charger = this.charger;
+    if (!this.connected || !charger || this.costBusy || this.settingsBusy || this.pendingCostWrites.has(charger)) return;
+    if (this.settingsDirty || this.settingsConflict) {
+      this.reloadSettings();
+      void this.loadMarketOptions(true);
+      return;
+    }
+    if (this.costDirty && !window.confirm("Discard the unsaved market and cost changes and reload?")) return;
+    this.resetCosts();
+    this.unknownCostWrites.delete(charger);
+    this.settingsRecord = null;
+    this.marketOptions = null;
+    this.marketOptionsAt = null;
+    this.paint();
+    void this.loadSettings();
+    void this.loadMarketOptions(true);
+    this.refresh();
+  },
+  async loadMarketOptions(force = false) {
+    if (this.marketLoading || !this.charger || !this._hass) return;
+    if (!force && this.marketOptions && Date.now() - (this.marketOptionsAt || 0) < OPTIONS_REFRESH_MS) return;
+    const generation = this.generation, charger = this.charger, hass = this._hass;
+    const current = () => this.connected && generation === this.generation && charger === this.charger;
+    this.marketLoading = true;
+    try {
+      const decoded = decodeMarketOptions(await this.bounded(getMarketOptions(hass, charger)));
+      if (!current()) return;
+      if (!decoded.ok) {
+        this.marketOptionsFailed = true;
+        this.costNotice = decoded.failure === "unsupported" ? translate2("en", "market.error.version") : translate2("en", "market.error.read");
+        return;
+      }
+      this.marketOptions = decoded.value;
+      this.marketOptionsAt = Date.now();
+      this.marketOptionsFailed = false;
+      if (this.costNotice === translate2("en", "market.error.version") || this.costNotice === translate2("en", "market.error.read") || this.costNotice === "The area list could not be read. Use Reload to try again.") this.costNotice = "";
+    } catch {
+      if (current()) {
+        this.marketOptionsFailed = true;
+        if (!this.marketOptions) this.costNotice = "The area list could not be read. Use Reload to try again.";
+      }
+    } finally {
+      if (this.connected && generation === this.generation) {
+        this.marketLoading = false;
+        this.paint();
+      }
+    }
+  },
+  costWriteBlocked(record5) {
+    const charger = this.charger, hass = this._hass;
+    return !this.connected || hass?.connected === false || hass?.user?.is_admin !== true || !charger || !record5 || this.costBusy || this.marketLoading || this.settingsLoading || this.pendingCostWrites.has(charger) || this.unknownCostWrites.has(charger) || this.costConflict || this.costAwaitingRead || this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.settingsConflict;
+  },
+  costReadiness(dashboard) {
+    if (!dashboard || !dashFresh(dashboard, this.dashboardFailed)) return "The dashboard observation is stale. Wait for a fresh read or reload before saving.";
+    if (!this.marketOptions || this.marketOptionsFailed || Date.now() - (this.marketOptionsAt || 0) > OPTIONS_MAX_AGE_MS) return "The area list is stale or unavailable. Reload before saving.";
+    return "";
+  },
+  async finishCostWrite(generation, charger, body) {
+    this.costBusy = true;
+    this.statusEpoch++;
+    this.statusAt = null;
+    this.paint();
+    try {
+      await body();
+    } finally {
+      if (this.connected && generation === this.generation && charger === this.charger) {
+        this.costBusy = false;
+        this.dashboardEpoch++;
+        this.paint();
+        this.refresh();
+      }
+    }
+  },
+  /** Run one dispatched write: its own answer is the only thing that settles the outcome. */
+  async dispatchCostWrite(label2, makeRequest, settle) {
+    const generation = this.generation, permissionEpoch = this.permissionEpoch, charger = this.charger;
+    const current = () => this.connected && generation === this.generation && permissionEpoch === this.permissionEpoch && charger === this.charger;
+    await this.finishCostWrite(generation, charger, async () => {
+      const request = makeRequest();
+      this.pendingCostWrites.set(charger, request);
+      request.finally(() => {
+        if (this.pendingCostWrites.get(charger) === request) this.pendingCostWrites.delete(charger);
+      }).catch(() => {
+      });
+      this.costNotice = "Saving\u2026";
+      this.paint();
+      const unknown = (text4) => {
+        this.unknownCostWrites.add(charger);
+        if (this.connected && generation === this.generation) {
+          this.costConflict = true;
+          this.costNotice = text4;
+        }
+      };
+      try {
+        const answer = await this.bounded(request);
+        if (!current()) {
+          this.unknownCostWrites.add(charger);
+          return;
+        }
+        settle(answer, unknown);
+      } catch (error2) {
+        const code = error2?.code;
+        if (!current()) {
+          this.unknownCostWrites.add(charger);
+          return;
+        }
+        if (code === GRID_TARIFF_CONFLICT) {
+          this.costConflict = true;
+          this.settingsConflict = true;
+          this.settingsNotice = "Market or cost settings changed elsewhere. Reload settings before editing again.";
+          this.costNotice = `${label2} not saved: the electricity price was changed elsewhere since it was read; nothing was written. Reload and review the new values.`;
+          return;
+        }
+        if (REFUSED(code)) {
+          this.costNotice = `${label2} not saved: ${translate2("en", settingsErrorKey(code))} (${code}).`;
+          return;
+        }
+        unknown("Save outcome unknown; the request may still complete. Wait, then reload before retrying.");
+      }
+    });
+  },
+  async saveMarket(values) {
+    const record5 = this.settingsRecord, options = this.marketOptions, hass = this._hass, charger = this.charger, generation = this.generation, permissionEpoch = this.permissionEpoch;
+    const decoded = decodeDashboard(this.rawDashboard), dashboard = decoded.ok ? decoded.value : null;
+    if (this.costWriteBlocked(record5)) {
+      this.costNotice = "Save unavailable: another request is running, a previous outcome is unknown or stale, or permission is missing.";
+      this.paint();
+      return;
+    }
+    const notReady = this.costReadiness(dashboard);
+    if (notReady || !marketEditable(options.state, true)) {
+      this.costNotice = notReady || "The area list is not held, so nothing can be changed.";
+      this.paint();
+      return;
+    }
+    const plan = marketWritePlan(record5, options, values, true);
+    if (!plan.ok) {
+      this.costNotice = plan.notice;
+      this.paint();
+      return;
+    }
+    if (!plan.changed) {
+      this.costNotice = "No changes to save.";
+      this.paint();
+      return;
+    }
+    if (plan.areaChanged && !window.confirm(`Switch the price area from ${plan.fromArea || "none"} to ${plan.toArea}? This changes the prices, currency and price provider route used for planning${dashboard?.price_source ? ` by all ${dashboard.price_source.charger_count} charger(s) using \u201C${dashboard.price_source.title}\u201D` : ""}. Fees do not carry over, and a soft price cap is not converted between currencies \u2014 review it afterwards.`)) return;
+    if (this.costWriteBlocked(this.settingsRecord) || this.settingsRecord !== record5 || this.generation !== generation || this.permissionEpoch !== permissionEpoch || this.charger !== charger) {
+      this.costNotice = "State changed; review the values and try again.";
+      this.paint();
+      return;
+    }
+    await this.dispatchCostWrite("Area and taxes", () => updateSettings(hass, charger, record5.revision, plan.body), (raw, unknown) => {
+      const answer = decodeSettingsAnswer(raw);
+      if (!answer.ok) {
+        unknown("Save response unavailable; outcome unknown. Reload before retrying.");
+        return;
+      }
+      const a4 = answer.value;
+      if (a4.ok) {
+        this.settingsRecord = a4.settings;
+        this.settingsConflict = false;
+        this.resetCosts();
+        this.costAwaitingRead = true;
+        this.costNotice = `Area and taxes saved and confirmed by the backend. ${SAVED_NOTE}`;
+      } else if (a4.code === SETTINGS_REVISION_CONFLICT) {
+        this.costConflict = true;
+        this.settingsConflict = true;
+        this.settingsNotice = "Settings changed elsewhere. Reload settings before editing again.";
+        this.costNotice = "Area and taxes not saved: settings were changed elsewhere; nothing was written. Reload and review the new values.";
+      } else if (a4.code === SETTINGS_RECONCILE_FAILED) {
+        if (a4.settings) {
+          this.settingsRecord = a4.settings;
+          this.settingsConflict = false;
+        }
+        this.resetCosts();
+        this.costAwaitingRead = true;
+        this.costConflict = true;
+        this.costNotice = "Area and taxes were saved, but replanning failed; reload and inspect the confirmed values before changing them again.";
+      } else if (a4.code === SETTINGS_NOT_COMMITTED) {
+        this.costNotice = "Area and taxes were not saved: the backend did not commit the change.";
+      } else this.costNotice = `Area and taxes not saved: ${translate2("en", settingsErrorKey(a4.code))} (${a4.code}).`;
+    });
+  },
+  async saveTariff(values) {
+    const hass = this._hass, charger = this.charger, generation = this.generation, permissionEpoch = this.permissionEpoch, record5 = this.settingsRecord;
+    const decoded = decodeDashboard(this.rawDashboard), dashboard = decoded.ok ? decoded.value : null;
+    if (this.costWriteBlocked(record5)) {
+      this.costNotice = "Save unavailable: another request is running, a previous outcome is unknown or stale, or permission is missing.";
+      this.paint();
+      return;
+    }
+    const notReady = this.costReadiness(dashboard);
+    if (notReady) {
+      this.costNotice = notReady;
+      this.paint();
+      return;
+    }
+    const block = dashboard.grid_tariff;
+    const plan = tariffWritePlan(block, values);
+    if (!plan.ok) {
+      this.costNotice = plan.notice;
+      this.paint();
+      return;
+    }
+    if (!plan.changed) {
+      this.costNotice = "No changes to save.";
+      this.paint();
+      return;
+    }
+    if (this.costWriteBlocked(this.settingsRecord) || this.settingsRecord !== record5 || this.generation !== generation || this.permissionEpoch !== permissionEpoch || this.charger !== charger) {
+      this.costNotice = "State changed; review the values and try again.";
+      this.paint();
+      return;
+    }
+    await this.dispatchCostWrite("Grid tariff", () => updateGridTariff(hass, charger, plan.expected, plan.body), (answer, unknown) => {
+      if (!answer || answer.ok !== true) {
+        unknown("Save response unavailable; outcome unknown. Reload before retrying.");
+        return;
+      }
+      this.settingsRecord = null;
+      this.settingsConflict = false;
+      this.resetCosts();
+      this.costAwaitingRead = true;
+      this.costNotice = `Grid tariff saved and confirmed by the backend. ${SAVED_NOTE}`;
+    });
+  },
+  async savePriceEntry(values) {
+    const hass = this._hass, charger = this.charger, generation = this.generation, permissionEpoch = this.permissionEpoch, record5 = this.settingsRecord;
+    const decoded = decodeDashboard(this.rawDashboard), dashboard = decoded.ok ? decoded.value : null;
+    if (this.costWriteBlocked(record5)) {
+      this.costNotice = "Save unavailable: another request is running, a previous outcome is unknown or stale, or permission is missing.";
+      this.paint();
+      return;
+    }
+    const notReady = this.costReadiness(dashboard);
+    if (notReady) {
+      this.costNotice = notReady;
+      this.paint();
+      return;
+    }
+    const source = dashboard.price_source && dashboard.price_source.writable ? { base: dashboard.price_source.entry_id, count: dashboard.price_source.charger_count, choices: dashboard.price_source.choices.map((c5) => ({ value: c5.entry_id, text: c5.title })) } : null;
+    const plan = sourceWritePlan(source, values);
+    if (!plan.ok) {
+      this.costNotice = plan.notice;
+      this.paint();
+      return;
+    }
+    if (!plan.changed) {
+      this.costNotice = "No changes to save.";
+      this.paint();
+      return;
+    }
+    const title = source.choices.find((c5) => c5.value === plan.entryId)?.text || plan.entryId;
+    if (!window.confirm(`Use the electricity price entry \u201C${title}\u201D? Its area, provider route and fees apply to ${plan.count} charger(s) now using the current one, and plans are recalculated. SpotNav does not copy fees between entries.`)) return;
+    if (this.costWriteBlocked(this.settingsRecord) || this.settingsRecord !== record5 || this.generation !== generation || this.permissionEpoch !== permissionEpoch || this.charger !== charger) {
+      this.costNotice = "State changed; review the values and try again.";
+      this.paint();
+      return;
+    }
+    await this.dispatchCostWrite("Price entry", () => choosePriceSource(hass, charger, plan.entryId), (answer, unknown) => {
+      if (!answer || answer.ok !== true) {
+        unknown("Save response unavailable; outcome unknown. Reload before retrying.");
+        return;
+      }
+      this.settingsRecord = null;
+      this.settingsConflict = false;
+      this.resetCosts();
+      this.costAwaitingRead = true;
+      this.costNotice = `Price entry chosen and confirmed by the backend. ${SAVED_NOTE}`;
+    });
+  }
+};
 
 // src/price-provider.ts
 function addIntegrationPath(domain) {
@@ -60705,9 +61800,9 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
     const warning = doc.createElement("p");
     warning.textContent = state.reason === "no_ocpp_target" ? "SpotNav has not identified an OCPP connector for this charger. Check its OCPP charger setup." : state.reason === "wrong_connector" ? "SpotNav is configured for a different connector; this test requires connector 1." : state.reason === "ambiguous_station" ? "Multiple OCPP connections match this charger. No request will be sent until its identity is unambiguous." : state.reason === "unsupported_ocpp_version" ? "This test requires an OCPP 1.6 connection." : "HA OCPP has not matched this charger to Morek station 3020002509120029. Check its OCPP configuration and connection.";
     section.append(warning);
-    const identity2 = doc.createElement("p");
-    identity2.textContent = `SpotNav OCPP ID: ${state.configured_id ?? "not found"} \xB7 connector: ${state.connector_id ?? "not found"} \xB7 HA OCPP station: ${state.resolved_id ?? "not resolved"}`;
-    section.append(identity2);
+    const identity3 = doc.createElement("p");
+    identity3.textContent = `SpotNav OCPP ID: ${state.configured_id ?? "not found"} \xB7 connector: ${state.connector_id ?? "not found"} \xB7 HA OCPP station: ${state.resolved_id ?? "not resolved"}`;
+    section.append(identity3);
   }
   const note = doc.createElement("p");
   note.textContent = state.ownership?.recorded_owner === "morek_schedule" ? "Morek uses schedule ownership; manual profile writes are blocked. These controls do not establish physical charging." : "Pause Auto 'Until I resume' before sending. These controls do not authorize a plugged-in car.";
@@ -61879,7 +62974,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.158";
+var CARD_VERSION = "2.5.159";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {
@@ -62021,6 +63116,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this.vehicleConflict = false;
     this.vehicleNotice = "";
     this.autoNotice = "";
+    this.initCosts();
     this.connected = false;
   }
   connectedCallback() {
@@ -62071,6 +63167,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       this.pendingVehicleWrites = this.vehicleWriteContext.pending;
       this.unknownVehicleWrites = this.vehicleWriteContext.unknown;
     }
+    this.bindCostContext(value2);
     if (!this.chargeWriteContext && value2) {
       const key3 = value2.connection || value2;
       if (!chargeWritesByConnection.has(key3)) chargeWritesByConnection.set(key3, { pending: /* @__PURE__ */ new Map(), unknown: /* @__PURE__ */ new Set(), expected: /* @__PURE__ */ new Map() });
@@ -62108,6 +63205,13 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       this.vehicleConfig = null;
       this.vehicleConfigAt = null;
       this.vehicleLoading = false;
+      if (this.costBusy && this.charger) {
+        this.unknownCostWrites.add(this.charger);
+        this.costConflict = true;
+        this.costNotice = "Permission changed during the market/cost save; its outcome must be checked by reloading.";
+      }
+      this.marketOptions = null;
+      this.marketOptionsAt = null;
       if (this.autoBusy) {
         this.autoUncertain = true;
         this.autoNotice = "Permission changed during the operation; its outcome may be unknown.";
@@ -62138,6 +63242,20 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     if (this.settingsBusy && this.charger) this.unknownSettingsWrites.add(this.charger);
     if (this.chargeBusy && this.charger) this.chargeUnknown?.add(this.charger);
     if (this.vehicleBusy && this.charger) this.unknownVehicleWrites.add(this.charger);
+    if (this.costBusy && this.charger) this.unknownCostWrites.add(this.charger);
+    const costDirty = preserveDraft && this.costDirty, costArea = preserveDraft ? this.marketArea : null, costBase = preserveDraft ? this.costBase : null, costFee = preserveDraft && this.costFeeEdited;
+    this.marketOptions = null;
+    this.marketOptionsAt = null;
+    this.marketOptionsFailed = false;
+    this.marketLoading = false;
+    this.costBusy = false;
+    this.costConflict = false;
+    this.costNotice = "";
+    this.costAwaitingRead = false;
+    this.costDirty = !!costDirty;
+    this.marketArea = costArea;
+    this.costBase = costBase;
+    this.costFeeEdited = !!costFee;
     const vehicleDirty = preserveDraft && this.vehicleDirty;
     this.vehicleConfig = null;
     this.vehicleConfigAt = null;
@@ -62222,16 +63340,16 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     }
     const allowed = this._hass?.user?.is_admin === true || dashboard?.settings?.users_change_plan === true;
     if (this.settingsRecord) {
-      const record4 = this.settingsRecord;
+      const record5 = this.settingsRecord;
       const currency = dashboard?.market?.currency || null;
       if (this.settingsDirty && this.draftCurrency !== void 0 && this.draftCurrency !== currency) {
         this.settingsConflict = true;
         this.settingsNotice = "Price currency changed while editing. Reload settings before saving.";
       }
       adapter.model.capCurrency = currency;
-      adapter.model.settings = { driver: record4.driver, energy: record4.requested_kwh, vehicleId: record4.target.vehicle_id || "", target: record4.target.target_percent, minimum: record4.minimum_ready_by_soc, cap: capInput(record4.soft_price_cap, currency), readyBy: record4.departure_time, ...record4.time_reserve_percent === void 0 ? {} : { reserve: record4.time_reserve_percent }, capEnabled: record4.soft_price_cap != null, capBasis: record4.cap_price_basis, deadlineEnabled: record4.departure_enabled };
+      adapter.model.settings = { driver: record5.driver, energy: record5.requested_kwh, vehicleId: record5.target.vehicle_id || "", target: record5.target.target_percent, minimum: record5.minimum_ready_by_soc, cap: capInput(record5.soft_price_cap, currency), readyBy: record5.departure_time, ...record5.time_reserve_percent === void 0 ? {} : { reserve: record5.time_reserve_percent }, capEnabled: record5.soft_price_cap != null, capBasis: record5.cap_price_basis, deadlineEnabled: record5.departure_enabled };
       adapter.model.planVehicles = dashboard ? chargerCarsOf(dashboard).filter((v2) => v2.id && v2.id !== "guest") : [];
-      const discovered = dashboard?.soc?.vehicle_id, selected = record4.target.vehicle_id;
+      const discovered = dashboard?.soc?.vehicle_id, selected = record5.target.vehicle_id;
       const defaultVehicle = !selected && !dashboard?.guest?.active && adapter.model.planVehicles.length === 1 ? adapter.model.planVehicles[0] : null;
       if (defaultVehicle) {
         Object.assign(adapter.model.settings, { vehicleId: defaultVehicle.id, driver: "target_soc", target: 80, minimum: 40, readyBy: "07:30", deadlineEnabled: true });
@@ -62239,14 +63357,14 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       }
       adapter.model.vehicleHelp = selected === "guest" || dashboard?.guest?.active ? "Guest charging uses requested energy; choose a configured vehicle for a target-SOC plan." : selected ? adapter.model.planVehicles.some((v2) => v2.id === selected) ? "Saved vehicle selected." : "Saved vehicle is not currently discovered; check vehicle configuration." : defaultVehicle ? "The only available vehicle is selected by default. Target 80%, minimum 40%, and ready by 07:30 are proposed, not saved; review and save the plan to apply them." : discovered && discovered !== "guest" ? `No vehicle saved; currently discovered: ${dashboard?.soc?.vehicle_name || discovered}. Choose a vehicle.` : "No unambiguous vehicle selected. Choose a discovered vehicle or configure vehicle discovery.";
       adapter.model.vehicleHelp += ` ${dashboard?.soc?.capacity_kwh > 0 ? "Capacity is available for the observed vehicle." : "Usable battery capacity is unavailable for the observed vehicle; configure it before relying on an SOC plan."} ${adapter.model.vehicle.socDetail} An old reading can be inaccurate after driving.`;
-      if (adapter.model.chart && record4.revision === dashboard?.settings?.revision && record4.cap_price_basis === "nord_pool" && Number.isFinite(record4.soft_price_cap)) {
-        adapter.model.chart.cap = displayPrice(record4.soft_price_cap, currency);
+      if (adapter.model.chart && record5.revision === dashboard?.settings?.revision && record5.cap_price_basis === "nord_pool" && Number.isFinite(record5.soft_price_cap)) {
+        adapter.model.chart.cap = displayPrice(record5.soft_price_cap, currency);
       }
       adapter.model.settingsEditor = true;
-      adapter.model.policySupported = record4.soft_price_cap !== void 0;
+      adapter.model.policySupported = record5.soft_price_cap !== void 0;
       adapter.model.canSave = allowed && !this.settingsBusy && !this.settingsConflict;
       adapter.model.settingsNotice = this.settingsNotice || (!allowed ? "You do not have permission to change this plan." : "");
-      adapter.model.labels.settingsNote = `Charge by requested energy or a SpotNav target SOC. The planning target is separate from the car\u2019s own charge limit. Saving a mode, target or energy change can recalculate the plan and may trigger normal guarded schedule reconciliation when ownership is armed; it does not guarantee Resume or physical charging.${record4.fill_to_limit ? " Fill-to-limit is saved separately and remains enabled; review it in the existing card if the requested energy is not being used." : ""}`;
+      adapter.model.labels.settingsNote = `Charge by requested energy or a SpotNav target SOC. The planning target is separate from the car\u2019s own charge limit. Saving a mode, target or energy change can recalculate the plan and may trigger normal guarded schedule reconciliation when ownership is armed; it does not guarantee Resume or physical charging.${record5.fill_to_limit ? " Fill-to-limit is saved separately and remains enabled; review it in the existing card if the requested energy is not being used." : ""}`;
       adapter.model.labels.saveLabel = this.settingsBusy ? "Saving\u2026" : "Save plan";
       adapter.actions.save = (values) => this.savePlan(values);
       adapter.actions.reloadSettings = () => this.reloadSettings();
@@ -62257,6 +63375,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       };
     } else adapter.model.settingsNotice = this.settingsLoading ? "Loading settings\u2026" : this.settingsNotice || "Settings unavailable.";
     this.paintVehicleSources(adapter, dashboard);
+    this.paintMarketCosts(adapter, dashboard);
     this.message(this.dashboardFailed ? "Dashboard refresh failed; the last observation may be stale." : "");
     if (this.view) this.view.update(adapter);
     else this.view = mountDashboard(this.shadowRoot.querySelector("main"), adapter);
@@ -62517,6 +63636,8 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     if (!this.connected || this.settingsBusy || !this.charger || this.pendingSettingsWrites.has(this.charger)) return;
     if (!window.confirm("Discard the current draft and reload the latest settings?")) return;
     this.view?.resetDrafts();
+    this.resetCosts();
+    this.unknownCostWrites.delete(this.charger);
     this.draftRevision = null;
     this.draftCurrency = void 0;
     this.settingsRecord = null;
@@ -62577,7 +63698,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
   }
   async morekAction(action) {
     const hass = this._hass, charger = this.charger, generation = this.generation, permissionEpoch = this.permissionEpoch, statusSnapshot = this.rawStatus, observedAt = this.statusAt, state = decodeMorekState(statusSnapshot);
-    if (!this.connected || hass?.connected === false || hass?.user?.is_admin !== true || !charger || !state || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || !["status", "send", "fetch", "clear", "reconfirm_migration", "recalculate_sync", "reset_learning"].includes(action)) return;
+    if (!this.connected || hass?.connected === false || hass?.user?.is_admin !== true || !charger || !state || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || !["status", "send", "fetch", "clear", "reconfirm_migration", "recalculate_sync", "reset_learning"].includes(action)) return;
     if (action === "reconfirm_migration" && state.ownership?.reconfirmation_required !== true) return;
     if (action !== "status" && !state.supported) return;
     if (action === "clear" && state.cleanup_supported !== true) return;
@@ -62666,22 +63787,22 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     }
   }
   async savePlan(values) {
-    const generation = this.generation, permissionEpoch = this.permissionEpoch, charger = this.charger, hass = this._hass, record4 = this.settingsRecord;
+    const generation = this.generation, permissionEpoch = this.permissionEpoch, charger = this.charger, hass = this._hass, record5 = this.settingsRecord;
     const decoded = decodeDashboard(this.rawDashboard);
     const allowed = hass?.user?.is_admin === true || decoded.ok && decoded.value.settings?.users_change_plan === true;
-    if (!this.connected || hass?.connected === false || !charger || !record4 || this.settingsBusy || this.pendingSettingsWrites.has(charger) || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.settingsConflict || !allowed) {
+    if (!this.connected || hass?.connected === false || !charger || !record5 || this.settingsBusy || this.pendingSettingsWrites.has(charger) || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || this.settingsConflict || !allowed) {
       this.settingsNotice = "Save unavailable or permission denied.";
       this.paint();
       return;
     }
-    const base2 = formFromRecord(record4), driver = values.driver ?? base2.driver, vehicleId = values.vehicleId ?? base2.vehicleId;
+    const base2 = formFromRecord(record5), driver = values.driver ?? base2.driver, vehicleId = values.vehicleId ?? base2.vehicleId;
     if (vehicleId !== base2.vehicleId && (!decoded.ok || !chargerCarsOf(decoded.value).some((v2) => v2.id === vehicleId && v2.id !== "guest"))) {
       this.settingsNotice = "Choose an available discovered vehicle.";
       this.paint();
       return;
     }
-    const form = { ...base2, driver, energy: values.energy ?? base2.energy, vehicleId, targetPercent: values.target ?? base2.targetPercent, minimumReadySoc: values.minimum, capValue: capForSave(values.cap, decoded.ok ? decoded.value.market?.currency : null, record4.soft_price_cap), capEnabled: values.capEnabled, capBasis: values.capBasis, deadlineEnabled: values.deadlineEnabled, deadlineTime: values.readyBy, ...base2.timeReserve === void 0 ? {} : { timeReserve: values.reserve ?? base2.timeReserve } };
-    const check = replacementFor("plan", record4, form);
+    const form = { ...base2, driver, energy: values.energy ?? base2.energy, vehicleId, targetPercent: values.target ?? base2.targetPercent, minimumReadySoc: values.minimum, capValue: capForSave(values.cap, decoded.ok ? decoded.value.market?.currency : null, record5.soft_price_cap), capEnabled: values.capEnabled, capBasis: values.capBasis, deadlineEnabled: values.deadlineEnabled, deadlineTime: values.readyBy, ...base2.timeReserve === void 0 ? {} : { timeReserve: values.reserve ?? base2.timeReserve } };
+    const check = replacementFor("plan", record5, form);
     if (!check.ok) {
       this.settingsNotice = translate2("en", check.errorKey);
       this.paint();
@@ -62703,7 +63824,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this.settingsNotice = "Saving\u2026";
     this.paint();
     try {
-      const request = updateSettings(hass, charger, record4.revision, check.body);
+      const request = updateSettings(hass, charger, record5.revision, check.body);
       this.pendingSettingsWrites.set(charger, request);
       request.finally(() => {
         if (this.pendingSettingsWrites.get(charger) === request) this.pendingSettingsWrites.delete(charger);
@@ -62779,7 +63900,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       savedId: this.settingsRecord?.target?.vehicle_id || null,
       selectedId: this.vehicleSelected,
       entityState,
-      blocked: this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || unknown,
+      blocked: this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.costBusy || unknown,
       conflict: this.vehicleConflict || unknown,
       busy: this.vehicleBusy,
       notice: unknown && !this.vehicleNotice ? "A previous vehicle save has an unknown outcome. Reload vehicle sources to confirm it." : this.vehicleNotice
@@ -62862,7 +63983,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
   }
   vehicleWriteBlocked(ctx) {
     const charger = this.charger, hass = this._hass;
-    return !this.connected || hass?.connected === false || hass?.user?.is_admin !== true || !charger || !ctx || this.vehicleBusy || this.vehicleLoading || this.pendingVehicleWrites.has(charger) || this.unknownVehicleWrites.has(charger) || this.vehicleConflict || this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy;
+    return !this.connected || hass?.connected === false || hass?.user?.is_admin !== true || !charger || !ctx || this.vehicleBusy || this.costBusy || this.vehicleLoading || this.pendingVehicleWrites.has(charger) || this.unknownVehicleWrites.has(charger) || this.vehicleConflict || this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy;
   }
   async finishVehicleWrite(generation, charger, body) {
     this.vehicleBusy = true;
@@ -62880,8 +64001,8 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       }
     }
   }
-  vehicleAnswer(label2, ok2, code, fieldErrors, config) {
-    if (ok2) {
+  vehicleAnswer(label2, ok3, code, fieldErrors, config) {
+    if (ok3) {
       this.vehicleDirty = false;
       this.vehicleBase = null;
       this.vehicleConflict = false;
@@ -63074,6 +64195,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       return;
     }
     if (!this.settingsRecord && !this.settingsLoading) void this.loadSettings();
+    void this.loadMarketOptions();
     if (hass.user?.is_admin === true && !this.vehicleLoading && !this.vehicleBusy && (!this.vehicleConfig || Date.now() - (this.vehicleConfigAt || 0) > CONFIG_REFRESH_MS)) void this.loadVehicleConfig();
     const valid = () => this.connected && generation === this.generation && this.charger === charger && this._hass?.connected !== false;
     if (!this.ageTimer) this.ageTimer = setInterval(() => {
@@ -63105,6 +64227,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
         }
         this.dashboardFailed = false;
         this.rawDashboard = raw;
+        this.costAwaitingRead = false;
         this.controlPermissionPending = false;
         const control = decodeDashboard(raw).value?.control;
         const generated = Date.parse(raw.generated_at || "");
@@ -63151,6 +64274,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     }
   }
 };
+Object.assign(SpotnavEnhancedPanel.prototype, marketCostMethods);
 if (!customElements.get("spotnav-enhanced-panel")) customElements.define("spotnav-enhanced-panel", SpotnavEnhancedPanel);
 export {
   SpotnavEnhancedPanel

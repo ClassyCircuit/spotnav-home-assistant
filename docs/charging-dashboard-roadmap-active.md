@@ -80,7 +80,7 @@ One at a time; “Needs” lists the only real dependencies. Stable parent ids; 
 | 14 | 15.11 Learned-estimate display and reset | 15.9b | |
 | 15 | 15.10 Morek behind-plan check and power feed (deferrable) | 15.9a (energy side stays capture-only until 15.9b) | ◆ |
 | 16 | 13.1 Vehicle sources and planning properties | none | |
-| 17 | 13.2 Market and charging-cost settings | none | |
+| 17 | 13.2 Market and charging-cost settings | none | ✔ local (2.5.159) |
 | 18 | 13.3 Practical plan and charger parameters | 15.1b if built (no duplicate reserve control) | |
 | 19 | 13.4 Notification settings and setup diagnostics | none | |
 | 20 | 7.1 Available-day navigation | none | |
@@ -733,12 +733,42 @@ Full requirement text: archive “Stage 13”.
   exists but is unavailable is marked as reporting nothing, not removed; (4) whether a Morek owner re-uploads after the
   replan is the existing reconciliation's behaviour, unverified; (5) the 13.1 area has no i18n (English text); (6) no
   browser/Playwright, not installed.
-- [ ] **13.2 Market and charging-cost settings.** Expose existing market/price-area selection and tariff
+- [x] **13.2 Market and charging-cost settings.** Expose existing market/price-area selection and tariff
   settings (VAT, energy tax, grid fees incl. existing time-dependent/percentage options). Keep provider
   route, held-data provenance, selected market, raw price and configured variable cost distinct; never
   silently switch provider, enable fees or assume prices exclude charges; keep 12.2’s c/kWh display. Tests:
   supported/missing providers, area changes, variable/negative prices, fee basis, currencies, settings-to-plan
   updates. Do not invent historical tariffs.
+  *Locally implemented with mocked checks (2.5.159; coordinator review/commit pending); not installed or live-verified.*
+  A collapsed “Advanced: market & charging costs” section is added to the shared sidebar UI (also in the local preview as
+  a fictional read-only sample), new files `sidebar/market-costs.js` (pure model and write plans),
+  `sidebar/market-costs-panel.js` (panel wiring) and `shared-dashboard/market-costs-view.js`. **No backend change.** It reuses
+  the existing canonical commands and the old card's own builders/decoders (`src/market.ts` `marketReplacement`,
+  `src/grid-tariff.ts` `storedBody`/`sameBody`): `get_market_options` (read, any signed-in user), `update_settings`
+  (price area and VAT / energy tax / flat grid fee: off, the area's suggestion kept as “suggested” and never copied, or the
+  person's own figure; compare-and-set on the wire revision), `update_grid_tariff` (grid fee as % of the raw price and the
+  high-load fee with its days/months/hours window; compare-and-set on the price entry's write counter; demand-charge
+  components are sent back exactly as stored) and `choose_price_source` (only when several entries exist, with confirmation).
+  All writes are administrator-only. It shows, separately: the provider (`prices.provider`) and the held-data state
+  (`prices.state`, interval count and resolution, area-list state, “held, not proof the provider answered”), the saved
+  vs selected area and its currency/units (c/kWh display unchanged; flat fees in the area's minor unit/kWh exactly as stored,
+  no conversion), the current interval's raw published price next to its configured variable cost (negative values and unknowns
+  kept as such, `unknown` is never zero), per-component “included in the published price” locks and the planner's order of
+  fee application (raw + tax + flat/high-load fee + % of raw, then × (1 + VAT)). Never silently picks a provider, area or entry,
+  enables a fee, assumes what a price includes, invents hours (suggested hours are labelled and only saved with the fee on) or
+  reconstructs historical tariffs. A changed area asks for confirmation and says that the provider route and currency change, fees
+  do not carry over and a soft price cap is not converted. Opening/editing only reads; unchanged and invalid saves send nothing;
+  drafts survive refreshes; a stale dashboard or area list, a pending post-save dashboard read, another writer's change while
+  editing (signature check), a revision conflict (nothing written, reload required), a reconcile failure after a durable save, a
+  permission change or timeout (unknown outcome, saving blocked until an explicit reload) are all handled. A successful tariff or
+  price-entry write re-reads the settings record (the wire revision includes the price entry's write counter).
+  **Limits:** (1) the area, tax and fee **replan** is the backend's existing behaviour after `update_settings` and a price-entry write;
+  whether a Morek owner then re-uploads is the existing reconciliation, unverified; (2) a price-entry/area change is applied to every
+  charger using that entry, said in text but not previewed per charger; (3) demand-charge components, the import target and the
+  Nord Pool key/price-provider setup remain in the old card (not duplicated here); (4) English text only, no i18n for this area;
+  (5) no browser/Playwright, no HA-fixture Python tests (none needed, no backend change), not installed; (6) the sidebar read-only
+  host tests were extended to allow the new read-only `get_market_options` message; (7) for a selected-but-unsaved area only the
+  area list's suggestions are shown, not computed per-fee amounts.
 - [ ] **13.3 Practical plan and charger parameters.** Maximum charging periods, planned current, supported
   departure date/weekday options not already in 12.5 (no duplicate ready-by/cap/minimum/target controls and no
   duplicate of the 15.1b reserve control). Planned current is a planning input, not load balancing; respect

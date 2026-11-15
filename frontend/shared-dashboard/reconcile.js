@@ -5,6 +5,7 @@ const key = node => {
   if (node.id) return `id:${node.id}`;
   if (node.dataset.setting) return `setting:${node.dataset.setting}`;
   if (node.dataset.vsetting) return `vsetting:${node.dataset.vsetting}`;
+  if (node.dataset.msetting) return `msetting:${node.dataset.msetting}`;
   if (node.dataset.vselect) return `vselect:${node.dataset.vselect}`;
   if (node.dataset.morekAction) return `morek-action:${node.dataset.morekAction}`;
   if (node.hasAttribute('data-morek-actions')) return 'morek-actions';
