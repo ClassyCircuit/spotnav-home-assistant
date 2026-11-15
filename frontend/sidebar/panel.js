@@ -1,5 +1,7 @@
 import { mountDashboard } from '../shared-dashboard/dashboard.js';
-import { listChargers, getDashboard, morekSchedule, getSettings, updateSettings, performAction, chargeNowAction } from '../src/api.ts';
+import { listChargers, getDashboard, morekSchedule, getSettings, updateSettings, performAction, chargeNowAction, getEntityConfig, setVehicleSoc, updateVehicle } from '../src/api.ts';
+import { decodeEntityAnswer, decodeVehicleWriteAnswer, entityErrorKey, fieldErrorKey, ENTITY_CONFLICT } from '../src/entity-config.ts';
+import { vehicleSourcesModel, vehicleSignature, chooseVehicle, sensorWritePlan, propertyWritePlan, CONFIG_REFRESH_MS } from './vehicle-sources.js';
 import { admittedAction, chargerCarsOf } from '../src/model.ts';
 import { decodeSettingsAnswer, formFromRecord, replacementFor } from '../src/settings.ts';
 import { decodeDashboard } from '../src/validate.ts';
@@ -22,6 +24,7 @@ const dashboardFresh = (dashboard, failed) => fresh(Date.parse(dashboard?.genera
 // A dispatched write outlives its host element, including a newly mounted panel.
 const settingsWritesByConnection = new WeakMap();
 const chargeWritesByConnection = new WeakMap();
+const vehicleWritesByConnection = new WeakMap();
 
 function actionFailure(code, action) {
   const reasons={
@@ -96,6 +99,10 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     this.statusEpoch = 0;
     this.pendingSettingsWrites = new Map();
     this.unknownSettingsWrites = new Set();
+    this.pendingVehicleWrites = new Map();
+    this.unknownVehicleWrites = new Set();
+    this.vehicleConfig = null;this.vehicleConfigAt = null;this.vehicleConfigFailed = false;this.vehicleLoading = false;
+    this.vehicleSelected = null;this.vehicleBase = null;this.vehicleDirty = false;this.vehicleBusy = false;this.vehicleConflict = false;this.vehicleNotice = '';
     this.autoNotice = '';
     this.connected = false;
   }
@@ -126,6 +133,12 @@ export class SpotnavEnhancedPanel extends HTMLElement {
       this.pendingSettingsWrites=this.settingsWriteContext.pending;
       this.unknownSettingsWrites=this.settingsWriteContext.unknown;
     }
+    if (!this.vehicleWriteContext && value) {
+      const key=value.connection || value;
+      if (!vehicleWritesByConnection.has(key)) vehicleWritesByConnection.set(key,{pending:new Map(),unknown:new Set()});
+      this.vehicleWriteContext=vehicleWritesByConnection.get(key);
+      this.pendingVehicleWrites=this.vehicleWriteContext.pending;this.unknownVehicleWrites=this.vehicleWriteContext.unknown;
+    }
     if (!this.chargeWriteContext && value) {
       const key=value.connection || value;
       if (!chargeWritesByConnection.has(key)) chargeWritesByConnection.set(key,{pending:new Map(),unknown:new Set(),expected:new Map()});
@@ -143,6 +156,8 @@ export class SpotnavEnhancedPanel extends HTMLElement {
       this.permissionEpoch++;this.dashboardEpoch++;this.controlPermissionPending=true;
       if (this.settingsBusy) {this.settingsConflict=true;this.settingsNotice='Permission changed during save; its outcome must be checked by reloading settings.';}
       if (this.morekBusy) {if(this.morekActiveAction==='send')this.morekUncertain=true;this.morekError='Permission changed during the operation; its outcome may be unknown.';}
+      if (this.vehicleBusy && this.charger) {this.unknownVehicleWrites.add(this.charger);this.vehicleConflict=true;this.vehicleNotice='Permission changed during the vehicle save; its outcome must be checked by reloading.';}
+      this.vehicleConfig=null;this.vehicleConfigAt=null;this.vehicleLoading=false;
       if (this.autoBusy) {this.autoUncertain=true;this.autoNotice='Permission changed during the operation; its outcome may be unknown.';}
       if (this.chargeBusy && this.charger) {this.chargeUnknown?.add(this.charger);this.chargeNotice='Permission changed during the request; outcome unknown. Do not retry blindly.';}
       this.paint();this.refresh();
@@ -156,6 +171,10 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     else if (!preserveDraft) {this.draftRevision=null;this.draftCurrency=undefined;}
     if (this.settingsBusy && this.charger) this.unknownSettingsWrites.add(this.charger);
     if (this.chargeBusy && this.charger) this.chargeUnknown?.add(this.charger);
+    if (this.vehicleBusy && this.charger) this.unknownVehicleWrites.add(this.charger);
+    const vehicleDirty=preserveDraft && this.vehicleDirty;
+    this.vehicleConfig=null;this.vehicleConfigAt=null;this.vehicleConfigFailed=false;this.vehicleLoading=false;this.vehicleBusy=false;this.vehicleConflict=false;this.vehicleNotice='';this.vehicleDirty=!!vehicleDirty;
+    if (!preserveDraft) {this.vehicleBase=null;this.vehicleSelected=null;}
     this.chargeBusy=false;this.chargeNotice='';this.learningNotice='';
     this.generation++;
     clearInterval(this.ageTimer); this.ageTimer=null;
@@ -216,6 +235,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
       adapter.actions.reloadSettings=()=>this.reloadSettings();
       adapter.actions.edit=()=>{if(!this.settingsDirty)this.draftCurrency=currency;this.settingsDirty=true;this.paintMorek();};
     } else adapter.model.settingsNotice=this.settingsLoading ? 'Loading settings…' : (this.settingsNotice || 'Settings unavailable.');
+    this.paintVehicleSources(adapter,dashboard);
     this.message(this.dashboardFailed ? 'Dashboard refresh failed; the last observation may be stale.' : '');
     if (this.view) this.view.update(adapter);
     else this.view=mountDashboard(this.shadowRoot.querySelector('main'),adapter);
@@ -411,7 +431,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
   }
   async morekAction(action) {
     const hass=this._hass, charger=this.charger, generation=this.generation, permissionEpoch=this.permissionEpoch, statusSnapshot=this.rawStatus, observedAt=this.statusAt, state=decodeMorekState(statusSnapshot);
-    if (!this.connected || hass?.connected===false || hass?.user?.is_admin!==true || !charger || !state || this.morekBusy || this.autoBusy || this.chargeBusy || !['status','send','fetch','clear','reconfirm_migration','recalculate_sync','reset_learning'].includes(action)) return;
+    if (!this.connected || hass?.connected===false || hass?.user?.is_admin!==true || !charger || !state || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || !['status','send','fetch','clear','reconfirm_migration','recalculate_sync','reset_learning'].includes(action)) return;
     if (action==='reconfirm_migration' && state.ownership?.reconfirmation_required!==true) return;
     if (action!=='status' && !state.supported) return;
     if (action==='clear' && state.cleanup_supported!==true) return;
@@ -474,7 +494,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     const generation=this.generation, permissionEpoch=this.permissionEpoch, charger=this.charger, hass=this._hass, record=this.settingsRecord;
     const decoded=decodeDashboard(this.rawDashboard);
     const allowed=hass?.user?.is_admin===true || (decoded.ok && decoded.value.settings?.users_change_plan===true);
-    if (!this.connected || hass?.connected===false || !charger || !record || this.settingsBusy || this.pendingSettingsWrites.has(charger) || this.morekBusy || this.autoBusy || this.chargeBusy || this.settingsConflict || !allowed) {this.settingsNotice='Save unavailable or permission denied.';this.paint();return;}
+    if (!this.connected || hass?.connected===false || !charger || !record || this.settingsBusy || this.pendingSettingsWrites.has(charger) || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.settingsConflict || !allowed) {this.settingsNotice='Save unavailable or permission denied.';this.paint();return;}
     const base=formFromRecord(record), driver=values.driver ?? base.driver, vehicleId=values.vehicleId ?? base.vehicleId;
     if (vehicleId!==base.vehicleId && (!decoded.ok || !chargerCarsOf(decoded.value).some(v=>v.id===vehicleId && v.id!=='guest'))) {this.settingsNotice='Choose an available discovered vehicle.';this.paint();return;}
     const form={...base,driver,energy:values.energy ?? base.energy,vehicleId,targetPercent:values.target ?? base.targetPercent,minimumReadySoc:values.minimum,capValue:capForSave(values.cap,decoded.ok ? decoded.value.market?.currency : null,record.soft_price_cap),capEnabled:values.capEnabled,capBasis:values.capBasis,deadlineEnabled:values.deadlineEnabled,deadlineTime:values.readyBy,...(base.timeReserve===undefined?{}:{timeReserve:values.reserve ?? base.timeReserve})};
@@ -496,6 +516,136 @@ export class SpotnavEnhancedPanel extends HTMLElement {
       else this.settingsNotice='Settings save rejected.';
     } catch {this.unknownSettingsWrites.add(charger);if(this.connected && generation===this.generation) {this.settingsConflict=true;this.settingsNotice='Save outcome unknown; the dispatched request may still complete. Wait for it to settle, then reload before retrying.';}}
     finally {if(this.connected && generation===this.generation) {this.settingsBusy=false;this.paint();this.refresh();}}
+  }
+  vehicleContext() {
+    const config=this.vehicleConfig, decoded=decodeDashboard(this.rawDashboard), dashboard=decoded.ok ? decoded.value : null;
+    if (!config) return null;
+    const vehicleId=chooseVehicle(config.vehicles,this.vehicleSelected,this.settingsRecord?.target?.vehicle_id || null);
+    const vehicle=config.vehicles.find(v=>v.id===vehicleId);
+    if (!vehicle) return null;
+    return {vehicleId,vehicle,dashboard,row:(dashboard?.vehicles||[]).find(r=>r.id===vehicleId) || null,props:(config.vehicleProperties||[]).find(p=>p.id===vehicleId) || null};
+  }
+  paintVehicleSources(adapter,dashboard) {
+    const admin=this._hass?.user?.is_admin===true, charger=this.charger;
+    const unknown=this.unknownVehicleWrites.has(charger) || this.pendingVehicleWrites.has(charger);
+    const ctx=this.vehicleContext();
+    // A draft is only meaningful against what it was started from; anyone else's change makes it a conflict to reload.
+    if (this.vehicleDirty && this.vehicleBase && ctx && !this.vehicleConflict && (ctx.vehicleId!==this.vehicleBase.vehicleId || vehicleSignature(ctx.vehicle,ctx.props)!==this.vehicleBase.signature)) {
+      this.vehicleConflict=true;this.vehicleNotice='Vehicle sources changed while editing. Reload before saving again.';
+    }
+    const states=this._hass?.states;
+    const entityState=id=>{if(!states)return 'ok';const s=states[id];return !s ? 'missing' : ['unavailable','unknown'].includes(s.state) ? 'unavailable' : 'ok';};
+    const vehicle=adapter.model.vehicle;
+    adapter.model.vehicleSources=vehicleSourcesModel({admin,loading:this.vehicleLoading,failed:this.vehicleConfigFailed,config:this.vehicleConfig,configAt:this.vehicleConfigAt,now:Date.now(),rows:dashboard?.vehicles || [],
+      dashboardFresh:!!dashboard && dashboardFresh(dashboard,this.dashboardFailed),reading:{vehicleId:dashboard?.soc?.vehicle_id ?? null,value:vehicle?.soc,stale:vehicle?.stale,detail:vehicle?.socDetail || ''},
+      savedId:this.settingsRecord?.target?.vehicle_id || null,selectedId:this.vehicleSelected,entityState,blocked:this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || unknown,
+      conflict:this.vehicleConflict || unknown,busy:this.vehicleBusy,notice:unknown && !this.vehicleNotice ? 'A previous vehicle save has an unknown outcome. Reload vehicle sources to confirm it.' : this.vehicleNotice});
+    adapter.actions.editVehicle=()=>this.editVehicle();
+    adapter.actions.selectVehicle=id=>this.selectVehicle(id);
+    adapter.actions.saveVehicleSensor=values=>this.saveVehicleSensor(values);
+    adapter.actions.saveVehicleProperties=values=>this.saveVehicleProperties(values);
+    adapter.actions.reloadVehicleSources=()=>this.reloadVehicleSources();
+  }
+  editVehicle() {
+    if (this.vehicleDirty) return;
+    const ctx=this.vehicleContext();
+    this.vehicleBase=ctx ? {vehicleId:ctx.vehicleId,signature:vehicleSignature(ctx.vehicle,ctx.props),props:ctx.props ? {...ctx.props} : null} : null;
+    this.vehicleDirty=true;
+  }
+  selectVehicle(id) {
+    if (this.vehicleBusy || id===(this.vehicleContext()?.vehicleId ?? '')) {this.paint();return;}
+    if (this.vehicleDirty && !window.confirm('Discard the unsaved vehicle changes and switch vehicle?')) {this.paint();return;}
+    this.view?.resetVehicleDrafts();this.vehicleDirty=false;this.vehicleBase=null;this.vehicleSelected=id || null;this.vehicleNotice='';this.paint();
+  }
+  reloadVehicleSources() {
+    const charger=this.charger;
+    if (!this.connected || !charger || this.vehicleBusy || this.pendingVehicleWrites.has(charger)) return;
+    if (this.vehicleDirty && !window.confirm('Discard the unsaved vehicle changes and reload vehicle sources?')) return;
+    this.view?.resetVehicleDrafts();this.vehicleDirty=false;this.vehicleBase=null;this.vehicleConflict=false;this.unknownVehicleWrites.delete(charger);this.vehicleNotice='';this.vehicleConfig=null;this.vehicleConfigAt=null;
+    this.paint();void this.loadVehicleConfig();this.refresh();
+  }
+  async loadVehicleConfig() {
+    if (this.vehicleLoading || this.vehicleBusy || !this.charger || this._hass?.user?.is_admin!==true) return;
+    const generation=this.generation, permissionEpoch=this.permissionEpoch, charger=this.charger, hass=this._hass;
+    const current=()=>this.connected && generation===this.generation && permissionEpoch===this.permissionEpoch && charger===this.charger;
+    this.vehicleLoading=true;
+    try {
+      const decoded=decodeEntityAnswer(await this.bounded(getEntityConfig(hass,charger)));
+      if (!current()) return;
+      if (!decoded.ok || !decoded.value.ok) {this.vehicleConfigFailed=true;this.vehicleNotice=decoded.ok && decoded.value.code ? translate('en',entityErrorKey(decoded.value.code)) : 'Vehicle sources unavailable.';return;}
+      this.vehicleConfig=decoded.value.config;this.vehicleConfigAt=Date.now();this.vehicleConfigFailed=false;
+      if (this.unknownVehicleWrites.has(charger) || this.pendingVehicleWrites.has(charger)) {this.vehicleConflict=true;this.vehicleNotice='A previous vehicle save has an unknown outcome. Reload vehicle sources to confirm it.';}
+      else if (this.vehicleNotice==='Vehicle sources unavailable.') this.vehicleNotice='';
+    } catch { if (current()) {this.vehicleConfigFailed=true;this.vehicleNotice=this.vehicleConfig ? this.vehicleNotice : 'Vehicle sources unavailable.';} }
+    finally { if (this.connected && generation===this.generation) {this.vehicleLoading=false;this.paint();} }
+  }
+  vehicleWriteBlocked(ctx) {
+    const charger=this.charger, hass=this._hass;
+    return !this.connected || hass?.connected===false || hass?.user?.is_admin!==true || !charger || !ctx || this.vehicleBusy || this.vehicleLoading || this.pendingVehicleWrites.has(charger) || this.unknownVehicleWrites.has(charger) || this.vehicleConflict || this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy;
+  }
+  async finishVehicleWrite(generation,charger,body) {
+    // Common shell: once dispatched, only the write's own answer settles the outcome.
+    this.vehicleBusy=true;this.statusEpoch++;this.statusAt=null;this.paint();
+    try { await body(); }
+    finally { if (this.connected && generation===this.generation && charger===this.charger) {this.vehicleBusy=false;this.dashboardEpoch++;this.paint();this.refresh();} }
+  }
+  vehicleAnswer(label,ok,code,fieldErrors,config) {
+    if (ok) {
+      this.vehicleDirty=false;this.vehicleBase=null;this.vehicleConflict=false;this.view?.resetVehicleDrafts();
+      this.vehicleNotice=`${label} saved and confirmed by the backend. Plans for this car may recalculate and, if Morek owns the schedule, go through normal guarded reconciliation; this does not wake the car, send a notification or confirm charging.`;
+    } else {
+      if (code===ENTITY_CONFLICT) this.vehicleConflict=true;
+      const first=fieldErrors?.[0];
+      this.vehicleNotice=`${label} not saved: ${translate('en',first ? fieldErrorKey(first.code) : entityErrorKey(code))}`;
+    }
+    if (config) {this.vehicleConfig=config;this.vehicleConfigAt=Date.now();this.vehicleConfigFailed=false;}
+  }
+  async saveVehicleSensor(values) {
+    const generation=this.generation, permissionEpoch=this.permissionEpoch, charger=this.charger, hass=this._hass, ctx=this.vehicleContext();
+    if (this.vehicleWriteBlocked(ctx)) {this.vehicleNotice='Save unavailable: another request is running, the outcome of a previous save is unknown, or permission is missing.';this.paint();return;}
+    if (!this.vehicleConfigAt || Date.now()-this.vehicleConfigAt>90000 || this.vehicleConfigFailed) {this.vehicleNotice='Sensor information is stale. Wait for a fresh read or reload vehicle sources.';this.paint();return;}
+    const plan=sensorWritePlan(ctx.vehicle,values?.sensor);
+    if (!plan.ok) {this.vehicleNotice=plan.notice;this.paint();return;}
+    if (!plan.changed) {this.vehicleNotice='No changes to save.';this.paint();return;}
+    if (plan.replacesChoice && !window.confirm(plan.entityId ? 'Replace the sensor you chose earlier for this car?' : 'Clear your sensor choice and return to automatic detection? With several candidates this leaves the car without a charge reading.')) return;
+    const vehicle=ctx.vehicle, current=()=>this.connected && generation===this.generation && permissionEpoch===this.permissionEpoch && charger===this.charger;
+    // The backend compares `expectedEntityId` with the saved choice at the write itself (under a lock): a choice made
+    // elsewhere is a conflict and nothing is written, so there is no client re-read window.
+    await this.finishVehicleWrite(generation,charger,async()=>{
+      const request=setVehicleSoc(hass,charger,{vehicleId:vehicle.id,entityId:plan.entityId,expectedEntityId:plan.expected});
+      this.pendingVehicleWrites.set(charger,request);
+      request.finally(()=>{if(this.pendingVehicleWrites.get(charger)===request)this.pendingVehicleWrites.delete(charger);}).catch(()=>{});
+      this.vehicleNotice='Saving…';this.paint();
+      try {
+        const answer=decodeEntityAnswer(await this.bounded(request));
+        if (!current()) {this.unknownVehicleWrites.add(charger);return;}
+        if (!answer.ok) {this.unknownVehicleWrites.add(charger);this.vehicleConflict=true;this.vehicleNotice='Save response unavailable; outcome unknown. Reload vehicle sources before retrying.';return;}
+        this.vehicleAnswer('Sensor choice',answer.value.ok,answer.value.ok ? null : answer.value.code,answer.value.ok ? [] : answer.value.fieldErrors,answer.value.config);
+      } catch { this.unknownVehicleWrites.add(charger);if(this.connected && generation===this.generation){this.vehicleConflict=true;this.vehicleNotice='Save outcome unknown; the request may still complete. Wait, then reload vehicle sources before retrying.';} }
+    });
+  }
+  async saveVehicleProperties(values) {
+    const generation=this.generation, permissionEpoch=this.permissionEpoch, charger=this.charger, hass=this._hass, ctx=this.vehicleContext();
+    if (this.vehicleWriteBlocked(ctx)) {this.vehicleNotice='Save unavailable: another request is running, the outcome of a previous save is unknown, or permission is missing.';this.paint();return;}
+    if (!this.vehicleConfigAt || Date.now()-this.vehicleConfigAt>90000 || this.vehicleConfigFailed) {this.vehicleNotice='Vehicle information is stale. Wait for a fresh read or reload vehicle sources.';this.paint();return;}
+    const props=this.vehicleBase?.vehicleId===ctx.vehicleId && this.vehicleBase.props ? this.vehicleBase.props : ctx.props;
+    const plan=propertyWritePlan(props,values || {});
+    if (!plan.ok) {this.vehicleNotice=plan.notice;this.paint();return;}
+    if (!plan.changed) {this.vehicleNotice='No changes to save.';this.paint();return;}
+    if (plan.clearsCapacity && !window.confirm('Clear the battery capacity you entered? Plans that need a capacity will hold until one is available.')) return;
+    const vehicleId=ctx.vehicleId, current=()=>this.connected && generation===this.generation && permissionEpoch===this.permissionEpoch && charger===this.charger;
+    await this.finishVehicleWrite(generation,charger,async()=>{
+      const request=updateVehicle(hass,charger,{vehicleId,changes:plan.changes,expected:plan.expected});
+      this.pendingVehicleWrites.set(charger,request);
+      request.finally(()=>{if(this.pendingVehicleWrites.get(charger)===request)this.pendingVehicleWrites.delete(charger);}).catch(()=>{});
+      this.vehicleNotice='Saving…';this.paint();
+      try {
+        const answer=decodeVehicleWriteAnswer(await this.bounded(request));
+        if (!current()) {this.unknownVehicleWrites.add(charger);return;}
+        if (!answer.ok) {this.unknownVehicleWrites.add(charger);this.vehicleConflict=true;this.vehicleNotice='Save response unavailable; outcome unknown. Reload vehicle sources before retrying.';return;}
+        this.vehicleAnswer('Capacity and phases',answer.value.ok,answer.value.ok ? null : answer.value.code,answer.value.ok ? [] : answer.value.fieldErrors,answer.value.config);
+      } catch { this.unknownVehicleWrites.add(charger);if(this.connected && generation===this.generation){this.vehicleConflict=true;this.vehicleNotice='Save outcome unknown; the request may still complete. Wait, then reload vehicle sources before retrying.';} }
+    });
   }
   bounded(request) {
     let timer, cancel;
@@ -532,6 +682,8 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     const generation=this.generation, charger=this.charger, hass=this._hass;
     if (!charger || !hass || hass.connected===false) {this.message('Select an available charger.');return;}
     if (!this.settingsRecord && !this.settingsLoading) void this.loadSettings();
+    // Read-only: the entity config only lists sensors; reading it never writes or wakes anything.
+    if (hass.user?.is_admin===true && !this.vehicleLoading && !this.vehicleBusy && (!this.vehicleConfig || Date.now()-(this.vehicleConfigAt||0)>CONFIG_REFRESH_MS)) void this.loadVehicleConfig();
     const valid=()=>this.connected && generation===this.generation && this.charger===charger && this._hass?.connected!==false;
     if (!this.ageTimer) this.ageTimer=setInterval(()=>{if(valid()) { this.paint(); this.refresh(); }},30000);
     if (!this.rawDashboard) this.message('Loading separate dashboard and Morek observations…');

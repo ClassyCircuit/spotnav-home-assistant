@@ -181,7 +181,7 @@ describe('actual sidebar read-only host', () => {
     expect(panel.charger).toBe('a');expect(panel.shadowRoot.querySelector('.shell')).toBeTruthy();
     chargers=[...chargers,{charger_id:'b',charger_name:'B'}];panel.hass={...hass,connected:false};panel.hass=hass;await tick();expect(panel.charger).toBe('a');
     panel.remove();const next=document.createElement('spotnav-enhanced-panel');next.hass=hass;document.body.append(next);await tick();expect(next.charger).toBe('a');next.remove();
-    expect(calls.every(m=>['spotnav/list_chargers','spotnav/get_dashboard','spotnav/get_settings'].includes(m.type)||(m.type==='spotnav/morek_schedule'&&m.action==='status'))).toBe(true);
+    expect(calls.every(m=>['spotnav/list_chargers','spotnav/get_dashboard','spotnav/get_settings','spotnav/get_entity_config'].includes(m.type)||(m.type==='spotnav/morek_schedule'&&m.action==='status'))).toBe(true);
   });
   it('handles multiple, empty, changed and failed lists without stale dashboard', async () => {
     let chargers=[{charger_id:'a',charger_name:'A'},{charger_id:'b',charger_name:'B'}], fail=false;

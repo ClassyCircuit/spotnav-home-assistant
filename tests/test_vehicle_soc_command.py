@@ -211,3 +211,101 @@ async def test_an_unsupported_version_is_refused(hass: HomeAssistant, hass_ws_cl
     )
     assert frame["success"] is False
     assert frame["error"]["code"] == "spotnav_unsupported_api_version"
+
+
+async def test_expected_selection_guard_conflicts_without_writing_and_legacy_callers_still_write(
+    hass: HomeAssistant, hass_ws_client
+) -> None:
+    charger, _ = await setup_charger_and_site(hass)
+    device_id, soc, health = add_ambiguous_vehicle_device(hass, unique_id="car-a", name="Volvo")
+    client = await admin(hass, hass_ws_client)
+
+    # Expecting "no choice" while one exists is a conflict; nothing is written.
+    first = (await ws_call(client, {**set_message(charger.entry_id, device_id, soc), "expected_entity_id": None}))["result"]
+    assert first["ok"] is True and confirmed(hass, device_id) == {"soc_entity_id": soc}
+    stale = (await ws_call(client, {**set_message(charger.entry_id, device_id, health), "expected_entity_id": None}))["result"]
+    assert stale["ok"] is False and stale["error"] == "spotnav_conflict"
+    assert confirmed(hass, device_id) == {"soc_entity_id": soc}
+    # The matching expectation writes; a malformed one is invalid; omitting it keeps the legacy write.
+    match = (await ws_call(client, {**set_message(charger.entry_id, device_id, health), "expected_entity_id": soc}))["result"]
+    assert match["ok"] is True and confirmed(hass, device_id) == {"soc_entity_id": health}
+    bad = (await ws_call(client, {**set_message(charger.entry_id, device_id, soc), "expected_entity_id": 7}))["result"]
+    assert bad["error"] == "spotnav_invalid_value" and confirmed(hass, device_id) == {"soc_entity_id": health}
+    legacy = (await ws_call(client, set_message(charger.entry_id, device_id, soc)))["result"]
+    assert legacy["ok"] is True and confirmed(hass, device_id) == {"soc_entity_id": soc}
+
+
+async def test_two_interleaved_guarded_writes_leave_one_winner_and_one_conflict(hass: HomeAssistant) -> None:
+    import asyncio
+
+    from custom_components.spotnav.api.entity_config import EntityConfigRefusal, async_set_vehicle_soc
+
+    charger, _ = await setup_charger_and_site(hass)
+    device_id, soc, health = add_ambiguous_vehicle_device(hass, unique_id="car-a", name="Volvo")
+
+    results = await asyncio.gather(
+        async_set_vehicle_soc(hass, charger.entry_id, vehicle_id=device_id, entity_id=soc, expected_entity_id=None),
+        async_set_vehicle_soc(hass, charger.entry_id, vehicle_id=device_id, entity_id=health, expected_entity_id=None),
+        return_exceptions=True,
+    )
+
+    assert sum(isinstance(r, EntityConfigRefusal) and r.code == "spotnav_conflict" for r in results) == 1
+    assert sum(isinstance(r, dict) for r in results) == 1
+    assert confirmed(hass, device_id) == {"soc_entity_id": soc}  # the first to take the lock
+
+
+async def test_an_actual_selection_change_replans_planners_and_a_no_op_does_not(hass: HomeAssistant) -> None:
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from custom_components.spotnav.api import entity_config
+    from custom_components.spotnav.api.entity_config import async_set_vehicle_soc
+
+    charger, _ = await setup_charger_and_site(hass)
+    device_id, soc, _health = add_ambiguous_vehicle_device(hass, unique_id="car-a", name="Volvo")
+    controller = MagicMock()
+    controller.async_recalculate = AsyncMock()
+    with patch.object(entity_config, "preview_for", return_value=controller), patch.object(
+        entity_config, "_planner_entry_ids", return_value={charger.entry_id}
+    ):
+        await async_set_vehicle_soc(hass, charger.entry_id, vehicle_id=device_id, entity_id=soc)
+        await hass.async_block_till_done()
+        assert controller.async_recalculate.await_count == 1
+        await async_set_vehicle_soc(hass, charger.entry_id, vehicle_id=device_id, entity_id=soc)
+        await hass.async_block_till_done()
+        assert controller.async_recalculate.await_count == 1  # same sensor again: nothing to replan
+
+
+async def test_properties_are_listed_and_writable_for_a_vehicle_without_a_chosen_sensor(
+    hass: HomeAssistant, hass_ws_client
+) -> None:
+    charger, _ = await setup_charger_and_site(hass)
+    device_id, _soc, _health = add_ambiguous_vehicle_device(hass, unique_id="car-a", name="Volvo")
+    client = await admin(hass, hass_ws_client)
+
+    config = (await ws_call(client, get_message(charger.entry_id)))["result"]["config"]
+    assert config["vehicle_properties"] == [
+        {
+            "id": device_id,
+            "capacity_kwh": None,
+            "capacity_source": None,
+            "reported_capacity_kwh": None,
+            "reported_known": False,
+            "stored_capacity_kwh": None,
+            "onboard_phases": 3,
+            "stored_onboard_phases": None,
+        }
+    ]
+    update = {
+        "type": "spotnav/update_vehicle",
+        "api_version": ENTITY_CONFIG_API_VERSION,
+        "charger_id": charger.entry_id,
+        "vehicle_id": device_id,
+        "changes": {"capacity_kwh": 60, "onboard_phases": 1},
+        "expected": {"capacity_kwh": None, "onboard_phases": 3},
+    }
+    stale = (await ws_call(client, {**update, "expected": {"capacity_kwh": 50}}))["result"]
+    assert stale["error"] == "spotnav_conflict"
+    ok = (await ws_call(client, update))["result"]
+    assert ok["ok"] is True
+    row = ok["config"]["vehicle_properties"][0]
+    assert row["stored_capacity_kwh"] == 60 and row["capacity_source"] == "stored" and row["stored_onboard_phases"] == 1

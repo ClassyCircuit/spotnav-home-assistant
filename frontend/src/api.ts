@@ -470,6 +470,7 @@ export async function setVehicleSoc(
     charger_id: chargerId,
     vehicle_id: request.vehicleId,
     entity_id: request.entityId,
+    ...(request.expectedEntityId === undefined ? {} : { expected_entity_id: request.expectedEntityId }),
   });
 }
 

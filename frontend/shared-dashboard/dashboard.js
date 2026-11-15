@@ -15,6 +15,7 @@ import { renderBattery } from './vehicle-view.js';
 import { renderEvidence } from './evidence-view.js';
 import { renderHistory } from './history-view.js';
 import { renderInsights } from './insight-view.js';
+import { renderVehicleSources } from './vehicle-sources-view.js';
 import { escapeText as e } from './text.js';
 import { reconcile } from './reconcile.js';
 import { priceText, priceUnit } from './price-format.js';
@@ -93,10 +94,11 @@ export function mountDashboard(root, adapter) {
       ${modes.map(priceCard).join('')}
       ${card('Plan activity & freshness',labels.evidenceEyebrow || 'EVIDENCE',renderEvidence(m.evidence,state.power,knownPlan ? windows.length : null),'morek',tag)}
       ${card('Recent charging',labels.historyEyebrow || 'HISTORY',renderHistory(m.history,historyReady),'history',tag)}
+      ${m.vehicleSources ? card('Vehicle sources & properties','ADVANCED',renderVehicleSources(m.vehicleSources),'vehicle-sources',tag) : ''}
       </div><dialog id="plan-dialog" aria-labelledby="dialog-title"><div class="dialog-head"><div><div class="eyebrow">${e(labels.dialogEyebrow || 'PROPOSAL')}</div><h2 id="dialog-title">Proposed charging plan</h2></div><button id="close-plan" type="button" aria-label="Close proposed plan">✕</button></div><p class="subtext">${e(labels.dialogNote)}</p><div role="status" aria-live="polite">${m.warning ? `<strong>${e(m.warning.title)}</strong><p>${e(m.warning.detail)}</p>` : ''}${m.evidence?.status ? `<p>${e(m.evidence.status)}</p>` : ''}</div>${plan}</dialog><footer>${e(labels.footer)}</footer></div>`;
     const template=document.createElement('template'); template.innerHTML=html;
     if (!root.firstChild) root.append(template.content);
-    else reconcile(root.firstChild,template.content.firstChild,node=>drafts.has(node.dataset?.setting) || root.getRootNode().activeElement===node);
+    else reconcile(root.firstChild,template.content.firstChild,node=>drafts.has(node.dataset?.setting) || (node.dataset?.vsetting && drafts.has(`v:${node.dataset.vsetting}`)) || root.getRootNode().activeElement===node);
     listeners ||= new AbortController(); const signal = listeners.signal;
     const bind=(node,fn)=>{if(node && !bound.has(node)){bound.add(node);fn();}};
     const dialog = root.querySelector('#plan-dialog'); let trigger;
@@ -117,6 +119,18 @@ export function mountDashboard(root, adapter) {
       input.addEventListener('change', () => {drafts.set(input.dataset.setting, get()); showMode(); current.actions?.edit?.();}, {signal});});
     });
     showMode();
+    // Vehicle sources (13.1): own drafts, own saves; never part of the plan save.
+    root.querySelectorAll('[data-vsetting]').forEach(input => {
+      const key = `v:${input.dataset.vsetting}`;
+      if (drafts.has(key)) { if (input.value !== drafts.get(key)) input.value = drafts.get(key); }
+      else if (input.tagName === 'SELECT') { const base = input.querySelector('option[selected]'); if (base && input.value !== base.value) input.value = base.value; }
+      bind(input,()=>{const on=()=>{drafts.set(key,input.value);current.actions?.editVehicle?.(input.dataset.vsetting);};input.addEventListener('input',on,{signal});input.addEventListener('change',on,{signal});});
+    });
+    const vehiclePick=root.querySelector('[data-vselect="vehicle"]');if(vehiclePick){const chosen=vehiclePick.querySelector('option[selected]');if(chosen && vehiclePick.value!==chosen.value)vehiclePick.value=chosen.value;}bind(vehiclePick,()=>vehiclePick.addEventListener('change',()=>current.actions?.selectVehicle?.(vehiclePick.value),{signal}));
+    const vget=name=>root.querySelector(`[data-vsetting="${name}"]`)?.value;
+    const vsave=(id,fn)=>{const b=root.querySelector(id);bind(b,()=>b.addEventListener('click',()=>{if(current.model.vehicleSources?.canEdit===true && typeof current.actions?.[fn]==='function')current.actions[fn]({sensor:vget('sensor'),capacity:vget('capacity'),phases:vget('phases')});},{signal}));};
+    vsave('#save-vehicle-sensor','saveVehicleSensor');vsave('#save-vehicle-props','saveVehicleProperties');
+    const vreload=root.querySelector('#reload-vehicle-sources');bind(vreload,()=>vreload.addEventListener('click',()=>current.actions?.reloadVehicleSources?.(),{signal}));
     const saveButton=root.querySelector('#save-plan');bind(saveButton,()=>saveButton.addEventListener('click', () => { if (current.model.canSave === true && typeof current.actions?.save === 'function') current.actions.save(Object.fromEntries([...root.querySelectorAll('[data-setting]')].map(input=>[input.dataset.setting,input.type === 'checkbox' ? input.checked : input.value]))); }, {signal}));
     const reloadButton=root.querySelector('#reload-settings');bind(reloadButton,()=>reloadButton.addEventListener('click', () => current.actions?.reloadSettings?.(), {signal}));
     if (chartMount && ((!chartReady && Object.keys(chartMount.priceCharts).length) || (chartReady && !Object.keys(chartMount.priceCharts).length) || (!chartReady && !historyReady))) {chartMount.dispose();chartMount=null;}
@@ -139,7 +153,7 @@ export function mountDashboard(root, adapter) {
       if (viewport && (viewport.scrollX!==x || viewport.scrollY!==y)) viewport.scrollTo(x,y);
     }
     return result;
-  }, resetDrafts() { drafts.clear(); }, get charts() { return chartMount?.priceCharts || {}; }, dispose() { if (!disposed) { disposed = true; drafts.clear(); cleanup(); if (mounted.get(root) === instance) mounted.delete(root); } } };
+  }, resetDrafts() { drafts.clear(); }, resetVehicleDrafts() { for (const key of [...drafts.keys()]) if (key.startsWith('v:')) drafts.delete(key); }, get charts() { return chartMount?.priceCharts || {}; }, dispose() { if (!disposed) { disposed = true; drafts.clear(); cleanup(); if (mounted.get(root) === instance) mounted.delete(root); } } };
   mounted.set(root, instance);
   return instance;
 }

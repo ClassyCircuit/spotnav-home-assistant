@@ -4,6 +4,13 @@ recorded as the same discovery decision the `confirm_vehicle_soc` service record
 it to automatic detection) and `spotnav/update_vehicle` (a vehicle's battery size, consumption and onboard charger,
 written by `vehicles/vehicle_properties.py`):
 
+    {type: "spotnav/choose_vehicle_soc", api_version: 1, charger_id, vehicle_id, entity_id,
+     expected_entity_id?: <the sensor last seen chosen by a person> | null}
+
+`expected_entity_id` is optional; when present and the saved choice differs, `spotnav_conflict` and nothing is written.
+`get_entity_config`'s `config.vehicle_properties` lists every choosable vehicle's stored/reported capacity and phases
+(read-only; written with `update_vehicle` below, which accepts those vehicles even without a chosen sensor):
+
     {type: "spotnav/update_vehicle", api_version: 1, charger_id, vehicle_id,
      changes: {capacity_kwh?: 1..500 | null, consumption_kwh_per_10km?: > 0 | null, onboard_phases?: 1 | 3 | null,
                target_percent?: 0..100 | null, min_percent?: 10..80 in steps of 5 | null,
@@ -89,11 +96,12 @@ from ..const import (
     MODE_DETECTED,
     MODE_OCPP,
 )
-from ..repairs import async_clear_vehicle_soc, async_record_vehicle_soc
+from ..planning.auto_settings import DEFAULT_CONSUMPTION_KWH_PER_10KM
+from ..repairs import async_clear_vehicle_soc, async_record_vehicle_soc, soc_write_lock
 from ..runtime import domain_data, preview_for
 from ..vehicles import vehicle_properties, vehicle_target
 from ..vehicles.ocpp_identity import apply_target, resolve_target
-from ..vehicles.vehicle_discovery import resolve_target_vehicle, soc_choices, valid_soc_choice
+from ..vehicles.vehicle_discovery import soc_choices, valid_soc_choice
 from ..vehicles.vehicle_wake import wake_supported
 from .common import (
     ERROR_NOT_ADMIN,
@@ -230,8 +238,47 @@ def read_entity_config(hass: HomeAssistant, charger: ConfigEntry) -> dict[str, A
         "site": site,
         "fields": fields,
         "vehicles": vehicle_soc_vehicles(hass),
+        "vehicle_properties": _vehicle_property_rows(hass, charger),
         "control": charger_control_descriptor(hass, charger),
     }
+
+
+def _vehicle_property_rows(hass: HomeAssistant, charger: ConfigEntry) -> list[dict[str, Any]]:
+    """Read-only planning properties for every discovered vehicle, whether or not its sensor is chosen.
+
+    The dashboard's `vehicles` has no row for a car whose charge-level sensor is ambiguous or missing, so
+    this reports what is stored for it (never a guess). `reported_known` is false when nothing could be asked
+    of the car (no chosen sensor); a vehicle-reported capacity is then unknown, not absent. `capacity_kwh` is the
+    effective figure (reported, else stored, else `null`) the `update_vehicle` compare-and-set checks, and
+    `onboard_phases` is the effective one (stored, else the planning default of three).
+    """
+    store = domain_data(hass).auto_store
+    settings = None if store is None else store.settings(charger.entry_id)
+    captured = {v.id: v for v in capture_vehicles(hass, charger.entry_id, settings)[0]}
+    rows: list[dict[str, Any]] = []
+    for choice in soc_choices(hass):
+        own = vehicle_properties.stored_properties(hass, choice.id)
+        vehicle = captured.get(choice.id)
+        if vehicle is not None:
+            capacity, source = vehicle.capacity_kwh, vehicle.capacity_source
+            known = True
+        else:
+            capacity = own.capacity_kwh
+            source = "stored" if capacity is not None else None
+            known = False
+        rows.append(
+            {
+                "id": choice.id,
+                "capacity_kwh": capacity,
+                "capacity_source": source,
+                "reported_capacity_kwh": capacity if source == "reported" else None,
+                "reported_known": known,
+                "stored_capacity_kwh": own.capacity_kwh,
+                "onboard_phases": own.phases,
+                "stored_onboard_phases": own.onboard_phases,
+            }
+        )
+    return rows
 
 
 def _same(field: str, current: Any, expected: Any) -> bool:
@@ -453,14 +500,31 @@ async def async_update_entity_config(
     return read_entity_config(hass, charger)
 
 
+#: `async_set_vehicle_soc(expected_entity_id=...)` left out: a legacy caller that names no expectation.
+_NO_EXPECTATION: Final = object()
+
+
 async def async_set_vehicle_soc(
-    hass: HomeAssistant, charger_id: Any, *, vehicle_id: Any, entity_id: Any
+    hass: HomeAssistant,
+    charger_id: Any,
+    *,
+    vehicle_id: Any,
+    entity_id: Any,
+    expected_entity_id: Any = _NO_EXPECTATION,
 ) -> dict[str, Any]:
     """Choose which sensor is `vehicle_id`'s state of charge, or (`entity_id` `None`) go back to
     automatic detection, through the discovery decision itself.
 
     The charger only authenticates and receives the re-read config; the vehicle is a system-wide
     device (`vehicle_discovery.soc_choices`). Nothing is written unless the pair is valid.
+
+    `expected_entity_id` is optional (a caller that omits it keeps the old unconditional write): the sensor the
+    caller last saw *chosen by a person* (`None`: no choice, automatic or ambiguous). If the saved choice is not
+    that now, the answer is `spotnav_conflict` and nothing is written. The comparison and the write run under
+    one lock (`repairs.soc_write_lock`), which the `confirm_vehicle_soc` and `unconfirm_vehicle` services also take,
+    so these writers cannot interleave across the store's awaits. (The Repairs fix flow and the config flow's
+    `resolve_vehicle` step write the same decision without it: they are interactive, and not covered.) A write that really changes the sensor in use recalculates the plans of
+    the chargers that plan for this car, before or after; an unchanged selection recalculates nothing.
     """
     charger = _resolve_charger(hass, charger_id)
 
@@ -474,12 +538,33 @@ async def async_set_vehicle_soc(
     store = domain_data(hass).decision_store
     if store is None:
         raise _refuse(ERROR_INVALID_VALUE, ERR_UNKNOWN_VEHICLE)
-    if entity_id is None:
-        await async_clear_vehicle_soc(hass, store, vehicle_id)
-    elif valid_soc_choice(hass, vehicle_id, entity_id):
-        await async_record_vehicle_soc(hass, store, vehicle_id, entity_id)
-    else:
-        raise _refuse(ERROR_INVALID_VALUE, ERR_ENTITY_NOT_FOUND)
+    guarded = expected_entity_id is not _NO_EXPECTATION
+    if guarded and expected_entity_id is not None and (
+        not isinstance(expected_entity_id, str) or not expected_entity_id
+    ):
+        raise _refuse(ERROR_INVALID_VALUE, "invalid_expected")
+
+    async with soc_write_lock(hass):
+        def _current() -> Any:
+            return next((c for c in soc_choices(hass) if c.id == vehicle_id), None)
+
+        before = _current()
+        if before is None:
+            raise _refuse(ERROR_INVALID_VALUE, ERR_UNKNOWN_VEHICLE)
+        if guarded:
+            saved = before.selected_entity_id if before.source == "confirmed" else None
+            if saved != expected_entity_id:
+                raise EntityConfigRefusal(ERROR_CONFLICT, read_entity_config(hass, charger), [])
+        if entity_id is not None and not valid_soc_choice(hass, vehicle_id, entity_id):
+            raise _refuse(ERROR_INVALID_VALUE, ERR_ENTITY_NOT_FOUND)
+        affected = _planner_entry_ids(hass, vehicle_id)
+        if entity_id is None:
+            await async_clear_vehicle_soc(hass, store, vehicle_id)
+        else:
+            await async_record_vehicle_soc(hass, store, vehicle_id, entity_id)
+        after = _current()
+        if (None if after is None else after.selected_entity_id) != before.selected_entity_id:
+            await _recalculate_entries(hass, affected | _planner_entry_ids(hass, vehicle_id))
     return read_entity_config(hass, charger)
 
 
@@ -513,8 +598,10 @@ async def async_update_vehicle(
         return refusal
 
     store = domain_data(hass).decision_store
+    # Any vehicle whose sensor may be chosen: a car with an ambiguous or missing sensor has no dashboard row
+    # yet still has properties (compare-and-set then uses what is stored, as `get_entity_config` reports).
     if store is None or not isinstance(vehicle_id, str) or not any(
-        c.id == vehicle_id for c in resolve_target_vehicle(hass, None)[1]
+        c.id == vehicle_id for c in soc_choices(hass)
     ):
         raise _refuse(ERROR_INVALID_VALUE, [FieldError("vehicle_id", ERR_UNKNOWN_VEHICLE)])
     errors = vehicle_properties.validate_changes(changes)
@@ -530,7 +617,21 @@ async def async_update_vehicle(
         not isinstance(expected, dict) or set(expected) - set(vehicle_properties.PROPERTY_KEYS)
     ):
         raise _refuse(ERROR_INVALID_VALUE, [FieldError("expected", "invalid_expected")])
-    row = _vehicle_row(hass, entry_id, vehicle_id) or {}
+    row = _vehicle_row(hass, entry_id, vehicle_id)
+    if row is None:
+        stored = vehicle_properties.stored_properties(hass, vehicle_id)
+        row = {
+            "capacity_kwh": stored.capacity_kwh,
+            "consumption_kwh_per_10km": (
+                stored.consumption_kwh_per_10km
+                if stored.consumption_kwh_per_10km is not None
+                else DEFAULT_CONSUMPTION_KWH_PER_10KM
+            ),
+            "onboard_phases": stored.phases,
+            "target_percent": stored.target_percent,
+            "min_percent": stored.min_percent,
+            "wake_for_reading": stored.wake_for_reading if wake_supported(hass, vehicle_id) else None,
+        }
     seen = {
         vehicle_properties.KEY_CAPACITY: row.get("capacity_kwh"),
         vehicle_properties.KEY_CONSUMPTION: row.get("consumption_kwh_per_10km"),
@@ -555,17 +656,29 @@ async def async_update_vehicle(
     return read_entity_config(hass, charger), _vehicle_row(hass, entry_id, vehicle_id)
 
 
-async def _recalculate_planners_for(hass: HomeAssistant, vehicle_id: str) -> None:
-    """Plan again on every charger whose planned vehicle this is: its need or distance moved."""
+def _planner_entry_ids(hass: HomeAssistant, vehicle_id: str) -> set[str]:
+    """The chargers whose planned vehicle (stored, else the only one) is `vehicle_id` right now."""
     store = domain_data(hass).auto_store
     if store is None:
-        return
-    for entry_id in store.entry_ids():
-        if vehicle_properties.resolved_vehicle_id(hass, entry_id) != vehicle_id:
-            continue
+        return set()
+    return {
+        entry_id
+        for entry_id in store.entry_ids()
+        if vehicle_properties.resolved_vehicle_id(hass, entry_id) == vehicle_id
+    }
+
+
+async def _recalculate_entries(hass: HomeAssistant, entry_ids: set[str]) -> None:
+    """Recalculate those chargers' plans (no command, no wake): any Morek reconciliation is the normal guarded one."""
+    for entry_id in sorted(entry_ids):
         controller = preview_for(hass, entry_id)
         if controller is not None:
             hass.async_create_task(controller.async_recalculate())
+
+
+async def _recalculate_planners_for(hass: HomeAssistant, vehicle_id: str) -> None:
+    """Plan again on every charger whose planned vehicle this is: its need or distance moved."""
+    await _recalculate_entries(hass, _planner_entry_ids(hass, vehicle_id))
 
 
 def _envelope(config: dict[str, Any] | None, **extra: Any) -> dict[str, Any]:
@@ -670,6 +783,7 @@ async def websocket_update_entity_config(
         vol.Optional("charger_id"): object,
         vol.Optional("vehicle_id"): object,
         vol.Optional("entity_id"): object,
+        vol.Optional("expected_entity_id"): object,
     }
 )
 @websocket_api.async_response
@@ -688,6 +802,7 @@ async def websocket_set_vehicle_soc(
             msg.get("charger_id"),
             vehicle_id=msg.get("vehicle_id"),
             entity_id=msg.get("entity_id"),
+            **({"expected_entity_id": msg["expected_entity_id"]} if "expected_entity_id" in msg else {}),
         )
     except EntityConfigRefusal as refusal:
         connection.send_result(

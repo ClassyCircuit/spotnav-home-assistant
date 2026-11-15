@@ -13,6 +13,7 @@ prices have stopped raises and deletes its own (`price_device.py`); the sync her
 
 from __future__ import annotations
 
+import asyncio
 from collections import deque
 from collections.abc import Callable, Iterable
 from datetime import datetime, timedelta
@@ -421,6 +422,16 @@ def _decision_name(hass: HomeAssistant, kind: str, device_id: str) -> str:
         if decision.kind == kind and decision.device_id == device_id:
             return decision.name
     return device_id
+
+
+_SOC_LOCK_KEY = "spotnav_vehicle_soc_write_lock"
+
+
+def soc_write_lock(hass: HomeAssistant) -> asyncio.Lock:
+    """The one lock the `choose_vehicle_soc` save and the `confirm_vehicle_soc`/`unconfirm_vehicle` services take
+    around their compare-and-write, so they cannot interleave across the store's awaits. Not reentrant: take it
+    around, never inside, `async_record_vehicle_soc`/`async_clear_vehicle_soc`."""
+    return hass.data.setdefault(_SOC_LOCK_KEY, asyncio.Lock())
 
 
 async def async_record_vehicle_soc(

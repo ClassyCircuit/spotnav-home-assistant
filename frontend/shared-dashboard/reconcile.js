@@ -4,6 +4,8 @@ const key = node => {
   if (node.nodeType !== 1) return null;
   if (node.id) return `id:${node.id}`;
   if (node.dataset.setting) return `setting:${node.dataset.setting}`;
+  if (node.dataset.vsetting) return `vsetting:${node.dataset.vsetting}`;
+  if (node.dataset.vselect) return `vselect:${node.dataset.vselect}`;
   if (node.dataset.morekAction) return `morek-action:${node.dataset.morekAction}`;
   if (node.hasAttribute('data-morek-actions')) return 'morek-actions';
   if (node.dataset.zoom) return `zoom:${node.dataset.zoom}`;

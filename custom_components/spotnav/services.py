@@ -37,6 +37,7 @@ from .repairs import (
     async_clear_vehicle_soc,
     async_record_vehicle_soc,
     async_sync_resolution_repairs,
+    soc_write_lock,
 )
 from .pricing.price_points import resolution_minutes, rounded
 from .runtime import charger_data, domain_data, price_data, PriceData
@@ -328,7 +329,8 @@ async def _async_unconfirm_vehicle(hass: HomeAssistant, call: ServiceCall) -> No
     store = _decision_store_or_warn(hass, call)
     if store is None:
         return
-    await async_clear_vehicle_soc(hass, store, str(call.data["device_id"]))
+    async with soc_write_lock(hass):
+        await async_clear_vehicle_soc(hass, store, str(call.data["device_id"]))
 
 
 async def _async_confirm_charge_limit(hass: HomeAssistant, call: ServiceCall) -> None:
@@ -386,10 +388,12 @@ async def _async_confirm_vehicle_soc(hass: HomeAssistant, call: ServiceCall) -> 
         return
     device_id = str(call.data["device_id"])
     entity_id = str(call.data["entity_id"])
-    if not valid_soc_entity_id(hass, device_id, entity_id):
-        # One refusal naming nothing, so the service cannot be used to list a device's entities.
-        _LOGGER.warning(
-            "Ignoring a state-of-charge confirmation that is not a candidate of that vehicle"
-        )
-        return
-    await async_record_vehicle_soc(hass, store, device_id, entity_id)
+    # Same lock as the card's guarded save, so the two cannot interleave across the store's awaits.
+    async with soc_write_lock(hass):
+        if not valid_soc_entity_id(hass, device_id, entity_id):
+            # One refusal naming nothing, so the service cannot be used to list a device's entities.
+            _LOGGER.warning(
+                "Ignoring a state-of-charge confirmation that is not a candidate of that vehicle"
+            )
+            return
+        await async_record_vehicle_soc(hass, store, device_id, entity_id)

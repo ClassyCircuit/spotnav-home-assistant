@@ -2127,7 +2127,7 @@ var init_chunk_M45NRQFW = __esm({
       closeTimeInput: "Close time picker",
       collapseRow: "Collapse row",
       columnMenu: "Column options",
-      columnMovedToPosition: (label, position, total2) => `${label} moved to position ${position} of ${total2}`,
+      columnMovedToPosition: (label2, position, total2) => `${label2} moved to position ${position} of ${total2}`,
       columns: "Columns",
       compactPageXOfY: (page, total2) => `${page} of ${total2}`,
       completed: "Completed",
@@ -2151,7 +2151,7 @@ var init_chunk_M45NRQFW = __esm({
       error: "Error",
       exitFullscreen: "Exit fullscreen",
       expandRow: "Expand row",
-      filterByColumn: (label) => `Filter by ${label}`,
+      filterByColumn: (label2) => `Filter by ${label2}`,
       filterFrom: "From",
       filterMax: "Max",
       filterMin: "Min",
@@ -2203,7 +2203,7 @@ var init_chunk_M45NRQFW = __esm({
       },
       numRowsCopied: (num3) => num3 === 1 ? "1 row copied" : `${num3} rows copied`,
       numRowsSelected: (num3) => num3 === 1 ? "1 row selected" : `${num3} rows selected`,
-      optionPosition: (label, position, total2) => `${label}, ${position} of ${total2}`,
+      optionPosition: (label2, position, total2) => `${label2}, ${position} of ${total2}`,
       optionsLoadError: "Options could not be loaded",
       pageXOfY: (page, total2) => `Page ${page} of ${total2}`,
       pagination: "Pagination",
@@ -2529,8 +2529,8 @@ var init_chunk_LXLE4T4D = __esm({
               hasOtherElements = true;
             }
           } else if (node.nodeType === Node.TEXT_NODE) {
-            const text3 = node.textContent?.trim() || "";
-            if (text3.length > 0) {
+            const text4 = node.textContent?.trim() || "";
+            if (text4.length > 0) {
               hasText = true;
             }
           }
@@ -6215,7 +6215,7 @@ var platformApi = {
   measureText: /* @__PURE__ */ (function() {
     var _ctx;
     var _cachedFont;
-    return function(text3, font) {
+    return function(text4, font) {
       if (!_ctx) {
         var canvas = platformApi.createCanvas();
         _ctx = canvas && canvas.getContext("2d");
@@ -6224,18 +6224,18 @@ var platformApi = {
         if (_cachedFont !== font) {
           _cachedFont = _ctx.font = font || DEFAULT_FONT;
         }
-        return _ctx.measureText(text3);
+        return _ctx.measureText(text4);
       } else {
-        text3 = text3 || "";
+        text4 = text4 || "";
         font = font || DEFAULT_FONT;
         var res = /((?:\d+)?\.?\d*)px/.exec(font);
         var fontSize = res && +res[1] || DEFAULT_FONT_SIZE;
         var width = 0;
         if (font.indexOf("mono") >= 0) {
-          width = fontSize * text3.length;
+          width = fontSize * text4.length;
         } else {
-          for (var i7 = 0; i7 < text3.length; i7++) {
-            var preCalcWidth = DEFAULT_TEXT_WIDTH_MAP[text3[i7]];
+          for (var i7 = 0; i7 < text4.length; i7++) {
+            var preCalcWidth = DEFAULT_TEXT_WIDTH_MAP[text4[i7]];
             width += preCalcWidth == null ? fontSize : preCalcWidth * fontSize;
           }
         }
@@ -7314,11 +7314,11 @@ function getWheelDeltaMayPolyfill(e9) {
   var sign = deltaY > 0 ? -1 : deltaY < 0 ? 1 : deltaX > 0 ? -1 : 1;
   return 3 * delta * sign;
 }
-function addEventListener(el, name, handler, opt) {
-  el.addEventListener(name, handler, opt);
+function addEventListener(el, name, handler, opt2) {
+  el.addEventListener(name, handler, opt2);
 }
-function removeEventListener(el, name, handler, opt) {
-  el.removeEventListener(name, handler, opt);
+function removeEventListener(el, name, handler, opt2) {
+  el.removeEventListener(name, handler, opt2);
 }
 var stop = function(e9) {
   e9.preventDefault();
@@ -7692,15 +7692,15 @@ var BoundingRect = (function() {
   BoundingRect2.prototype.calculateTransform = function(b3) {
     return boundingRectCalculateTransform(create2(), this, b3);
   };
-  BoundingRect2.prototype.intersect = function(b3, mtv, opt) {
-    return BoundingRect2.intersect(this, b3, mtv, opt);
+  BoundingRect2.prototype.intersect = function(b3, mtv, opt2) {
+    return BoundingRect2.intersect(this, b3, mtv, opt2);
   };
-  BoundingRect2.intersect = function(a4, b3, mtv, opt) {
+  BoundingRect2.intersect = function(a4, b3, mtv, opt2) {
     if (mtv) {
       Point_default.set(mtv, 0, 0);
     }
-    var outIntersectRect = opt && opt.outIntersectRect || null;
-    var clamp2 = opt && opt.clamp;
+    var outIntersectRect = opt2 && opt2.outIntersectRect || null;
+    var clamp2 = opt2 && opt2.clamp;
     if (outIntersectRect) {
       outIntersectRect.x = outIntersectRect.y = outIntersectRect.width = outIntersectRect.height = NaN;
     }
@@ -7714,7 +7714,7 @@ var BoundingRect = (function() {
       b3 = boundingRectSet(_tmpIntersectB, b3.x, b3.y, b3.width, b3.height);
     }
     var useMTV = !!mtv;
-    _intersectCtx.reset(opt, useMTV);
+    _intersectCtx.reset(opt2, useMTV);
     var touchThreshold = _intersectCtx.touchThreshold;
     var ax0 = a4.x + touchThreshold;
     var ax1 = a4.x + a4.width - touchThreshold;
@@ -7899,10 +7899,10 @@ function createIntersectContext() {
     touchThreshold: 0,
     bidirectional: true,
     negativeSize: false,
-    reset: function(opt, useMTV) {
+    reset: function(opt2, useMTV) {
       _ctx.touchThreshold = 0;
-      if (opt && opt.touchThreshold != null) {
-        _ctx.touchThreshold = mathMax(0, opt.touchThreshold);
+      if (opt2 && opt2.touchThreshold != null) {
+        _ctx.touchThreshold = mathMax(0, opt2.touchThreshold);
       }
       _ctx.negativeSize = false;
       if (!useMTV) {
@@ -7911,12 +7911,12 @@ function createIntersectContext() {
       _ctx.minTv.set(Infinity, Infinity);
       _ctx.maxTv.set(0, 0);
       _ctx.useDir = false;
-      if (opt && opt.direction != null) {
+      if (opt2 && opt2.direction != null) {
         _ctx.useDir = true;
         _ctx.dirMinTv.copy(_ctx.minTv);
         _dirTmp.copy(_ctx.minTv);
-        _direction = opt.direction;
-        _ctx.bidirectional = opt.bidirectional == null || !!opt.bidirectional;
+        _direction = opt2.direction;
+        _ctx.bidirectional = opt2.bidirectional == null || !!opt2.bidirectional;
         if (!_ctx.bidirectional) {
           _dirCheckVec.set(Math.cos(_direction), Math.sin(_direction));
         }
@@ -8114,16 +8114,16 @@ var Handler = (function(_super) {
     }
   };
   Handler2.prototype.findHover = function(x2, y3, exclude) {
-    var list2 = this.storage.getDisplayList();
+    var list3 = this.storage.getDisplayList();
     var out2 = new HoveredResult(x2, y3);
-    setHoverTarget(list2, out2, x2, y3, exclude);
+    setHoverTarget(list3, out2, x2, y3, exclude);
     if (this._pointerSize && !out2.target) {
       var candidates = [];
       var pointerSize = this._pointerSize;
       var targetSizeHalf = pointerSize / 2;
       var pointerRect = new BoundingRect_default(x2 - targetSizeHalf, y3 - targetSizeHalf, pointerSize, pointerSize);
-      for (var i7 = list2.length - 1; i7 >= 0; i7--) {
-        var el = list2[i7];
+      for (var i7 = list3.length - 1; i7 >= 0; i7--) {
+        var el = list3[i7];
         if (el !== exclude && !el.ignore && !el.ignoreCoarsePointer && (!el.parent || !el.parent.ignoreCoarsePointer)) {
           tmpRect.copy(el.getBoundingRect());
           if (el.transform) {
@@ -8221,9 +8221,9 @@ function isHover(displayable, x2, y3) {
   }
   return false;
 }
-function setHoverTarget(list2, out2, x2, y3, exclude) {
-  for (var i7 = list2.length - 1; i7 >= 0; i7--) {
-    var el = list2[i7];
+function setHoverTarget(list3, out2, x2, y3, exclude) {
+  for (var i7 = list3.length - 1; i7 >= 0; i7--) {
+    var el = list3[i7];
     var hoverCheckResult = void 0;
     if (el !== exclude && !el.ignore && (hoverCheckResult = isHover(el, x2, y3))) {
       !out2.topTarget && (out2.topTarget = el);
@@ -9572,15 +9572,15 @@ var LRU = (function() {
     this._maxSize = maxSize;
   }
   LRU2.prototype.put = function(key3, value2) {
-    var list2 = this._list;
+    var list3 = this._list;
     var map3 = this._map;
     var removed = null;
     if (map3[key3] == null) {
-      var len2 = list2.len();
+      var len2 = list3.len();
       var entry = this._lastRemovedEntry;
       if (len2 >= this._maxSize && len2 > 0) {
-        var leastUsedEntry = list2.head;
-        list2.remove(leastUsedEntry);
+        var leastUsedEntry = list3.head;
+        list3.remove(leastUsedEntry);
         delete map3[leastUsedEntry.key];
         removed = leastUsedEntry.value;
         this._lastRemovedEntry = leastUsedEntry;
@@ -9591,18 +9591,18 @@ var LRU = (function() {
         entry = new Entry(value2);
       }
       entry.key = key3;
-      list2.insertEntry(entry);
+      list3.insertEntry(entry);
       map3[key3] = entry;
     }
     return removed;
   };
   LRU2.prototype.get = function(key3) {
     var entry = this._map[key3];
-    var list2 = this._list;
+    var list3 = this._list;
     if (entry != null) {
-      if (entry !== list2.tail) {
-        list2.remove(entry);
-        list2.insertEntry(entry);
+      if (entry !== list3.tail) {
+        list3.remove(entry);
+        list3.insertEntry(entry);
       }
       return entry.value;
     }
@@ -11186,10 +11186,10 @@ function mountGlobalDOMEventListeners(instance, scope) {
     mountSingleDOMEventListener(scope, nativeEventName, nativeEventListener, { capture: true });
   }
 }
-function mountSingleDOMEventListener(scope, nativeEventName, listener, opt) {
+function mountSingleDOMEventListener(scope, nativeEventName, listener, opt2) {
   scope.mounted[nativeEventName] = listener;
-  scope.listenerOpts[nativeEventName] = opt;
-  addEventListener(scope.domTarget, nativeEventName, listener, opt);
+  scope.listenerOpts[nativeEventName] = opt2;
+  addEventListener(scope.domTarget, nativeEventName, listener, opt2);
 }
 function unmountDOMEventListeners(scope) {
   var mounted2 = scope.mounted;
@@ -11537,25 +11537,25 @@ function measureCharWidth(fontMeasureInfo, charCode) {
   }
   return 0 <= charCode && charCode <= 127 ? fontMeasureInfo.asciiWidthMap != null ? fontMeasureInfo.asciiWidthMap[charCode] : fontMeasureInfo.asciiCharWidth : fontMeasureInfo.stWideCharWidth;
 }
-function measureWidth(fontMeasureInfo, text3) {
+function measureWidth(fontMeasureInfo, text4) {
   var strWidthCache = fontMeasureInfo.strWidthCache;
-  var width = strWidthCache.get(text3);
+  var width = strWidthCache.get(text4);
   if (width == null) {
-    width = platformApi.measureText(text3, fontMeasureInfo.font).width;
-    strWidthCache.put(text3, width);
+    width = platformApi.measureText(text4, fontMeasureInfo.font).width;
+    strWidthCache.put(text4, width);
   }
   return width;
 }
-function innerGetBoundingRect(text3, font, textAlign, textBaseline) {
-  var width = measureWidth(ensureFontMeasureInfo(font), text3);
+function innerGetBoundingRect(text4, font, textAlign, textBaseline) {
+  var width = measureWidth(ensureFontMeasureInfo(font), text4);
   var height = getLineHeight(font);
   var x2 = adjustTextX(0, width, textAlign);
   var y3 = adjustTextY(0, height, textBaseline);
   var rect = new BoundingRect_default(x2, y3, width, height);
   return rect;
 }
-function getBoundingRect(text3, font, textAlign, textBaseline) {
-  var textLines = ((text3 || "") + "").split("\n");
+function getBoundingRect(text4, font, textAlign, textBaseline) {
+  var textLines = ((text4 || "") + "").split("\n");
   var len2 = textLines.length;
   if (len2 === 1) {
     return innerGetBoundingRect(textLines[0], font, textAlign, textBaseline);
@@ -13005,14 +13005,14 @@ var ZRender = (function() {
       refreshHover: false
     });
   };
-  ZRender2.prototype._refresh = function(opt) {
-    if (opt.animUpdate) {
+  ZRender2.prototype._refresh = function(opt2) {
+    if (opt2.animUpdate) {
       this.animation.update(true);
     }
     this._needsRefresh = this._needsRefreshHover = false;
     this.painter.refresh({
-      refresh: opt.refresh,
-      refreshHover: opt.refreshHover
+      refresh: opt2.refresh,
+      refreshHover: opt2.refreshHover
     });
     this._needsRefresh = this._needsRefreshHover = false;
   };
@@ -13395,15 +13395,15 @@ function nice(val, mode) {
   val = nf * exp10;
   return round(val, -exponent);
 }
-function reformIntervals(list2) {
-  list2.sort(function(a4, b3) {
+function reformIntervals(list3) {
+  list3.sort(function(a4, b3) {
     return littleThan2(a4, b3, 0) ? -1 : 1;
   });
   var curr = -Infinity;
   var currClose = 1;
-  for (var i7 = 0; i7 < list2.length; ) {
-    var interval = list2[i7].interval;
-    var close_1 = list2[i7].close;
+  for (var i7 = 0; i7 < list3.length; ) {
+    var interval = list3[i7].interval;
+    var close_1 = list3[i7].close;
     for (var lg = 0; lg < 2; lg++) {
       if (interval[lg] <= curr) {
         interval[lg] = curr;
@@ -13413,12 +13413,12 @@ function reformIntervals(list2) {
       currClose = close_1[lg];
     }
     if (interval[0] === interval[1] && close_1[0] * close_1[1] !== 1) {
-      list2.splice(i7, 1);
+      list3.splice(i7, 1);
     } else {
       i7++;
     }
   }
-  return list2;
+  return list3;
   function littleThan2(a4, b3, lg2) {
     return a4.interval[lg2] < b3.interval[lg2] || a4.interval[lg2] === b3.interval[lg2] && (a4.close[lg2] - b3.close[lg2] === (!lg2 ? 1 : -1) || !lg2 && littleThan2(a4, b3, 1));
   }
@@ -13533,15 +13533,15 @@ var INTERNAL_COMPONENT_ID_PREFIX = "\0_ec_\0";
 function normalizeToArray(value2) {
   return value2 instanceof Array ? value2 : value2 == null ? [] : [value2];
 }
-function defaultEmphasis(opt, key3, subOpts) {
-  if (opt) {
-    opt[key3] = opt[key3] || {};
-    opt.emphasis = opt.emphasis || {};
-    opt.emphasis[key3] = opt.emphasis[key3] || {};
+function defaultEmphasis(opt2, key3, subOpts) {
+  if (opt2) {
+    opt2[key3] = opt2[key3] || {};
+    opt2.emphasis = opt2.emphasis || {};
+    opt2.emphasis[key3] = opt2.emphasis[key3] || {};
     for (var i7 = 0, len2 = subOpts.length; i7 < len2; i7++) {
       var subOptName = subOpts[i7];
-      if (!opt.emphasis[key3].hasOwnProperty(subOptName) && opt[key3].hasOwnProperty(subOptName)) {
-        opt.emphasis[key3][subOptName] = opt[key3][subOptName];
+      if (!opt2.emphasis[key3].hasOwnProperty(subOptName) && opt2[key3].hasOwnProperty(subOptName)) {
+        opt2.emphasis[key3][subOptName] = opt2[key3][subOptName];
       }
     }
   }
@@ -13684,23 +13684,23 @@ function makeIdAndName(mapResult) {
     existing && idMap.set(existing.id, item);
   });
   each(mapResult, function(item) {
-    var opt = item.newOption;
-    assert(!opt || opt.id == null || !idMap.get(opt.id) || idMap.get(opt.id) === item, "id duplicates: " + (opt && opt.id));
-    opt && opt.id != null && idMap.set(opt.id, item);
+    var opt2 = item.newOption;
+    assert(!opt2 || opt2.id == null || !idMap.get(opt2.id) || idMap.get(opt2.id) === item, "id duplicates: " + (opt2 && opt2.id));
+    opt2 && opt2.id != null && idMap.set(opt2.id, item);
     !item.keyInfo && (item.keyInfo = {});
   });
   each(mapResult, function(item, index) {
     var existing = item.existing;
-    var opt = item.newOption;
+    var opt2 = item.newOption;
     var keyInfo = item.keyInfo;
-    if (!isObject(opt)) {
+    if (!isObject(opt2)) {
       return;
     }
-    keyInfo.name = opt.name != null ? makeComparableKey(opt.name) : existing ? existing.name : DUMMY_COMPONENT_NAME_PREFIX + index;
+    keyInfo.name = opt2.name != null ? makeComparableKey(opt2.name) : existing ? existing.name : DUMMY_COMPONENT_NAME_PREFIX + index;
     if (existing) {
       keyInfo.id = makeComparableKey(existing.id);
-    } else if (opt.id != null) {
-      keyInfo.id = makeComparableKey(opt.id);
+    } else if (opt2.id != null) {
+      keyInfo.id = makeComparableKey(opt2.id);
     } else {
       var idNum = 0;
       do {
@@ -13819,25 +13819,25 @@ function makeInner() {
   };
 }
 var innerUniqueIndex = getRandomIdBase();
-function parseFinder(ecModel, finderInput, opt) {
-  var _a2 = preParseFinder(finderInput, opt), mainTypeSpecified = _a2.mainTypeSpecified, queryOptionMap = _a2.queryOptionMap, others = _a2.others;
+function parseFinder(ecModel, finderInput, opt2) {
+  var _a2 = preParseFinder(finderInput, opt2), mainTypeSpecified = _a2.mainTypeSpecified, queryOptionMap = _a2.queryOptionMap, others = _a2.others;
   var result2 = others;
-  var defaultMainType = opt ? opt.defaultMainType : null;
+  var defaultMainType = opt2 ? opt2.defaultMainType : null;
   if (!mainTypeSpecified && defaultMainType) {
     queryOptionMap.set(defaultMainType, {});
   }
   queryOptionMap.each(function(queryOption, mainType) {
     var queryResult = queryReferringComponents(ecModel, mainType, queryOption, {
       useDefault: defaultMainType === mainType,
-      enableAll: opt && opt.enableAll != null ? opt.enableAll : true,
-      enableNone: opt && opt.enableNone != null ? opt.enableNone : true
+      enableAll: opt2 && opt2.enableAll != null ? opt2.enableAll : true,
+      enableNone: opt2 && opt2.enableNone != null ? opt2.enableNone : true
     });
     result2[mainType + "Models"] = queryResult.models;
     result2[mainType + "Model"] = queryResult.models[0];
   });
   return result2;
 }
-function preParseFinder(finderInput, opt) {
+function preParseFinder(finderInput, opt2) {
   var finder;
   if (isString(finderInput)) {
     var obj = {};
@@ -13857,7 +13857,7 @@ function preParseFinder(finderInput, opt) {
     var parsedKey = key3.match(/^(\w+)(Index|Id|Name)$/) || [];
     var mainType = parsedKey[1];
     var queryType = (parsedKey[2] || "").toLowerCase();
-    if (!mainType || !queryType || opt && opt.includeMainTypes && indexOf(opt.includeMainTypes, mainType) < 0) {
+    if (!mainType || !queryType || opt2 && opt2.includeMainTypes && indexOf(opt2.includeMainTypes, mainType) < 0) {
       return;
     }
     mainTypeSpecified = mainTypeSpecified || !!mainType;
@@ -13880,8 +13880,8 @@ var MULTIPLE_REFERRING = {
   enableAll: true,
   enableNone: true
 };
-function queryReferringComponents(ecModel, mainType, userOption, opt) {
-  opt = opt || SINGLE_REFERRING;
+function queryReferringComponents(ecModel, mainType, userOption, opt2) {
+  opt2 = opt2 || SINGLE_REFERRING;
   var indexOption = userOption.index;
   var idOption = userOption.id;
   var nameOption = userOption.name;
@@ -13891,11 +13891,11 @@ function queryReferringComponents(ecModel, mainType, userOption, opt) {
   };
   if (!result2.specified) {
     var firstCmpt = void 0;
-    result2.models = opt.useDefault && (firstCmpt = ecModel.getComponent(mainType)) ? [firstCmpt] : [];
+    result2.models = opt2.useDefault && (firstCmpt = ecModel.getComponent(mainType)) ? [firstCmpt] : [];
     return result2;
   }
   if (indexOption === "none" || indexOption === false) {
-    if (opt.enableNone) {
+    if (opt2.enableNone) {
       result2.models = [];
       return result2;
     } else {
@@ -13906,7 +13906,7 @@ function queryReferringComponents(ecModel, mainType, userOption, opt) {
     }
   }
   if (indexOption === "all") {
-    if (opt.enableAll) {
+    if (opt2.enableAll) {
       indexOption = idOption = nameOption = null;
     } else {
       if (true) {
@@ -13985,11 +13985,11 @@ var ListIterator = (
   (function() {
     function ListIterator2() {
     }
-    ListIterator2.prototype.reset = function(list2, start2, end2, step) {
-      this._list = list2;
+    ListIterator2.prototype.reset = function(list3, start2, end2, step) {
+      this._list = list3;
       this._step = step = step || 1;
       this._idx = start2;
-      this._end = end2 != null ? end2 : step > 0 ? list2.length : 0;
+      this._end = end2 != null ? end2 : step > 0 ? list3.length : 0;
       this.item = null;
       this.key = NaN;
       return this;
@@ -14366,13 +14366,13 @@ function isImageReady(image) {
 
 // node_modules/zrender/lib/graphic/helper/parseText.js
 var STYLE_REG = /\{([a-zA-Z0-9_]+)\|([^}]*)\}/g;
-function truncateText2(out2, text3, containerWidth, font, ellipsis, options) {
+function truncateText2(out2, text4, containerWidth, font, ellipsis, options) {
   if (!containerWidth) {
     out2.text = "";
     out2.isTruncated = false;
     return;
   }
-  var textLines = (text3 + "").split("\n");
+  var textLines = (text4 + "").split("\n");
   options = prepareTruncateOptions(containerWidth, font, ellipsis, options);
   var isTruncated = false;
   var truncateOut = {};
@@ -14439,16 +14439,16 @@ function truncateSingleLine(out2, textLine, options) {
   out2.textLine = textLine;
   out2.isTruncated = true;
 }
-function estimateLength(text3, contentWidth, fontMeasureInfo) {
+function estimateLength(text4, contentWidth, fontMeasureInfo) {
   var width = 0;
   var i7 = 0;
-  for (var len2 = text3.length; i7 < len2 && width < contentWidth; i7++) {
-    width += measureCharWidth(fontMeasureInfo, text3.charCodeAt(i7));
+  for (var len2 = text4.length; i7 < len2 && width < contentWidth; i7++) {
+    width += measureCharWidth(fontMeasureInfo, text4.charCodeAt(i7));
   }
   return i7;
 }
 function parsePlainText(rawText, style, defaultOuterWidth, defaultOuterHeight) {
-  var text3 = formatText(rawText);
+  var text4 = formatText(rawText);
   var overflow = style.overflow;
   var padding = style.padding;
   var paddingH = padding ? padding[1] + padding[3] : 0;
@@ -14469,9 +14469,9 @@ function parsePlainText(rawText, style, defaultOuterWidth, defaultOuterHeight) {
   }
   var lines;
   if (width != null && (overflow === "break" || overflow === "breakAll")) {
-    lines = text3 ? wrapText(text3, style.font, width, overflow === "breakAll", 0).lines : [];
+    lines = text4 ? wrapText(text4, style.font, width, overflow === "breakAll", 0).lines : [];
   } else {
-    lines = text3 ? text3.split("\n") : [];
+    lines = text4 ? text4.split("\n") : [];
   }
   var contentHeight = lines.length * lineHeight;
   if (height == null) {
@@ -14483,7 +14483,7 @@ function parsePlainText(rawText, style, defaultOuterWidth, defaultOuterHeight) {
     lines = lines.slice(0, lineCount);
     contentHeight = lines.length * lineHeight;
   }
-  if (text3 && truncate && width != null) {
+  if (text4 && truncate && width != null) {
     var options = prepareTruncateOptions(width, font, style.ellipsis, {
       minChar: style.truncateMinChar,
       placeholder: style.placeholder
@@ -14549,8 +14549,8 @@ var RichTextContentBlock = /* @__PURE__ */ (function() {
 })();
 function parseRichText(rawText, style, defaultOuterWidth, defaultOuterHeight, topTextAlign) {
   var contentBlock = new RichTextContentBlock();
-  var text3 = formatText(rawText);
-  if (!text3) {
+  var text4 = formatText(rawText);
+  if (!text4) {
     return contentBlock;
   }
   var stlPadding = style.padding;
@@ -14568,16 +14568,16 @@ function parseRichText(rawText, style, defaultOuterWidth, defaultOuterHeight, to
   var wrapInfo = (overflow === "break" || overflow === "breakAll") && topWidth != null ? { width: topWidth, accumWidth: 0, breakAll: overflow === "breakAll" } : null;
   var lastIndex = STYLE_REG.lastIndex = 0;
   var result2;
-  while ((result2 = STYLE_REG.exec(text3)) != null) {
+  while ((result2 = STYLE_REG.exec(text4)) != null) {
     var matchedIndex = result2.index;
     if (matchedIndex > lastIndex) {
-      pushTokens(contentBlock, text3.substring(lastIndex, matchedIndex), style, wrapInfo);
+      pushTokens(contentBlock, text4.substring(lastIndex, matchedIndex), style, wrapInfo);
     }
     pushTokens(contentBlock, result2[2], style, wrapInfo, result2[1]);
     lastIndex = STYLE_REG.lastIndex;
   }
-  if (lastIndex < text3.length) {
-    pushTokens(contentBlock, text3.substring(lastIndex, text3.length), style, wrapInfo);
+  if (lastIndex < text4.length) {
+    pushTokens(contentBlock, text4.substring(lastIndex, text4.length), style, wrapInfo);
   }
   var pendingList = [];
   var calculatedHeight = 0;
@@ -14704,20 +14704,20 @@ function pushTokens(block, str, style, wrapInfo, styleName) {
   }
   var fontMeasureInfo = ensureFontMeasureInfo(font);
   for (var i7 = 0; i7 < strLines.length; i7++) {
-    var text3 = strLines[i7];
+    var text4 = strLines[i7];
     var token = new RichTextToken();
     token.styleName = styleName;
-    token.text = text3;
-    token.isLineHolder = !text3 && !isEmptyStr;
+    token.text = text4;
+    token.isLineHolder = !text4 && !isEmptyStr;
     if (typeof tokenStyle.width === "number") {
       token.width = tokenStyle.width;
     } else {
-      token.width = linesWidths ? linesWidths[i7] : measureWidth(fontMeasureInfo, text3);
+      token.width = linesWidths ? linesWidths[i7] : measureWidth(fontMeasureInfo, text4);
     }
     if (!i7 && !newLine) {
       var tokens2 = (lines[lines.length - 1] || (lines[0] = new RichTextLine())).tokens;
       var tokensLen = tokens2.length;
-      tokensLen === 1 && tokens2[0].isLineHolder ? tokens2[0] = token : (text3 || !tokensLen || isEmptyStr) && tokens2.push(token);
+      tokensLen === 1 && tokens2[0].isLineHolder ? tokens2[0] = token : (text4 || !tokensLen || isEmptyStr) && tokens2.push(token);
     } else {
       lines.push(new RichTextLine([token]));
     }
@@ -14740,7 +14740,7 @@ function isWordBreakChar(ch) {
   }
   return true;
 }
-function wrapText(text3, font, lineWidth, isBreakAll, lastAccumWidth) {
+function wrapText(text4, font, lineWidth, isBreakAll, lastAccumWidth) {
   var lines = [];
   var linesWidths = [];
   var line = "";
@@ -14748,8 +14748,8 @@ function wrapText(text3, font, lineWidth, isBreakAll, lastAccumWidth) {
   var currentWordWidth = 0;
   var accumWidth = 0;
   var fontMeasureInfo = ensureFontMeasureInfo(font);
-  for (var i7 = 0; i7 < text3.length; i7++) {
-    var ch = text3.charAt(i7);
+  for (var i7 = 0; i7 < text4.length; i7++) {
+    var ch = text4.charAt(i7);
     if (ch === "\n") {
       if (currentWord) {
         line += currentWord;
@@ -14852,13 +14852,13 @@ function calcInnerTextOverflowArea(out2, overflowRect, baseX, baseY, textAlign, 
 }
 var tmpCITCTextRect = new BoundingRect_default(0, 0, 0, 0);
 var tmpCITCIntersectRectOpt = { outIntersectRect: {}, clamp: true };
-function formatText(text3) {
-  return text3 != null ? text3 += "" : text3 = "";
+function formatText(text4) {
+  return text4 != null ? text4 += "" : text4 = "";
 }
 function tSpanCreateBoundingRect(style) {
-  var text3 = formatText(style.text);
+  var text4 = formatText(style.text);
   var font = style.font;
-  var contentWidth = measureWidth(ensureFontMeasureInfo(font), text3);
+  var contentWidth = measureWidth(ensureFontMeasureInfo(font), text4);
   var contentHeight = getLineHeight(font);
   return tSpanCreateBoundingRect2(style, contentWidth, contentHeight, null);
 }
@@ -17241,8 +17241,8 @@ var ZRText = (function(_super) {
     calcInnerTextOverflowArea(tmpCITOverflowAreaOut, defaultStyle.overflowRect, baseX, baseY, textAlign, verticalAlign);
     baseX = tmpCITOverflowAreaOut.baseX;
     baseY = tmpCITOverflowAreaOut.baseY;
-    var text3 = getStyleText(style);
-    var contentBlock = parsePlainText(text3, style, tmpCITOverflowAreaOut.outerWidth, tmpCITOverflowAreaOut.outerHeight);
+    var text4 = getStyleText(style);
+    var contentBlock = parsePlainText(text4, style, tmpCITOverflowAreaOut.outerWidth, tmpCITOverflowAreaOut.outerHeight);
     var needDrawBg = needDrawBackground(style);
     var bgColorDrawn = !!style.backgroundColor;
     var outerHeight = contentBlock.outerHeight;
@@ -17314,8 +17314,8 @@ var ZRText = (function(_super) {
     calcInnerTextOverflowArea(tmpCITOverflowAreaOut, defaultStyle.overflowRect, baseX, baseY, textAlign, verticalAlign);
     baseX = tmpCITOverflowAreaOut.baseX;
     baseY = tmpCITOverflowAreaOut.baseY;
-    var text3 = getStyleText(style);
-    var contentBlock = parseRichText(text3, style, tmpCITOverflowAreaOut.outerWidth, tmpCITOverflowAreaOut.outerHeight, textAlign);
+    var text4 = getStyleText(style);
+    var contentBlock = parseRichText(text4, style, tmpCITOverflowAreaOut.outerWidth, tmpCITOverflowAreaOut.outerHeight, textAlign);
     var contentWidth = contentBlock.width;
     var outerWidth = contentBlock.outerWidth;
     var outerHeight = contentBlock.outerHeight;
@@ -17546,9 +17546,9 @@ function getTextXForPadding(x2, textAlign, textPadding) {
   return textAlign === "right" ? x2 - textPadding[1] : textAlign === "center" ? x2 + textPadding[3] / 2 - textPadding[1] / 2 : x2 + textPadding[3];
 }
 function getStyleText(style) {
-  var text3 = style.text;
-  text3 != null && (text3 += "");
-  return text3;
+  var text4 = style.text;
+  text4 != null && (text4 += "");
+  return text4;
 }
 function needDrawBackground(style) {
   return !!(style.backgroundColor || style.lineHeight || style.borderWidth && style.borderColor);
@@ -19466,13 +19466,13 @@ var OrientedBoundingRect = (function() {
       this._origin[i7] = axes[i7].dot(corners[0]);
     }
   };
-  OrientedBoundingRect2.prototype.intersect = function(other, mtv, opt) {
+  OrientedBoundingRect2.prototype.intersect = function(other, mtv, opt2) {
     var overlapped = true;
     var noMtv = !mtv;
     if (mtv) {
       Point_default.set(mtv, 0, 0);
     }
-    _intersectCtx2.reset(opt, !noMtv);
+    _intersectCtx2.reset(opt2, !noMtv);
     if (!this._intersectCheckOneSide(this, other, noMtv, 1)) {
       overlapped = false;
       if (noMtv) {
@@ -19991,10 +19991,10 @@ function clipRectByRect(targetRect, rect) {
     };
   }
 }
-function createIcon(iconStr, opt, rect) {
+function createIcon(iconStr, opt2, rect) {
   var innerOpts = extend({
     rectHover: true
-  }, opt);
+  }, opt2);
   var style = innerOpts.style = {
     strokeNoScale: true
   };
@@ -20087,10 +20087,10 @@ function expandRectOnOneDimension(rect, delta, xy, wh, ltIdx, rbIdx, minSize) {
     rect[xy] -= delta[ltIdx];
   }
 }
-function setTooltipConfig(opt) {
-  var itemTooltipOption = opt.itemTooltipOption;
-  var componentModel = opt.componentModel;
-  var itemName = opt.itemName;
+function setTooltipConfig(opt2) {
+  var itemTooltipOption = opt2.itemTooltipOption;
+  var componentModel = opt2.componentModel;
+  var itemName = opt2.itemName;
   var itemTooltipOptionObj = isString(itemTooltipOption) ? {
     formatter: itemTooltipOption
   } : itemTooltipOption;
@@ -20102,7 +20102,7 @@ function setTooltipConfig(opt) {
     $vars: ["name"]
   };
   formatterParams[mainType + "Index"] = componentIndex;
-  var formatterParamsExtra = opt.formatterParamsExtra;
+  var formatterParamsExtra = opt2.formatterParamsExtra;
   if (formatterParamsExtra) {
     each(keys(formatterParamsExtra), function(key3) {
       if (!hasOwn(formatterParams, key3)) {
@@ -20111,7 +20111,7 @@ function setTooltipConfig(opt) {
       }
     });
   }
-  var ecData = getECData(opt.el);
+  var ecData = getECData(opt2.el);
   ecData.componentMainType = mainType;
   ecData.componentIndex = componentIndex;
   ecData.tooltipConfig = {
@@ -20205,7 +20205,7 @@ function doUpdateZ(el, z2, zlevel, maxZ2) {
   if (el.ignoreModelZ) {
     return maxZ2;
   }
-  var label = el.getTextContent();
+  var label2 = el.getTextContent();
   var labelLine = el.getTextGuideLine();
   var isGroup = el.isGroup;
   if (isGroup) {
@@ -20218,10 +20218,10 @@ function doUpdateZ(el, z2, zlevel, maxZ2) {
     el.zlevel = zlevel;
     maxZ2 = mathMax2(el.z2 || 0, maxZ2);
   }
-  if (label) {
-    label.z = z2;
-    label.zlevel = zlevel;
-    isFinite(maxZ2) && (label.z2 = maxZ2 + 2);
+  if (label2) {
+    label2.z = z2;
+    label2.zlevel = zlevel;
+    isFinite(maxZ2) && (label2.z2 = maxZ2 + 2);
   }
   if (labelLine) {
     var textGuideLineConfig = el.textGuideLineConfig;
@@ -20262,25 +20262,25 @@ registerShape("arc", Arc_default);
 
 // node_modules/echarts/lib/label/labelStyle.js
 var EMPTY_OBJ = {};
-function setLabelText(label, labelTexts) {
+function setLabelText(label2, labelTexts) {
   for (var i7 = 0; i7 < SPECIAL_STATES.length; i7++) {
     var stateName = SPECIAL_STATES[i7];
-    var text3 = labelTexts[stateName];
-    var state = label.ensureState(stateName);
+    var text4 = labelTexts[stateName];
+    var state = label2.ensureState(stateName);
     state.style = state.style || {};
-    state.style.text = text3;
+    state.style.text = text4;
   }
-  var oldStates = label.currentStates.slice();
-  label.clearStates(true);
-  label.setStyle({
+  var oldStates = label2.currentStates.slice();
+  label2.clearStates(true);
+  label2.setStyle({
     text: labelTexts.normal
   });
-  label.useStates(oldStates, true);
+  label2.useStates(oldStates, true);
 }
-function getLabelText(opt, stateModels, interpolatedValue) {
-  var labelFetcher = opt.labelFetcher;
-  var labelDataIndex = opt.labelDataIndex;
-  var labelDimIndex = opt.labelDimIndex;
+function getLabelText(opt2, stateModels, interpolatedValue) {
+  var labelFetcher = opt2.labelFetcher;
+  var labelDataIndex = opt2.labelDataIndex;
+  var labelDimIndex = opt2.labelDimIndex;
   var normalModel = stateModels.normal;
   var baseText;
   if (labelFetcher) {
@@ -20289,7 +20289,7 @@ function getLabelText(opt, stateModels, interpolatedValue) {
     } : null);
   }
   if (baseText == null) {
-    baseText = isFunction(opt.defaultText) ? opt.defaultText(labelDataIndex, opt, interpolatedValue) : opt.defaultText;
+    baseText = isFunction(opt2.defaultText) ? opt2.defaultText(labelDataIndex, opt2, interpolatedValue) : opt2.defaultText;
   }
   var statesText = {
     normal: baseText
@@ -20301,8 +20301,8 @@ function getLabelText(opt, stateModels, interpolatedValue) {
   }
   return statesText;
 }
-function setLabelStyle(targetEl, labelStatesModels, opt, stateSpecified) {
-  opt = opt || EMPTY_OBJ;
+function setLabelStyle(targetEl, labelStatesModels, opt2, stateSpecified) {
+  opt2 = opt2 || EMPTY_OBJ;
   var isSetOnText = targetEl instanceof Text_default;
   var needsCreateText = false;
   for (var i7 = 0; i7 < DISPLAY_STATES.length; i7++) {
@@ -20323,13 +20323,13 @@ function setLabelStyle(targetEl, labelStatesModels, opt, stateSpecified) {
         textContent.stateProxy = targetEl.stateProxy;
       }
     }
-    var labelStatesTexts = getLabelText(opt, labelStatesModels);
+    var labelStatesTexts = getLabelText(opt2, labelStatesModels);
     var normalModel = labelStatesModels.normal;
     var showNormal = !!normalModel.getShallow("show");
-    var normalStyle = createTextStyle(normalModel, stateSpecified && stateSpecified.normal, opt, false, !isSetOnText);
+    var normalStyle = createTextStyle(normalModel, stateSpecified && stateSpecified.normal, opt2, false, !isSetOnText);
     normalStyle.text = labelStatesTexts.normal;
     if (!isSetOnText) {
-      targetEl.setTextConfig(createTextConfig(normalModel, opt, false));
+      targetEl.setTextConfig(createTextConfig(normalModel, opt2, false));
     }
     for (var i7 = 0; i7 < SPECIAL_STATES.length; i7++) {
       var stateName = SPECIAL_STATES[i7];
@@ -20340,11 +20340,11 @@ function setLabelStyle(targetEl, labelStatesModels, opt, stateSpecified) {
         if (stateShow !== showNormal) {
           stateObj.ignore = !stateShow;
         }
-        stateObj.style = createTextStyle(stateModel, stateSpecified && stateSpecified[stateName], opt, true, !isSetOnText);
+        stateObj.style = createTextStyle(stateModel, stateSpecified && stateSpecified[stateName], opt2, true, !isSetOnText);
         stateObj.style.text = labelStatesTexts[stateName];
         if (!isSetOnText) {
           var targetElEmphasisState = targetEl.ensureState(stateName);
-          targetElEmphasisState.textConfig = createTextConfig(stateModel, opt, true);
+          targetElEmphasisState.textConfig = createTextConfig(stateModel, opt2, true);
         }
       }
     }
@@ -20358,9 +20358,9 @@ function setLabelStyle(targetEl, labelStatesModels, opt, stateSpecified) {
     textContent.ignore = !showNormal;
     textContent.useStyle(normalStyle);
     textContent.dirty();
-    if (opt.enableTextSetter) {
+    if (opt2.enableTextSetter) {
       labelInner(textContent).setLabelText = function(interpolatedValue) {
-        var labelStatesTexts2 = getLabelText(opt, labelStatesModels, interpolatedValue);
+        var labelStatesTexts2 = getLabelText(opt2, labelStatesModels, interpolatedValue);
         setLabelText(textContent, labelStatesTexts2);
       };
     }
@@ -20380,21 +20380,21 @@ function getLabelStatesModels(itemModel, labelName) {
   }
   return statesModels;
 }
-function createTextStyle(textStyleModel, specifiedTextStyle, opt, isNotNormal, isAttached) {
+function createTextStyle(textStyleModel, specifiedTextStyle, opt2, isNotNormal, isAttached) {
   var textStyle = {};
-  setTextStyleCommon(textStyle, textStyleModel, opt, isNotNormal, isAttached);
+  setTextStyleCommon(textStyle, textStyleModel, opt2, isNotNormal, isAttached);
   specifiedTextStyle && extend(textStyle, specifiedTextStyle);
   return textStyle;
 }
-function createTextConfig(textStyleModel, opt, isNotNormal) {
-  opt = opt || {};
+function createTextConfig(textStyleModel, opt2, isNotNormal) {
+  opt2 = opt2 || {};
   var textConfig = {};
   var labelPosition;
   var labelRotate = textStyleModel.getShallow("rotate");
   var labelDistance = retrieve2(textStyleModel.getShallow("distance"), isNotNormal ? null : 5);
   var labelOffset = textStyleModel.getShallow("offset");
   labelPosition = textStyleModel.getShallow("position") || (isNotNormal ? null : "inside");
-  labelPosition === "outside" && (labelPosition = opt.defaultOutsidePosition || "top");
+  labelPosition === "outside" && (labelPosition = opt2.defaultOutsidePosition || "top");
   if (labelPosition != null) {
     textConfig.position = labelPosition;
   }
@@ -20408,17 +20408,17 @@ function createTextConfig(textStyleModel, opt, isNotNormal) {
   if (labelDistance != null) {
     textConfig.distance = labelDistance;
   }
-  textConfig.outsideFill = textStyleModel.get("color") === "inherit" ? opt.inheritColor || null : "auto";
-  if (opt.autoOverflowArea != null) {
-    textConfig.autoOverflowArea = opt.autoOverflowArea;
+  textConfig.outsideFill = textStyleModel.get("color") === "inherit" ? opt2.inheritColor || null : "auto";
+  if (opt2.autoOverflowArea != null) {
+    textConfig.autoOverflowArea = opt2.autoOverflowArea;
   }
-  if (opt.layoutRect != null) {
-    textConfig.layoutRect = opt.layoutRect;
+  if (opt2.layoutRect != null) {
+    textConfig.layoutRect = opt2.layoutRect;
   }
   return textConfig;
 }
-function setTextStyleCommon(textStyle, textStyleModel, opt, isNotNormal, isAttached) {
-  opt = opt || EMPTY_OBJ;
+function setTextStyleCommon(textStyle, textStyleModel, opt2, isNotNormal, isAttached) {
+  opt2 = opt2 || EMPTY_OBJ;
   var ecModel = textStyleModel.ecModel;
   var globalTextStyle = ecModel && ecModel.option.textStyle;
   var richItemNames = getRichItemNames(textStyleModel);
@@ -20430,7 +20430,7 @@ function setTextStyleCommon(textStyle, textStyleModel, opt, isNotNormal, isAttac
     for (var name_1 in richItemNames) {
       if (richItemNames.hasOwnProperty(name_1)) {
         var richTextStyle = textStyleModel.getModel(["rich", name_1]);
-        setTokenTextStyle(richResult[name_1] = {}, richTextStyle, globalTextStyle, textStyleModel, richInheritPlainLabel, opt, isNotNormal, isAttached, false, true);
+        setTokenTextStyle(richResult[name_1] = {}, richTextStyle, globalTextStyle, textStyleModel, richInheritPlainLabel, opt2, isNotNormal, isAttached, false, true);
       }
     }
   }
@@ -20458,7 +20458,7 @@ function setTextStyleCommon(textStyle, textStyleModel, opt, isNotNormal, isAttac
       labelTextStyle.__marginType = LabelMarginType.textMargin;
     }
   }
-  setTokenTextStyle(textStyle, textStyleModel, globalTextStyle, null, null, opt, isNotNormal, isAttached, true, false);
+  setTokenTextStyle(textStyle, textStyleModel, globalTextStyle, null, null, opt2, isNotNormal, isAttached, true, false);
 }
 function getRichItemNames(textStyleModel) {
   var richItemNameMap;
@@ -20479,9 +20479,9 @@ function getRichItemNames(textStyleModel) {
 var TEXT_PROPS_WITH_GLOBAL = ["fontStyle", "fontWeight", "fontSize", "fontFamily", "textShadowColor", "textShadowBlur", "textShadowOffsetX", "textShadowOffsetY"];
 var TEXT_PROPS_SELF = ["align", "lineHeight", "width", "height", "tag", "verticalAlign", "ellipsis"];
 var TEXT_PROPS_BOX = ["padding", "borderWidth", "borderRadius", "borderDashOffset", "backgroundColor", "borderColor", "shadowColor", "shadowBlur", "shadowOffsetX", "shadowOffsetY"];
-function setTokenTextStyle(textStyle, textStyleModel, globalTextStyle, plainTextModel, richInheritPlainLabel, opt, isNotNormal, isAttached, isBlock, inRich) {
+function setTokenTextStyle(textStyle, textStyleModel, globalTextStyle, plainTextModel, richInheritPlainLabel, opt2, isNotNormal, isAttached, isBlock, inRich) {
   globalTextStyle = !isNotNormal && globalTextStyle || EMPTY_OBJ;
-  var inheritColor = opt && opt.inheritColor;
+  var inheritColor = opt2 && opt2.inheritColor;
   var fillColor = textStyleModel.getShallow("color");
   var strokeColor = textStyleModel.getShallow("textBorderColor");
   var opacity = retrieve2(textStyleModel.getShallow("opacity"), globalTextStyle.opacity);
@@ -20532,14 +20532,14 @@ function setTokenTextStyle(textStyle, textStyleModel, globalTextStyle, plainText
     textStyle.lineDashOffset = textBorderDashOffset;
   }
   if (!isNotNormal && opacity == null && !inRich) {
-    opacity = opt && opt.defaultOpacity;
+    opacity = opt2 && opt2.defaultOpacity;
   }
   if (opacity != null) {
     textStyle.opacity = opacity;
   }
   if (!isNotNormal && !isAttached) {
-    if (textStyle.fill == null && opt.inheritColor) {
-      textStyle.fill = opt.inheritColor;
+    if (textStyle.fill == null && opt2.inheritColor) {
+      textStyle.fill = opt2.inheritColor;
     }
   }
   for (var i7 = 0; i7 < TEXT_PROPS_WITH_GLOBAL.length; i7++) {
@@ -20562,7 +20562,7 @@ function setTokenTextStyle(textStyle, textStyleModel, globalTextStyle, plainText
       textStyle.verticalAlign = baseline;
     }
   }
-  if (!isBlock || !opt.disableBox) {
+  if (!isBlock || !opt2.disableBox) {
     for (var i7 = 0; i7 < TEXT_PROPS_BOX.length; i7++) {
       var key3 = TEXT_PROPS_BOX[i7];
       var val = textStyleModel.getShallow(key3);
@@ -20592,14 +20592,14 @@ function setTokenTextStyle(textStyle, textStyleModel, globalTextStyle, plainText
     }
   }
 }
-function getFont(opt, ecModel) {
+function getFont(opt2, ecModel) {
   var gTextStyleModel = ecModel && ecModel.getModel("textStyle");
   return trim([
     // FIXME in node-canvas fontWeight is before fontStyle
-    opt.fontStyle || gTextStyleModel && gTextStyleModel.getShallow("fontStyle") || "",
-    opt.fontWeight || gTextStyleModel && gTextStyleModel.getShallow("fontWeight") || "",
-    (opt.fontSize || gTextStyleModel && gTextStyleModel.getShallow("fontSize") || 12) + "px",
-    opt.fontFamily || gTextStyleModel && gTextStyleModel.getShallow("fontFamily") || "sans-serif"
+    opt2.fontStyle || gTextStyleModel && gTextStyleModel.getShallow("fontStyle") || "",
+    opt2.fontWeight || gTextStyleModel && gTextStyleModel.getShallow("fontWeight") || "",
+    (opt2.fontSize || gTextStyleModel && gTextStyleModel.getShallow("fontSize") || 12) + "px",
+    opt2.fontFamily || gTextStyleModel && gTextStyleModel.getShallow("fontFamily") || "sans-serif"
   ].join(" "));
 }
 var labelInner = makeInner();
@@ -20629,9 +20629,9 @@ var TextStyleMixin = (
         fontFamily: this.getShallow("fontFamily")
       }, this.ecModel);
     };
-    TextStyleMixin2.prototype.getTextRect = function(text3) {
+    TextStyleMixin2.prototype.getTextRect = function(text4) {
       var style = {
-        text: text3,
+        text: text4,
         verticalAlign: this.getShallow("verticalAlign") || this.getShallow("baseline")
       };
       for (var i7 = 0; i7 < textStyleParams.length; i7++) {
@@ -21182,10 +21182,10 @@ var _impl = null;
 function getScaleBreakHelper() {
   return _impl;
 }
-function simplyParseBreakOption(scale3, opt) {
+function simplyParseBreakOption(scale3, opt2) {
   var scaleBreakHelper = getScaleBreakHelper();
-  var breakOption = opt.breakOption;
-  var breakParsed = opt.breakParsed;
+  var breakOption = opt2.breakOption;
+  var breakParsed = opt2.breakParsed;
   if (!breakParsed && scaleBreakHelper) {
     breakParsed = scaleBreakHelper.parseAxisBreakOption(breakOption, scale3);
   }
@@ -21516,21 +21516,21 @@ function formatTpl(tpl, paramsList, encode) {
   return tpl;
 }
 function getTooltipMarker(inOpt, extraCssText) {
-  var opt = isString(inOpt) ? {
+  var opt2 = isString(inOpt) ? {
     color: inOpt,
     extraCssText
   } : inOpt || {};
-  var color3 = opt.color;
-  var type = opt.type;
-  extraCssText = opt.extraCssText;
-  var renderMode = opt.renderMode || "html";
+  var color3 = opt2.color;
+  var type = opt2.type;
+  extraCssText = opt2.extraCssText;
+  var renderMode = opt2.renderMode || "html";
   if (!color3) {
     return "";
   }
   if (renderMode === "html") {
     return type === "subItem" ? '<span style="display:inline-block;vertical-align:middle;margin-right:8px;margin-left:3px;border-radius:4px;width:4px;height:4px;background-color:' + encodeHTML(color3) + ";" + (extraCssText || "") + '"></span>' : '<span style="display:inline-block;margin-right:4px;border-radius:10px;width:10px;height:10px;background-color:' + encodeHTML(color3) + ";" + (extraCssText || "") + '"></span>';
   } else {
-    var markerId = opt.markerId || "markerX";
+    var markerId = opt2.markerId || "markerX";
     return {
       renderMode,
       content: "{" + markerId + "|}  ",
@@ -21569,11 +21569,11 @@ var CoordinateSystemManager = (
       function dealCreate(creatorMap, canBeNonSeriesBox) {
         var coordinateSystems = [];
         each(creatorMap, function(creator, type) {
-          var list2 = creator.create(ecModel, api);
-          coordinateSystems = coordinateSystems.concat(list2 || []);
+          var list3 = creator.create(ecModel, api);
+          coordinateSystems = coordinateSystems.concat(list3 || []);
           if (true) {
             if (canBeNonSeriesBox) {
-              each(list2, function(master) {
+              each(list3, function(master) {
                 return assert(!master.update);
               });
             }
@@ -21664,8 +21664,8 @@ function decideCoordSysUsageKind(model, printError) {
     kind
   };
 }
-function injectCoordSysByOption(opt) {
-  var targetModel = opt.targetModel, coordSysType = opt.coordSysType, coordSysProvider = opt.coordSysProvider, isDefaultDataCoordSys = opt.isDefaultDataCoordSys, allowNotFound = opt.allowNotFound;
+function injectCoordSysByOption(opt2) {
+  var targetModel = opt2.targetModel, coordSysType = opt2.coordSysType, coordSysProvider = opt2.coordSysProvider, isDefaultDataCoordSys = opt2.isDefaultDataCoordSys, allowNotFound = opt2.allowNotFound;
   if (true) {
     assert(!!coordSysType);
   }
@@ -21836,7 +21836,7 @@ var BoxLayoutReferenceType = {
   rect: 1,
   point: 2
 };
-function createBoxLayoutReference(model, api, opt) {
+function createBoxLayoutReference(model, api, opt2) {
   var refContainer;
   var refPoint;
   var layoutRefType;
@@ -21849,7 +21849,7 @@ function createBoxLayoutReference(model, api, opt) {
       boxCoordFrom = from;
       var result2 = boxCoordSys.dataToLayout(coord);
       refContainer = result2.contentRect || result2.rect;
-    } else if (opt && opt.enableLayoutOnlyByCenter && boxCoordSys.dataToPoint) {
+    } else if (opt2 && opt2.enableLayoutOnlyByCenter && boxCoordSys.dataToPoint) {
       layoutRefType = BoxLayoutReferenceType.point;
       boxCoordFrom = from;
       refPoint = boxCoordSys.dataToPoint(coord);
@@ -21880,10 +21880,10 @@ function createBoxLayoutReference(model, api, opt) {
     boxCoordFrom
   };
 }
-function positionElement(el, positionInfo, containerRect, margin, opt, out2) {
-  var h3 = !opt || !opt.hv || opt.hv[0];
-  var v2 = !opt || !opt.hv || opt.hv[1];
-  var boundingMode = opt && opt.boundingMode || "all";
+function positionElement(el, positionInfo, containerRect, margin, opt2, out2) {
+  var h3 = !opt2 || !opt2.hv || opt2.hv[0];
+  var v2 = !opt2 || !opt2.hv || opt2.hv[1];
+  var boundingMode = opt2 && opt2.boundingMode || "all";
   out2 = out2 || el;
   out2.x = el.x;
   out2.y = el.y;
@@ -21925,8 +21925,8 @@ function fetchLayoutMode(ins) {
     type: layoutMode
   } : null;
 }
-function mergeLayoutParam(targetOption, newOption, opt) {
-  var ignoreSize = opt && opt.ignoreSize;
+function mergeLayoutParam(targetOption, newOption, opt2) {
+  var ignoreSize = opt2 && opt2.ignoreSize;
   !isArray(ignoreSize) && (ignoreSize = [ignoreSize, ignoreSize]);
   var hResult = merge2(HV_NAMES[0], 0);
   var vResult = merge2(HV_NAMES[1], 1);
@@ -22031,8 +22031,8 @@ var ComponentModel = (
         var optList = [];
         var clz = ctor;
         while (clz) {
-          var opt = clz.prototype.defaultOption;
-          opt && optList.push(opt);
+          var opt2 = clz.prototype.defaultOption;
+          opt2 && optList.push(opt2);
           clz = clz.superClass;
         }
         var defaultOption3 = {};
@@ -22043,13 +22043,13 @@ var ComponentModel = (
       }
       return fields.defaultOption;
     };
-    ComponentModel2.prototype.getReferringComponents = function(mainType, opt) {
+    ComponentModel2.prototype.getReferringComponents = function(mainType, opt2) {
       var indexKey = mainType + "Index";
       var idKey = mainType + "Id";
       return queryReferringComponents(this.ecModel, mainType, {
         index: this.get(indexKey, true),
         id: this.get(idKey, true)
-      }, opt);
+      }, opt2);
     };
     ComponentModel2.prototype.getBoxLayoutParams = function() {
       return getBoxLayoutParams(this, false);
@@ -22635,10 +22635,10 @@ var GlobalModel = (
       this._optionManager.setOption(option, optionPreprocessorFuncs2, innerOpt);
       this._resetOption(null, innerOpt);
     };
-    GlobalModel2.prototype.resetOption = function(type, opt) {
-      return this._resetOption(type, normalizeSetOptionInput(opt));
+    GlobalModel2.prototype.resetOption = function(type, opt2) {
+      return this._resetOption(type, normalizeSetOptionInput(opt2));
     };
-    GlobalModel2.prototype._resetOption = function(type, opt) {
+    GlobalModel2.prototype._resetOption = function(type, opt2) {
       var optionChanged = false;
       var optionManager = this._optionManager;
       if (!type || type === "recreate") {
@@ -22650,7 +22650,7 @@ var GlobalModel = (
           initBase(this, baseOption);
         } else {
           this.restoreData();
-          this._mergeOption(baseOption, opt);
+          this._mergeOption(baseOption, opt2);
         }
         optionChanged = true;
       }
@@ -22661,7 +22661,7 @@ var GlobalModel = (
         var timelineOption = optionManager.getTimelineOption(this);
         if (timelineOption) {
           optionChanged = true;
-          this._mergeOption(timelineOption, opt);
+          this._mergeOption(timelineOption, opt2);
         }
       }
       if (!type || type === "recreate" || type === "media") {
@@ -22669,7 +22669,7 @@ var GlobalModel = (
         if (mediaOptions.length) {
           each(mediaOptions, function(mediaOption) {
             optionChanged = true;
-            this._mergeOption(mediaOption, opt);
+            this._mergeOption(mediaOption, opt2);
           }, this);
         }
       }
@@ -22678,13 +22678,13 @@ var GlobalModel = (
     GlobalModel2.prototype.mergeOption = function(option) {
       this._mergeOption(option, null);
     };
-    GlobalModel2.prototype._mergeOption = function(newOption, opt) {
+    GlobalModel2.prototype._mergeOption = function(newOption, opt2) {
       var option = this.option;
       var componentsMap = this._componentsMap;
       var componentsCount = this._componentsCount;
       var newCmptTypes = [];
       var newCmptTypeMap = createHashMap();
-      var replaceMergeMainTypeMap = opt && opt.replaceMergeMainTypeMap;
+      var replaceMergeMainTypeMap = opt2 && opt2.replaceMergeMainTypeMap;
       resetSourceDefaulter(this);
       each(newOption, function(componentOption, mainType) {
         if (componentOption == null) {
@@ -22842,15 +22842,15 @@ var GlobalModel = (
       return this._payload;
     };
     GlobalModel2.prototype.getComponent = function(mainType, idx) {
-      var list2 = this._componentsMap.get(mainType);
-      if (list2) {
-        var cmpt = list2[idx || 0];
+      var list3 = this._componentsMap.get(mainType);
+      if (list3) {
+        var cmpt = list3[idx || 0];
         if (cmpt) {
           return cmpt;
         } else if (idx == null) {
-          for (var i7 = 0; i7 < list2.length; i7++) {
-            if (list2[i7]) {
-              return list2[i7];
+          for (var i7 = 0; i7 < list3.length; i7++) {
+            if (list3[i7]) {
+              return list3[i7];
             }
           }
         }
@@ -23117,7 +23117,7 @@ var OptionManager = (
       this._currentMediaIndices = [];
       this._api = api;
     }
-    OptionManager2.prototype.setOption = function(rawOption, optionPreprocessorFuncs2, opt) {
+    OptionManager2.prototype.setOption = function(rawOption, optionPreprocessorFuncs2, opt2) {
       if (rawOption) {
         each(normalizeToArray(rawOption.series), function(series) {
           series && series.data && isTypedArray(series.data) && setAsPrimitive(series.data);
@@ -23296,8 +23296,8 @@ var OptionManager_default = OptionManager;
 var each3 = each;
 var isObject2 = isObject;
 var POSSIBLE_STYLES = ["areaStyle", "lineStyle", "nodeStyle", "linkStyle", "chordStyle", "label", "labelLine"];
-function compatEC2ItemStyle(opt) {
-  var itemStyleOpt = opt && opt.itemStyle;
+function compatEC2ItemStyle(opt2) {
+  var itemStyleOpt = opt2 && opt2.itemStyle;
   if (!itemStyleOpt) {
     return;
   }
@@ -23309,11 +23309,11 @@ function compatEC2ItemStyle(opt) {
       if (true) {
         deprecateReplaceLog("itemStyle.normal." + styleName, styleName);
       }
-      opt[styleName] = opt[styleName] || {};
-      if (!opt[styleName].normal) {
-        opt[styleName].normal = normalItemStyleOpt[styleName];
+      opt2[styleName] = opt2[styleName] || {};
+      if (!opt2[styleName].normal) {
+        opt2[styleName].normal = normalItemStyleOpt[styleName];
       } else {
-        merge(opt[styleName].normal, normalItemStyleOpt[styleName]);
+        merge(opt2[styleName].normal, normalItemStyleOpt[styleName]);
       }
       normalItemStyleOpt[styleName] = null;
     }
@@ -23321,57 +23321,57 @@ function compatEC2ItemStyle(opt) {
       if (true) {
         deprecateReplaceLog("itemStyle.emphasis." + styleName, "emphasis." + styleName);
       }
-      opt[styleName] = opt[styleName] || {};
-      if (!opt[styleName].emphasis) {
-        opt[styleName].emphasis = emphasisItemStyleOpt[styleName];
+      opt2[styleName] = opt2[styleName] || {};
+      if (!opt2[styleName].emphasis) {
+        opt2[styleName].emphasis = emphasisItemStyleOpt[styleName];
       } else {
-        merge(opt[styleName].emphasis, emphasisItemStyleOpt[styleName]);
+        merge(opt2[styleName].emphasis, emphasisItemStyleOpt[styleName]);
       }
       emphasisItemStyleOpt[styleName] = null;
     }
   }
 }
-function convertNormalEmphasis(opt, optType, useExtend) {
-  if (opt && opt[optType] && (opt[optType].normal || opt[optType].emphasis)) {
-    var normalOpt = opt[optType].normal;
-    var emphasisOpt = opt[optType].emphasis;
+function convertNormalEmphasis(opt2, optType, useExtend) {
+  if (opt2 && opt2[optType] && (opt2[optType].normal || opt2[optType].emphasis)) {
+    var normalOpt = opt2[optType].normal;
+    var emphasisOpt = opt2[optType].emphasis;
     if (normalOpt) {
       if (true) {
         deprecateLog("'normal' hierarchy in " + optType + " has been removed since 4.0. All style properties are configured in " + optType + " directly now.");
       }
       if (useExtend) {
-        opt[optType].normal = opt[optType].emphasis = null;
-        defaults(opt[optType], normalOpt);
+        opt2[optType].normal = opt2[optType].emphasis = null;
+        defaults(opt2[optType], normalOpt);
       } else {
-        opt[optType] = normalOpt;
+        opt2[optType] = normalOpt;
       }
     }
     if (emphasisOpt) {
       if (true) {
         deprecateLog(optType + ".emphasis has been changed to emphasis." + optType + " since 4.0");
       }
-      opt.emphasis = opt.emphasis || {};
-      opt.emphasis[optType] = emphasisOpt;
+      opt2.emphasis = opt2.emphasis || {};
+      opt2.emphasis[optType] = emphasisOpt;
       if (emphasisOpt.focus) {
-        opt.emphasis.focus = emphasisOpt.focus;
+        opt2.emphasis.focus = emphasisOpt.focus;
       }
       if (emphasisOpt.blurScope) {
-        opt.emphasis.blurScope = emphasisOpt.blurScope;
+        opt2.emphasis.blurScope = emphasisOpt.blurScope;
       }
     }
   }
 }
-function removeEC3NormalStatus(opt) {
-  convertNormalEmphasis(opt, "itemStyle");
-  convertNormalEmphasis(opt, "lineStyle");
-  convertNormalEmphasis(opt, "areaStyle");
-  convertNormalEmphasis(opt, "label");
-  convertNormalEmphasis(opt, "labelLine");
-  convertNormalEmphasis(opt, "upperLabel");
-  convertNormalEmphasis(opt, "edgeLabel");
+function removeEC3NormalStatus(opt2) {
+  convertNormalEmphasis(opt2, "itemStyle");
+  convertNormalEmphasis(opt2, "lineStyle");
+  convertNormalEmphasis(opt2, "areaStyle");
+  convertNormalEmphasis(opt2, "label");
+  convertNormalEmphasis(opt2, "labelLine");
+  convertNormalEmphasis(opt2, "upperLabel");
+  convertNormalEmphasis(opt2, "edgeLabel");
 }
-function compatTextStyle(opt, propName) {
-  var labelOptSingle = isObject2(opt) && opt[propName];
+function compatTextStyle(opt2, propName) {
+  var labelOptSingle = isObject2(opt2) && opt2[propName];
   var textStyle = isObject2(labelOptSingle) && labelOptSingle.textStyle;
   if (textStyle) {
     if (true) {
@@ -23385,11 +23385,11 @@ function compatTextStyle(opt, propName) {
     }
   }
 }
-function compatEC3CommonStyles(opt) {
-  if (opt) {
-    removeEC3NormalStatus(opt);
-    compatTextStyle(opt, "label");
-    opt.emphasis && compatTextStyle(opt.emphasis, "label");
+function compatEC3CommonStyles(opt2) {
+  if (opt2) {
+    removeEC3NormalStatus(opt2);
+    compatTextStyle(opt2, "label");
+    opt2.emphasis && compatTextStyle(opt2.emphasis, "label");
   }
 }
 function processSeries(seriesOpt) {
@@ -23429,8 +23429,8 @@ function processSeries(seriesOpt) {
         compatEC3CommonStyles(edgeData[i7]);
       }
     }
-    each(seriesOpt.categories, function(opt) {
-      removeEC3NormalStatus(opt);
+    each(seriesOpt.categories, function(opt2) {
+      removeEC3NormalStatus(opt2);
     });
   }
   if (data && !isTypedArray(data)) {
@@ -23463,8 +23463,8 @@ function processSeries(seriesOpt) {
     compatTextStyle(seriesOpt, "detail");
   } else if (seriesOpt.type === "treemap") {
     convertNormalEmphasis(seriesOpt.breadcrumb, "itemStyle");
-    each(seriesOpt.levels, function(opt) {
-      removeEC3NormalStatus(opt);
+    each(seriesOpt.levels, function(opt2) {
+      removeEC3NormalStatus(opt2);
     });
   } else if (seriesOpt.type === "tree") {
     removeEC3NormalStatus(seriesOpt.leaves);
@@ -23557,9 +23557,9 @@ function globalCompatStyle(option, isTheme) {
 }
 
 // node_modules/echarts/lib/preprocessor/backwardCompat.js
-function get(opt, path) {
+function get(opt2, path) {
   var pathArr = path.split(",");
-  var obj = opt;
+  var obj = opt2;
   for (var i7 = 0; i7 < pathArr.length; i7++) {
     obj = obj && obj[pathArr[i7]];
     if (obj == null) {
@@ -23568,9 +23568,9 @@ function get(opt, path) {
   }
   return obj;
 }
-function set2(opt, path, val, overwrite) {
+function set2(opt2, path, val, overwrite) {
   var pathArr = path.split(",");
-  var obj = opt;
+  var obj = opt2;
   var key3;
   var i7 = 0;
   for (; i7 < pathArr.length - 1; i7++) {
@@ -24603,8 +24603,8 @@ var iterator = /* @__PURE__ */ (function() {
 })();
 
 // node_modules/echarts/lib/data/helper/dataValueHelper.js
-function parseDataValue(value2, opt) {
-  var dimType = opt && opt.type;
+function parseDataValue(value2, opt2) {
+  var dimType = opt2 && opt2.type;
   if (dimType === "ordinal") {
     return value2;
   }
@@ -26283,7 +26283,7 @@ var TooltipMarkupStyleCreator = (
         return marker.content;
       }
     };
-    TooltipMarkupStyleCreator2.prototype.wrapRichTextStyle = function(text3, styles) {
+    TooltipMarkupStyleCreator2.prototype.wrapRichTextStyle = function(text4, styles) {
       var finalStl = {};
       if (isArray(styles)) {
         each(styles, function(stl) {
@@ -26294,17 +26294,17 @@ var TooltipMarkupStyleCreator = (
       }
       var styleName = this._generateStyleName();
       this.richTextStyles[styleName] = finalStl;
-      return "{" + styleName + "|" + text3 + "}";
+      return "{" + styleName + "|" + text4 + "}";
     };
     return TooltipMarkupStyleCreator2;
   })()
 );
 
 // node_modules/echarts/lib/component/tooltip/seriesFormatTooltip.js
-function defaultSeriesFormatTooltip(opt) {
-  var series = opt.series;
-  var dataIndex = opt.dataIndex;
-  var multipleSeries = opt.multipleSeries;
+function defaultSeriesFormatTooltip(opt2) {
+  var series = opt2.series;
+  var dataIndex = opt2.dataIndex;
+  var multipleSeries = opt2.multipleSeries;
   var data = series.getData();
   var tooltipDims = data.mapDimensionsAll("defaultedTooltip");
   var tooltipDimLen = tooltipDims.length;
@@ -27356,14 +27356,14 @@ var Scheduler = (
       var ecModel = this.api.getModel();
       var api = this.api;
       each(this._allHandlers, function(handler) {
-        var record3 = stageTaskMap.get(handler.uid) || stageTaskMap.set(handler.uid, {});
+        var record4 = stageTaskMap.get(handler.uid) || stageTaskMap.set(handler.uid, {});
         var errMsg = "";
         if (true) {
           errMsg = '"reset" and "overallReset" must not be both specified.';
         }
         assert(!(handler.reset && handler.overallReset), errMsg);
-        handler.reset && this._createSeriesStageTask(handler, record3, ecModel, api);
-        handler.overallReset && this._createOverallStageTask(handler, record3, ecModel, api);
+        handler.reset && this._createSeriesStageTask(handler, record4, ecModel, api);
+        handler.overallReset && this._createOverallStageTask(handler, record4, ecModel, api);
       }, this);
     };
     Scheduler2.prototype.prepareView = function(view, model, ecModel, api) {
@@ -27380,15 +27380,15 @@ var Scheduler = (
         block: true
       });
     };
-    Scheduler2.prototype.performVisualTasks = function(ecModel, payload, opt) {
-      this._performStageTasks(this._visualHandlers, ecModel, payload, opt);
+    Scheduler2.prototype.performVisualTasks = function(ecModel, payload, opt2) {
+      this._performStageTasks(this._visualHandlers, ecModel, payload, opt2);
     };
-    Scheduler2.prototype._performStageTasks = function(stageHandlers, ecModel, payload, opt) {
-      opt = opt || {};
+    Scheduler2.prototype._performStageTasks = function(stageHandlers, ecModel, payload, opt2) {
+      opt2 = opt2 || {};
       var unfinished = false;
       var scheduler = this;
       each(stageHandlers, function(stageHandler, idx) {
-        if (opt.visualType && opt.visualType !== stageHandler.visualType) {
+        if (opt2.visualType && opt2.visualType !== stageHandler.visualType) {
           return;
         }
         var stageHandlerRecord = scheduler._stageTaskMap.get(stageHandler.uid);
@@ -27398,14 +27398,14 @@ var Scheduler = (
           var overallNeedDirty_1;
           var agentStubMap = overallTask.agentStubMap;
           agentStubMap.each(function(stub) {
-            if (needSetDirty(opt, stub)) {
+            if (needSetDirty(opt2, stub)) {
               stub.dirty();
               overallNeedDirty_1 = true;
             }
           });
           overallNeedDirty_1 && overallTask.dirty();
           scheduler.updatePayload(overallTask, payload);
-          var performArgs_1 = scheduler.getPerformArgs(overallTask, opt.block);
+          var performArgs_1 = scheduler.getPerformArgs(overallTask, opt2.block);
           agentStubMap.each(function(stub) {
             stub.perform(performArgs_1);
           });
@@ -27414,10 +27414,10 @@ var Scheduler = (
           }
         } else if (seriesTaskMap) {
           seriesTaskMap.each(function(task, pipelineId) {
-            if (needSetDirty(opt, task)) {
+            if (needSetDirty(opt2, task)) {
               task.dirty();
             }
-            var performArgs = scheduler.getPerformArgs(task, opt.block);
+            var performArgs = scheduler.getPerformArgs(task, opt2.block);
             performArgs.skip = !stageHandler.performRawSeries && ecModel.isSeriesFiltered(task.context.model);
             scheduler.updatePayload(task, payload);
             if (task.perform(performArgs)) {
@@ -27426,8 +27426,8 @@ var Scheduler = (
           });
         }
       });
-      function needSetDirty(opt2, task) {
-        return opt2.setDirty && (!opt2.dirtyMap || opt2.dirtyMap.get(task.__pipeline.id));
+      function needSetDirty(opt3, task) {
+        return opt3.setDirty && (!opt3.dirtyMap || opt3.dirtyMap.get(task.__pipeline.id));
       }
       this.unfinished = unfinished || this.unfinished;
     };
@@ -28842,9 +28842,9 @@ function brushImage(ctx, el, style) {
 }
 function brushText(ctx, el, style) {
   var _a2;
-  var text3 = style.text;
-  text3 != null && (text3 += "");
-  if (text3) {
+  var text4 = style.text;
+  text4 != null && (text4 += "");
+  if (text4) {
     ctx.font = style.font || DEFAULT_FONT;
     ctx.textAlign = style.textAlign;
     ctx.textBaseline = style.textBaseline;
@@ -28859,17 +28859,17 @@ function brushText(ctx, el, style) {
     }
     if (style.strokeFirst) {
       if (styleHasStroke(style)) {
-        ctx.strokeText(text3, style.x, style.y);
+        ctx.strokeText(text4, style.x, style.y);
       }
       if (styleHasFill(style)) {
-        ctx.fillText(text3, style.x, style.y);
+        ctx.fillText(text4, style.x, style.y);
       }
     } else {
       if (styleHasFill(style)) {
-        ctx.fillText(text3, style.x, style.y);
+        ctx.fillText(text4, style.x, style.y);
       }
       if (styleHasStroke(style)) {
-        ctx.strokeText(text3, style.x, style.y);
+        ctx.strokeText(text4, style.x, style.y);
       }
     }
     if (lineDash) {
@@ -29872,8 +29872,8 @@ var ECharts = (
     };
     ECharts2.prototype.getSvgDataURL = function() {
       var zr = this._zr;
-      var list2 = zr.storage.getDisplayList();
-      each(list2, function(el) {
+      var list3 = zr.storage.getDisplayList();
+      each(list3, function(el) {
         el.stopAnimation(null, true);
       });
       return zr.painter.toDataURL();
@@ -29995,14 +29995,14 @@ var ECharts = (
         return this.getDataURL(opts);
       }
     };
-    ECharts2.prototype.convertToPixel = function(finder, value2, opt) {
-      return doConvertPixel(this, "convertToPixel", finder, value2, opt);
+    ECharts2.prototype.convertToPixel = function(finder, value2, opt2) {
+      return doConvertPixel(this, "convertToPixel", finder, value2, opt2);
     };
-    ECharts2.prototype.convertToLayout = function(finder, value2, opt) {
-      return doConvertPixel(this, "convertToLayout", finder, value2, opt);
+    ECharts2.prototype.convertToLayout = function(finder, value2, opt2) {
+      return doConvertPixel(this, "convertToLayout", finder, value2, opt2);
     };
-    ECharts2.prototype.convertFromPixel = function(finder, value2, opt) {
-      return doConvertPixel(this, "convertFromPixel", finder, value2, opt);
+    ECharts2.prototype.convertFromPixel = function(finder, value2, opt2) {
+      return doConvertPixel(this, "convertFromPixel", finder, value2, opt2);
     };
     ECharts2.prototype.containPixel = function(finder, value2) {
       if (this._disposed) {
@@ -30230,14 +30230,14 @@ var ECharts = (
       payload.type = connectionEventRevertMap[eventObj.type];
       return payload;
     };
-    ECharts2.prototype.dispatchAction = function(payload, opt) {
+    ECharts2.prototype.dispatchAction = function(payload, opt2) {
       if (this._disposed) {
         disposedWarning(this.id);
         return;
       }
-      if (!isObject(opt)) {
-        opt = {
-          silent: !!opt
+      if (!isObject(opt2)) {
+        opt2 = {
+          silent: !!opt2
         };
       }
       if (!actions[payload.type]) {
@@ -30250,9 +30250,9 @@ var ECharts = (
         this._pendingActions.push(payload);
         return;
       }
-      var silent = opt.silent;
+      var silent = opt2.silent;
       doDispatchAction.call(this, payload, silent);
-      var flush = opt.flush;
+      var flush = opt2.flush;
       if (flush) {
         this._zr.flush();
       } else if (flush !== false && env_default.browser.weChat) {
@@ -30548,7 +30548,7 @@ var ECharts = (
           updateMethods.update.call(this, payload);
         }
       };
-      function doConvertPixelImpl(ecIns, methodName, finder, value2, opt) {
+      function doConvertPixelImpl(ecIns, methodName, finder, value2, opt2) {
         if (ecIns._disposed) {
           disposedWarning(ecIns.id);
           return;
@@ -30559,7 +30559,7 @@ var ECharts = (
         var parsedFinder = parseFinder(ecModel, finder);
         for (var i7 = 0; i7 < coordSysList.length; i7++) {
           var coordSys = coordSysList[i7];
-          if (coordSys[methodName] && (result2 = coordSys[methodName](ecModel, parsedFinder, value2, opt)) != null) {
+          if (coordSys[methodName] && (result2 = coordSys[methodName](ecModel, parsedFinder, value2, opt2)) != null) {
             return result2;
           }
         }
@@ -31590,10 +31590,10 @@ function mayLabelDimType(dimType) {
 var SeriesDimensionDefine = (
   /** @class */
   /* @__PURE__ */ (function() {
-    function SeriesDimensionDefine2(opt) {
+    function SeriesDimensionDefine2(opt2) {
       this.otherDims = {};
-      if (opt != null) {
-        extend(this, opt);
+      if (opt2 != null) {
+        extend(this, opt2);
       }
     }
     return SeriesDimensionDefine2;
@@ -31613,12 +31613,12 @@ var dimTypeShort = {
 var SeriesDataSchema = (
   /** @class */
   (function() {
-    function SeriesDataSchema2(opt) {
-      this.dimensions = opt.dimensions;
-      this._dimOmitted = opt.dimensionOmitted;
-      this.source = opt.source;
-      this._fullDimCount = opt.fullDimensionCount;
-      this._updateDimOmitted(opt.dimensionOmitted);
+    function SeriesDataSchema2(opt2) {
+      this.dimensions = opt2.dimensions;
+      this._dimOmitted = opt2.dimensionOmitted;
+      this.source = opt2.source;
+      this._fullDimCount = opt2.fullDimensionCount;
+      this._updateDimOmitted(opt2.dimensionOmitted);
     }
     SeriesDataSchema2.prototype.isDimensionOmitted = function() {
       return this._dimOmitted;
@@ -32162,9 +32162,9 @@ var SeriesData = (
       "use strict";
       var fCtx = ctx || ctxCompat || this;
       var dimIndices = map2(normalizeDimensions(dims), this._getStoreDimIndex, this);
-      var list2 = cloneListForMapAndSample(this);
-      list2._store = this._store.map(dimIndices, fCtx ? bind(cb, fCtx) : cb);
-      return list2;
+      var list3 = cloneListForMapAndSample(this);
+      list3._store = this._store.map(dimIndices, fCtx ? bind(cb, fCtx) : cb);
+      return list3;
     };
     SeriesData2.prototype.modify = function(dims, cb, ctx, ctxCompat) {
       var _this = this;
@@ -32181,19 +32181,19 @@ var SeriesData = (
       this._store.modify(dimIndices, fCtx ? bind(cb, fCtx) : cb);
     };
     SeriesData2.prototype.downSample = function(dimension, rate, sampleValue, sampleIndex) {
-      var list2 = cloneListForMapAndSample(this);
-      list2._store = this._store.downSample(this._getStoreDimIndex(dimension), rate, sampleValue, sampleIndex);
-      return list2;
+      var list3 = cloneListForMapAndSample(this);
+      list3._store = this._store.downSample(this._getStoreDimIndex(dimension), rate, sampleValue, sampleIndex);
+      return list3;
     };
     SeriesData2.prototype.minmaxDownSample = function(valueDimension, rate) {
-      var list2 = cloneListForMapAndSample(this);
-      list2._store = this._store.minmaxDownSample(this._getStoreDimIndex(valueDimension), rate);
-      return list2;
+      var list3 = cloneListForMapAndSample(this);
+      list3._store = this._store.minmaxDownSample(this._getStoreDimIndex(valueDimension), rate);
+      return list3;
     };
     SeriesData2.prototype.lttbDownSample = function(valueDimension, rate) {
-      var list2 = cloneListForMapAndSample(this);
-      list2._store = this._store.lttbDownSample(this._getStoreDimIndex(valueDimension), rate);
-      return list2;
+      var list3 = cloneListForMapAndSample(this);
+      list3._store = this._store.lttbDownSample(this._getStoreDimIndex(valueDimension), rate);
+      return list3;
     };
     SeriesData2.prototype.getRawDataItem = function(idx) {
       return this._store.getRawDataItem(idx);
@@ -32295,13 +32295,13 @@ var SeriesData = (
         }
       });
     };
-    SeriesData2.prototype.cloneShallow = function(list2) {
-      if (!list2) {
-        list2 = new SeriesData2(this._schema ? this._schema : map2(this.dimensions, this._getDimInfo, this), this.hostModel);
+    SeriesData2.prototype.cloneShallow = function(list3) {
+      if (!list3) {
+        list3 = new SeriesData2(this._schema ? this._schema : map2(this.dimensions, this._getDimInfo, this), this.hostModel);
       }
-      transferProperties(list2, this);
-      list2._store = this._store;
-      return list2;
+      transferProperties(list3, this);
+      list3._store = this._store;
+      return list3;
     };
     SeriesData2.prototype.wrapMethod = function(methodName, injectFunction) {
       var originalMethod = this[methodName];
@@ -32353,9 +32353,9 @@ var SeriesData = (
         return dimensions;
       };
       cloneListForMapAndSample = function(original) {
-        var list2 = new SeriesData2(original._schema ? original._schema : map2(original.dimensions, original._getDimInfo, original), original.hostModel);
-        transferProperties(list2, original);
-        return list2;
+        var list3 = new SeriesData2(original._schema ? original._schema : map2(original.dimensions, original._getDimInfo, original), original.hostModel);
+        transferProperties(list3, original);
+        return list3;
       };
       transferProperties = function(target, source) {
         each(TRANSFERABLE_PROPERTIES.concat(source.__wrappedMethods || []), function(propName) {
@@ -32399,22 +32399,22 @@ var SeriesData = (
 var SeriesData_default = SeriesData;
 
 // node_modules/echarts/lib/data/helper/createDimensions.js
-function prepareSeriesDataSchema(source, opt) {
+function prepareSeriesDataSchema(source, opt2) {
   if (!isSourceInstance(source)) {
     source = createSourceFromSeriesDataOption(source);
   }
-  opt = opt || {};
-  var sysDims = opt.coordDimensions || [];
-  var dimsDef = opt.dimensionsDefine || source.dimensionsDefine || [];
+  opt2 = opt2 || {};
+  var sysDims = opt2.coordDimensions || [];
+  var dimsDef = opt2.dimensionsDefine || source.dimensionsDefine || [];
   var coordDimNameMap = createHashMap();
   var resultList = [];
-  var dimCount = getDimCount(source, sysDims, dimsDef, opt.dimensionsCount);
-  var omitUnusedDimensions = opt.canOmitUnusedDimensions && shouldOmitUnusedDimensions(dimCount);
+  var dimCount = getDimCount(source, sysDims, dimsDef, opt2.dimensionsCount);
+  var omitUnusedDimensions = opt2.canOmitUnusedDimensions && shouldOmitUnusedDimensions(dimCount);
   var isUsingSourceDimensionsDef = dimsDef === source.dimensionsDefine;
   var dataDimNameMap = isUsingSourceDimensionsDef ? ensureSourceDimNameMap(source) : createDimNameMap(dimsDef);
-  var encodeDef = opt.encodeDefine;
-  if (!encodeDef && opt.encodeDefaulter) {
-    encodeDef = opt.encodeDefaulter(source, dimCount);
+  var encodeDef = opt2.encodeDefine;
+  if (!encodeDef && opt2.encodeDefaulter) {
+    encodeDef = opt2.encodeDefaulter(source, dimCount);
   }
   var encodeDefMap = createHashMap(encodeDef);
   var indicesMap = new CtorInt32Array(dimCount);
@@ -32522,8 +32522,8 @@ function prepareSeriesDataSchema(source, opt) {
       coordDimNameMap.set(coordDim2, true);
     }
   }
-  var generateCoord = opt.generateCoord;
-  var generateCoordCount = opt.generateCoordCount;
+  var generateCoord = opt2.generateCoord;
+  var generateCoordCount = opt2.generateCoordCount;
   var fromZero = generateCoordCount != null;
   generateCoordCount = generateCoord ? generateCoordCount || 1 : 0;
   var extra = generateCoord || "value";
@@ -32717,10 +32717,10 @@ function isCategory(axisModel) {
 }
 
 // node_modules/echarts/lib/data/helper/dataStackHelper.js
-function enableDataStack(seriesModel, dimensionsInput, opt) {
-  opt = opt || {};
-  var byIndex = opt.byIndex;
-  var stackedCoordDimension = opt.stackedCoordDimension;
+function enableDataStack(seriesModel, dimensionsInput, opt2) {
+  opt2 = opt2 || {};
+  var byIndex = opt2.byIndex;
+  var stackedCoordDimension = opt2.stackedCoordDimension;
   var dimensionDefineList;
   var schema;
   var store;
@@ -32874,8 +32874,8 @@ function injectOrdinalMeta(dimInfoList, createInvertedIndices, coordSysInfo) {
   }
   return firstCategoryDimIndex;
 }
-function createSeriesData(sourceRaw, seriesModel, opt) {
-  opt = opt || {};
+function createSeriesData(sourceRaw, seriesModel, opt2) {
+  opt2 = opt2 || {};
   var sourceManager = seriesModel.getSourceManager();
   var source;
   var isOriginalSource = false;
@@ -32888,17 +32888,17 @@ function createSeriesData(sourceRaw, seriesModel, opt) {
   }
   var coordSysInfo = getCoordSysInfoBySeries(seriesModel);
   var coordSysDimDefs = getCoordSysDimDefs(seriesModel, coordSysInfo);
-  var useEncodeDefaulter = opt.useEncodeDefaulter;
+  var useEncodeDefaulter = opt2.useEncodeDefaulter;
   var encodeDefaulter = isFunction(useEncodeDefaulter) ? useEncodeDefaulter : useEncodeDefaulter ? curry(makeSeriesEncodeForAxisCoordSys, coordSysDimDefs, seriesModel) : null;
   var createDimensionOptions = {
     coordDimensions: coordSysDimDefs,
-    generateCoord: opt.generateCoord,
+    generateCoord: opt2.generateCoord,
     encodeDefine: seriesModel.getEncode(),
     encodeDefaulter,
     canOmitUnusedDimensions: !isOriginalSource
   };
   var schema = prepareSeriesDataSchema(source, createDimensionOptions);
-  var firstCategoryDimIndex = injectOrdinalMeta(schema.dimensions, opt.createInvertedIndices, coordSysInfo);
+  var firstCategoryDimIndex = injectOrdinalMeta(schema.dimensions, opt2.createInvertedIndices, coordSysInfo);
   var store = !isOriginalSource ? sourceManager.getSharedDataStore(schema) : null;
   var stackCalculationInfo = enableDataStack(seriesModel, {
     schema,
@@ -32956,12 +32956,12 @@ var uidBase = 0;
 var OrdinalMeta = (
   /** @class */
   (function() {
-    function OrdinalMeta2(opt) {
-      this.categories = opt.categories || [];
-      this._needCollect = opt.needCollect;
-      this._deduplication = opt.deduplication;
+    function OrdinalMeta2(opt2) {
+      this.categories = opt2.categories || [];
+      this._needCollect = opt2.needCollect;
+      this._deduplication = opt2.deduplication;
       this.uid = ++uidBase;
-      this._onCollect = opt.onCollect;
+      this._onCollect = opt2.onCollect;
     }
     OrdinalMeta2.createByAxisModel = function(axisModel) {
       var option = axisModel.option;
@@ -33203,8 +33203,8 @@ function getIntervalPrecision(niceInterval) {
 function logScaleLogTick(val, base2) {
   return mathLog(val) / mathLog(base2);
 }
-function logScalePowTick(linearTickVal, base2, opt) {
-  var lookup = opt && opt.lookup;
+function logScalePowTick(linearTickVal, base2, opt2) {
+  var lookup = opt2 && opt2.lookup;
   if (lookup) {
     for (var i7 = 0; i7 < lookup.from.length; i7++) {
       if (linearTickVal === lookup.from[i7]) {
@@ -33392,11 +33392,11 @@ var OrdinalScale = (
       scale: function(val) {
         return this.getRawOrdinalNumber(mathRound(this._mapper.scale(val)));
       },
-      transformIn: function(val, opt) {
-        return this._mapper.transformIn(this._getTickNumber(val), opt);
+      transformIn: function(val, opt2) {
+        return this._mapper.transformIn(this._getTickNumber(val), opt2);
       },
-      transformOut: function(val, opt) {
-        return this.getRawOrdinalNumber(this._mapper.transformOut(val, opt));
+      transformOut: function(val, opt2) {
+        return this.getRawOrdinalNumber(this._mapper.transformOut(val, opt2));
       },
       getExtent: function() {
         return this._mapper.getExtent();
@@ -33505,8 +33505,8 @@ var IntervalScale = (
         cfg.intervalPrecision = getIntervalPrecision(cfg.interval);
       }
     };
-    IntervalScale2.prototype.getTicks = function(opt) {
-      opt = opt || {};
+    IntervalScale2.prototype.getTicks = function(opt2) {
+      opt2 = opt2 || {};
       var cfg = this._cfg;
       var interval = cfg.interval;
       var extent = getScaleExtentForTickUnsafe(this);
@@ -33519,7 +33519,7 @@ var IntervalScale = (
       if (!interval) {
         return ticks;
       }
-      if (opt.breakTicks === "only_break" && brkAvailable) {
+      if (opt2.breakTicks === "only_break" && brkAvailable) {
         scaleBreakHelper.addBreaksToTicks(ticks, brk.breaks, extent);
         return ticks;
       }
@@ -33529,7 +33529,7 @@ var IntervalScale = (
       var safeLimit = 3e3;
       if (extent[0] < niceExtent[0]) {
         ticks.push({
-          value: opt.expandToNicedExtent ? round(niceExtent[0] - interval, intervalPrecision) : extent[0]
+          value: opt2.expandToNicedExtent ? round(niceExtent[0] - interval, intervalPrecision) : extent[0]
         });
       }
       var estimateNiceMultiple = function(tickVal, targetTick) {
@@ -33573,15 +33573,15 @@ var IntervalScale = (
       var lastNiceTick = ticks.length ? ticks[ticks.length - 1].value : niceExtent[1];
       if (extent[1] > lastNiceTick) {
         ticks.push({
-          value: opt.expandToNicedExtent ? round(lastNiceTick + interval, intervalPrecision) : extent[1]
+          value: opt2.expandToNicedExtent ? round(lastNiceTick + interval, intervalPrecision) : extent[1]
         });
       }
       if (brkAvailable) {
-        scaleBreakHelper.pruneTicksByBreak(opt.pruneByBreak, ticks, brk.breaks, function(item) {
+        scaleBreakHelper.pruneTicksByBreak(opt2.pruneByBreak, ticks, brk.breaks, function(item) {
           return item.value;
         }, cfg.interval, extent);
       }
-      if (brkAvailable && opt.breakTicks !== "none") {
+      if (brkAvailable && opt2.breakTicks !== "none") {
         scaleBreakHelper.addBreaksToTicks(ticks, brk.breaks, extent);
       }
       return ticks;
@@ -33589,11 +33589,11 @@ var IntervalScale = (
     IntervalScale2.prototype.getMinorTicks = function(splitNumber) {
       return getMinorTicks(this, splitNumber, getBreaksUnsafe(this), this._cfg.interval);
     };
-    IntervalScale2.prototype.getLabel = function(tick, opt) {
+    IntervalScale2.prototype.getLabel = function(tick, opt2) {
       if (tick == null) {
         return "";
       }
-      var precision = opt && opt.precision;
+      var precision = opt2 && opt2.precision;
       if (precision == null) {
         precision = getPrecision(tick.value) || 0;
       } else if (precision === "auto") {
@@ -33643,8 +33643,8 @@ var TimeScale = (
     TimeScale2.prototype.getFormattedLabel = function(tick, idx, labelFormatter) {
       return leveledFormat(tick, idx, labelFormatter, this._locale, this._useUTC);
     };
-    TimeScale2.prototype.getTicks = function(opt) {
-      opt = opt || {};
+    TimeScale2.prototype.getTicks = function(opt2) {
+      opt2 = opt2 || {};
       var interval = this._interval;
       var extent = getScaleExtentForTickUnsafe(this);
       var scaleBreakHelper = getScaleBreakHelper();
@@ -33655,7 +33655,7 @@ var TimeScale = (
         return ticks;
       }
       var useUTC = this._useUTC;
-      if (brkAvailable && opt.breakTicks === "only_break") {
+      if (brkAvailable && opt2.breakTicks === "only_break") {
         getScaleBreakHelper().addBreaksToTicks(ticks, brk.breaks, extent);
         return ticks;
       }
@@ -33669,11 +33669,11 @@ var TimeScale = (
         }
       });
       if (brkAvailable) {
-        getScaleBreakHelper().pruneTicksByBreak(opt.pruneByBreak, ticks, brk.breaks, function(item) {
+        getScaleBreakHelper().pruneTicksByBreak(opt2.pruneByBreak, ticks, brk.breaks, function(item) {
           return item.value;
         }, this._approxInterval, extent);
       }
-      if (brkAvailable && opt.breakTicks !== "none") {
+      if (brkAvailable && opt2.breakTicks !== "none") {
         getScaleBreakHelper().addBreaksToTicks(ticks, brk.breaks, extent, function(trimmedBrk) {
           var lowerBrkUnitIndex = Math.max(indexOf(primaryTimeUnits, getUnitFromValue(trimmedBrk.vmin, useUTC)), indexOf(primaryTimeUnits, getUnitFromValue(trimmedBrk.vmax, useUTC)));
           var upperBrkUnitIndex = 0;
@@ -33697,10 +33697,10 @@ var TimeScale = (
     TimeScale2.prototype.getMinorTicks = function(splitNumber) {
       return getMinorTicks(this, splitNumber, getBreaksUnsafe(this), this._interval);
     };
-    TimeScale2.prototype.setTimeInterval = function(opt) {
-      this._interval = opt.interval;
-      this._approxInterval = opt.approxInterval;
-      this._minLevelUnit = opt.minLevelUnit;
+    TimeScale2.prototype.setTimeInterval = function(opt2) {
+      this._interval = opt2.interval;
+      this._approxInterval = opt2.approxInterval;
+      this._minLevelUnit = opt2.minLevelUnit;
     };
     TimeScale2.parse = function(val) {
       return isNumber(val) ? Math.round(val) : +parseDate(val);
@@ -33971,7 +33971,7 @@ function createIntervalTicks(bottomUnitName, approxInterval, isUTC, extent, inne
   }
   return ticks;
 }
-var calcNiceForTimeScale = function(scale3, opt) {
+var calcNiceForTimeScale = function(scale3, opt2) {
   var extent = scale3.getExtent();
   if (extent[0] === extent[1]) {
     extent[0] -= ONE_DAY;
@@ -33983,10 +33983,10 @@ var calcNiceForTimeScale = function(scale3, opt) {
     extent[0] = extent[1] - ONE_DAY;
   }
   scale3.setExtent(extent[0], extent[1]);
-  var splitNumber = ensureValidSplitNumber(opt.splitNumber, 10);
+  var splitNumber = ensureValidSplitNumber(opt2.splitNumber, 10);
   var approxInterval = getScaleLinearSpanEffective(scale3) / splitNumber;
-  var minInterval = opt.minInterval;
-  var maxInterval = opt.maxInterval;
+  var minInterval = opt2.minInterval;
+  var maxInterval = opt2.maxInterval;
   if (minInterval != null && approxInterval < minInterval) {
     approxInterval = minInterval;
   }
@@ -34046,7 +34046,7 @@ var LogScale = (
       enableScaleMapperFreeze(_this, _this.intervalStub);
       return _this;
     }
-    LogScale2.prototype.getTicks = function(opt) {
+    LogScale2.prototype.getTicks = function(opt2) {
       var base2 = this.base;
       var powStub = this.powStub;
       var scaleBreakHelper = getScaleBreakHelper();
@@ -34059,7 +34059,7 @@ var LogScale = (
           to: powExtent
         }
       };
-      return map(intervalStub.getTicks(opt || {}), function(tick) {
+      return map(intervalStub.getTicks(opt2 || {}), function(tick) {
         var val = tick.value;
         var powVal = logScalePowTick(val, base2, powOpt);
         var vBreak;
@@ -34085,8 +34085,8 @@ var LogScale = (
         this.intervalStub.getConfig().interval
       );
     };
-    LogScale2.prototype.getLabel = function(data, opt) {
-      return this.intervalStub.getLabel(data, opt);
+    LogScale2.prototype.getLabel = function(data, opt2) {
+      return this.intervalStub.getLabel(data, opt2);
     };
     LogScale2.type = "log";
     LogScale2.mapperMethods = {
@@ -34099,12 +34099,12 @@ var LogScale = (
       scale: function(val) {
         return logScalePowTick(this.intervalStub.scale(val), this.base, null);
       },
-      transformIn: function(val, opt) {
+      transformIn: function(val, opt2) {
         val = logScaleLogTick(val, this.base);
-        return opt && opt.depth === SCALE_MAPPER_DEPTH_OUT_OF_BREAK ? val : this.intervalStub.transformIn(val, opt);
+        return opt2 && opt2.depth === SCALE_MAPPER_DEPTH_OUT_OF_BREAK ? val : this.intervalStub.transformIn(val, opt2);
       },
-      transformOut: function(val, opt) {
-        var depth = opt ? opt.depth : null;
+      transformOut: function(val, opt2) {
+        var depth = opt2 ? opt2.depth : null;
         tmpTransformOutOpt1.depth = depth;
         tmpTransformOutOpt2.lookup = this._lookup;
         return logScalePowTick(depth === SCALE_MAPPER_DEPTH_OUT_OF_BREAK ? val : this.intervalStub.transformOut(val, tmpTransformOutOpt1), this.base, tmpTransformOutOpt2);
@@ -34238,9 +34238,9 @@ function makeLabelFormatter(axis2) {
     };
   } else if (isString(labelFormatter)) {
     return function(tick) {
-      var label = axis2.scale.getLabel(tick);
-      var text3 = labelFormatter.replace("{value}", label != null ? label : "");
-      return text3;
+      var label2 = axis2.scale.getLabel(tick);
+      var text4 = labelFormatter.replace("{value}", label2 != null ? label2 : "");
+      return text4;
     };
   } else if (isFunction(labelFormatter)) {
     if (axis2.type === "category") {
@@ -34319,11 +34319,11 @@ function updateIntervalOrLogScaleForNiceOrAligned(scale3, fixMinMax, oldInterval
   intervalStub.setExtent(newIntervalExtent[0], newIntervalExtent[1]);
   if (isTargetLogScale) {
     var powStub = scale3.powStub;
-    var opt = {
+    var opt2 = {
       depth: SCALE_MAPPER_DEPTH_OUT_OF_BREAK
     };
-    var minPow = scale3.transformOut(newIntervalExtent[0], opt);
-    var maxPow = scale3.transformOut(newIntervalExtent[1], opt);
+    var minPow = scale3.transformOut(newIntervalExtent[0], opt2);
+    var maxPow = scale3.transformOut(newIntervalExtent[1], opt2);
     var extentChanged = extentDiffers(oldIntervalExtent, newIntervalExtent);
     if (fixMinMax[0] && !extentChanged[0]) {
       minPow = oldOutermostExtent[0];
@@ -34405,9 +34405,9 @@ function eachKeyEachAxis(ecModel, cb) {
     });
   });
 }
-function wrapStatResult(record3) {
+function wrapStatResult(record4) {
   return {
-    liPosMinGap: record3 ? record3.liPosMinGap : void 0
+    liPosMinGap: record4 ? record4.liPosMinGap : void 0
   };
 }
 function eachSeriesOnAxis(axis2, cb) {
@@ -34672,8 +34672,8 @@ function parseBoundaryGapOption(scale3, model) {
   }
   return [parseBoundaryGapOptionItem(boundaryGapOptionArr[0]), parseBoundaryGapOptionItem(boundaryGapOptionArr[1])];
 }
-function parseBoundaryGapOptionItem(opt) {
-  return parsePercent(typeof opt === "boolean" ? 0 : opt, 1) || 0;
+function parseBoundaryGapOptionItem(opt2) {
+  return parsePercent(typeof opt2 === "boolean" ? 0 : opt2, 1) || 0;
 }
 function ensureScaleStore(axisLike) {
   var store = scaleInner(axisLike.scale);
@@ -34822,19 +34822,19 @@ function adoptScaleExtentKindMapping(axis2, scale3, rawExtentResult, ecModel) {
 }
 
 // node_modules/echarts/lib/coord/axisNiceTicks.js
-function calcNiceForIntervalOrLogScale(scale3, opt) {
+function calcNiceForIntervalOrLogScale(scale3, opt2) {
   var isTargetLogScale = isLogScale(scale3);
   var intervalStub = isTargetLogScale ? scale3.intervalStub : scale3;
-  var fixMinMax = opt.fixMinMax || [];
+  var fixMinMax = opt2.fixMinMax || [];
   var oldOutermostExtent = isTargetLogScale ? scale3.getExtent() : null;
   var oldIntervalExtent = intervalStub.getExtent();
-  var newIntervalExtent = intervalScaleEnsureValidExtent(oldIntervalExtent, fixMinMax, opt.rawExtentResult);
+  var newIntervalExtent = intervalScaleEnsureValidExtent(oldIntervalExtent, fixMinMax, opt2.rawExtentResult);
   intervalStub.setExtent(newIntervalExtent[0], newIntervalExtent[1]);
   newIntervalExtent = intervalStub.getExtent();
-  var config = isTargetLogScale ? logScaleCalcNiceTicks(intervalStub, opt) : intervalScaleCalcNiceTicks(intervalStub, opt);
+  var config = isTargetLogScale ? logScaleCalcNiceTicks(intervalStub, opt2) : intervalScaleCalcNiceTicks(intervalStub, opt2);
   var autoIntervalPrecision = config.intervalPrecision;
   var autoInterval = config.interval;
-  var userInterval = opt.userInterval;
+  var userInterval = opt2.userInterval;
   if (userInterval != null) {
     config.interval = userInterval;
     config.intervalPrecision = getIntervalPrecision(userInterval);
@@ -34850,14 +34850,14 @@ function calcNiceForIntervalOrLogScale(scale3, opt) {
   }
   updateIntervalOrLogScaleForNiceOrAligned(scale3, fixMinMax, oldIntervalExtent, newIntervalExtent, oldOutermostExtent, config);
 }
-function intervalScaleCalcNiceTicks(scale3, opt) {
-  var splitNumber = ensureValidSplitNumber(opt.splitNumber, 5);
+function intervalScaleCalcNiceTicks(scale3, opt2) {
+  var splitNumber = ensureValidSplitNumber(opt2.splitNumber, 5);
   var span = getScaleLinearSpanEffective(scale3);
   if (true) {
     assert(isFinite(span) && span > 0);
   }
-  var minInterval = opt.minInterval;
-  var maxInterval = opt.maxInterval;
+  var minInterval = opt2.minInterval;
+  var maxInterval = opt2.maxInterval;
   var interval = nice(span / splitNumber, true);
   if (minInterval != null && interval < minInterval) {
     interval = minInterval;
@@ -34874,8 +34874,8 @@ function intervalScaleCalcNiceTicks(scale3, opt) {
     niceExtent
   };
 }
-function logScaleCalcNiceTicks(intervalStub, opt) {
-  var splitNumber = ensureValidSplitNumber(opt.splitNumber, 10);
+function logScaleCalcNiceTicks(intervalStub, opt2) {
+  var splitNumber = ensureValidSplitNumber(opt2.splitNumber, 10);
   var intervalExtent = intervalStub.getExtent();
   var span = getScaleLinearSpanEffective(intervalStub);
   if (true) {
@@ -34922,8 +34922,8 @@ function scaleCalcNice2(scale3, model, axis2, ecModel, externalDataExtent) {
     scale3.freeze();
   }
 }
-function scaleCalcNiceDirectly(scale3, opt) {
-  scaleCalcNiceMethods[scale3.type](scale3, opt);
+function scaleCalcNiceDirectly(scale3, opt2) {
+  scaleCalcNiceMethods[scale3.type](scale3, opt2);
 }
 var scaleCalcNiceMethods = {
   interval: calcNiceForIntervalOrLogScale,
@@ -35063,7 +35063,7 @@ function createAxisLabels(axis2, ctx) {
   }
   return axis2.type === "category" ? makeCategoryLabels(axis2, ctx) : makeRealNumberLabels(axis2);
 }
-function createAxisTicks(axis2, tickModel, opt) {
+function createAxisTicks(axis2, tickModel, opt2) {
   var scale3 = axis2.scale;
   var custom = axis2.getTickModel().get("customValues");
   if (custom) {
@@ -35072,7 +35072,7 @@ function createAxisTicks(axis2, tickModel, opt) {
     };
   }
   return axis2.type === "category" ? makeCategoryTicks(axis2, tickModel) : {
-    ticks: scale3.getTicks(opt)
+    ticks: scale3.getTicks(opt2)
   };
 }
 function parseTickLabelCustomValues(customValues, scale3) {
@@ -35303,15 +35303,15 @@ function makeTicksLabelsByCategoryIntervalNumOrCb(axis2, categoryInterval, onlyT
 
 // node_modules/echarts/lib/coord/axisBand.js
 var FALLBACK_BAND_WIDTH_RATIO = 0.8;
-function calcBandWidth(axis2, opt) {
-  opt = opt || {};
+function calcBandWidth(axis2, opt2) {
+  opt2 = opt2 || {};
   var out2 = {
     w: NaN,
     w2: NaN
   };
   var scale3 = axis2.scale;
-  var fromStat = opt.fromStat;
-  var min3 = opt.min;
+  var fromStat = opt2.fromStat;
+  var min3 = opt2.min;
   var scaleLinearSpan = getScaleLinearSpanForMapping(scale3);
   if (!isNullableNumberFinite(scaleLinearSpan)) {
     scaleLinearSpan = NaN;
@@ -35410,12 +35410,12 @@ var Axis = (
     Axis2.prototype.pointToData = function(point, clamp2) {
       return;
     };
-    Axis2.prototype.getTicksCoords = function(opt) {
-      opt = opt || {};
-      var tickModel = opt.tickModel || this.getTickModel();
+    Axis2.prototype.getTicksCoords = function(opt2) {
+      opt2 = opt2 || {};
+      var tickModel = opt2.tickModel || this.getTickModel();
       var result2 = createAxisTicks(this, tickModel, {
-        breakTicks: opt.breakTicks,
-        pruneByBreak: opt.pruneByBreak
+        breakTicks: opt2.breakTicks,
+        pruneByBreak: opt2.pruneByBreak
       });
       var preTicksCoords = map(result2.ticks, function(tick) {
         return {
@@ -35534,15 +35534,15 @@ function ensureLabelLayoutWithGeometry(labelLayout) {
   }
   return labelLayout;
 }
-function computeLabelGeometry(out2, label, opt) {
-  var rawTransform = label.getComputedTransform();
+function computeLabelGeometry(out2, label2, opt2) {
+  var rawTransform = label2.getComputedTransform();
   out2.transform = ensureCopyTransform(out2.transform, rawTransform);
-  var outLocalRect = out2.localRect = ensureCopyRect(out2.localRect, label.getBoundingRect());
-  var labelStyleExt = label.style;
+  var outLocalRect = out2.localRect = ensureCopyRect(out2.localRect, label2.getBoundingRect());
+  var labelStyleExt = label2.style;
   var margin = labelStyleExt.margin;
-  var marginForce = opt && opt.marginForce;
-  var minMarginForce = opt && opt.minMarginForce;
-  var marginDefault = opt && opt.marginDefault;
+  var marginForce = opt2 && opt2.marginForce;
+  var minMarginForce = opt2 && opt2.minMarginForce;
+  var marginDefault = opt2 && opt2.marginDefault;
   var marginType = labelStyleExt.__marginType;
   if (marginType == null && marginDefault) {
     margin = marginDefault;
@@ -35562,7 +35562,7 @@ function computeLabelGeometry(out2, label, opt) {
     expandOrShrinkRect(outGlobalRect, _tmpLabelMargin, false, false);
   }
   out2.axisAligned = isBoundingRectAxisAligned(rawTransform);
-  (out2.label = out2.label || {}).ignore = label.ignore;
+  (out2.label = out2.label || {}).ignore = label2.ignore;
   setLabelLayoutDirty(out2, false);
   setLabelLayoutDirty(out2, true, LABEL_LAYOUT_DIRTY_BIT_OBB);
   return out2;
@@ -35639,7 +35639,7 @@ function hideOverlap(labelList) {
     if (labelItem.label.ignore) {
       continue;
     }
-    var label = labelItem.label;
+    var label2 = labelItem.label;
     var labelLine = labelItem.labelLine;
     var overlapped = false;
     for (var j2 = 0; j2 < displayedLabels.length; j2++) {
@@ -35651,7 +35651,7 @@ function hideOverlap(labelList) {
       }
     }
     if (overlapped) {
-      hideEl(label);
+      hideEl(label2);
       labelLine && hideEl(labelLine);
     } else {
       displayedLabels.push(labelItem);
@@ -35696,21 +35696,21 @@ var LineSeriesModel = (
         useEncodeDefaulter: true
       });
     };
-    LineSeriesModel2.prototype.getLegendIcon = function(opt) {
+    LineSeriesModel2.prototype.getLegendIcon = function(opt2) {
       var group = new Group_default();
-      var line = createSymbol("line", 0, opt.itemHeight / 2, opt.itemWidth, 0, opt.lineStyle.stroke, false);
+      var line = createSymbol("line", 0, opt2.itemHeight / 2, opt2.itemWidth, 0, opt2.lineStyle.stroke, false);
       group.add(line);
-      line.setStyle(opt.lineStyle);
+      line.setStyle(opt2.lineStyle);
       var visualType = this.getData().getVisual("symbol");
       var visualRotate = this.getData().getVisual("symbolRotate");
       var symbolType = visualType === "none" ? "circle" : visualType;
-      var size = opt.itemHeight * 0.8;
-      var symbol = createSymbol(symbolType, (opt.itemWidth - size) / 2, (opt.itemHeight - size) / 2, size, size, opt.itemStyle.fill);
+      var size = opt2.itemHeight * 0.8;
+      var symbol = createSymbol(symbolType, (opt2.itemWidth - size) / 2, (opt2.itemHeight - size) / 2, size, size, opt2.itemStyle.fill);
       group.add(symbol);
-      symbol.setStyle(opt.itemStyle);
-      var symbolRotate = opt.iconRotate === "inherit" ? visualRotate : opt.iconRotate || 0;
+      symbol.setStyle(opt2.itemStyle);
+      var symbolRotate = opt2.iconRotate === "inherit" ? visualRotate : opt2.iconRotate || 0;
       symbol.rotation = symbolRotate * Math.PI / 180;
-      symbol.setOrigin([opt.itemWidth / 2, opt.itemHeight / 2]);
+      symbol.setOrigin([opt2.itemWidth / 2, opt2.itemHeight / 2]);
       if (symbolType.indexOf("empty") > -1) {
         symbol.style.stroke = symbol.style.fill;
         symbol.style.fill = tokens_default.color.neutral00;
@@ -36009,12 +36009,12 @@ var Symbol2 = (
     Symbol3.prototype.setSymbolScale = function(scale3) {
       this.scaleX = this.scaleY = scale3;
     };
-    Symbol3.prototype.fadeOut = function(cb, seriesModel, opt) {
+    Symbol3.prototype.fadeOut = function(cb, seriesModel, opt2) {
       var symbolPath = this.childAt(0);
       var dataIndex = getECData(this).dataIndex;
-      var animationOpt = opt && opt.animation;
+      var animationOpt = opt2 && opt2.animation;
       this.silent = symbolPath.silent = true;
-      if (opt && opt.fadeLabel) {
+      if (opt2 && opt2.fadeLabel) {
         var textContent = symbolPath.getTextContent();
         if (textContent) {
           removeElement(textContent, {
@@ -36059,16 +36059,16 @@ function driftSymbol(dx, dy) {
 var Symbol_default = Symbol2;
 
 // node_modules/echarts/lib/chart/helper/SymbolDraw.js
-function symbolNeedsDraw(data, point, idx, opt) {
-  return point && !isNaN(point[0]) && !isNaN(point[1]) && !(opt && opt.isIgnore && opt.isIgnore(idx)) && !(opt && opt.clipShape && !opt.clipShape.contain(point[0], point[1])) && data.getItemVisual(idx, "symbol") !== "none";
+function symbolNeedsDraw(data, point, idx, opt2) {
+  return point && !isNaN(point[0]) && !isNaN(point[1]) && !(opt2 && opt2.isIgnore && opt2.isIgnore(idx)) && !(opt2 && opt2.clipShape && !opt2.clipShape.contain(point[0], point[1])) && data.getItemVisual(idx, "symbol") !== "none";
 }
-function normalizeUpdateOpt(opt) {
-  if (opt != null && !isObject(opt)) {
-    opt = {
-      isIgnore: opt
+function normalizeUpdateOpt(opt2) {
+  if (opt2 != null && !isObject(opt2)) {
+    opt2 = {
+      isIgnore: opt2
     };
   }
-  return opt || {};
+  return opt2 || {};
 }
 function makeSeriesScope(data) {
   var seriesModel = data.hostModel;
@@ -36099,19 +36099,19 @@ var SymbolDraw = (
       this.group = new Group_default();
       this._SymbolCtor = SymbolCtor || Symbol_default;
     }
-    SymbolDraw2.prototype.updateData = function(data, opt) {
+    SymbolDraw2.prototype.updateData = function(data, opt2) {
       this._progressiveEls = null;
-      opt = normalizeUpdateOpt(opt);
+      opt2 = normalizeUpdateOpt(opt2);
       var group = this.group;
       var seriesModel = data.hostModel;
       var oldData = this._data;
       var SymbolCtor = this._SymbolCtor;
-      var disableAnimation = opt.disableAnimation;
+      var disableAnimation = opt2.disableAnimation;
       var seriesScope = this._seriesScope = makeSeriesScope(data);
       var symbolUpdateOpt = {
         disableAnimation
       };
-      var getSymbolPoint = opt.getSymbolPoint || function(idx) {
+      var getSymbolPoint = opt2.getSymbolPoint || function(idx) {
         return data.getItemLayout(idx);
       };
       if (!oldData) {
@@ -36119,13 +36119,13 @@ var SymbolDraw = (
       }
       data.diff(oldData).add(function(newIdx) {
         var point = getSymbolPoint(newIdx);
-        if (symbolNeedsDraw(data, point, newIdx, opt)) {
+        if (symbolNeedsDraw(data, point, newIdx, opt2)) {
           createEl(SymbolCtor, data, newIdx, seriesScope, symbolUpdateOpt, point, group);
         }
       }).update(function(newIdx, oldIdx) {
         var symbolEl = oldData.getItemGraphicEl(oldIdx);
         var point = getSymbolPoint(newIdx);
-        if (!symbolNeedsDraw(data, point, newIdx, opt)) {
+        if (!symbolNeedsDraw(data, point, newIdx, opt2)) {
           group.remove(symbolEl);
           return;
         }
@@ -36155,7 +36155,7 @@ var SymbolDraw = (
       this._data = data;
     };
     ;
-    SymbolDraw2.prototype.updateLayout = function(opt) {
+    SymbolDraw2.prototype.updateLayout = function(opt2) {
       var data = this._data;
       if (!data) {
         return;
@@ -36165,7 +36165,7 @@ var SymbolDraw = (
       for (var idx = 0, len2 = store.count(); idx < len2; idx++) {
         var el = data.getItemGraphicEl(idx);
         var point = symbolDraw._getSymbolPoint(idx);
-        if (symbolNeedsDraw(data, point, idx, opt)) {
+        if (symbolNeedsDraw(data, point, idx, opt2)) {
           el = el || createEl(symbolDraw._SymbolCtor, data, idx, symbolDraw._seriesScope, {
             disableAnimation: true
           }, point, symbolDraw.group);
@@ -36185,9 +36185,9 @@ var SymbolDraw = (
       this.group.removeAll();
     };
     ;
-    SymbolDraw2.prototype.incrementalUpdate = function(taskParams, data, incrementalId, opt) {
+    SymbolDraw2.prototype.incrementalUpdate = function(taskParams, data, incrementalId, opt2) {
       this._progressiveEls = [];
-      opt = normalizeUpdateOpt(opt);
+      opt2 = normalizeUpdateOpt(opt2);
       function updateIncrementalAndHover(el2) {
         if (!el2.isGroup) {
           el2.incremental = incrementalId;
@@ -36196,7 +36196,7 @@ var SymbolDraw = (
       }
       for (var idx = taskParams.start; idx < taskParams.end; idx++) {
         var point = data.getItemLayout(idx);
-        if (symbolNeedsDraw(data, point, idx, opt)) {
+        if (symbolNeedsDraw(data, point, idx, opt2)) {
           var el = new this._SymbolCtor(data, idx, this._seriesScope);
           el.traverse(updateIncrementalAndHover);
           el.setPosition(point);
@@ -37722,7 +37722,7 @@ var LineView = (
           }
           var delay = isFunction(seriesDelay) ? seriesDelay(idx) : seriesDuration * ratio + seriesDelayValue;
           var symbolPath = el.getSymbolPath();
-          var text3 = symbolPath.getTextContent();
+          var text4 = symbolPath.getTextContent();
           el.attr({
             scaleX: 0,
             scaleY: 0
@@ -37735,8 +37735,8 @@ var LineView = (
             setToFinal: true,
             delay
           });
-          if (text3) {
-            text3.animateFrom({
+          if (text4) {
+            text4.animateFrom({
               style: {
                 opacity: 0
               }
@@ -37776,7 +37776,7 @@ var LineView = (
             inheritColor,
             labelFetcher: seriesModel,
             labelDataIndex: dataIndex,
-            defaultText: function(dataIndex2, opt, interpolatedValue) {
+            defaultText: function(dataIndex2, opt2, interpolatedValue) {
               return interpolatedValue != null ? getDefaultInterpolatedLabel(data_2, interpolatedValue) : getDefaultLabel(data_2, dataIndex2);
             },
             enableTextSetter: true
@@ -38191,7 +38191,7 @@ var AxisBuilderSharedContext = (
 );
 function resetOverlapRecordToShared(cfg, shared, axisModel, labelLayoutList) {
   var axis2 = axisModel.axis;
-  var record3 = shared.ensureRecord(axisModel);
+  var record4 = shared.ensureRecord(axisModel);
   var labelInfoList = [];
   var stOccupiedRect;
   var useStOccupiedRect = hasAxisName(cfg.axisName) && isNameLocationCenter(cfg.nameLocation);
@@ -38201,7 +38201,7 @@ function resetOverlapRecordToShared(cfg, shared, axisModel, labelLayoutList) {
       return;
     }
     labelInfoList.push(layoutInfo);
-    var transGroup = record3.transGroup;
+    var transGroup = record4.transGroup;
     if (useStOccupiedRect) {
       transGroup.transform ? invert(_stTransTmp, transGroup.transform) : identity(_stTransTmp);
       if (layoutInfo.transform) {
@@ -38212,8 +38212,8 @@ function resetOverlapRecordToShared(cfg, shared, axisModel, labelLayoutList) {
       stOccupiedRect ? stOccupiedRect.union(_stLabelRectTmp) : BoundingRect_default.copy(stOccupiedRect = new BoundingRect_default(0, 0, 0, 0), _stLabelRectTmp);
     }
   });
-  var sortByDim = Math.abs(record3.dirVec.x) > 0.1 ? "x" : "y";
-  var sortByValue = record3.transGroup[sortByDim];
+  var sortByDim = Math.abs(record4.dirVec.x) > 0.1 ? "x" : "y";
+  var sortByValue = record4.transGroup[sortByDim];
   labelInfoList.sort(function(info1, info2) {
     return Math.abs(info1.label[sortByDim] - sortByValue) - Math.abs(info2.label[sortByDim] - sortByValue);
   });
@@ -38223,8 +38223,8 @@ function resetOverlapRecordToShared(cfg, shared, axisModel, labelLayoutList) {
     var axisLineWidth = Math.max(extent[0], extent[1]) - axisLineX;
     stOccupiedRect.union(new BoundingRect_default(axisLineX, 0, axisLineWidth, 1));
   }
-  record3.stOccupiedRect = stOccupiedRect;
-  record3.labelInfoList = labelInfoList;
+  record4.stOccupiedRect = stOccupiedRect;
+  record4.labelInfoList = labelInfoList;
 }
 var _stTransTmp = create2();
 var _stLabelRectTmp = new BoundingRect_default(0, 0, 0, 0);
@@ -38260,23 +38260,23 @@ function moveIfOverlapByLinearLabels(baseLayoutInfoList, baseDirVec, movableLayo
 var AxisBuilder = (
   /** @class */
   (function() {
-    function AxisBuilder2(axisModel, api, opt, shared) {
+    function AxisBuilder2(axisModel, api, opt2, shared) {
       this.group = new Group_default();
       this._axisModel = axisModel;
       this._api = api;
       this._local = {};
       this._shared = shared || new AxisBuilderSharedContext(resolveAxisNameOverlapDefault);
-      this._resetCfgDetermined(opt);
+      this._resetCfgDetermined(opt2);
     }
-    AxisBuilder2.prototype.updateCfg = function(opt) {
+    AxisBuilder2.prototype.updateCfg = function(opt2) {
       if (true) {
         var ready = this._shared.ensureRecord(this._axisModel).ready;
         assert(!ready.axisLine && !ready.axisTickLabelDetermine);
         ready.axisName = ready.axisTickLabelEstimate = false;
       }
       var raw = this._cfg.raw;
-      raw.position = opt.position;
-      raw.labelOffset = opt.labelOffset;
+      raw.position = opt2.position;
+      raw.labelOffset = opt2.labelOffset;
       this._resetCfgDetermined(raw);
     };
     AxisBuilder2.prototype.__getRawCfg = function() {
@@ -38317,9 +38317,9 @@ var AxisBuilder = (
       });
       transformGroup.updateTransform();
       this._transformGroup = transformGroup;
-      var record3 = this._shared.ensureRecord(axisModel);
-      record3.transGroup = this._transformGroup;
-      record3.dirVec = new Point_default(Math.cos(-cfg.rotation), Math.sin(-cfg.rotation));
+      var record4 = this._shared.ensureRecord(axisModel);
+      record4.transGroup = this._transformGroup;
+      record4.dirVec = new Point_default(Math.cos(-cfg.rotation), Math.sin(-cfg.rotation));
     };
     AxisBuilder2.prototype.build = function(axisPartNameMap, extraParams) {
       var _this = this;
@@ -38608,11 +38608,11 @@ var builders = {
     group.add(textEl);
     textEl.decomposeTransform();
     if (cfg.shouldNameMoveOverlap && nameLayout) {
-      var record3 = shared.ensureRecord(axisModel);
+      var record4 = shared.ensureRecord(axisModel);
       if (true) {
-        assert(record3.labelInfoList);
+        assert(record4.labelInfoList);
       }
-      shared.resolveAxisNameOverlap(cfg, shared, axisModel, nameLayout, nameMoveDirVec, record3);
+      shared.resolveAxisNameOverlap(cfg, shared, axisModel, nameLayout, nameMoveDirVec, record4);
     }
   }
 };
@@ -38957,12 +38957,12 @@ function buildAxisLabel(cfg, local, group, kind, axisModel, api) {
     labelEls.push(textEl);
     labelGroup.add(textEl);
   });
-  var labelLayoutList = map(labelEls, function(label) {
+  var labelLayoutList = map(labelEls, function(label2) {
     return {
-      label,
-      priority: getLabelInner(label).labelInfo.tick["break"] ? label.z2 + (z2Max - z2Min + 1) : label.z2,
+      label: label2,
+      priority: getLabelInner(label2).labelInfo.tick["break"] ? label2.z2 + (z2Max - z2Min + 1) : label2.z2,
       defaultAttr: {
-        ignore: label.ignore
+        ignore: label2.ignore
       }
     };
   });
@@ -39038,8 +39038,8 @@ function adjustBreakLabels(axisModel, axisRotation, labelLayoutList) {
 var AxisBuilder_default = AxisBuilder;
 
 // node_modules/echarts/lib/coord/cartesian/cartesianAxisHelper.js
-function layout(rect, axisModel, opt) {
-  opt = opt || {};
+function layout(rect, axisModel, opt2) {
+  opt2 = opt2 || {};
   var axis2 = axisModel.axis;
   var layout2 = {};
   var otherAxisOnZeroOf = axis2.getAxesOnZeroOf()[0];
@@ -39073,7 +39073,7 @@ function layout(rect, axisModel, opt) {
   if (axisModel.get(["axisTick", "inside"])) {
     layout2.tickDirection = -layout2.tickDirection;
   }
-  if (retrieve(opt.labelInside, axisModel.get(["axisLabel", "inside"]))) {
+  if (retrieve(opt2.labelInside, axisModel.get(["axisLabel", "inside"]))) {
     layout2.labelDirection = -layout2.labelDirection;
   }
   var labelRotate = axisModel.get(["axisLabel", "rotate"]);
@@ -39189,23 +39189,23 @@ var GridModel_default = GridModel;
 // node_modules/echarts/lib/layout/barGrid.js
 var callOnlyOnce2 = makeCallOnlyOnce();
 var STACK_PREFIX = "__ec_stack_";
-function computeBarLayoutForCustomSeries(opt) {
-  if (!isOrdinalScale(opt.axis.scale)) {
+function computeBarLayoutForCustomSeries(opt2) {
+  if (!isOrdinalScale(opt2.axis.scale)) {
     return;
   }
-  var bandWidthResult = calcBandWidth(opt.axis);
+  var bandWidthResult = calcBandWidth(opt2.axis);
   var params = [];
-  for (var i7 = 0; i7 < opt.count || 0; i7++) {
+  for (var i7 = 0; i7 < opt2.count || 0; i7++) {
     params.push(defaults({
       stackId: STACK_PREFIX + i7
-    }, opt));
+    }, opt2));
   }
   var widthAndOffsets = calcBarWidthAndOffset({
     bandWidthResult,
     seriesInfo: params
   });
   var result2 = [];
-  for (var i7 = 0; i7 < opt.count; i7++) {
+  for (var i7 = 0; i7 < opt2.count; i7++) {
     var item = widthAndOffsets[STACK_PREFIX + i7];
     item.offsetCenter = item.offset + item.width / 2;
     result2.push(item);
@@ -41134,13 +41134,13 @@ var RoamController = (
       return this._pinching;
     };
     RoamController2.prototype._checkPointer = function(e9, x2, y3) {
-      var opt = this._opt;
-      var zInfoParsed = opt.zInfoParsed;
-      if (onIrrelevantElement(e9, opt.api, zInfoParsed.component)) {
+      var opt2 = this._opt;
+      var zInfoParsed = opt2.zInfoParsed;
+      if (onIrrelevantElement(e9, opt2.api, zInfoParsed.component)) {
         return false;
       }
       ;
-      var triggerInfo = opt.triggerInfo;
+      var triggerInfo = opt2.triggerInfo;
       var roamTrigger = triggerInfo.roamTrigger;
       var inArea = false;
       if (roamTrigger === "global") {
@@ -42059,17 +42059,17 @@ var Line2 = (
         defaultOpacity: lineStyle.opacity,
         defaultText: (rawVal == null ? lineData.getName(idx) : isFinite(rawVal) ? round(rawVal, 10) : rawVal) + ""
       });
-      var label = this.getTextContent();
-      if (label) {
+      var label2 = this.getTextContent();
+      if (label2) {
         var labelNormalModel = labelStatesModels.normal;
-        label.__align = label.style.align;
-        label.__verticalAlign = label.style.verticalAlign;
-        label.__position = labelNormalModel.get("position") || "middle";
+        label2.__align = label2.style.align;
+        label2.__verticalAlign = label2.style.verticalAlign;
+        label2.__position = labelNormalModel.get("position") || "middle";
         var distance2 = labelNormalModel.get("distance");
         if (!isArray(distance2)) {
           distance2 = [distance2, distance2];
         }
-        label.__labelDistance = distance2;
+        label2.__labelDistance = distance2;
       }
       this.setTextConfig({
         position: null,
@@ -42098,8 +42098,8 @@ var Line2 = (
       var lineGroup = this;
       var symbolFrom = lineGroup.childOfName("fromSymbol");
       var symbolTo = lineGroup.childOfName("toSymbol");
-      var label = lineGroup.getTextContent();
-      if (!symbolFrom && !symbolTo && (!label || label.ignore)) {
+      var label2 = lineGroup.getTextContent();
+      if (!symbolFrom && !symbolTo && (!label2 || label2.ignore)) {
         return;
       }
       var invScale = 1;
@@ -42140,12 +42140,12 @@ var Line2 = (
         symbolTo.scaleX = symbolTo.scaleY = invScale * percent2;
         symbolTo.markRedraw();
       }
-      if (label && !label.ignore) {
-        label.x = label.y = 0;
-        label.originX = label.originY = 0;
+      if (label2 && !label2.ignore) {
+        label2.x = label2.y = 0;
+        label2.originX = label2.originY = 0;
         var textAlign = void 0;
         var textVerticalAlign = void 0;
-        var distance2 = label.__labelDistance;
+        var distance2 = label2.__labelDistance;
         var distanceX = distance2[0] * invScale;
         var distanceY = distance2[1] * invScale;
         var halfPercent = percent2 / 2;
@@ -42157,15 +42157,15 @@ var Line2 = (
           n6[1] = -n6[1];
         }
         var dir = tangent[0] < 0 ? -1 : 1;
-        if (label.__position !== "start" && label.__position !== "end") {
+        if (label2.__position !== "start" && label2.__position !== "end") {
           var rotation = -Math.atan2(tangent[1], tangent[0]);
           if (toPos[0] < fromPos[0]) {
             rotation = Math.PI + rotation;
           }
-          label.rotation = rotation;
+          label2.rotation = rotation;
         }
         var dy = void 0;
-        switch (label.__position) {
+        switch (label2.__position) {
           case "insideStartTop":
           case "insideMiddleTop":
           case "insideEndTop":
@@ -42183,52 +42183,52 @@ var Line2 = (
             dy = 0;
             textVerticalAlign = "middle";
         }
-        switch (label.__position) {
+        switch (label2.__position) {
           case "end":
-            label.x = d3[0] * distanceX + toPos[0];
-            label.y = d3[1] * distanceY + toPos[1];
+            label2.x = d3[0] * distanceX + toPos[0];
+            label2.y = d3[1] * distanceY + toPos[1];
             textAlign = d3[0] > 0.8 ? "left" : d3[0] < -0.8 ? "right" : "center";
             textVerticalAlign = d3[1] > 0.8 ? "top" : d3[1] < -0.8 ? "bottom" : "middle";
             break;
           case "start":
-            label.x = -d3[0] * distanceX + fromPos[0];
-            label.y = -d3[1] * distanceY + fromPos[1];
+            label2.x = -d3[0] * distanceX + fromPos[0];
+            label2.y = -d3[1] * distanceY + fromPos[1];
             textAlign = d3[0] > 0.8 ? "right" : d3[0] < -0.8 ? "left" : "center";
             textVerticalAlign = d3[1] > 0.8 ? "bottom" : d3[1] < -0.8 ? "top" : "middle";
             break;
           case "insideStartTop":
           case "insideStart":
           case "insideStartBottom":
-            label.x = distanceX * dir + fromPos[0];
-            label.y = fromPos[1] + dy;
+            label2.x = distanceX * dir + fromPos[0];
+            label2.y = fromPos[1] + dy;
             textAlign = tangent[0] < 0 ? "right" : "left";
-            label.originX = -distanceX * dir;
-            label.originY = -dy;
+            label2.originX = -distanceX * dir;
+            label2.originY = -dy;
             break;
           case "insideMiddleTop":
           case "insideMiddle":
           case "insideMiddleBottom":
           case "middle":
-            label.x = cp[0];
-            label.y = cp[1] + dy;
+            label2.x = cp[0];
+            label2.y = cp[1] + dy;
             textAlign = "center";
-            label.originY = -dy;
+            label2.originY = -dy;
             break;
           case "insideEndTop":
           case "insideEnd":
           case "insideEndBottom":
-            label.x = -distanceX * dir + toPos[0];
-            label.y = toPos[1] + dy;
+            label2.x = -distanceX * dir + toPos[0];
+            label2.y = toPos[1] + dy;
             textAlign = tangent[0] >= 0 ? "right" : "left";
-            label.originX = distanceX * dir;
-            label.originY = -dy;
+            label2.originX = distanceX * dir;
+            label2.originY = -dy;
             break;
         }
-        label.scaleX = label.scaleY = invScale;
-        label.setStyle({
+        label2.scaleX = label2.scaleY = invScale;
+        label2.setStyle({
           // Use the user specified text align and baseline first
-          verticalAlign: label.__verticalAlign || textVerticalAlign,
-          align: label.__align || textAlign
+          verticalAlign: label2.__verticalAlign || textVerticalAlign,
+          align: label2.__align || textAlign
         });
       }
     };
@@ -42640,11 +42640,11 @@ function matrixPrepareCustom(coordSys) {
       height: rect.height
     },
     api: {
-      coord: function(data, opt) {
-        return coordSys.dataToPoint(data, opt);
+      coord: function(data, opt2) {
+        return coordSys.dataToPoint(data, opt2);
       },
-      layout: function(data, opt) {
-        return coordSys.dataToLayout(data, opt);
+      layout: function(data, opt2) {
+        return coordSys.dataToLayout(data, opt2);
       }
     }
   };
@@ -43502,13 +43502,13 @@ function makeRenderItem(customSeries, data, ecModel, api) {
     var itemStyle = getItemStyleModel(dataIndexInside, NORMAL).getItemStyle();
     visualColor != null && (itemStyle.fill = visualColor);
     opacity != null && (itemStyle.opacity = opacity);
-    var opt = {
+    var opt2 = {
       inheritColor: isString(visualColor) ? visualColor : tokens_default.color.neutral99
     };
     var labelModel = getLabelModel(dataIndexInside, NORMAL);
-    var textStyle = createTextStyle(labelModel, null, opt, false, true);
+    var textStyle = createTextStyle(labelModel, null, opt2, false, true);
     textStyle.text = labelModel.getShallow("show") ? retrieve2(customSeries.getFormattedLabel(dataIndexInside, NORMAL), getDefaultLabel(data, dataIndexInside)) : null;
-    var textConfig = createTextConfig(labelModel, opt, false);
+    var textConfig = createTextConfig(labelModel, opt2, false);
     preFetchFromExtra(userProps, itemStyle);
     itemStyle = convertToEC4StyleForCustomSerise(itemStyle, textStyle, textConfig);
     userProps && applyUserPropsAfter(itemStyle, userProps);
@@ -43554,19 +43554,19 @@ function makeRenderItem(customSeries, data, ecModel, api) {
       return data.getItemVisual(dataIndexInside, visualType);
     }
   }
-  function barLayout(opt) {
+  function barLayout(opt2) {
     if (coordSys.type === "cartesian2d") {
       var baseAxis = coordSys.getBaseAxis();
       return computeBarLayoutForCustomSeries(defaults({
         axis: baseAxis
-      }, opt));
+      }, opt2));
     }
   }
   function currentSeriesIndices() {
     return ecModel.getCurrentSeriesIndices();
   }
-  function font(opt) {
-    return getFont(opt, ecModel);
+  function font(opt2) {
+    return getFont(opt2, ecModel);
   }
 }
 function wrapEncodeDef(data) {
@@ -44121,14 +44121,14 @@ function buildElStyle(axisPointerModel) {
 }
 function buildLabelElOption(elOption, axisModel, axisPointerModel, api, labelPos) {
   var value2 = axisPointerModel.get("value");
-  var text3 = getValueLabel(value2, axisModel.axis, axisModel.ecModel, axisPointerModel.get("seriesDataIndices"), {
+  var text4 = getValueLabel(value2, axisModel.axis, axisModel.ecModel, axisPointerModel.get("seriesDataIndices"), {
     precision: axisPointerModel.get(["label", "precision"]),
     formatter: axisPointerModel.get(["label", "formatter"])
   });
   var labelModel = axisPointerModel.getModel("label");
   var paddings = normalizeCssArray2(labelModel.get("padding") || 0);
   var font = labelModel.getFont();
-  var textRect = getBoundingRect(text3, font);
+  var textRect = getBoundingRect(text4, font);
   var position = labelPos.position;
   var width = textRect.width + paddings[1] + paddings[3];
   var height = textRect.height + paddings[0] + paddings[2];
@@ -44148,7 +44148,7 @@ function buildLabelElOption(elOption, axisModel, axisPointerModel, api, labelPos
     x: position[0],
     y: position[1],
     style: createTextStyle(labelModel, {
-      text: text3,
+      text: text4,
       font,
       fill: labelModel.getTextColor(),
       padding: paddings,
@@ -44166,16 +44166,16 @@ function confineInContainer(position, width, height, api) {
   position[0] = Math.max(position[0], 0);
   position[1] = Math.max(position[1], 0);
 }
-function getValueLabel(value2, axis2, ecModel, seriesDataIndices, opt) {
+function getValueLabel(value2, axis2, ecModel, seriesDataIndices, opt2) {
   value2 = axis2.scale.parse(value2);
-  var text3 = axis2.scale.getLabel({
+  var text4 = axis2.scale.getLabel({
     value: value2
   }, {
     // If `precision` is set, width can be fixed (like '12.00500'), which
     // helps to debounce when when moving label.
-    precision: opt.precision
+    precision: opt2.precision
   });
-  var formatter = opt.formatter;
+  var formatter = opt2.formatter;
   if (formatter) {
     var params_1 = {
       value: getAxisRawValue(axis2, {
@@ -44192,12 +44192,12 @@ function getValueLabel(value2, axis2, ecModel, seriesDataIndices, opt) {
       dataParams && params_1.seriesData.push(dataParams);
     });
     if (isString(formatter)) {
-      text3 = formatter.replace("{value}", text3);
+      text4 = formatter.replace("{value}", text4);
     } else if (isFunction(formatter)) {
-      text3 = formatter(params_1);
+      text4 = formatter(params_1);
     }
   }
-  return text3;
+  return text4;
 }
 function getTransformedPosition(axis2, value2, layoutInfo) {
   var transform = create2();
@@ -44313,9 +44313,9 @@ var CartesianAxisPointer = (
   })(BaseAxisPointer_default)
 );
 function getCartesian(grid, axis2) {
-  var opt = {};
-  opt[axis2.dim + "AxisIndex"] = axis2.index;
-  return grid.getCartesian(opt);
+  var opt2 = {};
+  opt2[axis2.dim + "AxisIndex"] = axis2.index;
+  return grid.getCartesian(opt2);
 }
 var pointerShapeBuilder = {
   line: function(axis2, pixelValue, thisExtent, otherExtent) {
@@ -44419,8 +44419,8 @@ function register(key3, api, handler) {
   var zr = api.getZr();
   inner10(zr).records || (inner10(zr).records = {});
   initGlobalListeners(zr, api);
-  var record3 = inner10(zr).records[key3] || (inner10(zr).records[key3] = {});
-  record3.handler = handler;
+  var record4 = inner10(zr).records[key3] || (inner10(zr).records[key3] = {});
+  record4.handler = handler;
 }
 function initGlobalListeners(zr, api) {
   if (inner10(zr).initialized) {
@@ -44434,8 +44434,8 @@ function initGlobalListeners(zr, api) {
   function useHandler(eventType, cb) {
     zr.on(eventType, function(e9) {
       var dis = makeDispatchAction(api);
-      each5(inner10(zr).records, function(record3) {
-        record3 && cb(record3, e9, dis.dispatchAction);
+      each5(inner10(zr).records, function(record4) {
+        record4 && cb(record4, e9, dis.dispatchAction);
       });
       dispatchTooltipFinally(dis.pendings, api);
     });
@@ -44455,11 +44455,11 @@ function dispatchTooltipFinally(pendings, api) {
     api.dispatchAction(actuallyPayload);
   }
 }
-function onLeave(record3, e9, dispatchAction2) {
-  record3.handler("leave", null, dispatchAction2);
+function onLeave(record4, e9, dispatchAction2) {
+  record4.handler("leave", null, dispatchAction2);
 }
-function doEnter(currTrigger, record3, e9, dispatchAction2) {
-  record3.handler(currTrigger, e9, dispatchAction2);
+function doEnter(currTrigger, record4, e9, dispatchAction2) {
+  record4.handler(currTrigger, e9, dispatchAction2);
 }
 function makeDispatchAction(api) {
   var pendings = {
@@ -44485,8 +44485,8 @@ function unregister(key3, api) {
     return;
   }
   var zr = api.getZr();
-  var record3 = (inner10(zr).records || {})[key3];
-  if (record3) {
+  var record4 = (inner10(zr).records || {})[key3];
+  if (record4) {
     inner10(zr).records[key3] = null;
   }
 }
@@ -45220,21 +45220,21 @@ var DataZoomModel = (
         return this.ecModel.getComponent(getAxisMainType(axisDim), axisIndex);
       }
     };
-    DataZoomModel2.prototype.setRawRange = function(opt) {
+    DataZoomModel2.prototype.setRawRange = function(opt2) {
       var thisOption = this.option;
       var settledOption = this.settledOption;
       each([["start", "startValue"], ["end", "endValue"]], function(names) {
-        if (opt[names[0]] != null || opt[names[1]] != null) {
-          thisOption[names[0]] = settledOption[names[0]] = opt[names[0]];
-          thisOption[names[1]] = settledOption[names[1]] = opt[names[1]];
+        if (opt2[names[0]] != null || opt2[names[1]] != null) {
+          thisOption[names[0]] = settledOption[names[0]] = opt2[names[0]];
+          thisOption[names[1]] = settledOption[names[1]] = opt2[names[1]];
         }
       }, this);
-      this._updateRangeUse(opt);
+      this._updateRangeUse(opt2);
     };
-    DataZoomModel2.prototype.setCalculatedRange = function(opt) {
+    DataZoomModel2.prototype.setCalculatedRange = function(opt2) {
       var option = this.option;
       each(["start", "startValue", "end", "endValue"], function(name) {
-        option[name] = opt[name];
+        option[name] = opt2[name];
       });
     };
     DataZoomModel2.prototype.getPercentRange = function() {
@@ -45360,7 +45360,7 @@ var AxisProxy = (
     AxisProxy2.prototype.getMinMaxSpan = function() {
       return clone(this._minMaxSpan);
     };
-    AxisProxy2.prototype.calculateDataWindow = function(opt) {
+    AxisProxy2.prototype.calculateDataWindow = function(opt2) {
       var dataExtent = this._extent;
       var axis2 = this.getAxisModel().axis;
       var scale3 = axis2.scale;
@@ -45372,8 +45372,8 @@ var AxisProxy = (
       var hasPropModeValue;
       var needRound = [false, false];
       each(["start", "end"], function(prop, idx) {
-        var boundPercent = opt[prop];
-        var boundValue = opt[prop + "Value"];
+        var boundPercent = opt2[prop];
+        var boundValue = opt2[prop + "Value"];
         if (rangePropMode[idx] === "percent") {
           boundPercent == null && (boundPercent = percentExtent[idx]);
           boundValue = linearMap(boundPercent, percentExtent, dataExtent);
@@ -45446,14 +45446,14 @@ var AxisProxy = (
       var rawExtentInfo = axis2.scale.rawExtentInfo;
       this._extent = rawExtentInfo.makeNoZoom();
       this._updateMinMaxSpan();
-      var opt = dataZoomModel.settledOption;
+      var opt2 = dataZoomModel.settledOption;
       if (alignToPercentInverted) {
-        opt = defaults({
+        opt2 = defaults({
           start: alignToPercentInverted[0],
           end: alignToPercentInverted[1]
-        }, opt);
+        }, opt2);
       }
-      var _a2 = this._window = this.calculateDataWindow(opt), percent2 = _a2.percent, value2 = _a2.value;
+      var _a2 = this._window = this.calculateDataWindow(opt2), percent2 = _a2.percent, value2 = _a2.value;
       if (percent2[0] !== 0) {
         rawExtentInfo.setZoomMM(0, value2[0]);
       }
@@ -45886,7 +45886,7 @@ function makeStyleCoord(out2, zr, container, zrX, zrY) {
 var TooltipHTMLContent = (
   /** @class */
   (function() {
-    function TooltipHTMLContent2(api, opt) {
+    function TooltipHTMLContent2(api, opt2) {
       this._show = false;
       this._styleCoord = [0, 0, 0, 0];
       this._enterable = true;
@@ -45900,7 +45900,7 @@ var TooltipHTMLContent = (
       el.domBelongToZr = true;
       this.el = el;
       var zr = this._zr = api.getZr();
-      var appendTo = opt.appendTo;
+      var appendTo = opt2.appendTo;
       var container = appendTo && (isString(appendTo) ? document.querySelector(appendTo) : isDom(appendTo) ? appendTo : isFunction(appendTo) && appendTo(api.getDom()));
       makeStyleCoord(this._styleCoord, zr, container, api.getWidth() / 2, api.getHeight() / 2);
       (container || api.getDom()).appendChild(el);
@@ -47025,8 +47025,8 @@ function checkMarkerInSeries(seriesOpts, markerType) {
 }
 
 // node_modules/echarts/lib/component/marker/MarkerModel.js
-function fillLabel(opt) {
-  defaultEmphasis(opt, "label", ["show"]);
+function fillLabel(opt2) {
+  defaultEmphasis(opt2, "label", ["show"]);
 }
 var inner12 = makeInner();
 var MarkerModel = (
@@ -47513,9 +47513,9 @@ var MarkPointView_default = MarkPointView;
 function install7(registers) {
   registers.registerComponentModel(MarkPointModel_default);
   registers.registerComponentView(MarkPointView_default);
-  registers.registerPreprocessor(function(opt) {
-    if (checkMarkerInSeries(opt.series, "markPoint")) {
-      opt.markPoint = opt.markPoint || {};
+  registers.registerPreprocessor(function(opt2) {
+    if (checkMarkerInSeries(opt2.series, "markPoint")) {
+      opt2.markPoint = opt2.markPoint || {};
     }
   });
 }
@@ -47841,9 +47841,9 @@ var MarkLineView_default = MarkLineView;
 function install8(registers) {
   registers.registerComponentModel(MarkLineModel_default);
   registers.registerComponentView(MarkLineView_default);
-  registers.registerPreprocessor(function(opt) {
-    if (checkMarkerInSeries(opt.series, "markLine")) {
-      opt.markLine = opt.markLine || {};
+  registers.registerPreprocessor(function(opt2) {
+    if (checkMarkerInSeries(opt2.series, "markLine")) {
+      opt2.markLine = opt2.markLine || {};
     }
   });
 }
@@ -48180,9 +48180,9 @@ var MarkAreaView_default = MarkAreaView;
 function install9(registers) {
   registers.registerComponentModel(MarkAreaModel_default);
   registers.registerComponentView(MarkAreaView_default);
-  registers.registerPreprocessor(function(opt) {
-    if (checkMarkerInSeries(opt.series, "markArea")) {
-      opt.markArea = opt.markArea || {};
+  registers.registerPreprocessor(function(opt2) {
+    if (checkMarkerInSeries(opt2.series, "markArea")) {
+      opt2.markArea = opt2.markArea || {};
     }
   });
 }
@@ -50068,8 +50068,8 @@ var ContinuousView = (
       if (!dataRangeText) {
         return;
       }
-      var text3 = dataRangeText[1 - endsIndex];
-      text3 = text3 != null ? text3 + "" : "";
+      var text4 = dataRangeText[1 - endsIndex];
+      text4 = text4 != null ? text4 + "" : "";
       var visualMapModel = this.visualMapModel;
       var textGap = visualMapModel.get("textGap");
       var itemSize = visualMapModel.itemSize;
@@ -50084,7 +50084,7 @@ var ContinuousView = (
           y: position[1],
           verticalAlign: textStyleModel.get("verticalAlign") || (orient === "horizontal" ? "middle" : align),
           align: textStyleModel.get("align") || (orient === "horizontal" ? align : "center"),
-          text: text3
+          text: text4
         })
       }));
     };
@@ -50678,15 +50678,15 @@ function visualMapPreprocessor(option) {
   if (!isArray(visualMap)) {
     visualMap = visualMap ? [visualMap] : [];
   }
-  each9(visualMap, function(opt) {
-    if (!opt) {
+  each9(visualMap, function(opt2) {
+    if (!opt2) {
       return;
     }
-    if (has(opt, "splitList") && !has(opt, "pieces")) {
-      opt.pieces = opt.splitList;
-      delete opt.splitList;
+    if (has(opt2, "splitList") && !has(opt2, "pieces")) {
+      opt2.pieces = opt2.splitList;
+      delete opt2.splitList;
     }
-    var pieces = opt.pieces;
+    var pieces = opt2.pieces;
     if (pieces && isArray(pieces)) {
       each9(pieces, function(piece) {
         if (isObject(piece)) {
@@ -50700,7 +50700,7 @@ function visualMapPreprocessor(option) {
       });
     }
     if (true) {
-      var seriesTargets = opt.seriesTargets;
+      var seriesTargets = opt2.seriesTargets;
       if (seriesTargets && isArray(seriesTargets)) {
         each9(seriesTargets, function(target) {
           if (!isObject(target) || target.dimension == null) {
@@ -51148,8 +51148,8 @@ var PiecewiseVisualMapView = (
         return align;
       }
     };
-    PiecewiseVisualMapView2.prototype._renderEndsText = function(group, text3, itemSize, showLabel, itemAlign) {
-      if (!text3) {
+    PiecewiseVisualMapView2.prototype._renderEndsText = function(group, text4, itemSize, showLabel, itemAlign) {
+      if (!text4) {
         return;
       }
       var itemGroup = new Group_default();
@@ -51160,7 +51160,7 @@ var PiecewiseVisualMapView = (
           y: itemSize[1] / 2,
           verticalAlign: "middle",
           align: showLabel ? itemAlign : "center",
-          text: text3
+          text: text4
         })
       }));
       group.add(itemGroup);
@@ -51671,14 +51671,14 @@ var CanvasPainter = (function() {
     }
   };
   CanvasPainter2.prototype.refresh = function(optOrPaintAll) {
-    var opt;
+    var opt2;
     if (optOrPaintAll && !isObject(optOrPaintAll)) {
-      opt = { paintAll: !!optOrPaintAll };
+      opt2 = { paintAll: !!optOrPaintAll };
     } else {
-      opt = optOrPaintAll || {};
+      opt2 = optOrPaintAll || {};
     }
-    var refresh = retrieve2(opt.refresh, true);
-    var refreshHover = retrieve2(opt.refreshHover, false);
+    var refresh = retrieve2(opt2.refresh, true);
+    var refreshHover = retrieve2(opt2.refreshHover, false);
     if (refreshHover) {
       this._hoverLayerDirty = HOVER_LAYER_DIRTY_REPAINT;
     }
@@ -51688,11 +51688,11 @@ var CanvasPainter = (function() {
       }
       return this;
     }
-    var list2 = this.storage.getDisplayList(true);
-    this._updateLayerStatus(list2, opt.paintAll);
+    var list3 = this.storage.getDisplayList(true);
+    this._updateLayerStatus(list3, opt2.paintAll);
     this._redrawId = Math.random();
     var prevList = this._prevDisplayList;
-    this._paintList(list2, prevList, this._redrawId);
+    this._paintList(list3, prevList, this._redrawId);
     var bgColor = this._backgroundColor;
     eachLayer(this._i, function(layer, zlevel, zlevel2, idx) {
       if (layer.refresh) {
@@ -51700,11 +51700,11 @@ var CanvasPainter = (function() {
       }
     }, EACH_LAYER_NOT_BUILTIN);
     if (this._opts.useDirtyRect) {
-      this._prevDisplayList = list2.slice();
+      this._prevDisplayList = list3.slice();
     }
     return this;
   };
-  CanvasPainter2.prototype._paintHoverList = function(list2) {
+  CanvasPainter2.prototype._paintHoverList = function(list3) {
     var hoverLayer = this._i.hoverlayer;
     var hoverLayerDirty = this._hoverLayerDirty;
     this._hoverLayerDirty = HOVER_LAYER_DIRTY_NO;
@@ -51725,8 +51725,8 @@ var CanvasPainter = (function() {
       beforeBrushParam: {}
     };
     var ctx;
-    for (var i7 = 0, len2 = list2.length; i7 < len2; i7++) {
-      var el = list2[i7];
+    for (var i7 = 0, len2 = list3.length; i7 < len2; i7++) {
+      var el = list3[i7];
       if (!el.__inHover) {
         continue;
       }
@@ -51756,24 +51756,24 @@ var CanvasPainter = (function() {
   CanvasPainter2.prototype.paintOne = function(ctx, el) {
     brushSingle(ctx, el);
   };
-  CanvasPainter2.prototype._paintList = function(list2, prevList, redrawId) {
+  CanvasPainter2.prototype._paintList = function(list3, prevList, redrawId) {
     if (this._redrawId !== redrawId) {
       return;
     }
-    var finished = this._doPaintList(list2, prevList);
+    var finished = this._doPaintList(list3, prevList);
     if (this._needsManuallyCompositing) {
       this._compositeManually();
     }
     if (!finished) {
       var self_1 = this;
       requestAnimationFrame_default(function() {
-        self_1._paintList(list2, prevList, redrawId);
+        self_1._paintList(list3, prevList, redrawId);
       });
     } else {
       eachLayer(this._i, function(layer) {
         layer.afterBrush && layer.afterBrush();
       }, EACH_LAYER_BUILTIN_NOT_HOVER);
-      this._paintHoverList(list2);
+      this._paintHoverList(list3);
     }
   };
   CanvasPainter2.prototype._compositeManually = function() {
@@ -51787,7 +51787,7 @@ var CanvasPainter = (function() {
       }
     }, EACH_LAYER_BUILTIN);
   };
-  CanvasPainter2.prototype._doPaintList = function(list2, prevList) {
+  CanvasPainter2.prototype._doPaintList = function(list3, prevList) {
     var painter = this;
     var finished = true;
     eachLayer(this._i, function(layer) {
@@ -51800,7 +51800,7 @@ var CanvasPainter = (function() {
       if (!needDraw && !layer.__dirty) {
         return;
       }
-      var repaintRects = painter._opts.useDirtyRect && !isIncrementalLayer(layer) ? layer.createRepaintRects(list2, prevList, painter._width, painter._height) : null;
+      var repaintRects = painter._opts.useDirtyRect && !isIncrementalLayer(layer) ? layer.createRepaintRects(list3, prevList, painter._width, painter._height) : null;
       var firstLayerKey = painter._i.layerStack[0];
       var contentRetained = true;
       if (layer.__dirty) {
@@ -51810,7 +51810,7 @@ var CanvasPainter = (function() {
         layer.clear(false, clearColor, repaintRects);
       }
       eachCursorInLayer(layer, function(cursor) {
-        var cursorFinished = painter._paintPerCursor(layer, cursor, list2, repaintRects, contentRetained);
+        var cursorFinished = painter._paintPerCursor(layer, cursor, list3, repaintRects, contentRetained);
         finished = finished && cursorFinished;
       });
     }, EACH_LAYER_BUILTIN_NOT_HOVER);
@@ -51823,7 +51823,7 @@ var CanvasPainter = (function() {
     }
     return finished;
   };
-  CanvasPainter2.prototype._paintPerCursor = function(layer, layerCursor, list2, repaintRects, contentRetained) {
+  CanvasPainter2.prototype._paintPerCursor = function(layer, layerCursor, list3, repaintRects, contentRetained) {
     var ctx = layer.ctx;
     if (repaintRects) {
       if (!repaintRects.length) {
@@ -51836,18 +51836,18 @@ var CanvasPainter = (function() {
           ctx.beginPath();
           ctx.rect(rect.x * dpr2, rect.y * dpr2, rect.width * dpr2, rect.height * dpr2);
           ctx.clip();
-          this._paintPerCursorInRect(layer, layerCursor, list2, rect, contentRetained);
+          this._paintPerCursorInRect(layer, layerCursor, list3, rect, contentRetained);
           ctx.restore();
         }
       }
     } else {
       ctx.save();
-      this._paintPerCursorInRect(layer, layerCursor, list2, null, contentRetained);
+      this._paintPerCursorInRect(layer, layerCursor, list3, null, contentRetained);
       ctx.restore();
     }
     return layerCursor.drawIdx >= layerCursor.endIdx;
   };
-  CanvasPainter2.prototype._paintPerCursorInRect = function(layer, layerCursor, list2, repaintRect, contentRetained) {
+  CanvasPainter2.prototype._paintPerCursorInRect = function(layer, layerCursor, list3, repaintRect, contentRetained) {
     var scope = {
       inHover: false,
       allClipped: false,
@@ -51863,7 +51863,7 @@ var CanvasPainter = (function() {
     var notClearIdx = layerCursor.notClearIdx;
     var idx = notClearIdx >= 0 ? Math.min(notClearIdx, drawIdxBegin) : drawIdxBegin;
     for (; idx < layerCursor.endIdx; idx++) {
-      var el = list2[idx];
+      var el = list3[idx];
       if (idx < drawIdxBegin && !el.notClear) {
         continue;
       }
@@ -51985,12 +51985,12 @@ var CanvasPainter = (function() {
     });
     return layers;
   };
-  CanvasPainter2.prototype._updateLayerStatus = function(list2, paintAll) {
+  CanvasPainter2.prototype._updateLayerStatus = function(list3, paintAll) {
     var painter = this;
     if (painter._singleCanvas) {
-      for (var i7 = 1; i7 < list2.length; i7++) {
-        var el = list2[i7];
-        if (el.zlevel !== list2[i7 - 1].zlevel || el.incremental) {
+      for (var i7 = 1; i7 < list3.length; i7++) {
+        var el = list3[i7];
+        if (el.zlevel !== list3[i7 - 1].zlevel || el.incremental) {
           painter._needsManuallyCompositing = true;
           break;
         }
@@ -52008,8 +52008,8 @@ var CanvasPainter = (function() {
     var currLayer = null;
     var currCursor = null;
     var aboveIncrementalInCurrZLevel = false;
-    for (var idx = 0, len2 = list2.length; idx < len2; idx++) {
-      var el = list2[idx];
+    for (var idx = 0, len2 = list3.length; idx < len2; idx++) {
+      var el = list3[idx];
       var zlevel = el.zlevel;
       var elIncremental = el.incremental;
       var zlevel2 = void 0;
@@ -52069,11 +52069,11 @@ var CanvasPainter = (function() {
           cursorStack.splice(i8, 1);
         } else {
           var endIdxNew = cursor.endIdxNew;
-          if (isIncrementalLayer(layer) ? endIdxNew < cursor.drawIdx : endIdxNew !== cursor.endIdx || !endIdxNew || list2[endIdxNew - 1].id !== cursor.last) {
+          if (isIncrementalLayer(layer) ? endIdxNew < cursor.drawIdx : endIdxNew !== cursor.endIdx || !endIdxNew || list3[endIdxNew - 1].id !== cursor.last) {
             layer.__dirty = true;
           }
           cursor.endIdx = cursor.endIdxNew;
-          cursor.last = endIdxNew ? list2[endIdxNew - 1].id : NaN;
+          cursor.last = endIdxNew ? list3[endIdxNew - 1].id : NaN;
         }
       }
       if (layer.__dirty) {
@@ -52239,10 +52239,10 @@ var priceText = (value2) => {
 };
 var summaryPriceText = (value2) => Number.isFinite(value2) ? new Intl.NumberFormat("en", { maximumFractionDigits: 2, useGrouping: false }).format(Object.is(value2, -0) ? 0 : value2) : "Unknown";
 var capInput = (price, currency) => Number.isFinite(price) ? String(Number(displayPrice(price, currency).toPrecision(15))) : "";
-var capForSave = (text3, currency, saved) => {
-  if (text3 === capInput(saved, currency)) return saved == null ? "" : String(saved);
-  const normalized = text3.trim().replace(",", ".");
-  if (currency !== "EUR" || !normalized || !Number.isFinite(Number(normalized))) return text3;
+var capForSave = (text4, currency, saved) => {
+  if (text4 === capInput(saved, currency)) return saved == null ? "" : String(saved);
+  const normalized = text4.trim().replace(",", ".");
+  if (currency !== "EUR" || !normalized || !Number.isFinite(Number(normalized))) return text4;
   return String(Number(normalized) / 100);
 };
 
@@ -52519,13 +52519,13 @@ var minutesText = (value2) => {
 };
 function renderReserve(reserve, currency) {
   if (!reserve || typeof reserve !== "object") return "";
-  const text3 = (value2) => escapeText2(value2);
-  const explain = reserve.explain ? ` ${text3(reserve.explain)}` : "";
+  const text4 = (value2) => escapeText2(value2);
+  const explain = reserve.explain ? ` ${text4(reserve.explain)}` : "";
   if (!Number.isFinite(reserve.minutes)) return `<div class="plan-reserve"><p><b>Extra time reserve:</b> unavailable.</p></div>`;
-  if (reserve.minutes <= 0) return `<div class="plan-reserve"><p><b>Extra time reserve:</b> none in this plan${Number.isFinite(reserve.percent) ? ` (${text3(reserve.percent)}% asked)` : ""}.${reserve.limitText ? ` ${text3(reserve.limitText)}` : ""}</p></div>`;
+  if (reserve.minutes <= 0) return `<div class="plan-reserve"><p><b>Extra time reserve:</b> none in this plan${Number.isFinite(reserve.percent) ? ` (${text4(reserve.percent)}% asked)` : ""}.${reserve.limitText ? ` ${text4(reserve.limitText)}` : ""}</p></div>`;
   const asked = Number.isFinite(reserve.requestedMinutes) && reserve.requestedMinutes > reserve.minutes + 1e-6 ? ` of ${minutesText(reserve.requestedMinutes)} asked` : "";
   const allowance = reserve.allowance;
-  return `<div class="plan-reserve"><p><b>Extra allowed time:</b> ${minutesText(reserve.minutes)}${asked}, shown inside the windows above.${explain}${reserve.limitText ? ` ${text3(reserve.limitText)}` : ""}</p><p><b>Potential extra allowed reserve:</b> up to ${energy(allowance?.energyKwh)} \xB7 ${money(allowance?.cost, currency)} \u2014 an upper allowance at plan power and prices, separate from the required baseline; not measured or expected use.</p></div>`;
+  return `<div class="plan-reserve"><p><b>Extra allowed time:</b> ${minutesText(reserve.minutes)}${asked}, shown inside the windows above.${explain}${reserve.limitText ? ` ${text4(reserve.limitText)}` : ""}</p><p><b>Potential extra allowed reserve:</b> up to ${energy(allowance?.energyKwh)} \xB7 ${money(allowance?.cost, currency)} \u2014 an upper allowance at plan power and prices, separate from the required baseline; not measured or expected use.</p></div>`;
 }
 function renderLearning(learning) {
   if (!learning || !Array.isArray(learning.lines)) return "";
@@ -52599,11 +52599,36 @@ function renderInsights(insights) {
   return `<div class="insights-intro">${escapeText(insights.intro)}</div><div class="insight-grid">${blocks.map((b3) => `<section class="insight-block"><h3>${escapeText(b3.title)}</h3><div class="insight-value">${escapeText(b3.value)}</div><strong class="insight-status">${escapeText(b3.status ?? "")}</strong><p>${escapeText(b3.detail ?? "")}</p>${b3.extra ? `<div class="month-range">${escapeText(b3.extra)}</div>` : ""}</section>`).join("")}</div><p class="insight-caution">${escapeText(insights.caution)}</p><wa-details summary="How these insights work"><div class="details-body"><p>${escapeText(insights.method)}</p></div></wa-details>`;
 }
 
+// shared-dashboard/vehicle-sources-view.js
+var opt = (value2, text4, selected) => `<option value="${escapeText(value2)}" ${selected ? "selected" : ""}>${escapeText(text4)}</option>`;
+function renderVehicleSources(m4) {
+  if (!m4) return "";
+  const notes = [m4.notice, ...m4.notes || []].filter(Boolean).map((t6) => `<p class="vs-note">${escapeText(t6)}</p>`).join("");
+  const reload = m4.state === "forbidden" ? "" : '<button type="button" id="reload-vehicle-sources">Reload vehicle sources</button>';
+  if (m4.state !== "ready") return `<details id="vehicle-sources-details"><summary>Advanced: vehicle sources &amp; properties</summary><div class="vs-body" role="status">${notes}${reload}</div></details>`;
+  const edit = m4.canEdit ? "" : "disabled";
+  const picker = m4.vehicles.length > 1 || !m4.vehicleId ? `<label>Vehicle <select data-vselect="vehicle" ${m4.busy ? "disabled" : ""}>${m4.vehicleId ? "" : opt("", "Choose a vehicle\u2026", true)}${m4.vehicles.map((v2) => opt(v2.id, v2.name || v2.id, v2.id === m4.vehicleId)).join("")}</select></label>` : `<p class="vs-line"><b>Vehicle</b> ${escapeText(m4.vehicles[0].name || m4.vehicles[0].id)}</p>`;
+  let sensor = "", props = "";
+  if (m4.sensor) {
+    const s4 = m4.sensor;
+    sensor = `<div class="vs-block" data-vs="sensor" data-level="${escapeText(s4.level)}" data-status="${escapeText(s4.status)}"><h3>Charge-level sensor</h3><p class="vs-line">${escapeText(s4.text)}</p><p class="vs-line"><b>Current reading</b> ${escapeText(m4.reading.text)}</p><label>Sensor <select data-vsetting="sensor" ${s4.canEdit ? "" : "disabled"}>${s4.options.map((o9) => opt(o9.value, o9.text, o9.value === s4.base)).join("")}</select></label><wa-button id="save-vehicle-sensor" size="small" ${s4.canEdit ? "" : "disabled"}>Save sensor</wa-button></div>`;
+  }
+  if (m4.properties) {
+    const p4 = m4.properties, c5 = p4.capacity, ph = p4.phases;
+    props = `<div class="vs-block" data-vs="properties"><h3>Planning properties</h3><p class="vs-line"><b>Usable battery capacity</b> ${escapeText(c5.display)}</p><label>Capacity override (kWh) <input type="number" step="any" min="1" max="500" data-vsetting="capacity" value="${escapeText(c5.base)}" placeholder="${c5.editable ? "enter usable kWh" : ""}" ${c5.editable ? "" : "disabled"}></label><p class="vs-line"><b>Onboard charger</b> ${escapeText(ph.display)}</p>${ph.suggestion ? `<p class="vs-note">${escapeText(ph.suggestion)}</p>` : ""}<label>Onboard phases <select data-vsetting="phases" ${ph.editable ? "" : "disabled"}>${opt("3", "3-phase", ph.base === "3")}${opt("1", "1-phase", ph.base === "1")}</select></label><wa-button id="save-vehicle-props" size="small" ${c5.editable || ph.editable ? "" : "disabled"}>Save capacity &amp; phases</wa-button></div>`;
+  } else if (m4.sensor) {
+    props = '<div class="vs-block" data-vs="properties"><h3>Planning properties</h3><p class="vs-line">Capacity and onboard phases could not be read for this car. Reload vehicle sources; an older backend does not report them.</p></div>';
+  }
+  return `<details id="vehicle-sources-details"><summary>Advanced: vehicle sources &amp; properties</summary><div class="vs-body">${picker}${sensor}${props}<p class="vs-help">Saving only stores your choice and may recalculate plans for this car, followed by normal guarded schedule reconciliation if Morek owns the schedule. It never wakes the car, sends a notification or proves charging. A saved sensor is never replaced by detection.</p><div role="status" id="vehicle-sources-notice">${notes}</div>${reload}</div></details>`;
+}
+
 // shared-dashboard/reconcile.js
 var key2 = (node) => {
   if (node.nodeType !== 1) return null;
   if (node.id) return `id:${node.id}`;
   if (node.dataset.setting) return `setting:${node.dataset.setting}`;
+  if (node.dataset.vsetting) return `vsetting:${node.dataset.vsetting}`;
+  if (node.dataset.vselect) return `vselect:${node.dataset.vselect}`;
   if (node.dataset.morekAction) return `morek-action:${node.dataset.morekAction}`;
   if (node.hasAttribute("data-morek-actions")) return "morek-actions";
   if (node.dataset.zoom) return `zoom:${node.dataset.zoom}`;
@@ -52668,7 +52693,7 @@ await Promise.all([
   customElements.get("wa-details") ? null : Promise.resolve().then(() => (init_details(), details_exports))
 ]);
 var card = (title, eyebrow, body, cls, tag) => `<section class="panel ${cls}"><header class="panel-head"><div><div class="eyebrow">${escapeText(eyebrow)}</div><h2>${escapeText(title)}</h2></div>${tag ? `<span class="sample-tag">${escapeText(tag)}</span>` : ""}</header>${body}</section>`;
-var metric = (label, value2, note) => `<div class="metric"><div class="muted">${escapeText(label)}</div><strong>${escapeText(value2)}</strong><div class="muted">${escapeText(note)}</div></div>`;
+var metric = (label2, value2, note) => `<div class="metric"><div class="muted">${escapeText(label2)}</div><strong>${escapeText(value2)}</strong><div class="muted">${escapeText(note)}</div></div>`;
 var icon = '<svg aria-hidden="true" viewBox="0 0 24 24" width="17" height="17"><path d="M13 2 5 13h6l-1 9 9-12h-6z" fill="currentColor"/></svg>';
 var value = (v2) => v2 == null || typeof v2 === "number" && !Number.isFinite(v2) ? "" : String(v2);
 var mounted = /* @__PURE__ */ new WeakMap();
@@ -52722,7 +52747,7 @@ function mountDashboard(root, adapter) {
     const option = (s4) => `<option value="${escapeText(s4.value)}" ${s4.value === scenario.selected ? "selected" : ""}>${escapeText(s4.label)}</option>`;
     const capCurrency = m4.capCurrency === void 0 ? f3.currency === void 0 ? "EUR" : f3.currency : m4.capCurrency;
     const capUnit = priceUnit(capCurrency);
-    const fields = [["Target SOC (%)", "target", "number"], ["Minimum SOC (%)", "minimum", "number"], [`Soft cap (${capUnit})`, "cap", "number"], ["Ready by", "readyBy", "time"], ["Extra time reserve (%)", "reserve", "number"]].filter(([, key3]) => key3 !== "reserve" || settings.reserve !== void 0).map(([label, key3, type]) => `<span ${m4.settingsEditor && key3 === "target" ? 'data-mode="target_soc"' : ""}><wa-input data-setting="${key3}" label="${escapeText(label)}" value="${escapeText(value(settings[key3]))}" type="${type}"${key3 === "cap" ? ' step="any"' : ""}${key3 === "reserve" ? ' step="1" min="0" max="50"' : ""}${m4.canSave === true && !(m4.settingsEditor && (["minimum", "cap"].includes(key3) && !m4.policySupported)) ? "" : " disabled"}></wa-input></span>`).join("");
+    const fields = [["Target SOC (%)", "target", "number"], ["Minimum SOC (%)", "minimum", "number"], [`Soft cap (${capUnit})`, "cap", "number"], ["Ready by", "readyBy", "time"], ["Extra time reserve (%)", "reserve", "number"]].filter(([, key3]) => key3 !== "reserve" || settings.reserve !== void 0).map(([label2, key3, type]) => `<span ${m4.settingsEditor && key3 === "target" ? 'data-mode="target_soc"' : ""}><wa-input data-setting="${key3}" label="${escapeText(label2)}" value="${escapeText(value(settings[key3]))}" type="${type}"${key3 === "cap" ? ' step="any"' : ""}${key3 === "reserve" ? ' step="1" min="0" max="50"' : ""}${m4.canSave === true && !(m4.settingsEditor && (["minimum", "cap"].includes(key3) && !m4.policySupported)) ? "" : " disabled"}></wa-input></span>`).join("");
     const vehicles = m4.planVehicles || [], savedVehicle = settings.vehicleId || "";
     const vehicleOptions = vehicles.map((v2) => `<option value="${escapeText(v2.id)}" ${v2.id === savedVehicle ? "selected" : ""}>${escapeText(v2.name || v2.id)}</option>`).join("");
     const modeFields = m4.settingsEditor ? `<label>Charge by <select data-setting="driver" ${m4.canSave ? "" : "disabled"}><option value="manual_kwh" ${settings.driver === "manual_kwh" ? "selected" : ""}>Requested energy (kWh)</option><option value="target_soc" ${settings.driver === "target_soc" ? "selected" : ""}>Target SOC (%)</option></select></label><span data-mode="manual_kwh"><wa-input data-setting="energy" label="Requested energy (kWh)" type="number" step="any" value="${escapeText(value(settings.energy))}" ${m4.canSave ? "" : "disabled"}></wa-input></span><label data-mode="target_soc">Planning vehicle <select data-setting="vehicleId" ${m4.canSave ? "" : "disabled"}><option value="" ${!savedVehicle ? "selected" : ""}>No saved vehicle</option>${savedVehicle && !vehicles.some((v2) => v2.id === savedVehicle) ? `<option value="${escapeText(savedVehicle)}" selected>Saved vehicle unavailable${savedVehicle === "guest" ? " (guest)" : ""}</option>` : ""}${vehicleOptions}</select></label>` : "";
@@ -52737,11 +52762,12 @@ function mountDashboard(root, adapter) {
       ${modes.map(priceCard).join("")}
       ${card("Plan activity & freshness", labels.evidenceEyebrow || "EVIDENCE", renderEvidence(m4.evidence, state.power, knownPlan ? windows.length : null), "morek", tag)}
       ${card("Recent charging", labels.historyEyebrow || "HISTORY", renderHistory(m4.history, historyReady), "history", tag)}
+      ${m4.vehicleSources ? card("Vehicle sources & properties", "ADVANCED", renderVehicleSources(m4.vehicleSources), "vehicle-sources", tag) : ""}
       </div><dialog id="plan-dialog" aria-labelledby="dialog-title"><div class="dialog-head"><div><div class="eyebrow">${escapeText(labels.dialogEyebrow || "PROPOSAL")}</div><h2 id="dialog-title">Proposed charging plan</h2></div><button id="close-plan" type="button" aria-label="Close proposed plan">\u2715</button></div><p class="subtext">${escapeText(labels.dialogNote)}</p><div role="status" aria-live="polite">${m4.warning ? `<strong>${escapeText(m4.warning.title)}</strong><p>${escapeText(m4.warning.detail)}</p>` : ""}${m4.evidence?.status ? `<p>${escapeText(m4.evidence.status)}</p>` : ""}</div>${plan}</dialog><footer>${escapeText(labels.footer)}</footer></div>`;
     const template = document.createElement("template");
     template.innerHTML = html;
     if (!root.firstChild) root.append(template.content);
-    else reconcile(root.firstChild, template.content.firstChild, (node) => drafts.has(node.dataset?.setting) || root.getRootNode().activeElement === node);
+    else reconcile(root.firstChild, template.content.firstChild, (node) => drafts.has(node.dataset?.setting) || node.dataset?.vsetting && drafts.has(`v:${node.dataset.vsetting}`) || root.getRootNode().activeElement === node);
     listeners ||= new AbortController();
     const signal = listeners.signal;
     const bind3 = (node, fn) => {
@@ -52806,6 +52832,40 @@ function mountDashboard(root, adapter) {
       });
     });
     showMode();
+    root.querySelectorAll("[data-vsetting]").forEach((input) => {
+      const key3 = `v:${input.dataset.vsetting}`;
+      if (drafts.has(key3)) {
+        if (input.value !== drafts.get(key3)) input.value = drafts.get(key3);
+      } else if (input.tagName === "SELECT") {
+        const base2 = input.querySelector("option[selected]");
+        if (base2 && input.value !== base2.value) input.value = base2.value;
+      }
+      bind3(input, () => {
+        const on = () => {
+          drafts.set(key3, input.value);
+          current.actions?.editVehicle?.(input.dataset.vsetting);
+        };
+        input.addEventListener("input", on, { signal });
+        input.addEventListener("change", on, { signal });
+      });
+    });
+    const vehiclePick = root.querySelector('[data-vselect="vehicle"]');
+    if (vehiclePick) {
+      const chosen = vehiclePick.querySelector("option[selected]");
+      if (chosen && vehiclePick.value !== chosen.value) vehiclePick.value = chosen.value;
+    }
+    bind3(vehiclePick, () => vehiclePick.addEventListener("change", () => current.actions?.selectVehicle?.(vehiclePick.value), { signal }));
+    const vget = (name) => root.querySelector(`[data-vsetting="${name}"]`)?.value;
+    const vsave = (id, fn) => {
+      const b3 = root.querySelector(id);
+      bind3(b3, () => b3.addEventListener("click", () => {
+        if (current.model.vehicleSources?.canEdit === true && typeof current.actions?.[fn] === "function") current.actions[fn]({ sensor: vget("sensor"), capacity: vget("capacity"), phases: vget("phases") });
+      }, { signal }));
+    };
+    vsave("#save-vehicle-sensor", "saveVehicleSensor");
+    vsave("#save-vehicle-props", "saveVehicleProperties");
+    const vreload = root.querySelector("#reload-vehicle-sources");
+    bind3(vreload, () => vreload.addEventListener("click", () => current.actions?.reloadVehicleSources?.(), { signal }));
     const saveButton = root.querySelector("#save-plan");
     bind3(saveButton, () => saveButton.addEventListener("click", () => {
       if (current.model.canSave === true && typeof current.actions?.save === "function") current.actions.save(Object.fromEntries([...root.querySelectorAll("[data-setting]")].map((input) => [input.dataset.setting, input.type === "checkbox" ? input.checked : input.value])));
@@ -52845,6 +52905,8 @@ function mountDashboard(root, adapter) {
     return result2;
   }, resetDrafts() {
     drafts.clear();
+  }, resetVehicleDrafts() {
+    for (const key3 of [...drafts.keys()]) if (key3.startsWith("v:")) drafts.delete(key3);
   }, get charts() {
     return chartMount?.priceCharts || {};
   }, dispose() {
@@ -52884,6 +52946,7 @@ var CONNECTION_STATES = [
   "unknown"
 ];
 var SETTINGS_API_VERSION = 1;
+var ENTITY_CONFIG_API_VERSION = 1;
 var SETTINGS_DRIVER_TARGET_SOC = "target_soc";
 var SETTINGS_STRATEGY_CHEAPEST = "cheapest";
 var SETTINGS_STRATEGY_SOLAR = "solar";
@@ -57150,22 +57213,22 @@ function decodeActionResult(raw) {
   if (source === null) {
     throw new SpotnavApiError(null);
   }
-  const record3 = source;
+  const record4 = source;
   const keys2 = ["api_version", "ok", "error", "action", "choice"];
   for (const key3 of keys2) {
-    if (!(key3 in record3)) {
+    if (!(key3 in record4)) {
       throw new SpotnavApiError(null);
     }
   }
-  if (Object.keys(record3).length !== keys2.length) {
+  if (Object.keys(record4).length !== keys2.length) {
     throw new SpotnavApiError(null);
   }
-  const version = record3.api_version;
-  const ok = record3.ok;
-  const error2 = record3.error;
-  const answered = record3.action;
-  const answeredChoice = record3.choice;
-  if (typeof version !== "number" || typeof ok !== "boolean") {
+  const version = record4.api_version;
+  const ok2 = record4.ok;
+  const error2 = record4.error;
+  const answered = record4.action;
+  const answeredChoice = record4.choice;
+  if (typeof version !== "number" || typeof ok2 !== "boolean") {
     throw new SpotnavApiError(null);
   }
   for (const value2 of [error2, answered, answeredChoice]) {
@@ -57175,7 +57238,7 @@ function decodeActionResult(raw) {
   }
   return {
     api_version: version,
-    ok,
+    ok: ok2,
     error: error2 ?? null,
     action: answered ?? null,
     choice: answeredChoice ?? null
@@ -57204,92 +57267,33 @@ async function getLogs(hass, options = {}) {
   }
   return await call(hass, message);
 }
-
-// src/price-provider.ts
-function addIntegrationPath(domain) {
-  return `/config/integrations/dashboard/add?domain=${encodeURIComponent(domain)}`;
+async function getEntityConfig(hass, chargerId) {
+  return await call(hass, {
+    type: "spotnav/get_entity_config",
+    api_version: ENTITY_CONFIG_API_VERSION,
+    charger_id: chargerId
+  });
 }
-function integrationPath(domain) {
-  return `/config/integrations/integration/${encodeURIComponent(domain)}`;
+async function setVehicleSoc(hass, chargerId, request) {
+  return await call(hass, {
+    type: "spotnav/choose_vehicle_soc",
+    api_version: ENTITY_CONFIG_API_VERSION,
+    charger_id: chargerId,
+    vehicle_id: request.vehicleId,
+    entity_id: request.entityId,
+    ...request.expectedEntityId === void 0 ? {} : { expected_entity_id: request.expectedEntityId }
+  });
 }
-var NOTICES = {
-  add_nordpool: {
-    text: "price.notice.addNordpool",
-    action: { label: "price.notice.addNordpool.action", does: { kind: "page", path: addIntegrationPath("nordpool") } },
-    key: "offered"
-  },
-  nordpool_not_loaded: {
-    text: "price.notice.nordpoolNotLoaded",
-    action: { label: "price.notice.nordpoolNotLoaded.action", does: { kind: "page", path: integrationPath("nordpool") } },
-    key: "offered"
-  },
-  // Nord Pool from HACS has the built-in one's domain and no action: nothing to add, the key is the way on.
-  nordpool_custom: { text: "price.notice.nordpoolCustom", key: "shown" },
-  add_entsoe_key: { text: "price.notice.addEntsoeKey", key: "shown" },
-  entsoe_key_rejected: { text: "price.notice.entsoeKeyRejected", key: "shown" },
-  add_pvpc: {
-    text: "price.notice.addPvpc",
-    action: {
-      label: "price.notice.addPvpc.action",
-      does: { kind: "page", path: addIntegrationPath("pvpc_hourly_pricing") }
-    }
-  },
-  pvpc_not_loaded: {
-    text: "price.notice.pvpcNotLoaded",
-    action: {
-      label: "price.notice.pvpcNotLoaded.action",
-      does: { kind: "page", path: integrationPath("pvpc_hourly_pricing") }
-    }
-  },
-  add_octopus: {
-    text: "price.notice.addOctopus",
-    action: { label: "price.notice.addOctopus.action", does: { kind: "octopus" } }
-  },
-  octopus_not_loaded: {
-    text: "price.notice.octopusNotLoaded",
-    action: {
-      label: "price.notice.openOctopus",
-      does: { kind: "page", path: integrationPath("octopus_energy") }
-    }
-  },
-  octopus_no_agile: {
-    text: "price.notice.octopusNoAgile",
-    action: {
-      label: "price.notice.openOctopus",
-      does: { kind: "page", path: integrationPath("octopus_energy") }
-    }
-  },
-  octopus_region_mismatch: {
-    text: "price.notice.octopusRegionMismatch",
-    action: { label: "price.notice.chooseArea", does: { kind: "area" } }
-  },
-  add_zonneplan: {
-    text: "price.notice.addZonneplan",
-    action: { label: "price.notice.addZonneplan.action", does: { kind: "zonneplan" } }
-  },
-  zonneplan_not_loaded: {
-    text: "price.notice.zonneplanNotLoaded",
-    action: {
-      label: "price.notice.openZonneplan",
-      does: { kind: "page", path: integrationPath("zonneplan_one") }
-    }
-  },
-  zonneplan_no_tariff: {
-    text: "price.notice.zonneplanNoTariff",
-    action: {
-      label: "price.notice.openZonneplan",
-      does: { kind: "page", path: integrationPath("zonneplan_one") }
-    }
-  },
-  zonneplan_area: {
-    text: "price.notice.zonneplanArea",
-    action: { label: "price.notice.chooseArea", does: { kind: "area" } }
-  },
-  source_missing: {
-    text: "price.notice.sourceMissing",
-    action: { label: "price.notice.chooseArea", does: { kind: "area" } }
-  }
-};
+async function updateVehicle(hass, chargerId, request) {
+  return await call(hass, {
+    type: "spotnav/update_vehicle",
+    api_version: ENTITY_CONFIG_API_VERSION,
+    charger_id: chargerId,
+    vehicle_id: request.vehicleId,
+    changes: request.changes,
+    expected: request.expected
+  });
+}
 
 // src/settings.ts
 var MalformedPayload = class extends Error {
@@ -57603,13 +57607,13 @@ function decodeSettingsAnswer(raw) {
     if (version !== SETTINGS_API_VERSION) {
       return malformed();
     }
-    const ok = booleanValue(raw, "ok");
+    const ok2 = booleanValue(raw, "ok");
     const error2 = textOrNull(raw, "error");
     const rawSettings = raw["settings"];
     const rawPause = raw["pause"];
     const settings = rawSettings === null ? null : decodeSettingsRecord(rawSettings);
     const pause = rawPause === null ? null : decodePauseObservation(rawPause);
-    if (ok) {
+    if (ok2) {
       if (error2 !== null || settings === null || pause === null) {
         return malformed();
       }
@@ -57626,60 +57630,60 @@ function decodeSettingsAnswer(raw) {
     throw error2;
   }
 }
-function encodeBody(record3) {
+function encodeBody(record4) {
   return {
-    ...record3.soft_price_cap === void 0 ? {} : { soft_price_cap: record3.soft_price_cap },
-    ...record3.minimum_ready_by_soc === void 0 ? {} : { minimum_ready_by_soc: record3.minimum_ready_by_soc },
-    ...record3.cap_price_basis === void 0 ? {} : { cap_price_basis: record3.cap_price_basis },
-    ...record3.time_reserve_percent === void 0 ? {} : { time_reserve_percent: record3.time_reserve_percent },
-    area_id: record3.area_id,
-    overrides: record3.overrides.map((item) => ({
+    ...record4.soft_price_cap === void 0 ? {} : { soft_price_cap: record4.soft_price_cap },
+    ...record4.minimum_ready_by_soc === void 0 ? {} : { minimum_ready_by_soc: record4.minimum_ready_by_soc },
+    ...record4.cap_price_basis === void 0 ? {} : { cap_price_basis: record4.cap_price_basis },
+    ...record4.time_reserve_percent === void 0 ? {} : { time_reserve_percent: record4.time_reserve_percent },
+    area_id: record4.area_id,
+    overrides: record4.overrides.map((item) => ({
       area_id: item.area_id,
       vat: { ...item.vat },
       tax: { ...item.tax },
       transfer: { ...item.transfer }
     })),
-    phases: record3.phases,
-    amps: record3.amps,
-    requested_kwh: record3.requested_kwh,
-    ...record3.fill_to_limit === void 0 ? {} : { fill_to_limit: record3.fill_to_limit },
-    max_periods: record3.max_periods,
-    departure_enabled: record3.departure_enabled,
-    departure_time: record3.departure_time,
-    departure_date: record3.departure_date,
-    departure_weekdays: [...record3.departure_weekdays],
-    strategy: record3.strategy,
-    driver: record3.driver,
-    target: { ...record3.target },
-    ...record3.vehicle_ids === void 0 ? {} : { vehicle_ids: record3.vehicle_ids === null ? null : [...record3.vehicle_ids] },
-    ...record3.identify_mode === void 0 ? {} : { identify_mode: record3.identify_mode },
-    ...record3.identify_camera === void 0 ? {} : { identify_camera: copyCamera(record3.identify_camera) },
-    ...record3.users_change_plan === void 0 ? {} : { users_change_plan: record3.users_change_plan },
-    ...record3.if_not_ready === void 0 ? {} : { if_not_ready: record3.if_not_ready }
+    phases: record4.phases,
+    amps: record4.amps,
+    requested_kwh: record4.requested_kwh,
+    ...record4.fill_to_limit === void 0 ? {} : { fill_to_limit: record4.fill_to_limit },
+    max_periods: record4.max_periods,
+    departure_enabled: record4.departure_enabled,
+    departure_time: record4.departure_time,
+    departure_date: record4.departure_date,
+    departure_weekdays: [...record4.departure_weekdays],
+    strategy: record4.strategy,
+    driver: record4.driver,
+    target: { ...record4.target },
+    ...record4.vehicle_ids === void 0 ? {} : { vehicle_ids: record4.vehicle_ids === null ? null : [...record4.vehicle_ids] },
+    ...record4.identify_mode === void 0 ? {} : { identify_mode: record4.identify_mode },
+    ...record4.identify_camera === void 0 ? {} : { identify_camera: copyCamera(record4.identify_camera) },
+    ...record4.users_change_plan === void 0 ? {} : { users_change_plan: record4.users_change_plan },
+    ...record4.if_not_ready === void 0 ? {} : { if_not_ready: record4.if_not_ready }
   };
 }
 function copyCamera(camera) {
   return camera === null ? null : { ...camera, frame: camera.frame === null ? null : { ...camera.frame } };
 }
-function formFromRecord(record3) {
+function formFromRecord(record4) {
   return {
-    ...record3.time_reserve_percent === void 0 ? {} : { timeReserve: String(record3.time_reserve_percent) },
-    ...record3.soft_price_cap === void 0 ? {} : { capEnabled: record3.soft_price_cap !== null, capValue: record3.soft_price_cap === null ? "" : String(record3.soft_price_cap), capBasis: record3.cap_price_basis ?? "", minimumReadySoc: record3.minimum_ready_by_soc == null ? "" : String(record3.minimum_ready_by_soc) },
-    energy: String(record3.requested_kwh),
-    fill: record3.fill_to_limit === true,
-    deadlineEnabled: record3.departure_enabled,
-    deadlineTime: record3.departure_time,
-    departureDate: record3.departure_date ?? "",
-    departureWeekdays: record3.departure_weekdays.join(""),
-    current: record3.amps === null ? "" : String(record3.amps),
-    driver: record3.driver,
-    targetPercent: record3.target.target_percent === null ? "" : String(record3.target.target_percent),
-    vehicleId: record3.target.vehicle_id ?? "",
-    ...record3.if_not_ready === void 0 ? {} : { ifNotReady: record3.if_not_ready }
+    ...record4.time_reserve_percent === void 0 ? {} : { timeReserve: String(record4.time_reserve_percent) },
+    ...record4.soft_price_cap === void 0 ? {} : { capEnabled: record4.soft_price_cap !== null, capValue: record4.soft_price_cap === null ? "" : String(record4.soft_price_cap), capBasis: record4.cap_price_basis ?? "", minimumReadySoc: record4.minimum_ready_by_soc == null ? "" : String(record4.minimum_ready_by_soc) },
+    energy: String(record4.requested_kwh),
+    fill: record4.fill_to_limit === true,
+    deadlineEnabled: record4.departure_enabled,
+    deadlineTime: record4.departure_time,
+    departureDate: record4.departure_date ?? "",
+    departureWeekdays: record4.departure_weekdays.join(""),
+    current: record4.amps === null ? "" : String(record4.amps),
+    driver: record4.driver,
+    targetPercent: record4.target.target_percent === null ? "" : String(record4.target.target_percent),
+    vehicleId: record4.target.vehicle_id ?? "",
+    ...record4.if_not_ready === void 0 ? {} : { ifNotReady: record4.if_not_ready }
   };
 }
-function decimal(text3, minimum, maximum) {
-  const trimmed = text3.trim().replace(",", ".");
+function decimal(text4, minimum, maximum) {
+  const trimmed = text4.trim().replace(",", ".");
   if (trimmed === "") {
     return { ok: false, errorKey: "settings.error.required" };
   }
@@ -57692,8 +57696,8 @@ function decimal(text3, minimum, maximum) {
   }
   return { ok: true, value: value2 };
 }
-function integer(text3, minimum, maximum) {
-  const trimmed = text3.trim();
+function integer(text4, minimum, maximum) {
+  const trimmed = text4.trim();
   if (trimmed === "") {
     return { ok: false, errorKey: "settings.error.required" };
   }
@@ -57710,21 +57714,21 @@ var TIME_RESERVE_MIN = 0;
 var TIME_RESERVE_MAX = 50;
 var TARGET_PERCENT_MIN = 0;
 var TARGET_PERCENT_MAX = 100;
-function checkTargetPercent(text3) {
-  return decimal(text3, TARGET_PERCENT_MIN, TARGET_PERCENT_MAX);
+function checkTargetPercent(text4) {
+  return decimal(text4, TARGET_PERCENT_MIN, TARGET_PERCENT_MAX);
 }
-function checkEnergy(text3) {
-  return decimal(text3, ENERGY_MIN_KWH, ENERGY_MAX_KWH);
+function checkEnergy(text4) {
+  return decimal(text4, ENERGY_MIN_KWH, ENERGY_MAX_KWH);
 }
-function checkDeadlineTime(text3) {
-  const trimmed = text3.trim();
+function checkDeadlineTime(text4) {
+  const trimmed = text4.trim();
   if (trimmed === "") {
     return { ok: false, errorKey: "settings.error.required" };
   }
   return WALL_TIME.test(trimmed) ? { ok: true, value: trimmed } : { ok: false, errorKey: "settings.error.invalidTime" };
 }
-function checkDepartureDate(text3, days, moved) {
-  const trimmed = text3.trim();
+function checkDepartureDate(text4, days, moved) {
+  const trimmed = text4.trim();
   if (trimmed === "") {
     return { ok: true, value: null };
   }
@@ -57736,11 +57740,11 @@ function checkDepartureDate(text3, days, moved) {
   }
   return { ok: true, value: trimmed };
 }
-function checkCurrent(text3) {
-  return integer(text3, AMPS_MIN, AMPS_MAX);
+function checkCurrent(text4) {
+  return integer(text4, AMPS_MIN, AMPS_MAX);
 }
-function checkCurrentInRange(text3, range) {
-  const amps = checkCurrent(text3);
+function checkCurrentInRange(text4, range) {
+  const amps = checkCurrent(text4);
   if (!amps.ok) {
     return amps;
   }
@@ -57752,13 +57756,13 @@ var PERIODS_MIN = 1;
 var PERIODS_MAX = 8;
 var AMPS_MIN = 1;
 var AMPS_MAX = 80;
-function replacementFor(kind, record3, values, range = null, opened = null, days = null) {
-  const body = encodeBody(record3);
+function replacementFor(kind, record4, values, range = null, opened = null, days = null) {
+  const body = encodeBody(record4);
   const energy2 = kind === "energy" || kind === "plan" ? checkEnergy(values.energy) : null;
   if (energy2 !== null && !energy2.ok) {
     return energy2;
   }
-  const amps = kind === "current" || kind === "plan" ? currentCheck(values, record3, range) : null;
+  const amps = kind === "current" || kind === "plan" ? currentCheck(values, record4, range) : null;
   if (amps !== null && !amps.ok) {
     return amps;
   }
@@ -57766,7 +57770,7 @@ function replacementFor(kind, record3, values, range = null, opened = null, days
   if (time2 !== null && !time2.ok) {
     return time2;
   }
-  const dateBase = opened === null ? record3 : opened;
+  const dateBase = opened === null ? record4 : opened;
   const dateMoved = values.departureDate !== (dateBase.departure_date ?? "");
   const date2 = kind === "deadline" || kind === "plan" ? checkDepartureDate(values.deadlineEnabled ? values.departureDate : "", days, dateMoved) : null;
   if (date2 !== null && !date2.ok) {
@@ -57781,14 +57785,14 @@ function replacementFor(kind, record3, values, range = null, opened = null, days
     return { ok: false, errorKey: "settings.error.invalid" };
   }
   const soc2 = kind === "plan" && values.driver === SETTINGS_DRIVER_TARGET_SOC;
-  const targetPercent = soc2 && (values.targetPercent.trim() !== "" || record3.target.target_percent !== null) ? checkTargetPercent(values.targetPercent) : null;
+  const targetPercent = soc2 && (values.targetPercent.trim() !== "" || record4.target.target_percent !== null) ? checkTargetPercent(values.targetPercent) : null;
   if (targetPercent !== null && !targetPercent.ok) {
     return targetPercent;
   }
   let changed = false;
   const next = { ...body };
-  if (kind === "plan" && record3.soft_price_cap !== void 0 && values.capEnabled !== void 0) {
-    const base2 = opened ?? record3;
+  if (kind === "plan" && record4.soft_price_cap !== void 0 && values.capEnabled !== void 0) {
+    const base2 = opened ?? record4;
     const cap = values.capEnabled ? decimal(values.capValue ?? "", -1e9, 1e9) : null;
     if (cap !== null && !cap.ok) return cap;
     const minimum = (values.minimumReadySoc ?? "").trim() === "" ? null : decimal(values.minimumReadySoc ?? "", 0, 100);
@@ -57799,39 +57803,39 @@ function replacementFor(kind, record3, values, range = null, opened = null, days
     if (capValue !== null && basis === null) return { ok: false, errorKey: "settings.error.invalid" };
     if (opened === null || capValue !== base2.soft_price_cap) {
       next.soft_price_cap = capValue;
-      changed ||= capValue !== record3.soft_price_cap;
+      changed ||= capValue !== record4.soft_price_cap;
     }
     if (opened === null || minValue !== base2.minimum_ready_by_soc) {
       next.minimum_ready_by_soc = minValue;
-      changed ||= minValue !== record3.minimum_ready_by_soc;
+      changed ||= minValue !== record4.minimum_ready_by_soc;
     }
     if (opened === null || basis !== base2.cap_price_basis) {
       next.cap_price_basis = basis;
-      changed ||= basis !== record3.cap_price_basis;
+      changed ||= basis !== record4.cap_price_basis;
     }
   }
-  if (kind === "plan" && record3.time_reserve_percent !== void 0 && values.timeReserve !== void 0) {
+  if (kind === "plan" && record4.time_reserve_percent !== void 0 && values.timeReserve !== void 0) {
     const reserve = integer(values.timeReserve, TIME_RESERVE_MIN, TIME_RESERVE_MAX);
     if (!reserve.ok) return reserve;
     if (opened === null || reserve.value !== opened.time_reserve_percent) {
       next.time_reserve_percent = reserve.value;
-      changed ||= reserve.value !== record3.time_reserve_percent;
+      changed ||= reserve.value !== record4.time_reserve_percent;
     }
   }
   if (kind === "plan" && driverOk && (opened === null || values.driver !== opened.driver)) {
     next.driver = values.driver;
-    changed = changed || values.driver !== record3.driver;
+    changed = changed || values.driver !== record4.driver;
   }
-  const target = { ...record3.target };
+  const target = { ...record4.target };
   let targetMoved = false;
   if (targetPercent !== null && targetPercent.ok && (opened === null || targetPercent.value !== opened.target.target_percent)) {
     target.target_percent = targetPercent.value;
-    targetMoved = targetMoved || targetPercent.value !== record3.target.target_percent;
+    targetMoved = targetMoved || targetPercent.value !== record4.target.target_percent;
   }
   const vehicleId = values.vehicleId.trim();
   if (soc2 && vehicleId !== "" && (opened === null || vehicleId !== (opened.target.vehicle_id ?? ""))) {
     target.vehicle_id = vehicleId;
-    targetMoved = targetMoved || vehicleId !== record3.target.vehicle_id;
+    targetMoved = targetMoved || vehicleId !== record4.target.vehicle_id;
   }
   if (targetMoved) {
     next.target = target;
@@ -57839,22 +57843,22 @@ function replacementFor(kind, record3, values, range = null, opened = null, days
   }
   if (energy2 !== null && energy2.ok && (opened === null || energy2.value !== opened.requested_kwh)) {
     next.requested_kwh = energy2.value;
-    changed = changed || energy2.value !== record3.requested_kwh;
+    changed = changed || energy2.value !== record4.requested_kwh;
   }
-  const fillShown = opened === null ? record3.fill_to_limit === true : opened.fill_to_limit === true;
-  if (energy2 !== null && energy2.ok && record3.fill_to_limit !== void 0 && values.fill !== fillShown) {
+  const fillShown = opened === null ? record4.fill_to_limit === true : opened.fill_to_limit === true;
+  if (energy2 !== null && energy2.ok && record4.fill_to_limit !== void 0 && values.fill !== fillShown) {
     next.fill_to_limit = values.fill;
-    changed = changed || values.fill !== record3.fill_to_limit;
+    changed = changed || values.fill !== record4.fill_to_limit;
   }
   if (amps !== null && amps.ok && (opened === null || amps.value !== opened.amps)) {
     next.amps = amps.value;
-    changed = changed || amps.value !== record3.amps;
+    changed = changed || amps.value !== record4.amps;
   }
   const deadlineMoved = opened === null || time2 !== null && time2.ok && (values.deadlineEnabled !== opened.departure_enabled || time2.value !== opened.departure_time || date2 !== null && date2.ok && date2.value !== opened.departure_date);
-  const weekdaysMoved = dayList !== null && (opened === null ? dayList.join("") !== record3.departure_weekdays.join("") : dayList.join("") !== opened.departure_weekdays.join(""));
+  const weekdaysMoved = dayList !== null && (opened === null ? dayList.join("") !== record4.departure_weekdays.join("") : dayList.join("") !== opened.departure_weekdays.join(""));
   if (weekdaysMoved && dayList !== null) {
     next.departure_weekdays = dayList;
-    changed = changed || dayList.join("") !== record3.departure_weekdays.join("");
+    changed = changed || dayList.join("") !== record4.departure_weekdays.join("");
   }
   if (time2 !== null && time2.ok && deadlineMoved) {
     next.departure_enabled = values.deadlineEnabled;
@@ -57862,24 +57866,24 @@ function replacementFor(kind, record3, values, range = null, opened = null, days
     if (date2 !== null && date2.ok) {
       next.departure_date = date2.value;
     }
-    changed = changed || values.deadlineEnabled !== record3.departure_enabled || time2.value !== record3.departure_time || date2 !== null && date2.ok && date2.value !== record3.departure_date;
+    changed = changed || values.deadlineEnabled !== record4.departure_enabled || time2.value !== record4.departure_time || date2 !== null && date2.ok && date2.value !== record4.departure_date;
   }
-  if (kind === "plan" && record3.if_not_ready !== void 0 && IF_NOT_READY.includes(values.ifNotReady ?? "")) {
-    const shown = opened === null ? record3.if_not_ready : opened.if_not_ready;
+  if (kind === "plan" && record4.if_not_ready !== void 0 && IF_NOT_READY.includes(values.ifNotReady ?? "")) {
+    const shown = opened === null ? record4.if_not_ready : opened.if_not_ready;
     if (values.ifNotReady !== shown) {
       next.if_not_ready = values.ifNotReady;
-      changed = changed || values.ifNotReady !== record3.if_not_ready;
+      changed = changed || values.ifNotReady !== record4.if_not_ready;
     }
   }
   return { ok: true, body: next, changed };
 }
-function weekdaysFromText(text3) {
-  const days = [...new Set([...text3].map(Number))].filter((day) => day >= 1 && day <= 7).sort((a4, b3) => a4 - b3);
+function weekdaysFromText(text4) {
+  const days = [...new Set([...text4].map(Number))].filter((day) => day >= 1 && day <= 7).sort((a4, b3) => a4 - b3);
   return days.length === 0 ? "invalid" : days;
 }
-function currentCheck(values, record3, range) {
+function currentCheck(values, record4, range) {
   const amps = checkCurrent(values.current);
-  if (!amps.ok || range === null || amps.value === record3.amps) {
+  if (!amps.ok || range === null || amps.value === record4.amps) {
     return amps;
   }
   return checkCurrentInRange(values.current, range);
@@ -57890,8 +57894,8 @@ var DIRECTION_HINTS = ["use_power", "magnitude"];
 var HIGH_LOAD_DAYS = ["all", "weekdays", "mon_sat"];
 var DEMAND_TOP_N = [1, 3, 5];
 var MAX_DEMAND_COMPONENTS = 3;
-function referencePictures(list2) {
-  return list2.flatMap((entry) => {
+function referencePictures(list3) {
+  return list3.flatMap((entry) => {
     if (!isRecord2(entry) || entry.kind !== "day" && entry.kind !== "night" || typeof entry.taken_at !== "string") {
       return [];
     }
@@ -59556,6 +59560,936 @@ function progressOrNull(root) {
   }
 }
 
+// src/entity-config.ts
+var MalformedPayload2 = class extends Error {
+};
+function bad3() {
+  throw new MalformedPayload2("malformed");
+}
+function isRecord3(value2) {
+  return typeof value2 === "object" && value2 !== null && !Array.isArray(value2);
+}
+function record3(value2) {
+  return isRecord3(value2) ? value2 : bad3();
+}
+function exactKeys3(source, keys2) {
+  if (Object.keys(source).length !== keys2.length) {
+    bad3();
+  }
+  for (const key3 of keys2) {
+    if (!Object.prototype.hasOwnProperty.call(source, key3)) {
+      bad3();
+    }
+  }
+}
+function text3(source, key3) {
+  const value2 = source[key3];
+  return typeof value2 === "string" && value2 !== "" ? value2 : bad3();
+}
+function textOrNull3(source, key3) {
+  const value2 = source[key3];
+  if (value2 === null) {
+    return null;
+  }
+  return typeof value2 === "string" ? value2 : bad3();
+}
+function flag(source, key3) {
+  const value2 = source[key3];
+  return typeof value2 === "boolean" ? value2 : bad3();
+}
+function textList(source, key3) {
+  const value2 = source[key3];
+  if (!Array.isArray(value2)) {
+    return bad3();
+  }
+  return value2.map((entry) => typeof entry === "string" ? entry : bad3());
+}
+function numberOrNull2(source, key3) {
+  const value2 = source[key3];
+  if (value2 === null) {
+    return null;
+  }
+  return typeof value2 === "number" && Number.isFinite(value2) ? value2 : bad3();
+}
+var ENTITY_NOT_ADMIN = "spotnav_not_admin";
+var ENTITY_CONFLICT = "spotnav_conflict";
+var ENTITY_INVALID_VALUE = "spotnav_invalid_value";
+var ENTITY_NO_SITE = "spotnav_no_site";
+var ENVELOPE_KEYS2 = ["api_version", "ok", "error", "field_errors", "config"];
+var ENTITY_KEYS = [
+  "allowed_device_classes",
+  "allowed_domains",
+  "current",
+  "effective",
+  "field",
+  "kind",
+  "required",
+  "scope",
+  "writable"
+];
+var ENTITY_OPTIONAL_KEYS = ["none"];
+var NUMBER_KEYS = ["field", "kind", "minimum", "required", "scope", "value", "writable"];
+var ENUM_KEYS = ["choices", "field", "kind", "required", "scope", "value", "writable"];
+var ENUM_OPTIONAL_KEYS = ["own_sensors"];
+var FLAG_KEYS = ["field", "kind", "required", "scope", "value", "writable"];
+function decodeField(raw) {
+  const source = record3(raw);
+  const kind = source["kind"];
+  const scopeValue = source["scope"];
+  if (scopeValue !== "charger" && scopeValue !== "site") {
+    return bad3();
+  }
+  const scope = scopeValue;
+  const base2 = {
+    field: text3(source, "field"),
+    scope,
+    required: flag(source, "required"),
+    writable: flag(source, "writable")
+  };
+  if (kind === "entity") {
+    const rawNone = source["none"];
+    exactKeys3(
+      source,
+      rawNone === void 0 ? ENTITY_KEYS : [...ENTITY_KEYS, ...ENTITY_OPTIONAL_KEYS]
+    );
+    let none = null;
+    if (rawNone !== void 0) {
+      const choice = record3(rawNone);
+      exactKeys3(choice, ["allowed", "automatic", "chosen"]);
+      const rawAutomatic = choice["automatic"];
+      let automatic = null;
+      if (rawAutomatic !== null) {
+        const ref = record3(rawAutomatic);
+        exactKeys3(ref, ["entity_id", "friendly_name"]);
+        automatic = { entityId: text3(ref, "entity_id"), friendlyName: text3(ref, "friendly_name") };
+      }
+      none = { allowed: flag(choice, "allowed"), chosen: flag(choice, "chosen"), automatic };
+    }
+    const rawCurrent = source["current"];
+    let current = null;
+    if (rawCurrent !== null) {
+      const ref = record3(rawCurrent);
+      exactKeys3(ref, ["entity_id", "friendly_name", "exists"]);
+      current = {
+        entityId: text3(ref, "entity_id"),
+        friendlyName: text3(ref, "friendly_name"),
+        exists: flag(ref, "exists")
+      };
+    }
+    const rawEffective = source["effective"];
+    let effective = null;
+    if (rawEffective !== null) {
+      const ref = record3(rawEffective);
+      exactKeys3(ref, ["entity_id", "friendly_name", "source"]);
+      const origin = ref["source"];
+      if (origin !== "configured" && origin !== "automatic") {
+        return bad3();
+      }
+      effective = {
+        entityId: text3(ref, "entity_id"),
+        friendlyName: text3(ref, "friendly_name"),
+        source: origin
+      };
+    }
+    return {
+      ...base2,
+      kind,
+      current,
+      effective,
+      none,
+      domains: textList(source, "allowed_domains"),
+      deviceClasses: textList(source, "allowed_device_classes")
+    };
+  }
+  if (kind === "number") {
+    exactKeys3(source, NUMBER_KEYS);
+    const minimum = source["minimum"];
+    if (typeof minimum !== "number" || !Number.isFinite(minimum)) {
+      return bad3();
+    }
+    return { ...base2, kind, minimum, value: numberOrNull2(source, "value") };
+  }
+  if (kind === "enum") {
+    const rawOwn = source["own_sensors"];
+    exactKeys3(source, rawOwn === void 0 ? ENUM_KEYS : [...ENUM_KEYS, ...ENUM_OPTIONAL_KEYS]);
+    let ownSensors = null;
+    if (rawOwn !== void 0 && rawOwn !== null) {
+      const own = record3(rawOwn);
+      exactKeys3(own, ["integration", "sensors"]);
+      ownSensors = { integration: text3(own, "integration"), sensors: text3(own, "sensors") };
+    }
+    return { ...base2, kind, choices: textList(source, "choices"), value: textOrNull3(source, "value"), ownSensors };
+  }
+  if (kind === "flag") {
+    exactKeys3(source, FLAG_KEYS);
+    return { ...base2, kind, value: flag(source, "value") };
+  }
+  return bad3();
+}
+function list2(source, key3) {
+  const value2 = source[key3];
+  return Array.isArray(value2) ? value2 : bad3();
+}
+function intervalOrNull(source, key3) {
+  const value2 = source[key3];
+  if (value2 === null) {
+    return null;
+  }
+  return typeof value2 === "number" && Number.isFinite(value2) ? value2 : bad3();
+}
+var BASES = ["measured", "apparent", "reactive", "estimated"];
+function decodeBasis(value2) {
+  if (value2 === null) {
+    return null;
+  }
+  return typeof value2 === "string" && BASES.includes(value2) ? value2 : bad3();
+}
+function decodePhaseTexts(raw) {
+  const source = record3(raw);
+  exactKeys3(source, PHASES);
+  return { L1: textOrNull3(source, "L1"), L2: textOrNull3(source, "L2"), L3: textOrNull3(source, "L3") };
+}
+function decodeCurrentSource(raw) {
+  if (raw === null) {
+    return null;
+  }
+  const source = record3(raw);
+  exactKeys3(source, ["kind", "entity_id", "name", "attributes", "entity_ids"]);
+  const kind = oneOf2(source, "kind", ["attributes", "separate_entities"]);
+  if (kind === "attributes") {
+    return {
+      kind,
+      entityId: text3(source, "entity_id"),
+      name: text3(source, "name"),
+      attributes: decodePhaseTexts(source["attributes"])
+    };
+  }
+  return { kind, entityIds: decodePhaseTexts(source["entity_ids"]) };
+}
+function decodeMeasurement(raw) {
+  const source = record3(raw);
+  exactKeys3(source, ["mode", "current_estimated", "assumed_power_factor", "basis", "current_source"]);
+  const basis = record3(source["basis"]);
+  exactKeys3(basis, PHASES);
+  return {
+    mode: text3(source, "mode"),
+    currentEstimated: flag(source, "current_estimated"),
+    assumedPowerFactor: numberOrNull2(source, "assumed_power_factor"),
+    basis: {
+      L1: decodeBasis(basis["L1"]),
+      L2: decodeBasis(basis["L2"]),
+      L3: decodeBasis(basis["L3"])
+    },
+    currentSource: decodeCurrentSource(source["current_source"])
+  };
+}
+function decodeWarningPhase(raw) {
+  const source = record3(raw);
+  exactKeys3(source, ["phase", "cause", "entity_id", "age_s"]);
+  return {
+    phase: text3(source, "phase"),
+    cause: oneOf2(source, "cause", ["no_value", "stale"]),
+    entityId: textOrNull3(source, "entity_id"),
+    ageS: intervalOrNull(source, "age_s")
+  };
+}
+function decodeWarning(raw) {
+  const source = record3(raw);
+  exactKeys3(source, [
+    "code",
+    "integration",
+    "entity_id",
+    "interval_s",
+    "option",
+    "device_name",
+    "phases",
+    "limits_a",
+    "unavailable_entities",
+    "inverter",
+    "negative_phases"
+  ]);
+  const unavailable = source["unavailable_entities"];
+  if (!Array.isArray(unavailable) || !unavailable.every((entry) => typeof entry === "string")) {
+    return bad3();
+  }
+  const negative = source["negative_phases"];
+  if (!Array.isArray(negative) || !negative.every((entry) => typeof entry === "string")) {
+    return bad3();
+  }
+  const phases = source["phases"];
+  if (!Array.isArray(phases)) {
+    return bad3();
+  }
+  return {
+    code: text3(source, "code"),
+    integration: textOrNull3(source, "integration"),
+    entityId: textOrNull3(source, "entity_id"),
+    intervalS: intervalOrNull(source, "interval_s"),
+    option: textOrNull3(source, "option"),
+    deviceName: textOrNull3(source, "device_name"),
+    phases: phases.map(decodeWarningPhase),
+    limitsA: decodeLimits(source["limits_a"]),
+    unavailableEntities: unavailable,
+    inverter: flag(source, "inverter"),
+    negativePhases: negative
+  };
+}
+function decodeLimits(raw) {
+  if (raw === null) {
+    return null;
+  }
+  const source = record3(raw);
+  exactKeys3(source, ["battery", "spotnav"]);
+  const battery = source["battery"];
+  const spotnav = source["spotnav"];
+  return typeof battery === "number" && Number.isFinite(battery) && typeof spotnav === "number" && Number.isFinite(spotnav) ? { battery, spotnav } : bad3();
+}
+function decodeDetectedEntity(raw) {
+  const source = record3(raw);
+  exactKeys3(source, ["role", "phase", "entity_id", "friendly_name", "disabled"]);
+  return {
+    role: text3(source, "role"),
+    phase: textOrNull3(source, "phase"),
+    entityId: text3(source, "entity_id"),
+    friendlyName: text3(source, "friendly_name"),
+    disabled: flag(source, "disabled")
+  };
+}
+function decodeMeter(raw) {
+  const source = record3(raw);
+  exactKeys3(source, [
+    "id",
+    "integration",
+    "title",
+    "mode",
+    "confidence",
+    "current_signed",
+    "power_inverted",
+    "estimated",
+    "disabled_entities",
+    "entities",
+    "warnings",
+    "applied"
+  ]);
+  const confidence = source["confidence"];
+  if (confidence !== "high" && confidence !== "medium" && confidence !== "low") {
+    return bad3();
+  }
+  return {
+    id: text3(source, "id"),
+    integration: text3(source, "integration"),
+    title: text3(source, "title"),
+    mode: text3(source, "mode"),
+    confidence,
+    currentSigned: flag(source, "current_signed"),
+    powerInverted: flag(source, "power_inverted"),
+    estimated: flag(source, "estimated"),
+    disabledEntities: textList(source, "disabled_entities"),
+    entities: list2(source, "entities").map(decodeDetectedEntity),
+    warnings: textList(source, "warnings"),
+    applied: flag(source, "applied")
+  };
+}
+function decodeBattery(raw) {
+  const source = record3(raw);
+  exactKeys3(source, [
+    "id",
+    "integration",
+    "title",
+    "entity_id",
+    "friendly_name",
+    "inverted",
+    "discharge_entity_id",
+    "disabled_entities"
+  ]);
+  return {
+    id: text3(source, "id"),
+    integration: text3(source, "integration"),
+    title: text3(source, "title"),
+    entityId: text3(source, "entity_id"),
+    friendlyName: text3(source, "friendly_name"),
+    inverted: flag(source, "inverted"),
+    dischargeEntityId: textOrNull3(source, "discharge_entity_id"),
+    disabledEntities: textList(source, "disabled_entities")
+  };
+}
+function decodeChargerCurrent(raw) {
+  const source = record3(raw);
+  exactKeys3(source, ["id", "charger_name", "integration", "sensors", "entity_ids", "disabled_entities"]);
+  return {
+    id: text3(source, "id"),
+    chargerName: text3(source, "charger_name"),
+    integration: text3(source, "integration"),
+    sensors: text3(source, "sensors"),
+    entityIds: textList(source, "entity_ids"),
+    disabledEntities: textList(source, "disabled_entities")
+  };
+}
+function decodeRef(raw) {
+  const ref = record3(raw);
+  exactKeys3(ref, ["entity_id", "friendly_name"]);
+  return { entityId: text3(ref, "entity_id"), friendlyName: text3(ref, "friendly_name") };
+}
+function decodeVehicle2(raw) {
+  const source = record3(raw);
+  exactKeys3(source, ["id", "name", "selected", "source", "candidates"]);
+  const origin = source["source"];
+  if (origin !== "confirmed" && origin !== "automatic" && origin !== null) {
+    return bad3();
+  }
+  const candidates = source["candidates"];
+  if (!Array.isArray(candidates)) {
+    return bad3();
+  }
+  return {
+    id: text3(source, "id"),
+    name: text3(source, "name"),
+    selected: source["selected"] === null ? null : decodeRef(source["selected"]),
+    source: origin,
+    candidates: candidates.map(decodeRef)
+  };
+}
+function decodeVehicleProperties(raw) {
+  const source = record3(raw);
+  exactKeys3(source, [
+    "id",
+    "capacity_kwh",
+    "capacity_source",
+    "reported_capacity_kwh",
+    "reported_known",
+    "stored_capacity_kwh",
+    "onboard_phases",
+    "stored_onboard_phases"
+  ]);
+  const origin = source["capacity_source"];
+  if (origin !== "reported" && origin !== "stored" && origin !== null) {
+    return bad3();
+  }
+  const phases = source["onboard_phases"];
+  const stored = numberOrNull2(source, "stored_onboard_phases");
+  if (phases !== 1 && phases !== 3 || stored !== null && stored !== 1 && stored !== 3) {
+    return bad3();
+  }
+  return {
+    id: text3(source, "id"),
+    capacityKwh: numberOrNull2(source, "capacity_kwh"),
+    capacitySource: origin,
+    reportedCapacityKwh: numberOrNull2(source, "reported_capacity_kwh"),
+    reportedKnown: flag(source, "reported_known"),
+    storedCapacityKwh: numberOrNull2(source, "stored_capacity_kwh"),
+    onboardPhases: phases,
+    storedOnboardPhases: stored
+  };
+}
+function oneOf2(source, key3, allowed) {
+  const value2 = source[key3];
+  return allowed.find((candidate) => candidate === value2) ?? bad3();
+}
+var START_STOP_KINDS = ["switch", "select", "buttons", "easee", "number_pause"];
+function lenientKind(source, key3, allowed) {
+  const value2 = source[key3];
+  if (typeof value2 !== "string" || value2 === "") {
+    return bad3();
+  }
+  return allowed.find((candidate) => candidate === value2) ?? "other";
+}
+function integer2(source, key3) {
+  const value2 = source[key3];
+  return typeof value2 === "number" && Number.isInteger(value2) && value2 >= 0 ? value2 : bad3();
+}
+function decodeControl2(raw) {
+  const source = record3(raw);
+  exactKeys3(source, ["platform", "start_stop", "current", "charging_state", "policy", "capabilities", "conflicts"]);
+  const startStop = record3(source["start_stop"]);
+  exactKeys3(startStop, ["kind", "entity_ids", "inverted", "start_option", "stop_option"]);
+  const current = record3(source["current"]);
+  exactKeys3(current, ["kind", "entity_id", "service", "enabled"]);
+  const state = record3(source["charging_state"]);
+  exactKeys3(state, ["source", "entity_id"]);
+  const policy = record3(source["policy"]);
+  exactKeys3(policy, [
+    "min_interval_s",
+    "max_writes_per_minute",
+    "flash_stored",
+    "regulator_writes",
+    "zero_pauses",
+    "ignored_while_paused",
+    "installation_wide",
+    "resend_after_plug_in"
+  ]);
+  const capabilities = record3(source["capabilities"]);
+  exactKeys3(capabilities, [
+    "start_stop",
+    "set_current",
+    "regulated_current",
+    "reads_charging_state",
+    "reads_measured_current",
+    "reads_energy_register"
+  ]);
+  const conflicts = source["conflicts"];
+  if (!Array.isArray(conflicts)) {
+    return bad3();
+  }
+  const minInterval = policy["min_interval_s"];
+  if (typeof minInterval !== "number" || !Number.isFinite(minInterval) || minInterval < 0) {
+    return bad3();
+  }
+  const perMinute = policy["max_writes_per_minute"];
+  if (perMinute !== null) {
+    integer2(policy, "max_writes_per_minute");
+  }
+  return {
+    platform: textOrNull3(source, "platform"),
+    startStop: {
+      kind: lenientKind(startStop, "kind", START_STOP_KINDS),
+      entityIds: textList(startStop, "entity_ids"),
+      inverted: flag(startStop, "inverted"),
+      startOption: textOrNull3(startStop, "start_option"),
+      stopOption: textOrNull3(startStop, "stop_option")
+    },
+    current: {
+      kind: oneOf2(current, "kind", ["none", "ocpp", "number", "service"]),
+      entityId: textOrNull3(current, "entity_id"),
+      service: textOrNull3(current, "service"),
+      enabled: flag(current, "enabled")
+    },
+    chargingState: {
+      source: oneOf2(state, "source", ["status", "control"]),
+      entityId: textOrNull3(state, "entity_id")
+    },
+    policy: {
+      minIntervalS: minInterval,
+      maxWritesPerMinute: perMinute === null ? null : perMinute,
+      flashStored: flag(policy, "flash_stored"),
+      regulatorWrites: flag(policy, "regulator_writes"),
+      zeroPauses: flag(policy, "zero_pauses"),
+      ignoredWhilePaused: flag(policy, "ignored_while_paused"),
+      installationWide: flag(policy, "installation_wide"),
+      resendAfterPlugIn: flag(policy, "resend_after_plug_in")
+    },
+    capabilities: {
+      startStop: flag(capabilities, "start_stop"),
+      setCurrent: flag(capabilities, "set_current"),
+      regulatedCurrent: flag(capabilities, "regulated_current"),
+      readsChargingState: flag(capabilities, "reads_charging_state"),
+      readsMeasuredCurrent: flag(capabilities, "reads_measured_current"),
+      readsEnergyRegister: flag(capabilities, "reads_energy_register")
+    },
+    conflicts: conflicts.map((entry) => {
+      const item = record3(entry);
+      exactKeys3(item, ["kind", "entity_id", "label", "state"]);
+      return {
+        kind: oneOf2(item, "kind", ["own_mode", "disabled", "duplicate_charger", "other_controller"]),
+        entityId: text3(item, "entity_id"),
+        label: text3(item, "label"),
+        state: text3(item, "state")
+      };
+    })
+  };
+}
+function decodeConfig(raw) {
+  const source = record3(raw);
+  const rawProperties = source["vehicle_properties"];
+  exactKeys3(
+    source,
+    rawProperties === void 0 ? ["charger_id", "control", "fields", "site", "vehicles"] : ["charger_id", "control", "fields", "site", "vehicles", "vehicle_properties"]
+  );
+  if (rawProperties !== void 0 && !Array.isArray(rawProperties)) {
+    return bad3();
+  }
+  const vehicles = source["vehicles"];
+  if (!Array.isArray(vehicles)) {
+    return bad3();
+  }
+  const fields = source["fields"];
+  if (!Array.isArray(fields)) {
+    return bad3();
+  }
+  const rawSite = source["site"];
+  let site = null;
+  if (rawSite !== null) {
+    const siteSource = record3(rawSite);
+    exactKeys3(siteSource, ["name", "charger_count", "measurement", "warnings", "detection"]);
+    const count2 = siteSource["charger_count"];
+    if (typeof count2 !== "number" || !Number.isInteger(count2) || count2 < 0) {
+      return bad3();
+    }
+    const detection = record3(siteSource["detection"]);
+    const rawChargers = detection["chargers"];
+    exactKeys3(detection, rawChargers === void 0 ? ["meters", "batteries"] : ["meters", "batteries", "chargers"]);
+    site = {
+      name: text3(siteSource, "name"),
+      chargerCount: count2,
+      measurement: decodeMeasurement(siteSource["measurement"]),
+      warnings: list2(siteSource, "warnings").map(decodeWarning),
+      meters: list2(detection, "meters").map(decodeMeter),
+      batteries: list2(detection, "batteries").map(decodeBattery),
+      chargers: rawChargers === void 0 ? [] : list2(detection, "chargers").map(decodeChargerCurrent)
+    };
+  }
+  return {
+    chargerId: text3(source, "charger_id"),
+    fields: fields.map(decodeField),
+    site,
+    vehicles: vehicles.map(decodeVehicle2),
+    vehicleProperties: rawProperties === void 0 ? [] : rawProperties.map(decodeVehicleProperties),
+    control: source["control"] === null ? null : decodeControl2(source["control"])
+  };
+}
+function decodeEnvelope(raw, extra) {
+  const version = raw["api_version"];
+  if (typeof version === "number" && version !== ENTITY_CONFIG_API_VERSION) {
+    return "unsupported";
+  }
+  exactKeys3(raw, [...ENVELOPE_KEYS2, ...extra]);
+  if (version !== ENTITY_CONFIG_API_VERSION) {
+    return "malformed";
+  }
+  const ok2 = flag(raw, "ok");
+  const error2 = textOrNull3(raw, "error");
+  const rawConfig = raw["config"];
+  const config = rawConfig === null ? null : decodeConfig(rawConfig);
+  const rawErrors = raw["field_errors"];
+  if (!Array.isArray(rawErrors)) {
+    return "malformed";
+  }
+  const fieldErrors = rawErrors.map((entry) => {
+    const item = record3(entry);
+    exactKeys3(item, ["field", "code"]);
+    return { field: text3(item, "field"), code: text3(item, "code") };
+  });
+  if (ok2) {
+    if (error2 !== null || config === null || fieldErrors.length > 0) {
+      return "malformed";
+    }
+  } else if (error2 === null || error2 === "") {
+    return "malformed";
+  }
+  return { ok: ok2, error: error2, config, fieldErrors };
+}
+function decodeEntityAnswer(raw) {
+  try {
+    if (!isRecord3(raw)) {
+      return { ok: false, failure: "malformed" };
+    }
+    const envelope = decodeEnvelope(raw, []);
+    if (typeof envelope === "string") {
+      return { ok: false, failure: envelope };
+    }
+    if (envelope.ok && envelope.config !== null) {
+      return { ok: true, value: { ok: true, config: envelope.config } };
+    }
+    return {
+      ok: true,
+      value: { ok: false, code: envelope.error ?? "", config: envelope.config, fieldErrors: envelope.fieldErrors }
+    };
+  } catch (error2) {
+    if (error2 instanceof MalformedPayload2 || error2 instanceof Error && error2.message === "malformed") {
+      return { ok: false, failure: "malformed" };
+    }
+    throw error2;
+  }
+}
+function decodeVehicleWriteAnswer(raw) {
+  try {
+    if (!isRecord3(raw)) {
+      return { ok: false, failure: "malformed" };
+    }
+    const envelope = decodeEnvelope(raw, ["vehicle"]);
+    if (typeof envelope === "string") {
+      return { ok: false, failure: envelope };
+    }
+    if (envelope.ok && envelope.config !== null) {
+      return { ok: true, value: { ok: true, config: envelope.config } };
+    }
+    if (envelope.ok) {
+      return { ok: false, failure: "malformed" };
+    }
+    return {
+      ok: true,
+      value: { ok: false, code: envelope.error ?? "", config: envelope.config, fieldErrors: envelope.fieldErrors }
+    };
+  } catch (error2) {
+    if (error2 instanceof MalformedPayload2 || error2 instanceof Error && error2.message === "malformed") {
+      return { ok: false, failure: "malformed" };
+    }
+    throw error2;
+  }
+}
+var PHASES = ["L1", "L2", "L3"];
+function vehicleChoice(vehicle) {
+  return vehicle.source === "confirmed" && vehicle.selected !== null ? vehicle.selected.entityId : "";
+}
+var FIELD_ERROR_KEYS = {
+  required: "entity.error.field.required",
+  entity_not_found: "entity.error.field.notFound",
+  wrong_domain: "entity.error.field.wrongDomain",
+  invalid_value: "entity.error.field.invalid",
+  not_writable: "entity.error.field.notWritable",
+  control_path_unknown: "entity.error.field.controlPathUnknown",
+  unknown_field: "entity.error.field.unknown",
+  charge_control_in_use: "entity.error.field.chargeControlInUse",
+  current_limit_in_use: "entity.error.field.currentLimitInUse",
+  duplicate_charger: "entity.error.field.duplicateCharger",
+  unknown_vehicle: "entity.error.field.unknownVehicle",
+  invalid_capacity: "settings.vehicle.error.capacity",
+  invalid_consumption: "settings.vehicle.error.consumption",
+  invalid_onboard_phases: "settings.vehicle.error.onboardPhases"
+};
+function fieldErrorKey(code) {
+  return FIELD_ERROR_KEYS[code] ?? "entity.error.field.unknown";
+}
+function entityErrorKey(code) {
+  if (code === ENTITY_NOT_ADMIN) {
+    return "entity.error.notAdmin";
+  }
+  if (code === ENTITY_CONFLICT) {
+    return "entity.error.conflict";
+  }
+  if (code === ENTITY_INVALID_VALUE) {
+    return "entity.error.invalid";
+  }
+  if (code === ENTITY_NO_SITE) {
+    return "site.none";
+  }
+  return "entity.error.generic";
+}
+
+// src/observation-freshness.ts
+var OBSERVATION_MAX_AGE_MS = 9e4;
+var OBSERVATION_CLOCK_SKEW_MS = 5e3;
+function observationFreshness(timestamp, now, failed = false, maxAge = OBSERVATION_MAX_AGE_MS) {
+  if (failed) return "failed";
+  if (timestamp === null || !Number.isFinite(timestamp) || !Number.isFinite(now)) return "invalid";
+  if (timestamp > now + OBSERVATION_CLOCK_SKEW_MS) return "future";
+  if (now - timestamp > maxAge) return "old";
+  return "fresh";
+}
+
+// sidebar/vehicle-sources.js
+var CONFIG_REFRESH_MS = 45e3;
+var ok = (n6) => Number.isFinite(n6);
+var fmtKwh = (n6) => `${Math.round(n6 * 10) / 10} kWh`;
+var label = (e9) => e9?.friendlyName && e9.friendlyName !== e9.entityId ? `${e9.friendlyName} (${e9.entityId})` : e9?.entityId || "unknown";
+function vehicleSignature(vehicle, props) {
+  return JSON.stringify([
+    vehicle?.id ?? null,
+    vehicle?.selected?.entityId ?? null,
+    vehicle?.source ?? null,
+    (vehicle?.candidates || []).map((c5) => c5.entityId),
+    props ? [props.capacityKwh ?? null, props.capacitySource ?? null, props.storedCapacityKwh ?? null, props.reportedCapacityKwh ?? null, props.onboardPhases ?? null, props.storedOnboardPhases ?? null] : null
+  ]);
+}
+function chooseVehicle(vehicles, selectedId, savedId) {
+  const has3 = (id) => typeof id === "string" && vehicles.some((v2) => v2.id === id);
+  if (has3(selectedId)) return selectedId;
+  if (has3(savedId) && savedId !== "guest") return savedId;
+  return vehicles.length === 1 ? vehicles[0].id : null;
+}
+function sensorModel(vehicle, entityState) {
+  const candidates = vehicle.candidates || [];
+  const selected = vehicle.selected;
+  const base2 = vehicleChoice(vehicle);
+  let status, level, text4;
+  if (selected === null) {
+    status = candidates.length > 1 ? "ambiguous" : "missing";
+    level = "warn";
+    text4 = candidates.length > 1 ? `Several charge-level sensors fit and none is chosen, so SpotNav has no charge reading for this car. Choose one (${candidates.length} candidates).` : "No charge-level sensor was found for this car.";
+  } else {
+    const present = candidates.some((c5) => c5.entityId === selected.entityId);
+    const state = typeof entityState === "function" ? entityState(selected.entityId) : "ok";
+    status = vehicle.source === "confirmed" ? "confirmed" : "automatic";
+    level = "ok";
+    text4 = vehicle.source === "confirmed" ? `Chosen by you: ${label(selected)}.` : `Detected automatically (the only candidate): ${label(selected)}.`;
+    if (!present) {
+      status = "removed";
+      level = "warn";
+      text4 += " This sensor is no longer among the offered candidates.";
+    }
+    if (state === "missing") {
+      status = "removed";
+      level = "warn";
+      text4 += " Home Assistant no longer has this entity.";
+    } else if (state === "unavailable") {
+      level = "warn";
+      text4 += " It currently reports no value (unavailable or unknown).";
+    }
+  }
+  const options = [{ value: "", text: vehicle.source === "confirmed" ? "Return to automatic detection (clear my choice)" : selected === null ? "Choose a sensor\u2026" : "Automatic (only candidate)" }];
+  for (const c5 of candidates) options.push({ value: c5.entityId, text: label(c5) });
+  if (base2 && !candidates.some((c5) => c5.entityId === base2)) options.push({ value: base2, text: `${label(selected)} (no longer offered)` });
+  return { status, level, text: text4, base: base2, options };
+}
+function propertiesModel(props, row, canWrite) {
+  if (!props) return null;
+  const source = props.capacitySource;
+  const reported = ok(props.reportedCapacityKwh) && props.reportedCapacityKwh > 0 ? props.reportedCapacityKwh : null;
+  const stored = ok(props.storedCapacityKwh) && props.storedCapacityKwh > 0 ? props.storedCapacityKwh : null;
+  const parts = [];
+  if (reported !== null) parts.push(`${fmtKwh(reported)} reported by the vehicle's integration (used; cannot be overridden here)`);
+  else if (!props.reportedKnown) parts.push("Whether the vehicle reports a capacity is unknown until a charge-level sensor is chosen");
+  else parts.push("The vehicle reports no capacity");
+  if (stored !== null) parts.push(reported !== null ? `${fmtKwh(stored)} stored from you (not used while the vehicle reports one)` : `${fmtKwh(stored)} entered by you (used)`);
+  else if (reported === null) parts.push("nothing entered by you");
+  const display = reported === null && stored === null ? `${parts.join("; ")}. Missing \u2014 SpotNav does not guess a battery size.` : `${parts.join("; ")}.`;
+  const phases = props.storedOnboardPhases;
+  return {
+    capacity: { display, source, known: reported !== null || stored !== null, base: stored !== null ? String(stored) : "", effective: ok(props.capacityKwh) ? props.capacityKwh : null, editable: canWrite && source !== "reported" },
+    phases: {
+      base: String(props.onboardPhases === 1 ? 1 : 3),
+      display: phases === 1 ? "1-phase" : phases === 3 ? "3-phase (entered by you)" : "3-phase (the default; nothing entered)",
+      suggestion: row && row.suggested_onboard_phases === 1 && props.onboardPhases !== 1 ? "Recent charges look single-phase. Nothing was changed; set 1-phase below if that is right." : "",
+      editable: canWrite
+    }
+  };
+}
+function vehicleSourcesModel(input) {
+  const base2 = { notice: input.notice || "", conflict: !!input.conflict, busy: !!input.busy };
+  if (!input.admin) return { ...base2, state: "forbidden", canEdit: false, notice: "Administrator permission is required to inspect or change vehicle sources." };
+  if (!input.config) return { ...base2, state: input.loading ? "loading" : "unavailable", canEdit: false, notice: input.notice || (input.loading ? "Loading vehicle sources\u2026" : "Vehicle sources unavailable. Use Reload to try again.") };
+  const configFresh = observationFreshness(input.configAt ?? null, input.now, !!input.failed) === "fresh";
+  const vehicles = input.config.vehicles.map((v2) => ({ id: v2.id, name: v2.name }));
+  const vehicleId = chooseVehicle(vehicles, input.selectedId, input.savedId);
+  const vehicle = vehicles.length ? input.config.vehicles.find((v2) => v2.id === vehicleId) : null;
+  const canEdit = !input.blocked && !input.conflict && !input.busy;
+  const model = { ...base2, state: "ready", stale: !configFresh, vehicles, vehicleId: vehicleId || "", canEdit };
+  const notes = [];
+  if (input.savedId && input.savedId !== "guest" && !vehicles.some((v2) => v2.id === input.savedId)) notes.push("The vehicle saved in the plan is not currently discovered; check the car\u2019s integration.");
+  if (!vehicles.length) notes.push("No vehicle with a charge-level sensor was found.");
+  else if (!vehicle) notes.push("Several vehicles are available. Choose which one to inspect; none is assumed.");
+  if (!configFresh) notes.push("Sensor information is stale or its refresh failed; sensor changes are disabled until it is read again.");
+  model.notes = notes;
+  if (!vehicle) return { ...model, sensor: null, reading: null, properties: null };
+  const sensor = sensorModel(vehicle, input.entityState);
+  sensor.canEdit = canEdit && configFresh && input.dashboardFresh !== false;
+  const row = (input.rows || []).find((r8) => r8.id === vehicle.id) || null;
+  const props = (input.config.vehicleProperties || []).find((p4) => p4.id === vehicle.id) || null;
+  const properties = propertiesModel(props, row, canEdit && configFresh);
+  const r7 = input.reading && input.reading.vehicleId === vehicle.id ? input.reading : null;
+  const reading = r7 && ok(r7.value) ? { text: `${r7.value}%${r7.stale ? " \xB7 stale or unconfirmed" : ""} \u2014 ${r7.detail}`, stale: !!r7.stale } : row && ok(row.soc_percent) ? { text: `${row.soc_percent}% \xB7 last value, age unknown \u2014 not shown as a current reading.`, stale: true } : { text: "No valid reading from this car.", stale: true };
+  return { ...model, sensor, reading, properties, propertiesMissing: !props };
+}
+function sensorWritePlan(vehicle, draft) {
+  if (!vehicle) return { ok: false, notice: "Choose a vehicle first." };
+  const choice = typeof draft === "string" ? draft : "";
+  const base2 = vehicleChoice(vehicle);
+  if (choice === base2) return { ok: true, changed: false };
+  if (choice && !(vehicle.candidates || []).some((c5) => c5.entityId === choice)) return { ok: false, notice: "Choose one of the offered sensors." };
+  return { ok: true, changed: true, entityId: choice || null, expected: base2 || null, replacesChoice: base2 !== "" };
+}
+function propertyWritePlan(props, values) {
+  if (!props) return { ok: false, notice: "Capacity and phases are unavailable for this vehicle. Reload vehicle sources." };
+  const changes = {}, expected = {};
+  if (props.capacitySource !== "reported" && typeof values.capacity === "string") {
+    const text4 = values.capacity.trim();
+    const stored = ok(props.storedCapacityKwh) && props.storedCapacityKwh > 0 ? props.storedCapacityKwh : null;
+    const baseText = stored === null ? "" : String(stored);
+    if (text4 !== baseText) {
+      const number2 = text4 === "" ? null : Number(text4);
+      if (number2 !== null && !(ok(number2) && number2 >= 1 && number2 <= 500)) return { ok: false, notice: "Battery capacity must be between 1 and 500 kWh." };
+      if (number2 === null || number2 !== stored) {
+        changes.capacity_kwh = number2;
+        expected.capacity_kwh = props.capacityKwh ?? null;
+      }
+    }
+  }
+  if (values.phases !== void 0 && values.phases !== "") {
+    const phases = Number(values.phases);
+    if (phases !== 1 && phases !== 3) return { ok: false, notice: "The onboard charger must be 1-phase or 3-phase." };
+    if (phases !== (props.onboardPhases === 1 ? 1 : 3)) {
+      changes.onboard_phases = phases;
+      expected.onboard_phases = props.onboardPhases;
+    }
+  }
+  return Object.keys(changes).length ? { ok: true, changed: true, changes, expected, clearsCapacity: changes.capacity_kwh === null } : { ok: true, changed: false };
+}
+
+// src/price-provider.ts
+function addIntegrationPath(domain) {
+  return `/config/integrations/dashboard/add?domain=${encodeURIComponent(domain)}`;
+}
+function integrationPath(domain) {
+  return `/config/integrations/integration/${encodeURIComponent(domain)}`;
+}
+var NOTICES = {
+  add_nordpool: {
+    text: "price.notice.addNordpool",
+    action: { label: "price.notice.addNordpool.action", does: { kind: "page", path: addIntegrationPath("nordpool") } },
+    key: "offered"
+  },
+  nordpool_not_loaded: {
+    text: "price.notice.nordpoolNotLoaded",
+    action: { label: "price.notice.nordpoolNotLoaded.action", does: { kind: "page", path: integrationPath("nordpool") } },
+    key: "offered"
+  },
+  // Nord Pool from HACS has the built-in one's domain and no action: nothing to add, the key is the way on.
+  nordpool_custom: { text: "price.notice.nordpoolCustom", key: "shown" },
+  add_entsoe_key: { text: "price.notice.addEntsoeKey", key: "shown" },
+  entsoe_key_rejected: { text: "price.notice.entsoeKeyRejected", key: "shown" },
+  add_pvpc: {
+    text: "price.notice.addPvpc",
+    action: {
+      label: "price.notice.addPvpc.action",
+      does: { kind: "page", path: addIntegrationPath("pvpc_hourly_pricing") }
+    }
+  },
+  pvpc_not_loaded: {
+    text: "price.notice.pvpcNotLoaded",
+    action: {
+      label: "price.notice.pvpcNotLoaded.action",
+      does: { kind: "page", path: integrationPath("pvpc_hourly_pricing") }
+    }
+  },
+  add_octopus: {
+    text: "price.notice.addOctopus",
+    action: { label: "price.notice.addOctopus.action", does: { kind: "octopus" } }
+  },
+  octopus_not_loaded: {
+    text: "price.notice.octopusNotLoaded",
+    action: {
+      label: "price.notice.openOctopus",
+      does: { kind: "page", path: integrationPath("octopus_energy") }
+    }
+  },
+  octopus_no_agile: {
+    text: "price.notice.octopusNoAgile",
+    action: {
+      label: "price.notice.openOctopus",
+      does: { kind: "page", path: integrationPath("octopus_energy") }
+    }
+  },
+  octopus_region_mismatch: {
+    text: "price.notice.octopusRegionMismatch",
+    action: { label: "price.notice.chooseArea", does: { kind: "area" } }
+  },
+  add_zonneplan: {
+    text: "price.notice.addZonneplan",
+    action: { label: "price.notice.addZonneplan.action", does: { kind: "zonneplan" } }
+  },
+  zonneplan_not_loaded: {
+    text: "price.notice.zonneplanNotLoaded",
+    action: {
+      label: "price.notice.openZonneplan",
+      does: { kind: "page", path: integrationPath("zonneplan_one") }
+    }
+  },
+  zonneplan_no_tariff: {
+    text: "price.notice.zonneplanNoTariff",
+    action: {
+      label: "price.notice.openZonneplan",
+      does: { kind: "page", path: integrationPath("zonneplan_one") }
+    }
+  },
+  zonneplan_area: {
+    text: "price.notice.zonneplanArea",
+    action: { label: "price.notice.chooseArea", does: { kind: "area" } }
+  },
+  source_missing: {
+    text: "price.notice.sourceMissing",
+    action: { label: "price.notice.chooseArea", does: { kind: "area" } }
+  }
+};
+
 // src/model.ts
 function chargerCarsOf(dashboard) {
   if (dashboard.vehicle_choices.length === 0) {
@@ -59575,17 +60509,6 @@ function admittedAction(control, action, choice) {
     return control.automatic_action === ACTION_PAUSE && control.pause_choices.includes(choice);
   }
   return choice === null && control.automatic_action === ACTION_RESUME;
-}
-
-// src/observation-freshness.ts
-var OBSERVATION_MAX_AGE_MS = 9e4;
-var OBSERVATION_CLOCK_SKEW_MS = 5e3;
-function observationFreshness(timestamp, now, failed = false, maxAge = OBSERVATION_MAX_AGE_MS) {
-  if (failed) return "failed";
-  if (timestamp === null || !Number.isFinite(timestamp) || !Number.isFinite(now)) return "invalid";
-  if (timestamp > now + OBSERVATION_CLOCK_SKEW_MS) return "future";
-  if (now - timestamp > maxAge) return "old";
-  return "fresh";
 }
 
 // src/morek-view.ts
@@ -59647,13 +60570,13 @@ function morekEvidence(state, observedAt, failed, now = Date.now()) {
 }
 function transitions(doc, profile) {
   const start2 = new Date(profile.chargingSchedule.startSchedule).getTime();
-  const list2 = doc.createElement("ul");
+  const list3 = doc.createElement("ul");
   for (const period of profile.chargingSchedule.chargingSchedulePeriod) {
     const line = doc.createElement("li");
     line.textContent = `${localTime(new Date(start2 + period.startPeriod * 1e3).toISOString())}: ${period.limit} A`;
-    list2.append(line);
+    list3.append(line);
   }
-  return list2;
+  return list3;
 }
 var PREVIEW_REFUSALS = {
   pause_auto_first: "Pause Auto 'Until I resume' before sending.",
@@ -59870,13 +60793,13 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
       coverage.textContent = `Reported duration: ${state.effective.duration_s ?? "not reported"} seconds \xB7 unit: ${state.effective.rate_unit ?? "not reported"} \xB7 schedule start: ${localTime(state.effective.schedule_start ?? null)}.`;
       section.append(coverage);
     }
-    const list2 = doc.createElement("ul");
+    const list3 = doc.createElement("ul");
     for (const period of state.effective.periods) {
       const line = doc.createElement("li");
       line.textContent = `${localTime(period.at)}: ${period.amps} A`;
-      list2.append(line);
+      list3.append(line);
     }
-    section.append(list2);
+    section.append(list3);
   }
   if (typeof error2 === "string" && error2.trim() !== "") {
     const message = doc.createElement("p");
@@ -59888,11 +60811,11 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
     actions3.className = VISUAL_CLASSES.morekActions;
     actions3.dataset["morekActions"] = "";
     const choices = state.supported ? [["Recalculate preview", "status"], ["Send current plan", "send"], ["Refresh from Morek", "fetch"]] : [["Check connection again", "status"]];
-    for (const [label, action] of choices) {
+    for (const [label2, action] of choices) {
       const button = doc.createElement("button");
       button.type = "button";
       button.className = VISUAL_CLASSES.button;
-      button.textContent = label;
+      button.textContent = label2;
       button.dataset["morekAction"] = action;
       button.disabled = busy || action === "send" && (state.outcomes?.uncertain === true || state.preview === void 0 || state.preview.reason !== null || !state.preview.profile || !state.preview.preview_id);
       button.addEventListener("click", () => {
@@ -59963,16 +60886,16 @@ function healthKey(state, observedAt, failed, busy, now) {
 // shared-dashboard/reserve-model.js
 var finiteOrNull = (v2) => Number.isFinite(v2) && v2 >= 0 ? v2 : null;
 var reserveWindow = (detail, priced) => detail && detail.reserve_minutes !== void 0 ? { reserveMinutes: finiteOrNull(detail.reserve_minutes), reserveKwh: finiteOrNull(detail.reserve_kwh), reserveCost: priced && Number.isFinite(detail.reserve_cost) ? detail.reserve_cost : null } : {};
-function reserveModel(raw, currency, text3) {
+function reserveModel(raw, currency, text4) {
   if (!raw || typeof raw !== "object" || !Number.isFinite(raw.percent) || raw.percent <= 0) return null;
   const allowance = raw.allowance && raw.allowance.kind === "upper_allowance" ? raw.allowance : null;
-  const limitText = typeof raw.limit === "string" ? text3.limits[raw.limit] || text3.limits.unknown : null;
+  const limitText = typeof raw.limit === "string" ? text4.limits[raw.limit] || text4.limits.unknown : null;
   return {
     percent: raw.percent,
     minutes: finiteOrNull(raw.minutes),
     requestedMinutes: finiteOrNull(raw.requested_minutes),
     limitText,
-    explain: text3.explain,
+    explain: text4.explain,
     allowance: allowance ? { energyKwh: finiteOrNull(allowance.energy_kwh), cost: currency && allowance.cost && allowance.cost.currency === currency && Number.isFinite(allowance.cost.value) ? allowance.cost.value : null } : null
   };
 }
@@ -59993,19 +60916,19 @@ function decodeLearning(raw) {
   const rejections = raw.rejections && typeof raw.rejections === "object" && !Array.isArray(raw.rejections) ? Object.entries(raw.rejections).filter(([reason, n6]) => /^[a-z_0-9]{1,40}$/.test(reason) && count(n6) > 0).map(([reason, n6]) => ({ reason, count: n6 })).sort((a4, b3) => b3.count - a4.count || a4.reason.localeCompare(b3.reason)).slice(0, 5) : [];
   return { source: raw.source, mode: raw.mode, valid, agreeing, lengthen, shorten, effect, clamped: raw.clamped === true, rejections };
 }
-function learningModel(raw, stale, text3) {
+function learningModel(raw, stale, text4) {
   const state = stale ? "stale" : "fresh";
   const block = decodeLearning(raw);
-  if (!block) return { state: stale ? "stale" : "unknown", lines: [text3.unknown], note: text3.note, stale: !!stale, staleText: stale ? text3.stale : null };
+  if (!block) return { state: stale ? "stale" : "unknown", lines: [text4.unknown], note: text4.note, stale: !!stale, staleText: stale ? text4.stale : null };
   const lines = [
-    block.source === "learned" ? text3.learned : text3.default,
-    fill(text3.samples, { agreeing: block.agreeing, shorten: block.shorten, lengthen: block.lengthen, valid: block.valid })
+    block.source === "learned" ? text4.learned : text4.default,
+    fill(text4.samples, { agreeing: block.agreeing, shorten: block.shorten, lengthen: block.lengthen, valid: block.valid })
   ];
-  if (block.clamped) lines.push(text3.clamped);
-  const effect = stale ? text3.effect_unknown : block.effect === null ? text3.effect_unknown : block.effect === 0 ? text3.effect_none : fill(block.effect > 0 ? text3.effect_longer : text3.effect_shorter, { minutes: Math.abs(block.effect) });
+  if (block.clamped) lines.push(text4.clamped);
+  const effect = stale ? text4.effect_unknown : block.effect === null ? text4.effect_unknown : block.effect === 0 ? text4.effect_none : fill(block.effect > 0 ? text4.effect_longer : text4.effect_shorter, { minutes: Math.abs(block.effect) });
   lines.push(effect);
-  if (block.rejections.length) lines.push(fill(text3.rejected, { list: block.rejections.map((r7) => `${r7.reason.replace(/_/g, " ")} \xD7${r7.count}`).join(", ") }));
-  return { state, source: block.source, lines, note: text3.note, stale: !!stale, staleText: stale ? text3.stale : null, title: text3.title };
+  if (block.rejections.length) lines.push(fill(text4.rejected, { list: block.rejections.map((r7) => `${r7.reason.replace(/_/g, " ")} \xD7${r7.count}`).join(", ") }));
+  return { state, source: block.source, lines, note: text4.note, stale: !!stale, staleText: stale ? text4.stale : null, title: text4.title };
 }
 
 // sidebar/price-chart.js
@@ -60682,8 +61605,8 @@ function createLogViewer(getHass, { fetchLogs = getLogs, intervalMs = 5e3, timer
   root.innerHTML = MARKUP;
   const q = (s4) => root.querySelector(s4);
   const state = { lines: [], after: 0, boot: null, timer: null, busy: false, epoch: 0 };
-  const status = (text3) => {
-    q(".log-status").textContent = text3;
+  const status = (text4) => {
+    q(".log-status").textContent = text4;
   };
   const paint = () => {
     q(".log-lines").textContent = state.lines.map((l6) => l6.text).join("\n");
@@ -60866,7 +61789,7 @@ function checkItem(status, now, link, facts) {
   const reconciliation = status?.reconciliation;
   if (!isObject5(reconciliation) || reconciliation.check === void 0 || reconciliation.check === null) return null;
   const check = reconciliation.check;
-  const unknown = (text3) => ({ kind: "check_unknown", level: "info", text: text3 });
+  const unknown = (text4) => ({ kind: "check_unknown", level: "info", text: text4 });
   if (!isObject5(check)) return unknown("The schedule check result isn\u2019t readable, so it isn\u2019t known whether the charger\u2019s schedule matches.");
   if (check.class === null || check.class === void 0) return null;
   const at = stamp(check.at, now);
@@ -60956,7 +61879,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.155";
+var CARD_VERSION = "2.5.158";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {
@@ -61018,6 +61941,7 @@ var fresh = (timestamp, failed = false) => observationFreshness(timestamp, Date.
 var dashboardFresh = (dashboard, failed) => fresh(Date.parse(dashboard?.generated_at || ""), failed);
 var settingsWritesByConnection = /* @__PURE__ */ new WeakMap();
 var chargeWritesByConnection = /* @__PURE__ */ new WeakMap();
+var vehicleWritesByConnection = /* @__PURE__ */ new WeakMap();
 function actionFailure(code, action) {
   const reasons = {
     spotnav_action_unavailable: "The action is no longer available. Refresh and check the current Auto state.",
@@ -61084,6 +62008,18 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this.statusEpoch = 0;
     this.pendingSettingsWrites = /* @__PURE__ */ new Map();
     this.unknownSettingsWrites = /* @__PURE__ */ new Set();
+    this.pendingVehicleWrites = /* @__PURE__ */ new Map();
+    this.unknownVehicleWrites = /* @__PURE__ */ new Set();
+    this.vehicleConfig = null;
+    this.vehicleConfigAt = null;
+    this.vehicleConfigFailed = false;
+    this.vehicleLoading = false;
+    this.vehicleSelected = null;
+    this.vehicleBase = null;
+    this.vehicleDirty = false;
+    this.vehicleBusy = false;
+    this.vehicleConflict = false;
+    this.vehicleNotice = "";
     this.autoNotice = "";
     this.connected = false;
   }
@@ -61128,6 +62064,13 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       this.pendingSettingsWrites = this.settingsWriteContext.pending;
       this.unknownSettingsWrites = this.settingsWriteContext.unknown;
     }
+    if (!this.vehicleWriteContext && value2) {
+      const key3 = value2.connection || value2;
+      if (!vehicleWritesByConnection.has(key3)) vehicleWritesByConnection.set(key3, { pending: /* @__PURE__ */ new Map(), unknown: /* @__PURE__ */ new Set() });
+      this.vehicleWriteContext = vehicleWritesByConnection.get(key3);
+      this.pendingVehicleWrites = this.vehicleWriteContext.pending;
+      this.unknownVehicleWrites = this.vehicleWriteContext.unknown;
+    }
     if (!this.chargeWriteContext && value2) {
       const key3 = value2.connection || value2;
       if (!chargeWritesByConnection.has(key3)) chargeWritesByConnection.set(key3, { pending: /* @__PURE__ */ new Map(), unknown: /* @__PURE__ */ new Set(), expected: /* @__PURE__ */ new Map() });
@@ -61157,6 +62100,14 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
         if (this.morekActiveAction === "send") this.morekUncertain = true;
         this.morekError = "Permission changed during the operation; its outcome may be unknown.";
       }
+      if (this.vehicleBusy && this.charger) {
+        this.unknownVehicleWrites.add(this.charger);
+        this.vehicleConflict = true;
+        this.vehicleNotice = "Permission changed during the vehicle save; its outcome must be checked by reloading.";
+      }
+      this.vehicleConfig = null;
+      this.vehicleConfigAt = null;
+      this.vehicleLoading = false;
       if (this.autoBusy) {
         this.autoUncertain = true;
         this.autoNotice = "Permission changed during the operation; its outcome may be unknown.";
@@ -61172,10 +62123,10 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
   get hass() {
     return this._hass;
   }
-  message(text3) {
+  message(text4) {
     const el = this.shadowRoot.querySelector(".message");
-    el.textContent = text3;
-    el.hidden = !text3;
+    el.textContent = text4;
+    el.hidden = !text4;
   }
   stopObservations(preserveDraft = false) {
     const dirty = preserveDraft && this.settingsDirty;
@@ -61186,6 +62137,20 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     }
     if (this.settingsBusy && this.charger) this.unknownSettingsWrites.add(this.charger);
     if (this.chargeBusy && this.charger) this.chargeUnknown?.add(this.charger);
+    if (this.vehicleBusy && this.charger) this.unknownVehicleWrites.add(this.charger);
+    const vehicleDirty = preserveDraft && this.vehicleDirty;
+    this.vehicleConfig = null;
+    this.vehicleConfigAt = null;
+    this.vehicleConfigFailed = false;
+    this.vehicleLoading = false;
+    this.vehicleBusy = false;
+    this.vehicleConflict = false;
+    this.vehicleNotice = "";
+    this.vehicleDirty = !!vehicleDirty;
+    if (!preserveDraft) {
+      this.vehicleBase = null;
+      this.vehicleSelected = null;
+    }
     this.chargeBusy = false;
     this.chargeNotice = "";
     this.learningNotice = "";
@@ -61257,16 +62222,16 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     }
     const allowed = this._hass?.user?.is_admin === true || dashboard?.settings?.users_change_plan === true;
     if (this.settingsRecord) {
-      const record3 = this.settingsRecord;
+      const record4 = this.settingsRecord;
       const currency = dashboard?.market?.currency || null;
       if (this.settingsDirty && this.draftCurrency !== void 0 && this.draftCurrency !== currency) {
         this.settingsConflict = true;
         this.settingsNotice = "Price currency changed while editing. Reload settings before saving.";
       }
       adapter.model.capCurrency = currency;
-      adapter.model.settings = { driver: record3.driver, energy: record3.requested_kwh, vehicleId: record3.target.vehicle_id || "", target: record3.target.target_percent, minimum: record3.minimum_ready_by_soc, cap: capInput(record3.soft_price_cap, currency), readyBy: record3.departure_time, ...record3.time_reserve_percent === void 0 ? {} : { reserve: record3.time_reserve_percent }, capEnabled: record3.soft_price_cap != null, capBasis: record3.cap_price_basis, deadlineEnabled: record3.departure_enabled };
+      adapter.model.settings = { driver: record4.driver, energy: record4.requested_kwh, vehicleId: record4.target.vehicle_id || "", target: record4.target.target_percent, minimum: record4.minimum_ready_by_soc, cap: capInput(record4.soft_price_cap, currency), readyBy: record4.departure_time, ...record4.time_reserve_percent === void 0 ? {} : { reserve: record4.time_reserve_percent }, capEnabled: record4.soft_price_cap != null, capBasis: record4.cap_price_basis, deadlineEnabled: record4.departure_enabled };
       adapter.model.planVehicles = dashboard ? chargerCarsOf(dashboard).filter((v2) => v2.id && v2.id !== "guest") : [];
-      const discovered = dashboard?.soc?.vehicle_id, selected = record3.target.vehicle_id;
+      const discovered = dashboard?.soc?.vehicle_id, selected = record4.target.vehicle_id;
       const defaultVehicle = !selected && !dashboard?.guest?.active && adapter.model.planVehicles.length === 1 ? adapter.model.planVehicles[0] : null;
       if (defaultVehicle) {
         Object.assign(adapter.model.settings, { vehicleId: defaultVehicle.id, driver: "target_soc", target: 80, minimum: 40, readyBy: "07:30", deadlineEnabled: true });
@@ -61274,14 +62239,14 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       }
       adapter.model.vehicleHelp = selected === "guest" || dashboard?.guest?.active ? "Guest charging uses requested energy; choose a configured vehicle for a target-SOC plan." : selected ? adapter.model.planVehicles.some((v2) => v2.id === selected) ? "Saved vehicle selected." : "Saved vehicle is not currently discovered; check vehicle configuration." : defaultVehicle ? "The only available vehicle is selected by default. Target 80%, minimum 40%, and ready by 07:30 are proposed, not saved; review and save the plan to apply them." : discovered && discovered !== "guest" ? `No vehicle saved; currently discovered: ${dashboard?.soc?.vehicle_name || discovered}. Choose a vehicle.` : "No unambiguous vehicle selected. Choose a discovered vehicle or configure vehicle discovery.";
       adapter.model.vehicleHelp += ` ${dashboard?.soc?.capacity_kwh > 0 ? "Capacity is available for the observed vehicle." : "Usable battery capacity is unavailable for the observed vehicle; configure it before relying on an SOC plan."} ${adapter.model.vehicle.socDetail} An old reading can be inaccurate after driving.`;
-      if (adapter.model.chart && record3.revision === dashboard?.settings?.revision && record3.cap_price_basis === "nord_pool" && Number.isFinite(record3.soft_price_cap)) {
-        adapter.model.chart.cap = displayPrice(record3.soft_price_cap, currency);
+      if (adapter.model.chart && record4.revision === dashboard?.settings?.revision && record4.cap_price_basis === "nord_pool" && Number.isFinite(record4.soft_price_cap)) {
+        adapter.model.chart.cap = displayPrice(record4.soft_price_cap, currency);
       }
       adapter.model.settingsEditor = true;
-      adapter.model.policySupported = record3.soft_price_cap !== void 0;
+      adapter.model.policySupported = record4.soft_price_cap !== void 0;
       adapter.model.canSave = allowed && !this.settingsBusy && !this.settingsConflict;
       adapter.model.settingsNotice = this.settingsNotice || (!allowed ? "You do not have permission to change this plan." : "");
-      adapter.model.labels.settingsNote = `Charge by requested energy or a SpotNav target SOC. The planning target is separate from the car\u2019s own charge limit. Saving a mode, target or energy change can recalculate the plan and may trigger normal guarded schedule reconciliation when ownership is armed; it does not guarantee Resume or physical charging.${record3.fill_to_limit ? " Fill-to-limit is saved separately and remains enabled; review it in the existing card if the requested energy is not being used." : ""}`;
+      adapter.model.labels.settingsNote = `Charge by requested energy or a SpotNav target SOC. The planning target is separate from the car\u2019s own charge limit. Saving a mode, target or energy change can recalculate the plan and may trigger normal guarded schedule reconciliation when ownership is armed; it does not guarantee Resume or physical charging.${record4.fill_to_limit ? " Fill-to-limit is saved separately and remains enabled; review it in the existing card if the requested energy is not being used." : ""}`;
       adapter.model.labels.saveLabel = this.settingsBusy ? "Saving\u2026" : "Save plan";
       adapter.actions.save = (values) => this.savePlan(values);
       adapter.actions.reloadSettings = () => this.reloadSettings();
@@ -61291,6 +62256,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
         this.paintMorek();
       };
     } else adapter.model.settingsNotice = this.settingsLoading ? "Loading settings\u2026" : this.settingsNotice || "Settings unavailable.";
+    this.paintVehicleSources(adapter, dashboard);
     this.message(this.dashboardFailed ? "Dashboard refresh failed; the last observation may be stale." : "");
     if (this.view) this.view.update(adapter);
     else this.view = mountDashboard(this.shadowRoot.querySelector("main"), adapter);
@@ -61330,14 +62296,14 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     const summary = document.createElement("summary");
     summary.textContent = "What SpotNav sees";
     facts.append(summary);
-    const list2 = document.createElement("ul");
-    list2.style.margin = "4px 0 0";
+    const list3 = document.createElement("ul");
+    list3.style.margin = "4px 0 0";
     for (const fact of info.facts) {
       const li = document.createElement("li");
       li.textContent = fact;
-      list2.append(li);
+      list3.append(li);
     }
-    facts.append(list2);
+    facts.append(list3);
     nodes.push(facts);
     el.replaceChildren(...nodes);
   }
@@ -61611,7 +62577,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
   }
   async morekAction(action) {
     const hass = this._hass, charger = this.charger, generation = this.generation, permissionEpoch = this.permissionEpoch, statusSnapshot = this.rawStatus, observedAt = this.statusAt, state = decodeMorekState(statusSnapshot);
-    if (!this.connected || hass?.connected === false || hass?.user?.is_admin !== true || !charger || !state || this.morekBusy || this.autoBusy || this.chargeBusy || !["status", "send", "fetch", "clear", "reconfirm_migration", "recalculate_sync", "reset_learning"].includes(action)) return;
+    if (!this.connected || hass?.connected === false || hass?.user?.is_admin !== true || !charger || !state || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || !["status", "send", "fetch", "clear", "reconfirm_migration", "recalculate_sync", "reset_learning"].includes(action)) return;
     if (action === "reconfirm_migration" && state.ownership?.reconfirmation_required !== true) return;
     if (action !== "status" && !state.supported) return;
     if (action === "clear" && state.cleanup_supported !== true) return;
@@ -61700,22 +62666,22 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     }
   }
   async savePlan(values) {
-    const generation = this.generation, permissionEpoch = this.permissionEpoch, charger = this.charger, hass = this._hass, record3 = this.settingsRecord;
+    const generation = this.generation, permissionEpoch = this.permissionEpoch, charger = this.charger, hass = this._hass, record4 = this.settingsRecord;
     const decoded = decodeDashboard(this.rawDashboard);
     const allowed = hass?.user?.is_admin === true || decoded.ok && decoded.value.settings?.users_change_plan === true;
-    if (!this.connected || hass?.connected === false || !charger || !record3 || this.settingsBusy || this.pendingSettingsWrites.has(charger) || this.morekBusy || this.autoBusy || this.chargeBusy || this.settingsConflict || !allowed) {
+    if (!this.connected || hass?.connected === false || !charger || !record4 || this.settingsBusy || this.pendingSettingsWrites.has(charger) || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.settingsConflict || !allowed) {
       this.settingsNotice = "Save unavailable or permission denied.";
       this.paint();
       return;
     }
-    const base2 = formFromRecord(record3), driver = values.driver ?? base2.driver, vehicleId = values.vehicleId ?? base2.vehicleId;
+    const base2 = formFromRecord(record4), driver = values.driver ?? base2.driver, vehicleId = values.vehicleId ?? base2.vehicleId;
     if (vehicleId !== base2.vehicleId && (!decoded.ok || !chargerCarsOf(decoded.value).some((v2) => v2.id === vehicleId && v2.id !== "guest"))) {
       this.settingsNotice = "Choose an available discovered vehicle.";
       this.paint();
       return;
     }
-    const form = { ...base2, driver, energy: values.energy ?? base2.energy, vehicleId, targetPercent: values.target ?? base2.targetPercent, minimumReadySoc: values.minimum, capValue: capForSave(values.cap, decoded.ok ? decoded.value.market?.currency : null, record3.soft_price_cap), capEnabled: values.capEnabled, capBasis: values.capBasis, deadlineEnabled: values.deadlineEnabled, deadlineTime: values.readyBy, ...base2.timeReserve === void 0 ? {} : { timeReserve: values.reserve ?? base2.timeReserve } };
-    const check = replacementFor("plan", record3, form);
+    const form = { ...base2, driver, energy: values.energy ?? base2.energy, vehicleId, targetPercent: values.target ?? base2.targetPercent, minimumReadySoc: values.minimum, capValue: capForSave(values.cap, decoded.ok ? decoded.value.market?.currency : null, record4.soft_price_cap), capEnabled: values.capEnabled, capBasis: values.capBasis, deadlineEnabled: values.deadlineEnabled, deadlineTime: values.readyBy, ...base2.timeReserve === void 0 ? {} : { timeReserve: values.reserve ?? base2.timeReserve } };
+    const check = replacementFor("plan", record4, form);
     if (!check.ok) {
       this.settingsNotice = translate2("en", check.errorKey);
       this.paint();
@@ -61737,7 +62703,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this.settingsNotice = "Saving\u2026";
     this.paint();
     try {
-      const request = updateSettings(hass, charger, record3.revision, check.body);
+      const request = updateSettings(hass, charger, record4.revision, check.body);
       this.pendingSettingsWrites.set(charger, request);
       request.finally(() => {
         if (this.pendingSettingsWrites.get(charger) === request) this.pendingSettingsWrites.delete(charger);
@@ -61776,6 +62742,274 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
         this.refresh();
       }
     }
+  }
+  vehicleContext() {
+    const config = this.vehicleConfig, decoded = decodeDashboard(this.rawDashboard), dashboard = decoded.ok ? decoded.value : null;
+    if (!config) return null;
+    const vehicleId = chooseVehicle(config.vehicles, this.vehicleSelected, this.settingsRecord?.target?.vehicle_id || null);
+    const vehicle = config.vehicles.find((v2) => v2.id === vehicleId);
+    if (!vehicle) return null;
+    return { vehicleId, vehicle, dashboard, row: (dashboard?.vehicles || []).find((r7) => r7.id === vehicleId) || null, props: (config.vehicleProperties || []).find((p4) => p4.id === vehicleId) || null };
+  }
+  paintVehicleSources(adapter, dashboard) {
+    const admin = this._hass?.user?.is_admin === true, charger = this.charger;
+    const unknown = this.unknownVehicleWrites.has(charger) || this.pendingVehicleWrites.has(charger);
+    const ctx = this.vehicleContext();
+    if (this.vehicleDirty && this.vehicleBase && ctx && !this.vehicleConflict && (ctx.vehicleId !== this.vehicleBase.vehicleId || vehicleSignature(ctx.vehicle, ctx.props) !== this.vehicleBase.signature)) {
+      this.vehicleConflict = true;
+      this.vehicleNotice = "Vehicle sources changed while editing. Reload before saving again.";
+    }
+    const states = this._hass?.states;
+    const entityState = (id) => {
+      if (!states) return "ok";
+      const s4 = states[id];
+      return !s4 ? "missing" : ["unavailable", "unknown"].includes(s4.state) ? "unavailable" : "ok";
+    };
+    const vehicle = adapter.model.vehicle;
+    adapter.model.vehicleSources = vehicleSourcesModel({
+      admin,
+      loading: this.vehicleLoading,
+      failed: this.vehicleConfigFailed,
+      config: this.vehicleConfig,
+      configAt: this.vehicleConfigAt,
+      now: Date.now(),
+      rows: dashboard?.vehicles || [],
+      dashboardFresh: !!dashboard && dashboardFresh(dashboard, this.dashboardFailed),
+      reading: { vehicleId: dashboard?.soc?.vehicle_id ?? null, value: vehicle?.soc, stale: vehicle?.stale, detail: vehicle?.socDetail || "" },
+      savedId: this.settingsRecord?.target?.vehicle_id || null,
+      selectedId: this.vehicleSelected,
+      entityState,
+      blocked: this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || unknown,
+      conflict: this.vehicleConflict || unknown,
+      busy: this.vehicleBusy,
+      notice: unknown && !this.vehicleNotice ? "A previous vehicle save has an unknown outcome. Reload vehicle sources to confirm it." : this.vehicleNotice
+    });
+    adapter.actions.editVehicle = () => this.editVehicle();
+    adapter.actions.selectVehicle = (id) => this.selectVehicle(id);
+    adapter.actions.saveVehicleSensor = (values) => this.saveVehicleSensor(values);
+    adapter.actions.saveVehicleProperties = (values) => this.saveVehicleProperties(values);
+    adapter.actions.reloadVehicleSources = () => this.reloadVehicleSources();
+  }
+  editVehicle() {
+    if (this.vehicleDirty) return;
+    const ctx = this.vehicleContext();
+    this.vehicleBase = ctx ? { vehicleId: ctx.vehicleId, signature: vehicleSignature(ctx.vehicle, ctx.props), props: ctx.props ? { ...ctx.props } : null } : null;
+    this.vehicleDirty = true;
+  }
+  selectVehicle(id) {
+    if (this.vehicleBusy || id === (this.vehicleContext()?.vehicleId ?? "")) {
+      this.paint();
+      return;
+    }
+    if (this.vehicleDirty && !window.confirm("Discard the unsaved vehicle changes and switch vehicle?")) {
+      this.paint();
+      return;
+    }
+    this.view?.resetVehicleDrafts();
+    this.vehicleDirty = false;
+    this.vehicleBase = null;
+    this.vehicleSelected = id || null;
+    this.vehicleNotice = "";
+    this.paint();
+  }
+  reloadVehicleSources() {
+    const charger = this.charger;
+    if (!this.connected || !charger || this.vehicleBusy || this.pendingVehicleWrites.has(charger)) return;
+    if (this.vehicleDirty && !window.confirm("Discard the unsaved vehicle changes and reload vehicle sources?")) return;
+    this.view?.resetVehicleDrafts();
+    this.vehicleDirty = false;
+    this.vehicleBase = null;
+    this.vehicleConflict = false;
+    this.unknownVehicleWrites.delete(charger);
+    this.vehicleNotice = "";
+    this.vehicleConfig = null;
+    this.vehicleConfigAt = null;
+    this.paint();
+    void this.loadVehicleConfig();
+    this.refresh();
+  }
+  async loadVehicleConfig() {
+    if (this.vehicleLoading || this.vehicleBusy || !this.charger || this._hass?.user?.is_admin !== true) return;
+    const generation = this.generation, permissionEpoch = this.permissionEpoch, charger = this.charger, hass = this._hass;
+    const current = () => this.connected && generation === this.generation && permissionEpoch === this.permissionEpoch && charger === this.charger;
+    this.vehicleLoading = true;
+    try {
+      const decoded = decodeEntityAnswer(await this.bounded(getEntityConfig(hass, charger)));
+      if (!current()) return;
+      if (!decoded.ok || !decoded.value.ok) {
+        this.vehicleConfigFailed = true;
+        this.vehicleNotice = decoded.ok && decoded.value.code ? translate2("en", entityErrorKey(decoded.value.code)) : "Vehicle sources unavailable.";
+        return;
+      }
+      this.vehicleConfig = decoded.value.config;
+      this.vehicleConfigAt = Date.now();
+      this.vehicleConfigFailed = false;
+      if (this.unknownVehicleWrites.has(charger) || this.pendingVehicleWrites.has(charger)) {
+        this.vehicleConflict = true;
+        this.vehicleNotice = "A previous vehicle save has an unknown outcome. Reload vehicle sources to confirm it.";
+      } else if (this.vehicleNotice === "Vehicle sources unavailable.") this.vehicleNotice = "";
+    } catch {
+      if (current()) {
+        this.vehicleConfigFailed = true;
+        this.vehicleNotice = this.vehicleConfig ? this.vehicleNotice : "Vehicle sources unavailable.";
+      }
+    } finally {
+      if (this.connected && generation === this.generation) {
+        this.vehicleLoading = false;
+        this.paint();
+      }
+    }
+  }
+  vehicleWriteBlocked(ctx) {
+    const charger = this.charger, hass = this._hass;
+    return !this.connected || hass?.connected === false || hass?.user?.is_admin !== true || !charger || !ctx || this.vehicleBusy || this.vehicleLoading || this.pendingVehicleWrites.has(charger) || this.unknownVehicleWrites.has(charger) || this.vehicleConflict || this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy;
+  }
+  async finishVehicleWrite(generation, charger, body) {
+    this.vehicleBusy = true;
+    this.statusEpoch++;
+    this.statusAt = null;
+    this.paint();
+    try {
+      await body();
+    } finally {
+      if (this.connected && generation === this.generation && charger === this.charger) {
+        this.vehicleBusy = false;
+        this.dashboardEpoch++;
+        this.paint();
+        this.refresh();
+      }
+    }
+  }
+  vehicleAnswer(label2, ok2, code, fieldErrors, config) {
+    if (ok2) {
+      this.vehicleDirty = false;
+      this.vehicleBase = null;
+      this.vehicleConflict = false;
+      this.view?.resetVehicleDrafts();
+      this.vehicleNotice = `${label2} saved and confirmed by the backend. Plans for this car may recalculate and, if Morek owns the schedule, go through normal guarded reconciliation; this does not wake the car, send a notification or confirm charging.`;
+    } else {
+      if (code === ENTITY_CONFLICT) this.vehicleConflict = true;
+      const first = fieldErrors?.[0];
+      this.vehicleNotice = `${label2} not saved: ${translate2("en", first ? fieldErrorKey(first.code) : entityErrorKey(code))}`;
+    }
+    if (config) {
+      this.vehicleConfig = config;
+      this.vehicleConfigAt = Date.now();
+      this.vehicleConfigFailed = false;
+    }
+  }
+  async saveVehicleSensor(values) {
+    const generation = this.generation, permissionEpoch = this.permissionEpoch, charger = this.charger, hass = this._hass, ctx = this.vehicleContext();
+    if (this.vehicleWriteBlocked(ctx)) {
+      this.vehicleNotice = "Save unavailable: another request is running, the outcome of a previous save is unknown, or permission is missing.";
+      this.paint();
+      return;
+    }
+    if (!this.vehicleConfigAt || Date.now() - this.vehicleConfigAt > 9e4 || this.vehicleConfigFailed) {
+      this.vehicleNotice = "Sensor information is stale. Wait for a fresh read or reload vehicle sources.";
+      this.paint();
+      return;
+    }
+    const plan = sensorWritePlan(ctx.vehicle, values?.sensor);
+    if (!plan.ok) {
+      this.vehicleNotice = plan.notice;
+      this.paint();
+      return;
+    }
+    if (!plan.changed) {
+      this.vehicleNotice = "No changes to save.";
+      this.paint();
+      return;
+    }
+    if (plan.replacesChoice && !window.confirm(plan.entityId ? "Replace the sensor you chose earlier for this car?" : "Clear your sensor choice and return to automatic detection? With several candidates this leaves the car without a charge reading.")) return;
+    const vehicle = ctx.vehicle, current = () => this.connected && generation === this.generation && permissionEpoch === this.permissionEpoch && charger === this.charger;
+    await this.finishVehicleWrite(generation, charger, async () => {
+      const request = setVehicleSoc(hass, charger, { vehicleId: vehicle.id, entityId: plan.entityId, expectedEntityId: plan.expected });
+      this.pendingVehicleWrites.set(charger, request);
+      request.finally(() => {
+        if (this.pendingVehicleWrites.get(charger) === request) this.pendingVehicleWrites.delete(charger);
+      }).catch(() => {
+      });
+      this.vehicleNotice = "Saving\u2026";
+      this.paint();
+      try {
+        const answer = decodeEntityAnswer(await this.bounded(request));
+        if (!current()) {
+          this.unknownVehicleWrites.add(charger);
+          return;
+        }
+        if (!answer.ok) {
+          this.unknownVehicleWrites.add(charger);
+          this.vehicleConflict = true;
+          this.vehicleNotice = "Save response unavailable; outcome unknown. Reload vehicle sources before retrying.";
+          return;
+        }
+        this.vehicleAnswer("Sensor choice", answer.value.ok, answer.value.ok ? null : answer.value.code, answer.value.ok ? [] : answer.value.fieldErrors, answer.value.config);
+      } catch {
+        this.unknownVehicleWrites.add(charger);
+        if (this.connected && generation === this.generation) {
+          this.vehicleConflict = true;
+          this.vehicleNotice = "Save outcome unknown; the request may still complete. Wait, then reload vehicle sources before retrying.";
+        }
+      }
+    });
+  }
+  async saveVehicleProperties(values) {
+    const generation = this.generation, permissionEpoch = this.permissionEpoch, charger = this.charger, hass = this._hass, ctx = this.vehicleContext();
+    if (this.vehicleWriteBlocked(ctx)) {
+      this.vehicleNotice = "Save unavailable: another request is running, the outcome of a previous save is unknown, or permission is missing.";
+      this.paint();
+      return;
+    }
+    if (!this.vehicleConfigAt || Date.now() - this.vehicleConfigAt > 9e4 || this.vehicleConfigFailed) {
+      this.vehicleNotice = "Vehicle information is stale. Wait for a fresh read or reload vehicle sources.";
+      this.paint();
+      return;
+    }
+    const props = this.vehicleBase?.vehicleId === ctx.vehicleId && this.vehicleBase.props ? this.vehicleBase.props : ctx.props;
+    const plan = propertyWritePlan(props, values || {});
+    if (!plan.ok) {
+      this.vehicleNotice = plan.notice;
+      this.paint();
+      return;
+    }
+    if (!plan.changed) {
+      this.vehicleNotice = "No changes to save.";
+      this.paint();
+      return;
+    }
+    if (plan.clearsCapacity && !window.confirm("Clear the battery capacity you entered? Plans that need a capacity will hold until one is available.")) return;
+    const vehicleId = ctx.vehicleId, current = () => this.connected && generation === this.generation && permissionEpoch === this.permissionEpoch && charger === this.charger;
+    await this.finishVehicleWrite(generation, charger, async () => {
+      const request = updateVehicle(hass, charger, { vehicleId, changes: plan.changes, expected: plan.expected });
+      this.pendingVehicleWrites.set(charger, request);
+      request.finally(() => {
+        if (this.pendingVehicleWrites.get(charger) === request) this.pendingVehicleWrites.delete(charger);
+      }).catch(() => {
+      });
+      this.vehicleNotice = "Saving\u2026";
+      this.paint();
+      try {
+        const answer = decodeVehicleWriteAnswer(await this.bounded(request));
+        if (!current()) {
+          this.unknownVehicleWrites.add(charger);
+          return;
+        }
+        if (!answer.ok) {
+          this.unknownVehicleWrites.add(charger);
+          this.vehicleConflict = true;
+          this.vehicleNotice = "Save response unavailable; outcome unknown. Reload vehicle sources before retrying.";
+          return;
+        }
+        this.vehicleAnswer("Capacity and phases", answer.value.ok, answer.value.ok ? null : answer.value.code, answer.value.ok ? [] : answer.value.fieldErrors, answer.value.config);
+      } catch {
+        this.unknownVehicleWrites.add(charger);
+        if (this.connected && generation === this.generation) {
+          this.vehicleConflict = true;
+          this.vehicleNotice = "Save outcome unknown; the request may still complete. Wait, then reload vehicle sources before retrying.";
+        }
+      }
+    });
   }
   bounded(request) {
     let timer, cancel;
@@ -61840,6 +63074,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       return;
     }
     if (!this.settingsRecord && !this.settingsLoading) void this.loadSettings();
+    if (hass.user?.is_admin === true && !this.vehicleLoading && !this.vehicleBusy && (!this.vehicleConfig || Date.now() - (this.vehicleConfigAt || 0) > CONFIG_REFRESH_MS)) void this.loadVehicleConfig();
     const valid = () => this.connected && generation === this.generation && this.charger === charger && this._hass?.connected !== false;
     if (!this.ageTimer) this.ageTimer = setInterval(() => {
       if (valid()) {

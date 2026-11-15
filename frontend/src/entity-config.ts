@@ -256,6 +256,23 @@ export interface VehicleSoc {
   candidates: EntityRef[];
 }
 
+/**
+ * A choosable vehicle's planning properties as `get_entity_config` states them, present even when no charge-level
+ * sensor is chosen (the dashboard has no row then). `reportedKnown` false: nothing could be asked of the car, so a
+ * vehicle-reported capacity is unknown rather than absent. `capacityKwh`/`onboardPhases` are the effective values
+ * `update_vehicle`'s compare-and-set checks.
+ */
+export interface VehiclePropertiesInfo {
+  id: string;
+  capacityKwh: number | null;
+  capacitySource: "reported" | "stored" | null;
+  reportedCapacityKwh: number | null;
+  reportedKnown: boolean;
+  storedCapacityKwh: number | null;
+  onboardPhases: number;
+  storedOnboardPhases: number | null;
+}
+
 /** How a charger is started and stopped, as its adapter describes it. */
 export interface ControlStartStop {
   kind: "switch" | "select" | "buttons" | "easee" | "number_pause" | "other";
@@ -324,6 +341,8 @@ export interface EntityConfig {
   fields: EntityField[];
   site: EntitySite | null;
   vehicles: VehicleSoc[];
+  /** Empty from a backend that does not send `vehicle_properties`. */
+  vehicleProperties: VehiclePropertiesInfo[];
   /** `null` while the charger is not loaded. */
   control: EntityControl | null;
 }
@@ -697,6 +716,33 @@ function decodeVehicle(raw: unknown): VehicleSoc {
   };
 }
 
+function decodeVehicleProperties(raw: unknown): VehiclePropertiesInfo {
+  const source = record(raw);
+  exactKeys(source, [
+    "id", "capacity_kwh", "capacity_source", "reported_capacity_kwh", "reported_known",
+    "stored_capacity_kwh", "onboard_phases", "stored_onboard_phases",
+  ]);
+  const origin = source["capacity_source"];
+  if (origin !== "reported" && origin !== "stored" && origin !== null) {
+    return bad();
+  }
+  const phases = source["onboard_phases"];
+  const stored = numberOrNull(source, "stored_onboard_phases");
+  if ((phases !== 1 && phases !== 3) || (stored !== null && stored !== 1 && stored !== 3)) {
+    return bad();
+  }
+  return {
+    id: text(source, "id"),
+    capacityKwh: numberOrNull(source, "capacity_kwh"),
+    capacitySource: origin,
+    reportedCapacityKwh: numberOrNull(source, "reported_capacity_kwh"),
+    reportedKnown: flag(source, "reported_known"),
+    storedCapacityKwh: numberOrNull(source, "stored_capacity_kwh"),
+    onboardPhases: phases,
+    storedOnboardPhases: stored,
+  };
+}
+
 function oneOf<T extends string>(source: Record<string, unknown>, key: string, allowed: readonly T[]): T {
   const value = source[key];
   return allowed.find((candidate) => candidate === value) ?? bad();
@@ -811,7 +857,17 @@ function decodeControl(raw: unknown): EntityControl {
 
 function decodeConfig(raw: unknown): EntityConfig {
   const source = record(raw);
-  exactKeys(source, ["charger_id", "control", "fields", "site", "vehicles"]);
+  // `vehicle_properties` came later: an older backend does not send it.
+  const rawProperties = source["vehicle_properties"];
+  exactKeys(
+    source,
+    rawProperties === undefined
+      ? ["charger_id", "control", "fields", "site", "vehicles"]
+      : ["charger_id", "control", "fields", "site", "vehicles", "vehicle_properties"],
+  );
+  if (rawProperties !== undefined && !Array.isArray(rawProperties)) {
+    return bad();
+  }
   const vehicles = source["vehicles"];
   if (!Array.isArray(vehicles)) {
     return bad();
@@ -848,6 +904,7 @@ function decodeConfig(raw: unknown): EntityConfig {
     fields: fields.map(decodeField),
     site,
     vehicles: vehicles.map(decodeVehicle),
+    vehicleProperties: rawProperties === undefined ? [] : (rawProperties as unknown[]).map(decodeVehicleProperties),
     control: source["control"] === null ? null : decodeControl(source["control"]),
   };
 }
@@ -932,6 +989,37 @@ export type VehicleAnswer =
 export type VehicleDecodeResult =
   | { ok: true; value: VehicleAnswer }
   | { ok: false; failure: "unsupported" | "malformed" };
+
+/**
+ * `update_vehicle`'s answer when only the outcome and the re-read config matter: a vehicle whose charge-level sensor is
+ * not chosen has no dashboard row, so `vehicle` may be `null` even on success (`decodeVehicleAnswer` rejects that).
+ */
+export function decodeVehicleWriteAnswer(raw: unknown): EntityDecodeResult {
+  try {
+    if (!isRecord(raw)) {
+      return { ok: false, failure: "malformed" };
+    }
+    const envelope = decodeEnvelope(raw, ["vehicle"]);
+    if (typeof envelope === "string") {
+      return { ok: false, failure: envelope };
+    }
+    if (envelope.ok && envelope.config !== null) {
+      return { ok: true, value: { ok: true, config: envelope.config } };
+    }
+    if (envelope.ok) {
+      return { ok: false, failure: "malformed" };
+    }
+    return {
+      ok: true,
+      value: { ok: false, code: envelope.error ?? "", config: envelope.config, fieldErrors: envelope.fieldErrors },
+    };
+  } catch (error) {
+    if (error instanceof MalformedPayload || (error instanceof Error && error.message === "malformed")) {
+      return { ok: false, failure: "malformed" };
+    }
+    throw error;
+  }
+}
 
 export function decodeVehicleAnswer(raw: unknown): VehicleDecodeResult {
   try {
@@ -1188,6 +1276,8 @@ export function entityChange(config: EntityConfig, scope: EntityScope, draft: En
 export interface VehicleSocRequest {
   vehicleId: string;
   entityId: string | null;
+  /** The sensor last seen chosen by a person (`null`: none). Sent only when present; the backend then refuses a changed choice. */
+  expectedEntityId?: string | null;
 }
 
 export function vehicleChoice(vehicle: VehicleSoc): string {
