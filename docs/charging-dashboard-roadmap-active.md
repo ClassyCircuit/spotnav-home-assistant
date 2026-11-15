@@ -807,11 +807,34 @@ Full requirement text: archive “Stage 13”.
   as good as the dashboard's `current_range` (the default range when none is reported); (5) English text only, no i18n for this area;
   (6) no browser/Playwright, no HA-fixture Python tests (no backend change), not installed; (7) `test/sidebar.test.ts` passes (90) but
   takes about 33 s here, so run it separately from the focused set.
-- [ ] **13.4 Notification settings and concise setup diagnostics.** Per-charger recipients (HA mobile apps)
+- [x] **13.4 Notification settings and concise setup diagnostics.** Per-charger recipients (HA mobile apps)
   and event settings; show no-recipient, unavailable, permission and save failures; a compact actionable view
   of existing capability/setup warnings (missing/ambiguous measurement sources, pricing configuration,
   execution blockers where exposed), linking to settings and reusing 12.4/12.7 text. A notice never proves a
   plan was sent or charging measured. Tests: missing phones, selected events, persistence, permissions.
+  *Implemented and coordinator-reviewed with mocked checks (2.5.162); not installed or live-verified.*
+  A collapsed “Advanced: notifications & setup check” section is added to the shared sidebar UI (also in the local preview as a
+  fictional read-only sample); new files `sidebar/notify-setup.js` (pure model, diagnostics, write plan), `sidebar/notify-setup-panel.js`
+  (panel wiring) and `shared-dashboard/notify-setup-view.js`. **No backend change, no new API message.** Recipients and events are saved with
+  the existing canonical `update_settings` replacement through the old card's `notificationsReplacement` (compare-and-set on the wire revision;
+  the tap-through `url` is kept exactly as saved; administrator-only, as the backend requires). It lists the registered `notify.mobile_app_*`
+  phones (`notifications.available`) and the eight events with the saved choice, and says: no registered phone, a chosen phone whose notify
+  service is gone (kept and skipped when sending until unticked), no recipient with events on, no events, read-only for a non-administrator,
+  an older backend without notifications. A save with no phone or no event is stored and said to send nothing. The **setup check** is a compact
+  list built only from existing data: the dashboard `setup` rows for measurement sources (vehicle, car level, site, grid sign, demand grid power;
+  same words as the old card's “Get started”, the phone/app/solar/phase rows left out), a missing car reading, pricing (no provider for the saved
+  area, held price state not ready, no intervals; “held, not proof the provider answered”) and execution blockers (the 9.5/17.6 recovery text from
+  fresh Morek status; a stale or missing status is “unknown”, never “nothing blocked”). Rows link (open + scroll, no write) to the existing Vehicle
+  sources, Market & costs and Plan activity & freshness sections; site/grid rows say they are set up outside this sidebar. The area states that
+  a notification only says SpotNav noticed an event and does not prove a plan was sent or charging measured, and that saving sends no
+  notification and does not wake the car. Opening/editing only reads; unchanged saves send nothing; drafts survive refreshes (`n:` drafts); a stale
+  dashboard, a pending post-save read, another writer's change to the choice while editing (signature check), a revision conflict (nothing written,
+  reload required), a reconcile failure after a durable save, a refused code, a timeout or a permission change mid-save (unknown outcome, saving blocked
+  until an explicit Reload) are handled, sharing the plan form's pending/unknown-write bookkeeping. `notifyBusy` is added to the other panels' busy guards.
+  **Limits:** (1) a notification's delivery to a phone is not checked: “available” only means the notify service exists in HA now; (2) the tap-through
+  `url` is not editable here; (3) the setup check shows what the backend already reports (setup rows are administrator-only; others see “unknown”), no
+  new probes; grid/site/demand setup stays outside the sidebar; (4) English text only, no i18n for this area; (5) no browser/Playwright, no HA-fixture
+  Python tests (no backend change), `test/sidebar.test.ts` not rerun (about 33 s), not installed.
 
 **Excluded from Stage 13:** solar/hybrid and home-energy flows, site load balancing, the legacy minimum-SOC
 start controller, direct legacy Start/Stop, BMW wake or limit writes, external debug upload. Do not imply the

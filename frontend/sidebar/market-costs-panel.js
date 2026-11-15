@@ -49,7 +49,7 @@ export const marketCostMethods = {
     adapter.model.marketCosts = marketCostsModel({
       admin, loading: this.settingsLoading || this.marketLoading, failed: this.marketOptionsFailed, record: this.settingsRecord, options: this.marketOptions, optionsAt: this.marketOptionsAt, now: Date.now(),
       dashboard, dashboardFresh: !!dashboard && dashFresh(dashboard, this.dashboardFailed), areaDraft: this.marketArea,
-      blocked: this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.paramBusy || staleRecord || unknown,
+      blocked: this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.paramBusy || this.notifyBusy || staleRecord || unknown,
       conflict: this.costConflict || unknown, busy: this.costBusy, awaitingRead: this.costAwaitingRead,
       notice: this.costNotice || (unknown ? 'A previous market/cost save has an unknown outcome. Reload to confirm it.' : staleRecord ? 'Settings changed elsewhere or the record is stale. Reload before changing market or costs.' : ''),
     });
@@ -102,7 +102,7 @@ export const marketCostMethods = {
   },
   costWriteBlocked(record) {
     const charger = this.charger, hass = this._hass;
-    return !this.connected || hass?.connected === false || hass?.user?.is_admin !== true || !charger || !record || this.costBusy || this.marketLoading || this.settingsLoading || this.pendingCostWrites.has(charger) || this.unknownCostWrites.has(charger) || this.costConflict || this.costAwaitingRead || this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.paramBusy || this.settingsConflict;
+    return !this.connected || hass?.connected === false || hass?.user?.is_admin !== true || !charger || !record || this.costBusy || this.marketLoading || this.settingsLoading || this.pendingCostWrites.has(charger) || this.unknownCostWrites.has(charger) || this.costConflict || this.costAwaitingRead || this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.paramBusy || this.notifyBusy || this.settingsConflict;
   },
   costReadiness(dashboard) {
     if (!dashboard || !dashFresh(dashboard, this.dashboardFailed)) return 'The dashboard observation is stale. Wait for a fresh read or reload before saving.';

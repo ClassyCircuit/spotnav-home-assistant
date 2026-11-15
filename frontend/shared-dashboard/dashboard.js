@@ -18,6 +18,7 @@ import { renderInsights } from './insight-view.js';
 import { renderVehicleSources } from './vehicle-sources-view.js';
 import { renderMarketCosts } from './market-costs-view.js';
 import { renderPlanParams } from './plan-params-view.js';
+import { renderNotifySetup } from './notify-setup-view.js';
 import { escapeText as e } from './text.js';
 import { reconcile } from './reconcile.js';
 import { priceText, priceUnit } from './price-format.js';
@@ -99,10 +100,11 @@ export function mountDashboard(root, adapter) {
       ${m.vehicleSources ? card('Vehicle sources & properties','ADVANCED',renderVehicleSources(m.vehicleSources),'vehicle-sources',tag) : ''}
       ${m.marketCosts ? card('Market & charging costs','ADVANCED',renderMarketCosts(m.marketCosts),'market-costs',tag) : ''}
       ${m.planParams ? card('Plan & charger parameters','ADVANCED',renderPlanParams(m.planParams),'plan-params',tag) : ''}
+      ${m.notifySetup ? card('Notifications & setup check','ADVANCED',renderNotifySetup(m.notifySetup),'notify-setup',tag) : ''}
       </div><dialog id="plan-dialog" aria-labelledby="dialog-title"><div class="dialog-head"><div><div class="eyebrow">${e(labels.dialogEyebrow || 'PROPOSAL')}</div><h2 id="dialog-title">Proposed charging plan</h2></div><button id="close-plan" type="button" aria-label="Close proposed plan">✕</button></div><p class="subtext">${e(labels.dialogNote)}</p><div role="status" aria-live="polite">${m.warning ? `<strong>${e(m.warning.title)}</strong><p>${e(m.warning.detail)}</p>` : ''}${m.evidence?.status ? `<p>${e(m.evidence.status)}</p>` : ''}</div>${plan}</dialog><footer>${e(labels.footer)}</footer></div>`;
     const template=document.createElement('template'); template.innerHTML=html;
     if (!root.firstChild) root.append(template.content);
-    else reconcile(root.firstChild,template.content.firstChild,node=>drafts.has(node.dataset?.setting) || (node.dataset?.vsetting && drafts.has(`v:${node.dataset.vsetting}`)) || (node.dataset?.msetting && drafts.has(`m:${node.dataset.msetting}`)) || (node.dataset?.psetting && drafts.has(`p:${node.dataset.psetting}`)) || root.getRootNode().activeElement===node);
+    else reconcile(root.firstChild,template.content.firstChild,node=>drafts.has(node.dataset?.setting) || (node.dataset?.vsetting && drafts.has(`v:${node.dataset.vsetting}`)) || (node.dataset?.msetting && drafts.has(`m:${node.dataset.msetting}`)) || (node.dataset?.psetting && drafts.has(`p:${node.dataset.psetting}`)) || (node.dataset?.nsetting && drafts.has(`n:${node.dataset.nsetting}`)) || root.getRootNode().activeElement===node);
     listeners ||= new AbortController(); const signal = listeners.signal;
     const bind=(node,fn)=>{if(node && !bound.has(node)){bound.add(node);fn();}};
     const dialog = root.querySelector('#plan-dialog'); let trigger;
@@ -160,6 +162,17 @@ export function mountDashboard(root, adapter) {
     const pvalues=kind=>kind==='periods'?{periods:pget('periods')}:kind==='current'?{current:pget('current')}:{date:pget('date'),weekdays:[...root.querySelectorAll('[data-psetting^="wd-"]')].filter(c=>c.checked).map(c=>c.value).join('')};
     for(const [id,kind] of [['#save-periods','periods'],['#save-current','current'],['#save-departure','departure']]){const b=root.querySelector(id);bind(b,()=>b.addEventListener('click',()=>{if(current.model.planParams?.canEdit===true && typeof current.actions?.saveParams==='function')current.actions.saveParams(kind,pvalues(kind));},{signal}));}
     const preload=root.querySelector('#reload-plan-params');bind(preload,()=>preload.addEventListener('click',()=>current.actions?.reloadPlanParams?.(),{signal}));
+    // Notifications & setup check (13.4): own drafts and save; the diagnostic links only open and scroll to a section.
+    root.querySelectorAll('[data-nsetting]').forEach(input => {
+      const key = `n:${input.dataset.nsetting}`;
+      if (drafts.has(key)) { const on = drafts.get(key) === '1'; if (input.checked !== on) input.checked = on; }
+      else { const base = input.hasAttribute('checked'); if (input.checked !== base) input.checked = base; }
+      bind(input,()=>{const on=()=>{drafts.set(key,input.checked ? '1' : '0');current.actions?.editNotify?.();};input.addEventListener('change',on,{signal});});
+    });
+    const nvalues=()=>({targets:[...root.querySelectorAll('[data-nsetting^="tg-"]')].filter(c=>c.checked).map(c=>c.dataset.nsetting.slice(3)),events:[...root.querySelectorAll('[data-nsetting^="ev-"]')].filter(c=>c.checked).map(c=>c.dataset.nsetting.slice(3))});
+    const nsave=root.querySelector('#save-notify');bind(nsave,()=>nsave.addEventListener('click',()=>{if(current.model.notifySetup?.canEdit===true && typeof current.actions?.saveNotify==='function')current.actions.saveNotify(nvalues());},{signal}));
+    const nreload=root.querySelector('#reload-notify-setup');bind(nreload,()=>nreload.addEventListener('click',()=>current.actions?.reloadNotifySetup?.(),{signal}));
+    root.querySelectorAll('[data-goto]').forEach(b=>bind(b,()=>b.addEventListener('click',()=>{const target=[...root.querySelectorAll('section.panel')].find(s=>s.classList.contains(b.dataset.goto));if(!target)return;const d=target.querySelector('details');if(d)d.open=true;target.scrollIntoView?.({block:'start'});},{signal})));
     const saveButton=root.querySelector('#save-plan');bind(saveButton,()=>saveButton.addEventListener('click', () => { if (current.model.canSave === true && typeof current.actions?.save === 'function') current.actions.save(Object.fromEntries([...root.querySelectorAll('[data-setting]')].map(input=>[input.dataset.setting,input.type === 'checkbox' ? input.checked : input.value]))); }, {signal}));
     const reloadButton=root.querySelector('#reload-settings');bind(reloadButton,()=>reloadButton.addEventListener('click', () => current.actions?.reloadSettings?.(), {signal}));
     if (chartMount && ((!chartReady && Object.keys(chartMount.priceCharts).length) || (chartReady && !Object.keys(chartMount.priceCharts).length) || (!chartReady && !historyReady))) {chartMount.dispose();chartMount=null;}
@@ -182,7 +195,7 @@ export function mountDashboard(root, adapter) {
       if (viewport && (viewport.scrollX!==x || viewport.scrollY!==y)) viewport.scrollTo(x,y);
     }
     return result;
-  }, resetDrafts() { drafts.clear(); }, resetVehicleDrafts() { for (const key of [...drafts.keys()]) if (key.startsWith('v:')) drafts.delete(key); }, setMarketDraft(name,value) { drafts.set(`m:${name}`,value); }, resetParamDrafts() { for (const key of [...drafts.keys()]) if (key.startsWith('p:')) drafts.delete(key); }, resetMarketDrafts(keepArea=false) { for (const key of [...drafts.keys()]) if (key.startsWith('m:') && !(keepArea && key==='m:area')) drafts.delete(key); }, get charts() { return chartMount?.priceCharts || {}; }, dispose() { if (!disposed) { disposed = true; drafts.clear(); cleanup(); if (mounted.get(root) === instance) mounted.delete(root); } } };
+  }, resetDrafts() { drafts.clear(); }, resetVehicleDrafts() { for (const key of [...drafts.keys()]) if (key.startsWith('v:')) drafts.delete(key); }, setMarketDraft(name,value) { drafts.set(`m:${name}`,value); }, resetParamDrafts() { for (const key of [...drafts.keys()]) if (key.startsWith('p:')) drafts.delete(key); }, resetNotifyDrafts() { for (const key of [...drafts.keys()]) if (key.startsWith('n:')) drafts.delete(key); }, resetMarketDrafts(keepArea=false) { for (const key of [...drafts.keys()]) if (key.startsWith('m:') && !(keepArea && key==='m:area')) drafts.delete(key); }, get charts() { return chartMount?.priceCharts || {}; }, dispose() { if (!disposed) { disposed = true; drafts.clear(); cleanup(); if (mounted.get(root) === instance) mounted.delete(root); } } };
   mounted.set(root, instance);
   return instance;
 }

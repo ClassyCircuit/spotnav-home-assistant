@@ -1035,12 +1035,12 @@ var init_chunk_AOKMSJXD = __esm({
        * @internal Given a native event, this function cancels it and dispatches it again from the host element using the desired
        * event options.
        */
-      relayNativeEvent(event, eventOptions) {
+      relayNativeEvent(event, eventOptions2) {
         event.stopImmediatePropagation();
         this.dispatchEvent(
           new event.constructor(event.type, {
             ...event,
-            ...eventOptions
+            ...eventOptions2
           })
         );
       }
@@ -11935,8 +11935,8 @@ var Element = (function() {
       if (animator.getLoop() || fromStateTransition && fromStateTransition !== PRESERVED_NORMAL_STATE) {
         continue;
       }
-      var targetName = animator.targetName;
-      var target = targetName ? normalState[targetName] : normalState;
+      var targetName2 = animator.targetName;
+      var target = targetName2 ? normalState[targetName2] : normalState;
       animator.saveTo(target);
     }
   };
@@ -12192,9 +12192,9 @@ var Element = (function() {
     if (!transition) {
       for (var i7 = 0; i7 < this.animators.length; i7++) {
         var animator = this.animators[i7];
-        var targetName = animator.targetName;
+        var targetName2 = animator.targetName;
         if (!animator.getLoop()) {
-          animator.__changeFinalValue(targetName ? (state || normalState)[targetName] : state || normalState);
+          animator.__changeFinalValue(targetName2 ? (state || normalState)[targetName2] : state || normalState);
         }
       }
     }
@@ -14467,21 +14467,21 @@ function parsePlainText(rawText, style, defaultOuterWidth, defaultOuterHeight) {
   if (height == null && defaultOuterHeight != null) {
     height = defaultOuterHeight - paddingV;
   }
-  var lines2;
+  var lines3;
   if (width != null && (overflow === "break" || overflow === "breakAll")) {
-    lines2 = text4 ? wrapText(text4, style.font, width, overflow === "breakAll", 0).lines : [];
+    lines3 = text4 ? wrapText(text4, style.font, width, overflow === "breakAll", 0).lines : [];
   } else {
-    lines2 = text4 ? text4.split("\n") : [];
+    lines3 = text4 ? text4.split("\n") : [];
   }
-  var contentHeight = lines2.length * lineHeight;
+  var contentHeight = lines3.length * lineHeight;
   if (height == null) {
     height = contentHeight;
   }
   if (contentHeight > height && truncateLineOverflow) {
     var lineCount = Math.floor(height / lineHeight);
-    isTruncated = isTruncated || lines2.length > lineCount;
-    lines2 = lines2.slice(0, lineCount);
-    contentHeight = lines2.length * lineHeight;
+    isTruncated = isTruncated || lines3.length > lineCount;
+    lines3 = lines3.slice(0, lineCount);
+    contentHeight = lines3.length * lineHeight;
   }
   if (text4 && truncate && width != null) {
     var options = prepareTruncateOptions(width, font, style.ellipsis, {
@@ -14489,17 +14489,17 @@ function parsePlainText(rawText, style, defaultOuterWidth, defaultOuterHeight) {
       placeholder: style.placeholder
     });
     var singleOut = {};
-    for (var i7 = 0; i7 < lines2.length; i7++) {
-      truncateSingleLine(singleOut, lines2[i7], options);
-      lines2[i7] = singleOut.textLine;
+    for (var i7 = 0; i7 < lines3.length; i7++) {
+      truncateSingleLine(singleOut, lines3[i7], options);
+      lines3[i7] = singleOut.textLine;
       isTruncated = isTruncated || singleOut.isTruncated;
     }
   }
   var outerHeight = height;
   var contentWidth = 0;
   var fontMeasureInfo = ensureFontMeasureInfo(font);
-  for (var i7 = 0; i7 < lines2.length; i7++) {
-    contentWidth = Math.max(measureWidth(fontMeasureInfo, lines2[i7]), contentWidth);
+  for (var i7 = 0; i7 < lines3.length; i7++) {
+    contentWidth = Math.max(measureWidth(fontMeasureInfo, lines3[i7]), contentWidth);
   }
   if (width == null) {
     width = contentWidth;
@@ -14508,7 +14508,7 @@ function parsePlainText(rawText, style, defaultOuterWidth, defaultOuterHeight) {
   outerHeight += paddingV;
   outerWidth += paddingH;
   return {
-    lines: lines2,
+    lines: lines3,
     height,
     outerWidth,
     outerHeight,
@@ -14675,7 +14675,7 @@ function parseRichText(rawText, style, defaultOuterWidth, defaultOuterHeight, to
 function pushTokens(block, str, style, wrapInfo, styleName) {
   var isEmptyStr = str === "";
   var tokenStyle = styleName && style.rich[styleName] || {};
-  var lines2 = block.lines;
+  var lines3 = block.lines;
   var font = tokenStyle.font || style.font;
   var newLine = false;
   var strLines;
@@ -14685,7 +14685,7 @@ function pushTokens(block, str, style, wrapInfo, styleName) {
     var tokenPaddingH = tokenPadding ? tokenPadding[1] + tokenPadding[3] : 0;
     if (tokenStyle.width != null && tokenStyle.width !== "auto") {
       var outerWidth_1 = parsePercent(tokenStyle.width, wrapInfo.width) + tokenPaddingH;
-      if (lines2.length > 0) {
+      if (lines3.length > 0) {
         if (outerWidth_1 + wrapInfo.accumWidth > wrapInfo.width) {
           strLines = str.split("\n");
           newLine = true;
@@ -14715,11 +14715,11 @@ function pushTokens(block, str, style, wrapInfo, styleName) {
       token.width = linesWidths ? linesWidths[i7] : measureWidth(fontMeasureInfo, text4);
     }
     if (!i7 && !newLine) {
-      var tokens2 = (lines2[lines2.length - 1] || (lines2[0] = new RichTextLine())).tokens;
+      var tokens2 = (lines3[lines3.length - 1] || (lines3[0] = new RichTextLine())).tokens;
       var tokensLen = tokens2.length;
       tokensLen === 1 && tokens2[0].isLineHolder ? tokens2[0] = token : (text4 || !tokensLen || isEmptyStr) && tokens2.push(token);
     } else {
-      lines2.push(new RichTextLine([token]));
+      lines3.push(new RichTextLine([token]));
     }
   }
 }
@@ -14741,7 +14741,7 @@ function isWordBreakChar(ch) {
   return true;
 }
 function wrapText(text4, font, lineWidth, isBreakAll, lastAccumWidth) {
-  var lines2 = [];
+  var lines3 = [];
   var linesWidths = [];
   var line = "";
   var currentWord = "";
@@ -14755,7 +14755,7 @@ function wrapText(text4, font, lineWidth, isBreakAll, lastAccumWidth) {
         line += currentWord;
         accumWidth += currentWordWidth;
       }
-      lines2.push(line);
+      lines3.push(line);
       linesWidths.push(accumWidth);
       line = "";
       currentWord = "";
@@ -14765,15 +14765,15 @@ function wrapText(text4, font, lineWidth, isBreakAll, lastAccumWidth) {
     }
     var chWidth = measureCharWidth(fontMeasureInfo, ch.charCodeAt(0));
     var inWord = isBreakAll ? false : !isWordBreakChar(ch);
-    if (!lines2.length ? lastAccumWidth + accumWidth + chWidth > lineWidth : accumWidth + chWidth > lineWidth) {
+    if (!lines3.length ? lastAccumWidth + accumWidth + chWidth > lineWidth : accumWidth + chWidth > lineWidth) {
       if (!accumWidth) {
         if (inWord) {
-          lines2.push(currentWord);
+          lines3.push(currentWord);
           linesWidths.push(currentWordWidth);
           currentWord = ch;
           currentWordWidth = chWidth;
         } else {
-          lines2.push(ch);
+          lines3.push(ch);
           linesWidths.push(chWidth);
         }
       } else if (line || currentWord) {
@@ -14784,7 +14784,7 @@ function wrapText(text4, font, lineWidth, isBreakAll, lastAccumWidth) {
             currentWordWidth = 0;
             accumWidth = currentWordWidth;
           }
-          lines2.push(line);
+          lines3.push(line);
           linesWidths.push(accumWidth - currentWordWidth);
           currentWord += ch;
           currentWordWidth += chWidth;
@@ -14796,7 +14796,7 @@ function wrapText(text4, font, lineWidth, isBreakAll, lastAccumWidth) {
             currentWord = "";
             currentWordWidth = 0;
           }
-          lines2.push(line);
+          lines3.push(line);
           linesWidths.push(accumWidth);
           line = ch;
           accumWidth = chWidth;
@@ -14821,15 +14821,15 @@ function wrapText(text4, font, lineWidth, isBreakAll, lastAccumWidth) {
     line += currentWord;
   }
   if (line) {
-    lines2.push(line);
+    lines3.push(line);
     linesWidths.push(accumWidth);
   }
-  if (lines2.length === 1) {
+  if (lines3.length === 1) {
     accumWidth += lastAccumWidth;
   }
   return {
     accumWidth,
-    lines: lines2,
+    lines: lines3,
     linesWidths
   };
 }
@@ -22413,8 +22413,8 @@ function doGuessOrdinal(data, sourceFormat, seriesLayoutBy, dimensionsDefine, st
       }
     } else {
       for (var i7 = 0; i7 < dataArrayRows.length && i7 < maxLoop; i7++) {
-        var row = dataArrayRows[startIndex + i7];
-        if (row && (result2 = detectValue(row[dimIndex])) != null) {
+        var row2 = dataArrayRows[startIndex + i7];
+        if (row2 && (result2 = detectValue(row2[dimIndex])) != null) {
           return result2;
         }
       }
@@ -24228,8 +24228,8 @@ var rawSourceItemGetterMap = (_b = {}, _b[SOURCE_FORMAT_ARRAY_ROWS + "_" + SERIE
   var item = out2 || [];
   var data = rawData;
   for (var i7 = 0; i7 < data.length; i7++) {
-    var row = data[i7];
-    item[i7] = row ? row[idx] : null;
+    var row2 = data[i7];
+    item[i7] = row2 ? row2[idx] : null;
   }
   return item;
 }, _b[SOURCE_FORMAT_OBJECT_ROWS] = getItemSimply, _b[SOURCE_FORMAT_KEYED_COLUMNS] = function(rawData, startIndex, dimsDef, idx, out2) {
@@ -24254,8 +24254,8 @@ var countSimply = function(rawData, startIndex, dimsDef) {
 var rawSourceDataCounterMap = (_c = {}, _c[SOURCE_FORMAT_ARRAY_ROWS + "_" + SERIES_LAYOUT_BY_COLUMN] = function(rawData, startIndex, dimsDef) {
   return Math.max(0, rawData.length - startIndex);
 }, _c[SOURCE_FORMAT_ARRAY_ROWS + "_" + SERIES_LAYOUT_BY_ROW] = function(rawData, startIndex, dimsDef) {
-  var row = rawData[0];
-  return row ? Math.max(0, row.length - startIndex) : 0;
+  var row2 = rawData[0];
+  return row2 ? Math.max(0, row2.length - startIndex) : 0;
 }, _c[SOURCE_FORMAT_OBJECT_ROWS] = countSimply, _c[SOURCE_FORMAT_KEYED_COLUMNS] = function(rawData, startIndex, dimsDef) {
   var dimName = dimsDef[0].name;
   var col = dimName != null ? rawData[dimName] : null;
@@ -52494,8 +52494,8 @@ ${sampleDate(h3)}` : time2(h3);
 // shared-dashboard/plan-data.js
 var validSocAssumptions = ({ startingSoc, capacityKwh, efficiency } = {}) => Number.isFinite(startingSoc) && startingSoc >= 0 && startingSoc <= 100 && Number.isFinite(capacityKwh) && capacityKwh > 0 && Number.isFinite(efficiency) && efficiency > 0 && efficiency <= 1;
 var total = (rows) => {
-  const energy2 = rows.length > 0 && rows.every((row) => Number.isFinite(row.energy) && row.energy >= 0) ? rows.reduce((s4, row) => s4 + row.energy, 0) : null;
-  const cost = rows.length > 0 && rows.every((row) => Number.isFinite(row.cost)) ? rows.reduce((s4, row) => s4 + row.cost, 0) : null;
+  const energy2 = rows.length > 0 && rows.every((row2) => Number.isFinite(row2.energy) && row2.energy >= 0) ? rows.reduce((s4, row2) => s4 + row2.energy, 0) : null;
+  const cost = rows.length > 0 && rows.every((row2) => Number.isFinite(row2.cost)) ? rows.reduce((s4, row2) => s4 + row2.cost, 0) : null;
   const validEnergy = Number.isFinite(energy2) ? energy2 : null;
   const validCost = Number.isFinite(cost) ? cost : null;
   const average = validEnergy > 0 && validCost != null ? validCost * 100 / validEnergy : null;
@@ -52529,8 +52529,8 @@ function renderReserve(reserve, currency) {
 }
 function renderLearning(learning) {
   if (!learning || !Array.isArray(learning.lines)) return "";
-  const lines2 = learning.lines.map((line) => `<p>${escapeText2(line)}</p>`).join("");
-  return `<div class="plan-learning"><p><b>${escapeText2(learning.title ?? "Charging-time estimate")}</b>${learning.stale && learning.staleText ? ` \xB7 ${escapeText2(learning.staleText)}` : ""}</p>${lines2}<p class="projection-note">${escapeText2(learning.note ?? "Estimate, not a guarantee.")}</p></div>`;
+  const lines3 = learning.lines.map((line) => `<p>${escapeText2(line)}</p>`).join("");
+  return `<div class="plan-learning"><p><b>${escapeText2(learning.title ?? "Charging-time estimate")}</b>${learning.stale && learning.staleText ? ` \xB7 ${escapeText2(learning.staleText)}` : ""}</p>${lines3}<p class="projection-note">${escapeText2(learning.note ?? "Estimate, not a guarantee.")}</p></div>`;
 }
 function renderPlan(windows, assumptions = {}, stale = false, formatters, totals, reserve, learning) {
   if (!formatters || typeof formatters.time !== "function" || typeof formatters.day !== "function") throw new TypeError("Plan time and day formatters are required");
@@ -52689,6 +52689,31 @@ function renderPlanParams(m4) {
   return `<details id="plan-params-details"><summary>Advanced: plan &amp; charger parameters</summary><div class="pp-body">${periodsBlock(m4)}${currentBlock(m4)}${departureBlock(m4)}<p class="pp-help">${escapeText(m4.savedNote)}</p><div role="status" id="plan-params-notice">${notes}</div>${reload}</div></details>`;
 }
 
+// shared-dashboard/notify-setup-view.js
+var lines2 = (items, cls = "ns-line") => (items || []).filter(Boolean).map((t6) => `<p class="${cls}">${escapeText(t6)}</p>`).join("");
+var GOTO = /* @__PURE__ */ new Set(["vehicle-sources", "market-costs", "morek", "notify-setup"]);
+var LEVEL = { error: "Problem", warning: "Check", info: "Note" };
+function diagnostics(m4) {
+  const items = m4.diagnostics || [];
+  if (!items.length) return '<div class="ns-block" data-ns="diagnostics"><h3>Setup check</h3><p class="ns-line">Nothing is reported as missing or blocked. That is not proof charging works; it only means no listed problem was reported.</p></div>';
+  const li = items.map((d3) => `<li data-level="${escapeText(d3.level)}" data-group="${escapeText(d3.group)}"><span class="ns-tag">${escapeText(LEVEL[d3.level] || "Note")}</span> ${escapeText(d3.text)}${d3.goto && GOTO.has(d3.goto) ? ` <button type="button" class="ns-goto" data-goto="${escapeText(d3.goto)}">Open ${escapeText(d3.gotoLabel || "")}</button>` : ""}</li>`).join("");
+  return `<div class="ns-block" data-ns="diagnostics"><h3>Setup check</h3><ul class="ns-list">${li}</ul></div>`;
+}
+function recipients(m4) {
+  const lock = m4.canEdit ? "" : "disabled";
+  const phones = m4.phones.length ? m4.phones.map((p4) => `<label class="ns-opt"><input type="checkbox" data-nsetting="tg-${escapeText(p4.service)}" ${p4.checked ? "checked" : ""} ${lock}> ${escapeText(p4.name)}</label>`).join("") : '<p class="ns-line">No phones available.</p>';
+  const events = m4.events.map((v2) => `<label class="ns-opt"><input type="checkbox" data-nsetting="ev-${escapeText(v2.event)}" ${v2.checked ? "checked" : ""} ${lock}> ${escapeText(v2.label)}</label>`).join("");
+  return `<div class="ns-block" data-ns="recipients"><h3>Recipients &amp; events</h3><fieldset class="ns-days" ${lock}><legend>Phones (Home Assistant mobile apps)</legend>${phones}</fieldset><fieldset class="ns-days" ${lock}><legend>Events</legend>${events}</fieldset>${lines2(m4.problems, "ns-note")}<p class="ns-help">${escapeText(m4.noticeNote)}</p><wa-button id="save-notify" size="small" ${m4.canEdit ? "" : "disabled"}>Save notifications</wa-button></div>`;
+}
+function renderNotifySetup(m4) {
+  if (!m4) return "";
+  const notes = [m4.notice, ...m4.notes || []].filter(Boolean).map((t6) => `<p class="ns-note">${escapeText(t6)}</p>`).join("");
+  const reload = '<button type="button" id="reload-notify-setup">Reload notifications &amp; setup</button>';
+  const head = "<summary>Advanced: notifications &amp; setup check</summary>";
+  if (m4.state !== "ready") return `<details id="notify-setup-details">${head}<div class="ns-body" role="status">${notes}${diagnostics(m4)}${reload}</div></details>`;
+  return `<details id="notify-setup-details">${head}<div class="ns-body">${diagnostics(m4)}${recipients(m4)}<div role="status" id="notify-setup-notice">${notes}</div>${reload}</div></details>`;
+}
+
 // shared-dashboard/reconcile.js
 var key2 = (node) => {
   if (node.nodeType !== 1) return null;
@@ -52697,6 +52722,7 @@ var key2 = (node) => {
   if (node.dataset.vsetting) return `vsetting:${node.dataset.vsetting}`;
   if (node.dataset.msetting) return `msetting:${node.dataset.msetting}`;
   if (node.dataset.psetting) return `psetting:${node.dataset.psetting}`;
+  if (node.dataset.nsetting) return `nsetting:${node.dataset.nsetting}`;
   if (node.dataset.vselect) return `vselect:${node.dataset.vselect}`;
   if (node.dataset.morekAction) return `morek-action:${node.dataset.morekAction}`;
   if (node.hasAttribute("data-morek-actions")) return "morek-actions";
@@ -52834,11 +52860,12 @@ function mountDashboard(root, adapter) {
       ${m4.vehicleSources ? card("Vehicle sources & properties", "ADVANCED", renderVehicleSources(m4.vehicleSources), "vehicle-sources", tag) : ""}
       ${m4.marketCosts ? card("Market & charging costs", "ADVANCED", renderMarketCosts(m4.marketCosts), "market-costs", tag) : ""}
       ${m4.planParams ? card("Plan & charger parameters", "ADVANCED", renderPlanParams(m4.planParams), "plan-params", tag) : ""}
+      ${m4.notifySetup ? card("Notifications & setup check", "ADVANCED", renderNotifySetup(m4.notifySetup), "notify-setup", tag) : ""}
       </div><dialog id="plan-dialog" aria-labelledby="dialog-title"><div class="dialog-head"><div><div class="eyebrow">${escapeText(labels.dialogEyebrow || "PROPOSAL")}</div><h2 id="dialog-title">Proposed charging plan</h2></div><button id="close-plan" type="button" aria-label="Close proposed plan">\u2715</button></div><p class="subtext">${escapeText(labels.dialogNote)}</p><div role="status" aria-live="polite">${m4.warning ? `<strong>${escapeText(m4.warning.title)}</strong><p>${escapeText(m4.warning.detail)}</p>` : ""}${m4.evidence?.status ? `<p>${escapeText(m4.evidence.status)}</p>` : ""}</div>${plan}</dialog><footer>${escapeText(labels.footer)}</footer></div>`;
     const template = document.createElement("template");
     template.innerHTML = html;
     if (!root.firstChild) root.append(template.content);
-    else reconcile(root.firstChild, template.content.firstChild, (node) => drafts.has(node.dataset?.setting) || node.dataset?.vsetting && drafts.has(`v:${node.dataset.vsetting}`) || node.dataset?.msetting && drafts.has(`m:${node.dataset.msetting}`) || node.dataset?.psetting && drafts.has(`p:${node.dataset.psetting}`) || root.getRootNode().activeElement === node);
+    else reconcile(root.firstChild, template.content.firstChild, (node) => drafts.has(node.dataset?.setting) || node.dataset?.vsetting && drafts.has(`v:${node.dataset.vsetting}`) || node.dataset?.msetting && drafts.has(`m:${node.dataset.msetting}`) || node.dataset?.psetting && drafts.has(`p:${node.dataset.psetting}`) || node.dataset?.nsetting && drafts.has(`n:${node.dataset.nsetting}`) || root.getRootNode().activeElement === node);
     listeners ||= new AbortController();
     const signal = listeners.signal;
     const bind3 = (node, fn) => {
@@ -53014,6 +53041,37 @@ function mountDashboard(root, adapter) {
     }
     const preload = root.querySelector("#reload-plan-params");
     bind3(preload, () => preload.addEventListener("click", () => current.actions?.reloadPlanParams?.(), { signal }));
+    root.querySelectorAll("[data-nsetting]").forEach((input) => {
+      const key3 = `n:${input.dataset.nsetting}`;
+      if (drafts.has(key3)) {
+        const on = drafts.get(key3) === "1";
+        if (input.checked !== on) input.checked = on;
+      } else {
+        const base2 = input.hasAttribute("checked");
+        if (input.checked !== base2) input.checked = base2;
+      }
+      bind3(input, () => {
+        const on = () => {
+          drafts.set(key3, input.checked ? "1" : "0");
+          current.actions?.editNotify?.();
+        };
+        input.addEventListener("change", on, { signal });
+      });
+    });
+    const nvalues = () => ({ targets: [...root.querySelectorAll('[data-nsetting^="tg-"]')].filter((c5) => c5.checked).map((c5) => c5.dataset.nsetting.slice(3)), events: [...root.querySelectorAll('[data-nsetting^="ev-"]')].filter((c5) => c5.checked).map((c5) => c5.dataset.nsetting.slice(3)) });
+    const nsave = root.querySelector("#save-notify");
+    bind3(nsave, () => nsave.addEventListener("click", () => {
+      if (current.model.notifySetup?.canEdit === true && typeof current.actions?.saveNotify === "function") current.actions.saveNotify(nvalues());
+    }, { signal }));
+    const nreload = root.querySelector("#reload-notify-setup");
+    bind3(nreload, () => nreload.addEventListener("click", () => current.actions?.reloadNotifySetup?.(), { signal }));
+    root.querySelectorAll("[data-goto]").forEach((b3) => bind3(b3, () => b3.addEventListener("click", () => {
+      const target = [...root.querySelectorAll("section.panel")].find((s4) => s4.classList.contains(b3.dataset.goto));
+      if (!target) return;
+      const d3 = target.querySelector("details");
+      if (d3) d3.open = true;
+      target.scrollIntoView?.({ block: "start" });
+    }, { signal })));
     const saveButton = root.querySelector("#save-plan");
     bind3(saveButton, () => saveButton.addEventListener("click", () => {
       if (current.model.canSave === true && typeof current.actions?.save === "function") current.actions.save(Object.fromEntries([...root.querySelectorAll("[data-setting]")].map((input) => [input.dataset.setting, input.type === "checkbox" ? input.checked : input.value])));
@@ -53059,6 +53117,8 @@ function mountDashboard(root, adapter) {
     drafts.set(`m:${name}`, value2);
   }, resetParamDrafts() {
     for (const key3 of [...drafts.keys()]) if (key3.startsWith("p:")) drafts.delete(key3);
+  }, resetNotifyDrafts() {
+    for (const key3 of [...drafts.keys()]) if (key3.startsWith("n:")) drafts.delete(key3);
   }, resetMarketDrafts(keepArea = false) {
     for (const key3 of [...drafts.keys()]) if (key3.startsWith("m:") && !(keepArea && key3 === "m:area")) drafts.delete(key3);
   }, get charts() {
@@ -57868,6 +57928,17 @@ function encodeBody(record5) {
 function copyCamera(camera) {
   return camera === null ? null : { ...camera, frame: camera.frame === null ? null : { ...camera.frame } };
 }
+function notificationsReplacement(record5, choice) {
+  const current = record5.notifications;
+  if (current === void 0) {
+    return { ok: false, errorKey: "settings.error.version" };
+  }
+  const events = NOTIFICATION_EVENTS.filter((event) => choice.events.includes(event));
+  const targets = [...new Set(choice.targets)];
+  const notifications = { targets, events, url: choice.url };
+  const changed = targets.join(",") !== current.targets.join(",") || events.join(",") !== current.events.join(",") || choice.url !== current.url;
+  return { ok: true, body: { ...encodeBody(record5), notifications }, changed };
+}
 function formFromRecord(record5) {
   return {
     ...record5.time_reserve_percent === void 0 ? {} : { timeReserve: String(record5.time_reserve_percent) },
@@ -58736,15 +58807,15 @@ function decodeStrategyRow(source) {
 function decodeStrategy(source) {
   exactKeys2(source, ["selected", "available"]);
   const selected = enumOrNull(source, "selected", STRATEGIES2);
-  const rows = arrayValue(source, "available").map((row) => decodeStrategyRow(record2(row)));
+  const rows = arrayValue(source, "available").map((row2) => decodeStrategyRow(record2(row2)));
   const seen = /* @__PURE__ */ new Set();
-  for (const row of rows) {
-    if (seen.has(row.strategy)) {
+  for (const row2 of rows) {
+    if (seen.has(row2.strategy)) {
       return bad2();
     }
-    seen.add(row.strategy);
+    seen.add(row2.strategy);
   }
-  const enabled = rows.filter((row) => row.available).map((row) => row.strategy);
+  const enabled = rows.filter((row2) => row2.available).map((row2) => row2.strategy);
   if (selected === null ? enabled.length !== 0 : !enabled.includes(selected)) {
     return bad2();
   }
@@ -59106,7 +59177,7 @@ function decodeStatus(source) {
     return bad2();
   }
   let blocking = false;
-  const lines2 = arrayValue(source, "lines").map((raw) => {
+  const lines3 = arrayValue(source, "lines").map((raw) => {
     const line = record2(raw);
     exactKeys2(line, ["code", "params"]);
     const code = text2(line, "code");
@@ -59127,7 +59198,7 @@ function decodeStatus(source) {
   if (blocking !== (tone === "blocking")) {
     return bad2();
   }
-  return { tone, lines: lines2 };
+  return { tone, lines: lines3 };
 }
 function decodeDashboard(raw) {
   try {
@@ -59269,8 +59340,8 @@ function setupOrNull(root) {
       const item = record2(entry);
       const writes = "field" in item || "value" in item;
       exactKeys2(item, writes ? ["id", "dismissible", "field", "value"] : ["id", "dismissible"]);
-      const row = { id: text2(item, "id"), dismissible: booleanValue2(item, "dismissible") };
-      return writes ? { ...row, write: { field: text2(item, "field"), value: booleanValue2(item, "value") } } : row;
+      const row2 = { id: text2(item, "id"), dismissible: booleanValue2(item, "dismissible") };
+      return writes ? { ...row2, write: { field: text2(item, "field"), value: booleanValue2(item, "value") } } : row2;
     });
     return { items };
   } catch {
@@ -60584,7 +60655,7 @@ function sensorModel(vehicle, entityState) {
   if (base2 && !candidates.some((c5) => c5.entityId === base2)) options.push({ value: base2, text: `${label(selected)} (no longer offered)` });
   return { status, level, text: text4, base: base2, options };
 }
-function propertiesModel(props, row, canWrite) {
+function propertiesModel(props, row2, canWrite) {
   if (!props) return null;
   const source = props.capacitySource;
   const reported = ok(props.reportedCapacityKwh) && props.reportedCapacityKwh > 0 ? props.reportedCapacityKwh : null;
@@ -60602,7 +60673,7 @@ function propertiesModel(props, row, canWrite) {
     phases: {
       base: String(props.onboardPhases === 1 ? 1 : 3),
       display: phases === 1 ? "1-phase" : phases === 3 ? "3-phase (entered by you)" : "3-phase (the default; nothing entered)",
-      suggestion: row && row.suggested_onboard_phases === 1 && props.onboardPhases !== 1 ? "Recent charges look single-phase. Nothing was changed; set 1-phase below if that is right." : "",
+      suggestion: row2 && row2.suggested_onboard_phases === 1 && props.onboardPhases !== 1 ? "Recent charges look single-phase. Nothing was changed; set 1-phase below if that is right." : "",
       editable: canWrite
     }
   };
@@ -60626,11 +60697,11 @@ function vehicleSourcesModel(input) {
   if (!vehicle) return { ...model, sensor: null, reading: null, properties: null };
   const sensor = sensorModel(vehicle, input.entityState);
   sensor.canEdit = canEdit && configFresh && input.dashboardFresh !== false;
-  const row = (input.rows || []).find((r8) => r8.id === vehicle.id) || null;
+  const row2 = (input.rows || []).find((r8) => r8.id === vehicle.id) || null;
   const props = (input.config.vehicleProperties || []).find((p4) => p4.id === vehicle.id) || null;
-  const properties = propertiesModel(props, row, canEdit && configFresh);
+  const properties = propertiesModel(props, row2, canEdit && configFresh);
   const r7 = input.reading && input.reading.vehicleId === vehicle.id ? input.reading : null;
-  const reading = r7 && ok(r7.value) ? { text: `${r7.value}%${r7.stale ? " \xB7 stale or unconfirmed" : ""} \u2014 ${r7.detail}`, stale: !!r7.stale } : row && ok(row.soc_percent) ? { text: `${row.soc_percent}% \xB7 last value, age unknown \u2014 not shown as a current reading.`, stale: true } : { text: "No valid reading from this car.", stale: true };
+  const reading = r7 && ok(r7.value) ? { text: `${r7.value}%${r7.stale ? " \xB7 stale or unconfirmed" : ""} \u2014 ${r7.detail}`, stale: !!r7.stale } : row2 && ok(row2.soc_percent) ? { text: `${row2.soc_percent}% \xB7 last value, age unknown \u2014 not shown as a current reading.`, stale: true } : { text: "No valid reading from this car.", stale: true };
   return { ...model, sensor, reading, properties, propertiesMissing: !props };
 }
 function sensorWritePlan(vehicle, draft) {
@@ -60831,8 +60902,8 @@ function decodeMarketOptions(raw) {
   }
 }
 var FISCAL_COMPONENTS = ["vat", "tax", "transfer"];
-function fiscalFormFrom(row, component) {
-  const fiscal = row === null ? null : row[component];
+function fiscalFormFrom(row2, component) {
+  const fiscal = row2 === null ? null : row2[component];
   const stored = fiscal === null ? null : fiscal.value;
   return {
     enabled: fiscal !== null && fiscal.enabled,
@@ -60909,9 +60980,9 @@ function sameFiscal(left, right) {
 function sameRow(left, right) {
   return left.area_id === right.area_id && sameFiscal(left.vat, right.vat) && sameFiscal(left.tax, right.tax) && sameFiscal(left.transfer, right.transfer);
 }
-function rowStatesNothing(row) {
+function rowStatesNothing(row2) {
   for (const component of FISCAL_COMPONENTS) {
-    const fiscal = row[component];
+    const fiscal = row2[component];
     if (fiscal.enabled || fiscal.value !== null) {
       return false;
     }
@@ -60944,15 +61015,15 @@ function marketReplacement(base2, values, options) {
     }
     components[component] = stated.value;
   }
-  const row = {
+  const row2 = {
     area_id: areaId,
     vat: components.vat,
     tax: components.tax,
     transfer: components.transfer
   };
   const existing = base2.overrides.find((item) => item.area_id === areaId) ?? null;
-  const changed = areaId !== base2.area_id ? true : existing === null ? !rowStatesNothing(row) : !sameRow(existing, row);
-  const overrides = existing === null && rowStatesNothing(row) ? base2.overrides : existing === null ? [...base2.overrides, row] : base2.overrides.map((item) => item.area_id === areaId ? row : item);
+  const changed = areaId !== base2.area_id ? true : existing === null ? !rowStatesNothing(row2) : !sameRow(existing, row2);
+  const overrides = existing === null && rowStatesNothing(row2) ? base2.overrides : existing === null ? [...base2.overrides, row2] : base2.overrides.map((item) => item.area_id === areaId ? row2 : item);
   return {
     ok: true,
     body: { ...encodeBody(base2), area_id: areaId, overrides },
@@ -61049,10 +61120,10 @@ var figureText = (n6) => ok2(n6) ? String(n6) : "";
 var modeOf = (form) => !form.enabled ? "off" : form.intent === "suggested" ? "suggested" : "custom";
 function costSignature(record5, options, block, areaId) {
   const id = areaId ?? record5?.area_id ?? null;
-  const row = record5 ? record5.overrides.find((o9) => o9.area_id === id) || null : null;
+  const row2 = record5 ? record5.overrides.find((o9) => o9.area_id === id) || null : null;
   return JSON.stringify([
     record5?.area_id ?? null,
-    row,
+    row2,
     options ? options.state : null,
     options && id ? marketIncluded(options, id) : null,
     block ? [block.write_revision, block.transfer_percent.policy, block.transfer_percent.explicit_value, block.transfer_high.policy, block.transfer_high.explicit_value, block.high_load_window] : null
@@ -61098,14 +61169,14 @@ function currencyLine(dashboard, area) {
   return `Currency ${cur}${major ? ` (${major}${minor ? `, minor unit ${minor}` : ""})` : ""}. Prices and the chart show ${priceUnit(cur)}; flat fees are entered in ${minor ? `${minor}/kWh` : "the area\u2019s minor unit (unknown)"} exactly as stored, and VAT and the grid fee percentage in %.`;
 }
 function feeRows(record5, options, areaId, canEdit) {
-  const row = record5.overrides.find((o9) => o9.area_id === areaId) || null;
+  const row2 = record5.overrides.find((o9) => o9.area_id === areaId) || null;
   const included = marketIncluded(options, areaId);
   const rows = [];
   for (const key3 of FISCAL_COMPONENTS) {
-    const form = fiscalFormFrom(row, key3);
+    const form = fiscalFormFrom(row2, key3);
     const suggestion = marketSuggestion(options, areaId, key3);
     const unit = fiscalUnit(options, areaId, key3) ? key3 === "vat" ? "%" : `${fiscalUnit(options, areaId, key3)}/kWh` : key3 === "vat" ? "%" : "unit unknown";
-    const stored = row ? row[key3] : null;
+    const stored = row2 ? row2[key3] : null;
     const base2 = modeOf(form);
     if (included.includes(key3)) {
       rows.push({ key: key3, label: LABELS[key3], included: true, unit, mode: "included", figure: figureText(stored?.value ?? null), modes: [], hint: `Already included in this area\u2019s published price \u2014 nothing is added${stored && stored.value !== null ? ` (a stored figure of ${stored.value} ${unit} is kept but not used)` : ""}.`, canEdit: false });
@@ -61155,16 +61226,16 @@ function marketCostsModel(input) {
   const optionsFresh = ok2(input.optionsAt) && input.now - input.optionsAt <= OPTIONS_MAX_AGE_MS && !input.failed;
   const record5 = input.record, options = input.options;
   const editableState = marketEditable(options.state, input.admin === true);
-  const dashFresh3 = input.dashboardFresh !== false && !!dashboard;
+  const dashFresh4 = input.dashboardFresh !== false && !!dashboard;
   const baseEdit = input.admin === true && !input.blocked && !input.conflict && !input.busy && !input.awaitingRead;
-  const canEdit = baseEdit && editableState && optionsFresh && dashFresh3;
+  const canEdit = baseEdit && editableState && optionsFresh && dashFresh4;
   const notes = [];
   if (!input.admin) notes.push("Administrator permission is required to change the market, taxes and fees. Everything here is read-only.");
   const stateKey = marketStateKey(options.state, options.reason);
   if (stateKey) notes.push(translate2("en", stateKey));
   if (!editableState && input.admin) notes.push("The area list is not held, so the saved area is shown but nothing can be changed.");
   if (input.admin && !optionsFresh) notes.push("The area list is stale or its refresh failed; changes are disabled until it is read again.");
-  if (input.admin && !dashFresh3) notes.push("The dashboard observation is stale; changes are disabled until it is read again.");
+  if (input.admin && !dashFresh4) notes.push("The dashboard observation is stale; changes are disabled until it is read again.");
   if (input.awaitingRead && input.admin) notes.push("Waiting for a fresh dashboard read after the last save before another change.");
   const savedId = record5.area_id;
   const areaId = input.areaDraft ?? savedId;
@@ -61303,7 +61374,7 @@ var marketCostMethods = {
       dashboard,
       dashboardFresh: !!dashboard && dashFresh(dashboard, this.dashboardFailed),
       areaDraft: this.marketArea,
-      blocked: this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.paramBusy || staleRecord || unknown,
+      blocked: this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.paramBusy || this.notifyBusy || staleRecord || unknown,
       conflict: this.costConflict || unknown,
       busy: this.costBusy,
       awaitingRead: this.costAwaitingRead,
@@ -61393,7 +61464,7 @@ var marketCostMethods = {
   },
   costWriteBlocked(record5) {
     const charger = this.charger, hass = this._hass;
-    return !this.connected || hass?.connected === false || hass?.user?.is_admin !== true || !charger || !record5 || this.costBusy || this.marketLoading || this.settingsLoading || this.pendingCostWrites.has(charger) || this.unknownCostWrites.has(charger) || this.costConflict || this.costAwaitingRead || this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.paramBusy || this.settingsConflict;
+    return !this.connected || hass?.connected === false || hass?.user?.is_admin !== true || !charger || !record5 || this.costBusy || this.marketLoading || this.settingsLoading || this.pendingCostWrites.has(charger) || this.unknownCostWrites.has(charger) || this.costConflict || this.costAwaitingRead || this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.paramBusy || this.notifyBusy || this.settingsConflict;
   },
   costReadiness(dashboard) {
     if (!dashboard || !dashFresh(dashboard, this.dashboardFailed)) return "The dashboard observation is stale. Wait for a fresh read or reload before saving.";
@@ -62089,11 +62160,54 @@ var NOTICES = {
   }
 };
 
+// src/setup-checklist.ts
+var SETUP_ROWS = [
+  "vehicle",
+  "car_level",
+  "site",
+  "grid_power_sign",
+  "grid_current_sign",
+  "solar_forecast",
+  "demand_grid_power",
+  "phase_switching",
+  "phone",
+  "app"
+];
+var WRITING_ROWS = /* @__PURE__ */ new Set(["grid_power_sign", "grid_current_sign"]);
+var WORDS = {
+  vehicle: { text: "setup.vehicle.text", action: "setup.vehicle.action" },
+  car_level: { text: "setup.carLevel.text", action: "setup.carLevel.action" },
+  site: { text: "setup.site.text", action: "setup.site.action" },
+  grid_power_sign: { text: "setup.gridPowerSign.text", action: "setup.gridPowerSign.turnOff" },
+  grid_current_sign: { text: "setup.gridCurrentSign.text", action: "setup.gridCurrentSign.turnOff" },
+  solar_forecast: { text: "setup.solarForecast.text", action: "setup.solarForecast.action" },
+  demand_grid_power: { text: "setup.demandGridPower.text", action: "setup.demandGridPower.action" },
+  phase_switching: { text: "setup.phaseSwitching.text", action: "setup.phaseSwitching.action" },
+  phone: { text: "setup.phone.text", action: "setup.phone.action" },
+  app: { text: "setup.app.text", action: "setup.app.action" }
+};
+function setupRowsOf(block) {
+  if (block === null) {
+    return [];
+  }
+  return SETUP_ROWS.flatMap((id) => {
+    const found = block.items.find((item) => item.id === id);
+    const write = found?.write ?? null;
+    if (found === void 0 || WRITING_ROWS.has(id) !== (write !== null)) {
+      return [];
+    }
+    return [write === null ? { id, dismissible: found.dismissible } : { id, dismissible: found.dismissible, write }];
+  });
+}
+function setupRowText(language, id) {
+  return translate2(language, WORDS[id].text);
+}
+
 // src/model.ts
 var DEFAULT_CURRENT_RANGE = { minA: 6, maxA: 32 };
 function chargerCarsOf(dashboard) {
   if (dashboard.vehicle_choices.length === 0) {
-    return dashboard.vehicles.map((row) => ({ id: row.id, name: row.name }));
+    return dashboard.vehicles.map((row2) => ({ id: row2.id, name: row2.name }));
   }
   const allowed = dashboard.settings?.vehicle_ids ?? null;
   return dashboard.vehicle_choices.filter((choice) => allowed === null || allowed.includes(choice.id));
@@ -62312,7 +62426,7 @@ var planParamMethods = {
       dashboardFresh: !!dashboard && dashFresh2(dashboard, this.dashboardFailed),
       now: Date.now(),
       morekOwned,
-      blocked: this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || unknown,
+      blocked: this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || this.notifyBusy || unknown,
       conflict: this.paramConflict || this.settingsConflict || unknown,
       busy: this.paramBusy,
       awaitingRead: this.paramAwaitingRead,
@@ -62347,7 +62461,7 @@ var planParamMethods = {
   },
   paramWriteBlocked(record5, allowed) {
     const charger = this.charger, hass = this._hass;
-    return !this.connected || hass?.connected === false || !allowed || !charger || !record5 || this.paramBusy || this.settingsLoading || this.pendingSettingsWrites.has(charger) || this.unknownSettingsWrites.has(charger) || this.paramConflict || this.paramAwaitingRead || this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || this.settingsConflict;
+    return !this.connected || hass?.connected === false || !allowed || !charger || !record5 || this.paramBusy || this.settingsLoading || this.pendingSettingsWrites.has(charger) || this.unknownSettingsWrites.has(charger) || this.paramConflict || this.paramAwaitingRead || this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || this.notifyBusy || this.settingsConflict;
   },
   async saveParams(kind, values) {
     const record5 = this.settingsRecord, hass = this._hass, charger = this.charger, generation = this.generation, permissionEpoch = this.permissionEpoch;
@@ -62438,6 +62552,347 @@ var planParamMethods = {
   }
 };
 
+// src/notifications.ts
+var EVENT_KEYS = {
+  plan_stopped: "notifications.event.planStopped",
+  plan_at_risk: "notifications.event.planAtRisk",
+  charge_complete: "notifications.event.chargeComplete",
+  charge_started: "notifications.event.chargeStarted",
+  plugged_in: "notifications.event.pluggedIn",
+  unplugged: "notifications.event.unplugged",
+  plan_installed: "notifications.event.planInstalled",
+  vehicle_identify: "notifications.event.vehicleIdentify"
+};
+function phoneOptions(language, record5) {
+  const services = [
+    ...record5.available.map((entry) => entry.service),
+    ...record5.targets.filter((service) => !record5.available.some((entry) => entry.service === service))
+  ];
+  return services.map((service) => ({ value: service, label: targetName(language, record5, service) }));
+}
+function eventOptions(language) {
+  return NOTIFICATION_EVENTS.map((event) => ({ value: event, label: translate2(language, EVENT_KEYS[event]) }));
+}
+function targetName(language, record5, service) {
+  const found = record5.available.find((entry) => entry.service === service);
+  return found !== void 0 ? found.name : translate2(language, "notifications.missing", { name: service });
+}
+function noRecipientsHint(language, record5) {
+  return record5.events.length > 0 && record5.targets.length === 0 ? translate2(language, "notifications.noRecipients") : null;
+}
+
+// sidebar/recovery-banner.js
+var WHAT = {
+  wait_for_charger_connection: "The charger is not connected to Home Assistant, so no schedule was sent.",
+  check_charger_identity: "The charger identity could not be confirmed, so no schedule was sent.",
+  retry_after_stop_or_change: "A Stop or a connector change interrupted the update; nothing more was sent.",
+  confirm_ownership: "Schedule ownership needs confirmation before anything is sent.",
+  resolve_protection_conflict: "Another controller or site protection may also limit this charger; sending is blocked.",
+  resume_schedule: "Auto is paused until you press Resume.",
+  confirm_resume: "Resume cannot be continued automatically; confirm Resume again.",
+  wait_for_charge_now_end: "Charge Now is active; Auto follows when it ends or you return to Auto.",
+  check_charger_outcome: "The last schedule write has an unknown outcome. It is not retried automatically.",
+  check_charger_response: "The charger refused the schedule.",
+  wait_for_planner: "The plan is being recalculated.",
+  check_logs: "The schedule check failed unexpectedly; see SpotNav logs.",
+  wait_for_fresh_inputs: "Waiting for a fresh vehicle reading.",
+  // Stage 17.6: a hold the planner names itself; who acts is stated, none of these claims charging.
+  set_battery_capacity: "No plan yet: the battery capacity is not known. Enter it in Plan; the plan is then made automatically, and sent automatically only if the usual safety checks allow it.",
+  wait_for_exchange_rate: "No plan yet: waiting for the ECB exchange rate to convert the prices. It is asked for again automatically and the plan follows.",
+  adjust_planning_settings: "The plan cannot be sent as saved; adjust the planning settings.",
+  wait_for_prices: "Prices are unavailable or incomplete for the planned window.",
+  see_reason: "The schedule is not being updated.",
+  // 15.4a/b repair outcomes. Plain words, who acts; none of these asks for a blind resend.
+  needs_person: "Automatic repair is paused for this attempt: the charger\u2019s schedule still doesn\u2019t match, or the repair limit is used up. Check the charger and the SpotNav logs.",
+  wait_for_repair_deferral: "The charger\u2019s schedule differs a little. The current charge is left alone and SpotNav fixes it a bit later.",
+  wait_for_repair_spacing: "SpotNav already fixed the charger\u2019s schedule recently, so it waits before sending again. Nothing is sent now.",
+  wait_for_confirmation: "Checking the charger\u2019s schedule again: one odd reading isn\u2019t enough to act on.",
+  wait_for_repair_release: "The charger\u2019s schedule differs from the plan, but automatic repair is off, so nothing was sent. Check the schedule in the Morek app."
+};
+var REPAIR_NOTE = /* @__PURE__ */ new Set(["wait_for_repair_deferral", "wait_for_repair_spacing", "wait_for_confirmation", "wait_for_repair_release"]);
+var PERSON_THEN_AUTOMATIC = /* @__PURE__ */ new Set(["set_battery_capacity"]);
+var AUTOMATIC = /* @__PURE__ */ new Set(["wait_for_charger_connection", "check_charger_identity", "retry_after_stop_or_change", "wait_for_planner", "wait_for_fresh_inputs", "wait_for_prices", "wait_for_exchange_rate", "check_logs"]);
+var time = (iso) => {
+  const at = Date.parse(iso || "");
+  return Number.isFinite(at) ? new Date(at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : null;
+};
+function recoveryBanner(state, now = Date.now()) {
+  if (!state || state.supported === false) return null;
+  const reconciliation = state.reconciliation || {};
+  const blocker = reconciliation.blocker;
+  const recovery = reconciliation.recovery || {};
+  if (state.outcomes?.uncertain === true || blocker?.code === "upload_uncertain") {
+    return { level: "error", code: "upload_uncertain", text: `${WHAT.check_charger_outcome} Charging is not confirmed; check Morek and the SpotNav logs before acting. Nothing was cleared.` };
+  }
+  const repair = reconciliation.repair || {};
+  const checkClass = reconciliation.check && typeof reconciliation.check === "object" ? reconciliation.check.class : null;
+  if (blocker?.code === "repair_needs_person" || repair.needs_person === true && checkClass !== "healthy" && blocker?.code !== "upload_rejected") {
+    return { level: "error", code: "repair_needs_person", text: WHAT.needs_person };
+  }
+  if (!blocker) return null;
+  if (REPAIR_NOTE.has(blocker.action)) {
+    const next = blocker.action === "wait_for_repair_spacing" ? time(repair.budget?.next_at) : null;
+    const due = next && Date.parse(repair.budget.next_at) > now ? ` It can send again after ${next}.` : "";
+    return { level: blocker.action === "wait_for_repair_release" ? "warning" : "info", code: blocker.code, text: `${WHAT[blocker.action]}${due}` };
+  }
+  const inputs = reconciliation.inputs || {};
+  if (blocker.action === "wait_for_planner" && inputs.plan_state === "nothing_to_charge" && blocker.code !== "plan_inputs_changed") {
+    return { level: "info", code: blocker.code, text: "Nothing to charge right now: the plan needs no charging, so no schedule is being sent. This describes the plan, not the charger\u2019s actual power. SpotNav plans again when the car, prices or settings change." };
+  }
+  const what = WHAT[blocker.action] || WHAT.see_reason;
+  const suffix = ` (${blocker.detail || blocker.code})`;
+  if (blocker.code === "upload_rejected") {
+    const next = time(recovery.next_retry_at);
+    if (next && Date.parse(recovery.next_retry_at) > now) {
+      return { level: "warning", code: blocker.code, text: `${what} Retrying automatically at ${next}; ${recovery.retries_left ?? 0} attempt${recovery.retries_left === 1 ? "" : "s"} left.${suffix}` };
+    }
+    if (recovery.exhausted) return { level: "error", code: blocker.code, text: `${what} Automatic retries are used up; the schedule was not confirmed. Check the charger, then use Recalculate/sync.${suffix}` };
+    return { level: "warning", code: blocker.code, text: `${what} Retrying shortly.${suffix}` };
+  }
+  const retry = recovery.blocker_retry;
+  if (PERSON_THEN_AUTOMATIC.has(blocker.action)) return { level: "warning", code: blocker.code, text: `${what}${suffix}` };
+  if (AUTOMATIC.has(blocker.action)) {
+    const next = retry && !retry.exhausted ? time(retry.next_retry_at) : null;
+    const when2 = next ? ` SpotNav re-checks automatically at ${next}, and as soon as something changes.` : retry?.exhausted ? " Timed re-checks stopped; SpotNav re-checks when something changes. Use Recalculate/sync to check now." : " SpotNav re-checks when something changes.";
+    const car = blocker.who === "vehicle" ? " The plan is made automatically when the car reports its charge level." : "";
+    return { level: "warning", code: blocker.code, text: `${what}${car}${when2}${suffix}` };
+  }
+  const paused = blocker.action === "resume_schedule" || blocker.action === "wait_for_charge_now_end";
+  return { level: paused ? "info" : "error", code: blocker.code, text: `${what}${paused ? "" : " Needs your attention; it does not clear by itself."}${suffix}` };
+}
+
+// sidebar/notify-setup.js
+var MAX_TARGETS = 10;
+var NOTICE_NOTE = "A notification only says SpotNav noticed an event. It does not prove a plan was sent to the charger or that charging was measured; check Plan activity & freshness for that. Saving here only stores your choice: it sends no notification and does not wake the car.";
+var GOTO2 = { "vehicle-sources": "Vehicle sources & properties", "market-costs": "Market & charging costs", morek: "Plan activity & freshness", "notify-setup": "Notifications" };
+var MEASUREMENT_ROWS = { vehicle: "vehicle-sources", car_level: "vehicle-sources", site: null, grid_power_sign: null, grid_current_sign: null, demand_grid_power: null };
+function notifySignature(record5) {
+  const n6 = record5?.notifications;
+  return JSON.stringify(n6 ? [n6.targets, n6.events, n6.url] : null);
+}
+var row = (id, group, level, text4, goto = null) => ({ id, group, level, text: text4, goto, gotoLabel: goto ? GOTO2[goto] : null });
+function setupDiagnostics({ dashboard, status, statusFresh, now }) {
+  const out2 = [];
+  if (!dashboard) return [row("dashboard", "setup", "info", "No dashboard observation yet, so setup problems are unknown.")];
+  const rows = setupRowsOf(dashboard.setup ?? null);
+  if (dashboard.setup == null) out2.push(row("setup-unknown", "setup", "info", "The backend did not report what is left to set up, so that is unknown (it is shown to administrators only)."));
+  for (const r7 of rows) {
+    if (!(r7.id in MEASUREMENT_ROWS)) continue;
+    const goto = MEASUREMENT_ROWS[r7.id];
+    out2.push(row(`setup-${r7.id}`, "measurement", r7.id === "grid_power_sign" || r7.id === "grid_current_sign" ? "warning" : "info", `${setupRowText("en", r7.id)}${goto ? "" : " This is set up in Home Assistant (the SpotNav card or the site settings), not here."}`, goto));
+  }
+  const soc2 = dashboard.soc;
+  if (soc2 && soc2.value == null && !rows.some((r7) => r7.id === "car_level" || r7.id === "vehicle")) out2.push(row("soc-missing", "measurement", "info", "The car\u2019s charge level has no valid reading now, so an SOC plan relies on the last known or an estimated level. Choose or check the level sensor.", "vehicle-sources"));
+  const prices = dashboard.prices;
+  if (prices) {
+    if (prices.provider && !prices.provider.name) out2.push(row("price-provider", "pricing", "warning", `No price provider is configured for the saved area${prices.provider.notice ? ` (${prices.provider.notice.code.replace(/_/g, " ")})` : ""}. Prices may be missing or held from before.`, "market-costs"));
+    if (typeof prices.state === "string" && prices.state !== "ready") out2.push(row("price-state", "pricing", "warning", `Held price data is \u201C${prices.state.replace(/_/g, " ")}\u201D${prices.reason ? ` (${String(prices.reason).replace(/_/g, " ")})` : ""}, so plans may use incomplete prices. Held data is not proof the provider answered just now.`, "market-costs"));
+    else if (prices.interval_count === 0) out2.push(row("price-none", "pricing", "warning", "No price intervals are held, so a price-based plan cannot be made.", "market-costs"));
+  }
+  if (!statusFresh) out2.push(row("status-stale", "execution", "info", "Morek status is unavailable or stale, so execution blockers are unknown. This is not proof that nothing is blocked.", "morek"));
+  else {
+    const banner = recoveryBanner(status, now);
+    if (banner) out2.push(row(`exec-${banner.code || "blocker"}`, "execution", banner.level === "error" ? "error" : banner.level === "warning" ? "warning" : "info", banner.text, "morek"));
+  }
+  return out2;
+}
+function recipientProblems(n6, can) {
+  const out2 = [];
+  const available = new Set(n6.available.map((a4) => a4.service));
+  if (n6.available.length === 0) out2.push("No Home Assistant mobile app is registered for notifications. Install the Home Assistant Companion app on a phone and sign in (or use the SpotNav app), then Reload.");
+  const missing = n6.targets.filter((t6) => !available.has(t6));
+  for (const t6 of missing) out2.push(`${t6.replace(/^mobile_app_/, "").replace(/_/g, " ")} is chosen but its notify service is not available now (the phone may be offline or re-registered). It is kept, and skipped when sending, until you untick it.`);
+  const hint = noRecipientsHint("en", n6);
+  if (hint) out2.push(`${hint} Tick at least one phone to receive the ticked events.`);
+  if (n6.events.length === 0 && n6.targets.length > 0) out2.push("No events are ticked, so nothing is sent even to the chosen phones.");
+  if (!can) out2.push("Only an administrator can change notifications.");
+  return out2;
+}
+function notifyModel(input) {
+  const base2 = { notice: input.notice || "", conflict: !!input.conflict, busy: !!input.busy };
+  const diagnostics2 = setupDiagnostics({ dashboard: input.dashboard || null, status: input.status || null, statusFresh: input.statusFresh === true, now: input.now ?? Date.now() });
+  const record5 = input.record || null, n6 = record5?.notifications;
+  if (!record5) return { ...base2, state: input.loading ? "loading" : "unavailable", canEdit: false, diagnostics: diagnostics2, notice: base2.notice || (input.loading ? "Loading notification settings\u2026" : "Notification settings unavailable. Use Reload to try again.") };
+  if (!n6) return { ...base2, state: "unsupported", canEdit: false, diagnostics: diagnostics2, notice: base2.notice || "This backend does not offer notification settings; nothing can be chosen here." };
+  const fresh2 = input.dashboardFresh !== false && !!input.dashboard;
+  const admin = input.admin === true;
+  const open = !input.blocked && !input.conflict && !input.busy && !input.awaitingRead && fresh2 && admin;
+  const notes = [];
+  if (!admin) notes.push("Only an administrator can change notifications; they are shown read-only.");
+  if (admin && !fresh2) notes.push("The dashboard observation is stale; changes are disabled until it is read again.");
+  if (input.awaitingRead && admin) notes.push("Waiting for a fresh dashboard read after the last save before another change.");
+  const phones = phoneOptions("en", n6).map((o9) => ({ service: o9.value, name: o9.label, checked: n6.targets.includes(o9.value), missing: !n6.available.some((a4) => a4.service === o9.value) }));
+  const events = eventOptions("en").map((o9) => ({ event: o9.value, label: o9.label, checked: n6.events.includes(o9.value) }));
+  return { ...base2, state: "ready", canEdit: open, notes, phones, events, problems: recipientProblems(n6, admin), diagnostics: diagnostics2, noticeNote: NOTICE_NOTE };
+}
+function notifyWritePlan(record5, values, admin) {
+  if (!admin) return { ok: false, notice: "Administrator permission is required to change notifications." };
+  const n6 = record5?.notifications;
+  if (!record5) return { ok: false, notice: "Reload the settings first." };
+  if (!n6) return { ok: false, notice: "This backend does not offer notification settings." };
+  const targets = Array.isArray(values?.targets) ? values.targets.filter((t6) => typeof t6 === "string") : [];
+  const events = Array.isArray(values?.events) ? values.events.filter((t6) => typeof t6 === "string") : [];
+  const allowed = /* @__PURE__ */ new Set([...n6.available.map((a4) => a4.service), ...n6.targets]);
+  if (targets.some((t6) => !allowed.has(t6))) return { ok: false, notice: "A chosen phone is not one of the available phones. Reload and choose again." };
+  if (new Set(targets).size > MAX_TARGETS) return { ok: false, notice: `At most ${MAX_TARGETS} phones can be chosen.` };
+  const check = notificationsReplacement(record5, { targets, events, url: n6.url });
+  if (!check.ok) return { ok: false, notice: translate2("en", check.errorKey) };
+  if (!check.changed) return { ok: true, changed: false };
+  const sent = check.body.notifications;
+  return { ok: true, changed: true, body: check.body, targets: sent.targets, events: sent.events, sendsNothing: sent.targets.length === 0 || sent.events.length === 0 };
+}
+
+// sidebar/notify-setup-panel.js
+var REFUSED3 = (code) => typeof code === "string" && (code === "spotnav_not_admin" || code === "spotnav_unknown_charger" || code === "spotnav_unsupported_api_version" || code === "spotnav_invalid_value" || code === "revision_conflict" || code.startsWith("invalid_"));
+var dashFresh3 = (dashboard, failed) => observationFreshness(Date.parse(dashboard?.generated_at || ""), Date.now(), failed) === "fresh";
+var notifySetupMethods = {
+  initNotify() {
+    this.notifyDirty = false;
+    this.notifyBase = null;
+    this.notifyBusy = false;
+    this.notifyConflict = false;
+    this.notifyNotice = "";
+    this.notifyAwaitingRead = false;
+  },
+  resetNotify() {
+    this.view?.resetNotifyDrafts();
+    this.notifyDirty = false;
+    this.notifyBase = null;
+    this.notifyConflict = false;
+    this.notifyNotice = "";
+  },
+  paintNotifySetup(adapter, dashboard) {
+    const admin = this._hass?.user?.is_admin === true, charger = this.charger;
+    const unknown = this.unknownSettingsWrites.has(charger) || this.pendingSettingsWrites.has(charger);
+    if (this.notifyDirty && this.notifyBase && !this.notifyConflict && this.settingsRecord && notifySignature(this.settingsRecord) !== this.notifyBase.signature) {
+      this.notifyConflict = true;
+      this.notifyNotice = "The notification settings changed while editing. Reload before saving again.";
+    }
+    const status = this.rawStatus ? decodeMorekState(this.rawStatus) : null;
+    adapter.model.notifySetup = notifyModel({
+      admin,
+      loading: this.settingsLoading,
+      record: this.settingsRecord,
+      dashboard,
+      dashboardFresh: !!dashboard && dashFresh3(dashboard, this.dashboardFailed),
+      status,
+      statusFresh: !!status && observationFreshness(this.statusAt, Date.now(), this.statusFailed) === "fresh",
+      now: Date.now(),
+      blocked: this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || this.paramBusy || unknown,
+      conflict: this.notifyConflict || this.settingsConflict || unknown,
+      busy: this.notifyBusy,
+      awaitingRead: this.notifyAwaitingRead,
+      notice: this.notifyNotice || (unknown ? "A previous settings save has an unknown outcome. Reload to confirm it." : this.settingsConflict ? "Settings changed elsewhere or the record is stale. Reload before changing notifications." : "")
+    });
+    adapter.actions.editNotify = () => this.editNotify();
+    adapter.actions.saveNotify = (values) => this.saveNotify(values);
+    adapter.actions.reloadNotifySetup = () => this.reloadNotifySetup();
+  },
+  editNotify() {
+    if (this.notifyDirty) return;
+    this.notifyBase = this.settingsRecord ? { signature: notifySignature(this.settingsRecord) } : null;
+    this.notifyDirty = true;
+  },
+  reloadNotifySetup() {
+    const charger = this.charger;
+    if (!this.connected || !charger || this.notifyBusy || this.settingsBusy || this.pendingSettingsWrites.has(charger)) return;
+    if (this.notifyDirty && !window.confirm("Discard the unsaved notification changes and reload?")) return;
+    this.resetNotify();
+    this.unknownSettingsWrites.delete(charger);
+    this.settingsConflict = false;
+    this.settingsRecord = null;
+    this.paint();
+    void this.loadSettings();
+    this.refresh();
+  },
+  notifyWriteBlocked(record5, admin) {
+    const charger = this.charger, hass = this._hass;
+    return !this.connected || hass?.connected === false || !admin || !charger || !record5 || this.notifyBusy || this.settingsLoading || this.pendingSettingsWrites.has(charger) || this.unknownSettingsWrites.has(charger) || this.notifyConflict || this.notifyAwaitingRead || this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || this.paramBusy || this.settingsConflict;
+  },
+  async saveNotify(values) {
+    const record5 = this.settingsRecord, hass = this._hass, charger = this.charger, generation = this.generation, permissionEpoch = this.permissionEpoch;
+    const decoded = decodeDashboard(this.rawDashboard), dashboard = decoded.ok ? decoded.value : null;
+    const admin = hass?.user?.is_admin === true;
+    const say = (text4) => {
+      this.notifyNotice = text4;
+      this.paint();
+    };
+    if (this.notifyWriteBlocked(record5, admin)) return say(admin ? "Save unavailable: another request is running, a previous outcome is unknown or stale." : "Only an administrator can change notifications.");
+    if (!dashboard || !dashFresh3(dashboard, this.dashboardFailed)) return say("The dashboard observation is stale. Wait for a fresh read or reload before saving.");
+    const plan = notifyWritePlan(record5, values, admin);
+    if (!plan.ok) return say(plan.notice);
+    if (!plan.changed) return say("No changes to save.");
+    if (this.notifyWriteBlocked(this.settingsRecord, admin) || this.settingsRecord !== record5 || this.generation !== generation || this.permissionEpoch !== permissionEpoch || this.charger !== charger) return say("State changed; review the values and try again.");
+    const current = () => this.connected && generation === this.generation && permissionEpoch === this.permissionEpoch && charger === this.charger;
+    this.notifyBusy = true;
+    this.statusEpoch++;
+    this.statusAt = null;
+    this.paint();
+    try {
+      const request = updateSettings(hass, charger, record5.revision, plan.body);
+      this.pendingSettingsWrites.set(charger, request);
+      request.finally(() => {
+        if (this.pendingSettingsWrites.get(charger) === request) this.pendingSettingsWrites.delete(charger);
+      }).catch(() => {
+      });
+      this.notifyNotice = "Saving\u2026";
+      this.paint();
+      const unknown = (text4) => {
+        this.unknownSettingsWrites.add(charger);
+        if (this.connected && generation === this.generation) {
+          this.notifyConflict = true;
+          this.notifyNotice = text4;
+        }
+      };
+      try {
+        const answer = decodeSettingsAnswer(await this.bounded(request));
+        if (!current()) {
+          this.unknownSettingsWrites.add(charger);
+          return;
+        }
+        if (!answer.ok) unknown("Save response unavailable; outcome unknown. Reload before retrying.");
+        else if (answer.value.ok) {
+          this.settingsRecord = answer.value.settings;
+          this.settingsConflict = false;
+          this.resetNotify();
+          this.notifyAwaitingRead = true;
+          this.notifyNotice = `Notification settings saved and confirmed by the backend.${plan.sendsNothing ? " With no phone or no event ticked, nothing will be sent." : ""} This stored your choice only: no notification was sent and nothing about a plan or charging is confirmed.`;
+        } else if (answer.value.code === SETTINGS_REVISION_CONFLICT) {
+          this.notifyConflict = true;
+          this.settingsConflict = true;
+          this.settingsNotice = "Settings changed elsewhere. Reload settings before editing again.";
+          this.notifyNotice = "Notifications not saved: settings were changed elsewhere; nothing was written. Reload and review the new values.";
+        } else if (answer.value.code === SETTINGS_RECONCILE_FAILED) {
+          if (answer.value.settings) {
+            this.settingsRecord = answer.value.settings;
+            this.settingsConflict = false;
+          }
+          this.resetNotify();
+          this.notifyAwaitingRead = true;
+          this.notifyConflict = true;
+          this.notifyNotice = "Notification settings were saved, but replanning failed; reload and inspect the confirmed values before changing them again.";
+        } else if (answer.value.code === SETTINGS_NOT_COMMITTED) this.notifyNotice = "Notifications not saved: the backend did not commit the change.";
+        else this.notifyNotice = `Notifications not saved: ${translate2("en", settingsErrorKey(answer.value.code))} (${answer.value.code}).`;
+      } catch (error2) {
+        const code = error2?.code;
+        if (!current()) {
+          this.unknownSettingsWrites.add(charger);
+          return;
+        }
+        if (REFUSED3(code)) this.notifyNotice = `Notifications not saved: ${translate2("en", settingsErrorKey(code))} (${code}).`;
+        else unknown("Save outcome unknown; the request may still complete. Wait, then reload before retrying.");
+      }
+    } finally {
+      if (this.connected && generation === this.generation && charger === this.charger) {
+        this.notifyBusy = false;
+        this.dashboardEpoch++;
+        this.paint();
+        this.refresh();
+      }
+    }
+  }
+};
+
 // src/daily-overview.ts
 var STATUS_MAX_AGE = 9e4;
 var READBACK_MAX_AGE = 3e5;
@@ -62502,15 +62957,15 @@ function learningModel(raw, stale, text4) {
   const state = stale ? "stale" : "fresh";
   const block = decodeLearning(raw);
   if (!block) return { state: stale ? "stale" : "unknown", lines: [text4.unknown], note: text4.note, stale: !!stale, staleText: stale ? text4.stale : null };
-  const lines2 = [
+  const lines3 = [
     block.source === "learned" ? text4.learned : text4.default,
     fill(text4.samples, { agreeing: block.agreeing, shorten: block.shorten, lengthen: block.lengthen, valid: block.valid })
   ];
-  if (block.clamped) lines2.push(text4.clamped);
+  if (block.clamped) lines3.push(text4.clamped);
   const effect = stale ? text4.effect_unknown : block.effect === null ? text4.effect_unknown : block.effect === 0 ? text4.effect_none : fill(block.effect > 0 ? text4.effect_longer : text4.effect_shorter, { minutes: Math.abs(block.effect) });
-  lines2.push(effect);
-  if (block.rejections.length) lines2.push(fill(text4.rejected, { list: block.rejections.map((r7) => `${r7.reason.replace(/_/g, " ")} \xD7${r7.count}`).join(", ") }));
-  return { state, source: block.source, lines: lines2, note: text4.note, stale: !!stale, staleText: stale ? text4.stale : null, title: text4.title };
+  lines3.push(effect);
+  if (block.rejections.length) lines3.push(fill(text4.rejected, { list: block.rejections.map((r7) => `${r7.reason.replace(/_/g, " ")} \xD7${r7.count}`).join(", ") }));
+  return { state, source: block.source, lines: lines3, note: text4.note, stale: !!stale, staleText: stale ? text4.stale : null, title: text4.title };
 }
 
 // sidebar/price-chart.js
@@ -62525,11 +62980,11 @@ function publishedChart(raw, market, now, stale) {
   }
   const prices = [];
   let previous = -Infinity;
-  for (const row of rows) {
-    if (!row || typeof row.start !== "string" || typeof row.end !== "string" || !/(?:Z|[+-]\d\d:\d\d)$/i.test(row.start) || !/(?:Z|[+-]\d\d:\d\d)$/i.test(row.end)) return null;
-    const start2 = Date.parse(row.start), end2 = Date.parse(row.end);
-    if (!Number.isFinite(start2) || !Number.isFinite(end2) || end2 <= start2 || start2 < previous || !(row.raw_price === null || Number.isFinite(row.raw_price))) return null;
-    if (row.raw_price !== null) prices.push({ start: start2, end: end2, cents: displayPrice(row.raw_price, currency) });
+  for (const row2 of rows) {
+    if (!row2 || typeof row2.start !== "string" || typeof row2.end !== "string" || !/(?:Z|[+-]\d\d:\d\d)$/i.test(row2.start) || !/(?:Z|[+-]\d\d:\d\d)$/i.test(row2.end)) return null;
+    const start2 = Date.parse(row2.start), end2 = Date.parse(row2.end);
+    if (!Number.isFinite(start2) || !Number.isFinite(end2) || end2 <= start2 || start2 < previous || !(row2.raw_price === null || Number.isFinite(row2.raw_price))) return null;
+    if (row2.raw_price !== null) prices.push({ start: start2, end: end2, cents: displayPrice(row2.raw_price, currency) });
     previous = end2;
   }
   if (!prices.length) return null;
@@ -63061,7 +63516,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
   const rawProposal = raw?.plan?.proposal;
   const details = rawProposal?.window_details;
   const rawProjection = rawProposal?.projection;
-  const validDetails = Array.isArray(details) && proposal && details.length === proposal.periods.length && details.every((item, i7) => item && Date.parse(item.start) === proposal.periods[i7].startMs && Date.parse(item.end) === proposal.periods[i7].endMs && Number.isFinite(item.energy_kwh) && item.energy_kwh >= 0 && (item.cost === null || Number.isFinite(item.cost)) && (item.projected_soc === void 0 || validPercent(item.projected_soc))) && Number.isFinite(proposal.planned_kwh) && Math.abs(details.reduce((sum, row) => sum + row.energy_kwh, 0) - proposal.planned_kwh) < Math.max(1e-6, Math.abs(proposal.planned_kwh) * 1e-8) && (proposal.unpriced || !proposal.cost || details.every((row) => Number.isFinite(row.cost)) && Math.abs(details.reduce((sum, row) => sum + row.cost, 0) - proposal.cost.value) < Math.max(1e-6, Math.abs(proposal.cost.value) * 1e-8));
+  const validDetails = Array.isArray(details) && proposal && details.length === proposal.periods.length && details.every((item, i7) => item && Date.parse(item.start) === proposal.periods[i7].startMs && Date.parse(item.end) === proposal.periods[i7].endMs && Number.isFinite(item.energy_kwh) && item.energy_kwh >= 0 && (item.cost === null || Number.isFinite(item.cost)) && (item.projected_soc === void 0 || validPercent(item.projected_soc))) && Number.isFinite(proposal.planned_kwh) && Math.abs(details.reduce((sum, row2) => sum + row2.energy_kwh, 0) - proposal.planned_kwh) < Math.max(1e-6, Math.abs(proposal.planned_kwh) * 1e-8) && (proposal.unpriced || !proposal.cost || details.every((row2) => Number.isFinite(row2.cost)) && Math.abs(details.reduce((sum, row2) => sum + row2.cost, 0) - proposal.cost.value) < Math.max(1e-6, Math.abs(proposal.cost.value) * 1e-8));
   const planCurrency = proposal?.cost?.currency || d3.market?.currency || null;
   const pricedBasis = rawProposal?.cost_basis === "configured_variable_cost" && !proposal?.unpriced && proposal?.cost?.currency === planCurrency && /^[A-Z]{3}$/.test(planCurrency || "");
   const projectionValid = !planStale && validPercent(rawProjection?.starting_soc) && Number.isFinite(rawProjection?.kwh_per_percent) && rawProjection.kwh_per_percent > 0;
@@ -63265,86 +63720,6 @@ function createLogViewer(getHass, { fetchLogs = getLogs, intervalMs = 5e3, timer
   return root;
 }
 
-// sidebar/recovery-banner.js
-var WHAT = {
-  wait_for_charger_connection: "The charger is not connected to Home Assistant, so no schedule was sent.",
-  check_charger_identity: "The charger identity could not be confirmed, so no schedule was sent.",
-  retry_after_stop_or_change: "A Stop or a connector change interrupted the update; nothing more was sent.",
-  confirm_ownership: "Schedule ownership needs confirmation before anything is sent.",
-  resolve_protection_conflict: "Another controller or site protection may also limit this charger; sending is blocked.",
-  resume_schedule: "Auto is paused until you press Resume.",
-  confirm_resume: "Resume cannot be continued automatically; confirm Resume again.",
-  wait_for_charge_now_end: "Charge Now is active; Auto follows when it ends or you return to Auto.",
-  check_charger_outcome: "The last schedule write has an unknown outcome. It is not retried automatically.",
-  check_charger_response: "The charger refused the schedule.",
-  wait_for_planner: "The plan is being recalculated.",
-  check_logs: "The schedule check failed unexpectedly; see SpotNav logs.",
-  wait_for_fresh_inputs: "Waiting for a fresh vehicle reading.",
-  // Stage 17.6: a hold the planner names itself; who acts is stated, none of these claims charging.
-  set_battery_capacity: "No plan yet: the battery capacity is not known. Enter it in Plan; the plan is then made automatically, and sent automatically only if the usual safety checks allow it.",
-  wait_for_exchange_rate: "No plan yet: waiting for the ECB exchange rate to convert the prices. It is asked for again automatically and the plan follows.",
-  adjust_planning_settings: "The plan cannot be sent as saved; adjust the planning settings.",
-  wait_for_prices: "Prices are unavailable or incomplete for the planned window.",
-  see_reason: "The schedule is not being updated.",
-  // 15.4a/b repair outcomes. Plain words, who acts; none of these asks for a blind resend.
-  needs_person: "Automatic repair is paused for this attempt: the charger\u2019s schedule still doesn\u2019t match, or the repair limit is used up. Check the charger and the SpotNav logs.",
-  wait_for_repair_deferral: "The charger\u2019s schedule differs a little. The current charge is left alone and SpotNav fixes it a bit later.",
-  wait_for_repair_spacing: "SpotNav already fixed the charger\u2019s schedule recently, so it waits before sending again. Nothing is sent now.",
-  wait_for_confirmation: "Checking the charger\u2019s schedule again: one odd reading isn\u2019t enough to act on.",
-  wait_for_repair_release: "The charger\u2019s schedule differs from the plan, but automatic repair is off, so nothing was sent. Check the schedule in the Morek app."
-};
-var REPAIR_NOTE = /* @__PURE__ */ new Set(["wait_for_repair_deferral", "wait_for_repair_spacing", "wait_for_confirmation", "wait_for_repair_release"]);
-var PERSON_THEN_AUTOMATIC = /* @__PURE__ */ new Set(["set_battery_capacity"]);
-var AUTOMATIC = /* @__PURE__ */ new Set(["wait_for_charger_connection", "check_charger_identity", "retry_after_stop_or_change", "wait_for_planner", "wait_for_fresh_inputs", "wait_for_prices", "wait_for_exchange_rate", "check_logs"]);
-var time = (iso) => {
-  const at = Date.parse(iso || "");
-  return Number.isFinite(at) ? new Date(at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : null;
-};
-function recoveryBanner(state, now = Date.now()) {
-  if (!state || state.supported === false) return null;
-  const reconciliation = state.reconciliation || {};
-  const blocker = reconciliation.blocker;
-  const recovery = reconciliation.recovery || {};
-  if (state.outcomes?.uncertain === true || blocker?.code === "upload_uncertain") {
-    return { level: "error", code: "upload_uncertain", text: `${WHAT.check_charger_outcome} Charging is not confirmed; check Morek and the SpotNav logs before acting. Nothing was cleared.` };
-  }
-  const repair = reconciliation.repair || {};
-  const checkClass = reconciliation.check && typeof reconciliation.check === "object" ? reconciliation.check.class : null;
-  if (blocker?.code === "repair_needs_person" || repair.needs_person === true && checkClass !== "healthy" && blocker?.code !== "upload_rejected") {
-    return { level: "error", code: "repair_needs_person", text: WHAT.needs_person };
-  }
-  if (!blocker) return null;
-  if (REPAIR_NOTE.has(blocker.action)) {
-    const next = blocker.action === "wait_for_repair_spacing" ? time(repair.budget?.next_at) : null;
-    const due = next && Date.parse(repair.budget.next_at) > now ? ` It can send again after ${next}.` : "";
-    return { level: blocker.action === "wait_for_repair_release" ? "warning" : "info", code: blocker.code, text: `${WHAT[blocker.action]}${due}` };
-  }
-  const inputs = reconciliation.inputs || {};
-  if (blocker.action === "wait_for_planner" && inputs.plan_state === "nothing_to_charge" && blocker.code !== "plan_inputs_changed") {
-    return { level: "info", code: blocker.code, text: "Nothing to charge right now: the plan needs no charging, so no schedule is being sent. This describes the plan, not the charger\u2019s actual power. SpotNav plans again when the car, prices or settings change." };
-  }
-  const what = WHAT[blocker.action] || WHAT.see_reason;
-  const suffix = ` (${blocker.detail || blocker.code})`;
-  if (blocker.code === "upload_rejected") {
-    const next = time(recovery.next_retry_at);
-    if (next && Date.parse(recovery.next_retry_at) > now) {
-      return { level: "warning", code: blocker.code, text: `${what} Retrying automatically at ${next}; ${recovery.retries_left ?? 0} attempt${recovery.retries_left === 1 ? "" : "s"} left.${suffix}` };
-    }
-    if (recovery.exhausted) return { level: "error", code: blocker.code, text: `${what} Automatic retries are used up; the schedule was not confirmed. Check the charger, then use Recalculate/sync.${suffix}` };
-    return { level: "warning", code: blocker.code, text: `${what} Retrying shortly.${suffix}` };
-  }
-  const retry = recovery.blocker_retry;
-  if (PERSON_THEN_AUTOMATIC.has(blocker.action)) return { level: "warning", code: blocker.code, text: `${what}${suffix}` };
-  if (AUTOMATIC.has(blocker.action)) {
-    const next = retry && !retry.exhausted ? time(retry.next_retry_at) : null;
-    const when2 = next ? ` SpotNav re-checks automatically at ${next}, and as soon as something changes.` : retry?.exhausted ? " Timed re-checks stopped; SpotNav re-checks when something changes. Use Recalculate/sync to check now." : " SpotNav re-checks when something changes.";
-    const car = blocker.who === "vehicle" ? " The plan is made automatically when the car reports its charge level." : "";
-    return { level: "warning", code: blocker.code, text: `${what}${car}${when2}${suffix}` };
-  }
-  const paused = blocker.action === "resume_schedule" || blocker.action === "wait_for_charge_now_end";
-  return { level: paused ? "info" : "error", code: blocker.code, text: `${what}${paused ? "" : " Needs your attention; it does not clear by itself."}${suffix}` };
-}
-
 // sidebar/schedule-check.js
 var CLOCK_SKEW_MS3 = 5e3;
 var MAX_CHECK_AGE_MS = 864e5;
@@ -63461,7 +63836,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.161";
+var CARD_VERSION = "2.5.162";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {
@@ -63605,6 +63980,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this.autoNotice = "";
     this.initCosts();
     this.initParams();
+    this.initNotify();
     this.connected = false;
   }
   connectedCallback() {
@@ -63705,6 +64081,11 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
         this.paramConflict = true;
         this.paramNotice = "Permission changed during the parameter save; its outcome must be checked by reloading.";
       }
+      if (this.notifyBusy && this.charger) {
+        this.unknownSettingsWrites.add(this.charger);
+        this.notifyConflict = true;
+        this.notifyNotice = "Permission changed during the notification save; its outcome must be checked by reloading.";
+      }
       if (this.autoBusy) {
         this.autoUncertain = true;
         this.autoNotice = "Permission changed during the operation; its outcome may be unknown.";
@@ -63744,6 +64125,14 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this.paramAwaitingRead = false;
     this.paramDirty = !!paramDirty;
     this.paramBase = paramBase;
+    if (this.notifyBusy && this.charger) this.unknownSettingsWrites.add(this.charger);
+    const notifyDirty = preserveDraft && this.notifyDirty, notifyBase = preserveDraft ? this.notifyBase : null;
+    this.notifyBusy = false;
+    this.notifyConflict = false;
+    this.notifyNotice = "";
+    this.notifyAwaitingRead = false;
+    this.notifyDirty = !!notifyDirty;
+    this.notifyBase = notifyBase;
     const costDirty = preserveDraft && this.costDirty, costArea = preserveDraft ? this.marketArea : null, costBase = preserveDraft ? this.costBase : null, costFee = preserveDraft && this.costFeeEdited;
     this.marketOptions = null;
     this.marketOptionsAt = null;
@@ -63878,6 +64267,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this.paintVehicleSources(adapter, dashboard);
     this.paintMarketCosts(adapter, dashboard);
     this.paintPlanParams(adapter, dashboard, this.morekOwnedNow());
+    this.paintNotifySetup(adapter, dashboard);
     this.message(this.dashboardFailed ? "Dashboard refresh failed; the last observation may be stale." : "");
     if (this.view) this.view.update(adapter);
     else this.view = mountDashboard(this.shadowRoot.querySelector("main"), adapter);
@@ -64201,7 +64591,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
   }
   async morekAction(action) {
     const hass = this._hass, charger = this.charger, generation = this.generation, permissionEpoch = this.permissionEpoch, statusSnapshot = this.rawStatus, observedAt = this.statusAt, state = decodeMorekState(statusSnapshot);
-    if (!this.connected || hass?.connected === false || hass?.user?.is_admin !== true || !charger || !state || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || this.paramBusy || !["status", "send", "fetch", "clear", "reconfirm_migration", "recalculate_sync", "reset_learning"].includes(action)) return;
+    if (!this.connected || hass?.connected === false || hass?.user?.is_admin !== true || !charger || !state || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || this.paramBusy || this.notifyBusy || !["status", "send", "fetch", "clear", "reconfirm_migration", "recalculate_sync", "reset_learning"].includes(action)) return;
     if (action === "reconfirm_migration" && state.ownership?.reconfirmation_required !== true) return;
     if (action !== "status" && !state.supported) return;
     if (action === "clear" && state.cleanup_supported !== true) return;
@@ -64293,7 +64683,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     const generation = this.generation, permissionEpoch = this.permissionEpoch, charger = this.charger, hass = this._hass, record5 = this.settingsRecord;
     const decoded = decodeDashboard(this.rawDashboard);
     const allowed = hass?.user?.is_admin === true || decoded.ok && decoded.value.settings?.users_change_plan === true;
-    if (!this.connected || hass?.connected === false || !charger || !record5 || this.settingsBusy || this.pendingSettingsWrites.has(charger) || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || this.paramBusy || this.settingsConflict || !allowed) {
+    if (!this.connected || hass?.connected === false || !charger || !record5 || this.settingsBusy || this.pendingSettingsWrites.has(charger) || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || this.paramBusy || this.notifyBusy || this.settingsConflict || !allowed) {
       this.settingsNotice = "Save unavailable or permission denied.";
       this.paint();
       return;
@@ -64403,7 +64793,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       savedId: this.settingsRecord?.target?.vehicle_id || null,
       selectedId: this.vehicleSelected,
       entityState,
-      blocked: this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.costBusy || this.paramBusy || unknown,
+      blocked: this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.costBusy || this.paramBusy || this.notifyBusy || unknown,
       conflict: this.vehicleConflict || unknown,
       busy: this.vehicleBusy,
       notice: unknown && !this.vehicleNotice ? "A previous vehicle save has an unknown outcome. Reload vehicle sources to confirm it." : this.vehicleNotice
@@ -64486,7 +64876,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
   }
   vehicleWriteBlocked(ctx) {
     const charger = this.charger, hass = this._hass;
-    return !this.connected || hass?.connected === false || hass?.user?.is_admin !== true || !charger || !ctx || this.vehicleBusy || this.costBusy || this.paramBusy || this.vehicleLoading || this.pendingVehicleWrites.has(charger) || this.unknownVehicleWrites.has(charger) || this.vehicleConflict || this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy;
+    return !this.connected || hass?.connected === false || hass?.user?.is_admin !== true || !charger || !ctx || this.vehicleBusy || this.costBusy || this.paramBusy || this.notifyBusy || this.vehicleLoading || this.pendingVehicleWrites.has(charger) || this.unknownVehicleWrites.has(charger) || this.vehicleConflict || this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy;
   }
   async finishVehicleWrite(generation, charger, body) {
     this.vehicleBusy = true;
@@ -64732,6 +65122,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
         this.rawDashboard = raw;
         this.costAwaitingRead = false;
         this.paramAwaitingRead = false;
+        this.notifyAwaitingRead = false;
         this.controlPermissionPending = false;
         const control = decodeDashboard(raw).value?.control;
         const generated = Date.parse(raw.generated_at || "");
@@ -64778,7 +65169,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     }
   }
 };
-Object.assign(SpotnavEnhancedPanel.prototype, marketCostMethods, planParamMethods);
+Object.assign(SpotnavEnhancedPanel.prototype, marketCostMethods, planParamMethods, notifySetupMethods);
 if (!customElements.get("spotnav-enhanced-panel")) customElements.define("spotnav-enhanced-panel", SpotnavEnhancedPanel);
 export {
   SpotnavEnhancedPanel

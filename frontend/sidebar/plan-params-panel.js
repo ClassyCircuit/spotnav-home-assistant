@@ -32,7 +32,7 @@ export const planParamMethods = {
     }
     adapter.model.planParams = planParamsModel({
       admin, loading: this.settingsLoading, record: this.settingsRecord, dashboard, dashboardFresh: !!dashboard && dashFresh(dashboard, this.dashboardFailed), now: Date.now(), morekOwned,
-      blocked: this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || unknown,
+      blocked: this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || this.notifyBusy || unknown,
       conflict: this.paramConflict || this.settingsConflict || unknown, busy: this.paramBusy, awaitingRead: this.paramAwaitingRead,
       notice: this.paramNotice || (unknown ? 'A previous settings save has an unknown outcome. Reload to confirm it.' : this.settingsConflict ? 'Settings changed elsewhere or the record is stale. Reload before changing these parameters.' : ''),
     });
@@ -60,7 +60,7 @@ export const planParamMethods = {
   },
   paramWriteBlocked(record, allowed) {
     const charger = this.charger, hass = this._hass;
-    return !this.connected || hass?.connected === false || !allowed || !charger || !record || this.paramBusy || this.settingsLoading || this.pendingSettingsWrites.has(charger) || this.unknownSettingsWrites.has(charger) || this.paramConflict || this.paramAwaitingRead || this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || this.settingsConflict;
+    return !this.connected || hass?.connected === false || !allowed || !charger || !record || this.paramBusy || this.settingsLoading || this.pendingSettingsWrites.has(charger) || this.unknownSettingsWrites.has(charger) || this.paramConflict || this.paramAwaitingRead || this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || this.notifyBusy || this.settingsConflict;
   },
   async saveParams(kind, values) {
     const record = this.settingsRecord, hass = this._hass, charger = this.charger, generation = this.generation, permissionEpoch = this.permissionEpoch;

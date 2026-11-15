@@ -4861,3 +4861,24 @@ Implementation sub-agent; no HA, charger, deployment, commit or push; no browser
 - **Unrun / limits:** full frontend suite, browser/Playwright, HA-fixture Python tests (none needed, no backend change), installed behaviour, a Morek
   owner's re-upload after a replan, the plan's effective window count, i18n for this area. Not installed, deployed or live-verified; no HA, charger or
   hardware access was used.
+
+## Stage 13.4 — notification settings and setup check (manifest 2.5.162, local, coordinator review/commit pending)
+
+- **What:** a collapsed “Advanced: notifications & setup check” card in the shared sidebar UI and the local preview (fictional, read-only sample):
+  per-charger HA mobile-app recipients, the eight events, and a compact setup check. Pure model/plans in `frontend/sidebar/notify-setup.js`, panel wiring in
+  `frontend/sidebar/notify-setup-panel.js`, renderer `frontend/shared-dashboard/notify-setup-view.js`; small hooks in `sidebar/panel.js`, `shared-dashboard/dashboard.js`
+  (drafts `n:`, `data-nsetting`, `data-goto` links), `reconcile.js`, `dark.css`, `prototype/sample-adapter.js`, `src/setup-checklist.ts` (new `setupRowText`), and
+  `notifyBusy` in the plan-params/market panels' guards. **No backend change, no new message.**
+- **Reuse:** `update_settings` through `notificationsReplacement` (url kept, events in backend order, administrator-only); `notifications.available` from the settings record;
+  `phoneOptions`/`eventOptions`/`noRecipientsHint` from `src/notifications.ts`; dashboard `setup` rows via `setupRowsOf`/`setupRowText`; `prices.provider/state/interval_count`;
+  `recoveryBanner` (9.5/17.6 wording) from fresh Morek status. Stale/missing status → “unknown”, not “nothing blocked”.
+- **Rules:** a notification only says SpotNav noticed an event — never that a plan was sent or charging measured; saving sends nothing and does not wake the car;
+  no phone/no event is stored and said to send nothing; a vanished chosen phone is kept (flagged) until unticked; unchanged/invalid saves send nothing; conflict, reconcile
+  failure, refusal, timeout and permission change mid-save handled like 13.3 (unknown outcome blocks saving until Reload).
+- **Checks run (mocked):** `npx vitest run test/notify-setup.test.ts` (24, about 8 s: model, diagnostics, write plan, renderer/preview parity, real panel: read-only open, save with revision,
+  unchanged, missing phones, conflict, refusal, unknown outcome and reload, reconcile failure, non-admin, stale dashboard, drafts and concurrent change, permission change mid-save, link);
+  `test/plan-params.test.ts` + `test/market-costs.test.ts` (61), `test/vehicle-sources.test.ts` + `test/notifications.test.ts` (41), `test/setup-checklist.test.ts` (20),
+  `node --test shared-dashboard/boundaries.test.mjs prototype/sample.test.mjs` (11), `npx tsc --noEmit`, `npm run build`, `npm run check-dist`, `npm run prototype:build`.
+- **Unrun / limits:** `test/sidebar.test.ts` (about 33 s), full frontend suite, browser/Playwright, HA-fixture Python tests (none needed), installed behaviour, i18n for this area,
+  delivery of a notification to a phone (an available notify service is not proof of delivery), editing the tap-through url. Not installed, deployed or live-verified; no HA,
+  charger or hardware access was used.

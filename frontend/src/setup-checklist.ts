@@ -70,6 +70,11 @@ export function setupRowsOf(block: SetupBlock | null): SetupRow[] {
   });
 }
 
+/** One row's sentence in a language (the words the card and the sidebar's setup diagnostics share). */
+export function setupRowText(language: Language, id: SetupRowId): string {
+  return translate(language, WORDS[id].text);
+}
+
 /** "Get started: 3 things left", in the language's own plural. */
 export function setupLineText(language: Language, count: number): string {
   const key: TranslationKey = pluralForm(language, count) === "one" ? "setup.line.one" : "setup.line.other";

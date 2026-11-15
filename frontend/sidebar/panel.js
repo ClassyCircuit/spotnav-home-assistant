@@ -4,6 +4,7 @@ import { decodeEntityAnswer, decodeVehicleWriteAnswer, entityErrorKey, fieldErro
 import { vehicleSourcesModel, vehicleSignature, chooseVehicle, sensorWritePlan, propertyWritePlan, CONFIG_REFRESH_MS } from './vehicle-sources.js';
 import { marketCostMethods } from './market-costs-panel.js';
 import { planParamMethods } from './plan-params-panel.js';
+import { notifySetupMethods } from './notify-setup-panel.js';
 import { admittedAction, chargerCarsOf } from '../src/model.ts';
 import { decodeSettingsAnswer, formFromRecord, replacementFor } from '../src/settings.ts';
 import { decodeDashboard } from '../src/validate.ts';
@@ -108,6 +109,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     this.autoNotice = '';
     this.initCosts();
     this.initParams();
+    this.initNotify();
     this.connected = false;
   }
   connectedCallback() {
@@ -166,6 +168,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
       if (this.costBusy && this.charger) {this.unknownCostWrites.add(this.charger);this.costConflict=true;this.costNotice='Permission changed during the market/cost save; its outcome must be checked by reloading.';}
       this.marketOptions=null;this.marketOptionsAt=null;
       if (this.paramBusy && this.charger) {this.unknownSettingsWrites.add(this.charger);this.paramConflict=true;this.paramNotice='Permission changed during the parameter save; its outcome must be checked by reloading.';}
+      if (this.notifyBusy && this.charger) {this.unknownSettingsWrites.add(this.charger);this.notifyConflict=true;this.notifyNotice='Permission changed during the notification save; its outcome must be checked by reloading.';}
       if (this.autoBusy) {this.autoUncertain=true;this.autoNotice='Permission changed during the operation; its outcome may be unknown.';}
       if (this.chargeBusy && this.charger) {this.chargeUnknown?.add(this.charger);this.chargeNotice='Permission changed during the request; outcome unknown. Do not retry blindly.';}
       this.paint();this.refresh();
@@ -184,6 +187,9 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     if (this.paramBusy && this.charger) this.unknownSettingsWrites.add(this.charger);
     const paramDirty=preserveDraft && this.paramDirty, paramBase=preserveDraft ? this.paramBase : null;
     this.paramBusy=false;this.paramConflict=false;this.paramNotice='';this.paramAwaitingRead=false;this.paramDirty=!!paramDirty;this.paramBase=paramBase;
+    if (this.notifyBusy && this.charger) this.unknownSettingsWrites.add(this.charger);
+    const notifyDirty=preserveDraft && this.notifyDirty, notifyBase=preserveDraft ? this.notifyBase : null;
+    this.notifyBusy=false;this.notifyConflict=false;this.notifyNotice='';this.notifyAwaitingRead=false;this.notifyDirty=!!notifyDirty;this.notifyBase=notifyBase;
     const costDirty=preserveDraft && this.costDirty, costArea=preserveDraft ? this.marketArea : null, costBase=preserveDraft ? this.costBase : null, costFee=preserveDraft && this.costFeeEdited;
     this.marketOptions=null;this.marketOptionsAt=null;this.marketOptionsFailed=false;this.marketLoading=false;this.costBusy=false;this.costConflict=false;this.costNotice='';this.costAwaitingRead=false;this.costDirty=!!costDirty;this.marketArea=costArea;this.costBase=costBase;this.costFeeEdited=!!costFee;
     const vehicleDirty=preserveDraft && this.vehicleDirty;
@@ -252,6 +258,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     this.paintVehicleSources(adapter,dashboard);
     this.paintMarketCosts(adapter,dashboard);
     this.paintPlanParams(adapter,dashboard,this.morekOwnedNow());
+    this.paintNotifySetup(adapter,dashboard);
     this.message(this.dashboardFailed ? 'Dashboard refresh failed; the last observation may be stale.' : '');
     if (this.view) this.view.update(adapter);
     else this.view=mountDashboard(this.shadowRoot.querySelector('main'),adapter);
@@ -447,7 +454,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
   }
   async morekAction(action) {
     const hass=this._hass, charger=this.charger, generation=this.generation, permissionEpoch=this.permissionEpoch, statusSnapshot=this.rawStatus, observedAt=this.statusAt, state=decodeMorekState(statusSnapshot);
-    if (!this.connected || hass?.connected===false || hass?.user?.is_admin!==true || !charger || !state || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || this.paramBusy || !['status','send','fetch','clear','reconfirm_migration','recalculate_sync','reset_learning'].includes(action)) return;
+    if (!this.connected || hass?.connected===false || hass?.user?.is_admin!==true || !charger || !state || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || this.paramBusy || this.notifyBusy || !['status','send','fetch','clear','reconfirm_migration','recalculate_sync','reset_learning'].includes(action)) return;
     if (action==='reconfirm_migration' && state.ownership?.reconfirmation_required!==true) return;
     if (action!=='status' && !state.supported) return;
     if (action==='clear' && state.cleanup_supported!==true) return;
@@ -510,7 +517,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     const generation=this.generation, permissionEpoch=this.permissionEpoch, charger=this.charger, hass=this._hass, record=this.settingsRecord;
     const decoded=decodeDashboard(this.rawDashboard);
     const allowed=hass?.user?.is_admin===true || (decoded.ok && decoded.value.settings?.users_change_plan===true);
-    if (!this.connected || hass?.connected===false || !charger || !record || this.settingsBusy || this.pendingSettingsWrites.has(charger) || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || this.paramBusy || this.settingsConflict || !allowed) {this.settingsNotice='Save unavailable or permission denied.';this.paint();return;}
+    if (!this.connected || hass?.connected===false || !charger || !record || this.settingsBusy || this.pendingSettingsWrites.has(charger) || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || this.paramBusy || this.notifyBusy || this.settingsConflict || !allowed) {this.settingsNotice='Save unavailable or permission denied.';this.paint();return;}
     const base=formFromRecord(record), driver=values.driver ?? base.driver, vehicleId=values.vehicleId ?? base.vehicleId;
     if (vehicleId!==base.vehicleId && (!decoded.ok || !chargerCarsOf(decoded.value).some(v=>v.id===vehicleId && v.id!=='guest'))) {this.settingsNotice='Choose an available discovered vehicle.';this.paint();return;}
     const form={...base,driver,energy:values.energy ?? base.energy,vehicleId,targetPercent:values.target ?? base.targetPercent,minimumReadySoc:values.minimum,capValue:capForSave(values.cap,decoded.ok ? decoded.value.market?.currency : null,record.soft_price_cap),capEnabled:values.capEnabled,capBasis:values.capBasis,deadlineEnabled:values.deadlineEnabled,deadlineTime:values.readyBy,...(base.timeReserve===undefined?{}:{timeReserve:values.reserve ?? base.timeReserve})};
@@ -554,7 +561,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     const vehicle=adapter.model.vehicle;
     adapter.model.vehicleSources=vehicleSourcesModel({admin,loading:this.vehicleLoading,failed:this.vehicleConfigFailed,config:this.vehicleConfig,configAt:this.vehicleConfigAt,now:Date.now(),rows:dashboard?.vehicles || [],
       dashboardFresh:!!dashboard && dashboardFresh(dashboard,this.dashboardFailed),reading:{vehicleId:dashboard?.soc?.vehicle_id ?? null,value:vehicle?.soc,stale:vehicle?.stale,detail:vehicle?.socDetail || ''},
-      savedId:this.settingsRecord?.target?.vehicle_id || null,selectedId:this.vehicleSelected,entityState,blocked:this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.costBusy || this.paramBusy || unknown,
+      savedId:this.settingsRecord?.target?.vehicle_id || null,selectedId:this.vehicleSelected,entityState,blocked:this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.costBusy || this.paramBusy || this.notifyBusy || unknown,
       conflict:this.vehicleConflict || unknown,busy:this.vehicleBusy,notice:unknown && !this.vehicleNotice ? 'A previous vehicle save has an unknown outcome. Reload vehicle sources to confirm it.' : this.vehicleNotice});
     adapter.actions.editVehicle=()=>this.editVehicle();
     adapter.actions.selectVehicle=id=>this.selectVehicle(id);
@@ -597,7 +604,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
   }
   vehicleWriteBlocked(ctx) {
     const charger=this.charger, hass=this._hass;
-    return !this.connected || hass?.connected===false || hass?.user?.is_admin!==true || !charger || !ctx || this.vehicleBusy || this.costBusy || this.paramBusy || this.vehicleLoading || this.pendingVehicleWrites.has(charger) || this.unknownVehicleWrites.has(charger) || this.vehicleConflict || this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy;
+    return !this.connected || hass?.connected===false || hass?.user?.is_admin!==true || !charger || !ctx || this.vehicleBusy || this.costBusy || this.paramBusy || this.notifyBusy || this.vehicleLoading || this.pendingVehicleWrites.has(charger) || this.unknownVehicleWrites.has(charger) || this.vehicleConflict || this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy;
   }
   async finishVehicleWrite(generation,charger,body) {
     // Common shell: once dispatched, only the write's own answer settles the outcome.
@@ -715,7 +722,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
         if (!valid() || epoch!==this.dashboardEpoch) return;
         const decoded=dashboardAdapter(raw,this.rawStatus,this.statusAt);
         if (!decoded || decoded.draftKey!==charger) {this.dashboardFailed=true;if(this.view)this.paint();else this.message('Dashboard unavailable or unsupported.');return;}
-        this.dashboardFailed=false; this.rawDashboard=raw;this.costAwaitingRead=false;this.paramAwaitingRead=false;this.controlPermissionPending=false;
+        this.dashboardFailed=false; this.rawDashboard=raw;this.costAwaitingRead=false;this.paramAwaitingRead=false;this.notifyAwaitingRead=false;this.controlPermissionPending=false;
         const control=decodeDashboard(raw).value?.control;
         const generated=Date.parse(raw.generated_at || '');
         if(this.autoExpected && control && fresh(generated) && generated<=Date.now() && generated>=this.autoExpected.dispatchedAt && (this.autoExpected.action==='stop' ? control.pause?.choice===this.autoExpected.choice : control.pause?.choice==null)) {this.autoNotice='Confirmed by a fresh dashboard observation.';this.autoExpected=null;}
@@ -737,5 +744,5 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     }
   }
 }
-Object.assign(SpotnavEnhancedPanel.prototype,marketCostMethods,planParamMethods);
+Object.assign(SpotnavEnhancedPanel.prototype,marketCostMethods,planParamMethods,notifySetupMethods);
 if (!customElements.get('spotnav-enhanced-panel')) customElements.define('spotnav-enhanced-panel',SpotnavEnhancedPanel);
