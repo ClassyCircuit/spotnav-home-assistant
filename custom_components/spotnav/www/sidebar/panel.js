@@ -7314,11 +7314,11 @@ function getWheelDeltaMayPolyfill(e9) {
   var sign = deltaY > 0 ? -1 : deltaY < 0 ? 1 : deltaX > 0 ? -1 : 1;
   return 3 * delta * sign;
 }
-function addEventListener(el, name, handler, opt3) {
-  el.addEventListener(name, handler, opt3);
+function addEventListener(el, name, handler, opt4) {
+  el.addEventListener(name, handler, opt4);
 }
-function removeEventListener(el, name, handler, opt3) {
-  el.removeEventListener(name, handler, opt3);
+function removeEventListener(el, name, handler, opt4) {
+  el.removeEventListener(name, handler, opt4);
 }
 var stop = function(e9) {
   e9.preventDefault();
@@ -7692,15 +7692,15 @@ var BoundingRect = (function() {
   BoundingRect2.prototype.calculateTransform = function(b3) {
     return boundingRectCalculateTransform(create2(), this, b3);
   };
-  BoundingRect2.prototype.intersect = function(b3, mtv, opt3) {
-    return BoundingRect2.intersect(this, b3, mtv, opt3);
+  BoundingRect2.prototype.intersect = function(b3, mtv, opt4) {
+    return BoundingRect2.intersect(this, b3, mtv, opt4);
   };
-  BoundingRect2.intersect = function(a4, b3, mtv, opt3) {
+  BoundingRect2.intersect = function(a4, b3, mtv, opt4) {
     if (mtv) {
       Point_default.set(mtv, 0, 0);
     }
-    var outIntersectRect = opt3 && opt3.outIntersectRect || null;
-    var clamp2 = opt3 && opt3.clamp;
+    var outIntersectRect = opt4 && opt4.outIntersectRect || null;
+    var clamp2 = opt4 && opt4.clamp;
     if (outIntersectRect) {
       outIntersectRect.x = outIntersectRect.y = outIntersectRect.width = outIntersectRect.height = NaN;
     }
@@ -7714,7 +7714,7 @@ var BoundingRect = (function() {
       b3 = boundingRectSet(_tmpIntersectB, b3.x, b3.y, b3.width, b3.height);
     }
     var useMTV = !!mtv;
-    _intersectCtx.reset(opt3, useMTV);
+    _intersectCtx.reset(opt4, useMTV);
     var touchThreshold = _intersectCtx.touchThreshold;
     var ax0 = a4.x + touchThreshold;
     var ax1 = a4.x + a4.width - touchThreshold;
@@ -7899,10 +7899,10 @@ function createIntersectContext() {
     touchThreshold: 0,
     bidirectional: true,
     negativeSize: false,
-    reset: function(opt3, useMTV) {
+    reset: function(opt4, useMTV) {
       _ctx.touchThreshold = 0;
-      if (opt3 && opt3.touchThreshold != null) {
-        _ctx.touchThreshold = mathMax(0, opt3.touchThreshold);
+      if (opt4 && opt4.touchThreshold != null) {
+        _ctx.touchThreshold = mathMax(0, opt4.touchThreshold);
       }
       _ctx.negativeSize = false;
       if (!useMTV) {
@@ -7911,12 +7911,12 @@ function createIntersectContext() {
       _ctx.minTv.set(Infinity, Infinity);
       _ctx.maxTv.set(0, 0);
       _ctx.useDir = false;
-      if (opt3 && opt3.direction != null) {
+      if (opt4 && opt4.direction != null) {
         _ctx.useDir = true;
         _ctx.dirMinTv.copy(_ctx.minTv);
         _dirTmp.copy(_ctx.minTv);
-        _direction = opt3.direction;
-        _ctx.bidirectional = opt3.bidirectional == null || !!opt3.bidirectional;
+        _direction = opt4.direction;
+        _ctx.bidirectional = opt4.bidirectional == null || !!opt4.bidirectional;
         if (!_ctx.bidirectional) {
           _dirCheckVec.set(Math.cos(_direction), Math.sin(_direction));
         }
@@ -11186,10 +11186,10 @@ function mountGlobalDOMEventListeners(instance, scope) {
     mountSingleDOMEventListener(scope, nativeEventName, nativeEventListener, { capture: true });
   }
 }
-function mountSingleDOMEventListener(scope, nativeEventName, listener, opt3) {
+function mountSingleDOMEventListener(scope, nativeEventName, listener, opt4) {
   scope.mounted[nativeEventName] = listener;
-  scope.listenerOpts[nativeEventName] = opt3;
-  addEventListener(scope.domTarget, nativeEventName, listener, opt3);
+  scope.listenerOpts[nativeEventName] = opt4;
+  addEventListener(scope.domTarget, nativeEventName, listener, opt4);
 }
 function unmountDOMEventListeners(scope) {
   var mounted2 = scope.mounted;
@@ -13005,14 +13005,14 @@ var ZRender = (function() {
       refreshHover: false
     });
   };
-  ZRender2.prototype._refresh = function(opt3) {
-    if (opt3.animUpdate) {
+  ZRender2.prototype._refresh = function(opt4) {
+    if (opt4.animUpdate) {
       this.animation.update(true);
     }
     this._needsRefresh = this._needsRefreshHover = false;
     this.painter.refresh({
-      refresh: opt3.refresh,
-      refreshHover: opt3.refreshHover
+      refresh: opt4.refresh,
+      refreshHover: opt4.refreshHover
     });
     this._needsRefresh = this._needsRefreshHover = false;
   };
@@ -13533,15 +13533,15 @@ var INTERNAL_COMPONENT_ID_PREFIX = "\0_ec_\0";
 function normalizeToArray(value2) {
   return value2 instanceof Array ? value2 : value2 == null ? [] : [value2];
 }
-function defaultEmphasis(opt3, key3, subOpts) {
-  if (opt3) {
-    opt3[key3] = opt3[key3] || {};
-    opt3.emphasis = opt3.emphasis || {};
-    opt3.emphasis[key3] = opt3.emphasis[key3] || {};
+function defaultEmphasis(opt4, key3, subOpts) {
+  if (opt4) {
+    opt4[key3] = opt4[key3] || {};
+    opt4.emphasis = opt4.emphasis || {};
+    opt4.emphasis[key3] = opt4.emphasis[key3] || {};
     for (var i7 = 0, len2 = subOpts.length; i7 < len2; i7++) {
       var subOptName = subOpts[i7];
-      if (!opt3.emphasis[key3].hasOwnProperty(subOptName) && opt3[key3].hasOwnProperty(subOptName)) {
-        opt3.emphasis[key3][subOptName] = opt3[key3][subOptName];
+      if (!opt4.emphasis[key3].hasOwnProperty(subOptName) && opt4[key3].hasOwnProperty(subOptName)) {
+        opt4.emphasis[key3][subOptName] = opt4[key3][subOptName];
       }
     }
   }
@@ -13684,23 +13684,23 @@ function makeIdAndName(mapResult) {
     existing && idMap.set(existing.id, item);
   });
   each(mapResult, function(item) {
-    var opt3 = item.newOption;
-    assert(!opt3 || opt3.id == null || !idMap.get(opt3.id) || idMap.get(opt3.id) === item, "id duplicates: " + (opt3 && opt3.id));
-    opt3 && opt3.id != null && idMap.set(opt3.id, item);
+    var opt4 = item.newOption;
+    assert(!opt4 || opt4.id == null || !idMap.get(opt4.id) || idMap.get(opt4.id) === item, "id duplicates: " + (opt4 && opt4.id));
+    opt4 && opt4.id != null && idMap.set(opt4.id, item);
     !item.keyInfo && (item.keyInfo = {});
   });
   each(mapResult, function(item, index) {
     var existing = item.existing;
-    var opt3 = item.newOption;
+    var opt4 = item.newOption;
     var keyInfo = item.keyInfo;
-    if (!isObject(opt3)) {
+    if (!isObject(opt4)) {
       return;
     }
-    keyInfo.name = opt3.name != null ? makeComparableKey(opt3.name) : existing ? existing.name : DUMMY_COMPONENT_NAME_PREFIX + index;
+    keyInfo.name = opt4.name != null ? makeComparableKey(opt4.name) : existing ? existing.name : DUMMY_COMPONENT_NAME_PREFIX + index;
     if (existing) {
       keyInfo.id = makeComparableKey(existing.id);
-    } else if (opt3.id != null) {
-      keyInfo.id = makeComparableKey(opt3.id);
+    } else if (opt4.id != null) {
+      keyInfo.id = makeComparableKey(opt4.id);
     } else {
       var idNum = 0;
       do {
@@ -13819,25 +13819,25 @@ function makeInner() {
   };
 }
 var innerUniqueIndex = getRandomIdBase();
-function parseFinder(ecModel, finderInput, opt3) {
-  var _a2 = preParseFinder(finderInput, opt3), mainTypeSpecified = _a2.mainTypeSpecified, queryOptionMap = _a2.queryOptionMap, others = _a2.others;
+function parseFinder(ecModel, finderInput, opt4) {
+  var _a2 = preParseFinder(finderInput, opt4), mainTypeSpecified = _a2.mainTypeSpecified, queryOptionMap = _a2.queryOptionMap, others = _a2.others;
   var result2 = others;
-  var defaultMainType = opt3 ? opt3.defaultMainType : null;
+  var defaultMainType = opt4 ? opt4.defaultMainType : null;
   if (!mainTypeSpecified && defaultMainType) {
     queryOptionMap.set(defaultMainType, {});
   }
   queryOptionMap.each(function(queryOption, mainType) {
     var queryResult = queryReferringComponents(ecModel, mainType, queryOption, {
       useDefault: defaultMainType === mainType,
-      enableAll: opt3 && opt3.enableAll != null ? opt3.enableAll : true,
-      enableNone: opt3 && opt3.enableNone != null ? opt3.enableNone : true
+      enableAll: opt4 && opt4.enableAll != null ? opt4.enableAll : true,
+      enableNone: opt4 && opt4.enableNone != null ? opt4.enableNone : true
     });
     result2[mainType + "Models"] = queryResult.models;
     result2[mainType + "Model"] = queryResult.models[0];
   });
   return result2;
 }
-function preParseFinder(finderInput, opt3) {
+function preParseFinder(finderInput, opt4) {
   var finder;
   if (isString(finderInput)) {
     var obj = {};
@@ -13857,7 +13857,7 @@ function preParseFinder(finderInput, opt3) {
     var parsedKey = key3.match(/^(\w+)(Index|Id|Name)$/) || [];
     var mainType = parsedKey[1];
     var queryType = (parsedKey[2] || "").toLowerCase();
-    if (!mainType || !queryType || opt3 && opt3.includeMainTypes && indexOf(opt3.includeMainTypes, mainType) < 0) {
+    if (!mainType || !queryType || opt4 && opt4.includeMainTypes && indexOf(opt4.includeMainTypes, mainType) < 0) {
       return;
     }
     mainTypeSpecified = mainTypeSpecified || !!mainType;
@@ -13880,8 +13880,8 @@ var MULTIPLE_REFERRING = {
   enableAll: true,
   enableNone: true
 };
-function queryReferringComponents(ecModel, mainType, userOption, opt3) {
-  opt3 = opt3 || SINGLE_REFERRING;
+function queryReferringComponents(ecModel, mainType, userOption, opt4) {
+  opt4 = opt4 || SINGLE_REFERRING;
   var indexOption = userOption.index;
   var idOption = userOption.id;
   var nameOption = userOption.name;
@@ -13891,11 +13891,11 @@ function queryReferringComponents(ecModel, mainType, userOption, opt3) {
   };
   if (!result2.specified) {
     var firstCmpt = void 0;
-    result2.models = opt3.useDefault && (firstCmpt = ecModel.getComponent(mainType)) ? [firstCmpt] : [];
+    result2.models = opt4.useDefault && (firstCmpt = ecModel.getComponent(mainType)) ? [firstCmpt] : [];
     return result2;
   }
   if (indexOption === "none" || indexOption === false) {
-    if (opt3.enableNone) {
+    if (opt4.enableNone) {
       result2.models = [];
       return result2;
     } else {
@@ -13906,7 +13906,7 @@ function queryReferringComponents(ecModel, mainType, userOption, opt3) {
     }
   }
   if (indexOption === "all") {
-    if (opt3.enableAll) {
+    if (opt4.enableAll) {
       indexOption = idOption = nameOption = null;
     } else {
       if (true) {
@@ -14467,21 +14467,21 @@ function parsePlainText(rawText, style, defaultOuterWidth, defaultOuterHeight) {
   if (height == null && defaultOuterHeight != null) {
     height = defaultOuterHeight - paddingV;
   }
-  var lines;
+  var lines2;
   if (width != null && (overflow === "break" || overflow === "breakAll")) {
-    lines = text4 ? wrapText(text4, style.font, width, overflow === "breakAll", 0).lines : [];
+    lines2 = text4 ? wrapText(text4, style.font, width, overflow === "breakAll", 0).lines : [];
   } else {
-    lines = text4 ? text4.split("\n") : [];
+    lines2 = text4 ? text4.split("\n") : [];
   }
-  var contentHeight = lines.length * lineHeight;
+  var contentHeight = lines2.length * lineHeight;
   if (height == null) {
     height = contentHeight;
   }
   if (contentHeight > height && truncateLineOverflow) {
     var lineCount = Math.floor(height / lineHeight);
-    isTruncated = isTruncated || lines.length > lineCount;
-    lines = lines.slice(0, lineCount);
-    contentHeight = lines.length * lineHeight;
+    isTruncated = isTruncated || lines2.length > lineCount;
+    lines2 = lines2.slice(0, lineCount);
+    contentHeight = lines2.length * lineHeight;
   }
   if (text4 && truncate && width != null) {
     var options = prepareTruncateOptions(width, font, style.ellipsis, {
@@ -14489,17 +14489,17 @@ function parsePlainText(rawText, style, defaultOuterWidth, defaultOuterHeight) {
       placeholder: style.placeholder
     });
     var singleOut = {};
-    for (var i7 = 0; i7 < lines.length; i7++) {
-      truncateSingleLine(singleOut, lines[i7], options);
-      lines[i7] = singleOut.textLine;
+    for (var i7 = 0; i7 < lines2.length; i7++) {
+      truncateSingleLine(singleOut, lines2[i7], options);
+      lines2[i7] = singleOut.textLine;
       isTruncated = isTruncated || singleOut.isTruncated;
     }
   }
   var outerHeight = height;
   var contentWidth = 0;
   var fontMeasureInfo = ensureFontMeasureInfo(font);
-  for (var i7 = 0; i7 < lines.length; i7++) {
-    contentWidth = Math.max(measureWidth(fontMeasureInfo, lines[i7]), contentWidth);
+  for (var i7 = 0; i7 < lines2.length; i7++) {
+    contentWidth = Math.max(measureWidth(fontMeasureInfo, lines2[i7]), contentWidth);
   }
   if (width == null) {
     width = contentWidth;
@@ -14508,7 +14508,7 @@ function parsePlainText(rawText, style, defaultOuterWidth, defaultOuterHeight) {
   outerHeight += paddingV;
   outerWidth += paddingH;
   return {
-    lines,
+    lines: lines2,
     height,
     outerWidth,
     outerHeight,
@@ -14675,7 +14675,7 @@ function parseRichText(rawText, style, defaultOuterWidth, defaultOuterHeight, to
 function pushTokens(block, str, style, wrapInfo, styleName) {
   var isEmptyStr = str === "";
   var tokenStyle = styleName && style.rich[styleName] || {};
-  var lines = block.lines;
+  var lines2 = block.lines;
   var font = tokenStyle.font || style.font;
   var newLine = false;
   var strLines;
@@ -14685,7 +14685,7 @@ function pushTokens(block, str, style, wrapInfo, styleName) {
     var tokenPaddingH = tokenPadding ? tokenPadding[1] + tokenPadding[3] : 0;
     if (tokenStyle.width != null && tokenStyle.width !== "auto") {
       var outerWidth_1 = parsePercent(tokenStyle.width, wrapInfo.width) + tokenPaddingH;
-      if (lines.length > 0) {
+      if (lines2.length > 0) {
         if (outerWidth_1 + wrapInfo.accumWidth > wrapInfo.width) {
           strLines = str.split("\n");
           newLine = true;
@@ -14715,11 +14715,11 @@ function pushTokens(block, str, style, wrapInfo, styleName) {
       token.width = linesWidths ? linesWidths[i7] : measureWidth(fontMeasureInfo, text4);
     }
     if (!i7 && !newLine) {
-      var tokens2 = (lines[lines.length - 1] || (lines[0] = new RichTextLine())).tokens;
+      var tokens2 = (lines2[lines2.length - 1] || (lines2[0] = new RichTextLine())).tokens;
       var tokensLen = tokens2.length;
       tokensLen === 1 && tokens2[0].isLineHolder ? tokens2[0] = token : (text4 || !tokensLen || isEmptyStr) && tokens2.push(token);
     } else {
-      lines.push(new RichTextLine([token]));
+      lines2.push(new RichTextLine([token]));
     }
   }
 }
@@ -14741,7 +14741,7 @@ function isWordBreakChar(ch) {
   return true;
 }
 function wrapText(text4, font, lineWidth, isBreakAll, lastAccumWidth) {
-  var lines = [];
+  var lines2 = [];
   var linesWidths = [];
   var line = "";
   var currentWord = "";
@@ -14755,7 +14755,7 @@ function wrapText(text4, font, lineWidth, isBreakAll, lastAccumWidth) {
         line += currentWord;
         accumWidth += currentWordWidth;
       }
-      lines.push(line);
+      lines2.push(line);
       linesWidths.push(accumWidth);
       line = "";
       currentWord = "";
@@ -14765,15 +14765,15 @@ function wrapText(text4, font, lineWidth, isBreakAll, lastAccumWidth) {
     }
     var chWidth = measureCharWidth(fontMeasureInfo, ch.charCodeAt(0));
     var inWord = isBreakAll ? false : !isWordBreakChar(ch);
-    if (!lines.length ? lastAccumWidth + accumWidth + chWidth > lineWidth : accumWidth + chWidth > lineWidth) {
+    if (!lines2.length ? lastAccumWidth + accumWidth + chWidth > lineWidth : accumWidth + chWidth > lineWidth) {
       if (!accumWidth) {
         if (inWord) {
-          lines.push(currentWord);
+          lines2.push(currentWord);
           linesWidths.push(currentWordWidth);
           currentWord = ch;
           currentWordWidth = chWidth;
         } else {
-          lines.push(ch);
+          lines2.push(ch);
           linesWidths.push(chWidth);
         }
       } else if (line || currentWord) {
@@ -14784,7 +14784,7 @@ function wrapText(text4, font, lineWidth, isBreakAll, lastAccumWidth) {
             currentWordWidth = 0;
             accumWidth = currentWordWidth;
           }
-          lines.push(line);
+          lines2.push(line);
           linesWidths.push(accumWidth - currentWordWidth);
           currentWord += ch;
           currentWordWidth += chWidth;
@@ -14796,7 +14796,7 @@ function wrapText(text4, font, lineWidth, isBreakAll, lastAccumWidth) {
             currentWord = "";
             currentWordWidth = 0;
           }
-          lines.push(line);
+          lines2.push(line);
           linesWidths.push(accumWidth);
           line = ch;
           accumWidth = chWidth;
@@ -14821,15 +14821,15 @@ function wrapText(text4, font, lineWidth, isBreakAll, lastAccumWidth) {
     line += currentWord;
   }
   if (line) {
-    lines.push(line);
+    lines2.push(line);
     linesWidths.push(accumWidth);
   }
-  if (lines.length === 1) {
+  if (lines2.length === 1) {
     accumWidth += lastAccumWidth;
   }
   return {
     accumWidth,
-    lines,
+    lines: lines2,
     linesWidths
   };
 }
@@ -19466,13 +19466,13 @@ var OrientedBoundingRect = (function() {
       this._origin[i7] = axes[i7].dot(corners[0]);
     }
   };
-  OrientedBoundingRect2.prototype.intersect = function(other, mtv, opt3) {
+  OrientedBoundingRect2.prototype.intersect = function(other, mtv, opt4) {
     var overlapped = true;
     var noMtv = !mtv;
     if (mtv) {
       Point_default.set(mtv, 0, 0);
     }
-    _intersectCtx2.reset(opt3, !noMtv);
+    _intersectCtx2.reset(opt4, !noMtv);
     if (!this._intersectCheckOneSide(this, other, noMtv, 1)) {
       overlapped = false;
       if (noMtv) {
@@ -19991,10 +19991,10 @@ function clipRectByRect(targetRect, rect) {
     };
   }
 }
-function createIcon(iconStr, opt3, rect) {
+function createIcon(iconStr, opt4, rect) {
   var innerOpts = extend({
     rectHover: true
-  }, opt3);
+  }, opt4);
   var style = innerOpts.style = {
     strokeNoScale: true
   };
@@ -20087,10 +20087,10 @@ function expandRectOnOneDimension(rect, delta, xy, wh, ltIdx, rbIdx, minSize) {
     rect[xy] -= delta[ltIdx];
   }
 }
-function setTooltipConfig(opt3) {
-  var itemTooltipOption = opt3.itemTooltipOption;
-  var componentModel = opt3.componentModel;
-  var itemName = opt3.itemName;
+function setTooltipConfig(opt4) {
+  var itemTooltipOption = opt4.itemTooltipOption;
+  var componentModel = opt4.componentModel;
+  var itemName = opt4.itemName;
   var itemTooltipOptionObj = isString(itemTooltipOption) ? {
     formatter: itemTooltipOption
   } : itemTooltipOption;
@@ -20102,7 +20102,7 @@ function setTooltipConfig(opt3) {
     $vars: ["name"]
   };
   formatterParams[mainType + "Index"] = componentIndex;
-  var formatterParamsExtra = opt3.formatterParamsExtra;
+  var formatterParamsExtra = opt4.formatterParamsExtra;
   if (formatterParamsExtra) {
     each(keys(formatterParamsExtra), function(key3) {
       if (!hasOwn(formatterParams, key3)) {
@@ -20111,7 +20111,7 @@ function setTooltipConfig(opt3) {
       }
     });
   }
-  var ecData = getECData(opt3.el);
+  var ecData = getECData(opt4.el);
   ecData.componentMainType = mainType;
   ecData.componentIndex = componentIndex;
   ecData.tooltipConfig = {
@@ -20277,10 +20277,10 @@ function setLabelText(label2, labelTexts) {
   });
   label2.useStates(oldStates, true);
 }
-function getLabelText(opt3, stateModels, interpolatedValue) {
-  var labelFetcher = opt3.labelFetcher;
-  var labelDataIndex = opt3.labelDataIndex;
-  var labelDimIndex = opt3.labelDimIndex;
+function getLabelText(opt4, stateModels, interpolatedValue) {
+  var labelFetcher = opt4.labelFetcher;
+  var labelDataIndex = opt4.labelDataIndex;
+  var labelDimIndex = opt4.labelDimIndex;
   var normalModel = stateModels.normal;
   var baseText;
   if (labelFetcher) {
@@ -20289,7 +20289,7 @@ function getLabelText(opt3, stateModels, interpolatedValue) {
     } : null);
   }
   if (baseText == null) {
-    baseText = isFunction(opt3.defaultText) ? opt3.defaultText(labelDataIndex, opt3, interpolatedValue) : opt3.defaultText;
+    baseText = isFunction(opt4.defaultText) ? opt4.defaultText(labelDataIndex, opt4, interpolatedValue) : opt4.defaultText;
   }
   var statesText = {
     normal: baseText
@@ -20301,8 +20301,8 @@ function getLabelText(opt3, stateModels, interpolatedValue) {
   }
   return statesText;
 }
-function setLabelStyle(targetEl, labelStatesModels, opt3, stateSpecified) {
-  opt3 = opt3 || EMPTY_OBJ;
+function setLabelStyle(targetEl, labelStatesModels, opt4, stateSpecified) {
+  opt4 = opt4 || EMPTY_OBJ;
   var isSetOnText = targetEl instanceof Text_default;
   var needsCreateText = false;
   for (var i7 = 0; i7 < DISPLAY_STATES.length; i7++) {
@@ -20323,13 +20323,13 @@ function setLabelStyle(targetEl, labelStatesModels, opt3, stateSpecified) {
         textContent.stateProxy = targetEl.stateProxy;
       }
     }
-    var labelStatesTexts = getLabelText(opt3, labelStatesModels);
+    var labelStatesTexts = getLabelText(opt4, labelStatesModels);
     var normalModel = labelStatesModels.normal;
     var showNormal = !!normalModel.getShallow("show");
-    var normalStyle = createTextStyle(normalModel, stateSpecified && stateSpecified.normal, opt3, false, !isSetOnText);
+    var normalStyle = createTextStyle(normalModel, stateSpecified && stateSpecified.normal, opt4, false, !isSetOnText);
     normalStyle.text = labelStatesTexts.normal;
     if (!isSetOnText) {
-      targetEl.setTextConfig(createTextConfig(normalModel, opt3, false));
+      targetEl.setTextConfig(createTextConfig(normalModel, opt4, false));
     }
     for (var i7 = 0; i7 < SPECIAL_STATES.length; i7++) {
       var stateName = SPECIAL_STATES[i7];
@@ -20340,11 +20340,11 @@ function setLabelStyle(targetEl, labelStatesModels, opt3, stateSpecified) {
         if (stateShow !== showNormal) {
           stateObj.ignore = !stateShow;
         }
-        stateObj.style = createTextStyle(stateModel, stateSpecified && stateSpecified[stateName], opt3, true, !isSetOnText);
+        stateObj.style = createTextStyle(stateModel, stateSpecified && stateSpecified[stateName], opt4, true, !isSetOnText);
         stateObj.style.text = labelStatesTexts[stateName];
         if (!isSetOnText) {
           var targetElEmphasisState = targetEl.ensureState(stateName);
-          targetElEmphasisState.textConfig = createTextConfig(stateModel, opt3, true);
+          targetElEmphasisState.textConfig = createTextConfig(stateModel, opt4, true);
         }
       }
     }
@@ -20358,9 +20358,9 @@ function setLabelStyle(targetEl, labelStatesModels, opt3, stateSpecified) {
     textContent.ignore = !showNormal;
     textContent.useStyle(normalStyle);
     textContent.dirty();
-    if (opt3.enableTextSetter) {
+    if (opt4.enableTextSetter) {
       labelInner(textContent).setLabelText = function(interpolatedValue) {
-        var labelStatesTexts2 = getLabelText(opt3, labelStatesModels, interpolatedValue);
+        var labelStatesTexts2 = getLabelText(opt4, labelStatesModels, interpolatedValue);
         setLabelText(textContent, labelStatesTexts2);
       };
     }
@@ -20380,21 +20380,21 @@ function getLabelStatesModels(itemModel, labelName) {
   }
   return statesModels;
 }
-function createTextStyle(textStyleModel, specifiedTextStyle, opt3, isNotNormal, isAttached) {
+function createTextStyle(textStyleModel, specifiedTextStyle, opt4, isNotNormal, isAttached) {
   var textStyle = {};
-  setTextStyleCommon(textStyle, textStyleModel, opt3, isNotNormal, isAttached);
+  setTextStyleCommon(textStyle, textStyleModel, opt4, isNotNormal, isAttached);
   specifiedTextStyle && extend(textStyle, specifiedTextStyle);
   return textStyle;
 }
-function createTextConfig(textStyleModel, opt3, isNotNormal) {
-  opt3 = opt3 || {};
+function createTextConfig(textStyleModel, opt4, isNotNormal) {
+  opt4 = opt4 || {};
   var textConfig = {};
   var labelPosition;
   var labelRotate = textStyleModel.getShallow("rotate");
   var labelDistance = retrieve2(textStyleModel.getShallow("distance"), isNotNormal ? null : 5);
   var labelOffset = textStyleModel.getShallow("offset");
   labelPosition = textStyleModel.getShallow("position") || (isNotNormal ? null : "inside");
-  labelPosition === "outside" && (labelPosition = opt3.defaultOutsidePosition || "top");
+  labelPosition === "outside" && (labelPosition = opt4.defaultOutsidePosition || "top");
   if (labelPosition != null) {
     textConfig.position = labelPosition;
   }
@@ -20408,17 +20408,17 @@ function createTextConfig(textStyleModel, opt3, isNotNormal) {
   if (labelDistance != null) {
     textConfig.distance = labelDistance;
   }
-  textConfig.outsideFill = textStyleModel.get("color") === "inherit" ? opt3.inheritColor || null : "auto";
-  if (opt3.autoOverflowArea != null) {
-    textConfig.autoOverflowArea = opt3.autoOverflowArea;
+  textConfig.outsideFill = textStyleModel.get("color") === "inherit" ? opt4.inheritColor || null : "auto";
+  if (opt4.autoOverflowArea != null) {
+    textConfig.autoOverflowArea = opt4.autoOverflowArea;
   }
-  if (opt3.layoutRect != null) {
-    textConfig.layoutRect = opt3.layoutRect;
+  if (opt4.layoutRect != null) {
+    textConfig.layoutRect = opt4.layoutRect;
   }
   return textConfig;
 }
-function setTextStyleCommon(textStyle, textStyleModel, opt3, isNotNormal, isAttached) {
-  opt3 = opt3 || EMPTY_OBJ;
+function setTextStyleCommon(textStyle, textStyleModel, opt4, isNotNormal, isAttached) {
+  opt4 = opt4 || EMPTY_OBJ;
   var ecModel = textStyleModel.ecModel;
   var globalTextStyle = ecModel && ecModel.option.textStyle;
   var richItemNames = getRichItemNames(textStyleModel);
@@ -20430,7 +20430,7 @@ function setTextStyleCommon(textStyle, textStyleModel, opt3, isNotNormal, isAtta
     for (var name_1 in richItemNames) {
       if (richItemNames.hasOwnProperty(name_1)) {
         var richTextStyle = textStyleModel.getModel(["rich", name_1]);
-        setTokenTextStyle(richResult[name_1] = {}, richTextStyle, globalTextStyle, textStyleModel, richInheritPlainLabel, opt3, isNotNormal, isAttached, false, true);
+        setTokenTextStyle(richResult[name_1] = {}, richTextStyle, globalTextStyle, textStyleModel, richInheritPlainLabel, opt4, isNotNormal, isAttached, false, true);
       }
     }
   }
@@ -20458,7 +20458,7 @@ function setTextStyleCommon(textStyle, textStyleModel, opt3, isNotNormal, isAtta
       labelTextStyle.__marginType = LabelMarginType.textMargin;
     }
   }
-  setTokenTextStyle(textStyle, textStyleModel, globalTextStyle, null, null, opt3, isNotNormal, isAttached, true, false);
+  setTokenTextStyle(textStyle, textStyleModel, globalTextStyle, null, null, opt4, isNotNormal, isAttached, true, false);
 }
 function getRichItemNames(textStyleModel) {
   var richItemNameMap;
@@ -20479,9 +20479,9 @@ function getRichItemNames(textStyleModel) {
 var TEXT_PROPS_WITH_GLOBAL = ["fontStyle", "fontWeight", "fontSize", "fontFamily", "textShadowColor", "textShadowBlur", "textShadowOffsetX", "textShadowOffsetY"];
 var TEXT_PROPS_SELF = ["align", "lineHeight", "width", "height", "tag", "verticalAlign", "ellipsis"];
 var TEXT_PROPS_BOX = ["padding", "borderWidth", "borderRadius", "borderDashOffset", "backgroundColor", "borderColor", "shadowColor", "shadowBlur", "shadowOffsetX", "shadowOffsetY"];
-function setTokenTextStyle(textStyle, textStyleModel, globalTextStyle, plainTextModel, richInheritPlainLabel, opt3, isNotNormal, isAttached, isBlock, inRich) {
+function setTokenTextStyle(textStyle, textStyleModel, globalTextStyle, plainTextModel, richInheritPlainLabel, opt4, isNotNormal, isAttached, isBlock, inRich) {
   globalTextStyle = !isNotNormal && globalTextStyle || EMPTY_OBJ;
-  var inheritColor = opt3 && opt3.inheritColor;
+  var inheritColor = opt4 && opt4.inheritColor;
   var fillColor = textStyleModel.getShallow("color");
   var strokeColor = textStyleModel.getShallow("textBorderColor");
   var opacity = retrieve2(textStyleModel.getShallow("opacity"), globalTextStyle.opacity);
@@ -20532,14 +20532,14 @@ function setTokenTextStyle(textStyle, textStyleModel, globalTextStyle, plainText
     textStyle.lineDashOffset = textBorderDashOffset;
   }
   if (!isNotNormal && opacity == null && !inRich) {
-    opacity = opt3 && opt3.defaultOpacity;
+    opacity = opt4 && opt4.defaultOpacity;
   }
   if (opacity != null) {
     textStyle.opacity = opacity;
   }
   if (!isNotNormal && !isAttached) {
-    if (textStyle.fill == null && opt3.inheritColor) {
-      textStyle.fill = opt3.inheritColor;
+    if (textStyle.fill == null && opt4.inheritColor) {
+      textStyle.fill = opt4.inheritColor;
     }
   }
   for (var i7 = 0; i7 < TEXT_PROPS_WITH_GLOBAL.length; i7++) {
@@ -20562,7 +20562,7 @@ function setTokenTextStyle(textStyle, textStyleModel, globalTextStyle, plainText
       textStyle.verticalAlign = baseline;
     }
   }
-  if (!isBlock || !opt3.disableBox) {
+  if (!isBlock || !opt4.disableBox) {
     for (var i7 = 0; i7 < TEXT_PROPS_BOX.length; i7++) {
       var key3 = TEXT_PROPS_BOX[i7];
       var val = textStyleModel.getShallow(key3);
@@ -20592,14 +20592,14 @@ function setTokenTextStyle(textStyle, textStyleModel, globalTextStyle, plainText
     }
   }
 }
-function getFont(opt3, ecModel) {
+function getFont(opt4, ecModel) {
   var gTextStyleModel = ecModel && ecModel.getModel("textStyle");
   return trim([
     // FIXME in node-canvas fontWeight is before fontStyle
-    opt3.fontStyle || gTextStyleModel && gTextStyleModel.getShallow("fontStyle") || "",
-    opt3.fontWeight || gTextStyleModel && gTextStyleModel.getShallow("fontWeight") || "",
-    (opt3.fontSize || gTextStyleModel && gTextStyleModel.getShallow("fontSize") || 12) + "px",
-    opt3.fontFamily || gTextStyleModel && gTextStyleModel.getShallow("fontFamily") || "sans-serif"
+    opt4.fontStyle || gTextStyleModel && gTextStyleModel.getShallow("fontStyle") || "",
+    opt4.fontWeight || gTextStyleModel && gTextStyleModel.getShallow("fontWeight") || "",
+    (opt4.fontSize || gTextStyleModel && gTextStyleModel.getShallow("fontSize") || 12) + "px",
+    opt4.fontFamily || gTextStyleModel && gTextStyleModel.getShallow("fontFamily") || "sans-serif"
   ].join(" "));
 }
 var labelInner = makeInner();
@@ -21182,10 +21182,10 @@ var _impl = null;
 function getScaleBreakHelper() {
   return _impl;
 }
-function simplyParseBreakOption(scale3, opt3) {
+function simplyParseBreakOption(scale3, opt4) {
   var scaleBreakHelper = getScaleBreakHelper();
-  var breakOption = opt3.breakOption;
-  var breakParsed = opt3.breakParsed;
+  var breakOption = opt4.breakOption;
+  var breakParsed = opt4.breakParsed;
   if (!breakParsed && scaleBreakHelper) {
     breakParsed = scaleBreakHelper.parseAxisBreakOption(breakOption, scale3);
   }
@@ -21516,21 +21516,21 @@ function formatTpl(tpl, paramsList, encode) {
   return tpl;
 }
 function getTooltipMarker(inOpt, extraCssText) {
-  var opt3 = isString(inOpt) ? {
+  var opt4 = isString(inOpt) ? {
     color: inOpt,
     extraCssText
   } : inOpt || {};
-  var color3 = opt3.color;
-  var type = opt3.type;
-  extraCssText = opt3.extraCssText;
-  var renderMode = opt3.renderMode || "html";
+  var color3 = opt4.color;
+  var type = opt4.type;
+  extraCssText = opt4.extraCssText;
+  var renderMode = opt4.renderMode || "html";
   if (!color3) {
     return "";
   }
   if (renderMode === "html") {
     return type === "subItem" ? '<span style="display:inline-block;vertical-align:middle;margin-right:8px;margin-left:3px;border-radius:4px;width:4px;height:4px;background-color:' + encodeHTML(color3) + ";" + (extraCssText || "") + '"></span>' : '<span style="display:inline-block;margin-right:4px;border-radius:10px;width:10px;height:10px;background-color:' + encodeHTML(color3) + ";" + (extraCssText || "") + '"></span>';
   } else {
-    var markerId = opt3.markerId || "markerX";
+    var markerId = opt4.markerId || "markerX";
     return {
       renderMode,
       content: "{" + markerId + "|}  ",
@@ -21664,8 +21664,8 @@ function decideCoordSysUsageKind(model, printError) {
     kind
   };
 }
-function injectCoordSysByOption(opt3) {
-  var targetModel = opt3.targetModel, coordSysType = opt3.coordSysType, coordSysProvider = opt3.coordSysProvider, isDefaultDataCoordSys = opt3.isDefaultDataCoordSys, allowNotFound = opt3.allowNotFound;
+function injectCoordSysByOption(opt4) {
+  var targetModel = opt4.targetModel, coordSysType = opt4.coordSysType, coordSysProvider = opt4.coordSysProvider, isDefaultDataCoordSys = opt4.isDefaultDataCoordSys, allowNotFound = opt4.allowNotFound;
   if (true) {
     assert(!!coordSysType);
   }
@@ -21836,7 +21836,7 @@ var BoxLayoutReferenceType = {
   rect: 1,
   point: 2
 };
-function createBoxLayoutReference(model, api, opt3) {
+function createBoxLayoutReference(model, api, opt4) {
   var refContainer;
   var refPoint;
   var layoutRefType;
@@ -21849,7 +21849,7 @@ function createBoxLayoutReference(model, api, opt3) {
       boxCoordFrom = from;
       var result2 = boxCoordSys.dataToLayout(coord);
       refContainer = result2.contentRect || result2.rect;
-    } else if (opt3 && opt3.enableLayoutOnlyByCenter && boxCoordSys.dataToPoint) {
+    } else if (opt4 && opt4.enableLayoutOnlyByCenter && boxCoordSys.dataToPoint) {
       layoutRefType = BoxLayoutReferenceType.point;
       boxCoordFrom = from;
       refPoint = boxCoordSys.dataToPoint(coord);
@@ -21880,10 +21880,10 @@ function createBoxLayoutReference(model, api, opt3) {
     boxCoordFrom
   };
 }
-function positionElement(el, positionInfo, containerRect, margin, opt3, out2) {
-  var h3 = !opt3 || !opt3.hv || opt3.hv[0];
-  var v2 = !opt3 || !opt3.hv || opt3.hv[1];
-  var boundingMode = opt3 && opt3.boundingMode || "all";
+function positionElement(el, positionInfo, containerRect, margin, opt4, out2) {
+  var h3 = !opt4 || !opt4.hv || opt4.hv[0];
+  var v2 = !opt4 || !opt4.hv || opt4.hv[1];
+  var boundingMode = opt4 && opt4.boundingMode || "all";
   out2 = out2 || el;
   out2.x = el.x;
   out2.y = el.y;
@@ -21925,8 +21925,8 @@ function fetchLayoutMode(ins) {
     type: layoutMode
   } : null;
 }
-function mergeLayoutParam(targetOption, newOption, opt3) {
-  var ignoreSize = opt3 && opt3.ignoreSize;
+function mergeLayoutParam(targetOption, newOption, opt4) {
+  var ignoreSize = opt4 && opt4.ignoreSize;
   !isArray(ignoreSize) && (ignoreSize = [ignoreSize, ignoreSize]);
   var hResult = merge2(HV_NAMES[0], 0);
   var vResult = merge2(HV_NAMES[1], 1);
@@ -22031,8 +22031,8 @@ var ComponentModel = (
         var optList = [];
         var clz = ctor;
         while (clz) {
-          var opt3 = clz.prototype.defaultOption;
-          opt3 && optList.push(opt3);
+          var opt4 = clz.prototype.defaultOption;
+          opt4 && optList.push(opt4);
           clz = clz.superClass;
         }
         var defaultOption3 = {};
@@ -22043,13 +22043,13 @@ var ComponentModel = (
       }
       return fields.defaultOption;
     };
-    ComponentModel2.prototype.getReferringComponents = function(mainType, opt3) {
+    ComponentModel2.prototype.getReferringComponents = function(mainType, opt4) {
       var indexKey = mainType + "Index";
       var idKey = mainType + "Id";
       return queryReferringComponents(this.ecModel, mainType, {
         index: this.get(indexKey, true),
         id: this.get(idKey, true)
-      }, opt3);
+      }, opt4);
     };
     ComponentModel2.prototype.getBoxLayoutParams = function() {
       return getBoxLayoutParams(this, false);
@@ -22635,10 +22635,10 @@ var GlobalModel = (
       this._optionManager.setOption(option, optionPreprocessorFuncs2, innerOpt);
       this._resetOption(null, innerOpt);
     };
-    GlobalModel2.prototype.resetOption = function(type, opt3) {
-      return this._resetOption(type, normalizeSetOptionInput(opt3));
+    GlobalModel2.prototype.resetOption = function(type, opt4) {
+      return this._resetOption(type, normalizeSetOptionInput(opt4));
     };
-    GlobalModel2.prototype._resetOption = function(type, opt3) {
+    GlobalModel2.prototype._resetOption = function(type, opt4) {
       var optionChanged = false;
       var optionManager = this._optionManager;
       if (!type || type === "recreate") {
@@ -22650,7 +22650,7 @@ var GlobalModel = (
           initBase(this, baseOption);
         } else {
           this.restoreData();
-          this._mergeOption(baseOption, opt3);
+          this._mergeOption(baseOption, opt4);
         }
         optionChanged = true;
       }
@@ -22661,7 +22661,7 @@ var GlobalModel = (
         var timelineOption = optionManager.getTimelineOption(this);
         if (timelineOption) {
           optionChanged = true;
-          this._mergeOption(timelineOption, opt3);
+          this._mergeOption(timelineOption, opt4);
         }
       }
       if (!type || type === "recreate" || type === "media") {
@@ -22669,7 +22669,7 @@ var GlobalModel = (
         if (mediaOptions.length) {
           each(mediaOptions, function(mediaOption) {
             optionChanged = true;
-            this._mergeOption(mediaOption, opt3);
+            this._mergeOption(mediaOption, opt4);
           }, this);
         }
       }
@@ -22678,13 +22678,13 @@ var GlobalModel = (
     GlobalModel2.prototype.mergeOption = function(option) {
       this._mergeOption(option, null);
     };
-    GlobalModel2.prototype._mergeOption = function(newOption, opt3) {
+    GlobalModel2.prototype._mergeOption = function(newOption, opt4) {
       var option = this.option;
       var componentsMap = this._componentsMap;
       var componentsCount = this._componentsCount;
       var newCmptTypes = [];
       var newCmptTypeMap = createHashMap();
-      var replaceMergeMainTypeMap = opt3 && opt3.replaceMergeMainTypeMap;
+      var replaceMergeMainTypeMap = opt4 && opt4.replaceMergeMainTypeMap;
       resetSourceDefaulter(this);
       each(newOption, function(componentOption, mainType) {
         if (componentOption == null) {
@@ -23117,7 +23117,7 @@ var OptionManager = (
       this._currentMediaIndices = [];
       this._api = api;
     }
-    OptionManager2.prototype.setOption = function(rawOption, optionPreprocessorFuncs2, opt3) {
+    OptionManager2.prototype.setOption = function(rawOption, optionPreprocessorFuncs2, opt4) {
       if (rawOption) {
         each(normalizeToArray(rawOption.series), function(series) {
           series && series.data && isTypedArray(series.data) && setAsPrimitive(series.data);
@@ -23296,8 +23296,8 @@ var OptionManager_default = OptionManager;
 var each3 = each;
 var isObject2 = isObject;
 var POSSIBLE_STYLES = ["areaStyle", "lineStyle", "nodeStyle", "linkStyle", "chordStyle", "label", "labelLine"];
-function compatEC2ItemStyle(opt3) {
-  var itemStyleOpt = opt3 && opt3.itemStyle;
+function compatEC2ItemStyle(opt4) {
+  var itemStyleOpt = opt4 && opt4.itemStyle;
   if (!itemStyleOpt) {
     return;
   }
@@ -23309,11 +23309,11 @@ function compatEC2ItemStyle(opt3) {
       if (true) {
         deprecateReplaceLog("itemStyle.normal." + styleName, styleName);
       }
-      opt3[styleName] = opt3[styleName] || {};
-      if (!opt3[styleName].normal) {
-        opt3[styleName].normal = normalItemStyleOpt[styleName];
+      opt4[styleName] = opt4[styleName] || {};
+      if (!opt4[styleName].normal) {
+        opt4[styleName].normal = normalItemStyleOpt[styleName];
       } else {
-        merge(opt3[styleName].normal, normalItemStyleOpt[styleName]);
+        merge(opt4[styleName].normal, normalItemStyleOpt[styleName]);
       }
       normalItemStyleOpt[styleName] = null;
     }
@@ -23321,57 +23321,57 @@ function compatEC2ItemStyle(opt3) {
       if (true) {
         deprecateReplaceLog("itemStyle.emphasis." + styleName, "emphasis." + styleName);
       }
-      opt3[styleName] = opt3[styleName] || {};
-      if (!opt3[styleName].emphasis) {
-        opt3[styleName].emphasis = emphasisItemStyleOpt[styleName];
+      opt4[styleName] = opt4[styleName] || {};
+      if (!opt4[styleName].emphasis) {
+        opt4[styleName].emphasis = emphasisItemStyleOpt[styleName];
       } else {
-        merge(opt3[styleName].emphasis, emphasisItemStyleOpt[styleName]);
+        merge(opt4[styleName].emphasis, emphasisItemStyleOpt[styleName]);
       }
       emphasisItemStyleOpt[styleName] = null;
     }
   }
 }
-function convertNormalEmphasis(opt3, optType, useExtend) {
-  if (opt3 && opt3[optType] && (opt3[optType].normal || opt3[optType].emphasis)) {
-    var normalOpt = opt3[optType].normal;
-    var emphasisOpt = opt3[optType].emphasis;
+function convertNormalEmphasis(opt4, optType, useExtend) {
+  if (opt4 && opt4[optType] && (opt4[optType].normal || opt4[optType].emphasis)) {
+    var normalOpt = opt4[optType].normal;
+    var emphasisOpt = opt4[optType].emphasis;
     if (normalOpt) {
       if (true) {
         deprecateLog("'normal' hierarchy in " + optType + " has been removed since 4.0. All style properties are configured in " + optType + " directly now.");
       }
       if (useExtend) {
-        opt3[optType].normal = opt3[optType].emphasis = null;
-        defaults(opt3[optType], normalOpt);
+        opt4[optType].normal = opt4[optType].emphasis = null;
+        defaults(opt4[optType], normalOpt);
       } else {
-        opt3[optType] = normalOpt;
+        opt4[optType] = normalOpt;
       }
     }
     if (emphasisOpt) {
       if (true) {
         deprecateLog(optType + ".emphasis has been changed to emphasis." + optType + " since 4.0");
       }
-      opt3.emphasis = opt3.emphasis || {};
-      opt3.emphasis[optType] = emphasisOpt;
+      opt4.emphasis = opt4.emphasis || {};
+      opt4.emphasis[optType] = emphasisOpt;
       if (emphasisOpt.focus) {
-        opt3.emphasis.focus = emphasisOpt.focus;
+        opt4.emphasis.focus = emphasisOpt.focus;
       }
       if (emphasisOpt.blurScope) {
-        opt3.emphasis.blurScope = emphasisOpt.blurScope;
+        opt4.emphasis.blurScope = emphasisOpt.blurScope;
       }
     }
   }
 }
-function removeEC3NormalStatus(opt3) {
-  convertNormalEmphasis(opt3, "itemStyle");
-  convertNormalEmphasis(opt3, "lineStyle");
-  convertNormalEmphasis(opt3, "areaStyle");
-  convertNormalEmphasis(opt3, "label");
-  convertNormalEmphasis(opt3, "labelLine");
-  convertNormalEmphasis(opt3, "upperLabel");
-  convertNormalEmphasis(opt3, "edgeLabel");
+function removeEC3NormalStatus(opt4) {
+  convertNormalEmphasis(opt4, "itemStyle");
+  convertNormalEmphasis(opt4, "lineStyle");
+  convertNormalEmphasis(opt4, "areaStyle");
+  convertNormalEmphasis(opt4, "label");
+  convertNormalEmphasis(opt4, "labelLine");
+  convertNormalEmphasis(opt4, "upperLabel");
+  convertNormalEmphasis(opt4, "edgeLabel");
 }
-function compatTextStyle(opt3, propName) {
-  var labelOptSingle = isObject2(opt3) && opt3[propName];
+function compatTextStyle(opt4, propName) {
+  var labelOptSingle = isObject2(opt4) && opt4[propName];
   var textStyle = isObject2(labelOptSingle) && labelOptSingle.textStyle;
   if (textStyle) {
     if (true) {
@@ -23385,11 +23385,11 @@ function compatTextStyle(opt3, propName) {
     }
   }
 }
-function compatEC3CommonStyles(opt3) {
-  if (opt3) {
-    removeEC3NormalStatus(opt3);
-    compatTextStyle(opt3, "label");
-    opt3.emphasis && compatTextStyle(opt3.emphasis, "label");
+function compatEC3CommonStyles(opt4) {
+  if (opt4) {
+    removeEC3NormalStatus(opt4);
+    compatTextStyle(opt4, "label");
+    opt4.emphasis && compatTextStyle(opt4.emphasis, "label");
   }
 }
 function processSeries(seriesOpt) {
@@ -23429,8 +23429,8 @@ function processSeries(seriesOpt) {
         compatEC3CommonStyles(edgeData[i7]);
       }
     }
-    each(seriesOpt.categories, function(opt3) {
-      removeEC3NormalStatus(opt3);
+    each(seriesOpt.categories, function(opt4) {
+      removeEC3NormalStatus(opt4);
     });
   }
   if (data && !isTypedArray(data)) {
@@ -23463,8 +23463,8 @@ function processSeries(seriesOpt) {
     compatTextStyle(seriesOpt, "detail");
   } else if (seriesOpt.type === "treemap") {
     convertNormalEmphasis(seriesOpt.breadcrumb, "itemStyle");
-    each(seriesOpt.levels, function(opt3) {
-      removeEC3NormalStatus(opt3);
+    each(seriesOpt.levels, function(opt4) {
+      removeEC3NormalStatus(opt4);
     });
   } else if (seriesOpt.type === "tree") {
     removeEC3NormalStatus(seriesOpt.leaves);
@@ -23557,9 +23557,9 @@ function globalCompatStyle(option, isTheme) {
 }
 
 // node_modules/echarts/lib/preprocessor/backwardCompat.js
-function get(opt3, path) {
+function get(opt4, path) {
   var pathArr = path.split(",");
-  var obj = opt3;
+  var obj = opt4;
   for (var i7 = 0; i7 < pathArr.length; i7++) {
     obj = obj && obj[pathArr[i7]];
     if (obj == null) {
@@ -23568,9 +23568,9 @@ function get(opt3, path) {
   }
   return obj;
 }
-function set2(opt3, path, val, overwrite) {
+function set2(opt4, path, val, overwrite) {
   var pathArr = path.split(",");
-  var obj = opt3;
+  var obj = opt4;
   var key3;
   var i7 = 0;
   for (; i7 < pathArr.length - 1; i7++) {
@@ -24603,8 +24603,8 @@ var iterator = /* @__PURE__ */ (function() {
 })();
 
 // node_modules/echarts/lib/data/helper/dataValueHelper.js
-function parseDataValue(value2, opt3) {
-  var dimType = opt3 && opt3.type;
+function parseDataValue(value2, opt4) {
+  var dimType = opt4 && opt4.type;
   if (dimType === "ordinal") {
     return value2;
   }
@@ -26301,10 +26301,10 @@ var TooltipMarkupStyleCreator = (
 );
 
 // node_modules/echarts/lib/component/tooltip/seriesFormatTooltip.js
-function defaultSeriesFormatTooltip(opt3) {
-  var series = opt3.series;
-  var dataIndex = opt3.dataIndex;
-  var multipleSeries = opt3.multipleSeries;
+function defaultSeriesFormatTooltip(opt4) {
+  var series = opt4.series;
+  var dataIndex = opt4.dataIndex;
+  var multipleSeries = opt4.multipleSeries;
   var data = series.getData();
   var tooltipDims = data.mapDimensionsAll("defaultedTooltip");
   var tooltipDimLen = tooltipDims.length;
@@ -27380,15 +27380,15 @@ var Scheduler = (
         block: true
       });
     };
-    Scheduler2.prototype.performVisualTasks = function(ecModel, payload, opt3) {
-      this._performStageTasks(this._visualHandlers, ecModel, payload, opt3);
+    Scheduler2.prototype.performVisualTasks = function(ecModel, payload, opt4) {
+      this._performStageTasks(this._visualHandlers, ecModel, payload, opt4);
     };
-    Scheduler2.prototype._performStageTasks = function(stageHandlers, ecModel, payload, opt3) {
-      opt3 = opt3 || {};
+    Scheduler2.prototype._performStageTasks = function(stageHandlers, ecModel, payload, opt4) {
+      opt4 = opt4 || {};
       var unfinished = false;
       var scheduler = this;
       each(stageHandlers, function(stageHandler, idx) {
-        if (opt3.visualType && opt3.visualType !== stageHandler.visualType) {
+        if (opt4.visualType && opt4.visualType !== stageHandler.visualType) {
           return;
         }
         var stageHandlerRecord = scheduler._stageTaskMap.get(stageHandler.uid);
@@ -27398,14 +27398,14 @@ var Scheduler = (
           var overallNeedDirty_1;
           var agentStubMap = overallTask.agentStubMap;
           agentStubMap.each(function(stub) {
-            if (needSetDirty(opt3, stub)) {
+            if (needSetDirty(opt4, stub)) {
               stub.dirty();
               overallNeedDirty_1 = true;
             }
           });
           overallNeedDirty_1 && overallTask.dirty();
           scheduler.updatePayload(overallTask, payload);
-          var performArgs_1 = scheduler.getPerformArgs(overallTask, opt3.block);
+          var performArgs_1 = scheduler.getPerformArgs(overallTask, opt4.block);
           agentStubMap.each(function(stub) {
             stub.perform(performArgs_1);
           });
@@ -27414,10 +27414,10 @@ var Scheduler = (
           }
         } else if (seriesTaskMap) {
           seriesTaskMap.each(function(task, pipelineId) {
-            if (needSetDirty(opt3, task)) {
+            if (needSetDirty(opt4, task)) {
               task.dirty();
             }
-            var performArgs = scheduler.getPerformArgs(task, opt3.block);
+            var performArgs = scheduler.getPerformArgs(task, opt4.block);
             performArgs.skip = !stageHandler.performRawSeries && ecModel.isSeriesFiltered(task.context.model);
             scheduler.updatePayload(task, payload);
             if (task.perform(performArgs)) {
@@ -27426,8 +27426,8 @@ var Scheduler = (
           });
         }
       });
-      function needSetDirty(opt4, task) {
-        return opt4.setDirty && (!opt4.dirtyMap || opt4.dirtyMap.get(task.__pipeline.id));
+      function needSetDirty(opt5, task) {
+        return opt5.setDirty && (!opt5.dirtyMap || opt5.dirtyMap.get(task.__pipeline.id));
       }
       this.unfinished = unfinished || this.unfinished;
     };
@@ -29995,14 +29995,14 @@ var ECharts = (
         return this.getDataURL(opts);
       }
     };
-    ECharts2.prototype.convertToPixel = function(finder, value2, opt3) {
-      return doConvertPixel(this, "convertToPixel", finder, value2, opt3);
+    ECharts2.prototype.convertToPixel = function(finder, value2, opt4) {
+      return doConvertPixel(this, "convertToPixel", finder, value2, opt4);
     };
-    ECharts2.prototype.convertToLayout = function(finder, value2, opt3) {
-      return doConvertPixel(this, "convertToLayout", finder, value2, opt3);
+    ECharts2.prototype.convertToLayout = function(finder, value2, opt4) {
+      return doConvertPixel(this, "convertToLayout", finder, value2, opt4);
     };
-    ECharts2.prototype.convertFromPixel = function(finder, value2, opt3) {
-      return doConvertPixel(this, "convertFromPixel", finder, value2, opt3);
+    ECharts2.prototype.convertFromPixel = function(finder, value2, opt4) {
+      return doConvertPixel(this, "convertFromPixel", finder, value2, opt4);
     };
     ECharts2.prototype.containPixel = function(finder, value2) {
       if (this._disposed) {
@@ -30230,14 +30230,14 @@ var ECharts = (
       payload.type = connectionEventRevertMap[eventObj.type];
       return payload;
     };
-    ECharts2.prototype.dispatchAction = function(payload, opt3) {
+    ECharts2.prototype.dispatchAction = function(payload, opt4) {
       if (this._disposed) {
         disposedWarning(this.id);
         return;
       }
-      if (!isObject(opt3)) {
-        opt3 = {
-          silent: !!opt3
+      if (!isObject(opt4)) {
+        opt4 = {
+          silent: !!opt4
         };
       }
       if (!actions[payload.type]) {
@@ -30250,9 +30250,9 @@ var ECharts = (
         this._pendingActions.push(payload);
         return;
       }
-      var silent = opt3.silent;
+      var silent = opt4.silent;
       doDispatchAction.call(this, payload, silent);
-      var flush = opt3.flush;
+      var flush = opt4.flush;
       if (flush) {
         this._zr.flush();
       } else if (flush !== false && env_default.browser.weChat) {
@@ -30548,7 +30548,7 @@ var ECharts = (
           updateMethods.update.call(this, payload);
         }
       };
-      function doConvertPixelImpl(ecIns, methodName, finder, value2, opt3) {
+      function doConvertPixelImpl(ecIns, methodName, finder, value2, opt4) {
         if (ecIns._disposed) {
           disposedWarning(ecIns.id);
           return;
@@ -30559,7 +30559,7 @@ var ECharts = (
         var parsedFinder = parseFinder(ecModel, finder);
         for (var i7 = 0; i7 < coordSysList.length; i7++) {
           var coordSys = coordSysList[i7];
-          if (coordSys[methodName] && (result2 = coordSys[methodName](ecModel, parsedFinder, value2, opt3)) != null) {
+          if (coordSys[methodName] && (result2 = coordSys[methodName](ecModel, parsedFinder, value2, opt4)) != null) {
             return result2;
           }
         }
@@ -31590,10 +31590,10 @@ function mayLabelDimType(dimType) {
 var SeriesDimensionDefine = (
   /** @class */
   /* @__PURE__ */ (function() {
-    function SeriesDimensionDefine2(opt3) {
+    function SeriesDimensionDefine2(opt4) {
       this.otherDims = {};
-      if (opt3 != null) {
-        extend(this, opt3);
+      if (opt4 != null) {
+        extend(this, opt4);
       }
     }
     return SeriesDimensionDefine2;
@@ -31613,12 +31613,12 @@ var dimTypeShort = {
 var SeriesDataSchema = (
   /** @class */
   (function() {
-    function SeriesDataSchema2(opt3) {
-      this.dimensions = opt3.dimensions;
-      this._dimOmitted = opt3.dimensionOmitted;
-      this.source = opt3.source;
-      this._fullDimCount = opt3.fullDimensionCount;
-      this._updateDimOmitted(opt3.dimensionOmitted);
+    function SeriesDataSchema2(opt4) {
+      this.dimensions = opt4.dimensions;
+      this._dimOmitted = opt4.dimensionOmitted;
+      this.source = opt4.source;
+      this._fullDimCount = opt4.fullDimensionCount;
+      this._updateDimOmitted(opt4.dimensionOmitted);
     }
     SeriesDataSchema2.prototype.isDimensionOmitted = function() {
       return this._dimOmitted;
@@ -32399,22 +32399,22 @@ var SeriesData = (
 var SeriesData_default = SeriesData;
 
 // node_modules/echarts/lib/data/helper/createDimensions.js
-function prepareSeriesDataSchema(source, opt3) {
+function prepareSeriesDataSchema(source, opt4) {
   if (!isSourceInstance(source)) {
     source = createSourceFromSeriesDataOption(source);
   }
-  opt3 = opt3 || {};
-  var sysDims = opt3.coordDimensions || [];
-  var dimsDef = opt3.dimensionsDefine || source.dimensionsDefine || [];
+  opt4 = opt4 || {};
+  var sysDims = opt4.coordDimensions || [];
+  var dimsDef = opt4.dimensionsDefine || source.dimensionsDefine || [];
   var coordDimNameMap = createHashMap();
   var resultList = [];
-  var dimCount = getDimCount(source, sysDims, dimsDef, opt3.dimensionsCount);
-  var omitUnusedDimensions = opt3.canOmitUnusedDimensions && shouldOmitUnusedDimensions(dimCount);
+  var dimCount = getDimCount(source, sysDims, dimsDef, opt4.dimensionsCount);
+  var omitUnusedDimensions = opt4.canOmitUnusedDimensions && shouldOmitUnusedDimensions(dimCount);
   var isUsingSourceDimensionsDef = dimsDef === source.dimensionsDefine;
   var dataDimNameMap = isUsingSourceDimensionsDef ? ensureSourceDimNameMap(source) : createDimNameMap(dimsDef);
-  var encodeDef = opt3.encodeDefine;
-  if (!encodeDef && opt3.encodeDefaulter) {
-    encodeDef = opt3.encodeDefaulter(source, dimCount);
+  var encodeDef = opt4.encodeDefine;
+  if (!encodeDef && opt4.encodeDefaulter) {
+    encodeDef = opt4.encodeDefaulter(source, dimCount);
   }
   var encodeDefMap = createHashMap(encodeDef);
   var indicesMap = new CtorInt32Array(dimCount);
@@ -32522,8 +32522,8 @@ function prepareSeriesDataSchema(source, opt3) {
       coordDimNameMap.set(coordDim2, true);
     }
   }
-  var generateCoord = opt3.generateCoord;
-  var generateCoordCount = opt3.generateCoordCount;
+  var generateCoord = opt4.generateCoord;
+  var generateCoordCount = opt4.generateCoordCount;
   var fromZero = generateCoordCount != null;
   generateCoordCount = generateCoord ? generateCoordCount || 1 : 0;
   var extra = generateCoord || "value";
@@ -32717,10 +32717,10 @@ function isCategory(axisModel) {
 }
 
 // node_modules/echarts/lib/data/helper/dataStackHelper.js
-function enableDataStack(seriesModel, dimensionsInput, opt3) {
-  opt3 = opt3 || {};
-  var byIndex = opt3.byIndex;
-  var stackedCoordDimension = opt3.stackedCoordDimension;
+function enableDataStack(seriesModel, dimensionsInput, opt4) {
+  opt4 = opt4 || {};
+  var byIndex = opt4.byIndex;
+  var stackedCoordDimension = opt4.stackedCoordDimension;
   var dimensionDefineList;
   var schema;
   var store;
@@ -32874,8 +32874,8 @@ function injectOrdinalMeta(dimInfoList, createInvertedIndices, coordSysInfo) {
   }
   return firstCategoryDimIndex;
 }
-function createSeriesData(sourceRaw, seriesModel, opt3) {
-  opt3 = opt3 || {};
+function createSeriesData(sourceRaw, seriesModel, opt4) {
+  opt4 = opt4 || {};
   var sourceManager = seriesModel.getSourceManager();
   var source;
   var isOriginalSource = false;
@@ -32888,17 +32888,17 @@ function createSeriesData(sourceRaw, seriesModel, opt3) {
   }
   var coordSysInfo = getCoordSysInfoBySeries(seriesModel);
   var coordSysDimDefs = getCoordSysDimDefs(seriesModel, coordSysInfo);
-  var useEncodeDefaulter = opt3.useEncodeDefaulter;
+  var useEncodeDefaulter = opt4.useEncodeDefaulter;
   var encodeDefaulter = isFunction(useEncodeDefaulter) ? useEncodeDefaulter : useEncodeDefaulter ? curry(makeSeriesEncodeForAxisCoordSys, coordSysDimDefs, seriesModel) : null;
   var createDimensionOptions = {
     coordDimensions: coordSysDimDefs,
-    generateCoord: opt3.generateCoord,
+    generateCoord: opt4.generateCoord,
     encodeDefine: seriesModel.getEncode(),
     encodeDefaulter,
     canOmitUnusedDimensions: !isOriginalSource
   };
   var schema = prepareSeriesDataSchema(source, createDimensionOptions);
-  var firstCategoryDimIndex = injectOrdinalMeta(schema.dimensions, opt3.createInvertedIndices, coordSysInfo);
+  var firstCategoryDimIndex = injectOrdinalMeta(schema.dimensions, opt4.createInvertedIndices, coordSysInfo);
   var store = !isOriginalSource ? sourceManager.getSharedDataStore(schema) : null;
   var stackCalculationInfo = enableDataStack(seriesModel, {
     schema,
@@ -32956,12 +32956,12 @@ var uidBase = 0;
 var OrdinalMeta = (
   /** @class */
   (function() {
-    function OrdinalMeta2(opt3) {
-      this.categories = opt3.categories || [];
-      this._needCollect = opt3.needCollect;
-      this._deduplication = opt3.deduplication;
+    function OrdinalMeta2(opt4) {
+      this.categories = opt4.categories || [];
+      this._needCollect = opt4.needCollect;
+      this._deduplication = opt4.deduplication;
       this.uid = ++uidBase;
-      this._onCollect = opt3.onCollect;
+      this._onCollect = opt4.onCollect;
     }
     OrdinalMeta2.createByAxisModel = function(axisModel) {
       var option = axisModel.option;
@@ -33203,8 +33203,8 @@ function getIntervalPrecision(niceInterval) {
 function logScaleLogTick(val, base2) {
   return mathLog(val) / mathLog(base2);
 }
-function logScalePowTick(linearTickVal, base2, opt3) {
-  var lookup = opt3 && opt3.lookup;
+function logScalePowTick(linearTickVal, base2, opt4) {
+  var lookup = opt4 && opt4.lookup;
   if (lookup) {
     for (var i7 = 0; i7 < lookup.from.length; i7++) {
       if (linearTickVal === lookup.from[i7]) {
@@ -33392,11 +33392,11 @@ var OrdinalScale = (
       scale: function(val) {
         return this.getRawOrdinalNumber(mathRound(this._mapper.scale(val)));
       },
-      transformIn: function(val, opt3) {
-        return this._mapper.transformIn(this._getTickNumber(val), opt3);
+      transformIn: function(val, opt4) {
+        return this._mapper.transformIn(this._getTickNumber(val), opt4);
       },
-      transformOut: function(val, opt3) {
-        return this.getRawOrdinalNumber(this._mapper.transformOut(val, opt3));
+      transformOut: function(val, opt4) {
+        return this.getRawOrdinalNumber(this._mapper.transformOut(val, opt4));
       },
       getExtent: function() {
         return this._mapper.getExtent();
@@ -33505,8 +33505,8 @@ var IntervalScale = (
         cfg.intervalPrecision = getIntervalPrecision(cfg.interval);
       }
     };
-    IntervalScale2.prototype.getTicks = function(opt3) {
-      opt3 = opt3 || {};
+    IntervalScale2.prototype.getTicks = function(opt4) {
+      opt4 = opt4 || {};
       var cfg = this._cfg;
       var interval = cfg.interval;
       var extent = getScaleExtentForTickUnsafe(this);
@@ -33519,7 +33519,7 @@ var IntervalScale = (
       if (!interval) {
         return ticks;
       }
-      if (opt3.breakTicks === "only_break" && brkAvailable) {
+      if (opt4.breakTicks === "only_break" && brkAvailable) {
         scaleBreakHelper.addBreaksToTicks(ticks, brk.breaks, extent);
         return ticks;
       }
@@ -33529,7 +33529,7 @@ var IntervalScale = (
       var safeLimit = 3e3;
       if (extent[0] < niceExtent[0]) {
         ticks.push({
-          value: opt3.expandToNicedExtent ? round(niceExtent[0] - interval, intervalPrecision) : extent[0]
+          value: opt4.expandToNicedExtent ? round(niceExtent[0] - interval, intervalPrecision) : extent[0]
         });
       }
       var estimateNiceMultiple = function(tickVal, targetTick) {
@@ -33573,15 +33573,15 @@ var IntervalScale = (
       var lastNiceTick = ticks.length ? ticks[ticks.length - 1].value : niceExtent[1];
       if (extent[1] > lastNiceTick) {
         ticks.push({
-          value: opt3.expandToNicedExtent ? round(lastNiceTick + interval, intervalPrecision) : extent[1]
+          value: opt4.expandToNicedExtent ? round(lastNiceTick + interval, intervalPrecision) : extent[1]
         });
       }
       if (brkAvailable) {
-        scaleBreakHelper.pruneTicksByBreak(opt3.pruneByBreak, ticks, brk.breaks, function(item) {
+        scaleBreakHelper.pruneTicksByBreak(opt4.pruneByBreak, ticks, brk.breaks, function(item) {
           return item.value;
         }, cfg.interval, extent);
       }
-      if (brkAvailable && opt3.breakTicks !== "none") {
+      if (brkAvailable && opt4.breakTicks !== "none") {
         scaleBreakHelper.addBreaksToTicks(ticks, brk.breaks, extent);
       }
       return ticks;
@@ -33589,11 +33589,11 @@ var IntervalScale = (
     IntervalScale2.prototype.getMinorTicks = function(splitNumber) {
       return getMinorTicks(this, splitNumber, getBreaksUnsafe(this), this._cfg.interval);
     };
-    IntervalScale2.prototype.getLabel = function(tick, opt3) {
+    IntervalScale2.prototype.getLabel = function(tick, opt4) {
       if (tick == null) {
         return "";
       }
-      var precision = opt3 && opt3.precision;
+      var precision = opt4 && opt4.precision;
       if (precision == null) {
         precision = getPrecision(tick.value) || 0;
       } else if (precision === "auto") {
@@ -33643,8 +33643,8 @@ var TimeScale = (
     TimeScale2.prototype.getFormattedLabel = function(tick, idx, labelFormatter) {
       return leveledFormat(tick, idx, labelFormatter, this._locale, this._useUTC);
     };
-    TimeScale2.prototype.getTicks = function(opt3) {
-      opt3 = opt3 || {};
+    TimeScale2.prototype.getTicks = function(opt4) {
+      opt4 = opt4 || {};
       var interval = this._interval;
       var extent = getScaleExtentForTickUnsafe(this);
       var scaleBreakHelper = getScaleBreakHelper();
@@ -33655,7 +33655,7 @@ var TimeScale = (
         return ticks;
       }
       var useUTC = this._useUTC;
-      if (brkAvailable && opt3.breakTicks === "only_break") {
+      if (brkAvailable && opt4.breakTicks === "only_break") {
         getScaleBreakHelper().addBreaksToTicks(ticks, brk.breaks, extent);
         return ticks;
       }
@@ -33669,11 +33669,11 @@ var TimeScale = (
         }
       });
       if (brkAvailable) {
-        getScaleBreakHelper().pruneTicksByBreak(opt3.pruneByBreak, ticks, brk.breaks, function(item) {
+        getScaleBreakHelper().pruneTicksByBreak(opt4.pruneByBreak, ticks, brk.breaks, function(item) {
           return item.value;
         }, this._approxInterval, extent);
       }
-      if (brkAvailable && opt3.breakTicks !== "none") {
+      if (brkAvailable && opt4.breakTicks !== "none") {
         getScaleBreakHelper().addBreaksToTicks(ticks, brk.breaks, extent, function(trimmedBrk) {
           var lowerBrkUnitIndex = Math.max(indexOf(primaryTimeUnits, getUnitFromValue(trimmedBrk.vmin, useUTC)), indexOf(primaryTimeUnits, getUnitFromValue(trimmedBrk.vmax, useUTC)));
           var upperBrkUnitIndex = 0;
@@ -33697,10 +33697,10 @@ var TimeScale = (
     TimeScale2.prototype.getMinorTicks = function(splitNumber) {
       return getMinorTicks(this, splitNumber, getBreaksUnsafe(this), this._interval);
     };
-    TimeScale2.prototype.setTimeInterval = function(opt3) {
-      this._interval = opt3.interval;
-      this._approxInterval = opt3.approxInterval;
-      this._minLevelUnit = opt3.minLevelUnit;
+    TimeScale2.prototype.setTimeInterval = function(opt4) {
+      this._interval = opt4.interval;
+      this._approxInterval = opt4.approxInterval;
+      this._minLevelUnit = opt4.minLevelUnit;
     };
     TimeScale2.parse = function(val) {
       return isNumber(val) ? Math.round(val) : +parseDate(val);
@@ -33971,7 +33971,7 @@ function createIntervalTicks(bottomUnitName, approxInterval, isUTC, extent, inne
   }
   return ticks;
 }
-var calcNiceForTimeScale = function(scale3, opt3) {
+var calcNiceForTimeScale = function(scale3, opt4) {
   var extent = scale3.getExtent();
   if (extent[0] === extent[1]) {
     extent[0] -= ONE_DAY;
@@ -33983,10 +33983,10 @@ var calcNiceForTimeScale = function(scale3, opt3) {
     extent[0] = extent[1] - ONE_DAY;
   }
   scale3.setExtent(extent[0], extent[1]);
-  var splitNumber = ensureValidSplitNumber(opt3.splitNumber, 10);
+  var splitNumber = ensureValidSplitNumber(opt4.splitNumber, 10);
   var approxInterval = getScaleLinearSpanEffective(scale3) / splitNumber;
-  var minInterval = opt3.minInterval;
-  var maxInterval = opt3.maxInterval;
+  var minInterval = opt4.minInterval;
+  var maxInterval = opt4.maxInterval;
   if (minInterval != null && approxInterval < minInterval) {
     approxInterval = minInterval;
   }
@@ -34046,7 +34046,7 @@ var LogScale = (
       enableScaleMapperFreeze(_this, _this.intervalStub);
       return _this;
     }
-    LogScale2.prototype.getTicks = function(opt3) {
+    LogScale2.prototype.getTicks = function(opt4) {
       var base2 = this.base;
       var powStub = this.powStub;
       var scaleBreakHelper = getScaleBreakHelper();
@@ -34059,7 +34059,7 @@ var LogScale = (
           to: powExtent
         }
       };
-      return map(intervalStub.getTicks(opt3 || {}), function(tick) {
+      return map(intervalStub.getTicks(opt4 || {}), function(tick) {
         var val = tick.value;
         var powVal = logScalePowTick(val, base2, powOpt);
         var vBreak;
@@ -34085,8 +34085,8 @@ var LogScale = (
         this.intervalStub.getConfig().interval
       );
     };
-    LogScale2.prototype.getLabel = function(data, opt3) {
-      return this.intervalStub.getLabel(data, opt3);
+    LogScale2.prototype.getLabel = function(data, opt4) {
+      return this.intervalStub.getLabel(data, opt4);
     };
     LogScale2.type = "log";
     LogScale2.mapperMethods = {
@@ -34099,12 +34099,12 @@ var LogScale = (
       scale: function(val) {
         return logScalePowTick(this.intervalStub.scale(val), this.base, null);
       },
-      transformIn: function(val, opt3) {
+      transformIn: function(val, opt4) {
         val = logScaleLogTick(val, this.base);
-        return opt3 && opt3.depth === SCALE_MAPPER_DEPTH_OUT_OF_BREAK ? val : this.intervalStub.transformIn(val, opt3);
+        return opt4 && opt4.depth === SCALE_MAPPER_DEPTH_OUT_OF_BREAK ? val : this.intervalStub.transformIn(val, opt4);
       },
-      transformOut: function(val, opt3) {
-        var depth = opt3 ? opt3.depth : null;
+      transformOut: function(val, opt4) {
+        var depth = opt4 ? opt4.depth : null;
         tmpTransformOutOpt1.depth = depth;
         tmpTransformOutOpt2.lookup = this._lookup;
         return logScalePowTick(depth === SCALE_MAPPER_DEPTH_OUT_OF_BREAK ? val : this.intervalStub.transformOut(val, tmpTransformOutOpt1), this.base, tmpTransformOutOpt2);
@@ -34319,11 +34319,11 @@ function updateIntervalOrLogScaleForNiceOrAligned(scale3, fixMinMax, oldInterval
   intervalStub.setExtent(newIntervalExtent[0], newIntervalExtent[1]);
   if (isTargetLogScale) {
     var powStub = scale3.powStub;
-    var opt3 = {
+    var opt4 = {
       depth: SCALE_MAPPER_DEPTH_OUT_OF_BREAK
     };
-    var minPow = scale3.transformOut(newIntervalExtent[0], opt3);
-    var maxPow = scale3.transformOut(newIntervalExtent[1], opt3);
+    var minPow = scale3.transformOut(newIntervalExtent[0], opt4);
+    var maxPow = scale3.transformOut(newIntervalExtent[1], opt4);
     var extentChanged = extentDiffers(oldIntervalExtent, newIntervalExtent);
     if (fixMinMax[0] && !extentChanged[0]) {
       minPow = oldOutermostExtent[0];
@@ -34672,8 +34672,8 @@ function parseBoundaryGapOption(scale3, model) {
   }
   return [parseBoundaryGapOptionItem(boundaryGapOptionArr[0]), parseBoundaryGapOptionItem(boundaryGapOptionArr[1])];
 }
-function parseBoundaryGapOptionItem(opt3) {
-  return parsePercent(typeof opt3 === "boolean" ? 0 : opt3, 1) || 0;
+function parseBoundaryGapOptionItem(opt4) {
+  return parsePercent(typeof opt4 === "boolean" ? 0 : opt4, 1) || 0;
 }
 function ensureScaleStore(axisLike) {
   var store = scaleInner(axisLike.scale);
@@ -34822,19 +34822,19 @@ function adoptScaleExtentKindMapping(axis2, scale3, rawExtentResult, ecModel) {
 }
 
 // node_modules/echarts/lib/coord/axisNiceTicks.js
-function calcNiceForIntervalOrLogScale(scale3, opt3) {
+function calcNiceForIntervalOrLogScale(scale3, opt4) {
   var isTargetLogScale = isLogScale(scale3);
   var intervalStub = isTargetLogScale ? scale3.intervalStub : scale3;
-  var fixMinMax = opt3.fixMinMax || [];
+  var fixMinMax = opt4.fixMinMax || [];
   var oldOutermostExtent = isTargetLogScale ? scale3.getExtent() : null;
   var oldIntervalExtent = intervalStub.getExtent();
-  var newIntervalExtent = intervalScaleEnsureValidExtent(oldIntervalExtent, fixMinMax, opt3.rawExtentResult);
+  var newIntervalExtent = intervalScaleEnsureValidExtent(oldIntervalExtent, fixMinMax, opt4.rawExtentResult);
   intervalStub.setExtent(newIntervalExtent[0], newIntervalExtent[1]);
   newIntervalExtent = intervalStub.getExtent();
-  var config = isTargetLogScale ? logScaleCalcNiceTicks(intervalStub, opt3) : intervalScaleCalcNiceTicks(intervalStub, opt3);
+  var config = isTargetLogScale ? logScaleCalcNiceTicks(intervalStub, opt4) : intervalScaleCalcNiceTicks(intervalStub, opt4);
   var autoIntervalPrecision = config.intervalPrecision;
   var autoInterval = config.interval;
-  var userInterval = opt3.userInterval;
+  var userInterval = opt4.userInterval;
   if (userInterval != null) {
     config.interval = userInterval;
     config.intervalPrecision = getIntervalPrecision(userInterval);
@@ -34850,14 +34850,14 @@ function calcNiceForIntervalOrLogScale(scale3, opt3) {
   }
   updateIntervalOrLogScaleForNiceOrAligned(scale3, fixMinMax, oldIntervalExtent, newIntervalExtent, oldOutermostExtent, config);
 }
-function intervalScaleCalcNiceTicks(scale3, opt3) {
-  var splitNumber = ensureValidSplitNumber(opt3.splitNumber, 5);
+function intervalScaleCalcNiceTicks(scale3, opt4) {
+  var splitNumber = ensureValidSplitNumber(opt4.splitNumber, 5);
   var span = getScaleLinearSpanEffective(scale3);
   if (true) {
     assert(isFinite(span) && span > 0);
   }
-  var minInterval = opt3.minInterval;
-  var maxInterval = opt3.maxInterval;
+  var minInterval = opt4.minInterval;
+  var maxInterval = opt4.maxInterval;
   var interval = nice(span / splitNumber, true);
   if (minInterval != null && interval < minInterval) {
     interval = minInterval;
@@ -34874,8 +34874,8 @@ function intervalScaleCalcNiceTicks(scale3, opt3) {
     niceExtent
   };
 }
-function logScaleCalcNiceTicks(intervalStub, opt3) {
-  var splitNumber = ensureValidSplitNumber(opt3.splitNumber, 10);
+function logScaleCalcNiceTicks(intervalStub, opt4) {
+  var splitNumber = ensureValidSplitNumber(opt4.splitNumber, 10);
   var intervalExtent = intervalStub.getExtent();
   var span = getScaleLinearSpanEffective(intervalStub);
   if (true) {
@@ -34922,8 +34922,8 @@ function scaleCalcNice2(scale3, model, axis2, ecModel, externalDataExtent) {
     scale3.freeze();
   }
 }
-function scaleCalcNiceDirectly(scale3, opt3) {
-  scaleCalcNiceMethods[scale3.type](scale3, opt3);
+function scaleCalcNiceDirectly(scale3, opt4) {
+  scaleCalcNiceMethods[scale3.type](scale3, opt4);
 }
 var scaleCalcNiceMethods = {
   interval: calcNiceForIntervalOrLogScale,
@@ -35063,7 +35063,7 @@ function createAxisLabels(axis2, ctx) {
   }
   return axis2.type === "category" ? makeCategoryLabels(axis2, ctx) : makeRealNumberLabels(axis2);
 }
-function createAxisTicks(axis2, tickModel, opt3) {
+function createAxisTicks(axis2, tickModel, opt4) {
   var scale3 = axis2.scale;
   var custom = axis2.getTickModel().get("customValues");
   if (custom) {
@@ -35072,7 +35072,7 @@ function createAxisTicks(axis2, tickModel, opt3) {
     };
   }
   return axis2.type === "category" ? makeCategoryTicks(axis2, tickModel) : {
-    ticks: scale3.getTicks(opt3)
+    ticks: scale3.getTicks(opt4)
   };
 }
 function parseTickLabelCustomValues(customValues, scale3) {
@@ -35303,15 +35303,15 @@ function makeTicksLabelsByCategoryIntervalNumOrCb(axis2, categoryInterval, onlyT
 
 // node_modules/echarts/lib/coord/axisBand.js
 var FALLBACK_BAND_WIDTH_RATIO = 0.8;
-function calcBandWidth(axis2, opt3) {
-  opt3 = opt3 || {};
+function calcBandWidth(axis2, opt4) {
+  opt4 = opt4 || {};
   var out2 = {
     w: NaN,
     w2: NaN
   };
   var scale3 = axis2.scale;
-  var fromStat = opt3.fromStat;
-  var min3 = opt3.min;
+  var fromStat = opt4.fromStat;
+  var min3 = opt4.min;
   var scaleLinearSpan = getScaleLinearSpanForMapping(scale3);
   if (!isNullableNumberFinite(scaleLinearSpan)) {
     scaleLinearSpan = NaN;
@@ -35410,12 +35410,12 @@ var Axis = (
     Axis2.prototype.pointToData = function(point, clamp2) {
       return;
     };
-    Axis2.prototype.getTicksCoords = function(opt3) {
-      opt3 = opt3 || {};
-      var tickModel = opt3.tickModel || this.getTickModel();
+    Axis2.prototype.getTicksCoords = function(opt4) {
+      opt4 = opt4 || {};
+      var tickModel = opt4.tickModel || this.getTickModel();
       var result2 = createAxisTicks(this, tickModel, {
-        breakTicks: opt3.breakTicks,
-        pruneByBreak: opt3.pruneByBreak
+        breakTicks: opt4.breakTicks,
+        pruneByBreak: opt4.pruneByBreak
       });
       var preTicksCoords = map(result2.ticks, function(tick) {
         return {
@@ -35534,15 +35534,15 @@ function ensureLabelLayoutWithGeometry(labelLayout) {
   }
   return labelLayout;
 }
-function computeLabelGeometry(out2, label2, opt3) {
+function computeLabelGeometry(out2, label2, opt4) {
   var rawTransform = label2.getComputedTransform();
   out2.transform = ensureCopyTransform(out2.transform, rawTransform);
   var outLocalRect = out2.localRect = ensureCopyRect(out2.localRect, label2.getBoundingRect());
   var labelStyleExt = label2.style;
   var margin = labelStyleExt.margin;
-  var marginForce = opt3 && opt3.marginForce;
-  var minMarginForce = opt3 && opt3.minMarginForce;
-  var marginDefault = opt3 && opt3.marginDefault;
+  var marginForce = opt4 && opt4.marginForce;
+  var minMarginForce = opt4 && opt4.minMarginForce;
+  var marginDefault = opt4 && opt4.marginDefault;
   var marginType = labelStyleExt.__marginType;
   if (marginType == null && marginDefault) {
     margin = marginDefault;
@@ -35696,21 +35696,21 @@ var LineSeriesModel = (
         useEncodeDefaulter: true
       });
     };
-    LineSeriesModel2.prototype.getLegendIcon = function(opt3) {
+    LineSeriesModel2.prototype.getLegendIcon = function(opt4) {
       var group = new Group_default();
-      var line = createSymbol("line", 0, opt3.itemHeight / 2, opt3.itemWidth, 0, opt3.lineStyle.stroke, false);
+      var line = createSymbol("line", 0, opt4.itemHeight / 2, opt4.itemWidth, 0, opt4.lineStyle.stroke, false);
       group.add(line);
-      line.setStyle(opt3.lineStyle);
+      line.setStyle(opt4.lineStyle);
       var visualType = this.getData().getVisual("symbol");
       var visualRotate = this.getData().getVisual("symbolRotate");
       var symbolType = visualType === "none" ? "circle" : visualType;
-      var size = opt3.itemHeight * 0.8;
-      var symbol = createSymbol(symbolType, (opt3.itemWidth - size) / 2, (opt3.itemHeight - size) / 2, size, size, opt3.itemStyle.fill);
+      var size = opt4.itemHeight * 0.8;
+      var symbol = createSymbol(symbolType, (opt4.itemWidth - size) / 2, (opt4.itemHeight - size) / 2, size, size, opt4.itemStyle.fill);
       group.add(symbol);
-      symbol.setStyle(opt3.itemStyle);
-      var symbolRotate = opt3.iconRotate === "inherit" ? visualRotate : opt3.iconRotate || 0;
+      symbol.setStyle(opt4.itemStyle);
+      var symbolRotate = opt4.iconRotate === "inherit" ? visualRotate : opt4.iconRotate || 0;
       symbol.rotation = symbolRotate * Math.PI / 180;
-      symbol.setOrigin([opt3.itemWidth / 2, opt3.itemHeight / 2]);
+      symbol.setOrigin([opt4.itemWidth / 2, opt4.itemHeight / 2]);
       if (symbolType.indexOf("empty") > -1) {
         symbol.style.stroke = symbol.style.fill;
         symbol.style.fill = tokens_default.color.neutral00;
@@ -36009,12 +36009,12 @@ var Symbol2 = (
     Symbol3.prototype.setSymbolScale = function(scale3) {
       this.scaleX = this.scaleY = scale3;
     };
-    Symbol3.prototype.fadeOut = function(cb, seriesModel, opt3) {
+    Symbol3.prototype.fadeOut = function(cb, seriesModel, opt4) {
       var symbolPath = this.childAt(0);
       var dataIndex = getECData(this).dataIndex;
-      var animationOpt = opt3 && opt3.animation;
+      var animationOpt = opt4 && opt4.animation;
       this.silent = symbolPath.silent = true;
-      if (opt3 && opt3.fadeLabel) {
+      if (opt4 && opt4.fadeLabel) {
         var textContent = symbolPath.getTextContent();
         if (textContent) {
           removeElement(textContent, {
@@ -36059,16 +36059,16 @@ function driftSymbol(dx, dy) {
 var Symbol_default = Symbol2;
 
 // node_modules/echarts/lib/chart/helper/SymbolDraw.js
-function symbolNeedsDraw(data, point, idx, opt3) {
-  return point && !isNaN(point[0]) && !isNaN(point[1]) && !(opt3 && opt3.isIgnore && opt3.isIgnore(idx)) && !(opt3 && opt3.clipShape && !opt3.clipShape.contain(point[0], point[1])) && data.getItemVisual(idx, "symbol") !== "none";
+function symbolNeedsDraw(data, point, idx, opt4) {
+  return point && !isNaN(point[0]) && !isNaN(point[1]) && !(opt4 && opt4.isIgnore && opt4.isIgnore(idx)) && !(opt4 && opt4.clipShape && !opt4.clipShape.contain(point[0], point[1])) && data.getItemVisual(idx, "symbol") !== "none";
 }
-function normalizeUpdateOpt(opt3) {
-  if (opt3 != null && !isObject(opt3)) {
-    opt3 = {
-      isIgnore: opt3
+function normalizeUpdateOpt(opt4) {
+  if (opt4 != null && !isObject(opt4)) {
+    opt4 = {
+      isIgnore: opt4
     };
   }
-  return opt3 || {};
+  return opt4 || {};
 }
 function makeSeriesScope(data) {
   var seriesModel = data.hostModel;
@@ -36099,19 +36099,19 @@ var SymbolDraw = (
       this.group = new Group_default();
       this._SymbolCtor = SymbolCtor || Symbol_default;
     }
-    SymbolDraw2.prototype.updateData = function(data, opt3) {
+    SymbolDraw2.prototype.updateData = function(data, opt4) {
       this._progressiveEls = null;
-      opt3 = normalizeUpdateOpt(opt3);
+      opt4 = normalizeUpdateOpt(opt4);
       var group = this.group;
       var seriesModel = data.hostModel;
       var oldData = this._data;
       var SymbolCtor = this._SymbolCtor;
-      var disableAnimation = opt3.disableAnimation;
+      var disableAnimation = opt4.disableAnimation;
       var seriesScope = this._seriesScope = makeSeriesScope(data);
       var symbolUpdateOpt = {
         disableAnimation
       };
-      var getSymbolPoint = opt3.getSymbolPoint || function(idx) {
+      var getSymbolPoint = opt4.getSymbolPoint || function(idx) {
         return data.getItemLayout(idx);
       };
       if (!oldData) {
@@ -36119,13 +36119,13 @@ var SymbolDraw = (
       }
       data.diff(oldData).add(function(newIdx) {
         var point = getSymbolPoint(newIdx);
-        if (symbolNeedsDraw(data, point, newIdx, opt3)) {
+        if (symbolNeedsDraw(data, point, newIdx, opt4)) {
           createEl(SymbolCtor, data, newIdx, seriesScope, symbolUpdateOpt, point, group);
         }
       }).update(function(newIdx, oldIdx) {
         var symbolEl = oldData.getItemGraphicEl(oldIdx);
         var point = getSymbolPoint(newIdx);
-        if (!symbolNeedsDraw(data, point, newIdx, opt3)) {
+        if (!symbolNeedsDraw(data, point, newIdx, opt4)) {
           group.remove(symbolEl);
           return;
         }
@@ -36155,7 +36155,7 @@ var SymbolDraw = (
       this._data = data;
     };
     ;
-    SymbolDraw2.prototype.updateLayout = function(opt3) {
+    SymbolDraw2.prototype.updateLayout = function(opt4) {
       var data = this._data;
       if (!data) {
         return;
@@ -36165,7 +36165,7 @@ var SymbolDraw = (
       for (var idx = 0, len2 = store.count(); idx < len2; idx++) {
         var el = data.getItemGraphicEl(idx);
         var point = symbolDraw._getSymbolPoint(idx);
-        if (symbolNeedsDraw(data, point, idx, opt3)) {
+        if (symbolNeedsDraw(data, point, idx, opt4)) {
           el = el || createEl(symbolDraw._SymbolCtor, data, idx, symbolDraw._seriesScope, {
             disableAnimation: true
           }, point, symbolDraw.group);
@@ -36185,9 +36185,9 @@ var SymbolDraw = (
       this.group.removeAll();
     };
     ;
-    SymbolDraw2.prototype.incrementalUpdate = function(taskParams, data, incrementalId, opt3) {
+    SymbolDraw2.prototype.incrementalUpdate = function(taskParams, data, incrementalId, opt4) {
       this._progressiveEls = [];
-      opt3 = normalizeUpdateOpt(opt3);
+      opt4 = normalizeUpdateOpt(opt4);
       function updateIncrementalAndHover(el2) {
         if (!el2.isGroup) {
           el2.incremental = incrementalId;
@@ -36196,7 +36196,7 @@ var SymbolDraw = (
       }
       for (var idx = taskParams.start; idx < taskParams.end; idx++) {
         var point = data.getItemLayout(idx);
-        if (symbolNeedsDraw(data, point, idx, opt3)) {
+        if (symbolNeedsDraw(data, point, idx, opt4)) {
           var el = new this._SymbolCtor(data, idx, this._seriesScope);
           el.traverse(updateIncrementalAndHover);
           el.setPosition(point);
@@ -37776,7 +37776,7 @@ var LineView = (
             inheritColor,
             labelFetcher: seriesModel,
             labelDataIndex: dataIndex,
-            defaultText: function(dataIndex2, opt3, interpolatedValue) {
+            defaultText: function(dataIndex2, opt4, interpolatedValue) {
               return interpolatedValue != null ? getDefaultInterpolatedLabel(data_2, interpolatedValue) : getDefaultLabel(data_2, dataIndex2);
             },
             enableTextSetter: true
@@ -38260,23 +38260,23 @@ function moveIfOverlapByLinearLabels(baseLayoutInfoList, baseDirVec, movableLayo
 var AxisBuilder = (
   /** @class */
   (function() {
-    function AxisBuilder2(axisModel, api, opt3, shared) {
+    function AxisBuilder2(axisModel, api, opt4, shared) {
       this.group = new Group_default();
       this._axisModel = axisModel;
       this._api = api;
       this._local = {};
       this._shared = shared || new AxisBuilderSharedContext(resolveAxisNameOverlapDefault);
-      this._resetCfgDetermined(opt3);
+      this._resetCfgDetermined(opt4);
     }
-    AxisBuilder2.prototype.updateCfg = function(opt3) {
+    AxisBuilder2.prototype.updateCfg = function(opt4) {
       if (true) {
         var ready = this._shared.ensureRecord(this._axisModel).ready;
         assert(!ready.axisLine && !ready.axisTickLabelDetermine);
         ready.axisName = ready.axisTickLabelEstimate = false;
       }
       var raw = this._cfg.raw;
-      raw.position = opt3.position;
-      raw.labelOffset = opt3.labelOffset;
+      raw.position = opt4.position;
+      raw.labelOffset = opt4.labelOffset;
       this._resetCfgDetermined(raw);
     };
     AxisBuilder2.prototype.__getRawCfg = function() {
@@ -39038,8 +39038,8 @@ function adjustBreakLabels(axisModel, axisRotation, labelLayoutList) {
 var AxisBuilder_default = AxisBuilder;
 
 // node_modules/echarts/lib/coord/cartesian/cartesianAxisHelper.js
-function layout(rect, axisModel, opt3) {
-  opt3 = opt3 || {};
+function layout(rect, axisModel, opt4) {
+  opt4 = opt4 || {};
   var axis2 = axisModel.axis;
   var layout2 = {};
   var otherAxisOnZeroOf = axis2.getAxesOnZeroOf()[0];
@@ -39073,7 +39073,7 @@ function layout(rect, axisModel, opt3) {
   if (axisModel.get(["axisTick", "inside"])) {
     layout2.tickDirection = -layout2.tickDirection;
   }
-  if (retrieve(opt3.labelInside, axisModel.get(["axisLabel", "inside"]))) {
+  if (retrieve(opt4.labelInside, axisModel.get(["axisLabel", "inside"]))) {
     layout2.labelDirection = -layout2.labelDirection;
   }
   var labelRotate = axisModel.get(["axisLabel", "rotate"]);
@@ -39189,23 +39189,23 @@ var GridModel_default = GridModel;
 // node_modules/echarts/lib/layout/barGrid.js
 var callOnlyOnce2 = makeCallOnlyOnce();
 var STACK_PREFIX = "__ec_stack_";
-function computeBarLayoutForCustomSeries(opt3) {
-  if (!isOrdinalScale(opt3.axis.scale)) {
+function computeBarLayoutForCustomSeries(opt4) {
+  if (!isOrdinalScale(opt4.axis.scale)) {
     return;
   }
-  var bandWidthResult = calcBandWidth(opt3.axis);
+  var bandWidthResult = calcBandWidth(opt4.axis);
   var params = [];
-  for (var i7 = 0; i7 < opt3.count || 0; i7++) {
+  for (var i7 = 0; i7 < opt4.count || 0; i7++) {
     params.push(defaults({
       stackId: STACK_PREFIX + i7
-    }, opt3));
+    }, opt4));
   }
   var widthAndOffsets = calcBarWidthAndOffset({
     bandWidthResult,
     seriesInfo: params
   });
   var result2 = [];
-  for (var i7 = 0; i7 < opt3.count; i7++) {
+  for (var i7 = 0; i7 < opt4.count; i7++) {
     var item = widthAndOffsets[STACK_PREFIX + i7];
     item.offsetCenter = item.offset + item.width / 2;
     result2.push(item);
@@ -41134,13 +41134,13 @@ var RoamController = (
       return this._pinching;
     };
     RoamController2.prototype._checkPointer = function(e9, x2, y3) {
-      var opt3 = this._opt;
-      var zInfoParsed = opt3.zInfoParsed;
-      if (onIrrelevantElement(e9, opt3.api, zInfoParsed.component)) {
+      var opt4 = this._opt;
+      var zInfoParsed = opt4.zInfoParsed;
+      if (onIrrelevantElement(e9, opt4.api, zInfoParsed.component)) {
         return false;
       }
       ;
-      var triggerInfo = opt3.triggerInfo;
+      var triggerInfo = opt4.triggerInfo;
       var roamTrigger = triggerInfo.roamTrigger;
       var inArea = false;
       if (roamTrigger === "global") {
@@ -42640,11 +42640,11 @@ function matrixPrepareCustom(coordSys) {
       height: rect.height
     },
     api: {
-      coord: function(data, opt3) {
-        return coordSys.dataToPoint(data, opt3);
+      coord: function(data, opt4) {
+        return coordSys.dataToPoint(data, opt4);
       },
-      layout: function(data, opt3) {
-        return coordSys.dataToLayout(data, opt3);
+      layout: function(data, opt4) {
+        return coordSys.dataToLayout(data, opt4);
       }
     }
   };
@@ -43502,13 +43502,13 @@ function makeRenderItem(customSeries, data, ecModel, api) {
     var itemStyle = getItemStyleModel(dataIndexInside, NORMAL).getItemStyle();
     visualColor != null && (itemStyle.fill = visualColor);
     opacity != null && (itemStyle.opacity = opacity);
-    var opt3 = {
+    var opt4 = {
       inheritColor: isString(visualColor) ? visualColor : tokens_default.color.neutral99
     };
     var labelModel = getLabelModel(dataIndexInside, NORMAL);
-    var textStyle = createTextStyle(labelModel, null, opt3, false, true);
+    var textStyle = createTextStyle(labelModel, null, opt4, false, true);
     textStyle.text = labelModel.getShallow("show") ? retrieve2(customSeries.getFormattedLabel(dataIndexInside, NORMAL), getDefaultLabel(data, dataIndexInside)) : null;
-    var textConfig = createTextConfig(labelModel, opt3, false);
+    var textConfig = createTextConfig(labelModel, opt4, false);
     preFetchFromExtra(userProps, itemStyle);
     itemStyle = convertToEC4StyleForCustomSerise(itemStyle, textStyle, textConfig);
     userProps && applyUserPropsAfter(itemStyle, userProps);
@@ -43554,19 +43554,19 @@ function makeRenderItem(customSeries, data, ecModel, api) {
       return data.getItemVisual(dataIndexInside, visualType);
     }
   }
-  function barLayout(opt3) {
+  function barLayout(opt4) {
     if (coordSys.type === "cartesian2d") {
       var baseAxis = coordSys.getBaseAxis();
       return computeBarLayoutForCustomSeries(defaults({
         axis: baseAxis
-      }, opt3));
+      }, opt4));
     }
   }
   function currentSeriesIndices() {
     return ecModel.getCurrentSeriesIndices();
   }
-  function font(opt3) {
-    return getFont(opt3, ecModel);
+  function font(opt4) {
+    return getFont(opt4, ecModel);
   }
 }
 function wrapEncodeDef(data) {
@@ -44166,16 +44166,16 @@ function confineInContainer(position, width, height, api) {
   position[0] = Math.max(position[0], 0);
   position[1] = Math.max(position[1], 0);
 }
-function getValueLabel(value2, axis2, ecModel, seriesDataIndices, opt3) {
+function getValueLabel(value2, axis2, ecModel, seriesDataIndices, opt4) {
   value2 = axis2.scale.parse(value2);
   var text4 = axis2.scale.getLabel({
     value: value2
   }, {
     // If `precision` is set, width can be fixed (like '12.00500'), which
     // helps to debounce when when moving label.
-    precision: opt3.precision
+    precision: opt4.precision
   });
-  var formatter = opt3.formatter;
+  var formatter = opt4.formatter;
   if (formatter) {
     var params_1 = {
       value: getAxisRawValue(axis2, {
@@ -44313,9 +44313,9 @@ var CartesianAxisPointer = (
   })(BaseAxisPointer_default)
 );
 function getCartesian(grid, axis2) {
-  var opt3 = {};
-  opt3[axis2.dim + "AxisIndex"] = axis2.index;
-  return grid.getCartesian(opt3);
+  var opt4 = {};
+  opt4[axis2.dim + "AxisIndex"] = axis2.index;
+  return grid.getCartesian(opt4);
 }
 var pointerShapeBuilder = {
   line: function(axis2, pixelValue, thisExtent, otherExtent) {
@@ -45220,21 +45220,21 @@ var DataZoomModel = (
         return this.ecModel.getComponent(getAxisMainType(axisDim), axisIndex);
       }
     };
-    DataZoomModel2.prototype.setRawRange = function(opt3) {
+    DataZoomModel2.prototype.setRawRange = function(opt4) {
       var thisOption = this.option;
       var settledOption = this.settledOption;
       each([["start", "startValue"], ["end", "endValue"]], function(names) {
-        if (opt3[names[0]] != null || opt3[names[1]] != null) {
-          thisOption[names[0]] = settledOption[names[0]] = opt3[names[0]];
-          thisOption[names[1]] = settledOption[names[1]] = opt3[names[1]];
+        if (opt4[names[0]] != null || opt4[names[1]] != null) {
+          thisOption[names[0]] = settledOption[names[0]] = opt4[names[0]];
+          thisOption[names[1]] = settledOption[names[1]] = opt4[names[1]];
         }
       }, this);
-      this._updateRangeUse(opt3);
+      this._updateRangeUse(opt4);
     };
-    DataZoomModel2.prototype.setCalculatedRange = function(opt3) {
+    DataZoomModel2.prototype.setCalculatedRange = function(opt4) {
       var option = this.option;
       each(["start", "startValue", "end", "endValue"], function(name) {
-        option[name] = opt3[name];
+        option[name] = opt4[name];
       });
     };
     DataZoomModel2.prototype.getPercentRange = function() {
@@ -45360,7 +45360,7 @@ var AxisProxy = (
     AxisProxy2.prototype.getMinMaxSpan = function() {
       return clone(this._minMaxSpan);
     };
-    AxisProxy2.prototype.calculateDataWindow = function(opt3) {
+    AxisProxy2.prototype.calculateDataWindow = function(opt4) {
       var dataExtent = this._extent;
       var axis2 = this.getAxisModel().axis;
       var scale3 = axis2.scale;
@@ -45372,8 +45372,8 @@ var AxisProxy = (
       var hasPropModeValue;
       var needRound = [false, false];
       each(["start", "end"], function(prop, idx) {
-        var boundPercent = opt3[prop];
-        var boundValue = opt3[prop + "Value"];
+        var boundPercent = opt4[prop];
+        var boundValue = opt4[prop + "Value"];
         if (rangePropMode[idx] === "percent") {
           boundPercent == null && (boundPercent = percentExtent[idx]);
           boundValue = linearMap(boundPercent, percentExtent, dataExtent);
@@ -45446,14 +45446,14 @@ var AxisProxy = (
       var rawExtentInfo = axis2.scale.rawExtentInfo;
       this._extent = rawExtentInfo.makeNoZoom();
       this._updateMinMaxSpan();
-      var opt3 = dataZoomModel.settledOption;
+      var opt4 = dataZoomModel.settledOption;
       if (alignToPercentInverted) {
-        opt3 = defaults({
+        opt4 = defaults({
           start: alignToPercentInverted[0],
           end: alignToPercentInverted[1]
-        }, opt3);
+        }, opt4);
       }
-      var _a2 = this._window = this.calculateDataWindow(opt3), percent2 = _a2.percent, value2 = _a2.value;
+      var _a2 = this._window = this.calculateDataWindow(opt4), percent2 = _a2.percent, value2 = _a2.value;
       if (percent2[0] !== 0) {
         rawExtentInfo.setZoomMM(0, value2[0]);
       }
@@ -45886,7 +45886,7 @@ function makeStyleCoord(out2, zr, container, zrX, zrY) {
 var TooltipHTMLContent = (
   /** @class */
   (function() {
-    function TooltipHTMLContent2(api, opt3) {
+    function TooltipHTMLContent2(api, opt4) {
       this._show = false;
       this._styleCoord = [0, 0, 0, 0];
       this._enterable = true;
@@ -45900,7 +45900,7 @@ var TooltipHTMLContent = (
       el.domBelongToZr = true;
       this.el = el;
       var zr = this._zr = api.getZr();
-      var appendTo = opt3.appendTo;
+      var appendTo = opt4.appendTo;
       var container = appendTo && (isString(appendTo) ? document.querySelector(appendTo) : isDom(appendTo) ? appendTo : isFunction(appendTo) && appendTo(api.getDom()));
       makeStyleCoord(this._styleCoord, zr, container, api.getWidth() / 2, api.getHeight() / 2);
       (container || api.getDom()).appendChild(el);
@@ -47025,8 +47025,8 @@ function checkMarkerInSeries(seriesOpts, markerType) {
 }
 
 // node_modules/echarts/lib/component/marker/MarkerModel.js
-function fillLabel(opt3) {
-  defaultEmphasis(opt3, "label", ["show"]);
+function fillLabel(opt4) {
+  defaultEmphasis(opt4, "label", ["show"]);
 }
 var inner12 = makeInner();
 var MarkerModel = (
@@ -47513,9 +47513,9 @@ var MarkPointView_default = MarkPointView;
 function install7(registers) {
   registers.registerComponentModel(MarkPointModel_default);
   registers.registerComponentView(MarkPointView_default);
-  registers.registerPreprocessor(function(opt3) {
-    if (checkMarkerInSeries(opt3.series, "markPoint")) {
-      opt3.markPoint = opt3.markPoint || {};
+  registers.registerPreprocessor(function(opt4) {
+    if (checkMarkerInSeries(opt4.series, "markPoint")) {
+      opt4.markPoint = opt4.markPoint || {};
     }
   });
 }
@@ -47841,9 +47841,9 @@ var MarkLineView_default = MarkLineView;
 function install8(registers) {
   registers.registerComponentModel(MarkLineModel_default);
   registers.registerComponentView(MarkLineView_default);
-  registers.registerPreprocessor(function(opt3) {
-    if (checkMarkerInSeries(opt3.series, "markLine")) {
-      opt3.markLine = opt3.markLine || {};
+  registers.registerPreprocessor(function(opt4) {
+    if (checkMarkerInSeries(opt4.series, "markLine")) {
+      opt4.markLine = opt4.markLine || {};
     }
   });
 }
@@ -48180,9 +48180,9 @@ var MarkAreaView_default = MarkAreaView;
 function install9(registers) {
   registers.registerComponentModel(MarkAreaModel_default);
   registers.registerComponentView(MarkAreaView_default);
-  registers.registerPreprocessor(function(opt3) {
-    if (checkMarkerInSeries(opt3.series, "markArea")) {
-      opt3.markArea = opt3.markArea || {};
+  registers.registerPreprocessor(function(opt4) {
+    if (checkMarkerInSeries(opt4.series, "markArea")) {
+      opt4.markArea = opt4.markArea || {};
     }
   });
 }
@@ -50678,15 +50678,15 @@ function visualMapPreprocessor(option) {
   if (!isArray(visualMap)) {
     visualMap = visualMap ? [visualMap] : [];
   }
-  each9(visualMap, function(opt3) {
-    if (!opt3) {
+  each9(visualMap, function(opt4) {
+    if (!opt4) {
       return;
     }
-    if (has(opt3, "splitList") && !has(opt3, "pieces")) {
-      opt3.pieces = opt3.splitList;
-      delete opt3.splitList;
+    if (has(opt4, "splitList") && !has(opt4, "pieces")) {
+      opt4.pieces = opt4.splitList;
+      delete opt4.splitList;
     }
-    var pieces = opt3.pieces;
+    var pieces = opt4.pieces;
     if (pieces && isArray(pieces)) {
       each9(pieces, function(piece) {
         if (isObject(piece)) {
@@ -50700,7 +50700,7 @@ function visualMapPreprocessor(option) {
       });
     }
     if (true) {
-      var seriesTargets = opt3.seriesTargets;
+      var seriesTargets = opt4.seriesTargets;
       if (seriesTargets && isArray(seriesTargets)) {
         each9(seriesTargets, function(target) {
           if (!isObject(target) || target.dimension == null) {
@@ -51671,14 +51671,14 @@ var CanvasPainter = (function() {
     }
   };
   CanvasPainter2.prototype.refresh = function(optOrPaintAll) {
-    var opt3;
+    var opt4;
     if (optOrPaintAll && !isObject(optOrPaintAll)) {
-      opt3 = { paintAll: !!optOrPaintAll };
+      opt4 = { paintAll: !!optOrPaintAll };
     } else {
-      opt3 = optOrPaintAll || {};
+      opt4 = optOrPaintAll || {};
     }
-    var refresh = retrieve2(opt3.refresh, true);
-    var refreshHover = retrieve2(opt3.refreshHover, false);
+    var refresh = retrieve2(opt4.refresh, true);
+    var refreshHover = retrieve2(opt4.refreshHover, false);
     if (refreshHover) {
       this._hoverLayerDirty = HOVER_LAYER_DIRTY_REPAINT;
     }
@@ -51689,7 +51689,7 @@ var CanvasPainter = (function() {
       return this;
     }
     var list3 = this.storage.getDisplayList(true);
-    this._updateLayerStatus(list3, opt3.paintAll);
+    this._updateLayerStatus(list3, opt4.paintAll);
     this._redrawId = Math.random();
     var prevList = this._prevDisplayList;
     this._paintList(list3, prevList, this._redrawId);
@@ -52529,8 +52529,8 @@ function renderReserve(reserve, currency) {
 }
 function renderLearning(learning) {
   if (!learning || !Array.isArray(learning.lines)) return "";
-  const lines = learning.lines.map((line) => `<p>${escapeText2(line)}</p>`).join("");
-  return `<div class="plan-learning"><p><b>${escapeText2(learning.title ?? "Charging-time estimate")}</b>${learning.stale && learning.staleText ? ` \xB7 ${escapeText2(learning.staleText)}` : ""}</p>${lines}<p class="projection-note">${escapeText2(learning.note ?? "Estimate, not a guarantee.")}</p></div>`;
+  const lines2 = learning.lines.map((line) => `<p>${escapeText2(line)}</p>`).join("");
+  return `<div class="plan-learning"><p><b>${escapeText2(learning.title ?? "Charging-time estimate")}</b>${learning.stale && learning.staleText ? ` \xB7 ${escapeText2(learning.staleText)}` : ""}</p>${lines2}<p class="projection-note">${escapeText2(learning.note ?? "Estimate, not a guarantee.")}</p></div>`;
 }
 function renderPlan(windows, assumptions = {}, stale = false, formatters, totals, reserve, learning) {
   if (!formatters || typeof formatters.time !== "function" || typeof formatters.day !== "function") throw new TypeError("Plan time and day formatters are required");
@@ -52663,6 +52663,32 @@ function renderMarketCosts(m4) {
   return `<details id="market-costs-details"><summary>Advanced: market &amp; charging costs</summary><div class="mc-body">${summaryBlock(m4)}${sourceBlock(m4)}${marketBlock(m4)}${tariffBlock(m4)}<div class="mc-block" data-mc="basis"><h3>How costs are built</h3><p class="mc-line">${escapeText(m4.basis)}</p></div><p class="mc-help">Saving only stores your choice. It may recalculate plans and cost estimates for every charger using this price entry, followed by normal guarded schedule reconciliation if Morek owns the schedule. It never changes the provider on its own, sends a notification, wakes the car or proves charging. Historical tariffs are not reconstructed or invented.</p><div role="status" id="market-costs-notice">${notes}</div>${reload}</div></details>`;
 }
 
+// shared-dashboard/plan-params-view.js
+var opt3 = (value2, text4, selected) => `<option value="${escapeText(value2)}" ${selected ? "selected" : ""}>${escapeText(text4)}</option>`;
+var lines = (items, cls = "pp-line") => (items || []).filter(Boolean).map((t6) => `<p class="${cls}">${escapeText(t6)}</p>`).join("");
+function periodsBlock(m4) {
+  const p4 = m4.periods;
+  return `<div class="pp-block" data-pp="periods"><h3>Maximum charging periods</h3><p class="pp-line">Saved: ${escapeText(p4.saved)}.</p><label>Charging periods <select data-psetting="periods" ${p4.canEdit ? "" : "disabled"}>${p4.options.map((o9) => opt3(o9.value, o9.text, o9.value === p4.value)).join("")}</select></label>${lines(p4.notes)}<wa-button id="save-periods" size="small" ${p4.canEdit ? "" : "disabled"}>Save charging periods</wa-button></div>`;
+}
+function currentBlock(m4) {
+  const c5 = m4.current;
+  return `<div class="pp-block" data-pp="current"><h3>Planned current</h3><label>Planned current (A) <input type="number" inputmode="numeric" step="1" min="${escapeText(c5.min)}" max="${escapeText(c5.max)}" data-psetting="current" value="${escapeText(c5.value)}" ${c5.canEdit ? "" : "disabled"}></label><p class="pp-line">${escapeText(c5.rangeText)}</p>${c5.nominal ? `<p class="pp-line">${escapeText(c5.nominal)}</p>` : ""}${lines(c5.warnings, "pp-note")}${!c5.warnings.includes(c5.morekNote) ? `<p class="pp-help">${escapeText(c5.morekNote)}</p>` : ""}<p class="pp-help">${escapeText(m4.currentNote)}</p><wa-button id="save-current" size="small" ${c5.canEdit ? "" : "disabled"}>Save planned current</wa-button></div>`;
+}
+function departureBlock(m4) {
+  const d3 = m4.departure;
+  const lock = d3.canEdit ? "" : "disabled";
+  const days = d3.weekdays.map((w2) => `<label class="pp-day"><input type="checkbox" value="${escapeText(w2.n)}" data-psetting="wd-${escapeText(w2.n)}" ${w2.checked ? "checked" : ""} ${lock}> ${escapeText(w2.label)}</label>`).join("");
+  const range2 = d3.dateKnown ? ` min="${escapeText(d3.dateMin)}" max="${escapeText(d3.dateMax)}"` : "";
+  return `<div class="pp-block" data-pp="departure"><h3>Departure date &amp; weekdays</h3><p class="pp-line">${escapeText(d3.next)}</p><label>Departure date (blank: daily, by weekday) <input type="date" data-psetting="date"${range2} value="${escapeText(d3.date)}" ${lock}></label><fieldset class="pp-days" ${lock}><legend>Weekdays with a departure</legend>${days}</fieldset>${lines(d3.notes)}<wa-button id="save-departure" size="small" ${d3.canEdit ? "" : "disabled"}>Save departure</wa-button></div>`;
+}
+function renderPlanParams(m4) {
+  if (!m4) return "";
+  const notes = [m4.notice, ...m4.notes || []].filter(Boolean).map((t6) => `<p class="pp-note">${escapeText(t6)}</p>`).join("");
+  const reload = '<button type="button" id="reload-plan-params">Reload plan &amp; charger parameters</button>';
+  if (m4.state !== "ready") return `<details id="plan-params-details"><summary>Advanced: plan &amp; charger parameters</summary><div class="pp-body" role="status">${notes}${reload}</div></details>`;
+  return `<details id="plan-params-details"><summary>Advanced: plan &amp; charger parameters</summary><div class="pp-body">${periodsBlock(m4)}${currentBlock(m4)}${departureBlock(m4)}<p class="pp-help">${escapeText(m4.savedNote)}</p><div role="status" id="plan-params-notice">${notes}</div>${reload}</div></details>`;
+}
+
 // shared-dashboard/reconcile.js
 var key2 = (node) => {
   if (node.nodeType !== 1) return null;
@@ -52670,6 +52696,7 @@ var key2 = (node) => {
   if (node.dataset.setting) return `setting:${node.dataset.setting}`;
   if (node.dataset.vsetting) return `vsetting:${node.dataset.vsetting}`;
   if (node.dataset.msetting) return `msetting:${node.dataset.msetting}`;
+  if (node.dataset.psetting) return `psetting:${node.dataset.psetting}`;
   if (node.dataset.vselect) return `vselect:${node.dataset.vselect}`;
   if (node.dataset.morekAction) return `morek-action:${node.dataset.morekAction}`;
   if (node.hasAttribute("data-morek-actions")) return "morek-actions";
@@ -52806,11 +52833,12 @@ function mountDashboard(root, adapter) {
       ${card("Recent charging", labels.historyEyebrow || "HISTORY", renderHistory(m4.history, historyReady), "history", tag)}
       ${m4.vehicleSources ? card("Vehicle sources & properties", "ADVANCED", renderVehicleSources(m4.vehicleSources), "vehicle-sources", tag) : ""}
       ${m4.marketCosts ? card("Market & charging costs", "ADVANCED", renderMarketCosts(m4.marketCosts), "market-costs", tag) : ""}
+      ${m4.planParams ? card("Plan & charger parameters", "ADVANCED", renderPlanParams(m4.planParams), "plan-params", tag) : ""}
       </div><dialog id="plan-dialog" aria-labelledby="dialog-title"><div class="dialog-head"><div><div class="eyebrow">${escapeText(labels.dialogEyebrow || "PROPOSAL")}</div><h2 id="dialog-title">Proposed charging plan</h2></div><button id="close-plan" type="button" aria-label="Close proposed plan">\u2715</button></div><p class="subtext">${escapeText(labels.dialogNote)}</p><div role="status" aria-live="polite">${m4.warning ? `<strong>${escapeText(m4.warning.title)}</strong><p>${escapeText(m4.warning.detail)}</p>` : ""}${m4.evidence?.status ? `<p>${escapeText(m4.evidence.status)}</p>` : ""}</div>${plan}</dialog><footer>${escapeText(labels.footer)}</footer></div>`;
     const template = document.createElement("template");
     template.innerHTML = html;
     if (!root.firstChild) root.append(template.content);
-    else reconcile(root.firstChild, template.content.firstChild, (node) => drafts.has(node.dataset?.setting) || node.dataset?.vsetting && drafts.has(`v:${node.dataset.vsetting}`) || node.dataset?.msetting && drafts.has(`m:${node.dataset.msetting}`) || root.getRootNode().activeElement === node);
+    else reconcile(root.firstChild, template.content.firstChild, (node) => drafts.has(node.dataset?.setting) || node.dataset?.vsetting && drafts.has(`v:${node.dataset.vsetting}`) || node.dataset?.msetting && drafts.has(`m:${node.dataset.msetting}`) || node.dataset?.psetting && drafts.has(`p:${node.dataset.psetting}`) || root.getRootNode().activeElement === node);
     listeners ||= new AbortController();
     const signal = listeners.signal;
     const bind3 = (node, fn) => {
@@ -52953,6 +52981,39 @@ function mountDashboard(root, adapter) {
     }
     const mreload = root.querySelector("#reload-market-costs");
     bind3(mreload, () => mreload.addEventListener("click", () => current.actions?.reloadMarketCosts?.(), { signal }));
+    root.querySelectorAll("[data-psetting]").forEach((input) => {
+      const key3 = `p:${input.dataset.psetting}`, box2 = input.type === "checkbox";
+      if (drafts.has(key3)) {
+        if (box2) {
+          const on = drafts.get(key3) === "1";
+          if (input.checked !== on) input.checked = on;
+        } else if (input.value !== drafts.get(key3)) input.value = drafts.get(key3);
+      } else if (box2) {
+        const base2 = input.hasAttribute("checked");
+        if (input.checked !== base2) input.checked = base2;
+      } else if (input.tagName === "SELECT") {
+        const base2 = input.querySelector("option[selected]");
+        if (base2 && input.value !== base2.value) input.value = base2.value;
+      }
+      bind3(input, () => {
+        const on = () => {
+          drafts.set(key3, box2 ? input.checked ? "1" : "0" : input.value);
+          current.actions?.editParams?.();
+        };
+        input.addEventListener("input", on, { signal });
+        input.addEventListener("change", on, { signal });
+      });
+    });
+    const pget = (name) => root.querySelector(`[data-psetting="${name}"]`)?.value;
+    const pvalues = (kind) => kind === "periods" ? { periods: pget("periods") } : kind === "current" ? { current: pget("current") } : { date: pget("date"), weekdays: [...root.querySelectorAll('[data-psetting^="wd-"]')].filter((c5) => c5.checked).map((c5) => c5.value).join("") };
+    for (const [id, kind] of [["#save-periods", "periods"], ["#save-current", "current"], ["#save-departure", "departure"]]) {
+      const b3 = root.querySelector(id);
+      bind3(b3, () => b3.addEventListener("click", () => {
+        if (current.model.planParams?.canEdit === true && typeof current.actions?.saveParams === "function") current.actions.saveParams(kind, pvalues(kind));
+      }, { signal }));
+    }
+    const preload = root.querySelector("#reload-plan-params");
+    bind3(preload, () => preload.addEventListener("click", () => current.actions?.reloadPlanParams?.(), { signal }));
     const saveButton = root.querySelector("#save-plan");
     bind3(saveButton, () => saveButton.addEventListener("click", () => {
       if (current.model.canSave === true && typeof current.actions?.save === "function") current.actions.save(Object.fromEntries([...root.querySelectorAll("[data-setting]")].map((input) => [input.dataset.setting, input.type === "checkbox" ? input.checked : input.value])));
@@ -52996,6 +53057,8 @@ function mountDashboard(root, adapter) {
     for (const key3 of [...drafts.keys()]) if (key3.startsWith("v:")) drafts.delete(key3);
   }, setMarketDraft(name, value2) {
     drafts.set(`m:${name}`, value2);
+  }, resetParamDrafts() {
+    for (const key3 of [...drafts.keys()]) if (key3.startsWith("p:")) drafts.delete(key3);
   }, resetMarketDrafts(keepArea = false) {
     for (const key3 of [...drafts.keys()]) if (key3.startsWith("m:") && !(keepArea && key3 === "m:area")) drafts.delete(key3);
   }, get charts() {
@@ -55985,6 +56048,9 @@ function zoneClock(timeZone) {
 function localDayKey(instantMs2, timeZone) {
   return zoneClock(timeZone).dayKey(instantMs2);
 }
+function msOfDay(instantMs2, timeZone) {
+  return zoneClock(timeZone).msOfDay(instantMs2);
+}
 function localMidnightAt(instantMs2, timeZone) {
   const clock5 = zoneClock(timeZone);
   const estimate = instantMs2 - clock5.msOfDay(instantMs2);
@@ -56001,6 +56067,11 @@ function localMidnightAt(instantMs2, timeZone) {
   return best;
 }
 var HOURS_OF_DAY = Array.from({ length: 24 }, (_2, hour) => hour);
+
+// src/format.ts
+function hasZone(context) {
+  return context.timeZone !== "";
+}
 
 // src/i18n/en.json
 var en_default2 = {
@@ -57227,6 +57298,19 @@ var en_default2 = {
 
 // src/i18n/index.ts
 var loaded = /* @__PURE__ */ new Map([["en", en_default2]]);
+var pluralRules = /* @__PURE__ */ new Map();
+function rulesFor(language) {
+  const existing = pluralRules.get(language);
+  if (existing !== void 0) {
+    return existing;
+  }
+  const created = new Intl.PluralRules(language, { type: "cardinal" });
+  pluralRules.set(language, created);
+  return created;
+}
+function pluralForm(language, count2) {
+  return rulesFor(language).select(count2) === "one" ? "one" : "other";
+}
 function translate2(language, key3, params = {}) {
   const template = loaded.get(language)?.[key3] ?? en_default2[key3];
   return template.replace(/\{(\w+)\}/g, (match, name) => params[name] ?? match);
@@ -57846,6 +57930,26 @@ function checkDeadlineTime(text4) {
   }
   return WALL_TIME.test(trimmed) ? { ok: true, value: trimmed } : { ok: false, errorKey: "settings.error.invalidTime" };
 }
+var DEPARTURE_DAYS_AHEAD = 7;
+function departureDays(timeZone, nowMs) {
+  if (!hasZone({ language: "en", timeZone, unit: "", currency: null, majorUnit: null })) {
+    return null;
+  }
+  const midnight = localMidnightAt(nowMs, timeZone);
+  const HOUR = 36e5;
+  const dayAfter = (days) => localDayKey(midnight + days * 24 * HOUR + 12 * HOUR, timeZone);
+  const today = localDayKey(nowMs, timeZone);
+  return {
+    today,
+    max: dayAfter(DEPARTURE_DAYS_AHEAD),
+    nextOccurrence: (wallTime2) => {
+      const match = /^(\d{2}):(\d{2})$/.exec(wallTime2);
+      const wallMs = match === null ? Number.NaN : (Number(match[1]) * 60 + Number(match[2])) * 6e4;
+      const sinceMidnight = msOfDay(nowMs, timeZone);
+      return Number.isFinite(wallMs) && wallMs > sinceMidnight ? today : dayAfter(1);
+    }
+  };
+}
 function checkDepartureDate(text4, days, moved) {
   const trimmed = text4.trim();
   if (trimmed === "") {
@@ -57868,6 +57972,20 @@ function checkCurrentInRange(text4, range2) {
     return amps;
   }
   return amps.value < range2.minA || amps.value > range2.maxA ? { ok: false, errorKey: "settings.error.outOfRange" } : amps;
+}
+var NOMINAL_VOLTS_SINGLE_PHASE = 230;
+var NOMINAL_VOLTS_THREE_PHASE = 400;
+function nominalPowerKw(amps, phases) {
+  if (!Number.isFinite(amps)) {
+    return null;
+  }
+  if (phases === 1) {
+    return NOMINAL_VOLTS_SINGLE_PHASE * amps / 1e3;
+  }
+  if (phases === 3) {
+    return Math.sqrt(3) * NOMINAL_VOLTS_THREE_PHASE * amps / 1e3;
+  }
+  return null;
 }
 var ENERGY_MIN_KWH = 0.1;
 var ENERGY_MAX_KWH = 1e3;
@@ -58988,7 +59106,7 @@ function decodeStatus(source) {
     return bad2();
   }
   let blocking = false;
-  const lines = arrayValue(source, "lines").map((raw) => {
+  const lines2 = arrayValue(source, "lines").map((raw) => {
     const line = record2(raw);
     exactKeys2(line, ["code", "params"]);
     const code = text2(line, "code");
@@ -59009,7 +59127,7 @@ function decodeStatus(source) {
   if (blocking !== (tone === "blocking")) {
     return bad2();
   }
-  return { tone, lines };
+  return { tone, lines: lines2 };
 }
 function decodeDashboard(raw) {
   try {
@@ -61037,16 +61155,16 @@ function marketCostsModel(input) {
   const optionsFresh = ok2(input.optionsAt) && input.now - input.optionsAt <= OPTIONS_MAX_AGE_MS && !input.failed;
   const record5 = input.record, options = input.options;
   const editableState = marketEditable(options.state, input.admin === true);
-  const dashFresh2 = input.dashboardFresh !== false && !!dashboard;
+  const dashFresh3 = input.dashboardFresh !== false && !!dashboard;
   const baseEdit = input.admin === true && !input.blocked && !input.conflict && !input.busy && !input.awaitingRead;
-  const canEdit = baseEdit && editableState && optionsFresh && dashFresh2;
+  const canEdit = baseEdit && editableState && optionsFresh && dashFresh3;
   const notes = [];
   if (!input.admin) notes.push("Administrator permission is required to change the market, taxes and fees. Everything here is read-only.");
   const stateKey = marketStateKey(options.state, options.reason);
   if (stateKey) notes.push(translate2("en", stateKey));
   if (!editableState && input.admin) notes.push("The area list is not held, so the saved area is shown but nothing can be changed.");
   if (input.admin && !optionsFresh) notes.push("The area list is stale or its refresh failed; changes are disabled until it is read again.");
-  if (input.admin && !dashFresh2) notes.push("The dashboard observation is stale; changes are disabled until it is read again.");
+  if (input.admin && !dashFresh3) notes.push("The dashboard observation is stale; changes are disabled until it is read again.");
   if (input.awaitingRead && input.admin) notes.push("Waiting for a fresh dashboard read after the last save before another change.");
   const savedId = record5.area_id;
   const areaId = input.areaDraft ?? savedId;
@@ -61185,7 +61303,7 @@ var marketCostMethods = {
       dashboard,
       dashboardFresh: !!dashboard && dashFresh(dashboard, this.dashboardFailed),
       areaDraft: this.marketArea,
-      blocked: this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || staleRecord || unknown,
+      blocked: this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.paramBusy || staleRecord || unknown,
       conflict: this.costConflict || unknown,
       busy: this.costBusy,
       awaitingRead: this.costAwaitingRead,
@@ -61275,7 +61393,7 @@ var marketCostMethods = {
   },
   costWriteBlocked(record5) {
     const charger = this.charger, hass = this._hass;
-    return !this.connected || hass?.connected === false || hass?.user?.is_admin !== true || !charger || !record5 || this.costBusy || this.marketLoading || this.settingsLoading || this.pendingCostWrites.has(charger) || this.unknownCostWrites.has(charger) || this.costConflict || this.costAwaitingRead || this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.settingsConflict;
+    return !this.connected || hass?.connected === false || hass?.user?.is_admin !== true || !charger || !record5 || this.costBusy || this.marketLoading || this.settingsLoading || this.pendingCostWrites.has(charger) || this.unknownCostWrites.has(charger) || this.costConflict || this.costAwaitingRead || this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.paramBusy || this.settingsConflict;
   },
   costReadiness(dashboard) {
     if (!dashboard || !dashFresh(dashboard, this.dashboardFailed)) return "The dashboard observation is stale. Wait for a fresh read or reload before saving.";
@@ -61498,113 +61616,6 @@ var marketCostMethods = {
     });
   }
 };
-
-// src/price-provider.ts
-function addIntegrationPath(domain) {
-  return `/config/integrations/dashboard/add?domain=${encodeURIComponent(domain)}`;
-}
-function integrationPath(domain) {
-  return `/config/integrations/integration/${encodeURIComponent(domain)}`;
-}
-var NOTICES = {
-  add_nordpool: {
-    text: "price.notice.addNordpool",
-    action: { label: "price.notice.addNordpool.action", does: { kind: "page", path: addIntegrationPath("nordpool") } },
-    key: "offered"
-  },
-  nordpool_not_loaded: {
-    text: "price.notice.nordpoolNotLoaded",
-    action: { label: "price.notice.nordpoolNotLoaded.action", does: { kind: "page", path: integrationPath("nordpool") } },
-    key: "offered"
-  },
-  // Nord Pool from HACS has the built-in one's domain and no action: nothing to add, the key is the way on.
-  nordpool_custom: { text: "price.notice.nordpoolCustom", key: "shown" },
-  add_entsoe_key: { text: "price.notice.addEntsoeKey", key: "shown" },
-  entsoe_key_rejected: { text: "price.notice.entsoeKeyRejected", key: "shown" },
-  add_pvpc: {
-    text: "price.notice.addPvpc",
-    action: {
-      label: "price.notice.addPvpc.action",
-      does: { kind: "page", path: addIntegrationPath("pvpc_hourly_pricing") }
-    }
-  },
-  pvpc_not_loaded: {
-    text: "price.notice.pvpcNotLoaded",
-    action: {
-      label: "price.notice.pvpcNotLoaded.action",
-      does: { kind: "page", path: integrationPath("pvpc_hourly_pricing") }
-    }
-  },
-  add_octopus: {
-    text: "price.notice.addOctopus",
-    action: { label: "price.notice.addOctopus.action", does: { kind: "octopus" } }
-  },
-  octopus_not_loaded: {
-    text: "price.notice.octopusNotLoaded",
-    action: {
-      label: "price.notice.openOctopus",
-      does: { kind: "page", path: integrationPath("octopus_energy") }
-    }
-  },
-  octopus_no_agile: {
-    text: "price.notice.octopusNoAgile",
-    action: {
-      label: "price.notice.openOctopus",
-      does: { kind: "page", path: integrationPath("octopus_energy") }
-    }
-  },
-  octopus_region_mismatch: {
-    text: "price.notice.octopusRegionMismatch",
-    action: { label: "price.notice.chooseArea", does: { kind: "area" } }
-  },
-  add_zonneplan: {
-    text: "price.notice.addZonneplan",
-    action: { label: "price.notice.addZonneplan.action", does: { kind: "zonneplan" } }
-  },
-  zonneplan_not_loaded: {
-    text: "price.notice.zonneplanNotLoaded",
-    action: {
-      label: "price.notice.openZonneplan",
-      does: { kind: "page", path: integrationPath("zonneplan_one") }
-    }
-  },
-  zonneplan_no_tariff: {
-    text: "price.notice.zonneplanNoTariff",
-    action: {
-      label: "price.notice.openZonneplan",
-      does: { kind: "page", path: integrationPath("zonneplan_one") }
-    }
-  },
-  zonneplan_area: {
-    text: "price.notice.zonneplanArea",
-    action: { label: "price.notice.chooseArea", does: { kind: "area" } }
-  },
-  source_missing: {
-    text: "price.notice.sourceMissing",
-    action: { label: "price.notice.chooseArea", does: { kind: "area" } }
-  }
-};
-
-// src/model.ts
-function chargerCarsOf(dashboard) {
-  if (dashboard.vehicle_choices.length === 0) {
-    return dashboard.vehicles.map((row) => ({ id: row.id, name: row.name }));
-  }
-  const allowed = dashboard.settings?.vehicle_ids ?? null;
-  return dashboard.vehicle_choices.filter((choice) => allowed === null || allowed.includes(choice.id));
-}
-function admittedAction(control, action, choice) {
-  if (action === ACTION_START) {
-    return choice === null && control.immediate_action === ACTION_START;
-  }
-  if (action === ACTION_STOP) {
-    if (choice === null) {
-      return control.immediate_action === ACTION_STOP;
-    }
-    return control.automatic_action === ACTION_PAUSE && control.pause_choices.includes(choice);
-  }
-  return choice === null && control.automatic_action === ACTION_RESUME;
-}
 
 // src/morek-view.ts
 function decodeMorekState(raw) {
@@ -61951,6 +61962,482 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
   return section;
 }
 
+// src/charge-periods.ts
+var PERIODS_AUTO = "auto";
+function chargePeriodsLabel(language, count2) {
+  if (count2 === null) {
+    return translate2(language, "settings.periods.auto");
+  }
+  return translate2(language, `settings.periods.value.${pluralForm(language, count2)}`, {
+    count: String(count2)
+  });
+}
+function chargePeriodsOptions(language) {
+  const options = [
+    {
+      value: PERIODS_AUTO,
+      label: chargePeriodsLabel(language, null),
+      help: translate2(language, "settings.periods.autoHelp")
+    }
+  ];
+  for (let count2 = PERIODS_MIN; count2 <= PERIODS_MAX; count2 += 1) {
+    options.push({ value: String(count2), label: chargePeriodsLabel(language, count2) });
+  }
+  return options;
+}
+function chargePeriodsValue(record5) {
+  return record5.max_periods === null ? PERIODS_AUTO : String(record5.max_periods);
+}
+function chargePeriodsReplacement(record5, option) {
+  let count2 = null;
+  if (option !== PERIODS_AUTO) {
+    count2 = Number(option);
+    if (!Number.isInteger(count2) || count2 < PERIODS_MIN || count2 > PERIODS_MAX) {
+      return { ok: false, errorKey: "settings.error.invalid" };
+    }
+  }
+  return {
+    ok: true,
+    body: { ...encodeBody(record5), max_periods: count2 },
+    changed: count2 !== record5.max_periods
+  };
+}
+
+// src/price-provider.ts
+function addIntegrationPath(domain) {
+  return `/config/integrations/dashboard/add?domain=${encodeURIComponent(domain)}`;
+}
+function integrationPath(domain) {
+  return `/config/integrations/integration/${encodeURIComponent(domain)}`;
+}
+var NOTICES = {
+  add_nordpool: {
+    text: "price.notice.addNordpool",
+    action: { label: "price.notice.addNordpool.action", does: { kind: "page", path: addIntegrationPath("nordpool") } },
+    key: "offered"
+  },
+  nordpool_not_loaded: {
+    text: "price.notice.nordpoolNotLoaded",
+    action: { label: "price.notice.nordpoolNotLoaded.action", does: { kind: "page", path: integrationPath("nordpool") } },
+    key: "offered"
+  },
+  // Nord Pool from HACS has the built-in one's domain and no action: nothing to add, the key is the way on.
+  nordpool_custom: { text: "price.notice.nordpoolCustom", key: "shown" },
+  add_entsoe_key: { text: "price.notice.addEntsoeKey", key: "shown" },
+  entsoe_key_rejected: { text: "price.notice.entsoeKeyRejected", key: "shown" },
+  add_pvpc: {
+    text: "price.notice.addPvpc",
+    action: {
+      label: "price.notice.addPvpc.action",
+      does: { kind: "page", path: addIntegrationPath("pvpc_hourly_pricing") }
+    }
+  },
+  pvpc_not_loaded: {
+    text: "price.notice.pvpcNotLoaded",
+    action: {
+      label: "price.notice.pvpcNotLoaded.action",
+      does: { kind: "page", path: integrationPath("pvpc_hourly_pricing") }
+    }
+  },
+  add_octopus: {
+    text: "price.notice.addOctopus",
+    action: { label: "price.notice.addOctopus.action", does: { kind: "octopus" } }
+  },
+  octopus_not_loaded: {
+    text: "price.notice.octopusNotLoaded",
+    action: {
+      label: "price.notice.openOctopus",
+      does: { kind: "page", path: integrationPath("octopus_energy") }
+    }
+  },
+  octopus_no_agile: {
+    text: "price.notice.octopusNoAgile",
+    action: {
+      label: "price.notice.openOctopus",
+      does: { kind: "page", path: integrationPath("octopus_energy") }
+    }
+  },
+  octopus_region_mismatch: {
+    text: "price.notice.octopusRegionMismatch",
+    action: { label: "price.notice.chooseArea", does: { kind: "area" } }
+  },
+  add_zonneplan: {
+    text: "price.notice.addZonneplan",
+    action: { label: "price.notice.addZonneplan.action", does: { kind: "zonneplan" } }
+  },
+  zonneplan_not_loaded: {
+    text: "price.notice.zonneplanNotLoaded",
+    action: {
+      label: "price.notice.openZonneplan",
+      does: { kind: "page", path: integrationPath("zonneplan_one") }
+    }
+  },
+  zonneplan_no_tariff: {
+    text: "price.notice.zonneplanNoTariff",
+    action: {
+      label: "price.notice.openZonneplan",
+      does: { kind: "page", path: integrationPath("zonneplan_one") }
+    }
+  },
+  zonneplan_area: {
+    text: "price.notice.zonneplanArea",
+    action: { label: "price.notice.chooseArea", does: { kind: "area" } }
+  },
+  source_missing: {
+    text: "price.notice.sourceMissing",
+    action: { label: "price.notice.chooseArea", does: { kind: "area" } }
+  }
+};
+
+// src/model.ts
+var DEFAULT_CURRENT_RANGE = { minA: 6, maxA: 32 };
+function chargerCarsOf(dashboard) {
+  if (dashboard.vehicle_choices.length === 0) {
+    return dashboard.vehicles.map((row) => ({ id: row.id, name: row.name }));
+  }
+  const allowed = dashboard.settings?.vehicle_ids ?? null;
+  return dashboard.vehicle_choices.filter((choice) => allowed === null || allowed.includes(choice.id));
+}
+function admittedAction(control, action, choice) {
+  if (action === ACTION_START) {
+    return choice === null && control.immediate_action === ACTION_START;
+  }
+  if (action === ACTION_STOP) {
+    if (choice === null) {
+      return control.immediate_action === ACTION_STOP;
+    }
+    return control.automatic_action === ACTION_PAUSE && control.pause_choices.includes(choice);
+  }
+  return choice === null && control.automatic_action === ACTION_RESUME;
+}
+
+// sidebar/plan-params.js
+var MOREK_MAX_WINDOWS = 3;
+var WEEKDAYS = [[1, "Mon"], [2, "Tue"], [3, "Wed"], [4, "Thu"], [5, "Fri"], [6, "Sat"], [7, "Sun"]];
+var MOREK_REQUIRED_AMPS = 16;
+var CURRENT_NOTE = "Planned current is the current the plan assumes when it works out how long charging takes and what schedule to send. It is a planning input, not household load balancing or electrical protection, and SpotNav never raises it by itself.";
+var SAVED_NOTE2 = "Saving only stores your choice. The plan may recalculate and, if Morek owns the schedule, go through normal guarded reconciliation; it does not wake the car, send a notification, change protection or prove charging.";
+var pad2 = (n6) => String(n6).padStart(2, "0");
+function isoWeekday(date2) {
+  const m4 = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date2 || "");
+  if (!m4) return null;
+  const d3 = new Date(Date.UTC(Number(m4[1]), Number(m4[2]) - 1, Number(m4[3])));
+  return d3.getUTCDay() === 0 ? 7 : d3.getUTCDay();
+}
+function addDays(date2, n6) {
+  const m4 = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date2 || "");
+  if (!m4) return null;
+  const d3 = new Date(Date.UTC(Number(m4[1]), Number(m4[2]) - 1, Number(m4[3]) + n6));
+  return `${d3.getUTCFullYear()}-${pad2(d3.getUTCMonth() + 1)}-${pad2(d3.getUTCDate())}`;
+}
+function currentRangeOf(dashboard) {
+  const r7 = dashboard?.current_range ?? null;
+  return r7 ? { minA: r7.min_a, maxA: r7.max_a, reported: r7.source !== "default" } : { ...DEFAULT_CURRENT_RANGE, reported: false };
+}
+function paramSignature(record5, dashboard) {
+  const r7 = currentRangeOf(dashboard);
+  return JSON.stringify(record5 ? [record5.max_periods, record5.amps, record5.departure_enabled, record5.departure_time, record5.departure_date, record5.departure_weekdays, r7.minA, r7.maxA] : null);
+}
+function periodNotes(record5, morekOwned) {
+  const cap = record5.max_periods;
+  const effective = cap === null ? MOREK_MAX_WINDOWS : Math.min(cap, MOREK_MAX_WINDOWS);
+  const limit = `Morek can carry at most ${MOREK_MAX_WINDOWS} charging windows in one plan`;
+  const notes = [cap === null ? "Automatic: the planner weighs a start cost per period and keeps each period at least half an hour." : `A hard cap of ${cap} separate charging period${cap === 1 ? "" : "s"}; the plan may use fewer.`];
+  if (morekOwned === true) notes.push(`${limit}, so while Morek owns the schedule the plan uses at most ${effective} (a higher cap does not add windows there).`);
+  else if (morekOwned === false) notes.push(`Morek does not own the schedule now. ${limit}; if it takes over, at most ${effective} apply.`);
+  else notes.push(`Whether Morek owns the schedule is not known right now. ${limit}; if it does, at most ${effective} apply.`);
+  return notes;
+}
+function morekCurrentNote(amps, morekOwned) {
+  const need = `A Morek schedule can only be sent while the planned current is exactly ${MOREK_REQUIRED_AMPS} A`;
+  if (morekOwned === true) return amps === MOREK_REQUIRED_AMPS ? `${need}; the saved ${amps} A meets this.` : `${need}. Morek owns the schedule now and the saved current is ${amps === null ? "not set" : `${amps} A`}, so automatic scheduling and re-sends are refused until it is ${MOREK_REQUIRED_AMPS} A. It is kept as saved; SpotNav does not change it. While Morek owns the schedule only ${MOREK_REQUIRED_AMPS} A can be saved here.`;
+  if (morekOwned === false) return `${need}. Morek does not own the schedule now; another value is saved normally, but a Morek schedule cannot be sent with it.`;
+  return `${need}. Whether Morek owns the schedule is not known right now, so it is treated as possibly owning it: ${amps === MOREK_REQUIRED_AMPS ? `the saved ${amps} A meets this` : `the saved ${amps === null ? "current is not set" : `${amps} A`} would block a Morek schedule`}, and saving another value asks for confirmation.`;
+}
+function currentBlock2(record5, dashboard, canEdit, morekOwned) {
+  const range2 = currentRangeOf(dashboard);
+  const amps = record5.amps;
+  const warn2 = [];
+  if (amps === null) warn2.push("No planned current is saved.");
+  else if (amps < range2.minA || amps > range2.maxA) warn2.push(`The saved current ${amps} A is outside ${range2.reported ? "the charger\u2019s reported" : "the default"} range ${range2.minA}\u2013${range2.maxA} A. It is kept exactly as saved until you change it; SpotNav never adjusts it by itself.`);
+  const morek = morekCurrentNote(amps, morekOwned ?? null);
+  if (amps !== MOREK_REQUIRED_AMPS && morekOwned !== false) warn2.push(morek);
+  const kw = amps === null ? null : nominalPowerKw(amps, record5.phases);
+  const nominal = amps === null ? "" : kw === null ? `Nominal power at ${amps} A is unknown: the charger\u2019s phase count is not set.` : `About ${kw.toFixed(1)} kW nominal at ${amps} A on ${record5.phases} phase${record5.phases === 1 ? "" : "s"}: a planning figure, not a measurement; the car may draw less.`;
+  return {
+    value: amps === null ? "" : String(amps),
+    min: range2.minA,
+    max: range2.maxA,
+    reported: range2.reported,
+    canEdit,
+    morekOwned: morekOwned ?? null,
+    morekNote: morek,
+    ...morekOwned === true ? { min: MOREK_REQUIRED_AMPS, max: MOREK_REQUIRED_AMPS } : {},
+    rangeText: range2.reported ? `This charger accepts ${range2.minA}\u2013${range2.maxA} A (the lowest limit its setup reports).` : `The charger\u2019s range is not reported, so the everyday ${range2.minA}\u2013${range2.maxA} A is shown; the backend still refuses a current above the charger\u2019s own maximum.`,
+    nominal,
+    warnings: warn2
+  };
+}
+function nextDepartureText(record5, days) {
+  if (!record5.departure_enabled) return "Ready-by is off, so the plan has no deadline. Turn it on in Plan controls to use a date or weekdays.";
+  const time2 = record5.departure_time;
+  if (!days) return `Ready-by ${time2}. The market\u2019s time zone is not known, so the next date cannot be named here.`;
+  const date2 = record5.departure_date;
+  if (date2) {
+    if (date2 < days.today) return `The saved date ${date2} has passed; planning ignores it and the saved weekdays apply.`;
+    if (date2 === days.today && days.nextOccurrence(time2) !== days.today) return `Dated ready-by ${date2} ${time2} (market local time) \u2014 that time has already passed today.`;
+    return `Dated ready-by: ${date2} ${time2} (market local time). A chosen date overrides the weekdays.`;
+  }
+  const set3 = new Set(record5.departure_weekdays);
+  let day = days.nextOccurrence(time2);
+  for (let i7 = 0; i7 < 8 && day; i7 += 1, day = addDays(day, 1)) {
+    if (set3.has(isoWeekday(day))) return `Next ready-by: ${day} ${time2} (market local time).`;
+  }
+  return "No weekday is saved, so no departure can be named.";
+}
+function departureBlock2(record5, dashboard, now, canEdit) {
+  const days = departureDays(dashboard?.market?.timezone ?? "", now);
+  const enabled = record5.departure_enabled === true;
+  const notes = [];
+  if (!enabled) notes.push("Ready-by is off. Turn it on in Plan controls first; a date and weekdays only mean something with a ready-by time.");
+  else notes.push(`Ready-by time ${record5.departure_time} is changed in Plan controls. A date (today to 7 days ahead, in the market\u2019s local time) overrides the weekdays; on a weekday that is not ticked there is no departure and the plan runs to the next ticked day.`);
+  if (!days && enabled) notes.push("The market\u2019s time zone is unknown, so a new date cannot be chosen safely; an existing date can still be cleared.");
+  return {
+    enabled,
+    time: record5.departure_time,
+    date: record5.departure_date ?? "",
+    dateMin: days?.today ?? "",
+    dateMax: days?.max ?? "",
+    dateKnown: !!days,
+    weekdays: WEEKDAYS.map(([n6, label2]) => ({ n: n6, label: label2, checked: record5.departure_weekdays.includes(n6) })),
+    canEdit: canEdit && enabled,
+    next: nextDepartureText(record5, days),
+    notes
+  };
+}
+function planParamsModel(input) {
+  const base2 = { notice: input.notice || "", conflict: !!input.conflict, busy: !!input.busy };
+  const record5 = input.record || null, dashboard = input.dashboard || null;
+  if (!record5) return { ...base2, state: input.loading ? "loading" : "unavailable", canEdit: false, notice: base2.notice || (input.loading ? "Loading plan and charger parameters\u2026" : "Plan and charger parameters unavailable. Use Reload to try again.") };
+  const fresh2 = input.dashboardFresh !== false && !!dashboard;
+  const admin = input.admin === true;
+  const planAllowed = admin || dashboard?.settings?.users_change_plan === true;
+  const open = !input.blocked && !input.conflict && !input.busy && !input.awaitingRead && fresh2;
+  const notes = [];
+  if (!planAllowed) notes.push("You do not have permission to change the plan, so everything here is read-only.");
+  else if (!admin) notes.push("Charging periods can only be changed by an administrator; the planned current and departure date and weekdays follow the charger\u2019s \u201Cusers may change the plan\u201D setting.");
+  if (planAllowed && !fresh2) notes.push("The dashboard observation is stale; changes are disabled until it is read again.");
+  if (input.awaitingRead && planAllowed) notes.push("Waiting for a fresh dashboard read after the last save before another change.");
+  return {
+    ...base2,
+    state: "ready",
+    canEdit: open && planAllowed,
+    notes,
+    currentNote: CURRENT_NOTE,
+    savedNote: SAVED_NOTE2,
+    periods: { value: chargePeriodsValue(record5), saved: chargePeriodsLabel("en", record5.max_periods), options: chargePeriodsOptions("en").map((o9) => ({ value: o9.value, text: o9.help ? `${o9.label} \u2014 ${o9.help}` : o9.label })), canEdit: open && admin, notes: periodNotes(record5, input.morekOwned ?? null) },
+    current: currentBlock2(record5, dashboard, open && planAllowed, input.morekOwned ?? null),
+    departure: departureBlock2(record5, dashboard, input.now, open && planAllowed)
+  };
+}
+function periodsWritePlan(record5, values, admin) {
+  if (!admin) return { ok: false, notice: "Administrator permission is required to change the charging periods." };
+  if (!record5) return { ok: false, notice: "Reload the settings first." };
+  const option = typeof values?.periods === "string" ? values.periods : "";
+  const check = chargePeriodsReplacement(record5, option);
+  if (!check.ok) return { ok: false, notice: translate2("en", check.errorKey) };
+  if (!check.changed) return { ok: true, changed: false };
+  return { ok: true, changed: true, body: check.body, from: record5.max_periods, to: check.body.max_periods };
+}
+function currentWritePlan(record5, values, allowed, dashboard, morekOwned = null) {
+  if (!allowed) return { ok: false, notice: "You do not have permission to change the plan." };
+  if (!record5) return { ok: false, notice: "Reload the settings first." };
+  const text4 = typeof values?.current === "string" ? values.current.trim() : "";
+  if (text4 === "" && record5.amps === null) return { ok: true, changed: false };
+  const range2 = currentRangeOf(dashboard);
+  const check = replacementFor("current", record5, { ...formFromRecord(record5), current: text4 }, { minA: range2.minA, maxA: range2.maxA });
+  if (!check.ok) return { ok: false, notice: `${translate2("en", check.errorKey)} (allowed ${range2.minA}\u2013${range2.maxA} A).` };
+  if (!check.changed) return { ok: true, changed: false };
+  const to = check.body.amps;
+  if (to !== MOREK_REQUIRED_AMPS && morekOwned === true) return { ok: false, notice: `Not saved: Morek owns the schedule now and can only send a schedule at ${MOREK_REQUIRED_AMPS} A; ${to} A would stop automatic scheduling. Choose ${MOREK_REQUIRED_AMPS} A, or stop the Morek schedule first. The saved ${record5.amps} A is unchanged.` };
+  return { ok: true, changed: true, body: check.body, from: record5.amps, to, morekBlocks: to !== MOREK_REQUIRED_AMPS && morekOwned !== false };
+}
+function departureWritePlan(record5, values, allowed, dashboard, now) {
+  if (!allowed) return { ok: false, notice: "You do not have permission to change the plan." };
+  if (!record5) return { ok: false, notice: "Reload the settings first." };
+  if (!record5.departure_enabled) return { ok: false, notice: "Ready-by is off. Turn it on in Plan controls before choosing a date or weekdays." };
+  const days = departureDays(dashboard?.market?.timezone ?? "", now);
+  const date2 = typeof values?.date === "string" ? values.date.trim() : "";
+  const weekdays2 = typeof values?.weekdays === "string" ? values.weekdays : "";
+  const moved = date2 !== (record5.departure_date ?? "");
+  if (moved && date2 !== "" && !days) return { ok: false, notice: "The market\u2019s time zone is unknown, so a new date cannot be chosen safely." };
+  if (moved && date2 === days?.today && days.nextOccurrence(record5.departure_time) !== days.today) return { ok: false, notice: `${record5.departure_time} has already passed today in the market\u2019s time zone; choose a later date, or change the ready-by time in Plan controls.` };
+  const check = replacementFor("deadline", record5, { ...formFromRecord(record5), departureDate: date2, departureWeekdays: weekdays2 }, null, null, days);
+  if (!check.ok) return { ok: false, notice: translate2("en", check.errorKey) };
+  if (!check.changed) return { ok: true, changed: false };
+  return { ok: true, changed: true, body: check.body, dateChanged: moved, weekdaysChanged: check.body.departure_weekdays.join("") !== record5.departure_weekdays.join("") };
+}
+
+// sidebar/plan-params-panel.js
+var REFUSED2 = (code) => typeof code === "string" && (code === "spotnav_not_admin" || code === "spotnav_unknown_charger" || code === "spotnav_unsupported_api_version" || code === "spotnav_invalid_value" || code === "revision_conflict" || code.startsWith("invalid_"));
+var dashFresh2 = (dashboard, failed) => observationFreshness(Date.parse(dashboard?.generated_at || ""), Date.now(), failed) === "fresh";
+var planParamMethods = {
+  initParams() {
+    this.paramDirty = false;
+    this.paramBase = null;
+    this.paramBusy = false;
+    this.paramConflict = false;
+    this.paramNotice = "";
+    this.paramAwaitingRead = false;
+  },
+  resetParams() {
+    this.view?.resetParamDrafts();
+    this.paramDirty = false;
+    this.paramBase = null;
+    this.paramConflict = false;
+    this.paramNotice = "";
+  },
+  paintPlanParams(adapter, dashboard, morekOwned) {
+    const admin = this._hass?.user?.is_admin === true, charger = this.charger;
+    const unknown = this.unknownSettingsWrites.has(charger) || this.pendingSettingsWrites.has(charger);
+    if (this.paramDirty && this.paramBase && !this.paramConflict && this.settingsRecord && paramSignature(this.settingsRecord, dashboard) !== this.paramBase.signature) {
+      this.paramConflict = true;
+      this.paramNotice = "The plan or charger parameters changed while editing. Reload before saving again.";
+    }
+    adapter.model.planParams = planParamsModel({
+      admin,
+      loading: this.settingsLoading,
+      record: this.settingsRecord,
+      dashboard,
+      dashboardFresh: !!dashboard && dashFresh2(dashboard, this.dashboardFailed),
+      now: Date.now(),
+      morekOwned,
+      blocked: this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || unknown,
+      conflict: this.paramConflict || this.settingsConflict || unknown,
+      busy: this.paramBusy,
+      awaitingRead: this.paramAwaitingRead,
+      notice: this.paramNotice || (unknown ? "A previous settings save has an unknown outcome. Reload to confirm it." : this.settingsConflict ? "Settings changed elsewhere or the record is stale. Reload before changing these parameters." : "")
+    });
+    adapter.actions.editParams = () => this.editParams();
+    adapter.actions.saveParams = (kind, values) => this.saveParams(kind, values);
+    adapter.actions.reloadPlanParams = () => this.reloadPlanParams();
+  },
+  editParams() {
+    if (this.paramDirty) return;
+    const decoded = decodeDashboard(this.rawDashboard);
+    this.paramBase = this.settingsRecord ? { signature: paramSignature(this.settingsRecord, decoded.ok ? decoded.value : null) } : null;
+    this.paramDirty = true;
+  },
+  reloadPlanParams() {
+    const charger = this.charger;
+    if (!this.connected || !charger || this.paramBusy || this.settingsBusy || this.pendingSettingsWrites.has(charger)) return;
+    if (this.paramDirty && !window.confirm("Discard the unsaved parameter changes and reload?")) return;
+    this.resetParams();
+    this.unknownSettingsWrites.delete(charger);
+    this.settingsConflict = false;
+    this.settingsRecord = null;
+    this.paint();
+    void this.loadSettings();
+    this.refresh();
+  },
+  /** true / false from fresh Morek status; null when it is unknown (conservative: treated as possibly owned). */
+  morekOwnedNow() {
+    const st = this.rawStatus ? decodeMorekState(this.rawStatus) : null;
+    return st && st.ownership && observationFreshness(this.statusAt, Date.now(), this.statusFailed) === "fresh" ? st.ownership.recorded_owner === "morek_schedule" : null;
+  },
+  paramWriteBlocked(record5, allowed) {
+    const charger = this.charger, hass = this._hass;
+    return !this.connected || hass?.connected === false || !allowed || !charger || !record5 || this.paramBusy || this.settingsLoading || this.pendingSettingsWrites.has(charger) || this.unknownSettingsWrites.has(charger) || this.paramConflict || this.paramAwaitingRead || this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || this.settingsConflict;
+  },
+  async saveParams(kind, values) {
+    const record5 = this.settingsRecord, hass = this._hass, charger = this.charger, generation = this.generation, permissionEpoch = this.permissionEpoch;
+    const decoded = decodeDashboard(this.rawDashboard), dashboard = decoded.ok ? decoded.value : null;
+    const admin = hass?.user?.is_admin === true, planAllowed = admin || dashboard?.settings?.users_change_plan === true;
+    const say = (text4) => {
+      this.paramNotice = text4;
+      this.paint();
+    };
+    const allowed = kind === "periods" ? admin : planAllowed;
+    if (this.paramWriteBlocked(record5, allowed)) return say("Save unavailable: another request is running, a previous outcome is unknown or stale, or permission is missing.");
+    if (!dashboard || !dashFresh2(dashboard, this.dashboardFailed)) return say("The dashboard observation is stale. Wait for a fresh read or reload before saving.");
+    const now = Date.now();
+    const plan = kind === "periods" ? periodsWritePlan(record5, values, admin) : kind === "current" ? currentWritePlan(record5, values, planAllowed, dashboard, this.morekOwnedNow()) : kind === "departure" ? departureWritePlan(record5, values, planAllowed, dashboard, now) : { ok: false, notice: "Unknown parameter group." };
+    if (!plan.ok) return say(plan.notice);
+    if (!plan.changed) return say("No changes to save.");
+    if (kind === "current" && plan.morekBlocks && !window.confirm(`Planned current ${plan.to} A is not ${MOREK_REQUIRED_AMPS} A. It is saved as chosen, but a Morek schedule cannot be sent while the current is anything other than ${MOREK_REQUIRED_AMPS} A, and it is not known whether Morek owns the schedule now. If it does, automatic scheduling will stop. Save ${plan.to} A anyway?`)) return;
+    if (kind === "current" && record5.amps !== null && plan.to > record5.amps && !window.confirm(`Raise the planned current from ${record5.amps} A to ${plan.to} A? The plan will assume this current. It does not change load balancing or electrical protection, and the charger and installation must really support it.`)) return;
+    const label2 = kind === "periods" ? "Charging periods" : kind === "current" ? "Planned current" : "Departure";
+    if (this.paramWriteBlocked(this.settingsRecord, allowed) || this.settingsRecord !== record5 || this.generation !== generation || this.permissionEpoch !== permissionEpoch || this.charger !== charger) return say("State changed; review the values and try again.");
+    const current = () => this.connected && generation === this.generation && permissionEpoch === this.permissionEpoch && charger === this.charger;
+    this.paramBusy = true;
+    this.statusEpoch++;
+    this.statusAt = null;
+    this.paint();
+    try {
+      const request = updateSettings(hass, charger, record5.revision, plan.body);
+      this.pendingSettingsWrites.set(charger, request);
+      request.finally(() => {
+        if (this.pendingSettingsWrites.get(charger) === request) this.pendingSettingsWrites.delete(charger);
+      }).catch(() => {
+      });
+      this.paramNotice = "Saving\u2026";
+      this.paint();
+      const unknown = (text4) => {
+        this.unknownSettingsWrites.add(charger);
+        if (this.connected && generation === this.generation) {
+          this.paramConflict = true;
+          this.paramNotice = text4;
+        }
+      };
+      try {
+        const answer = decodeSettingsAnswer(await this.bounded(request));
+        if (!current()) {
+          this.unknownSettingsWrites.add(charger);
+          return;
+        }
+        if (!answer.ok) unknown("Save response unavailable; outcome unknown. Reload before retrying.");
+        else if (answer.value.ok) {
+          this.settingsRecord = answer.value.settings;
+          this.settingsConflict = false;
+          this.resetParams();
+          this.paramAwaitingRead = true;
+          this.paramNotice = `${label2} saved and confirmed by the backend. ${SAVED_NOTE2}`;
+        } else if (answer.value.code === SETTINGS_REVISION_CONFLICT) {
+          this.paramConflict = true;
+          this.settingsConflict = true;
+          this.settingsNotice = "Settings changed elsewhere. Reload settings before editing again.";
+          this.paramNotice = `${label2} not saved: settings were changed elsewhere; nothing was written. Reload and review the new values.`;
+        } else if (answer.value.code === SETTINGS_RECONCILE_FAILED) {
+          if (answer.value.settings) {
+            this.settingsRecord = answer.value.settings;
+            this.settingsConflict = false;
+          }
+          this.resetParams();
+          this.paramAwaitingRead = true;
+          this.paramConflict = true;
+          this.paramNotice = `${label2} were saved, but replanning failed; reload and inspect the confirmed values before changing them again.`;
+        } else if (answer.value.code === SETTINGS_NOT_COMMITTED) this.paramNotice = `${label2} not saved: the backend did not commit the change.`;
+        else this.paramNotice = `${label2} not saved: ${translate2("en", settingsErrorKey(answer.value.code))} (${answer.value.code}).`;
+      } catch (error2) {
+        const code = error2?.code;
+        if (!current()) {
+          this.unknownSettingsWrites.add(charger);
+          return;
+        }
+        if (REFUSED2(code)) this.paramNotice = `${label2} not saved: ${translate2("en", settingsErrorKey(code))} (${code}).`;
+        else unknown("Save outcome unknown; the request may still complete. Wait, then reload before retrying.");
+      }
+    } finally {
+      if (this.connected && generation === this.generation && charger === this.charger) {
+        this.paramBusy = false;
+        this.dashboardEpoch++;
+        this.paint();
+        this.refresh();
+      }
+    }
+  }
+};
+
 // src/daily-overview.ts
 var STATUS_MAX_AGE = 9e4;
 var READBACK_MAX_AGE = 3e5;
@@ -62015,15 +62502,15 @@ function learningModel(raw, stale, text4) {
   const state = stale ? "stale" : "fresh";
   const block = decodeLearning(raw);
   if (!block) return { state: stale ? "stale" : "unknown", lines: [text4.unknown], note: text4.note, stale: !!stale, staleText: stale ? text4.stale : null };
-  const lines = [
+  const lines2 = [
     block.source === "learned" ? text4.learned : text4.default,
     fill(text4.samples, { agreeing: block.agreeing, shorten: block.shorten, lengthen: block.lengthen, valid: block.valid })
   ];
-  if (block.clamped) lines.push(text4.clamped);
+  if (block.clamped) lines2.push(text4.clamped);
   const effect = stale ? text4.effect_unknown : block.effect === null ? text4.effect_unknown : block.effect === 0 ? text4.effect_none : fill(block.effect > 0 ? text4.effect_longer : text4.effect_shorter, { minutes: Math.abs(block.effect) });
-  lines.push(effect);
-  if (block.rejections.length) lines.push(fill(text4.rejected, { list: block.rejections.map((r7) => `${r7.reason.replace(/_/g, " ")} \xD7${r7.count}`).join(", ") }));
-  return { state, source: block.source, lines, note: text4.note, stale: !!stale, staleText: stale ? text4.stale : null, title: text4.title };
+  lines2.push(effect);
+  if (block.rejections.length) lines2.push(fill(text4.rejected, { list: block.rejections.map((r7) => `${r7.reason.replace(/_/g, " ")} \xD7${r7.count}`).join(", ") }));
+  return { state, source: block.source, lines: lines2, note: text4.note, stale: !!stale, staleText: stale ? text4.stale : null, title: text4.title };
 }
 
 // sidebar/price-chart.js
@@ -62974,7 +63461,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.159";
+var CARD_VERSION = "2.5.161";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {
@@ -63117,6 +63604,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this.vehicleNotice = "";
     this.autoNotice = "";
     this.initCosts();
+    this.initParams();
     this.connected = false;
   }
   connectedCallback() {
@@ -63212,6 +63700,11 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       }
       this.marketOptions = null;
       this.marketOptionsAt = null;
+      if (this.paramBusy && this.charger) {
+        this.unknownSettingsWrites.add(this.charger);
+        this.paramConflict = true;
+        this.paramNotice = "Permission changed during the parameter save; its outcome must be checked by reloading.";
+      }
       if (this.autoBusy) {
         this.autoUncertain = true;
         this.autoNotice = "Permission changed during the operation; its outcome may be unknown.";
@@ -63243,6 +63736,14 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     if (this.chargeBusy && this.charger) this.chargeUnknown?.add(this.charger);
     if (this.vehicleBusy && this.charger) this.unknownVehicleWrites.add(this.charger);
     if (this.costBusy && this.charger) this.unknownCostWrites.add(this.charger);
+    if (this.paramBusy && this.charger) this.unknownSettingsWrites.add(this.charger);
+    const paramDirty = preserveDraft && this.paramDirty, paramBase = preserveDraft ? this.paramBase : null;
+    this.paramBusy = false;
+    this.paramConflict = false;
+    this.paramNotice = "";
+    this.paramAwaitingRead = false;
+    this.paramDirty = !!paramDirty;
+    this.paramBase = paramBase;
     const costDirty = preserveDraft && this.costDirty, costArea = preserveDraft ? this.marketArea : null, costBase = preserveDraft ? this.costBase : null, costFee = preserveDraft && this.costFeeEdited;
     this.marketOptions = null;
     this.marketOptionsAt = null;
@@ -63376,6 +63877,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     } else adapter.model.settingsNotice = this.settingsLoading ? "Loading settings\u2026" : this.settingsNotice || "Settings unavailable.";
     this.paintVehicleSources(adapter, dashboard);
     this.paintMarketCosts(adapter, dashboard);
+    this.paintPlanParams(adapter, dashboard, this.morekOwnedNow());
     this.message(this.dashboardFailed ? "Dashboard refresh failed; the last observation may be stale." : "");
     if (this.view) this.view.update(adapter);
     else this.view = mountDashboard(this.shadowRoot.querySelector("main"), adapter);
@@ -63637,6 +64139,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     if (!window.confirm("Discard the current draft and reload the latest settings?")) return;
     this.view?.resetDrafts();
     this.resetCosts();
+    this.resetParams();
     this.unknownCostWrites.delete(this.charger);
     this.draftRevision = null;
     this.draftCurrency = void 0;
@@ -63698,7 +64201,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
   }
   async morekAction(action) {
     const hass = this._hass, charger = this.charger, generation = this.generation, permissionEpoch = this.permissionEpoch, statusSnapshot = this.rawStatus, observedAt = this.statusAt, state = decodeMorekState(statusSnapshot);
-    if (!this.connected || hass?.connected === false || hass?.user?.is_admin !== true || !charger || !state || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || !["status", "send", "fetch", "clear", "reconfirm_migration", "recalculate_sync", "reset_learning"].includes(action)) return;
+    if (!this.connected || hass?.connected === false || hass?.user?.is_admin !== true || !charger || !state || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || this.paramBusy || !["status", "send", "fetch", "clear", "reconfirm_migration", "recalculate_sync", "reset_learning"].includes(action)) return;
     if (action === "reconfirm_migration" && state.ownership?.reconfirmation_required !== true) return;
     if (action !== "status" && !state.supported) return;
     if (action === "clear" && state.cleanup_supported !== true) return;
@@ -63790,7 +64293,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     const generation = this.generation, permissionEpoch = this.permissionEpoch, charger = this.charger, hass = this._hass, record5 = this.settingsRecord;
     const decoded = decodeDashboard(this.rawDashboard);
     const allowed = hass?.user?.is_admin === true || decoded.ok && decoded.value.settings?.users_change_plan === true;
-    if (!this.connected || hass?.connected === false || !charger || !record5 || this.settingsBusy || this.pendingSettingsWrites.has(charger) || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || this.settingsConflict || !allowed) {
+    if (!this.connected || hass?.connected === false || !charger || !record5 || this.settingsBusy || this.pendingSettingsWrites.has(charger) || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || this.paramBusy || this.settingsConflict || !allowed) {
       this.settingsNotice = "Save unavailable or permission denied.";
       this.paint();
       return;
@@ -63900,7 +64403,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       savedId: this.settingsRecord?.target?.vehicle_id || null,
       selectedId: this.vehicleSelected,
       entityState,
-      blocked: this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.costBusy || unknown,
+      blocked: this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.costBusy || this.paramBusy || unknown,
       conflict: this.vehicleConflict || unknown,
       busy: this.vehicleBusy,
       notice: unknown && !this.vehicleNotice ? "A previous vehicle save has an unknown outcome. Reload vehicle sources to confirm it." : this.vehicleNotice
@@ -63983,7 +64486,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
   }
   vehicleWriteBlocked(ctx) {
     const charger = this.charger, hass = this._hass;
-    return !this.connected || hass?.connected === false || hass?.user?.is_admin !== true || !charger || !ctx || this.vehicleBusy || this.costBusy || this.vehicleLoading || this.pendingVehicleWrites.has(charger) || this.unknownVehicleWrites.has(charger) || this.vehicleConflict || this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy;
+    return !this.connected || hass?.connected === false || hass?.user?.is_admin !== true || !charger || !ctx || this.vehicleBusy || this.costBusy || this.paramBusy || this.vehicleLoading || this.pendingVehicleWrites.has(charger) || this.unknownVehicleWrites.has(charger) || this.vehicleConflict || this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy;
   }
   async finishVehicleWrite(generation, charger, body) {
     this.vehicleBusy = true;
@@ -64228,6 +64731,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
         this.dashboardFailed = false;
         this.rawDashboard = raw;
         this.costAwaitingRead = false;
+        this.paramAwaitingRead = false;
         this.controlPermissionPending = false;
         const control = decodeDashboard(raw).value?.control;
         const generated = Date.parse(raw.generated_at || "");
@@ -64274,7 +64778,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     }
   }
 };
-Object.assign(SpotnavEnhancedPanel.prototype, marketCostMethods);
+Object.assign(SpotnavEnhancedPanel.prototype, marketCostMethods, planParamMethods);
 if (!customElements.get("spotnav-enhanced-panel")) customElements.define("spotnav-enhanced-panel", SpotnavEnhancedPanel);
 export {
   SpotnavEnhancedPanel

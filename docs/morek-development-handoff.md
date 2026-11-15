@@ -13,7 +13,7 @@ The active roadmap defines 16.1 planning and 16.2 guarded price admission/UI, ah
 work. Each gets a fresh Claude Sonnet 5.5 medium delegate, focused fast checks, coordinator review and
 commit/push. No HA operations or deployment are authorized by this implementation stage.
 
-**Stage 13.2 market and charging-cost settings implemented locally (2.5.159, 2026-11-15; coordinator review/commit pending; see the entry at the end).** **Stage 13.1 (2.5.158) is committed (`d81c3fd8`):** an advanced “vehicle sources & properties” section in the shared sidebar UI (see the entry at the end; 2.5.157 adds a read-only vehicle-properties block, a server-side expected-selection guard and a replan on a real selection change). Stages 16 and 17.1–17.6 are committed and pushed (HEAD `35f5ae5f` at the start of 13.1). Mocked checks only; not installed, deployed or live-verified.
+**Stage 13.3 practical plan and charger parameters implemented locally (2.5.161, 2026-11-15; coordinator review/commit pending; see the entry at the end).** **Stage 13.2 (2.5.159) is committed (`7e352562`):** market and charging-cost settings in the sidebar. **Stage 13.1 (2.5.158) is committed (`d81c3fd8`):** an advanced “vehicle sources & properties” section in the shared sidebar UI (see the entry at the end; 2.5.157 adds a read-only vehicle-properties block, a server-side expected-selection guard and a replan on a real selection change). Stages 16 and 17.1–17.6 are committed and pushed (HEAD `35f5ae5f` at the start of 13.1). Mocked checks only; not installed, deployed or live-verified.
 
 **Stage 15 implementation complete locally (2.5.143, 2026-11-14):** all 15 implementation substages were delegated separately, coordinator-reviewed and committed/pushed in sequence. Focused mocked checks and required builds passed; detailed entries retain harness failures and unrun checks. No deployment, live charger commands or physical validation were performed. Next feature work is Stage 13, then 7 and 8 when requested; E1/E2 and user-owned 5.1/5.8 remain. Late unbound meter rises remain unassigned, and learning falls back to defaults when proof is missing.
 
@@ -4829,3 +4829,35 @@ Implementation sub-agent; no HA, charger, deployment, commit or push; no browser
 - **Unrun / limits:** full frontend suite, browser/Playwright, HA-fixture Python tests, installed behaviour, a Morek owner's re-upload after a replan,
   i18n for this area (English text), per-charger preview of a shared price-entry change. Demand-charge components, the import target and Nord Pool key /
   provider setup remain in the old card. Not installed, deployed or live-verified; no HA, charger or hardware access was used.
+
+## Stage 13.3 — practical plan and charger parameters (manifest 2.5.161, local, coordinator review/commit pending)
+
+- **What:** a collapsed “Advanced: plan & charger parameters” card in the shared sidebar UI and the local preview (fictional, read-only
+  sample): maximum charging periods, planned current, departure date and weekdays. Pure model/plans in `frontend/sidebar/plan-params.js`,
+  panel wiring in `frontend/sidebar/plan-params-panel.js`, renderer `frontend/shared-dashboard/plan-params-view.js`; small hooks in
+  `sidebar/panel.js`, `shared-dashboard/dashboard.js` (drafts `p:`, `data-psetting`), `reconcile.js`, `dark.css` (dark theme and ≤800 px rules) and
+  `prototype/sample-adapter.js`. **No backend change, no new message.** Ready-by on/off/time, target, cap, minimum and reserve are not duplicated.
+- **Reuse:** the existing `update_settings` replacement through the card's validators: `chargePeriodsReplacement`, `replacementFor('current')` with the
+  charger's `current_range` (6–32 A default, labelled), `replacementFor('deadline')` with `departureDays` (today..+7 in the market calendar).
+  Permissions follow the backend: periods administrator-only; current and departure for administrators or where `users_change_plan` is on.
+- **Safety rules enforced and tested:** the current is never raised automatically (a raise asks first; a stored out-of-range value is kept and
+  flagged, an untouched value is not re-judged); the planned current is described as a planning input, not load balancing or protection; Morek's
+  3-window limit (`MOREK_MAX_BLOCKS`) is stated with the effective `min(cap, 3)` and ownership from fresh Morek status (else “not known”); a
+  date needs ready-by on; a new date needs a known market zone, lies in today..+7 and, for today, a time still ahead; an empty weekday set is
+  refused; unchanged or invalid sends nothing; only the owned fields change, built from the latest accepted record.
+- **Write outcomes:** `revision_conflict` writes nothing and blocks until reload (marks the plan record stale); a reconcile failure after a durable
+  save adopts the record and demands a reload; a refused code is “not saved”; a timeout, a non-accepting or unreadable answer or a permission
+  change mid-save is an unknown outcome that blocks saving until an explicit Reload (shared `unknownSettingsWrites`/`pendingSettingsWrites` with
+  the plan form); after an accepted write the panel waits for a fresh dashboard read (`paramAwaitingRead`) before another change.
+- **Morek 16 A limitation (review fix, 2.5.161):** a Morek schedule is only sent at exactly 16 A (`_validated_proposal` and the worker refuse any other saved current with `current_must_be_16`). The planned-current block now says so. Ownership comes from fresh Morek status (`recorded_owner`): **owned** → the input is limited to 16 A, a saved non-16 value is shown with a warning and kept exactly as saved (never changed silently), and a save of any other value is refused client-side with no request; **unknown** (no/stale status, non-administrators, never loaded) is treated conservatively as possibly owned → the same warning, and saving a non-16 value asks for confirmation first; **not Morek-owned** → a neutral note only and normal saving. The charger's electrical range, raise confirmation, permissions and the backend's own validation are unchanged. No backend change: a non-panel client can still save another current, and the backend refusal remains the final guard. Tests: `test/plan-params.test.ts` (26: model, write plan, panel for owned/unknown/non-Morek, no silent change).
+- **Bug fixed:** `departureDays().nextOccurrence` (`src/settings.ts`) used elapsed time since local midnight instead of the wall clock, one hour
+  wrong on 23/25-hour days (also affected the old card's date-picker default); covered by `test/plan-params.test.ts`.
+- **Checks run (mocked):** `npx vitest run test/plan-params.test.ts` (23, about 8 s: period options and Morek note, current range/nominal/out-of-range,
+  weekday/date/deadline logic, both Stockholm clock changes, permissions, signatures, renderer/preview/dark-CSS parity; real panel: read-only open, saves
+  with revision, raise confirmation, refusals, conflict, reconcile failure, unknown outcome and reload, non-admin, stale dashboard, drafts and concurrent
+  change, permission change mid-save); together with `test/settings.test.ts` and `test/market-costs.test.ts` (185 pass, about 14 s);
+  `test/vehicle-sources.test.ts` + `test/settings-editors.test.ts` (125 pass, about 20 s); `test/sidebar.test.ts` (90 pass but about 33 s, run separately);
+  `npx tsc --noEmit`; `npm run build`; `npm run check-dist`.
+- **Unrun / limits:** full frontend suite, browser/Playwright, HA-fixture Python tests (none needed, no backend change), installed behaviour, a Morek
+  owner's re-upload after a replan, the plan's effective window count, i18n for this area. Not installed, deployed or live-verified; no HA, charger or
+  hardware access was used.

@@ -9,7 +9,7 @@
 // built from it, so fields a focused edit does not own cannot be lost.
 
 import { chargeCeiling } from "./target-need";
-import { localDayKey, localMidnightAt } from "./chart";
+import { localDayKey, localMidnightAt, msOfDay } from "./chart";
 import { departureDayLabel, energyAmount, formatNumber, hasZone, percentAmount } from "./format";
 import { translate, type Language, type TranslationKey } from "./i18n";
 import {
@@ -800,7 +800,8 @@ export function departureDays(timeZone: string, nowMs: number): DepartureDays | 
     nextOccurrence: (wallTime: string): string => {
       const match = /^(\d{2}):(\d{2})$/.exec(wallTime);
       const wallMs = match === null ? Number.NaN : (Number(match[1]) * 60 + Number(match[2])) * 60_000;
-      const sinceMidnight = nowMs - midnight;
+      // The wall clock's reading, not the elapsed time since midnight: they differ by an hour on a 23 or 25 h day.
+      const sinceMidnight = msOfDay(nowMs, timeZone);
       return Number.isFinite(wallMs) && wallMs > sinceMidnight ? today : dayAfter(1);
     },
   };

@@ -81,7 +81,7 @@ One at a time; “Needs” lists the only real dependencies. Stable parent ids; 
 | 15 | 15.10 Morek behind-plan check and power feed (deferrable) | 15.9a (energy side stays capture-only until 15.9b) | ◆ |
 | 16 | 13.1 Vehicle sources and planning properties | none | |
 | 17 | 13.2 Market and charging-cost settings | none | ✔ local (2.5.159) |
-| 18 | 13.3 Practical plan and charger parameters | 15.1b if built (no duplicate reserve control) | |
+| 18 | 13.3 Practical plan and charger parameters | 15.1b if built (no duplicate reserve control) | ✔ local (2.5.161) |
 | 19 | 13.4 Notification settings and setup diagnostics | none | |
 | 20 | 7.1 Available-day navigation | none | |
 | 21 | 7.2 Chart interaction and DST/resolution fixes | none (may share a session with 7.1 if 7.1 needs no backend read) | |
@@ -769,11 +769,44 @@ Full requirement text: archive “Stage 13”.
   (5) no browser/Playwright, no HA-fixture Python tests (none needed, no backend change), not installed; (6) the sidebar read-only
   host tests were extended to allow the new read-only `get_market_options` message; (7) for a selected-but-unsaved area only the
   area list's suggestions are shown, not computed per-fee amounts.
-- [ ] **13.3 Practical plan and charger parameters.** Maximum charging periods, planned current, supported
+- [x] **13.3 Practical plan and charger parameters.** Maximum charging periods, planned current, supported
   departure date/weekday options not already in 12.5 (no duplicate ready-by/cap/minimum/target controls and no
   duplicate of the 15.1b reserve control). Planned current is a planning input, not load balancing; respect
   charger/electrical bounds and Morek transition/period limits; never raise current or change protection
   automatically. Tests: period counts and currents, date/weekday/deadline, DST, conflicts, backend replanning.
+  *Locally implemented with mocked checks (2.5.161; coordinator review/commit pending); not installed or live-verified.*
+  **Morek 16 A guard (2.5.161):** the Morek schedule needs exactly 16 A, so while Morek owns the schedule only 16 A can be saved here (other values refused, saved value kept and flagged); with unknown ownership a non-16 save asks first; otherwise normal. Frontend-only; the backend refusal stays final.
+  A collapsed “Advanced: plan & charger parameters” section is added to the shared sidebar UI (also in the local preview as a
+  fictional read-only sample); new files `sidebar/plan-params.js` (pure model and write plans), `sidebar/plan-params-panel.js` (panel
+  wiring) and `shared-dashboard/plan-params-view.js`. **No backend change, no new API message.** Every write is the existing
+  canonical `update_settings` replacement (compare-and-set on the wire revision), built from the accepted record with only the
+  fields owned here changed, using the card's own validators (`chargePeriodsReplacement`, `replacementFor('current'|'deadline')`).
+  Three groups, each with its own Save: **maximum charging periods** (Automatic or 1–8; administrator-only, as the backend requires);
+  **planned current** (whole amperes, judged against the dashboard's `current_range`, with the everyday 6–32 A shown and labelled as
+  such when the charger reports none; the backend still refuses a value above the charger's own maximum; a raise asks first; a stored
+  out-of-range value is shown with a warning and kept exactly as saved, never adjusted); **departure date and weekdays** (date picker
+  limited to today..+7 in the market's local calendar, weekday ticks; only while ready-by is on). Ready-by on/off and time, target, cap,
+  minimum and reserve stay in Plan controls and are not repeated. Non-administrators can edit current and departure only where the
+  charger's `users_change_plan` allows it (the backend's `NON_ADMIN_FIELDS` rule); periods stay administrator-only. The area states, as
+  text, that planned current is a planning input and not load balancing or protection and that nothing raises it automatically; that
+  Morek carries at most 3 windows per plan (`MOREK_MAX_BLOCKS`), so the effective limit while Morek owns the schedule is `min(cap, 3)`
+  (ownership is taken from fresh Morek status, otherwise shown as “not known”); the nominal kW at the saved current and phases (a
+  planning figure, not a measurement); the next departure in the market calendar; and that a save may recalculate the plan and lead to
+  normal guarded reconciliation when Morek owns the schedule, without waking the car, notifying, changing protection or proving
+  charging. Opening and editing only read; unchanged and invalid saves send nothing; drafts survive refreshes; a stale dashboard, a
+  pending post-save dashboard read, another writer's change to these fields while editing (signature check; unrelated plan changes do
+  not count), a revision conflict (nothing written, reload required), a reconcile failure after a durable save, a refused code, and a
+  timeout or permission change mid-save (unknown outcome, saving blocked until an explicit Reload) are all handled. It shares the plan
+  form's pending/unknown-write bookkeeping, so two `update_settings` saves of one record can never overlap.
+  **Bug fixed on the way (shared with the old card's date picker):** `departureDays(...).nextOccurrence` compared the wall time with the
+  *elapsed* time since local midnight, which is an hour off on a 23 h or 25 h day; it now uses the wall clock's reading (tested on both
+  Stockholm clock changes).
+  **Limits:** (1) a *newly chosen* date of today whose time has already passed is refused locally; whether the backend treats it
+  differently is not verified; (2) a Morek owner's re-upload after the replan is the existing reconciliation's behaviour, unverified;
+  (3) the section does not show the plan's *effective* window count, only the cap and Morek's limit; (4) the charger-range bound is only
+  as good as the dashboard's `current_range` (the default range when none is reported); (5) English text only, no i18n for this area;
+  (6) no browser/Playwright, no HA-fixture Python tests (no backend change), not installed; (7) `test/sidebar.test.ts` passes (90) but
+  takes about 33 s here, so run it separately from the focused set.
 - [ ] **13.4 Notification settings and concise setup diagnostics.** Per-charger recipients (HA mobile apps)
   and event settings; show no-recipient, unavailable, permission and save failures; a compact actionable view
   of existing capability/setup warnings (missing/ambiguous measurement sources, pricing configuration,
