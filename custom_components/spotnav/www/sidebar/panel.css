@@ -3563,6 +3563,84 @@ footer {
   color: var(--muted);
   font-size: 12px;
 }
+.insight-lines {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  display: grid;
+  gap: 4px;
+}
+.insight-lines b {
+  font-weight: 650;
+}
+.insight-banner {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  background: #eff7f4;
+  color: #416b60;
+  border-left: 4px solid #6aa89a;
+}
+.insight-banner[data-insight-banner=error],
+.insight-banner[data-insight-banner=invalid],
+.insight-banner[data-insight-banner=permission],
+.insight-banner[data-insight-banner=refresh-failed] {
+  background: #fff1ed;
+  color: #873b2d;
+  border-color: #d4805c;
+}
+.insight-banner[data-insight-banner=unavailable] {
+  background: #fff8e6;
+  color: #6b4e12;
+  border-color: #d4a24c;
+}
+.insight-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  align-items: end;
+}
+.insight-control {
+  display: grid;
+  gap: 3px;
+  font-size: 12px;
+  min-width: 0;
+}
+.insight-control select {
+  max-width: 100%;
+  min-height: 36px;
+}
+.insight-compare {
+  margin-top: 10px;
+  font-size: 12px;
+  overflow-x: auto;
+}
+.insight-compare table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.insight-compare th,
+.insight-compare td {
+  padding: 3px 6px;
+  text-align: left;
+  border-bottom: 1px solid #d6dde4;
+  font-weight: 400;
+}
+.insight-compare thead th {
+  font-weight: 650;
+}
+.insight-compare tbody th {
+  font-weight: 600;
+}
+.insight-details {
+  margin-top: 8px;
+  font-size: 12px;
+}
 
 /* shared-dashboard/dark.css */
 :host {
@@ -5371,4 +5449,38 @@ dialog {
   .track-seg {
     line-height: 24px;
   }
+}
+.insight-banner {
+  background: #223d3a;
+  color: #c4e3da;
+}
+.insight-banner[data-insight-banner=error],
+.insight-banner[data-insight-banner=invalid],
+.insight-banner[data-insight-banner=permission],
+.insight-banner[data-insight-banner=refresh-failed] {
+  background: #422b29;
+  color: #ffddd1;
+}
+.insight-banner[data-insight-banner=unavailable] {
+  background: #3d3318;
+  color: #f3dca5;
+}
+.insight-lines {
+  color: var(--muted);
+}
+.insight-lines b {
+  color: var(--ink);
+}
+.insight-control select {
+  background: #161e29;
+  color: var(--ink);
+  border: 1px solid #66788e;
+  border-radius: 8px;
+  padding: 6px;
+  font: inherit;
+}
+.insight-compare th,
+.insight-compare td {
+  border-color: #3a4c60;
+  color: var(--ink);
 }

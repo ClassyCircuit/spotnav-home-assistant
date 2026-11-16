@@ -84,7 +84,7 @@ describe('sidebar price-day navigation', () => {
     panel.stopObservations(false);
     expect(panel.priceDays).toBeNull();
     // never a write
-    const writes = calls.filter(m => !['spotnav/list_chargers', 'spotnav/get_dashboard', 'spotnav/get_settings', 'spotnav/get_price_days', 'spotnav/morek_schedule', 'spotnav/get_market', 'spotnav/get_market_options', 'spotnav/get_entity_config'].includes(m.type) || (m.type === 'spotnav/morek_schedule' && m.action && m.action !== 'status'));
+    const writes = calls.filter(m => !['spotnav/list_chargers', 'spotnav/get_dashboard', 'spotnav/get_settings', 'spotnav/get_price_days','spotnav/get_price_insights', 'spotnav/morek_schedule', 'spotnav/get_market', 'spotnav/get_market_options', 'spotnav/get_entity_config'].includes(m.type) || (m.type === 'spotnav/morek_schedule' && m.action && m.action !== 'status'));
     expect(writes.map(m => m.type + ':' + (m.action || ''))).toEqual([]);
     panel.remove();
   });

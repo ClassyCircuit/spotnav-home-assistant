@@ -46,16 +46,13 @@ it is not a claim that the plan has been priced from that chart. Controls remain
 The compact controls list shows each window and projected SOC; use “View full window
 details” or the next-window control for the complete modal, also present in both charts.
 
-The sample Price insights panel uses the chart fixture for current and upcoming prices,
-and a separate synthetic hourly historical fixture joined to the chart's past. Its
-30-day classification uses duration-weighted 25th/75th percentiles, with at least
-90% duration coverage and 24 intervals required. The lowest known one-hour opportunity
-searches starts at Now or source interval boundaries; it is not a proposed plan.
-October 2026 averages available prices by interval duration and states coverage.
-The expandable method explains dates, counts and limitations. Add `?insights=missing`
-to mask the insight inputs for a missing-data example; the separate chart remains intact
-and the scenario is labelled. These are fictional fixed-day samples, not live history,
-market forecasts, charging costs or savings; same-weekday comparisons are not used.
+The sample Price insights card is the live panel's own state machine (`shared-dashboard/price-insights.js`) and renderer,
+fed fixture answers in the exact shape of `spotnav/get_price_insights` (`insight-fixture.js`; live and monthly modes). The
+current price and the best published window come from the chart's own sample rows; the 30-day baseline and the monthly
+statistics are fictional. It shows the fixed absolute band and the relative percentile as separate lines, the window-length
+selector (15 to 720 min), a bounded month picker and an explicit month comparison; each choice is one read, nothing is
+saved. Add `?insights=missing` for a young installation (no baseline, nothing published, no month with enough days). These
+are fictional fixed-day samples, not live history, market forecasts, charging costs or savings.
 
 The selected stepped-area **Prices & plan** is shown by default. Append
 `?comparison=bar` to also inspect the old bar alternative; both use the same

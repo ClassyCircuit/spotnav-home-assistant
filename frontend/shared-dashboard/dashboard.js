@@ -125,6 +125,12 @@ export function mountDashboard(root, adapter) {
     // History day (7.3a): explicit, read-only navigation; the host decides what to load and keeps the day on refreshes.
     root.querySelectorAll('[data-history-nav]').forEach(button=>bind(button,()=>button.addEventListener('click',()=>{if(button.hasAttribute('disabled'))return;current.actions?.historyNav?.(button.dataset.historyNav);},{signal})));
     root.querySelectorAll('[data-history-date]').forEach(input=>bind(input,()=>input.addEventListener('change',()=>{if(input.value)current.actions?.historyNav?.('day',input.value);},{signal})));
+    // Price insights (7.5): explicit read-only choices (window length, month, comparison month, retry); nothing is saved.
+    root.querySelectorAll('[data-insight-duration]').forEach(select=>bind(select,()=>select.addEventListener('change',()=>current.actions?.insightNav?.('duration',Number(select.value)),{signal})));
+    root.querySelectorAll('[data-insight-month]').forEach(select=>bind(select,()=>select.addEventListener('change',()=>{if(select.value)current.actions?.insightNav?.('month',select.value);},{signal})));
+    root.querySelectorAll('[data-insight-compare]').forEach(select=>bind(select,()=>select.addEventListener('change',()=>current.actions?.insightNav?.('compare',select.value),{signal})));
+    root.querySelectorAll('[data-insight-compare-previous]').forEach(button=>bind(button,()=>button.addEventListener('click',()=>current.actions?.insightNav?.('compare','previous'),{signal})));
+    root.querySelectorAll('[data-insight-retry]').forEach(button=>bind(button,()=>button.addEventListener('click',()=>current.actions?.insightNav?.('retry'),{signal})));
     const detailsLink=root.querySelector('a[href="#details"]');bind(detailsLink,()=>detailsLink.addEventListener('click', event => { event.preventDefault(); root.querySelector('#details').open = true; }, {signal}));
     const scenarioInput=root.querySelector('#sample-state');bind(scenarioInput,()=>scenarioInput.addEventListener('change', event => current.actions?.selectScenario?.(event.target.value), {signal}));
     const showMode=()=>{const mode=root.querySelector('[data-setting="driver"]')?.value;root.querySelectorAll('[data-mode]').forEach(el=>{el.hidden=el.dataset.mode!==mode;});};

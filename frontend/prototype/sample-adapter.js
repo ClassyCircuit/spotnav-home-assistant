@@ -5,25 +5,11 @@ import { createHistoryDay } from '../shared-dashboard/history-day.js';
 import { HISTORY_TODAY, HISTORY_ZONE, fixtureHistoryRequest } from './history-day-fixture.js';
 import { dailyStates, chooseDailyState, historyFixture } from './daily-sample.js';
 import { evidenceFixture } from './evidence-view.js';
-import { history, monthlyRange, baselineRange, futureRange } from './insight-fixture.js';
+import { createPriceInsights } from '../shared-dashboard/price-insights.js';
+import { INSIGHT_TODAY, fixtureInsightsRequest } from './insight-fixture.js';
 import { reserveModel } from '../shared-dashboard/reserve-model.js';
 import { learningModel } from '../shared-dashboard/learning-model.js';
-import { assess, bestOpportunity, summarize } from './insights.js';
 
-const number = n => Number.isFinite(n) ? n.toFixed(2) : 'Unknown';
-const pct = n => n ? `${(n.coverage*100).toFixed(1)}%` : 'Unknown';
-export function sampleInsights(missing) {
-  const source = missing ? history.filter(p=>p.start >= -300 && p.end <= -24) : history;
-  const current = missing ? null : prices.find(p=>p.start<=now && now<p.end)?.cents;
-  const a = assess(current,source,...baselineRange), month = summarize(source,...monthlyRange);
-  const opportunity = bestOpportunity(missing ? [] : prices,...futureRange), best = opportunity.best;
-  return { intro:`Fictional sample · EUR c/kWh · variable price including fees and taxes${missing ? ' · insight inputs masked for missing-data demonstration; chart remains unchanged' : ''}`,
-    blocks:[{title:'Current price',value:`${number(a.currentPrice)} c/kWh`,status:a.label,detail:`Compared with the preceding 30 days · ${pct(a.baseline)} coverage`},
-      {title:'Best 1-hour price at sample interval starts',value:best ? `${number(best.average)} c/kWh` : 'Unknown',status:best ? `${day(best.start)} · ${sampleDate(best.start)} ${time(best.start)}–${time(best.end)}` : '',detail:best ? `Among starts at Now or interval boundaries, not every possible start · ${pct(opportunity.coverage)} of future horizon priced` : `No complete 1-hour window at Now or interval starts · ${pct(opportunity.coverage)} of future horizon priced`},
-      {title:'October 2026 · sample prices',value:`${number(month?.average)} c/kWh`,detail:`Duration-weighted average of available intervals · ${pct(month)} coverage`,extra:`Low ${number(month?.low)} · High ${number(month?.high)} c/kWh`}],
-    caution:'Price opportunity, not the proposed plan. It may be outside the deadline or cap, is not necessarily selected or feasible, and does not guarantee charging. Monthly prices are not charging cost or savings.',
-    method:`Baseline: ${sampleDate(baselineRange[0])} ${time(baselineRange[0])}–${sampleDate(baselineRange[1])} ${time(baselineRange[1])}, 2026; ${a.baseline?.count ?? 0} available intervals, ${a.baseline ? a.baseline.covered.toFixed(2) : 'Unknown'} of 720 hours (${pct(a.baseline)}). Classification requires at least 90% coverage and 24 intervals. Lower means below the duration-weighted 25th percentile (${number(a.baseline?.p25)} c/kWh); higher means above the 75th (${number(a.baseline?.p75)} c/kWh); values at or between are typical. These are relative to this fictional sample, not universal thresholds. Opportunity: cheapest complete 1-hour average among starts at Now or known interval boundaries through ${sampleDate(futureRange[1])} ${time(futureRange[1])}. Gaps are excluded, not zero; unknown future beyond the shown horizon is not considered. October covers Oct 1 00:00–Nov 1 00:00, 2026: ${month?.count ?? 0} intervals, ${month ? month.covered.toFixed(2) : 'Unknown'} of 744 hours. Monthly low/high and average cover available intervals only. Fixed 24-hour sample days; no timezone/DST or same-weekday inference.` };
-}
 // Hand-authored, backend-shaped (same decoder as the live panel); fictional numbers, 10 % of the sample need.
 const sampleReserve = reserveModel({percent:10,minutes:6,requested_minutes:6,limit:null,allowance:{kind:'upper_allowance',energy_kwh:0.6,cost:{value:0.12,currency:'EUR'}}},'EUR',{explain:'Extra allowed time to reach the target; the car’s own limit stops it, so the reserve is not a higher SOC.',limits:{unknown:'The reserve is smaller than requested.'}});
 // Same shape and decoder as the live panel; fictional numbers (four agreeing charges lengthen the sample plan a little).
@@ -38,6 +24,8 @@ export function createSampleAdapter(rebuild) {
   const navigation = createPriceDays({request:fixtureRequest(context), onChange:()=>rebuild?.(build())});
   // History day (7.3a): the live panel's own state machine and renderer, fed backend-shaped fixture answers.
   const historyNavigation = createHistoryDay({request:fixtureHistoryRequest(context), onChange:()=>rebuild?.(build())});
+  // Price insights (7.5): the live panel's own state machine and renderer, fed backend-shaped fixture answers.
+  const insightNavigation = createPriceInsights({request:fixtureInsightsRequest(context,{missing:missingInsights}), onChange:()=>rebuild?.(build()), now:()=>Date.UTC(2026,10,9,14,30)});
   const hours = ms => (ms-EPOCH)/3600000;
   // Fictional latest readback (remaining period only), in the backend's absolute-instant shape; never history.
   const sampleEffective = () => { const h = x => EPOCH + x * 3600000; const spans = [[now,24,0],[24,24.625,16],[24.625,25,0],[25,25.375,16],[25.375,36,0]].map(([a,b,value])=>({start:h(a),end:h(b),value}));
@@ -52,7 +40,7 @@ export function createSampleAdapter(rebuild) {
     const chart = navPrices ? {prices:navPrices,now,deadline,horizon:[bounds[0],bounds.at(-1)],cap,viewKey:view.viewKey,comparison:false} : {prices,now,deadline,horizon,cap,viewKey:'today::0',comparison:new URLSearchParams(location.search).get('comparison')==='bar'};
     const nav = {snapRange:navPrices ? (a,b)=>snapRange(a,b,bounds) : snapRange, initialRange:navPrices ? c=>navRange ? snapRange(Math.max(bounds[0],navRange[0]),Math.min(bounds.at(-1),navRange[1]),bounds) : initialRange(c,bounds) : initialRange};
     const b = adapterBase();
-    return {...b, format:{...b.format,...nav}, model:{...b.model,chart,priceNav:view?.nav ?? null,historyDay:historyNavigation.sync({charger:context.charger,epoch:'sample',zone:HISTORY_ZONE,marketZone:HISTORY_ZONE,today:HISTORY_TODAY}).view()}, actions:{...b.actions,priceNav:(kind,arg)=>kind==='retry' ? navigation.retry() : navigation.select(kind,arg),historyNav:(kind,arg)=>kind==='retry' ? historyNavigation.retry() : historyNavigation.select(kind,arg)}};
+    return {...b, format:{...b.format,...nav}, model:{...b.model,chart,priceNav:view?.nav ?? null,insights:insightNavigation.sync({...context,today:INSIGHT_TODAY}).view(),historyDay:historyNavigation.sync({charger:context.charger,epoch:'sample',zone:HISTORY_ZONE,marketZone:HISTORY_ZONE,today:HISTORY_TODAY}).view()}, actions:{...b.actions,priceNav:(kind,arg)=>kind==='retry' ? navigation.retry() : navigation.select(kind,arg),historyNav:(kind,arg)=>kind==='retry' ? historyNavigation.retry() : historyNavigation.select(kind,arg),insightNav:(kind,arg)=>kind==='retry' ? insightNavigation.retry() : kind==='duration' ? insightNavigation.setDuration(arg) : kind==='month' ? insightNavigation.selectMonth(arg) : insightNavigation.selectCompare(arg)}};
   };
   const base = () => adapterBase();
   const adapterBase = () => ({ format:{toAxis:hours,time,day,minutesPerTimeUnit:60,staleLabel:'stale sample',date:sampleDate,tooltipDate:h=>`${sampleDate(h)} 2026`,days:sampleDays,priceGaps,stepSegments,stepPoints,snapRange,initialRange,timeTicks},
@@ -61,7 +49,7 @@ export function createSampleAdapter(rebuild) {
       scenarios:{label:'Sample scenario',selected:dailyScenario,options:Object.entries(dailyStates).map(([value,s])=>({value,label:s.label})),note:'Local illustration only · no settings or charger actions'},
       warning:state.warning ? {title:dailyScenario==='mismatch'?'Schedule needs attention':'Sample state needs attention',detail:dailyScenario==='mismatch'?'Sample effective limits differ from the last sent plan. This is not proof of charging; measured power is shown separately.':state.policy}:null,
       chart:{prices,now,deadline,horizon,cap,comparison:new URLSearchParams(location.search).get('comparison')==='bar'},
-      insights:sampleInsights(missingInsights), evidence:{...evidenceFixture(dailyScenario),context:'Fictional sample · Now Mon 9 Nov 14:30',dispatch:'Autonomous dispatch is unarmed.'},
+      evidence:{...evidenceFixture(dailyScenario),context:'Fictional sample · Now Mon 9 Nov 14:30',dispatch:'Autonomous dispatch is unarmed.'},
       history:historyFixture(),
       // Fictional and read-only: the live panel supplies the same shape from the backend, with saves.
       vehicleSources:{state:'ready',stale:false,canEdit:false,busy:false,conflict:false,notice:'Sample data: nothing here can be saved.',notes:[],vehicles:[{id:'sample-car',name:'Sample EV'}],vehicleId:'sample-car',sensor:{status:'confirmed',level:'ok',text:'Chosen by you: Sample EV battery level (sensor.sample_ev_battery_level).',base:'sensor.sample_ev_battery_level',options:[{value:'',text:'Return to automatic detection (clear my choice)'},{value:'sensor.sample_ev_battery_level',text:'Sample EV battery level (sensor.sample_ev_battery_level)'}],canEdit:false},reading:{text:'62% — fictional sample reading.',stale:false},properties:{capacity:{display:'64.0 kWh reported by the vehicle’s integration (used; cannot be overridden here); nothing entered by you.',base:'',editable:false},phases:{base:'3',display:'3-phase (the default until set)',suggestion:'',editable:false}}},

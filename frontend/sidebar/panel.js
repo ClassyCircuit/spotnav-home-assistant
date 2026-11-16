@@ -1,7 +1,8 @@
 import { mountDashboard } from '../shared-dashboard/dashboard.js';
-import { listChargers, getDashboard, getPriceDays, getChargingHistory, morekSchedule, getSettings, updateSettings, performAction, chargeNowAction, getEntityConfig, setVehicleSoc, updateVehicle } from '../src/api.ts';
+import { listChargers, getDashboard, getPriceDays, getPriceInsights, getChargingHistory, morekSchedule, getSettings, updateSettings, performAction, chargeNowAction, getEntityConfig, setVehicleSoc, updateVehicle } from '../src/api.ts';
 import { createPriceDays } from '../shared-dashboard/price-days.js';
 import { createHistoryDay, localDate } from '../shared-dashboard/history-day.js';
+import { createPriceInsights } from '../shared-dashboard/price-insights.js';
 import { localDaySpan } from './price-chart.js';
 import { decodeEntityAnswer, decodeVehicleWriteAnswer, entityErrorKey, fieldErrorKey, ENTITY_CONFLICT } from '../src/entity-config.ts';
 import { vehicleSourcesModel, vehicleSignature, chooseVehicle, sensorWritePlan, propertyWritePlan, CONFIG_REFRESH_MS } from './vehicle-sources.js';
@@ -103,6 +104,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     this.permissionEpoch = 0;
     this.priceDays = null;
     this.historyDay = null;
+    this.priceInsights = null;
     this.dashboardEpoch = 0;
     this.statusEpoch = 0;
     this.pendingSettingsWrites = new Map();
@@ -204,6 +206,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     this.generation++;
     this.priceDays?.dispose();this.priceDays=null;
     this.historyDay?.dispose();this.historyDay=null;
+    this.priceInsights?.dispose();this.priceInsights=null;
     clearInterval(this.ageTimer); this.ageTimer=null;
     for (const cancel of this.cancellations || []) cancel();
     this.cancellations=new Set();
@@ -238,6 +241,18 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     this.historyDay ||= createHistoryDay({request:params=>this.bounded(getChargingHistory(this._hass,this.charger,params.date)),onChange:()=>{if(this.connected)this.paint();}});
     return this.historyDay.sync({charger:this.charger,epoch:`${this.generation}:${this.permissionEpoch}`,zone,marketZone:dashboard.market?.timezone || null,today}).view();
   }
+  // Price insights (7.5): read-only held-price statistics, one live read plus the current month on open, then only on an
+  // explicit choice (window length, month, comparison) or at most every few minutes; a failure waits for Retry.
+  insightView(dashboard) {
+    const raw=this.rawDashboard, area=raw?.prices?.area_id, today=raw?.prices?.today;
+    if (!dashboard || !this.charger || !this._hass || typeof area!=='string' || !area || typeof today!=='string' || !dashboard.market?.currency) {this.priceInsights?.dispose();this.priceInsights=null;return null;}
+    this.priceInsights ||= createPriceInsights({request:params=>this.bounded(getPriceInsights(this._hass,this.charger,params)),onChange:()=>{if(this.connected)this.paint();}});
+    return this.priceInsights.sync({charger:this.charger,epoch:`${this.generation}:${this.permissionEpoch}`,area,currency:dashboard.market.currency,today}).view();
+  }
+  insightNav(kind,arg) {
+    const insights=this.priceInsights;if(!insights)return;
+    if (kind==='retry') insights.retry(); else if (kind==='duration') insights.setDuration(arg); else if (kind==='month') insights.selectMonth(arg); else if (kind==='compare') insights.selectCompare(arg);
+  }
   historyNav(kind,arg) {
     if (kind==='retry') this.historyDay?.retry(); else this.historyDay?.select(kind,arg);
   }
@@ -253,6 +268,8 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     adapter.actions.priceNav=(kind,arg)=>this.priceNav(kind,arg);
     adapter.model.historyDay=this.historyView(dashboard);
     adapter.actions.historyNav=(kind,arg)=>this.historyNav(kind,arg);
+    adapter.model.insights=this.insightView(dashboard);
+    adapter.actions.insightNav=(kind,arg)=>this.insightNav(kind,arg);
     this.paintAutomatic(dashboard);
     this.paintChargeNow(dashboard);
     this.paintSession();

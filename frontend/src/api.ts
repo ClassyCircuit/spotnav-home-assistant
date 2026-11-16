@@ -13,6 +13,7 @@ import {
   POWER_MONTH_API_VERSION,
   PRICE_DAYS_API_VERSION,
   HISTORY_API_VERSION,
+  PRICE_INSIGHTS_API_VERSION,
   SESSIONS_API_VERSION,
   SETTINGS_API_VERSION,
   REGION_API_VERSION,
@@ -102,6 +103,23 @@ export async function getPriceDays(
   return await call<unknown>(hass, {
     type: "spotnav/get_price_days",
     api_version: PRICE_DAYS_API_VERSION,
+    charger_id: chargerId,
+    ...request,
+  });
+}
+
+/**
+ * Read-only price insights (`spotnav/get_price_insights`, any signed-in user): the live mode (window length 15..720 in
+ * steps of 15) or one `YYYY-MM` month. Deliberately `unknown`: the insights model validates the answer against what it asked.
+ */
+export async function getPriceInsights(
+  hass: HomeAssistantLike,
+  chargerId: string,
+  request: { mode: "live"; duration_minutes?: number } | { mode: "monthly"; month?: string },
+): Promise<unknown> {
+  return await call<unknown>(hass, {
+    type: "spotnav/get_price_insights",
+    api_version: PRICE_INSIGHTS_API_VERSION,
     charger_id: chargerId,
     ...request,
   });

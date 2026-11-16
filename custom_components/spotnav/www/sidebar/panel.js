@@ -839,8 +839,8 @@ var init_decorators = __esm({
 function camelToKebab(str) {
   return str.replace(/[A-Z]/g, (c5) => `-${c5.toLowerCase()}`);
 }
-function buildStyleAttribute(options) {
-  const { property: property2, value: value2, element } = options;
+function buildStyleAttribute(options2) {
+  const { property: property2, value: value2, element } = options2;
   if (value2) {
     let style = element.getAttribute("style") || "";
     if (style) {
@@ -1948,10 +1948,10 @@ var init_chunk_XNTP7DEQ = __esm({
 });
 
 // node_modules/@awesome.me/webawesome/dist/chunks/chunk.PZAN6FPN.js
-function watch(propertyName, options) {
+function watch(propertyName, options2) {
   const resolvedOptions = {
     waitUntilFirstUpdate: false,
-    ...options
+    ...options2
   };
   return (proto, decoratedFnName) => {
     const { update: update2 } = proto;
@@ -2058,11 +2058,11 @@ var init_dist = __esm({
         const secondary = translations.get(language);
         return { locale, language, region, primary, secondary };
       }
-      exists(key3, options) {
+      exists(key3, options2) {
         var _a2;
-        const { primary, secondary } = this.getTranslationData((_a2 = options.lang) !== null && _a2 !== void 0 ? _a2 : this.lang());
-        options = Object.assign({ includeFallback: false }, options);
-        if (primary && primary[key3] || secondary && secondary[key3] || options.includeFallback && fallback && fallback[key3]) {
+        const { primary, secondary } = this.getTranslationData((_a2 = options2.lang) !== null && _a2 !== void 0 ? _a2 : this.lang());
+        options2 = Object.assign({ includeFallback: false }, options2);
+        if (primary && primary[key3] || secondary && secondary[key3] || options2.includeFallback && fallback && fallback[key3]) {
           return true;
         }
         return false;
@@ -2085,16 +2085,16 @@ var init_dist = __esm({
         }
         return term;
       }
-      date(dateToFormat, options) {
+      date(dateToFormat, options2) {
         dateToFormat = new Date(dateToFormat);
-        return new Intl.DateTimeFormat(this.lang(), options).format(dateToFormat);
+        return new Intl.DateTimeFormat(this.lang(), options2).format(dateToFormat);
       }
-      number(numberToFormat, options) {
+      number(numberToFormat, options2) {
         numberToFormat = Number(numberToFormat);
-        return isNaN(numberToFormat) ? "" : new Intl.NumberFormat(this.lang(), options).format(numberToFormat);
+        return isNaN(numberToFormat) ? "" : new Intl.NumberFormat(this.lang(), options2).format(numberToFormat);
       }
-      relativeTime(value2, unit, options) {
-        return new Intl.RelativeTimeFormat(this.lang(), options).format(value2, unit);
+      relativeTime(value2, unit, options2) {
+        return new Intl.RelativeTimeFormat(this.lang(), options2).format(value2, unit);
       }
     };
   }
@@ -2157,14 +2157,14 @@ var init_chunk_M45NRQFW = __esm({
       filterMin: "Min",
       filterTo: "To",
       firstPage: "First page",
-      goToSlide: (slide, count2) => `Go to slide ${slide} of ${count2}`,
+      goToSlide: (slide, count3) => `Go to slide ${slide} of ${count3}`,
       hideColumn: "Hide column",
       hidePassword: "Hide password",
       hour: "Hour",
       incompleteDate: "Enter a valid date.",
       increment: "Increment",
-      jumpBackwardX: (count2) => `Jump back ${count2} pages`,
-      jumpForwardX: (count2) => `Jump forward ${count2} pages`,
+      jumpBackwardX: (count3) => `Jump back ${count3} pages`,
+      jumpForwardX: (count3) => `Jump forward ${count3} pages`,
       lastPage: "Last page",
       loading: "Loading",
       locked: "Locked",
@@ -2183,26 +2183,26 @@ var init_chunk_M45NRQFW = __esm({
       noResults: "No matching results",
       notCompleted: "Not completed",
       now: "Now",
-      numCharacters: (num4) => {
-        if (num4 === 1) return "1 character";
-        return `${num4} characters`;
+      numCharacters: (num5) => {
+        if (num5 === 1) return "1 character";
+        return `${num5} characters`;
       },
-      numCharactersRemaining: (num4) => {
-        if (num4 === 1) return "1 character remaining";
-        return `${num4} characters remaining`;
+      numCharactersRemaining: (num5) => {
+        if (num5 === 1) return "1 character remaining";
+        return `${num5} characters remaining`;
       },
-      numOptionsAvailable: (num4) => {
-        if (num4 === 0) return "No options available";
-        if (num4 === 1) return "1 option available";
-        return `${num4} options available`;
+      numOptionsAvailable: (num5) => {
+        if (num5 === 0) return "No options available";
+        if (num5 === 1) return "1 option available";
+        return `${num5} options available`;
       },
-      numOptionsSelected: (num4) => {
-        if (num4 === 0) return "No options selected";
-        if (num4 === 1) return "1 option selected";
-        return `${num4} options selected`;
+      numOptionsSelected: (num5) => {
+        if (num5 === 0) return "No options selected";
+        if (num5 === 1) return "1 option selected";
+        return `${num5} options selected`;
       },
-      numRowsCopied: (num4) => num4 === 1 ? "1 row copied" : `${num4} rows copied`,
-      numRowsSelected: (num4) => num4 === 1 ? "1 row selected" : `${num4} rows selected`,
+      numRowsCopied: (num5) => num5 === 1 ? "1 row copied" : `${num5} rows copied`,
+      numRowsSelected: (num5) => num5 === 1 ? "1 row selected" : `${num5} rows selected`,
       optionPosition: (label2, position, total2) => `${label2}, ${position} of ${total2}`,
       optionsLoadError: "Options could not be loaded",
       pageXOfY: (page, total2) => `Page ${page} of ${total2}`,
@@ -2568,8 +2568,8 @@ var init_chunk_LXLE4T4D = __esm({
         this.button.click();
       }
       /** Sets focus on the button. */
-      focus(options) {
-        this.button.focus(options);
+      focus(options2) {
+        this.button.focus(options2);
       }
       /** Removes focus from the button. */
       blur() {
@@ -5253,8 +5253,8 @@ var init_chunk_R6M2PXD4 = __esm({
         this.updateValidity();
       }
       /** Sets focus on the input. */
-      focus(options) {
-        this.input.focus(options);
+      focus(options2) {
+        this.input.focus(options2);
       }
       /** Removes focus from the input. */
       blur() {
@@ -5771,8 +5771,8 @@ var init_chunk_F25QOBDY = __esm({
 });
 
 // node_modules/@awesome.me/webawesome/dist/chunks/chunk.L6CIKOFQ.js
-async function animate(el, keyframes, options) {
-  return el.animate(keyframes, options).finished.catch(() => {
+async function animate(el, keyframes, options2) {
+  return el.animate(keyframes, options2).finished.catch(() => {
   });
 }
 function parseDuration(duration2) {
@@ -8487,16 +8487,16 @@ function TimSort(array, compare2) {
     }
     var _minGallop = minGallop;
     var count1;
-    var count2;
+    var count22;
     var exit;
     while (1) {
       count1 = 0;
-      count2 = 0;
+      count22 = 0;
       exit = false;
       do {
         if (compare2(array[cursor2], tmp[cursor1]) < 0) {
           array[dest++] = array[cursor2++];
-          count2++;
+          count22++;
           count1 = 0;
           if (--length2 === 0) {
             exit = true;
@@ -8505,13 +8505,13 @@ function TimSort(array, compare2) {
         } else {
           array[dest++] = tmp[cursor1++];
           count1++;
-          count2 = 0;
+          count22 = 0;
           if (--length1 === 1) {
             exit = true;
             break;
           }
         }
-      } while ((count1 | count2) < _minGallop);
+      } while ((count1 | count22) < _minGallop);
       if (exit) {
         break;
       }
@@ -8534,14 +8534,14 @@ function TimSort(array, compare2) {
           exit = true;
           break;
         }
-        count2 = gallopLeft(tmp[cursor1], array, cursor2, length2, 0, compare2);
-        if (count2 !== 0) {
-          for (i7 = 0; i7 < count2; i7++) {
+        count22 = gallopLeft(tmp[cursor1], array, cursor2, length2, 0, compare2);
+        if (count22 !== 0) {
+          for (i7 = 0; i7 < count22; i7++) {
             array[dest + i7] = array[cursor2 + i7];
           }
-          dest += count2;
-          cursor2 += count2;
-          length2 -= count2;
+          dest += count22;
+          cursor2 += count22;
+          length2 -= count22;
           if (length2 === 0) {
             exit = true;
             break;
@@ -8553,7 +8553,7 @@ function TimSort(array, compare2) {
           break;
         }
         _minGallop--;
-      } while (count1 >= DEFAULT_MIN_GALLOPING || count2 >= DEFAULT_MIN_GALLOPING);
+      } while (count1 >= DEFAULT_MIN_GALLOPING || count22 >= DEFAULT_MIN_GALLOPING);
       if (exit) {
         break;
       }
@@ -8609,27 +8609,27 @@ function TimSort(array, compare2) {
     var _minGallop = minGallop;
     while (true) {
       var count1 = 0;
-      var count2 = 0;
+      var count22 = 0;
       var exit = false;
       do {
         if (compare2(tmp[cursor2], array[cursor1]) < 0) {
           array[dest--] = array[cursor1--];
           count1++;
-          count2 = 0;
+          count22 = 0;
           if (--length1 === 0) {
             exit = true;
             break;
           }
         } else {
           array[dest--] = tmp[cursor2--];
-          count2++;
+          count22++;
           count1 = 0;
           if (--length2 === 1) {
             exit = true;
             break;
           }
         }
-      } while ((count1 | count2) < _minGallop);
+      } while ((count1 | count22) < _minGallop);
       if (exit) {
         break;
       }
@@ -8654,14 +8654,14 @@ function TimSort(array, compare2) {
           exit = true;
           break;
         }
-        count2 = length2 - gallopLeft(array[cursor1], tmp, 0, length2, length2 - 1, compare2);
-        if (count2 !== 0) {
-          dest -= count2;
-          cursor2 -= count2;
-          length2 -= count2;
+        count22 = length2 - gallopLeft(array[cursor1], tmp, 0, length2, length2 - 1, compare2);
+        if (count22 !== 0) {
+          dest -= count22;
+          cursor2 -= count22;
+          length2 -= count22;
           customDest = dest + 1;
           customCursor = cursor2 + 1;
-          for (i7 = 0; i7 < count2; i7++) {
+          for (i7 = 0; i7 < count22; i7++) {
             array[customDest + i7] = tmp[customCursor + i7];
           }
           if (length2 <= 1) {
@@ -8675,7 +8675,7 @@ function TimSort(array, compare2) {
           break;
         }
         _minGallop--;
-      } while (count1 >= DEFAULT_MIN_GALLOPING || count2 >= DEFAULT_MIN_GALLOPING);
+      } while (count1 >= DEFAULT_MIN_GALLOPING || count22 >= DEFAULT_MIN_GALLOPING);
       if (exit) {
         break;
       }
@@ -9478,15 +9478,15 @@ var Clip = (function() {
     }
     var life = this._life;
     var elapsedTime = globalTime - this._startTime - this._pausedTime;
-    var percent2 = elapsedTime / life;
-    if (percent2 < 0) {
-      percent2 = 0;
+    var percent3 = elapsedTime / life;
+    if (percent3 < 0) {
+      percent3 = 0;
     }
-    percent2 = Math.min(percent2, 1);
+    percent3 = Math.min(percent3, 1);
     var easingFunc = this.easingFunc;
-    var schedule = easingFunc ? easingFunc(percent2) : percent2;
+    var schedule = easingFunc ? easingFunc(percent3) : percent3;
     this.onframe(schedule);
-    if (percent2 === 1) {
+    if (percent3 === 1) {
       if (this.loop) {
         var remainder = elapsedTime % life;
         this._startTime = globalTime - remainder;
@@ -10117,17 +10117,17 @@ var encodeBase64 = (function() {
 
 // node_modules/zrender/lib/animation/Animator.js
 var arraySlice = Array.prototype.slice;
-function interpolateNumber(p0, p1, percent2) {
-  return (p1 - p0) * percent2 + p0;
+function interpolateNumber(p0, p1, percent3) {
+  return (p1 - p0) * percent3 + p0;
 }
-function interpolate1DArray(out2, p0, p1, percent2) {
+function interpolate1DArray(out2, p0, p1, percent3) {
   var len2 = p0.length;
   for (var i7 = 0; i7 < len2; i7++) {
-    out2[i7] = interpolateNumber(p0[i7], p1[i7], percent2);
+    out2[i7] = interpolateNumber(p0[i7], p1[i7], percent3);
   }
   return out2;
 }
-function interpolate2DArray(out2, p0, p1, percent2) {
+function interpolate2DArray(out2, p0, p1, percent3) {
   var len2 = p0.length;
   var len22 = len2 && p0[0].length;
   for (var i7 = 0; i7 < len2; i7++) {
@@ -10135,7 +10135,7 @@ function interpolate2DArray(out2, p0, p1, percent2) {
       out2[i7] = [];
     }
     for (var j2 = 0; j2 < len22; j2++) {
-      out2[i7][j2] = interpolateNumber(p0[i7][j2], p1[i7][j2], percent2);
+      out2[i7][j2] = interpolateNumber(p0[i7][j2], p1[i7][j2], percent3);
     }
   }
   return out2;
@@ -10370,7 +10370,7 @@ var Track = (function() {
       }
     }
   };
-  Track2.prototype.step = function(target, percent2) {
+  Track2.prototype.step = function(target, percent3) {
     if (this._finished) {
       return;
     }
@@ -10392,19 +10392,19 @@ var Track = (function() {
     if (kfsNum === 1) {
       frame = nextFrame = keyframes[0];
     } else {
-      if (percent2 < 0) {
+      if (percent3 < 0) {
         frameIdx = 0;
-      } else if (percent2 < this._lastFrP) {
+      } else if (percent3 < this._lastFrP) {
         var start2 = mathMin9(lastFrame + 1, kfsNum - 1);
         for (frameIdx = start2; frameIdx >= 0; frameIdx--) {
-          if (keyframes[frameIdx].percent <= percent2) {
+          if (keyframes[frameIdx].percent <= percent3) {
             break;
           }
         }
         frameIdx = mathMin9(frameIdx, kfsNum - 2);
       } else {
         for (frameIdx = lastFrame; frameIdx < kfsNum; frameIdx++) {
-          if (keyframes[frameIdx].percent > percent2) {
+          if (keyframes[frameIdx].percent > percent3) {
             break;
           }
         }
@@ -10417,9 +10417,9 @@ var Track = (function() {
       return;
     }
     this._lastFr = frameIdx;
-    this._lastFrP = percent2;
+    this._lastFrP = percent3;
     var interval = nextFrame.percent - frame.percent;
-    var w2 = interval === 0 ? 1 : mathMin9((percent2 - frame.percent) / interval, 1);
+    var w2 = interval === 0 ? 1 : mathMin9((percent3 - frame.percent) / interval, 1);
     if (nextFrame.easingFunc) {
       w2 = nextFrame.easingFunc(w2);
     }
@@ -10648,7 +10648,7 @@ var Animator = (function() {
         life: maxTime,
         loop: this._loop,
         delay: this._delay || 0,
-        onframe: function(percent2) {
+        onframe: function(percent3) {
           self2._started = 2;
           var additiveAnimators = self2._additiveAnimators;
           if (additiveAnimators) {
@@ -10664,12 +10664,12 @@ var Animator = (function() {
             }
           }
           for (var i8 = 0; i8 < tracks.length; i8++) {
-            tracks[i8].step(self2._target, percent2);
+            tracks[i8].step(self2._target, percent3);
           }
           var onframeList = self2._onframeCbs;
           if (onframeList) {
             for (var i8 = 0; i8 < onframeList.length; i8++) {
-              onframeList[i8](self2._target, percent2);
+              onframeList[i8](self2._target, percent3);
             }
           }
         },
@@ -10939,10 +10939,10 @@ var Animation = (function(_super) {
   Animation2.prototype.isFinished = function() {
     return this._head == null;
   };
-  Animation2.prototype.animate = function(target, options) {
-    options = options || {};
+  Animation2.prototype.animate = function(target, options2) {
+    options2 = options2 || {};
     this.start();
-    var animator = new Animator_default(target, options.loop);
+    var animator = new Animator_default(target, options2.loop);
     this.addAnimator(animator);
     return animator;
   };
@@ -12525,8 +12525,8 @@ function animateTo(animatable, target, cfg, animationProps, reverse) {
     cfgDone && cfgDone();
   }
   if (animators.length > 0 && cfg.during) {
-    animators[0].during(function(target2, percent2) {
-      cfg.during(percent2);
+    animators[0].during(function(target2, percent3) {
+      cfg.during(percent3);
     });
   }
   for (var i7 = 0; i7 < animators.length; i7++) {
@@ -13525,8 +13525,8 @@ function throwError(msg) {
 }
 
 // node_modules/echarts/lib/util/model.js
-function interpolateNumber2(p0, p1, percent2) {
-  return (p1 - p0) * percent2 + p0;
+function interpolateNumber2(p0, p1, percent3) {
+  return (p1 - p0) * percent3 + p0;
 }
 var DUMMY_COMPONENT_NAME_PREFIX = "series\0";
 var INTERNAL_COMPONENT_ID_PREFIX = "\0_ec_\0";
@@ -13951,16 +13951,16 @@ function getTooltipRenderMode(renderModeOption) {
     return renderModeOption || "html";
   }
 }
-function interpolateRawValues(data, precision, sourceValue, targetValue, percent2) {
+function interpolateRawValues(data, precision, sourceValue, targetValue, percent3) {
   var isAutoPrecision = precision == null || precision === "auto";
   if (targetValue == null) {
     return targetValue;
   }
   if (isNumber(targetValue)) {
-    var value2 = interpolateNumber2(sourceValue || 0, targetValue, percent2);
+    var value2 = interpolateNumber2(sourceValue || 0, targetValue, percent3);
     return round(value2, isAutoPrecision ? Math.max(getPrecision(sourceValue || 0), getPrecision(targetValue)) : precision);
   } else if (isString(targetValue)) {
-    return percent2 < 1 ? sourceValue : targetValue;
+    return percent3 < 1 ? sourceValue : targetValue;
   } else {
     var interpolated = [];
     var leftArr = sourceValue;
@@ -13969,11 +13969,11 @@ function interpolateRawValues(data, precision, sourceValue, targetValue, percent
     for (var i7 = 0; i7 < length_1; ++i7) {
       var info = data.getDimensionInfo(i7);
       if (info && info.type === "ordinal") {
-        interpolated[i7] = (percent2 < 1 && leftArr ? leftArr : rightArr)[i7];
+        interpolated[i7] = (percent3 < 1 && leftArr ? leftArr : rightArr)[i7];
       } else {
         var leftVal = leftArr && leftArr[i7] ? leftArr[i7] : 0;
         var rightVal = rightArr[i7];
-        var value2 = interpolateNumber2(leftVal, rightVal, percent2);
+        var value2 = interpolateNumber2(leftVal, rightVal, percent3);
         interpolated[i7] = round(value2, isAutoPrecision ? Math.max(getPrecision(leftVal), getPrecision(rightVal)) : precision);
       }
     }
@@ -14037,8 +14037,8 @@ function isValidBoundsForExtent(start2, end2) {
   return isValidNumberForExtent(start2) && isValidNumberForExtent(end2) && start2 <= end2;
 }
 function extentHasValue(extent) {
-  var span = extent[1] - extent[0];
-  return isFinite(span) && span >= 0;
+  var span2 = extent[1] - extent[0];
+  return isFinite(span2) && span2 >= 0;
 }
 function ensureExtentAscSimply(extent) {
   if (isValidBoundsForExtent(extent[0], extent[1]) && extent[0] > extent[1]) {
@@ -14066,14 +14066,14 @@ function removeDuplicates(arr, getKey2, resolve) {
     if (true) {
       assert(isString(key3));
     }
-    var count2 = dupMap.get(key3) || 0;
+    var count3 = dupMap.get(key3) || 0;
     if (resolve) {
-      resolve(item, count2);
+      resolve(item, count3);
     }
-    if (!count2 && !resolve) {
+    if (!count3 && !resolve) {
       arr[writeIdx++] = item;
     }
-    dupMap.set(key3, count2 + 1);
+    dupMap.set(key3, count3 + 1);
   });
   if (!resolve) {
     arr.length = writeIdx;
@@ -14366,33 +14366,33 @@ function isImageReady(image) {
 
 // node_modules/zrender/lib/graphic/helper/parseText.js
 var STYLE_REG = /\{([a-zA-Z0-9_]+)\|([^}]*)\}/g;
-function truncateText2(out2, text4, containerWidth, font, ellipsis, options) {
+function truncateText2(out2, text4, containerWidth, font, ellipsis, options2) {
   if (!containerWidth) {
     out2.text = "";
     out2.isTruncated = false;
     return;
   }
   var textLines = (text4 + "").split("\n");
-  options = prepareTruncateOptions(containerWidth, font, ellipsis, options);
+  options2 = prepareTruncateOptions(containerWidth, font, ellipsis, options2);
   var isTruncated = false;
   var truncateOut = {};
   for (var i7 = 0, len2 = textLines.length; i7 < len2; i7++) {
-    truncateSingleLine(truncateOut, textLines[i7], options);
+    truncateSingleLine(truncateOut, textLines[i7], options2);
     textLines[i7] = truncateOut.textLine;
     isTruncated = isTruncated || truncateOut.isTruncated;
   }
   out2.text = textLines.join("\n");
   out2.isTruncated = isTruncated;
 }
-function prepareTruncateOptions(containerWidth, font, ellipsis, options) {
-  options = options || {};
-  var preparedOpts = extend({}, options);
+function prepareTruncateOptions(containerWidth, font, ellipsis, options2) {
+  options2 = options2 || {};
+  var preparedOpts = extend({}, options2);
   ellipsis = retrieve2(ellipsis, "...");
-  preparedOpts.maxIterations = retrieve2(options.maxIterations, 2);
-  var minChar = preparedOpts.minChar = retrieve2(options.minChar, 0);
+  preparedOpts.maxIterations = retrieve2(options2.maxIterations, 2);
+  var minChar = preparedOpts.minChar = retrieve2(options2.minChar, 0);
   var fontMeasureInfo = preparedOpts.fontMeasureInfo = ensureFontMeasureInfo(font);
   var ascCharWidth = fontMeasureInfo.asciiCharWidth;
-  preparedOpts.placeholder = retrieve2(options.placeholder, "");
+  preparedOpts.placeholder = retrieve2(options2.placeholder, "");
   var contentWidth = containerWidth = Math.max(0, containerWidth - 1);
   for (var i7 = 0; i7 < minChar && contentWidth >= ascCharWidth; i7++) {
     contentWidth -= ascCharWidth;
@@ -14409,10 +14409,10 @@ function prepareTruncateOptions(containerWidth, font, ellipsis, options) {
   preparedOpts.containerWidth = containerWidth;
   return preparedOpts;
 }
-function truncateSingleLine(out2, textLine, options) {
-  var containerWidth = options.containerWidth;
-  var contentWidth = options.contentWidth;
-  var fontMeasureInfo = options.fontMeasureInfo;
+function truncateSingleLine(out2, textLine, options2) {
+  var containerWidth = options2.containerWidth;
+  var contentWidth = options2.contentWidth;
+  var fontMeasureInfo = options2.fontMeasureInfo;
   if (!containerWidth) {
     out2.textLine = "";
     out2.isTruncated = false;
@@ -14425,8 +14425,8 @@ function truncateSingleLine(out2, textLine, options) {
     return;
   }
   for (var j2 = 0; ; j2++) {
-    if (lineWidth <= contentWidth || j2 >= options.maxIterations) {
-      textLine += options.ellipsis;
+    if (lineWidth <= contentWidth || j2 >= options2.maxIterations) {
+      textLine += options2.ellipsis;
       break;
     }
     var subLength = j2 === 0 ? estimateLength(textLine, contentWidth, fontMeasureInfo) : lineWidth > 0 ? Math.floor(textLine.length * contentWidth / lineWidth) : 0;
@@ -14434,7 +14434,7 @@ function truncateSingleLine(out2, textLine, options) {
     lineWidth = measureWidth(fontMeasureInfo, textLine);
   }
   if (textLine === "") {
-    textLine = options.placeholder;
+    textLine = options2.placeholder;
   }
   out2.textLine = textLine;
   out2.isTruncated = true;
@@ -14467,39 +14467,39 @@ function parsePlainText(rawText, style, defaultOuterWidth, defaultOuterHeight) {
   if (height == null && defaultOuterHeight != null) {
     height = defaultOuterHeight - paddingV;
   }
-  var lines3;
+  var lines4;
   if (width != null && (overflow === "break" || overflow === "breakAll")) {
-    lines3 = text4 ? wrapText(text4, style.font, width, overflow === "breakAll", 0).lines : [];
+    lines4 = text4 ? wrapText(text4, style.font, width, overflow === "breakAll", 0).lines : [];
   } else {
-    lines3 = text4 ? text4.split("\n") : [];
+    lines4 = text4 ? text4.split("\n") : [];
   }
-  var contentHeight = lines3.length * lineHeight;
+  var contentHeight = lines4.length * lineHeight;
   if (height == null) {
     height = contentHeight;
   }
   if (contentHeight > height && truncateLineOverflow) {
     var lineCount = Math.floor(height / lineHeight);
-    isTruncated = isTruncated || lines3.length > lineCount;
-    lines3 = lines3.slice(0, lineCount);
-    contentHeight = lines3.length * lineHeight;
+    isTruncated = isTruncated || lines4.length > lineCount;
+    lines4 = lines4.slice(0, lineCount);
+    contentHeight = lines4.length * lineHeight;
   }
   if (text4 && truncate && width != null) {
-    var options = prepareTruncateOptions(width, font, style.ellipsis, {
+    var options2 = prepareTruncateOptions(width, font, style.ellipsis, {
       minChar: style.truncateMinChar,
       placeholder: style.placeholder
     });
     var singleOut = {};
-    for (var i7 = 0; i7 < lines3.length; i7++) {
-      truncateSingleLine(singleOut, lines3[i7], options);
-      lines3[i7] = singleOut.textLine;
+    for (var i7 = 0; i7 < lines4.length; i7++) {
+      truncateSingleLine(singleOut, lines4[i7], options2);
+      lines4[i7] = singleOut.textLine;
       isTruncated = isTruncated || singleOut.isTruncated;
     }
   }
   var outerHeight = height;
   var contentWidth = 0;
   var fontMeasureInfo = ensureFontMeasureInfo(font);
-  for (var i7 = 0; i7 < lines3.length; i7++) {
-    contentWidth = Math.max(measureWidth(fontMeasureInfo, lines3[i7]), contentWidth);
+  for (var i7 = 0; i7 < lines4.length; i7++) {
+    contentWidth = Math.max(measureWidth(fontMeasureInfo, lines4[i7]), contentWidth);
   }
   if (width == null) {
     width = contentWidth;
@@ -14508,7 +14508,7 @@ function parsePlainText(rawText, style, defaultOuterWidth, defaultOuterHeight) {
   outerHeight += paddingV;
   outerWidth += paddingH;
   return {
-    lines: lines3,
+    lines: lines4,
     height,
     outerWidth,
     outerHeight,
@@ -14672,10 +14672,10 @@ function parseRichText(rawText, style, defaultOuterWidth, defaultOuterHeight, to
   }
   return contentBlock;
 }
-function pushTokens(block, str, style, wrapInfo, styleName) {
+function pushTokens(block2, str, style, wrapInfo, styleName) {
   var isEmptyStr = str === "";
   var tokenStyle = styleName && style.rich[styleName] || {};
-  var lines3 = block.lines;
+  var lines4 = block2.lines;
   var font = tokenStyle.font || style.font;
   var newLine = false;
   var strLines;
@@ -14685,7 +14685,7 @@ function pushTokens(block, str, style, wrapInfo, styleName) {
     var tokenPaddingH = tokenPadding ? tokenPadding[1] + tokenPadding[3] : 0;
     if (tokenStyle.width != null && tokenStyle.width !== "auto") {
       var outerWidth_1 = parsePercent(tokenStyle.width, wrapInfo.width) + tokenPaddingH;
-      if (lines3.length > 0) {
+      if (lines4.length > 0) {
         if (outerWidth_1 + wrapInfo.accumWidth > wrapInfo.width) {
           strLines = str.split("\n");
           newLine = true;
@@ -14715,11 +14715,11 @@ function pushTokens(block, str, style, wrapInfo, styleName) {
       token.width = linesWidths ? linesWidths[i7] : measureWidth(fontMeasureInfo, text4);
     }
     if (!i7 && !newLine) {
-      var tokens2 = (lines3[lines3.length - 1] || (lines3[0] = new RichTextLine())).tokens;
+      var tokens2 = (lines4[lines4.length - 1] || (lines4[0] = new RichTextLine())).tokens;
       var tokensLen = tokens2.length;
       tokensLen === 1 && tokens2[0].isLineHolder ? tokens2[0] = token : (text4 || !tokensLen || isEmptyStr) && tokens2.push(token);
     } else {
-      lines3.push(new RichTextLine([token]));
+      lines4.push(new RichTextLine([token]));
     }
   }
 }
@@ -14741,7 +14741,7 @@ function isWordBreakChar(ch) {
   return true;
 }
 function wrapText(text4, font, lineWidth, isBreakAll, lastAccumWidth) {
-  var lines3 = [];
+  var lines4 = [];
   var linesWidths = [];
   var line = "";
   var currentWord = "";
@@ -14755,7 +14755,7 @@ function wrapText(text4, font, lineWidth, isBreakAll, lastAccumWidth) {
         line += currentWord;
         accumWidth += currentWordWidth;
       }
-      lines3.push(line);
+      lines4.push(line);
       linesWidths.push(accumWidth);
       line = "";
       currentWord = "";
@@ -14765,15 +14765,15 @@ function wrapText(text4, font, lineWidth, isBreakAll, lastAccumWidth) {
     }
     var chWidth = measureCharWidth(fontMeasureInfo, ch.charCodeAt(0));
     var inWord = isBreakAll ? false : !isWordBreakChar(ch);
-    if (!lines3.length ? lastAccumWidth + accumWidth + chWidth > lineWidth : accumWidth + chWidth > lineWidth) {
+    if (!lines4.length ? lastAccumWidth + accumWidth + chWidth > lineWidth : accumWidth + chWidth > lineWidth) {
       if (!accumWidth) {
         if (inWord) {
-          lines3.push(currentWord);
+          lines4.push(currentWord);
           linesWidths.push(currentWordWidth);
           currentWord = ch;
           currentWordWidth = chWidth;
         } else {
-          lines3.push(ch);
+          lines4.push(ch);
           linesWidths.push(chWidth);
         }
       } else if (line || currentWord) {
@@ -14784,7 +14784,7 @@ function wrapText(text4, font, lineWidth, isBreakAll, lastAccumWidth) {
             currentWordWidth = 0;
             accumWidth = currentWordWidth;
           }
-          lines3.push(line);
+          lines4.push(line);
           linesWidths.push(accumWidth - currentWordWidth);
           currentWord += ch;
           currentWordWidth += chWidth;
@@ -14796,7 +14796,7 @@ function wrapText(text4, font, lineWidth, isBreakAll, lastAccumWidth) {
             currentWord = "";
             currentWordWidth = 0;
           }
-          lines3.push(line);
+          lines4.push(line);
           linesWidths.push(accumWidth);
           line = ch;
           accumWidth = chWidth;
@@ -14821,15 +14821,15 @@ function wrapText(text4, font, lineWidth, isBreakAll, lastAccumWidth) {
     line += currentWord;
   }
   if (line) {
-    lines3.push(line);
+    lines4.push(line);
     linesWidths.push(accumWidth);
   }
-  if (lines3.length === 1) {
+  if (lines4.length === 1) {
     accumWidth += lastAccumWidth;
   }
   return {
     accumWidth,
-    lines: lines3,
+    lines: lines4,
     linesWidths
   };
 }
@@ -15766,7 +15766,7 @@ var PathProxy = (function() {
     this._pathLen = pathTotalLen;
     return pathTotalLen;
   };
-  PathProxy2.prototype.rebuildPath = function(ctx, percent2) {
+  PathProxy2.prototype.rebuildPath = function(ctx, percent3) {
     var d3 = this.data;
     var ux = this._ux;
     var uy = this._uy;
@@ -15777,7 +15777,7 @@ var PathProxy = (function() {
     var yi;
     var x2;
     var y3;
-    var drawPart = percent2 < 1;
+    var drawPart = percent3 < 1;
     var pathSegLen;
     var pathTotalLen;
     var accumLength = 0;
@@ -15792,7 +15792,7 @@ var PathProxy = (function() {
       }
       pathSegLen = this._pathSegLen;
       pathTotalLen = this._pathLen;
-      displayedLength = percent2 * pathTotalLen;
+      displayedLength = percent3 * pathTotalLen;
       if (!displayedLength) {
         return;
       }
@@ -17948,9 +17948,9 @@ function blurSeriesFromHighlightPayload(seriesModel, payload, api) {
   dataIndex = (isArray(dataIndex) ? dataIndex[0] : dataIndex) || 0;
   var el = data.getItemGraphicEl(dataIndex);
   if (!el) {
-    var count2 = data.count();
+    var count3 = data.count();
     var current = 0;
-    while (!el && current < count2) {
+    while (!el && current < count3) {
       el = data.getItemGraphicEl(current++);
     }
   }
@@ -19162,14 +19162,14 @@ var Line = (function(_super) {
       x2 = shape.x2;
       y22 = shape.y2;
     }
-    var percent2 = shape.percent;
-    if (percent2 === 0) {
+    var percent3 = shape.percent;
+    if (percent3 === 0) {
       return;
     }
     ctx.moveTo(x1, y1);
-    if (percent2 < 1) {
-      x2 = x1 * (1 - percent2) + x2 * percent2;
-      y22 = y1 * (1 - percent2) + y22 * percent2;
+    if (percent3 < 1) {
+      x2 = x1 * (1 - percent3) + x2 * percent3;
+      y22 = y1 * (1 - percent3) + y22 * percent3;
     }
     ctx.lineTo(x2, y22);
   };
@@ -19237,28 +19237,28 @@ var BezierCurve = (function(_super) {
     var cpy1 = shape.cpy1;
     var cpx2 = shape.cpx2;
     var cpy2 = shape.cpy2;
-    var percent2 = shape.percent;
-    if (percent2 === 0) {
+    var percent3 = shape.percent;
+    if (percent3 === 0) {
       return;
     }
     ctx.moveTo(x1, y1);
     if (cpx2 == null || cpy2 == null) {
-      if (percent2 < 1) {
-        quadraticSubdivide(x1, cpx1, x2, percent2, out);
+      if (percent3 < 1) {
+        quadraticSubdivide(x1, cpx1, x2, percent3, out);
         cpx1 = out[1];
         x2 = out[2];
-        quadraticSubdivide(y1, cpy1, y22, percent2, out);
+        quadraticSubdivide(y1, cpy1, y22, percent3, out);
         cpy1 = out[1];
         y22 = out[2];
       }
       ctx.quadraticCurveTo(cpx1, cpy1, x2, y22);
     } else {
-      if (percent2 < 1) {
-        cubicSubdivide(x1, cpx1, cpx2, x2, percent2, out);
+      if (percent3 < 1) {
+        cubicSubdivide(x1, cpx1, cpx2, x2, percent3, out);
         cpx1 = out[1];
         cpx2 = out[2];
         x2 = out[3];
-        cubicSubdivide(y1, cpy1, cpy2, y22, percent2, out);
+        cubicSubdivide(y1, cpy1, cpy2, y22, percent3, out);
         cpy1 = out[1];
         cpy2 = out[2];
         y22 = out[3];
@@ -21471,8 +21471,8 @@ function makeValueReadable(value2, valueType, useUTC) {
   function stringToUserReadable(str) {
     return str && trim(str) ? str : "-";
   }
-  function isNumberUserReadable(num4) {
-    return isNullableNumberFinite(num4);
+  function isNumberUserReadable(num5) {
+    return isNullableNumberFinite(num5);
   }
   var isTypeTime = valueType === "time";
   var isValueDate = value2 instanceof Date;
@@ -22332,20 +22332,20 @@ function makeSeriesEncodeForAxisCoordSys(coordDimensions, seriesModel, source) {
   });
   each(coordDimensions, function(coordDimInfo, coordDimIdx) {
     var coordDimName = coordDimInfo.name;
-    var count2 = getDataDimCountOnCoordDim(coordDimInfo);
+    var count3 = getDataDimCountOnCoordDim(coordDimInfo);
     if (baseCategoryDimIndex == null) {
       var start2 = datasetRecord.valueWayDim;
-      pushDim(encode[coordDimName], start2, count2);
-      pushDim(encodeSeriesName, start2, count2);
-      datasetRecord.valueWayDim += count2;
+      pushDim(encode[coordDimName], start2, count3);
+      pushDim(encodeSeriesName, start2, count3);
+      datasetRecord.valueWayDim += count3;
     } else if (baseCategoryDimIndex === coordDimIdx) {
-      pushDim(encode[coordDimName], 0, count2);
-      pushDim(encodeItemName, 0, count2);
+      pushDim(encode[coordDimName], 0, count3);
+      pushDim(encodeItemName, 0, count3);
     } else {
       var start2 = datasetRecord.categoryWayDim;
-      pushDim(encode[coordDimName], start2, count2);
-      pushDim(encodeSeriesName, start2, count2);
-      datasetRecord.categoryWayDim += count2;
+      pushDim(encode[coordDimName], start2, count3);
+      pushDim(encodeSeriesName, start2, count3);
+      datasetRecord.categoryWayDim += count3;
     }
   });
   function pushDim(dimIdxArr, idxFrom, idxCount) {
@@ -23751,12 +23751,12 @@ function globalBackwardCompat(option, isTheme) {
     option.visualMap = option.dataRange;
   }
   each(COMPATITABLE_COMPONENTS, function(componentName) {
-    var options = option[componentName];
-    if (options) {
-      if (!isArray(options)) {
-        options = [options];
+    var options2 = option[componentName];
+    if (options2) {
+      if (!isArray(options2)) {
+        options2 = [options2];
       }
-      each(options, function(option2) {
+      each(options2, function(option2) {
         compatLayoutProperties(option2);
       });
     }
@@ -24142,9 +24142,9 @@ var DefaultDataProvider = (
           var dimExtent = extent[dim];
           var min3 = dimExtent[0] == null ? Infinity : dimExtent[0];
           var max3 = dimExtent[1] == null ? -Infinity : dimExtent[1];
-          var count2 = end2 - start2;
+          var count3 = end2 - start2;
           var arr = storage[dim];
-          for (var i7 = 0; i7 < count2; i7++) {
+          for (var i7 = 0; i7 < count3; i7++) {
             var val = data[i7 * dimSize + dim];
             arr[start2 + i7] = val;
             val < min3 && (min3 = val);
@@ -25363,15 +25363,15 @@ var DataStore = (
         return this;
       }
       var newStore = this.clone();
-      var count2 = newStore.count();
+      var count3 = newStore.count();
       var Ctor = getIndicesCtor(newStore._rawCount);
-      var newIndices = new Ctor(count2);
+      var newIndices = new Ctor(count3);
       var value2 = [];
       var dimSize = dims.length;
       var offset = 0;
       var dim0 = dims[0];
       var chunks = newStore._chunks;
-      for (var i7 = 0; i7 < count2; i7++) {
+      for (var i7 = 0; i7 < count3; i7++) {
         var keep = void 0;
         var rawIdx = newStore.getRawIndex(i7);
         if (dimSize === 0) {
@@ -25391,7 +25391,7 @@ var DataStore = (
           newIndices[offset++] = rawIdx;
         }
       }
-      if (offset < count2) {
+      if (offset < count3) {
         newStore._indices = newIndices;
       }
       newStore._count = offset;
@@ -28548,8 +28548,8 @@ function normalizeSymbolOffset(symbolOffset, symbolSize) {
 }
 
 // node_modules/zrender/lib/canvas/helper.js
-function isSafeNum(num4) {
-  return isFinite(num4);
+function isSafeNum(num5) {
+  return isFinite(num5);
 }
 function createLinearGradient(ctx, obj, rect) {
   var x2 = obj.x == null ? 0 : obj.x;
@@ -33436,17 +33436,17 @@ function getMinorTicks(scale3, splitNumber, breaks, scaleInterval) {
     if (prevTick["break"] || nextTick["break"]) {
       continue;
     }
-    var count2 = 0;
+    var count3 = 0;
     var minorTicksGroup = [];
     var interval = nextTick.value - prevTick.value;
     var minorInterval = interval / splitNumber;
     var minorIntervalPrecision = getIntervalPrecision(minorInterval);
-    while (count2 < splitNumber - 1) {
-      var minorTick = round(prevTick.value + (count2 + 1) * minorInterval, minorIntervalPrecision);
+    while (count3 < splitNumber - 1) {
+      var minorTick = round(prevTick.value + (count3 + 1) * minorInterval, minorIntervalPrecision);
       if (minorTick > extent[0] && minorTick < extent[1]) {
         minorTicksGroup.push(minorTick);
       }
-      count2++;
+      count3++;
     }
     var scaleBreakHelper = getScaleBreakHelper();
     scaleBreakHelper && scaleBreakHelper.pruneTicksByBreak("auto", minorTicksGroup, breaks, function(value2) {
@@ -34547,12 +34547,12 @@ var ScaleRawExtentInfo = (
         fixMM[1] = noZoomEffMM[1] != null;
       }
       var boundaryGap = parseBoundaryGapOption(scale3, model);
-      var span = !isOrdinal ? dataMM[1] - dataMM[0] || Math.abs(dataMM[0]) : null;
+      var span2 = !isOrdinal ? dataMM[1] - dataMM[0] || Math.abs(dataMM[0]) : null;
       if (noZoomEffMM[0] == null) {
-        noZoomEffMM[0] = isOrdinal ? categoryAxisModelDataIsEmptyArray ? dataMM[0] : axisDataLen ? 0 : NaN : dataMM[0] - boundaryGap[0] * span;
+        noZoomEffMM[0] = isOrdinal ? categoryAxisModelDataIsEmptyArray ? dataMM[0] : axisDataLen ? 0 : NaN : dataMM[0] - boundaryGap[0] * span2;
       }
       if (noZoomEffMM[1] == null) {
-        noZoomEffMM[1] = isOrdinal ? categoryAxisModelDataIsEmptyArray ? dataMM[1] : axisDataLen ? axisDataLen - 1 : NaN : dataMM[1] + boundaryGap[1] * span;
+        noZoomEffMM[1] = isOrdinal ? categoryAxisModelDataIsEmptyArray ? dataMM[1] : axisDataLen ? axisDataLen - 1 : NaN : dataMM[1] + boundaryGap[1] * span2;
       }
       !isValidNumberForExtent(noZoomEffMM[0]) && (noZoomEffMM[0] = NaN);
       !isValidNumberForExtent(noZoomEffMM[1]) && (noZoomEffMM[1] = NaN);
@@ -34852,13 +34852,13 @@ function calcNiceForIntervalOrLogScale(scale3, opt4) {
 }
 function intervalScaleCalcNiceTicks(scale3, opt4) {
   var splitNumber = ensureValidSplitNumber(opt4.splitNumber, 5);
-  var span = getScaleLinearSpanEffective(scale3);
+  var span2 = getScaleLinearSpanEffective(scale3);
   if (true) {
-    assert(isFinite(span) && span > 0);
+    assert(isFinite(span2) && span2 > 0);
   }
   var minInterval = opt4.minInterval;
   var maxInterval = opt4.maxInterval;
-  var interval = nice(span / splitNumber, true);
+  var interval = nice(span2 / splitNumber, true);
   if (minInterval != null && interval < minInterval) {
     interval = minInterval;
   }
@@ -34877,12 +34877,12 @@ function intervalScaleCalcNiceTicks(scale3, opt4) {
 function logScaleCalcNiceTicks(intervalStub, opt4) {
   var splitNumber = ensureValidSplitNumber(opt4.splitNumber, 10);
   var intervalExtent = intervalStub.getExtent();
-  var span = getScaleLinearSpanEffective(intervalStub);
+  var span2 = getScaleLinearSpanEffective(intervalStub);
   if (true) {
-    assert(isFinite(span) && span > 0);
+    assert(isFinite(span2) && span2 > 0);
   }
-  var interval = mathMax2(quantity(span), 1);
-  var err = splitNumber / span * interval;
+  var interval = mathMax2(quantity(span2), 1);
+  var err = splitNumber / span2 * interval;
   if (err <= 0.5) {
     interval *= 10;
   }
@@ -36794,8 +36794,8 @@ function createGridClipPath(cartesian, hasAnimation, seriesModel, done, during) 
       }
       clipPath.shape.height = 0;
     }
-    var duringCb = isFunction(during) ? function(percent2) {
-      during(percent2, clipPath);
+    var duringCb = isFunction(during) ? function(percent3) {
+      during(percent3, clipPath);
     } : null;
     initProps(clipPath, {
       shape: {
@@ -37300,8 +37300,8 @@ function createLineClipPath(lineView, coordSys, hasAnimation, seriesModel) {
     var labelAnimationRecord_1 = {
       lastFrameIndex: 0
     };
-    var during = anyStateShowEndLabel(seriesModel) ? function(percent2, clipRect) {
-      lineView._endLabelOnDuring(percent2, clipRect, data_1, labelAnimationRecord_1, valueAnimation_1, endLabelModel_1, coordSys);
+    var during = anyStateShowEndLabel(seriesModel) ? function(percent3, clipRect) {
+      lineView._endLabelOnDuring(percent3, clipRect, data_1, labelAnimationRecord_1, valueAnimation_1, endLabelModel_1, coordSys);
     } : null;
     var isHorizontal = coordSys.getBaseAxis().isHorizontal();
     var clipPath = createGridClipPath(coordSys, hasAnimation, seriesModel, function() {
@@ -37788,11 +37788,11 @@ var LineView = (
         this._endLabel = null;
       }
     };
-    LineView2.prototype._endLabelOnDuring = function(percent2, clipRect, data, animationRecord, valueAnimation, endLabelModel, coordSys) {
+    LineView2.prototype._endLabelOnDuring = function(percent3, clipRect, data, animationRecord, valueAnimation, endLabelModel, coordSys) {
       var endLabel = this._endLabel;
       var polyline = this._polyline;
       if (endLabel) {
-        if (percent2 < 1 && animationRecord.originalX == null) {
+        if (percent3 < 1 && animationRecord.originalX == null) {
           animationRecord.originalX = endLabel.x;
           animationRecord.originalY = endLabel.y;
         }
@@ -37833,7 +37833,7 @@ var LineView = (
           }
           animationRecord.lastFrameIndex = indices[0];
         } else {
-          var idx = percent2 === 1 || animationRecord.lastFrameIndex > 0 ? indices[0] : 0;
+          var idx = percent3 === 1 || animationRecord.lastFrameIndex > 0 ? indices[0] : 0;
           var pt = getPointAtIndex(points2, idx);
           valueAnimation && (value2 = seriesModel.getRawValue(idx));
           endLabel.attr({
@@ -38021,14 +38021,14 @@ function pointsLayout(seriesType2, forceStoreInTypedArray) {
 var samplers = {
   average: function(frame) {
     var sum = 0;
-    var count2 = 0;
+    var count3 = 0;
     for (var i7 = 0; i7 < frame.length; i7++) {
       if (!isNaN(frame[i7])) {
         sum += frame[i7];
-        count2++;
+        count3++;
       }
     }
-    return count2 === 0 ? NaN : sum / count2;
+    return count3 === 0 ? NaN : sum / count3;
   },
   sum: function(frame) {
     var sum = 0;
@@ -38069,14 +38069,14 @@ function dataSample(seriesType2) {
       var data = seriesModel.getData();
       var sampling = seriesModel.get("sampling");
       var coordSys = seriesModel.coordinateSystem;
-      var count2 = data.count();
-      if (count2 > 10 && coordSys.type === "cartesian2d" && sampling) {
+      var count3 = data.count();
+      if (count3 > 10 && coordSys.type === "cartesian2d" && sampling) {
         var baseAxis = coordSys.getBaseAxis();
         var valueAxis2 = coordSys.getOtherAxis(baseAxis);
         var extent = baseAxis.getExtent();
         var dpr2 = api.getDevicePixelRatio();
         var size = Math.abs(extent[1] - extent[0]) * (dpr2 || 1);
-        var rate = Math.round(count2 / size);
+        var rate = Math.round(count3 / size);
         if (isFinite(rate) && rate > 1) {
           if (sampling === "lttb") {
             seriesModel.setData(data.lttbDownSample(data.mapDimension(valueAxis2.dim), 1 / rate));
@@ -42114,16 +42114,16 @@ var Line2 = (
       if (!this.__dirty && !line.__dirty) {
         return;
       }
-      var percent2 = line.shape.percent;
+      var percent3 = line.shape.percent;
       var fromPos = line.pointAt(0);
-      var toPos = line.pointAt(percent2);
+      var toPos = line.pointAt(percent3);
       var d3 = sub([], toPos, fromPos);
       normalize(d3, d3);
-      function setSymbolRotation(symbol, percent3) {
+      function setSymbolRotation(symbol, percent4) {
         var specifiedRotation = symbol.__specifiedRotation;
         if (specifiedRotation == null) {
-          var tangent2 = line.tangentAt(percent3);
-          symbol.attr("rotation", (percent3 === 1 ? -1 : 1) * Math.PI / 2 - Math.atan2(tangent2[1], tangent2[0]));
+          var tangent2 = line.tangentAt(percent4);
+          symbol.attr("rotation", (percent4 === 1 ? -1 : 1) * Math.PI / 2 - Math.atan2(tangent2[1], tangent2[0]));
         } else {
           symbol.attr("rotation", specifiedRotation);
         }
@@ -42131,13 +42131,13 @@ var Line2 = (
       if (symbolFrom) {
         symbolFrom.setPosition(fromPos);
         setSymbolRotation(symbolFrom, 0);
-        symbolFrom.scaleX = symbolFrom.scaleY = invScale * percent2;
+        symbolFrom.scaleX = symbolFrom.scaleY = invScale * percent3;
         symbolFrom.markRedraw();
       }
       if (symbolTo) {
         symbolTo.setPosition(toPos);
         setSymbolRotation(symbolTo, 1);
-        symbolTo.scaleX = symbolTo.scaleY = invScale * percent2;
+        symbolTo.scaleX = symbolTo.scaleY = invScale * percent3;
         symbolTo.markRedraw();
       }
       if (label2 && !label2.ignore) {
@@ -42148,7 +42148,7 @@ var Line2 = (
         var distance2 = label2.__labelDistance;
         var distanceX = distance2[0] * invScale;
         var distanceY = distance2[1] * invScale;
-        var halfPercent = percent2 / 2;
+        var halfPercent = percent3 / 2;
         var tangent = line.tangentAt(halfPercent);
         var n6 = [tangent[1], -tangent[0]];
         var cp = line.pointAt(halfPercent);
@@ -45453,11 +45453,11 @@ var AxisProxy = (
           end: alignToPercentInverted[1]
         }, opt4);
       }
-      var _a2 = this._window = this.calculateDataWindow(opt4), percent2 = _a2.percent, value2 = _a2.value;
-      if (percent2[0] !== 0) {
+      var _a2 = this._window = this.calculateDataWindow(opt4), percent3 = _a2.percent, value2 = _a2.value;
+      if (percent3[0] !== 0) {
         rawExtentInfo.setZoomMM(0, value2[0]);
       }
-      if (percent2[1] !== 100) {
+      if (percent3[1] !== 100) {
         rawExtentInfo.setZoomMM(1, value2[1]);
       }
     };
@@ -45600,10 +45600,10 @@ var dataZoomProcessor = {
     ecModel.eachComponent("dataZoom", function(dataZoomModel) {
       var axisProxy = dataZoomModel.findRepresentativeAxisProxy();
       if (axisProxy) {
-        var _a2 = axisProxy.getWindow(), percent2 = _a2.percent, value2 = _a2.value;
+        var _a2 = axisProxy.getWindow(), percent3 = _a2.percent, value2 = _a2.value;
         dataZoomModel.setCalculatedRange({
-          start: percent2[0],
-          end: percent2[1],
+          start: percent3[0],
+          end: percent3[1],
           startValue: value2[0],
           endValue: value2[1]
         });
@@ -49877,11 +49877,11 @@ function getColorStopValues(visualMapModel, valueState, dataExtent) {
   if (dataExtent[0] === dataExtent[1]) {
     return dataExtent.slice();
   }
-  var count2 = 200;
-  var step = (dataExtent[1] - dataExtent[0]) / count2;
+  var count3 = 200;
+  var step = (dataExtent[1] - dataExtent[0]) / count3;
   var value2 = dataExtent[0];
   var stopValues = [];
-  for (var i7 = 0; i7 <= count2 && value2 < dataExtent[1]; i7++) {
+  for (var i7 = 0; i7 <= count3 && value2 < dataExtent[1]; i7++) {
     stopValues.push(value2);
     value2 += step;
   }
@@ -52363,14 +52363,14 @@ ${sampleDate(h3)}` : time2(h3);
         }
       }
       for (const segment of sampleDays(z2.startValue, z2.endValue)) {
-        const left = pixel(segment.start), right = pixel(segment.end), span = right - left;
+        const left = pixel(segment.start), right = pixel(segment.end), span2 = right - left;
         const cell = document.createElement("div");
         cell.className = "day-cell";
         cell.dataset.start = segment.start;
         cell.dataset.end = segment.end;
         cell.style.left = `${left}px`;
-        cell.style.width = `${span}px`;
-        cell.textContent = span >= 140 ? segment.label : span >= 57 ? sampleDate(segment.midnight) : "";
+        cell.style.width = `${span2}px`;
+        cell.textContent = span2 >= 140 ? segment.label : span2 >= 57 ? sampleDate(segment.midnight) : "";
         elements.push(cell);
         if (segment.midnight > z2.startValue && segment.midnight < z2.endValue) {
           const line = document.createElement("div");
@@ -52422,7 +52422,7 @@ ${sampleDate(h3)}` : time2(h3);
         for (const s4 of lane.segments) {
           const a4 = Math.max(s4.start, z2.startValue), b3 = Math.min(s4.end, z2.endValue);
           if (!(b3 > a4)) continue;
-          const from = px(a4), span = px(b3) - from;
+          const from = px(a4), span2 = px(b3) - from;
           const seg = document.createElement("div");
           seg.className = `track-seg seg-${s4.kind}${s4.stale ? " seg-stale" : ""}${s4.openStart ? " edge-open-start" : ""}${s4.openEnd ? " edge-open-end" : ""}`;
           seg.dataset.kind = s4.kind;
@@ -52430,9 +52430,9 @@ ${sampleDate(h3)}` : time2(h3);
           seg.dataset.end = s4.end;
           if (s4.version != null) seg.dataset.version = s4.version;
           seg.style.left = `${from - left}px`;
-          seg.style.width = `${span}px`;
+          seg.style.width = `${span2}px`;
           seg.title = s4.text || "";
-          if (s4.label && span >= 64) seg.textContent = s4.label;
+          if (s4.label && span2 >= 64) seg.textContent = s4.label;
           bar.append(seg);
         }
         el.append(caption, bar);
@@ -52748,8 +52748,8 @@ function renderReserve(reserve, currency) {
 }
 function renderLearning(learning) {
   if (!learning || !Array.isArray(learning.lines)) return "";
-  const lines3 = learning.lines.map((line) => `<p>${escapeText2(line)}</p>`).join("");
-  return `<div class="plan-learning"><p><b>${escapeText2(learning.title ?? "Charging-time estimate")}</b>${learning.stale && learning.staleText ? ` \xB7 ${escapeText2(learning.staleText)}` : ""}</p>${lines3}<p class="projection-note">${escapeText2(learning.note ?? "Estimate, not a guarantee.")}</p></div>`;
+  const lines4 = learning.lines.map((line) => `<p>${escapeText2(line)}</p>`).join("");
+  return `<div class="plan-learning"><p><b>${escapeText2(learning.title ?? "Charging-time estimate")}</b>${learning.stale && learning.staleText ? ` \xB7 ${escapeText2(learning.staleText)}` : ""}</p>${lines4}<p class="projection-note">${escapeText2(learning.note ?? "Estimate, not a guarantee.")}</p></div>`;
 }
 function renderPlan(windows, assumptions = {}, stale = false, formatters, totals, reserve, learning) {
   if (!formatters || typeof formatters.time !== "function" || typeof formatters.day !== "function") throw new TypeError("Plan time and day formatters are required");
@@ -52800,7 +52800,7 @@ function renderBattery({ soc: soc2, target, capacityKwh, efficiency, stale = fal
 }
 
 // shared-dashboard/evidence-view.js
-function renderEvidence(data, power, count2) {
+function renderEvidence(data, power, count3) {
   const d3 = data || {};
   return `<div class="evidence-status"><strong>${escapeText(d3.status)}</strong><span>${escapeText(d3.context)}</span></div><div class="evidence-grid"><div><small>Proposal calculated</small><b>${escapeText(d3.proposal)}</b></div><div><small>Last sent / ACK</small><b>${escapeText(d3.sent)}</b></div><div><small>Effective limits read</small><b>${escapeText(d3.readback)}</b></div><div><small>Measured charging</small><b>${escapeText(d3.measurement)}</b></div></div><p class="subtext">${escapeText(d3.dispatch)}</p><wa-details id="details" summary="View evidence & debug controls"><div class="details-body">${d3.readiness ? `<p class="subtext">${escapeText(d3.readiness)}</p>` : ""}<div id="morek-debug"><div class="actions"><wa-button size="small" disabled>Send \xB7 unavailable</wa-button><wa-button size="small" disabled>Refresh \xB7 unavailable</wa-button></div></div></div></wa-details>`;
 }
@@ -52856,10 +52856,24 @@ function renderHistory(h3, chartAvailable = false, day = null) {
 }
 
 // shared-dashboard/insight-view.js
+var options = (list4, value2) => list4.map((o9) => `<option value="${escapeText(o9.value)}"${String(o9.value) === String(value2) ? " selected" : ""}>${escapeText(o9.label)}</option>`).join("");
+var lines = (block2) => (block2.lines || []).length ? `<ul class="insight-lines">${block2.lines.map((l6) => `<li><b>${escapeText(l6.label)}</b> ${escapeText(l6.text)}</li>`).join("")}</ul>` : "";
+var details = (block2) => (block2.details || []).length ? `<wa-details summary="Basis and baseline" class="insight-details"><div class="details-body">${block2.details.map((t6) => `<p>${escapeText(t6)}</p>`).join("")}</div></wa-details>` : "";
+var table = (t6) => !t6 ? "" : t6.eligible ? `<div class="insight-compare" data-insight-compare-state="ready"><table><thead><tr>${t6.head.map((h3) => `<th scope="col">${escapeText(h3)}</th>`).join("")}</tr></thead><tbody>${t6.rows.map((r7) => `<tr>${r7.map((c5, i7) => i7 ? `<td>${escapeText(c5)}</td>` : `<th scope="row">${escapeText(c5)}</th>`).join("")}</tr>`).join("")}</tbody></table><p>${escapeText(t6.note)}</p></div>` : `<p class="insight-compare" data-insight-compare-state="none" role="status">${escapeText(t6.text)}</p>`;
+function controls(block2, c5) {
+  if (!c5) return "";
+  if (block2.id === "window") return `<label class="insight-control">Window length <select data-insight-duration aria-label="Window length"${c5.duration.busy ? " disabled" : ""}>${options(c5.duration.options, c5.duration.value)}</select></label>`;
+  if (block2.id !== "month") return "";
+  const previous = c5.compare.previous ? `<wa-button size="small" data-insight-compare-previous>Compare with ${escapeText(c5.compare.previous.label)}</wa-button>` : "";
+  return `<div class="insight-controls"><label class="insight-control">Month <select data-insight-month aria-label="Month"${c5.month.busy ? " disabled" : ""}>${options(c5.month.options, c5.month.value)}</select></label><label class="insight-control">Compare with <select data-insight-compare aria-label="Compare with another month"${c5.compare.busy ? " disabled" : ""}>${options(c5.compare.options, c5.compare.value)}</select></label>${previous}</div>`;
+}
+var block = (b3, c5) => `<section class="insight-block"${b3.id ? ` data-insight-block="${escapeText(b3.id)}"` : ""}${b3.band ? ` data-insight-band="${escapeText(b3.band)}"` : ""}><h3>${escapeText(b3.title)}</h3><div class="insight-value">${escapeText(b3.value)}</div><strong class="insight-status">${escapeText(b3.status ?? "")}</strong>${b3.detail ? `<p>${escapeText(b3.detail)}</p>` : ""}${lines(b3)}${b3.extra ? `<div class="month-range">${escapeText(b3.extra)}</div>` : ""}${controls(b3, c5)}${table(b3.table)}${details(b3)}</section>`;
 function renderInsights(insights) {
   if (!insights) return "<p>Price insights unavailable.</p>";
   const blocks = Array.isArray(insights.blocks) ? insights.blocks : [];
-  return `<div class="insights-intro">${escapeText(insights.intro)}</div><div class="insight-grid">${blocks.map((b3) => `<section class="insight-block"><h3>${escapeText(b3.title)}</h3><div class="insight-value">${escapeText(b3.value)}</div><strong class="insight-status">${escapeText(b3.status ?? "")}</strong><p>${escapeText(b3.detail ?? "")}</p>${b3.extra ? `<div class="month-range">${escapeText(b3.extra)}</div>` : ""}</section>`).join("")}</div><p class="insight-caution">${escapeText(insights.caution)}</p><wa-details summary="How these insights work"><div class="details-body"><p>${escapeText(insights.method)}</p></div></wa-details>`;
+  const banners = (insights.banners || []).map((x2) => `<p class="insight-banner" data-insight-banner="${escapeText(x2.kind)}" role="status">${escapeText(x2.text)}</p>`).join("");
+  const retry = insights.controls?.canRetry ? '<wa-button size="small" data-insight-retry>Retry</wa-button>' : "";
+  return `<div class="insights-intro" data-insight-state="${escapeText(insights.state ?? "ready")}">${escapeText(insights.intro)}</div>${banners}${retry}<div class="insight-grid">${blocks.map((b3) => block(b3, insights.controls)).join("")}</div><p class="insight-caution">${escapeText(insights.caution)}</p><wa-details summary="How these insights work"><div class="details-body"><p>${escapeText(insights.method)}</p></div></wa-details>`;
 }
 
 // shared-dashboard/price-nav-view.js
@@ -52938,21 +52952,21 @@ function renderMarketCosts(m4) {
 
 // shared-dashboard/plan-params-view.js
 var opt3 = (value2, text4, selected) => `<option value="${escapeText(value2)}" ${selected ? "selected" : ""}>${escapeText(text4)}</option>`;
-var lines = (items, cls = "pp-line") => (items || []).filter(Boolean).map((t6) => `<p class="${cls}">${escapeText(t6)}</p>`).join("");
+var lines2 = (items, cls = "pp-line") => (items || []).filter(Boolean).map((t6) => `<p class="${cls}">${escapeText(t6)}</p>`).join("");
 function periodsBlock(m4) {
   const p4 = m4.periods;
-  return `<div class="pp-block" data-pp="periods"><h3>Maximum charging periods</h3><p class="pp-line">Saved: ${escapeText(p4.saved)}.</p><label>Charging periods <select data-psetting="periods" ${p4.canEdit ? "" : "disabled"}>${p4.options.map((o9) => opt3(o9.value, o9.text, o9.value === p4.value)).join("")}</select></label>${lines(p4.notes)}<wa-button id="save-periods" size="small" ${p4.canEdit ? "" : "disabled"}>Save charging periods</wa-button></div>`;
+  return `<div class="pp-block" data-pp="periods"><h3>Maximum charging periods</h3><p class="pp-line">Saved: ${escapeText(p4.saved)}.</p><label>Charging periods <select data-psetting="periods" ${p4.canEdit ? "" : "disabled"}>${p4.options.map((o9) => opt3(o9.value, o9.text, o9.value === p4.value)).join("")}</select></label>${lines2(p4.notes)}<wa-button id="save-periods" size="small" ${p4.canEdit ? "" : "disabled"}>Save charging periods</wa-button></div>`;
 }
 function currentBlock(m4) {
   const c5 = m4.current;
-  return `<div class="pp-block" data-pp="current"><h3>Planned current</h3><label>Planned current (A) <input type="number" inputmode="numeric" step="1" min="${escapeText(c5.min)}" max="${escapeText(c5.max)}" data-psetting="current" value="${escapeText(c5.value)}" ${c5.canEdit ? "" : "disabled"}></label><p class="pp-line">${escapeText(c5.rangeText)}</p>${c5.nominal ? `<p class="pp-line">${escapeText(c5.nominal)}</p>` : ""}${lines(c5.warnings, "pp-note")}${!c5.warnings.includes(c5.morekNote) ? `<p class="pp-help">${escapeText(c5.morekNote)}</p>` : ""}<p class="pp-help">${escapeText(m4.currentNote)}</p><wa-button id="save-current" size="small" ${c5.canEdit ? "" : "disabled"}>Save planned current</wa-button></div>`;
+  return `<div class="pp-block" data-pp="current"><h3>Planned current</h3><label>Planned current (A) <input type="number" inputmode="numeric" step="1" min="${escapeText(c5.min)}" max="${escapeText(c5.max)}" data-psetting="current" value="${escapeText(c5.value)}" ${c5.canEdit ? "" : "disabled"}></label><p class="pp-line">${escapeText(c5.rangeText)}</p>${c5.nominal ? `<p class="pp-line">${escapeText(c5.nominal)}</p>` : ""}${lines2(c5.warnings, "pp-note")}${!c5.warnings.includes(c5.morekNote) ? `<p class="pp-help">${escapeText(c5.morekNote)}</p>` : ""}<p class="pp-help">${escapeText(m4.currentNote)}</p><wa-button id="save-current" size="small" ${c5.canEdit ? "" : "disabled"}>Save planned current</wa-button></div>`;
 }
 function departureBlock(m4) {
   const d3 = m4.departure;
   const lock = d3.canEdit ? "" : "disabled";
   const days = d3.weekdays.map((w2) => `<label class="pp-day"><input type="checkbox" value="${escapeText(w2.n)}" data-psetting="wd-${escapeText(w2.n)}" ${w2.checked ? "checked" : ""} ${lock}> ${escapeText(w2.label)}</label>`).join("");
   const range2 = d3.dateKnown ? ` min="${escapeText(d3.dateMin)}" max="${escapeText(d3.dateMax)}"` : "";
-  return `<div class="pp-block" data-pp="departure"><h3>Departure date &amp; weekdays</h3><p class="pp-line">${escapeText(d3.next)}</p><label>Departure date (blank: daily, by weekday) <input type="date" data-psetting="date"${range2} value="${escapeText(d3.date)}" ${lock}></label><fieldset class="pp-days" ${lock}><legend>Weekdays with a departure</legend>${days}</fieldset>${lines(d3.notes)}<wa-button id="save-departure" size="small" ${d3.canEdit ? "" : "disabled"}>Save departure</wa-button></div>`;
+  return `<div class="pp-block" data-pp="departure"><h3>Departure date &amp; weekdays</h3><p class="pp-line">${escapeText(d3.next)}</p><label>Departure date (blank: daily, by weekday) <input type="date" data-psetting="date"${range2} value="${escapeText(d3.date)}" ${lock}></label><fieldset class="pp-days" ${lock}><legend>Weekdays with a departure</legend>${days}</fieldset>${lines2(d3.notes)}<wa-button id="save-departure" size="small" ${d3.canEdit ? "" : "disabled"}>Save departure</wa-button></div>`;
 }
 function renderPlanParams(m4) {
   if (!m4) return "";
@@ -52963,7 +52977,7 @@ function renderPlanParams(m4) {
 }
 
 // shared-dashboard/notify-setup-view.js
-var lines2 = (items, cls = "ns-line") => (items || []).filter(Boolean).map((t6) => `<p class="${cls}">${escapeText(t6)}</p>`).join("");
+var lines3 = (items, cls = "ns-line") => (items || []).filter(Boolean).map((t6) => `<p class="${cls}">${escapeText(t6)}</p>`).join("");
 var GOTO = /* @__PURE__ */ new Set(["vehicle-sources", "market-costs", "morek", "notify-setup"]);
 var LEVEL = { error: "Problem", warning: "Check", info: "Note" };
 function diagnostics(m4) {
@@ -52976,7 +52990,7 @@ function recipients(m4) {
   const lock = m4.canEdit ? "" : "disabled";
   const phones = m4.phones.length ? m4.phones.map((p4) => `<label class="ns-opt"><input type="checkbox" data-nsetting="tg-${escapeText(p4.service)}" ${p4.checked ? "checked" : ""} ${lock}> ${escapeText(p4.name)}</label>`).join("") : '<p class="ns-line">No phones available.</p>';
   const events = m4.events.map((v2) => `<label class="ns-opt"><input type="checkbox" data-nsetting="ev-${escapeText(v2.event)}" ${v2.checked ? "checked" : ""} ${lock}> ${escapeText(v2.label)}</label>`).join("");
-  return `<div class="ns-block" data-ns="recipients"><h3>Recipients &amp; events</h3><fieldset class="ns-days" ${lock}><legend>Phones (Home Assistant mobile apps)</legend>${phones}</fieldset><fieldset class="ns-days" ${lock}><legend>Events</legend>${events}</fieldset>${lines2(m4.problems, "ns-note")}<p class="ns-help">${escapeText(m4.noticeNote)}</p><wa-button id="save-notify" size="small" ${m4.canEdit ? "" : "disabled"}>Save notifications</wa-button></div>`;
+  return `<div class="ns-block" data-ns="recipients"><h3>Recipients &amp; events</h3><fieldset class="ns-days" ${lock}><legend>Phones (Home Assistant mobile apps)</legend>${phones}</fieldset><fieldset class="ns-days" ${lock}><legend>Events</legend>${events}</fieldset>${lines3(m4.problems, "ns-note")}<p class="ns-help">${escapeText(m4.noticeNote)}</p><wa-button id="save-notify" size="small" ${m4.canEdit ? "" : "disabled"}>Save notifications</wa-button></div>`;
 }
 function renderNotifySetup(m4) {
   if (!m4) return "";
@@ -53184,6 +53198,13 @@ function mountDashboard(root, adapter) {
     root.querySelectorAll("[data-history-date]").forEach((input) => bind3(input, () => input.addEventListener("change", () => {
       if (input.value) current.actions?.historyNav?.("day", input.value);
     }, { signal })));
+    root.querySelectorAll("[data-insight-duration]").forEach((select) => bind3(select, () => select.addEventListener("change", () => current.actions?.insightNav?.("duration", Number(select.value)), { signal })));
+    root.querySelectorAll("[data-insight-month]").forEach((select) => bind3(select, () => select.addEventListener("change", () => {
+      if (select.value) current.actions?.insightNav?.("month", select.value);
+    }, { signal })));
+    root.querySelectorAll("[data-insight-compare]").forEach((select) => bind3(select, () => select.addEventListener("change", () => current.actions?.insightNav?.("compare", select.value), { signal })));
+    root.querySelectorAll("[data-insight-compare-previous]").forEach((button) => bind3(button, () => button.addEventListener("click", () => current.actions?.insightNav?.("compare", "previous"), { signal })));
+    root.querySelectorAll("[data-insight-retry]").forEach((button) => bind3(button, () => button.addEventListener("click", () => current.actions?.insightNav?.("retry"), { signal })));
     const detailsLink = root.querySelector('a[href="#details"]');
     bind3(detailsLink, () => detailsLink.addEventListener("click", (event) => {
       event.preventDefault();
@@ -53460,6 +53481,7 @@ var IDENTIFY_MODES = ["automatic", "ask", "off"];
 var MARKET_API_VERSION = 1;
 var PRICE_DAYS_API_VERSION = 1;
 var HISTORY_API_VERSION = 1;
+var PRICE_INSIGHTS_API_VERSION = 1;
 var MARKET_STATES = ["loading", "ready", "stale", "unavailable", "invalid"];
 var MARKET_REASONS = ["offline", "invalid"];
 
@@ -57657,8 +57679,8 @@ function rulesFor(language) {
   pluralRules.set(language, created);
   return created;
 }
-function pluralForm(language, count2) {
-  return rulesFor(language).select(count2) === "one" ? "one" : "other";
+function pluralForm(language, count3) {
+  return rulesFor(language).select(count3) === "one" ? "one" : "other";
 }
 function translate2(language, key3, params = {}) {
   const template = loaded.get(language)?.[key3] ?? en_default2[key3];
@@ -57711,6 +57733,14 @@ async function getPriceDays(hass, chargerId, request) {
     ...request
   });
 }
+async function getPriceInsights(hass, chargerId, request) {
+  return await call(hass, {
+    type: "spotnav/get_price_insights",
+    api_version: PRICE_INSIGHTS_API_VERSION,
+    charger_id: chargerId,
+    ...request
+  });
+}
 async function getChargingHistory(hass, chargerId, date2) {
   return await call(hass, {
     type: "spotnav/get_charging_history",
@@ -57729,13 +57759,13 @@ async function morekSchedule(hass, chargerId, action, previewId) {
     ...action === "clear" ? { confirm_profile_id: 42001 } : {}
   });
 }
-async function chargeNowAction(hass, chargerId, action, options = {}) {
+async function chargeNowAction(hass, chargerId, action, options2 = {}) {
   return await call(hass, {
     type: "spotnav/morek_schedule",
     api_version: 1,
     charger_id: chargerId,
     action,
-    ...action === "charge_now" ? options : {}
+    ...action === "charge_now" ? options2 : {}
   });
 }
 function actionMessage(chargerId, action, choice) {
@@ -57828,9 +57858,9 @@ async function updateGridTariff(hass, chargerId, expectedWriteRevision, gridTari
     grid_tariff: gridTariff
   });
 }
-async function getLogs(hass, options = {}) {
+async function getLogs(hass, options2 = {}) {
   const message = { type: "spotnav/get_logs", api_version: 1 };
-  for (const [key3, value2] of Object.entries(options)) {
+  for (const [key3, value2] of Object.entries(options2)) {
     if (value2 !== void 0 && value2 !== null && value2 !== "") message[key3] = value2;
   }
   return await call(hass, message);
@@ -57951,10 +57981,10 @@ function createPriceDays({ request, onChange = () => {
   }
   const heldDay = (day) => st.available?.byDay.get(day);
   const liveCoversDay = (liveRows, c5, day) => {
-    const span = c5.span?.(day);
-    return !!span && (liveRows || []).some((row3) => {
+    const span2 = c5.span?.(day);
+    return !!span2 && (liveRows || []).some((row3) => {
       const s4 = Date.parse(row3?.start);
-      return s4 >= span[0] && s4 < span[1];
+      return s4 >= span2[0] && s4 < span2[1];
     });
   };
   return {
@@ -58160,8 +58190,8 @@ function historyTracks(answer, { raw, since, until, oldestPower, digest, readAt,
   if (raw === "digest_only" && digest) (digest.planned_blocks || []).forEach((b3) => addBlock(b3, true));
   else c5.planned_blocks.forEach((b3) => addBlock(b3, false));
   for (const u4 of c5.unknown_plan_spans) {
-    const span = bounded(instant(u4.from), u4.until ? instant(u4.until) : until, since, until);
-    if (span) unknown2.push({ ...span, reason: u4.reason });
+    const span2 = bounded(instant(u4.from), u4.until ? instant(u4.until) : until, since, until);
+    if (span2) unknown2.push({ ...span2, reason: u4.reason });
   }
   const detail = raw === "full" || raw === "partial";
   const measured = { detail, note: "", flow: [], outside: [], noFlow: [], unknown: [] };
@@ -58169,26 +58199,26 @@ function historyTracks(answer, { raw, since, until, oldestPower, digest, readAt,
   else {
     const upto = Number.isFinite(readAt) ? Math.min(until, readAt) : until;
     for (const i7 of o9.intervals) {
-      const a4 = instant(i7.first_sample), b3 = Math.max(instant(i7.last_sample), a4 + 6e4), span = bounded(a4, b3, since, until);
-      if (span) measured.flow.push({ ...span, startBounded: i7.start_bounded === true, endBounded: i7.end_bounded === true, peakW: num(i7.peak_w) ? i7.peak_w : null });
+      const a4 = instant(i7.first_sample), b3 = Math.max(instant(i7.last_sample), a4 + 6e4), span2 = bounded(a4, b3, since, until);
+      if (span2) measured.flow.push({ ...span2, startBounded: i7.start_bounded === true, endBounded: i7.end_bounded === true, peakW: num(i7.peak_w) ? i7.peak_w : null });
     }
     for (const x2 of c5.outside_plan) {
-      const span = bounded(instant(x2.start), instant(x2.end), since, until);
-      if (span) measured.outside.push({ ...span, kind: x2.kind });
+      const span2 = bounded(instant(x2.start), instant(x2.end), since, until);
+      if (span2) measured.outside.push({ ...span2, kind: x2.kind });
     }
     for (const b3 of c5.planned_blocks) if (b3.verdict === "no_flow_observed") {
-      const span = bounded(instant(b3.start), instant(b3.end), since, upto);
-      if (span) measured.noFlow.push(span);
+      const span2 = bounded(instant(b3.start), instant(b3.end), since, upto);
+      if (span2) measured.noFlow.push(span2);
     }
     const wholeWindow = nonneg(cov.window_seconds) && cov.window_seconds > 0 && cov.trusted_seconds >= cov.window_seconds && cov.window_seconds * 1e3 >= upto - since - MINUTE;
     if (cov.no_data_seconds === 0 && cov.untrusted_seconds === 0 && wholeWindow && o9.intervals.length === 0 && c5.outside_plan.length === 0 && o9.isolated_flow_samples === 0 && Number.isFinite(upto) && upto > since) measured.noFlow.push({ start: since, end: upto });
     for (const g2 of o9.gaps) {
-      const span = bounded(instant(g2.from), g2.to ? instant(g2.to) : instant(g2.from) + 6e4, since, until);
-      if (span) measured.unknown.push(span);
+      const span2 = bounded(instant(g2.from), g2.to ? instant(g2.to) : instant(g2.from) + 6e4, since, until);
+      if (span2) measured.unknown.push(span2);
     }
     if (raw === "partial" && Number.isFinite(oldestPower)) {
-      const span = bounded(since, oldestPower, since, until);
-      if (span) measured.unknown.push(span);
+      const span2 = bounded(since, oldestPower, since, until);
+      if (span2) measured.unknown.push(span2);
     }
   }
   const when2 = (ms2) => {
@@ -58216,8 +58246,8 @@ function buildHistoryModel(answer, day, fmt, readAt = NaN) {
   const oldestPower = kinds ? instant(kinds.power_w) : NaN;
   const digest = answer.digests.find((d3) => d3?.date === day) || null;
   const o9 = answer.observed, cov = o9.coverage;
-  const stamp2 = (iso) => fmt.stamp(iso);
-  const span = (a4, b3) => `${stamp2(a4)}\u2013${stamp2(b3)}`;
+  const stamp3 = (iso) => fmt.stamp(iso);
+  const span2 = (a4, b3) => `${stamp3(a4)}\u2013${stamp3(b3)}`;
   const limits = r7.limits && nonneg(r7.limits.max_samples_per_kind) ? r7.limits : { max_samples_per_kind: 4320, max_age_days: 7, max_digest_days: 62 };
   const rawDays = Math.round(limits.max_samples_per_kind / 1440 * 10) / 10;
   const retentionNote = `Measured detail is kept for about the last ${rawDays} days at one reading per minute (${limits.max_samples_per_kind} rows per kind; the ${limits.max_age_days}-day age limit only applies to sparser rows), not a guaranteed ${limits.max_age_days} days. Day summaries are kept up to ${limits.max_digest_days} days, without price rows. Session records last longer but carry no per-minute evidence.`;
@@ -58231,7 +58261,7 @@ function buildHistoryModel(answer, day, fmt, readAt = NaN) {
     rawNote = digest ? "The measured rows of this day are no longer kept; only its saved summary remains (no price rows, lists cut at 50 rows). The summary below is not live evidence." : sent2 ? "No measured power rows are kept for this day, so flow is unknown, not zero. Plans and sessions below are what was recorded." : "No charging evidence is kept for this day. That does not mean nothing happened.";
   } else if (oldestPower > since + PARTIAL_AFTER_S * 1e3) {
     raw = "partial";
-    rawNote = `Measured power rows are kept only from ${stamp2(kinds.power_w)}; flow before that is unknown, not zero.`;
+    rawNote = `Measured power rows are kept only from ${stamp3(kinds.power_w)}; flow before that is unknown, not zero.`;
   } else raw = "full";
   const truncated = [];
   if (signals) for (const [name, label2] of LISTS) {
@@ -58244,12 +58274,12 @@ function buildHistoryModel(answer, day, fmt, readAt = NaN) {
     kind: "known",
     start: instant(b3.start),
     version: b3.version ?? null,
-    text: `${span(b3.start, b3.end)} \xB7 limit ${b3.limit}${b3.unit ? ` ${b3.unit}` : ""} \xB7 plan ${b3.version ?? "unknown"}`,
+    text: `${span2(b3.start, b3.end)} \xB7 limit ${b3.limit}${b3.unit ? ` ${b3.unit}` : ""} \xB7 plan ${b3.version ?? "unknown"}`,
     verdict: b3.verdict,
     verdictText: VERDICT[b3.verdict] || "Unknown",
     detail: [
       ...(b3.reasons || []).map((x2) => REASON[x2] || words(x2)),
-      b3.intent_uncertain_after ? `intent uncertain after ${stamp2(b3.intent_uncertain_after)}` : "",
+      b3.intent_uncertain_after ? `intent uncertain after ${stamp3(b3.intent_uncertain_after)}` : "",
       b3.open_ended_in_profile ? "open-ended in the profile" : "",
       nonneg(b3.covered_fraction) ? `measured rows cover ${Math.round(b3.covered_fraction * 100)}% of the block` : ""
     ].filter(Boolean).join(" \xB7 ")
@@ -58258,7 +58288,7 @@ function buildHistoryModel(answer, day, fmt, readAt = NaN) {
     kind: "unknown",
     start: instant(u4.from),
     version: null,
-    text: `${stamp2(u4.from)}\u2013${u4.until ? stamp2(u4.until) : "end of day"} \xB7 what the charger had installed is unknown`,
+    text: `${stamp3(u4.from)}\u2013${u4.until ? stamp3(u4.until) : "end of day"} \xB7 what the charger had installed is unknown`,
     verdict: "unknown",
     verdictText: "Plan unknown",
     detail: words(u4.reason)
@@ -58266,10 +58296,10 @@ function buildHistoryModel(answer, day, fmt, readAt = NaN) {
   const sent = [...blocks, ...unknown2].sort((a4, b3) => a4.start - b3.start);
   const edge = (bounded2) => bounded2 === true ? "bounded" : "open (data gap, restart or data start beside it)";
   const flow = o9.intervals.map((i7) => ({
-    text: `${span(i7.first_sample, i7.last_sample)} \xB7 ${i7.samples ?? "?"} readings \xB7 peak ${num(i7.peak_w) ? `${(i7.peak_w / 1e3).toFixed(1)} kW` : "unknown"}`,
+    text: `${span2(i7.first_sample, i7.last_sample)} \xB7 ${i7.samples ?? "?"} readings \xB7 peak ${num(i7.peak_w) ? `${(i7.peak_w / 1e3).toFixed(1)} kW` : "unknown"}`,
     detail: `start ${edge(i7.start_bounded)} \xB7 end ${edge(i7.end_bounded)}`
   }));
-  const outside = answer.comparison.outside_plan.map((x2) => ({ kind: x2.kind, text: `${OUTSIDE[x2.kind] || words(x2.kind)}: ${span(x2.start, x2.end)} \xB7 ${duration(x2.seconds)}` }));
+  const outside = answer.comparison.outside_plan.map((x2) => ({ kind: x2.kind, text: `${OUTSIDE[x2.kind] || words(x2.kind)}: ${span2(x2.start, x2.end)} \xB7 ${duration(x2.seconds)}` }));
   const energy3 = o9.energy, cvg = energy3.coverage || {};
   const basis = (label2, value2, key3, note) => ({
     label: label2,
@@ -58289,29 +58319,29 @@ function buildHistoryModel(answer, day, fmt, readAt = NaN) {
   ].filter(Boolean);
   const sessions = answer.sessions.map((s4) => {
     const rec = s4.reconciliation && typeof s4.reconciliation === "object" ? s4.reconciliation : null;
-    const lines3 = [];
+    const lines4 = [];
     if (rec) {
-      lines3.push(`${RECON[rec.state] || `Register total ${words(rec.state)}`}${rec.reason ? ` (${words(rec.reason)})` : ""}`);
-      if (nonneg(rec.total_kwh) && ["reconciled", "consistent"].includes(rec.state)) lines3.push(`Register total ${kwh(rec.total_kwh)} against ${kwh(rec.placed_kwh)} placed in time`);
-      if (nonneg(rec.unplaced_late_kwh) && rec.unplaced_late_kwh > 0) lines3.push(`Unplaced late energy ${kwh(rec.unplaced_late_kwh)}: no known time, not part of the placed energy above, not priced`);
-      if (nonneg(rec.unassigned_register_kwh) && rec.unassigned_register_kwh > 0) lines3.push(`Later register rise ${kwh(rec.unassigned_register_kwh)}: seen by receipt time only, not assigned to this session`);
-      if (["uncertain", "unknown", "skipped", "inconsistent"].includes(rec.state) || nonneg(rec.unassigned_register_kwh) && rec.unassigned_register_kwh > 0) lines3.push("The session total is not certified");
-    } else lines3.push("Register reconciliation unavailable");
+      lines4.push(`${RECON[rec.state] || `Register total ${words(rec.state)}`}${rec.reason ? ` (${words(rec.reason)})` : ""}`);
+      if (nonneg(rec.total_kwh) && ["reconciled", "consistent"].includes(rec.state)) lines4.push(`Register total ${kwh(rec.total_kwh)} against ${kwh(rec.placed_kwh)} placed in time`);
+      if (nonneg(rec.unplaced_late_kwh) && rec.unplaced_late_kwh > 0) lines4.push(`Unplaced late energy ${kwh(rec.unplaced_late_kwh)}: no known time, not part of the placed energy above, not priced`);
+      if (nonneg(rec.unassigned_register_kwh) && rec.unassigned_register_kwh > 0) lines4.push(`Later register rise ${kwh(rec.unassigned_register_kwh)}: seen by receipt time only, not assigned to this session`);
+      if (["uncertain", "unknown", "skipped", "inconsistent"].includes(rec.state) || nonneg(rec.unassigned_register_kwh) && rec.unassigned_register_kwh > 0) lines4.push("The session total is not certified");
+    } else lines4.push("Register reconciliation unavailable");
     return {
-      text: `${span(s4.start, s4.end)} \xB7 placed energy ${kwh(s4.energy_kwh)} (source: ${words(s4.energy_source)})`,
-      lines: lines3,
+      text: `${span2(s4.start, s4.end)} \xB7 placed energy ${kwh(s4.energy_kwh)} (source: ${words(s4.energy_source)})`,
+      lines: lines4,
       detail: `${words(s4.source)} \xB7 started by ${words(s4.started_by)}${s4.price_slices_truncated === true ? ` \xB7 ${s4.price_slices_cut} price slice(s) not shown` : ""}`
     };
   });
-  const gaps = o9.gaps.map((g2) => `${words(g2.kind)} ${stamp2(g2.from)}${g2.to ? `\u2013${stamp2(g2.to)}` : ""}${g2.reason ? ` (${words(g2.reason)})` : ""}`);
-  const restarts = o9.capture_restarts.map(stamp2);
+  const gaps = o9.gaps.map((g2) => `${words(g2.kind)} ${stamp3(g2.from)}${g2.to ? `\u2013${stamp3(g2.to)}` : ""}${g2.reason ? ` (${words(g2.reason)})` : ""}`);
+  const restarts = o9.capture_restarts.map(stamp3);
   const unacked = answer.plans.filter((p4) => p4?.acked_intent !== true).length;
   const digestModel = digest ? {
     partial: digest.partial_retention === true,
-    computed: digest.computed_at ? stamp2(digest.computed_at) : null,
-    flow: (digest.observed_intervals || []).map((i7) => ({ text: `${span(i7.first_sample, i7.last_sample)} \xB7 ${i7.samples ?? "?"} readings \xB7 peak ${num(i7.peak_w) ? `${(i7.peak_w / 1e3).toFixed(1)} kW` : "unknown"}`, detail: `start ${edge(i7.start_bounded)} \xB7 end ${edge(i7.end_bounded)}` })),
-    blocks: (digest.planned_blocks || []).map((b3) => ({ text: `${span(b3.start, b3.end)} \xB7 limit ${b3.limit} \xB7 plan ${b3.version ?? "unknown"}`, verdictText: VERDICT[b3.verdict] || "Unknown", verdict: b3.verdict })),
-    outside: (digest.outside_plan || []).map((x2) => `${OUTSIDE[x2.kind] || words(x2.kind)}: ${span(x2.start, x2.end)}`),
+    computed: digest.computed_at ? stamp3(digest.computed_at) : null,
+    flow: (digest.observed_intervals || []).map((i7) => ({ text: `${span2(i7.first_sample, i7.last_sample)} \xB7 ${i7.samples ?? "?"} readings \xB7 peak ${num(i7.peak_w) ? `${(i7.peak_w / 1e3).toFixed(1)} kW` : "unknown"}`, detail: `start ${edge(i7.start_bounded)} \xB7 end ${edge(i7.end_bounded)}` })),
+    blocks: (digest.planned_blocks || []).map((b3) => ({ text: `${span2(b3.start, b3.end)} \xB7 limit ${b3.limit} \xB7 plan ${b3.version ?? "unknown"}`, verdictText: VERDICT[b3.verdict] || "Unknown", verdict: b3.verdict })),
+    outside: (digest.outside_plan || []).map((x2) => `${OUTSIDE[x2.kind] || words(x2.kind)}: ${span2(x2.start, x2.end)}`),
     unknownSpans: (digest.unknown_plan_spans || []).length,
     gapCount: digest.gap_count ?? null,
     restartCount: digest.restart_count ?? null,
@@ -58329,8 +58359,8 @@ function buildHistoryModel(answer, day, fmt, readAt = NaN) {
     truncated,
     partial: truncated.length > 0,
     retention: {
-      oldestPower: kinds?.power_w ? stamp2(kinds.power_w) : null,
-      oldestRegister: kinds?.energy_register_kwh ? stamp2(kinds.energy_register_kwh) : null,
+      oldestPower: kinds?.power_w ? stamp3(kinds.power_w) : null,
+      oldestRegister: kinds?.energy_register_kwh ? stamp3(kinds.energy_register_kwh) : null,
       digestDays: signals ? r7.digest_days.length : null,
       newestDigest: signals && r7.digest_days.length ? r7.digest_days.at(-1) : null
     },
@@ -58376,7 +58406,7 @@ function createHistoryDay({ request, onChange = () => {
       return String(iso);
     }
   } });
-  const failure = (error2) => {
+  const failure2 = (error2) => {
     const code = typeof error2?.code === "string" ? error2.code : "";
     if (/unauthorized|permission|forbidden/i.test(code)) return { state: "permission", message: "You do not have permission to read charging history." };
     if (code === "spotnav_history_unavailable") return { state: "unavailable", message: "Charging evidence is not kept for this installation, so there is no history to show." };
@@ -58401,9 +58431,9 @@ function createHistoryDay({ request, onChange = () => {
       if (mine !== seq || myKey !== key3) return;
       if (silent && st.result) {
         st.result = { ...st.result, refreshFailed: true };
-        st.error = { day, ...failure(error2) };
+        st.error = { day, ...failure2(error2) };
       } else {
-        st.error = { day, ...failure(error2) };
+        st.error = { day, ...failure2(error2) };
         st.result = null;
       }
     }
@@ -58475,6 +58505,489 @@ function createHistoryDay({ request, onChange = () => {
       st = initial();
     }
   };
+}
+
+// shared-dashboard/price-insights.js
+var LIVE_REFRESH_MS = 3e5;
+var INTERVAL_END_GAP_MS = 6e4;
+var DEFAULT_DURATION = 60;
+var DURATIONS = Array.from({ length: 48 }, (_2, i7) => (i7 + 1) * 15);
+var HISTORY_KEEP_DAYS = 400;
+var MAX_MONTHS = 14;
+var MIN_DAYS = 7;
+var CACHE_MONTHS = 3;
+var DAY_MS3 = 864e5;
+var MONTH_RE = /^(\d{4})-(0[1-9]|1[0-2])$/;
+var DAY_RE2 = /^(\d{4})-(\d{2})-(\d{2})$/;
+var num2 = (v2) => typeof v2 === "number" && Number.isFinite(v2);
+var count = (v2) => Number.isInteger(v2) && v2 >= 0;
+var nullableCount = (v2) => v2 === null || v2 === void 0 || count(v2);
+var instant2 = (v2) => typeof v2 === "string" ? Date.parse(v2) : NaN;
+var dayMs = (day) => {
+  const m4 = DAY_RE2.exec(day || "");
+  return m4 ? Date.UTC(+m4[1], +m4[2] - 1, +m4[3]) : NaN;
+};
+var zoneOk = (zone) => {
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: zone });
+    return typeof zone === "string" && zone !== "";
+  } catch {
+    return false;
+  }
+};
+var words2 = (code) => String(code ?? "unknown").replace(/_/g, " ");
+var REASON2 = {
+  baseline_too_short: "fewer than 7 complete recent days are held",
+  baseline_unknown: "the recent-days baseline is not available",
+  too_few_complete_days: "fewer than 7 complete days are held for this month",
+  no_completed_days: "no day of this month has completed yet",
+  no_current_interval: "no current price interval is published",
+  no_future_prices: "no later prices are published yet",
+  no_contiguous_window: "no unbroken published stretch of that length remains",
+  not_held: "the day is not held",
+  partial: "the day is incomplete",
+  invalid_prices: "prices are invalid",
+  conflicting_duplicate: "conflicting duplicate rows",
+  overlap: "overlapping rows",
+  no_price_rate: "no usable exchange rate",
+  day_stale: "the held day is stale",
+  day_invalid: "the held day is invalid",
+  inconsistent: "the answer contradicts itself"
+};
+var reasonText = (code) => REASON2[code] || words2(code);
+var EXCLUDED = { not_held: "not held", partial: "incomplete", invalid_prices: "invalid prices", conflicting_duplicate: "conflicting rows", overlap: "overlapping rows", no_price_rate: "no exchange rate" };
+var monthLabel = (month) => {
+  const m4 = MONTH_RE.exec(month || "");
+  return m4 ? new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", month: "long", year: "numeric" }).format(Date.UTC(+m4[1], +m4[2] - 1, 1)) : "Unknown month";
+};
+var monthOf = (day) => typeof day === "string" && DAY_RE2.test(day) ? day.slice(0, 7) : null;
+var prevMonth = (month) => {
+  const m4 = MONTH_RE.exec(month);
+  return m4 ? new Date(Date.UTC(+m4[1], +m4[2] - 2, 1)).toISOString().slice(0, 7) : null;
+};
+var durationText = (minutes) => {
+  const h3 = Math.floor(minutes / 60), m4 = minutes % 60;
+  return h3 && m4 ? `${h3} h ${m4} min` : h3 ? `${h3} h` : `${m4} min`;
+};
+function monthOptions(today) {
+  const t6 = dayMs(today);
+  if (!Number.isFinite(t6)) return [];
+  const out2 = [];
+  for (let month = monthOf(today); month && out2.length < MAX_MONTHS; month = prevMonth(month)) {
+    if (dayMs(`${month}-01`) < t6 - HISTORY_KEEP_DAYS * DAY_MS3) break;
+    out2.push({ value: month, label: out2.length === 0 ? `${monthLabel(month)} (so far)` : monthLabel(month) });
+  }
+  return out2;
+}
+var basisKey = (b3) => b3 && typeof b3 === "object" && b3.kind === "published_spot" && b3.unit === "major_per_kwh" && typeof b3.currency === "string" && b3.fees === "none" ? `${b3.kind}|${b3.unit}|${b3.currency}|${b3.fees}` : null;
+var topOk = (a4, asked, mode) => !!a4 && typeof a4 === "object" && a4.api_version === 1 && a4.mode === mode && a4.charger_id === asked.charger && a4.area_id === asked.area && a4.currency === asked.currency && basisKey(a4.basis) === `published_spot|major_per_kwh|${asked.currency}|none` && zoneOk(a4.zone) && Number.isFinite(instant2(a4.now));
+function excluded(x2) {
+  if (!x2 || typeof x2 !== "object" || !count(x2.count)) return null;
+  const reasons = x2.reasons && typeof x2.reasons === "object" ? Object.entries(x2.reasons).filter(([, n6]) => count(n6) && n6 > 0) : [];
+  return { count: x2.count, reasons };
+}
+var excludedText = (x2) => !x2 || x2.count === 0 ? "" : `${x2.count} excluded${x2.reasons.length ? ` (${x2.reasons.map(([code, n6]) => `${n6} ${EXCLUDED[code] || words2(code)}`).join(", ")})` : ""}`;
+function providers(list4, key3) {
+  const out2 = [];
+  for (const row3 of Array.isArray(list4) ? list4 : []) for (const label2 of key3 === "providers" ? Array.isArray(row3?.providers) ? row3.providers : [] : [row3?.provider]) if (typeof label2 === "string" && label2 && !out2.includes(label2)) out2.push(label2);
+  return out2;
+}
+function parseBaseline(b3) {
+  if (!b3 || typeof b3 !== "object" || !["known", "unknown"].includes(b3.status)) return null;
+  const min3 = count(b3.minimum_days) && b3.minimum_days > 0 ? b3.minimum_days : MIN_DAYS;
+  const ex = excluded(b3.days_excluded);
+  if (![b3.days_expected, b3.days_held, b3.days_used].every(count) || !ex || b3.days_used > b3.days_held || b3.days_held > b3.days_expected) return { known: false, reason: "inconsistent", min: min3, expected: null, held: null, used: null, excluded: null };
+  const known = b3.status === "known" && b3.days_used >= min3;
+  return { known, reason: known ? null : b3.status === "known" ? "inconsistent" : b3.unknown_reason || "baseline_unknown", min: min3, expected: b3.days_expected, held: b3.days_held, used: b3.days_used, excluded: ex };
+}
+function parseComparison(c5, baseline) {
+  if (!c5 || typeof c5 !== "object") return { known: false, reason: "baseline_unknown" };
+  if (c5.status !== "known") return { known: false, reason: c5.unknown_reason || "baseline_unknown" };
+  if (!baseline?.known) return { known: false, reason: baseline?.reason || "baseline_unknown" };
+  return num2(c5.percentile) && c5.percentile >= 0 && c5.percentile <= 100 ? { known: true, percentile: c5.percentile } : { known: false, reason: "inconsistent" };
+}
+function parseCurrent(cur, baseline) {
+  if (!cur || typeof cur !== "object") return { known: false, reason: "not_reported" };
+  const i7 = cur.interval, start2 = instant2(i7?.start), end2 = instant2(i7?.end);
+  if (cur.status !== "known") return { known: false, reason: cur.unknown_reason || "no_current_interval" };
+  if (!i7 || !num2(i7.price) || !(end2 > start2)) return { known: false, reason: "inconsistent" };
+  return { known: true, price: i7.price, start: start2, end: end2, comparison: parseComparison(cur.comparison, baseline) };
+}
+function parseWindow(w2, duration2, baseline) {
+  if (!w2 || typeof w2 !== "object") return { known: false, reason: "not_reported" };
+  if (w2.status !== "known") return { known: false, reason: w2.unknown_reason || "no_contiguous_window" };
+  const start2 = instant2(w2.start), end2 = instant2(w2.end);
+  if (!num2(w2.mean_price) || !(end2 > start2) || w2.duration_minutes !== duration2 || end2 - start2 !== duration2 * 6e4) return { known: false, reason: "inconsistent" };
+  const h3 = w2.horizon, from = instant2(h3?.from), until = instant2(h3?.until);
+  return { known: true, price: w2.mean_price, start: start2, end: end2, horizon: Number.isFinite(from) && Number.isFinite(until) && until > from ? { from, until } : null, comparison: parseComparison(w2.comparison, baseline) };
+}
+function parseLive(answer, asked) {
+  if (!topOk(answer, asked, "live") || answer.window_minutes !== asked.duration) return null;
+  const baseline = parseBaseline(answer.baseline);
+  return {
+    zone: answer.zone,
+    readNow: instant2(answer.now),
+    baseline,
+    current: parseCurrent(answer.current, baseline),
+    window: parseWindow(answer.cheapest_window, asked.duration, baseline),
+    providers: { baseline: providers(answer.provenance?.baseline_providers, "provider"), live: providers(answer.provenance?.live, "providers") },
+    currency: answer.currency
+  };
+}
+var STAT_KEYS = ["mean", "min", "max", "p10", "p50", "p90"];
+function parseStats(s4) {
+  if (!s4 || typeof s4 !== "object" || !STAT_KEYS.every((k2) => num2(s4[k2]))) return null;
+  if (!(s4.min <= s4.p10 && s4.p10 <= s4.p50 && s4.p50 <= s4.p90 && s4.p90 <= s4.max && s4.min <= s4.mean && s4.mean <= s4.max)) return null;
+  if (!num2(s4.negative_share) || s4.negative_share < 0 || s4.negative_share > 100 || !(num2(s4.negative_seconds) && s4.negative_seconds >= 0)) return null;
+  return { mean: s4.mean, min: s4.min, max: s4.max, p10: s4.p10, p50: s4.p50, p90: s4.p90, negativeShare: s4.negative_share, negativeSeconds: s4.negative_seconds };
+}
+function parseMonthly(answer, asked) {
+  if (!topOk(answer, asked, "monthly") || answer.month !== asked.month || !["complete_calendar_month", "completed_days_to_date"].includes(answer.scope) || !["known", "unknown"].includes(answer.status)) return null;
+  const cov = answer.coverage, ex = excluded(answer.days_excluded), min3 = count(answer.minimum_days) && answer.minimum_days > 0 ? answer.minimum_days : MIN_DAYS;
+  if (![answer.days_expected, answer.days_complete, answer.days_partial].every(count) || !nullableCount(answer.days_held) || !ex || !cov || typeof cov !== "object") return null;
+  if (answer.days_complete + answer.days_partial > answer.days_expected) return null;
+  const ratio = cov.valid_ratio === null ? null : cov.valid_ratio;
+  if (!nullableCount(cov.seconds_expected) || !nullableCount(cov.seconds_valid) || !nullableCount(cov.seconds_partial) || ratio !== null && !(num2(ratio) && ratio >= 0 && ratio <= 1)) return null;
+  if (count(cov.seconds_expected) && count(cov.seconds_valid) && cov.seconds_valid > cov.seconds_expected) return null;
+  const stats = answer.status === "known" ? parseStats(answer.statistics) : null;
+  if (answer.status === "known" && (!stats || answer.days_complete < min3 || answer.comparable?.meets_minimum !== true)) return null;
+  if (answer.status === "unknown" && answer.statistics) return null;
+  return {
+    month: answer.month,
+    scope: answer.scope,
+    toDate: answer.scope === "completed_days_to_date",
+    asOf: typeof answer.as_of_day === "string" ? answer.as_of_day : null,
+    zone: answer.zone,
+    known: answer.status === "known",
+    reason: answer.status === "known" ? null : answer.unknown_reason || "too_few_complete_days",
+    min: min3,
+    stats,
+    currency: answer.currency,
+    basis: basisKey(answer.basis),
+    area: answer.area_id,
+    daysExpected: answer.days_expected,
+    daysComplete: answer.days_complete,
+    daysPartial: answer.days_partial,
+    excluded: ex,
+    coverage: { ratio, expected: cov.seconds_expected ?? null, valid: cov.seconds_valid ?? null },
+    providers: providers(answer.provenance?.providers, "provider")
+  };
+}
+var moneyIn = (value2, currency) => {
+  const d3 = displayPrice(value2, currency);
+  return d3 === null ? "Unavailable" : `${summaryPriceText(d3)} ${priceUnit(currency)}`;
+};
+var stamp = (ms2, zone, withDate = true) => {
+  try {
+    return new Intl.DateTimeFormat("en-GB", { timeZone: zone, ...withDate ? { weekday: "short", day: "numeric", month: "short" } : {}, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(ms2);
+  } catch {
+    return "unknown time";
+  }
+};
+var localDay = (ms2, zone) => {
+  try {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).format(ms2);
+  } catch {
+    return null;
+  }
+};
+var span = (a4, b3, zone) => `${stamp(a4, zone)}\u2013${stamp(b3, zone, localDay(a4, zone) !== localDay(b3, zone))}`;
+var percent2 = (v2, digits = 0) => `${v2.toFixed(digits)}%`;
+var sourceLine = (list4) => list4.length ? `Provider label${list4.length > 1 ? "s" : ""} on the held files: ${list4.join(", ")}` : "Provider not reported";
+var BASIS_TEXT = (currency) => `Raw published spot price per kWh, no fees, taxes or margin${currency === "EUR" ? "; shown in euro cents" : ""}`;
+function relativeLine(comparison, baseline) {
+  if (comparison?.known) {
+    const used = baseline.used, expected = baseline.expected, p4 = comparison.percentile;
+    return { label: "Relative", text: `Compared with ${used} of the last ${expected} days: higher than about ${Math.round(p4)}% of that time (relative, duration-weighted; it does not change the fixed band)` };
+  }
+  const why = comparison?.reason ? reasonText(comparison.reason) : "the baseline is unavailable";
+  const days = baseline && baseline.expected !== null ? ` (${baseline.used} of ${baseline.expected} recent days usable, ${baseline.min} needed${baseline.excluded?.count ? `; ${excludedText(baseline.excluded)}` : ""})` : "";
+  return { label: "Relative", text: `Unknown: ${why}${days}` };
+}
+var baselineDetail = (b3, live) => b3 && b3.expected !== null ? `Baseline: the last ${b3.expected} completed local days; ${b3.used} fully held and used, ${b3.held} held${b3.excluded?.count ? `, ${excludedText(b3.excluded)}` : ""}. ${sourceLine(live.providers.baseline)}.` : "Baseline unavailable.";
+function currentBlock2(live, nowMs) {
+  const cur = live.current, cu = live.currency, zone = live.zone;
+  const ended = cur.known && cur.end <= nowMs;
+  const block2 = { id: "current", title: ended ? "Price at last read" : "Current price", value: "Unavailable", status: "", detail: "", lines: [], details: [] };
+  if (!cur.known) {
+    block2.status = `Unknown: ${reasonText(cur.reason)}`;
+    block2.lines.push(relativeLine(null, live.baseline), { label: "Basis", text: BASIS_TEXT(cu) });
+    return block2;
+  }
+  block2.value = moneyIn(cur.price, cu);
+  const band = priceBand(displayPrice(cur.price, cu), priceUnit(cu));
+  block2.status = band ? `In the ${band.label} band (${band.range} c/kWh, fixed)` : bandsApply(priceUnit(cu)) ? "" : `No fixed band is defined for ${cu}`;
+  block2.band = band ? band.key : null;
+  block2.lines.push({ label: "Interval", text: ended ? `${span(cur.start, cur.end, zone)} (ended; waiting for a refresh)` : span(cur.start, cur.end, zone) });
+  block2.lines.push(relativeLine(cur.comparison, live.baseline));
+  block2.lines.push({ label: "Basis", text: BASIS_TEXT(cu) });
+  block2.details.push(baselineDetail(live.baseline, live));
+  return block2;
+}
+function windowBlock(live, duration2, pending) {
+  const w2 = live.window, cu = live.currency, zone = live.zone;
+  const block2 = { id: "window", title: `Best published ${durationText(duration2)} window`, value: "Unavailable", status: "", detail: "", lines: [], details: [] };
+  if (pending) {
+    block2.status = pending;
+    return block2;
+  }
+  if (!w2.known) {
+    block2.status = `Unknown: ${reasonText(w2.reason)}`;
+    block2.lines.push({ label: "Basis", text: BASIS_TEXT(cu) });
+    return block2;
+  }
+  block2.value = moneyIn(w2.price, cu);
+  block2.status = `${span(w2.start, w2.end, zone)} \xB7 ${durationText(duration2)}`;
+  block2.lines.push({ label: "Mean", text: "Duration-weighted mean of the published prices in this window" });
+  if (w2.comparison.known) block2.lines.push({ label: "Relative", text: `Assumption: this window's mean compared with single interval prices of the last ${live.baseline.expected} days, higher than about ${Math.round(w2.comparison.percentile)}% of interval time` });
+  else block2.lines.push({ label: "Relative", text: `Unknown: ${reasonText(w2.comparison.reason)}` });
+  block2.lines.push({ label: "Not a plan", text: "Published prices only: not the charging plan. It may fall outside the deadline, cap or car availability." });
+  block2.lines.push({ label: "Basis", text: BASIS_TEXT(cu) });
+  block2.details.push(`Searched the unbroken published stretch${w2.horizon ? ` from ${stamp(w2.horizon.from, zone)} to ${stamp(w2.horizon.until, zone)}` : " ahead"}; a gap or the end of publication ends a window, ties go to the earliest. ${sourceLine(live.providers.live)}.`);
+  return block2;
+}
+function monthColumn(m4) {
+  const f3 = (v2) => moneyIn(v2, m4.currency);
+  return { title: `${monthLabel(m4.month)}${m4.toDate ? " so far" : ""}`, rows: m4.known ? [`${f3(m4.stats.mean)}`, `${f3(m4.stats.min)} \u2013 ${f3(m4.stats.max)}`, `${f3(m4.stats.p10)} \xB7 ${f3(m4.stats.p50)} \xB7 ${f3(m4.stats.p90)}`, percent2(m4.stats.negativeShare, 1), `${m4.daysComplete} of ${m4.daysExpected}`] : [] };
+}
+var COMPARE_ROWS = ["Weighted mean", "Low \u2013 high", "10th \xB7 50th \xB7 90th percentile", "Time below zero", "Complete days"];
+function monthBlock(entry, month) {
+  const block2 = { id: "month", title: `${monthLabel(month)}`, value: "Unavailable", status: "Loading\u2026", detail: "", lines: [], details: [] };
+  if (!entry || entry.status === "loading") return block2;
+  if (entry.status === "error") {
+    block2.status = entry.error.message;
+    return block2;
+  }
+  const m4 = entry.parsed, f3 = (v2) => moneyIn(v2, m4.currency);
+  block2.title = `${monthLabel(m4.month)}${m4.toDate ? " so far" : ""}`;
+  block2.status = m4.toDate ? `${m4.daysComplete} of ${m4.daysExpected} completed days${m4.asOf ? ` (through ${m4.asOf})` : ""} \xB7 month not complete` : `${m4.daysComplete} of ${m4.daysExpected} days complete`;
+  if (m4.daysPartial) block2.status += ` \xB7 ${m4.daysPartial} partial`;
+  if (m4.known) {
+    block2.value = f3(m4.stats.mean);
+    block2.lines.push({ label: "Range", text: `Low ${f3(m4.stats.min)} \xB7 high ${f3(m4.stats.max)}` });
+    block2.lines.push({ label: "Spread", text: `10th / 50th / 90th percentile (by time): ${f3(m4.stats.p10)} \xB7 ${f3(m4.stats.p50)} \xB7 ${f3(m4.stats.p90)}` });
+    block2.lines.push({ label: "Below zero", text: `${percent2(m4.stats.negativeShare, 1)} of the time (${(m4.stats.negativeSeconds / 3600).toFixed(1)} h)` });
+  } else block2.lines.push({ label: "Unknown", text: `${reasonText(m4.reason)}${m4.reason === "too_few_complete_days" ? ` (${m4.min} needed)` : ""}; no price statistics are shown rather than a misleading one` });
+  block2.lines.push({ label: "Coverage", text: m4.coverage.ratio === null ? "No completed day to measure yet" : `${percent2(m4.coverage.ratio * 100, 1)} of the expected time has complete prices${m4.daysPartial ? `; ${m4.daysPartial} partial day(s) are counted apart and not in the statistics` : ""}` });
+  const ex = excludedText(m4.excluded);
+  if (ex) block2.lines.push({ label: "Excluded days", text: ex });
+  block2.lines.push({ label: "Basis", text: BASIS_TEXT(m4.currency) });
+  block2.details.push(`Statistics use the complete days only, weighted by time (15-minute and hourly rows mix without resampling). ${sourceLine(m4.providers)}.${m4.toDate ? " The current month counts completed days only; today and the future are never included." : ""}`);
+  return block2;
+}
+function compareMonths(a4, b3) {
+  if (!a4 || !b3) return null;
+  const ca = a4.parsed, cb = b3.parsed;
+  if (!ca || !cb) return { eligible: false, text: "The other month could not be read, so no comparison is shown." };
+  const name = (m4) => `${monthLabel(m4.month)}${m4.toDate ? " so far" : ""}`;
+  for (const m4 of [ca, cb]) if (!m4.known) return { eligible: false, text: `No comparison: ${name(m4)} has no statistics (${reasonText(m4.reason)}).` };
+  if (ca.currency !== cb.currency || ca.basis !== cb.basis || ca.area !== cb.area) return { eligible: false, text: "No comparison: the two months use a different area, currency or price basis." };
+  const cols = [monthColumn(ca), monthColumn(cb)];
+  const partial = [ca, cb].filter((m4) => m4.toDate).map((m4) => `${monthLabel(m4.month)} counts completed days only (${m4.daysComplete} of ${m4.daysExpected})`);
+  return { eligible: true, head: ["", cols[0].title, cols[1].title], rows: COMPARE_ROWS.map((label2, i7) => [label2, cols[0].rows[i7], cols[1].rows[i7]]), note: partial.length ? `${partial.join("; ")}; it is not a full month.` : "Both are full months with enough complete days. Shown side by side, not subtracted." };
+}
+function failure(error2) {
+  const code = typeof error2?.code === "string" ? error2.code : "";
+  if (/unauthorized|permission|forbidden/i.test(code)) return { state: "permission", message: "You do not have permission to read price insights." };
+  if (/unknown_command|not_found|unknown_message/i.test(code)) return { state: "unavailable", message: "The installed integration does not provide price insights yet; update the integration and card together." };
+  if (code === "spotnav_unsupported_api_version") return { state: "unavailable", message: "The installed integration does not speak this insights version; update the integration and card together." };
+  if (code === "spotnav_no_price_area" || code === "spotnav_unknown_price_area") return { state: "unavailable", message: "No price area is configured, so there are no price insights." };
+  if (error2?.message === "invalid") return { state: "invalid", message: "The insights answer could not be understood and was not shown." };
+  return { state: "error", message: "Price insights could not be read." };
+}
+var CAUTION = "Price opportunities are not the charging plan: they may fall outside the deadline, cap or car availability. Reading this card never sends a plan, replans, wakes the car or changes a setting. Prices are not charging costs or savings.";
+var METHOD = 'Prices are the raw published spot price per kWh without fees, taxes or margin; euro prices are shown in cents. The baseline is the last 30 completed local days of the price area that are fully held (at least 7 are needed). "Relative" says how much of that baseline time the price was lower, weighted by duration, and never recolours the chart; the Cheap / Normal / Medium / Expensive band is a separate fixed rule on euro cents (<8, 8 to <15, 15 to 25, >25). The best window is the cheapest unbroken stretch of published prices of the chosen length from now on; unpublished prices are never guessed. Monthly statistics use complete days only; the current month counts completed days to date. A comparison is shown only when both months have enough complete days on the same basis.';
+function createPriceInsights({ request, onChange = () => {
+}, now = () => Date.now() }) {
+  let ctx = null, key3 = null, liveSeq = 0, monthSeq = 0;
+  const initial = () => ({ duration: DEFAULT_DURATION, month: null, compare: null, today: null, live: { result: null, at: NaN, loading: false, error: null, duration: null }, months: /* @__PURE__ */ new Map() });
+  let st = initial();
+  const reset = () => {
+    liveSeq++;
+    monthSeq++;
+    st = initial();
+  };
+  const keyOf = (c5) => JSON.stringify([c5.charger, c5.epoch, c5.area, c5.currency]);
+  const options2 = () => monthOptions(ctx.today);
+  const currentMonth = () => monthOf(ctx.today);
+  const shownMonth = () => st.month || currentMonth();
+  const known = (month) => options2().some((o9) => o9.value === month);
+  async function loadLive() {
+    const mine = ++liveSeq, myKey = key3, asked = { charger: ctx.charger, area: ctx.area, currency: ctx.currency, duration: st.duration };
+    st.live.loading = true;
+    st.live.error = null;
+    try {
+      const answer = await request({ mode: "live", duration_minutes: asked.duration });
+      if (mine !== liveSeq || myKey !== key3) return;
+      const parsed = parseLive(answer, asked);
+      if (!parsed) throw new Error("invalid");
+      st.live.result = parsed;
+      st.live.at = now();
+      st.live.duration = asked.duration;
+    } catch (error2) {
+      if (mine !== liveSeq || myKey !== key3) return;
+      st.live.error = failure(error2);
+    }
+    st.live.loading = false;
+    onChange();
+  }
+  async function loadMonth(month) {
+    const mine = ++monthSeq, myKey = key3, asked = { charger: ctx.charger, area: ctx.area, currency: ctx.currency, month };
+    const entry = { status: "loading", token: mine, parsed: null, error: null, at: NaN };
+    st.months.set(month, entry);
+    for (const old of [...st.months.keys()]) if (st.months.size > CACHE_MONTHS && ![shownMonth(), st.compare, month].includes(old)) st.months.delete(old);
+    try {
+      const answer = await request({ mode: "monthly", month });
+      if (myKey !== key3 || st.months.get(month) !== entry) return;
+      if (month !== shownMonth() && month !== st.compare) {
+        st.months.delete(month);
+        return;
+      }
+      const parsed = parseMonthly(answer, asked);
+      if (!parsed) throw new Error("invalid");
+      Object.assign(entry, { status: "ready", parsed, at: now() });
+    } catch (error2) {
+      if (myKey !== key3 || st.months.get(month) !== entry) return;
+      if (month !== shownMonth() && month !== st.compare) {
+        st.months.delete(month);
+        return;
+      }
+      Object.assign(entry, { status: "error", error: failure(error2) });
+    }
+    onChange();
+  }
+  const liveDue = () => {
+    const l6 = st.live, age = now() - l6.at;
+    if (!l6.result || l6.loading || l6.error) return false;
+    const ended = l6.result.current.known && l6.result.current.end <= now();
+    return age > LIVE_REFRESH_MS || ended && age > INTERVAL_END_GAP_MS;
+  };
+  const wanted = () => [shownMonth(), st.compare].filter(Boolean);
+  const api = {
+    /** Tell it who is asking. A change of charger, generation/permission epoch, area or currency drops everything. */
+    sync(next) {
+      const valid = !!(next && next.charger && next.epoch !== void 0 && typeof next.area === "string" && next.area && /^[A-Z]{3}$/.test(next.currency || "") && Number.isFinite(dayMs(next.today)));
+      const nextKey = valid ? keyOf(next) : null;
+      if (nextKey !== key3) {
+        reset();
+        key3 = nextKey;
+      }
+      ctx = valid ? next : null;
+      if (!ctx) return api;
+      if (st.today !== null && st.today !== ctx.today) {
+        st.months.clear();
+        monthSeq++;
+        st.live.at = Math.min(st.live.at, now() - LIVE_REFRESH_MS - 1);
+      }
+      st.today = ctx.today;
+      if (st.month && !known(st.month)) st.month = null;
+      if (st.compare && (!known(st.compare) || st.compare === shownMonth())) st.compare = null;
+      if (!st.live.result && !st.live.loading && !st.live.error) void loadLive();
+      else if (liveDue()) void loadLive();
+      for (const month of wanted()) if (!st.months.has(month)) void loadMonth(month);
+      return api;
+    },
+    /** An explicit window length (15..720 in steps of 15): one live read; nothing is saved. */
+    setDuration(minutes) {
+      if (!ctx || !DURATIONS.includes(minutes) || minutes === st.duration) return;
+      st.duration = minutes;
+      void loadLive();
+      onChange();
+    },
+    /** An explicit month from the bounded picker: one monthly read unless it is already held in memory. */
+    selectMonth(month) {
+      if (!ctx || !known(month)) return;
+      st.month = month === currentMonth() ? null : month;
+      if (st.compare === shownMonth()) st.compare = null;
+      const entry = st.months.get(month);
+      if (!entry || entry.status === "error") void loadMonth(month);
+      onChange();
+    },
+    /** An explicit second month (or '' / 'previous'): at most one more monthly read. */
+    selectCompare(month) {
+      if (!ctx) return;
+      const target = month === "previous" ? prevMonth(shownMonth()) : month;
+      if (!target) {
+        st.compare = null;
+        onChange();
+        return;
+      }
+      if (!known(target) || target === shownMonth()) return;
+      st.compare = target;
+      const entry = st.months.get(target);
+      if (!entry || entry.status === "error") void loadMonth(target);
+      onChange();
+    },
+    /** Explicit retry of whatever failed; each failed read once, never on a timer. */
+    retry() {
+      if (!ctx) return;
+      if (st.live.error && !st.live.loading) void loadLive();
+      for (const month of wanted()) if (st.months.get(month)?.status === "error") void loadMonth(month);
+      onChange();
+    },
+    view() {
+      if (!ctx) return null;
+      const nowMs = now(), l6 = st.live;
+      const month = shownMonth(), opts = options2();
+      const entry = st.months.get(month), cmpEntry = st.compare ? st.months.get(st.compare) : null;
+      const banners = [];
+      const blocks = [];
+      let currentUsable = false;
+      if (l6.result) {
+        const refreshFailed = !!l6.error;
+        const stale = refreshFailed || nowMs - l6.at > 2 * LIVE_REFRESH_MS;
+        currentUsable = !stale;
+        if (refreshFailed) banners.push({ kind: "refresh-failed", text: `The latest refresh failed (${l6.error.message}). Prices below are the earlier read from ${stamp(l6.at, l6.result.zone, false)}.` });
+        const durationPending = l6.duration !== st.duration ? l6.loading ? "Loading\u2026" : l6.error ? l6.error.message : "Loading\u2026" : null;
+        const cur = currentBlock2(l6.result, nowMs);
+        if (stale) cur.title = "Price at last read";
+        blocks.push(cur, windowBlock(l6.result, st.duration, durationPending));
+      } else {
+        const text4 = l6.error ? l6.error.message : "Loading price insights\u2026";
+        banners.push({ kind: l6.error ? l6.error.state : "loading", text: text4 });
+        blocks.push(
+          { id: "current", title: "Current price", value: "Unavailable", status: l6.error ? "Unavailable" : "Loading\u2026", lines: [], details: [] },
+          { id: "window", title: `Best published ${durationText(st.duration)} window`, value: "Unavailable", status: l6.error ? "Unavailable" : "Loading\u2026", lines: [], details: [] }
+        );
+      }
+      const mb = monthBlock(entry, month);
+      let table2 = null;
+      if (st.compare) {
+        const cmp = cmpEntry?.status === "ready" && entry?.status === "ready" ? compareMonths(entry, cmpEntry) : null;
+        if (cmp) table2 = cmp;
+        else table2 = { eligible: false, text: cmpEntry?.status === "error" ? cmpEntry.error.message : !entry || entry.status !== "ready" ? "Comparison waits for the selected month." : "Loading the other month\u2026" };
+      }
+      mb.table = table2;
+      blocks.push(mb);
+      const unit = priceUnit(ctx.currency);
+      const failed = !!l6.error || [entry, cmpEntry].some((e9) => e9?.status === "error");
+      const compareOptions = [{ value: "", label: "No comparison" }, ...opts.filter((o9) => o9.value !== month)];
+      const previous = prevMonth(month);
+      return {
+        state: l6.result ? "ready" : l6.error ? l6.error.state : "loading",
+        intro: `Published spot prices in ${unit}, without fees or taxes. ${l6.result ? `Read ${stamp(l6.at, l6.result.zone, false)} (${l6.result.zone}).` : ""}`.trim(),
+        blocks,
+        banners,
+        caution: CAUTION,
+        method: METHOD,
+        currentUsable,
+        controls: {
+          duration: { value: st.duration, options: DURATIONS.map((v2) => ({ value: v2, label: durationText(v2) })), busy: l6.loading },
+          month: { value: month, options: opts, busy: entry?.status === "loading" },
+          compare: { value: st.compare || "", options: compareOptions, previous: previous && known(previous) && st.compare !== previous ? { value: previous, label: monthLabel(previous) } : null, busy: cmpEntry?.status === "loading" },
+          canRetry: failed && !l6.loading
+        }
+      };
+    },
+    dispose() {
+      liveSeq++;
+      monthSeq++;
+      ctx = null;
+      key3 = null;
+      st = initial();
+    }
+  };
+  return api;
 }
 
 // sidebar/price-chart.js
@@ -58765,11 +59278,11 @@ function decodeTarget(source) {
   exactKeys(source, TARGET_KEYS);
   let targetPercent = null;
   if (source["target_percent"] !== null) {
-    const percent2 = finite2(source, "target_percent");
-    if (percent2 < 0 || percent2 > 100) {
+    const percent3 = finite2(source, "target_percent");
+    if (percent3 < 0 || percent3 > 100) {
       return bad();
     }
-    targetPercent = percent2;
+    targetPercent = percent3;
   }
   return {
     vehicle_id: textOrNull(source, "vehicle_id"),
@@ -59341,7 +59854,7 @@ function instantMs(value2) {
   const parsed = Date.parse(value2);
   return Number.isFinite(parsed) ? parsed : bad2();
 }
-function instant2(source, key3) {
+function instant3(source, key3) {
   const value2 = source[key3];
   const ms2 = instantMs(value2);
   return { text: value2, ms: ms2 };
@@ -59505,8 +60018,8 @@ function priceSource(raw) {
 }
 function decodeInterval(raw, timeZone, previous) {
   const source = record2(raw);
-  const start2 = instant2(source, "start");
-  const end2 = instant2(source, "end");
+  const start2 = instant3(source, "start");
+  const end2 = instant3(source, "end");
   const day = text2(source, "day");
   const duration2 = numberValue(source, "duration_minutes");
   if (end2.ms <= start2.ms) {
@@ -59620,8 +60133,8 @@ function decodePeriods(source) {
   const periods = [];
   for (const raw of arrayValue(source, "periods")) {
     const entry = record2(raw);
-    const start2 = instant2(entry, "start");
-    const end2 = instant2(entry, "end");
+    const start2 = instant3(entry, "start");
+    const end2 = instant3(entry, "end");
     if (end2.ms <= start2.ms) {
       bad2();
     }
@@ -60198,7 +60711,7 @@ function decodeStatus(source) {
     return bad2();
   }
   let blocking = false;
-  const lines3 = arrayValue(source, "lines").map((raw) => {
+  const lines4 = arrayValue(source, "lines").map((raw) => {
     const line = record2(raw);
     exactKeys2(line, ["code", "params"]);
     const code = text2(line, "code");
@@ -60219,7 +60732,7 @@ function decodeStatus(source) {
   if (blocking !== (tone === "blocking")) {
     return bad2();
   }
-  return { tone, lines: lines3 };
+  return { tone, lines: lines4 };
 }
 function decodeDashboard(raw) {
   try {
@@ -60376,8 +60889,8 @@ function priceSourceOrNull(root) {
   }
   try {
     exactKeys2(value2, ["entry_id", "title", "charger_count", "choices", "writable", "duplicate"]);
-    const count2 = value2.charger_count;
-    if (typeof count2 !== "number" || !Number.isInteger(count2) || count2 < 0 || typeof value2.writable !== "boolean") {
+    const count3 = value2.charger_count;
+    if (typeof count3 !== "number" || !Number.isInteger(count3) || count3 < 0 || typeof value2.writable !== "boolean") {
       return bad2();
     }
     const choices = arrayValue(value2, "choices").map((entry) => {
@@ -60400,7 +60913,7 @@ function priceSourceOrNull(root) {
     return {
       entry_id: text2(value2, "entry_id"),
       title: text2(value2, "title"),
-      charger_count: count2,
+      charger_count: count3,
       choices,
       writable: value2.writable,
       duplicate
@@ -60611,11 +61124,11 @@ function chargeBarOrNull(root) {
     if (!CHARGE_BAR_BASES.includes(basis)) {
       return null;
     }
-    const percent2 = numberOrNull(value2, "percent");
-    if (percent2 !== null && (!Number.isInteger(percent2) || percent2 < 0 || percent2 > 100)) {
+    const percent3 = numberOrNull(value2, "percent");
+    if (percent3 !== null && (!Number.isInteger(percent3) || percent3 < 0 || percent3 > 100)) {
       return null;
     }
-    if (basis === "open" !== (percent2 === null)) {
+    if (basis === "open" !== (percent3 === null)) {
       return null;
     }
     const moment = (key3) => required(value2, key3) === null ? null : instantMs(value2[key3]);
@@ -60625,7 +61138,7 @@ function chargeBarOrNull(root) {
     };
     return {
       basis,
-      percent: percent2,
+      percent: percent3,
       ends_at_ms: moment("ends_at"),
       power_kw: positive2("power_kw"),
       power_source: textOrNull2(value2, "power_source"),
@@ -60731,10 +61244,10 @@ function startingUpOrNull(root) {
   }
 }
 function strategyOptions(root) {
-  const options = arrayValue(root, "strategy_options").map(
+  const options2 = arrayValue(root, "strategy_options").map(
     (entry) => typeof entry === "string" && STRATEGIES2.includes(entry) ? entry : bad2()
   );
-  return new Set(options).size === options.length ? options : bad2();
+  return new Set(options2).size === options2.length ? options2 : bad2();
 }
 function detectedPhases(root) {
   const value2 = numberOrNull(root, "detected_phases");
@@ -61466,8 +61979,8 @@ function decodeConfig(raw) {
   if (rawSite !== null) {
     const siteSource = record3(rawSite);
     exactKeys3(siteSource, ["name", "charger_count", "measurement", "warnings", "detection"]);
-    const count2 = siteSource["charger_count"];
-    if (typeof count2 !== "number" || !Number.isInteger(count2) || count2 < 0) {
+    const count3 = siteSource["charger_count"];
+    if (typeof count3 !== "number" || !Number.isInteger(count3) || count3 < 0) {
       return bad3();
     }
     const detection = record3(siteSource["detection"]);
@@ -61475,7 +61988,7 @@ function decodeConfig(raw) {
     exactKeys3(detection, rawChargers === void 0 ? ["meters", "batteries"] : ["meters", "batteries", "chargers"]);
     site = {
       name: text3(siteSource, "name"),
-      chargerCount: count2,
+      chargerCount: count3,
       measurement: decodeMeasurement(siteSource["measurement"]),
       warnings: list3(siteSource, "warnings").map(decodeWarning),
       meters: list3(detection, "meters").map(decodeMeter),
@@ -61671,10 +62184,10 @@ function sensorModel(vehicle, entityState) {
       text4 += " It currently reports no value (unavailable or unknown).";
     }
   }
-  const options = [{ value: "", text: vehicle.source === "confirmed" ? "Return to automatic detection (clear my choice)" : selected === null ? "Choose a sensor\u2026" : "Automatic (only candidate)" }];
-  for (const c5 of candidates) options.push({ value: c5.entityId, text: label(c5) });
-  if (base2 && !candidates.some((c5) => c5.entityId === base2)) options.push({ value: base2, text: `${label(selected)} (no longer offered)` });
-  return { status, level, text: text4, base: base2, options };
+  const options2 = [{ value: "", text: vehicle.source === "confirmed" ? "Return to automatic detection (clear my choice)" : selected === null ? "Choose a sensor\u2026" : "Automatic (only candidate)" }];
+  for (const c5 of candidates) options2.push({ value: c5.entityId, text: label(c5) });
+  if (base2 && !candidates.some((c5) => c5.entityId === base2)) options2.push({ value: base2, text: `${label(selected)} (no longer offered)` });
+  return { status, level, text: text4, base: base2, options: options2 };
 }
 function propertiesModel(props, row3, canWrite) {
   if (!props) return null;
@@ -61932,12 +62445,12 @@ function fiscalFormFrom(row3, component) {
     intent: stored === null ? "suggested" : "custom"
   };
 }
-function marketIncluded(options, areaId) {
-  const area = areaId === null ? null : options.areas.find((item) => item.area_id === areaId) ?? null;
+function marketIncluded(options2, areaId) {
+  const area = areaId === null ? null : options2.areas.find((item) => item.area_id === areaId) ?? null;
   return area === null ? [] : area.included ?? [];
 }
-function marketSuggestion(options, areaId, component) {
-  const area = areaId === null ? null : options.areas.find((item) => item.area_id === areaId) ?? null;
+function marketSuggestion(options2, areaId, component) {
+  const area = areaId === null ? null : options2.areas.find((item) => item.area_id === areaId) ?? null;
   if (area === null) {
     return null;
   }
@@ -61946,15 +62459,15 @@ function marketSuggestion(options, areaId, component) {
   }
   return component === "tax" ? area.suggestions.tax_minor : area.suggestions.transfer_minor;
 }
-function fiscalUnit(options, areaId, component) {
+function fiscalUnit(options2, areaId, component) {
   if (component === "vat") {
     return "%";
   }
-  const area = areaId === null ? null : options.areas.find((item) => item.area_id === areaId) ?? null;
+  const area = areaId === null ? null : options2.areas.find((item) => item.area_id === areaId) ?? null;
   return area === null ? "" : area.minor_unit;
 }
-function marketAreaIsKnown(options, base2, areaId) {
-  return areaId === base2.area_id || options.areas.some((area) => area.area_id === areaId);
+function marketAreaIsKnown(options2, base2, areaId) {
+  return areaId === base2.area_id || options2.areas.some((area) => area.area_id === areaId);
 }
 function checkCustomFigure(text4) {
   const trimmed = text4.trim().replace(",", ".");
@@ -61978,12 +62491,12 @@ function retainedFigure(text4) {
   const kept = Number(trimmed);
   return Number.isFinite(kept) ? kept : null;
 }
-function fiscalStated(options, areaId, component, value2) {
+function fiscalStated(options2, areaId, component, value2) {
   if (value2.intent === "suggested") {
     if (!value2.enabled) {
       return { ok: true, value: { enabled: false, value: null } };
     }
-    if (marketSuggestion(options, areaId, component) === null) {
+    if (marketSuggestion(options2, areaId, component) === null) {
       const typed2 = checkCustomFigure(value2.value);
       return typed2.ok ? { ok: true, value: { enabled: true, value: typed2.value } } : typed2;
     }
@@ -62010,12 +62523,12 @@ function rowStatesNothing(row3) {
   }
   return true;
 }
-function marketReplacement(base2, values, options) {
+function marketReplacement(base2, values, options2) {
   const areaId = values.areaId;
   if (areaId === null) {
     return { ok: false, errorKey: "market.error.areaRequired" };
   }
-  if (!marketAreaIsKnown(options, base2, areaId)) {
+  if (!marketAreaIsKnown(options2, base2, areaId)) {
     return { ok: false, errorKey: "market.error.areaUnknown" };
   }
   const components = {
@@ -62024,13 +62537,13 @@ function marketReplacement(base2, values, options) {
     transfer: { enabled: false, value: null }
   };
   const stored = base2.overrides.find((item) => item.area_id === areaId) ?? null;
-  const included = marketIncluded(options, areaId);
+  const included = marketIncluded(options2, areaId);
   for (const component of FISCAL_COMPONENTS) {
     if (included.includes(component)) {
       components[component] = stored === null ? { enabled: false, value: null } : { ...stored[component] };
       continue;
     }
-    const stated = fiscalStated(options, areaId, component, values[component]);
+    const stated = fiscalStated(options2, areaId, component, values[component]);
     if (!stated.ok) {
       return stated;
     }
@@ -62095,8 +62608,8 @@ var SUGGESTED_WINDOW = { days: "weekdays", from_month: 11, to_month: 3, from_hou
 function sameWindow(a4, b3) {
   return a4.days === b3.days && a4.from_month === b3.from_month && a4.to_month === b3.to_month && a4.from_hour === b3.from_hour && a4.to_hour === b3.to_hour;
 }
-function gridTariffIncluded(block) {
-  return block.transfer_percent.policy === "included" || block.transfer_high.policy === "included";
+function gridTariffIncluded(block2) {
+  return block2.transfer_percent.policy === "included" || block2.transfer_high.policy === "included";
 }
 function feeBody(fee) {
   return { enabled: fee.policy === "manual", value: fee.explicit_value };
@@ -62108,13 +62621,13 @@ function copyComponent(component) {
     price_per_kw: { ...component.price_per_kw }
   };
 }
-function storedBody(block) {
+function storedBody(block2) {
   const body = {
-    transfer_percent: feeBody(block.transfer_percent),
-    transfer_high: feeBody(block.transfer_high),
-    high_load_window: block.high_load_window === null ? null : { ...block.high_load_window }
+    transfer_percent: feeBody(block2.transfer_percent),
+    transfer_high: feeBody(block2.transfer_high),
+    high_load_window: block2.high_load_window === null ? null : { ...block2.high_load_window }
   };
-  return block.demand === null ? body : { ...body, demand_components: block.demand.components.map(copyComponent) };
+  return block2.demand === null ? body : { ...body, demand_components: block2.demand.components.map(copyComponent) };
 }
 function sameComponent(a4, b3) {
   const window2 = a4.window === null || b3.window === null ? a4.window === b3.window : sameWindow(a4.window, b3.window);
@@ -62135,19 +62648,19 @@ var ok2 = (n6) => Number.isFinite(n6);
 var LABELS = { vat: "VAT", tax: "Energy tax", transfer: "Grid fee (flat)" };
 var DAY_CHOICES = [["all", "Every day"], ["weekdays", "Monday\u2013Friday"], ["mon_sat", "Monday\u2013Saturday"]];
 var MONTHS2 = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-var BASIS_TEXT = "How a configured variable cost is built: the raw published price, plus energy tax, plus the grid fee (the flat fee, or the high-load fee inside its hours), plus the grid fee as a percentage of the raw price (it follows the raw price\u2019s sign), then multiplied by (1 + VAT). VAT therefore applies to the tax and fees as well. A raw price can be negative; configured fees may make the final cost positive. A price that the area list says already includes a charge is not charged for it again.";
-var areaOf = (options, id) => options && id ? options.areas.find((a4) => a4.area_id === id) || null : null;
+var BASIS_TEXT2 = "How a configured variable cost is built: the raw published price, plus energy tax, plus the grid fee (the flat fee, or the high-load fee inside its hours), plus the grid fee as a percentage of the raw price (it follows the raw price\u2019s sign), then multiplied by (1 + VAT). VAT therefore applies to the tax and fees as well. A raw price can be negative; configured fees may make the final cost positive. A price that the area list says already includes a charge is not charged for it again.";
+var areaOf = (options2, id) => options2 && id ? options2.areas.find((a4) => a4.area_id === id) || null : null;
 var figureText = (n6) => ok2(n6) ? String(n6) : "";
 var modeOf = (form) => !form.enabled ? "off" : form.intent === "suggested" ? "suggested" : "custom";
-function costSignature(record5, options, block, areaId) {
+function costSignature(record5, options2, block2, areaId) {
   const id = areaId ?? record5?.area_id ?? null;
   const row3 = record5 ? record5.overrides.find((o9) => o9.area_id === id) || null : null;
   return JSON.stringify([
     record5?.area_id ?? null,
     row3,
-    options ? options.state : null,
-    options && id ? marketIncluded(options, id) : null,
-    block ? [block.write_revision, block.transfer_percent.policy, block.transfer_percent.explicit_value, block.transfer_high.policy, block.transfer_high.explicit_value, block.high_load_window] : null
+    options2 ? options2.state : null,
+    options2 && id ? marketIncluded(options2, id) : null,
+    block2 ? [block2.write_revision, block2.transfer_percent.policy, block2.transfer_percent.explicit_value, block2.transfer_high.policy, block2.transfer_high.explicit_value, block2.high_load_window] : null
   ]);
 }
 function providerLines(dashboard) {
@@ -62189,14 +62702,14 @@ function currencyLine(dashboard, area) {
   if (!cur) return "Currency unknown for the selected area.";
   return `Currency ${cur}${major ? ` (${major}${minor ? `, minor unit ${minor}` : ""})` : ""}. Prices and the chart show ${priceUnit(cur)}; flat fees are entered in ${minor ? `${minor}/kWh` : "the area\u2019s minor unit (unknown)"} exactly as stored, and VAT and the grid fee percentage in %.`;
 }
-function feeRows(record5, options, areaId, canEdit) {
+function feeRows(record5, options2, areaId, canEdit) {
   const row3 = record5.overrides.find((o9) => o9.area_id === areaId) || null;
-  const included = marketIncluded(options, areaId);
+  const included = marketIncluded(options2, areaId);
   const rows = [];
   for (const key3 of FISCAL_COMPONENTS) {
     const form = fiscalFormFrom(row3, key3);
-    const suggestion = marketSuggestion(options, areaId, key3);
-    const unit = fiscalUnit(options, areaId, key3) ? key3 === "vat" ? "%" : `${fiscalUnit(options, areaId, key3)}/kWh` : key3 === "vat" ? "%" : "unit unknown";
+    const suggestion = marketSuggestion(options2, areaId, key3);
+    const unit = fiscalUnit(options2, areaId, key3) ? key3 === "vat" ? "%" : `${fiscalUnit(options2, areaId, key3)}/kWh` : key3 === "vat" ? "%" : "unit unknown";
     const stored = row3 ? row3[key3] : null;
     const base2 = modeOf(form);
     if (included.includes(key3)) {
@@ -62211,19 +62724,19 @@ function feeRows(record5, options, areaId, canEdit) {
   }
   return rows;
 }
-function tariffModel(block, canEdit) {
-  if (!block) return null;
-  const included = gridTariffIncluded(block);
-  const high = block.transfer_high, pct = block.transfer_percent;
-  const stored = block.high_load_window;
+function tariffModel(block2, canEdit) {
+  if (!block2) return null;
+  const included = gridTariffIncluded(block2);
+  const high = block2.transfer_high, pct = block2.transfer_percent;
+  const stored = block2.high_load_window;
   const win = stored || SUGGESTED_WINDOW;
   const highUnit = high.unit;
-  const edit = canEdit && block.writable === true && !included;
-  const demandCount = block.demand ? block.demand.components.length : 0;
+  const edit = canEdit && block2.writable === true && !included;
+  const demandCount = block2.demand ? block2.demand.components.length : 0;
   return {
     included,
     canEdit: edit,
-    writable: block.writable === true,
+    writable: block2.writable === true,
     percent: { mode: pct.policy === "manual" ? "custom" : "off", figure: figureText(pct.explicit_value), unit: "%", policy: pct.policy },
     high: { mode: high.policy === "manual" ? "custom" : "off", figure: figureText(high.explicit_value), unit: highUnit ? highUnit : "unit unknown", unitKnown: !!highUnit, policy: high.policy },
     window: { ...win, stored: !!stored, suggested: !stored },
@@ -62240,19 +62753,19 @@ function tariffModel(block, canEdit) {
 function marketCostsModel(input) {
   const base2 = { notice: input.notice || "", conflict: !!input.conflict, busy: !!input.busy };
   const dashboard = input.dashboard || null;
-  const summary = { ...providerLines(dashboard), held: heldLine(dashboard), basis: BASIS_TEXT, ...nowLine(dashboard, input.now) };
+  const summary = { ...providerLines(dashboard), held: heldLine(dashboard), basis: BASIS_TEXT2, ...nowLine(dashboard, input.now) };
   const reloadNote = (text4) => ({ ...base2, ...summary, state: input.loading ? "loading" : "unavailable", canEdit: false, notice: base2.notice || text4 });
   if (!input.record) return reloadNote(input.loading ? "Loading market and cost settings\u2026" : "Market and cost settings unavailable. Use Reload to try again.");
   if (!input.options) return reloadNote(input.loading ? "Loading the area list\u2026" : "The area list is unavailable, so area and fees cannot be shown or changed. Use Reload to try again.");
   const optionsFresh = ok2(input.optionsAt) && input.now - input.optionsAt <= OPTIONS_MAX_AGE_MS && !input.failed;
-  const record5 = input.record, options = input.options;
-  const editableState = marketEditable(options.state, input.admin === true);
+  const record5 = input.record, options2 = input.options;
+  const editableState = marketEditable(options2.state, input.admin === true);
   const dashFresh4 = input.dashboardFresh !== false && !!dashboard;
   const baseEdit = input.admin === true && !input.blocked && !input.conflict && !input.busy && !input.awaitingRead;
   const canEdit = baseEdit && editableState && optionsFresh && dashFresh4;
   const notes = [];
   if (!input.admin) notes.push("Administrator permission is required to change the market, taxes and fees. Everything here is read-only.");
-  const stateKey = marketStateKey(options.state, options.reason);
+  const stateKey = marketStateKey(options2.state, options2.reason);
   if (stateKey) notes.push(translate2("en", stateKey));
   if (!editableState && input.admin) notes.push("The area list is not held, so the saved area is shown but nothing can be changed.");
   if (input.admin && !optionsFresh) notes.push("The area list is stale or its refresh failed; changes are disabled until it is read again.");
@@ -62260,18 +62773,18 @@ function marketCostsModel(input) {
   if (input.awaitingRead && input.admin) notes.push("Waiting for a fresh dashboard read after the last save before another change.");
   const savedId = record5.area_id;
   const areaId = input.areaDraft ?? savedId;
-  const area = areaOf(options, areaId);
-  const savedListed = !savedId || !!areaOf(options, savedId);
+  const area = areaOf(options2, areaId);
+  const savedListed = !savedId || !!areaOf(options2, savedId);
   if (savedId && !savedListed) notes.push(`The saved area ${savedId} is no longer in the area list; it is kept until you choose another.`);
   const areaOptions = [];
   if (!savedId) areaOptions.push({ value: "", text: "No area saved \u2014 choose one\u2026" });
   if (savedId && !savedListed) areaOptions.push({ value: savedId, text: `${savedId} (no longer listed)` });
-  for (const a4 of options.areas) areaOptions.push({ value: a4.area_id, text: `${marketAreaLabel("en", a4.name, a4.area_id)} \xB7 ${a4.currency}` });
+  for (const a4 of options2.areas) areaOptions.push({ value: a4.area_id, text: `${marketAreaLabel("en", a4.name, a4.area_id)} \xB7 ${a4.currency}` });
   const changedArea = areaId !== savedId;
   if (changedArea) notes.push(`The selected area differs from the saved one (${savedId || "none"}). The prices, currency and provider above are for the saved area until you save. Fees start from what is stored for the new area; nothing carries over.`);
-  const model = { ...base2, ...summary, state: "ready", canEdit, notes, areaDraft: changedArea, currencyText: currencyLine(dashboard, area || areaOf(options, savedId)) };
-  model.area = { value: areaId || "", options: areaOptions, canEdit: canEdit && options.areas.length > 0, savedId: savedId || "", savedText: savedId ? marketAreaLabel("en", areaOf(options, savedId)?.name ?? dashboard?.market?.area_name ?? null, savedId) : "none" };
-  model.fees = areaId && area ? feeRows(record5, options, areaId, canEdit) : [];
+  const model = { ...base2, ...summary, state: "ready", canEdit, notes, areaDraft: changedArea, currencyText: currencyLine(dashboard, area || areaOf(options2, savedId)) };
+  model.area = { value: areaId || "", options: areaOptions, canEdit: canEdit && options2.areas.length > 0, savedId: savedId || "", savedText: savedId ? marketAreaLabel("en", areaOf(options2, savedId)?.name ?? dashboard?.market?.area_name ?? null, savedId) : "none" };
+  model.fees = areaId && area ? feeRows(record5, options2, areaId, canEdit) : [];
   if (!model.fees.length) model.notes.push("Choose an area to see its taxes and fees.");
   const ps = dashboard?.price_source ?? null;
   model.source = ps ? { title: ps.title, count: ps.charger_count, writable: ps.writable === true, base: ps.entry_id, choices: ps.choices.map((c5) => ({ value: c5.entry_id, text: c5.title })), canEdit: canEdit && ps.writable === true && ps.choices.length > 1 } : null;
@@ -62280,9 +62793,9 @@ function marketCostsModel(input) {
   model.shared = ps ? `Area and fees belong to the price entry \u201C${ps.title}\u201D, used by ${ps.charger_count} charger${ps.charger_count === 1 ? "" : "s"}; a change applies to all of them.` : "";
   return model;
 }
-function marketWritePlan(record5, options, values, admin) {
+function marketWritePlan(record5, options2, values, admin) {
   if (!admin) return { ok: false, notice: "Administrator permission is required." };
-  if (!record5 || !options) return { ok: false, notice: "Reload market and cost settings first." };
+  if (!record5 || !options2) return { ok: false, notice: "Reload market and cost settings first." };
   const areaId = values?.area ? values.area : null;
   const form = { areaId, vat: null, tax: null, transfer: null };
   for (const key3 of FISCAL_COMPONENTS) {
@@ -62292,31 +62805,31 @@ function marketWritePlan(record5, options, values, admin) {
     else if (v2.mode === "custom") form[key3] = { enabled: true, value: text4, intent: "custom" };
     else form[key3] = { enabled: false, value: text4, intent: text4.trim() === "" ? "suggested" : "custom" };
   }
-  const check = marketReplacement(record5, form, options);
+  const check = marketReplacement(record5, form, options2);
   if (!check.ok) return { ok: false, notice: translate2("en", check.errorKey) };
   if (!check.changed) return { ok: true, changed: false };
   return { ok: true, changed: true, body: check.body, areaChanged: areaId !== record5.area_id, fromArea: record5.area_id, toArea: areaId };
 }
-function tariffWritePlan(block, values) {
-  if (!block) return { ok: false, notice: "This charger has no electricity price entry, so there is no grid tariff to change." };
-  if (block.writable !== true) return { ok: false, notice: "Administrator permission is required." };
-  if (gridTariffIncluded(block)) return { ok: false, notice: "The published price already includes the grid fee; nothing can be added." };
-  const body = storedBody(block);
-  const num4 = (t6) => {
+function tariffWritePlan(block2, values) {
+  if (!block2) return { ok: false, notice: "This charger has no electricity price entry, so there is no grid tariff to change." };
+  if (block2.writable !== true) return { ok: false, notice: "Administrator permission is required." };
+  if (gridTariffIncluded(block2)) return { ok: false, notice: "The published price already includes the grid fee; nothing can be added." };
+  const body = storedBody(block2);
+  const num5 = (t6) => {
     const s4 = typeof t6 === "string" ? t6.trim().replace(",", ".") : "";
     return s4 === "" ? null : Number(s4);
   };
   const p4 = values?.percent || { mode: "off", figure: "" };
   if (p4.mode === "custom") {
-    const n6 = num4(p4.figure);
+    const n6 = num5(p4.figure);
     if (n6 === null) return { ok: false, notice: "Enter the grid fee percentage, or switch it off." };
     if (!ok2(n6) || n6 < 0 || n6 > 1e3) return { ok: false, notice: "The grid fee percentage must be a number from 0 to 1000." };
     body.transfer_percent = { enabled: true, value: n6 };
-  } else body.transfer_percent = { enabled: false, value: block.transfer_percent.explicit_value };
+  } else body.transfer_percent = { enabled: false, value: block2.transfer_percent.explicit_value };
   const h3 = values?.high || { mode: "off", figure: "" };
   if (h3.mode === "custom") {
-    if (!block.transfer_high.unit) return { ok: false, notice: "The area\u2019s unit is unknown, so the high-load fee cannot be set." };
-    const n6 = num4(h3.figure);
+    if (!block2.transfer_high.unit) return { ok: false, notice: "The area\u2019s unit is unknown, so the high-load fee cannot be set." };
+    const n6 = num5(h3.figure);
     if (n6 === null) return { ok: false, notice: "Enter the high-load fee, or switch it off." };
     if (!ok2(n6) || n6 < 0 || n6 > HIGH_LOAD_MAX) return { ok: false, notice: `The high-load fee must be a number from 0 to ${HIGH_LOAD_MAX}.` };
     const w2 = values?.window || {};
@@ -62325,8 +62838,8 @@ function tariffWritePlan(block, values) {
     if (win.from_hour === win.to_hour) return { ok: false, notice: "The high-load window must not start and end at the same hour." };
     body.transfer_high = { enabled: true, value: n6 };
     body.high_load_window = win;
-  } else body.transfer_high = { enabled: false, value: block.transfer_high.explicit_value };
-  return sameBody(body, storedBody(block)) ? { ok: true, changed: false } : { ok: true, changed: true, body, expected: block.write_revision };
+  } else body.transfer_high = { enabled: false, value: block2.transfer_high.explicit_value };
+  return sameBody(body, storedBody(block2)) ? { ok: true, changed: false } : { ok: true, changed: true, body, expected: block2.write_revision };
 }
 function sourceWritePlan(source, values) {
   if (!source) return { ok: false, notice: "This charger has no electricity price entry." };
@@ -62378,8 +62891,8 @@ var marketCostMethods = {
   paintMarketCosts(adapter, dashboard) {
     const admin = this._hass?.user?.is_admin === true, charger = this.charger;
     const unknown2 = this.unknownCostWrites.has(charger) || this.pendingCostWrites.has(charger);
-    const block = dashboard?.grid_tariff ?? null;
-    if (this.costDirty && this.costBase && !this.costConflict && this.settingsRecord && this.marketOptions && costSignature(this.settingsRecord, this.marketOptions, block, this.costBase.areaId) !== this.costBase.signature) {
+    const block2 = dashboard?.grid_tariff ?? null;
+    if (this.costDirty && this.costBase && !this.costConflict && this.settingsRecord && this.marketOptions && costSignature(this.settingsRecord, this.marketOptions, block2, this.costBase.areaId) !== this.costBase.signature) {
       this.costConflict = true;
       this.costNotice = "Market or cost settings changed while editing. Reload before saving again.";
     }
@@ -62557,7 +63070,7 @@ var marketCostMethods = {
     });
   },
   async saveMarket(values) {
-    const record5 = this.settingsRecord, options = this.marketOptions, hass = this._hass, charger = this.charger, generation = this.generation, permissionEpoch = this.permissionEpoch;
+    const record5 = this.settingsRecord, options2 = this.marketOptions, hass = this._hass, charger = this.charger, generation = this.generation, permissionEpoch = this.permissionEpoch;
     const decoded = decodeDashboard(this.rawDashboard), dashboard = decoded.ok ? decoded.value : null;
     if (this.costWriteBlocked(record5)) {
       this.costNotice = "Save unavailable: another request is running, a previous outcome is unknown or stale, or permission is missing.";
@@ -62565,12 +63078,12 @@ var marketCostMethods = {
       return;
     }
     const notReady = this.costReadiness(dashboard);
-    if (notReady || !marketEditable(options.state, true)) {
+    if (notReady || !marketEditable(options2.state, true)) {
       this.costNotice = notReady || "The area list is not held, so nothing can be changed.";
       this.paint();
       return;
     }
-    const plan = marketWritePlan(record5, options, values, true);
+    const plan = marketWritePlan(record5, options2, values, true);
     if (!plan.ok) {
       this.costNotice = plan.notice;
       this.paint();
@@ -62633,8 +63146,8 @@ var marketCostMethods = {
       this.paint();
       return;
     }
-    const block = dashboard.grid_tariff;
-    const plan = tariffWritePlan(block, values);
+    const block2 = dashboard.grid_tariff;
+    const plan = tariffWritePlan(block2, values);
     if (!plan.ok) {
       this.costNotice = plan.notice;
       this.paint();
@@ -63039,59 +63552,59 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
       actions3.append(clear2);
     }
   }
-  const details = doc.createElement("details");
+  const details2 = doc.createElement("details");
   const summary = doc.createElement("summary");
   summary.textContent = "Technical evidence and diagnostics";
-  details.append(summary);
+  details2.append(summary);
   const actions2 = section.querySelector("[data-morek-actions]");
   for (const child of Array.from(section.children)) {
-    if (child !== heading && child !== health && child !== reconciliationDetail && child !== actions2) details.append(child);
+    if (child !== heading && child !== health && child !== reconciliationDetail && child !== actions2) details2.append(child);
   }
   const safety = doc.createElement("p");
   safety.textContent = "A final 0 A limit may remain. Readback is not profile inventory; ACK and readback do not prove physical charging. Preserve person Stop and household protection.";
   section.insertBefore(safety, actions2);
-  section.insertBefore(details, actions2);
+  section.insertBefore(details2, actions2);
   return section;
 }
 
 // src/charge-periods.ts
 var PERIODS_AUTO = "auto";
-function chargePeriodsLabel(language, count2) {
-  if (count2 === null) {
+function chargePeriodsLabel(language, count3) {
+  if (count3 === null) {
     return translate2(language, "settings.periods.auto");
   }
-  return translate2(language, `settings.periods.value.${pluralForm(language, count2)}`, {
-    count: String(count2)
+  return translate2(language, `settings.periods.value.${pluralForm(language, count3)}`, {
+    count: String(count3)
   });
 }
 function chargePeriodsOptions(language) {
-  const options = [
+  const options2 = [
     {
       value: PERIODS_AUTO,
       label: chargePeriodsLabel(language, null),
       help: translate2(language, "settings.periods.autoHelp")
     }
   ];
-  for (let count2 = PERIODS_MIN; count2 <= PERIODS_MAX; count2 += 1) {
-    options.push({ value: String(count2), label: chargePeriodsLabel(language, count2) });
+  for (let count3 = PERIODS_MIN; count3 <= PERIODS_MAX; count3 += 1) {
+    options2.push({ value: String(count3), label: chargePeriodsLabel(language, count3) });
   }
-  return options;
+  return options2;
 }
 function chargePeriodsValue(record5) {
   return record5.max_periods === null ? PERIODS_AUTO : String(record5.max_periods);
 }
 function chargePeriodsReplacement(record5, option) {
-  let count2 = null;
+  let count3 = null;
   if (option !== PERIODS_AUTO) {
-    count2 = Number(option);
-    if (!Number.isInteger(count2) || count2 < PERIODS_MIN || count2 > PERIODS_MAX) {
+    count3 = Number(option);
+    if (!Number.isInteger(count3) || count3 < PERIODS_MIN || count3 > PERIODS_MAX) {
       return { ok: false, errorKey: "settings.error.invalid" };
     }
   }
   return {
     ok: true,
-    body: { ...encodeBody(record5), max_periods: count2 },
-    changed: count2 !== record5.max_periods
+    body: { ...encodeBody(record5), max_periods: count3 },
+    changed: count3 !== record5.max_periods
   };
 }
 
@@ -63207,12 +63720,12 @@ var WORDS = {
   phone: { text: "setup.phone.text", action: "setup.phone.action" },
   app: { text: "setup.app.text", action: "setup.app.action" }
 };
-function setupRowsOf(block) {
-  if (block === null) {
+function setupRowsOf(block2) {
+  if (block2 === null) {
     return [];
   }
   return SETUP_ROWS.flatMap((id) => {
-    const found = block.items.find((item) => item.id === id);
+    const found = block2.items.find((item) => item.id === id);
     const write = found?.write ?? null;
     if (found === void 0 || WRITING_ROWS.has(id) !== (write !== null)) {
       return [];
@@ -63289,7 +63802,7 @@ function morekCurrentNote(amps, morekOwned) {
   if (morekOwned === false) return `${need}. Morek does not own the schedule now; another value is saved normally, but a Morek schedule cannot be sent with it.`;
   return `${need}. Whether Morek owns the schedule is not known right now, so it is treated as possibly owning it: ${amps === MOREK_REQUIRED_AMPS ? `the saved ${amps} A meets this` : `the saved ${amps === null ? "current is not set" : `${amps} A`} would block a Morek schedule`}, and saving another value asks for confirmation.`;
 }
-function currentBlock2(record5, dashboard, canEdit, morekOwned) {
+function currentBlock3(record5, dashboard, canEdit, morekOwned) {
   const range2 = currentRangeOf(dashboard);
   const amps = record5.amps;
   const warn2 = [];
@@ -63371,7 +63884,7 @@ function planParamsModel(input) {
     currentNote: CURRENT_NOTE,
     savedNote: SAVED_NOTE2,
     periods: { value: chargePeriodsValue(record5), saved: chargePeriodsLabel("en", record5.max_periods), options: chargePeriodsOptions("en").map((o9) => ({ value: o9.value, text: o9.help ? `${o9.label} \u2014 ${o9.help}` : o9.label })), canEdit: open && admin, notes: periodNotes(record5, input.morekOwned ?? null) },
-    current: currentBlock2(record5, dashboard, open && planAllowed, input.morekOwned ?? null),
+    current: currentBlock3(record5, dashboard, open && planAllowed, input.morekOwned ?? null),
     departure: departureBlock2(record5, dashboard, input.now, open && planAllowed)
   };
 }
@@ -63959,34 +64472,34 @@ function reserveModel(raw, currency, text4) {
 }
 
 // shared-dashboard/learning-model.js
-var count = (v2) => Number.isInteger(v2) && v2 >= 0 && v2 <= 1e6 ? v2 : null;
+var count2 = (v2) => Number.isInteger(v2) && v2 >= 0 && v2 <= 1e6 ? v2 : null;
 var fill = (template, values) => String(template).replace(/\{(\w+)\}/g, (_2, key3) => values[key3] ?? "");
 var LEARNING_KEYS = ["title", "unknown", "default", "learned", "samples", "effect_longer", "effect_shorter", "effect_none", "effect_unknown", "clamped", "note", "stale", "rejected"];
 function decodeLearning(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   if (raw.source !== "default" && raw.source !== "learned") return null;
   if (raw.mode !== "morek" && raw.mode !== "legacy") return null;
-  const valid = count(raw.valid_samples), agreeing = count(raw.agreeing_samples);
-  const lengthen = count(raw.needed_to_lengthen), shorten = count(raw.needed_to_shorten);
+  const valid = count2(raw.valid_samples), agreeing = count2(raw.agreeing_samples);
+  const lengthen = count2(raw.needed_to_lengthen), shorten = count2(raw.needed_to_shorten);
   if (valid === null || agreeing === null || lengthen === null || shorten === null || lengthen < 1 || shorten < 1 || agreeing > valid) return null;
   const effect = raw.effect_minutes === null || raw.effect_minutes === void 0 ? null : Number.isFinite(raw.effect_minutes) && Math.abs(raw.effect_minutes) <= 1e5 ? Math.round(raw.effect_minutes) : void 0;
   if (effect === void 0) return null;
-  const rejections = raw.rejections && typeof raw.rejections === "object" && !Array.isArray(raw.rejections) ? Object.entries(raw.rejections).filter(([reason, n6]) => /^[a-z_0-9]{1,40}$/.test(reason) && count(n6) > 0).map(([reason, n6]) => ({ reason, count: n6 })).sort((a4, b3) => b3.count - a4.count || a4.reason.localeCompare(b3.reason)).slice(0, 5) : [];
+  const rejections = raw.rejections && typeof raw.rejections === "object" && !Array.isArray(raw.rejections) ? Object.entries(raw.rejections).filter(([reason, n6]) => /^[a-z_0-9]{1,40}$/.test(reason) && count2(n6) > 0).map(([reason, n6]) => ({ reason, count: n6 })).sort((a4, b3) => b3.count - a4.count || a4.reason.localeCompare(b3.reason)).slice(0, 5) : [];
   return { source: raw.source, mode: raw.mode, valid, agreeing, lengthen, shorten, effect, clamped: raw.clamped === true, rejections };
 }
 function learningModel(raw, stale, text4) {
   const state = stale ? "stale" : "fresh";
-  const block = decodeLearning(raw);
-  if (!block) return { state: stale ? "stale" : "unknown", lines: [text4.unknown], note: text4.note, stale: !!stale, staleText: stale ? text4.stale : null };
-  const lines3 = [
-    block.source === "learned" ? text4.learned : text4.default,
-    fill(text4.samples, { agreeing: block.agreeing, shorten: block.shorten, lengthen: block.lengthen, valid: block.valid })
+  const block2 = decodeLearning(raw);
+  if (!block2) return { state: stale ? "stale" : "unknown", lines: [text4.unknown], note: text4.note, stale: !!stale, staleText: stale ? text4.stale : null };
+  const lines4 = [
+    block2.source === "learned" ? text4.learned : text4.default,
+    fill(text4.samples, { agreeing: block2.agreeing, shorten: block2.shorten, lengthen: block2.lengthen, valid: block2.valid })
   ];
-  if (block.clamped) lines3.push(text4.clamped);
-  const effect = stale ? text4.effect_unknown : block.effect === null ? text4.effect_unknown : block.effect === 0 ? text4.effect_none : fill(block.effect > 0 ? text4.effect_longer : text4.effect_shorter, { minutes: Math.abs(block.effect) });
-  lines3.push(effect);
-  if (block.rejections.length) lines3.push(fill(text4.rejected, { list: block.rejections.map((r7) => `${r7.reason.replace(/_/g, " ")} \xD7${r7.count}`).join(", ") }));
-  return { state, source: block.source, lines: lines3, note: text4.note, stale: !!stale, staleText: stale ? text4.stale : null, title: text4.title };
+  if (block2.clamped) lines4.push(text4.clamped);
+  const effect = stale ? text4.effect_unknown : block2.effect === null ? text4.effect_unknown : block2.effect === 0 ? text4.effect_none : fill(block2.effect > 0 ? text4.effect_longer : text4.effect_shorter, { minutes: Math.abs(block2.effect) });
+  lines4.push(effect);
+  if (block2.rejections.length) lines4.push(fill(text4.rejected, { list: block2.rejections.map((r7) => `${r7.reason.replace(/_/g, " ")} \xD7${r7.count}`).join(", ") }));
+  return { state, source: block2.source, lines: lines4, note: text4.note, stale: !!stale, staleText: stale ? text4.stale : null, title: text4.title };
 }
 
 // sidebar/evidence-freshness.js
@@ -64002,11 +64515,11 @@ var JUDGED = {
 };
 var STATES2 = /* @__PURE__ */ new Set(["current", "last_known", "idle", "unknown"]);
 function judgementFor(ready, key3, observedAtMs) {
-  const block = ready?.freshness;
-  if (block === void 0 || block === null) return null;
+  const block2 = ready?.freshness;
+  if (block2 === void 0 || block2 === null) return null;
   const unknown2 = { state: "unknown", link: null };
-  if (typeof block !== "object" || Array.isArray(block)) return unknown2;
-  const quantities = block.quantities;
+  if (typeof block2 !== "object" || Array.isArray(block2)) return unknown2;
+  const quantities = block2.quantities;
   if (!quantities || typeof quantities !== "object" || Array.isArray(quantities)) return unknown2;
   const item = quantities[JUDGED[key3]];
   if (!item || typeof item !== "object" || !STATES2.has(item.state)) return unknown2;
@@ -64037,7 +64550,7 @@ function read(ready, key3, now, unitCheck) {
 }
 var ago = (ms2) => ms2 < 6e4 ? `${Math.floor(ms2 / 1e3)} s ago` : ms2 < 36e5 ? `${Math.floor(ms2 / 6e4)} min ago` : `${Math.floor(ms2 / 36e5)} h ago`;
 var clock2 = (ms2) => new Date(ms2).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-var num2 = (value2, digits) => Number(value2.toFixed(digits)).toString();
+var num3 = (value2, digits) => Number(value2.toFixed(digits)).toString();
 function liveCharging(status, observedAt, failed, now = Date.now()) {
   const fresh2 = observationFreshness(observedAt, now, failed) === "fresh";
   const ready = fresh2 ? status?.readiness : null;
@@ -64060,18 +64573,18 @@ function liveCharging(status, observedAt, failed, now = Date.now()) {
   parts.push(reportedFresh ? `Charger reports \u201C${reportedFresh.value}\u201D for connector ${own}, ${reportedFresh.judged === "current" && reportedFresh.age > STRICT_MAX_AGE_MS ? `unchanged since ${clock2(reportedFresh.at)}` : ago(reportedFresh.age)}; a reported state is not measured power.` : reported ? `Last reported connector state \u201C${reported.value}\u201D ${reported.judged === "last_known" ? `is last known (${ago(reported.age)}); the charger connection is not confirmed now` : `is stale (${ago(reported.age)})`}; current state unknown.` : `Connector ${own} reported state unknown.`);
   let powerText = "Unknown";
   if (power?.fresh) {
-    powerText = power.value === 0 ? "0 W measured" : `${power.value >= 1e3 ? num2(power.value / 1e3, 2) + " kW" : num2(power.value, 0) + " W"} measured`;
+    powerText = power.value === 0 ? "0 W measured" : `${power.value >= 1e3 ? num3(power.value / 1e3, 2) + " kW" : num3(power.value, 0) + " W"} measured`;
     parts.push(`Measured power ${powerText}, ${ago(power.age)}.`);
   } else if (current?.fresh) {
-    powerText = `${num2(current.value, 1)} A measured (power unknown)`;
-    parts.push(`Measured current ${num2(current.value, 1)} A, ${ago(current.age)}; power is not derived from it.`);
+    powerText = `${num3(current.value, 1)} A measured (power unknown)`;
+    parts.push(`Measured current ${num3(current.value, 1)} A, ${ago(current.age)}; power is not derived from it.`);
   } else if (power || current) {
     const old = power || current;
     powerText = "Unknown";
     const why = old.judged === "idle" ? "; no reading is expected while nothing is charging" : old.judged === "last_known" ? "; the charger connection is not confirmed now" : "";
     parts.push(`Last measured ${power ? "power" : "current"} is ${why ? "old" : "stale"} (${ago(old.age)}${why}); not shown as current.`);
   } else parts.push("No measured power or current source is available for this connector.");
-  if (energy3) parts.push(`Cumulative energy register ${num2(energy3.value, 2)} kWh${energy3.fresh ? "" : " (stale)"}, ${ago(energy3.age)}; this is not this session\u2019s energy.`);
+  if (energy3) parts.push(`Cumulative energy register ${num3(energy3.value, 2)} kWh${energy3.fresh ? "" : " (stale)"}, ${ago(energy3.age)}; this is not this session\u2019s energy.`);
   else parts.push("Energy register unavailable.");
   let mismatch = false;
   if (flow && reportedFresh && normalized) {
@@ -64114,7 +64627,7 @@ var DISAGREES = /* @__PURE__ */ new Set(["limits_or_transitions_differ", "verifi
 var LOGGING = /* @__PURE__ */ new Set(["ocpp_sensitive_logging_enabled", "unsupported_ocpp_logging_or_interface"]);
 var ago2 = (ms2) => ms2 < 6e4 ? `${Math.max(0, Math.floor(ms2 / 1e3))} s ago` : ms2 < 36e5 ? `${Math.floor(ms2 / 6e4)} min ago` : `${Math.floor(ms2 / 36e5)} h ago`;
 var clock3 = (ms2) => new Date(ms2).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-var num3 = (value2, digits) => Number(value2.toFixed(digits)).toString();
+var num4 = (value2, digits) => Number(value2.toFixed(digits)).toString();
 var stamped = (ready, key3, reading, now, accept) => evidence(ready, key3, reading, now, (r7) => accept(r7.value));
 function chargingEnabled(ready) {
   const value2 = ready?.charging_enabled;
@@ -64136,8 +64649,8 @@ function scheduleLimit(status, now) {
       const at = Date.parse(p4?.at || "");
       if (Number.isFinite(at) && isNumber2(p4?.amps)) points2.push({ at, amps: p4.amps });
     }
-    const start2 = Date.parse(eff.schedule_start || ""), span = eff.duration_s;
-    if (points2.length && Number.isFinite(start2) && isNumber2(span) && now > start2 + span * 1e3) return null;
+    const start2 = Date.parse(eff.schedule_start || ""), span2 = eff.duration_s;
+    if (points2.length && Number.isFinite(start2) && isNumber2(span2) && now > start2 + span2 * 1e3) return null;
     source = "readback";
   } else if (status?.sent && /^accepted$/i.test(String(status.ack || "").trim()) && !DISAGREES.has(status.verification?.reason)) {
     const schedule = status.sent.chargingSchedule, start2 = Date.parse(schedule?.startSchedule || "");
@@ -64222,7 +64735,7 @@ function chargeSession(status, observedAt, failed, now = Date.now()) {
   const enabled = chargingEnabled(ready);
   if (enabled) facts.push(`Charging enabled: ${enabled.state === "enabled" ? "switch is on (not proof of authorization)" : enabled.reason === "control_off" ? "switch is off" : enabled.reason === "control_unavailable" ? "switch missing or unavailable" : "not confirmed"}`);
   else if (control?.fresh) facts.push(`Charge-control switch: ${control.value}${control.value === "off" && txn.kind !== "observed" ? " (normal before authorization)" : ""}`);
-  if (flow?.fresh) facts.push(`Measured ${flow.kind === "power" ? flow.value >= 1e3 ? `${num3(flow.value / 1e3, 2)} kW` : `${num3(flow.value, 0)} W` : `${num3(flow.value, 1)} A`} (${when(flow)})`);
+  if (flow?.fresh) facts.push(`Measured ${flow.kind === "power" ? flow.value >= 1e3 ? `${num4(flow.value / 1e3, 2)} kW` : `${num4(flow.value, 0)} W` : `${num4(flow.value, 1)} A`} (${when(flow)})`);
   else facts.push("Measured power: unknown");
   const done = (r7) => {
     r7.facts = facts;
@@ -64431,10 +64944,10 @@ var date = (value2, zone) => {
     return U;
   }
 };
-var part = (ms2, zone, options) => {
+var part = (ms2, zone, options2) => {
   if (!Number.isFinite(ms2)) return U;
   try {
-    return new Intl.DateTimeFormat("en", { ...options, timeZone: zone || "UTC" }).format(ms2) + (zone ? "" : " UTC");
+    return new Intl.DateTimeFormat("en", { ...options2, timeZone: zone || "UTC" }).format(ms2) + (zone ? "" : " UTC");
   } catch {
     return U;
   }
@@ -64502,14 +65015,14 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
   const proposal = d3.plan.proposal;
   const planStale = stale || d3.planning?.historical === true || !!(proposal?.periods.length && proposal.periods.every((p4) => p4.endMs <= now));
   const rawProposal = raw?.plan?.proposal;
-  const details = rawProposal?.window_details;
+  const details2 = rawProposal?.window_details;
   const rawProjection = rawProposal?.projection;
-  const validDetails = Array.isArray(details) && proposal && details.length === proposal.periods.length && details.every((item, i7) => item && Date.parse(item.start) === proposal.periods[i7].startMs && Date.parse(item.end) === proposal.periods[i7].endMs && Number.isFinite(item.energy_kwh) && item.energy_kwh >= 0 && (item.cost === null || Number.isFinite(item.cost)) && (item.projected_soc === void 0 || validPercent(item.projected_soc))) && Number.isFinite(proposal.planned_kwh) && Math.abs(details.reduce((sum, row3) => sum + row3.energy_kwh, 0) - proposal.planned_kwh) < Math.max(1e-6, Math.abs(proposal.planned_kwh) * 1e-8) && (proposal.unpriced || !proposal.cost || details.every((row3) => Number.isFinite(row3.cost)) && Math.abs(details.reduce((sum, row3) => sum + row3.cost, 0) - proposal.cost.value) < Math.max(1e-6, Math.abs(proposal.cost.value) * 1e-8));
+  const validDetails = Array.isArray(details2) && proposal && details2.length === proposal.periods.length && details2.every((item, i7) => item && Date.parse(item.start) === proposal.periods[i7].startMs && Date.parse(item.end) === proposal.periods[i7].endMs && Number.isFinite(item.energy_kwh) && item.energy_kwh >= 0 && (item.cost === null || Number.isFinite(item.cost)) && (item.projected_soc === void 0 || validPercent(item.projected_soc))) && Number.isFinite(proposal.planned_kwh) && Math.abs(details2.reduce((sum, row3) => sum + row3.energy_kwh, 0) - proposal.planned_kwh) < Math.max(1e-6, Math.abs(proposal.planned_kwh) * 1e-8) && (proposal.unpriced || !proposal.cost || details2.every((row3) => Number.isFinite(row3.cost)) && Math.abs(details2.reduce((sum, row3) => sum + row3.cost, 0) - proposal.cost.value) < Math.max(1e-6, Math.abs(proposal.cost.value) * 1e-8));
   const planCurrency = proposal?.cost?.currency || d3.market?.currency || null;
   const pricedBasis = rawProposal?.cost_basis === "configured_variable_cost" && !proposal?.unpriced && proposal?.cost?.currency === planCurrency && /^[A-Z]{3}$/.test(planCurrency || "");
   const projectionValid = !planStale && validPercent(rawProjection?.starting_soc) && Number.isFinite(rawProjection?.kwh_per_percent) && rawProjection.kwh_per_percent > 0;
   const windows = !planStale && proposal ? proposal.periods.map((p4, i7) => {
-    const detail = validDetails ? details[i7] : null;
+    const detail = validDetails ? details2[i7] : null;
     return {
       start: p4.startMs,
       end: p4.endMs,
@@ -64718,14 +65231,14 @@ var LINK_STATES = /* @__PURE__ */ new Set(["up", "down", "unknown"]);
 var BOOT_STATES = /* @__PURE__ */ new Set(["none", "unknown", "waiting", "requested", "blocked", "closed"]);
 var isObject5 = (v2) => v2 !== null && typeof v2 === "object" && !Array.isArray(v2);
 var clock5 = (ms2) => new Date(ms2).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-var stamp = (value2, now) => {
+var stamp2 = (value2, now) => {
   const ms2 = typeof value2 === "string" ? Date.parse(value2) : NaN;
   return Number.isFinite(ms2) && Number.isFinite(now) && ms2 <= now + CLOCK_SKEW_MS3 ? ms2 : null;
 };
 function linkInfo(status, now) {
   const link = status?.link;
   if (!isObject5(link) || !LINK_STATES.has(link.state)) return { state: "unknown", since: null };
-  return { state: link.state, since: stamp(link.since, now) };
+  return { state: link.state, since: stamp2(link.since, now) };
 }
 var BOOT_BLOCKED = {
   transaction_present: "the charger already reports a charging session",
@@ -64739,7 +65252,7 @@ function checkItem(status, now, link, facts) {
   const unknown2 = (text4) => ({ kind: "check_unknown", level: "info", text: text4 });
   if (!isObject5(check)) return unknown2("The schedule check result isn\u2019t readable, so it isn\u2019t known whether the charger\u2019s schedule matches.");
   if (check.class === null || check.class === void 0) return null;
-  const at = stamp(check.at, now);
+  const at = stamp2(check.at, now);
   if (!CLASSES.has(check.class) || at === null) return unknown2("The schedule check result isn\u2019t readable, so it isn\u2019t known whether the charger\u2019s schedule matches.");
   facts.push(`Schedule check: ${check.class}${typeof check.reason === "string" ? ` (${check.reason})` : ""} at ${clock5(at)}`);
   if (Number.isFinite(check.rechecks) && check.rechecks > 0) facts.push(`Re-checks in this episode: ${check.rechecks}`);
@@ -64778,14 +65291,14 @@ function bootItem(status, now, facts) {
   const boot = status?.readiness?.boot_start;
   if (boot === void 0 || boot === null) return null;
   if (!isObject5(boot) || !BOOT_STATES.has(boot.state)) return null;
-  const at = stamp(boot.at, now);
+  const at = stamp2(boot.at, now);
   const reason = typeof boot.reason === "string" ? boot.reason : "";
   if (boot.state !== "none" && boot.state !== "unknown") facts.push(`Charger restart: ${boot.state}${reason ? ` (${reason})` : ""}${at !== null ? ` at ${clock5(at)}` : ""}`);
   if (at === null) return null;
   const t6 = clock5(at);
   if (boot.state === "requested") {
     const ready = status.readiness;
-    const ssAt = stamp(ready.session_start_at, now);
+    const ssAt = stamp2(ready.session_start_at, now);
     const ss = isObject5(ready.session_start) ? ready.session_start : {};
     if (ssAt === null || ssAt < at || typeof ss.state !== "string") {
       return { kind: "boot_pending", level: "info", text: `The charger restarted at ${t6}. Restart recovery is pending and unconfirmed: it isn\u2019t known whether SpotNav has asked the charger to enable charging since then.` };
@@ -64826,7 +65339,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.172";
+var CARD_VERSION = "2.5.173";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {
@@ -64953,6 +65466,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this.permissionEpoch = 0;
     this.priceDays = null;
     this.historyDay = null;
+    this.priceInsights = null;
     this.dashboardEpoch = 0;
     this.statusEpoch = 0;
     this.pendingSettingsWrites = /* @__PURE__ */ new Map();
@@ -65159,6 +65673,8 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this.priceDays = null;
     this.historyDay?.dispose();
     this.historyDay = null;
+    this.priceInsights?.dispose();
+    this.priceInsights = null;
     clearInterval(this.ageTimer);
     this.ageTimer = null;
     for (const cancel of this.cancellations || []) cancel();
@@ -65252,6 +65768,28 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     } });
     return this.historyDay.sync({ charger: this.charger, epoch: `${this.generation}:${this.permissionEpoch}`, zone, marketZone: dashboard.market?.timezone || null, today }).view();
   }
+  // Price insights (7.5): read-only held-price statistics, one live read plus the current month on open, then only on an
+  // explicit choice (window length, month, comparison) or at most every few minutes; a failure waits for Retry.
+  insightView(dashboard) {
+    const raw = this.rawDashboard, area = raw?.prices?.area_id, today = raw?.prices?.today;
+    if (!dashboard || !this.charger || !this._hass || typeof area !== "string" || !area || typeof today !== "string" || !dashboard.market?.currency) {
+      this.priceInsights?.dispose();
+      this.priceInsights = null;
+      return null;
+    }
+    this.priceInsights ||= createPriceInsights({ request: (params) => this.bounded(getPriceInsights(this._hass, this.charger, params)), onChange: () => {
+      if (this.connected) this.paint();
+    } });
+    return this.priceInsights.sync({ charger: this.charger, epoch: `${this.generation}:${this.permissionEpoch}`, area, currency: dashboard.market.currency, today }).view();
+  }
+  insightNav(kind, arg) {
+    const insights = this.priceInsights;
+    if (!insights) return;
+    if (kind === "retry") insights.retry();
+    else if (kind === "duration") insights.setDuration(arg);
+    else if (kind === "month") insights.selectMonth(arg);
+    else if (kind === "compare") insights.selectCompare(arg);
+  }
   historyNav(kind, arg) {
     if (kind === "retry") this.historyDay?.retry();
     else this.historyDay?.select(kind, arg);
@@ -65272,6 +65810,8 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     adapter.actions.priceNav = (kind, arg) => this.priceNav(kind, arg);
     adapter.model.historyDay = this.historyView(dashboard);
     adapter.actions.historyNav = (kind, arg) => this.historyNav(kind, arg);
+    adapter.model.insights = this.insightView(dashboard);
+    adapter.actions.insightNav = (kind, arg) => this.insightNav(kind, arg);
     this.paintAutomatic(dashboard);
     this.paintChargeNow(dashboard);
     this.paintSession();

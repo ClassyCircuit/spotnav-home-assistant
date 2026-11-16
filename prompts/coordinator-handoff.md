@@ -10,6 +10,8 @@ Follow the actual request rather than automatically starting new work.
 
 ## Current handoff — 2026-11-16
 
+- **Current source 2.5.173: Stage 7 is complete locally and coordinator-reviewed.** Its seven substages were committed/pushed separately. Navigation, DST chart fixes, history evidence, aligned tracks, and live/monthly insights are implemented. Root's final check: 35 insights tests, prototype build and check-dist passed. No deployment or browser/live validation. **Next unstarted feature queue: Stage 8 (8.1 → 8.2a → 8.2b → 8.3a → 8.3b), only on request.** This supersedes the older queue/baseline notes below; do not reassign Stage 7.
+
 - Stage 7/8 were refreshed against 2.5.166. D1 is settled: historical costs default to Nord Pool spot only (fees/taxes separate). D2 is settled: same priced energy at the delivery day’s average spot price. D3 preserves existing retention; no product-decision gate remains. Follow the active roadmap’s updated 12-substage order, starting 7.1, only when implementation is requested. Preserve Stage 18 absolute bands/dark/mobile UI; history/savings views are read-only.
 
 - **Current source 2.5.166: Stage 18 is locally implemented and coordinator-reviewed**, with each of its four substages committed/pushed. Dark theme, Charge Now/mobile layout, sole-car default and absolute chart bands are done. No deployment; browser verification covered only shared mobile preview. Continue Stage 7/8 only when requested. The older baseline below predates Stage 18.

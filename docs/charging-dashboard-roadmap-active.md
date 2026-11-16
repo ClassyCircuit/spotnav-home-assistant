@@ -3,7 +3,7 @@
 Status: **in progress. This is the only work queue.** Created 2026-11-14 by splitting the old roadmap, which
 is now frozen as a historical reference:
 [archive/charging-dashboard-roadmap-2026-11-14.md](archive/charging-dashboard-roadmap-2026-11-14.md)
-(“the archive”). Initial audit basis: manifest 2.5.128, HEAD `6a50a7ae`. Stage 15 is now locally implemented and coordinator-reviewed through 2.5.143 with focused mocked checks; see its entries and the handoff for unrun checks. Stage 16.1–16.2, Stage 17.1–17.6, Stage 13.1–13.4 and Stage 18.1–18.4 are implemented locally with mocked checks and committed (manifest 2.5.166, HEAD `f0bb93a3`, 2026-11-16); the next unstarted feature queue is Stage 7, then Stage 8 (audited against 2.5.166 source and made implementation-ready on 2026-11-16, docs only), started only when the user requests it. Nothing below is
+(“the archive”). Initial audit basis: manifest 2.5.128, HEAD `6a50a7ae`. Stage 15 is locally implemented and coordinator-reviewed through 2.5.143 with focused mocked checks; see its entries and the handoff for unrun checks. Stages 16, 17, 13 and 18 are implemented locally and committed. Stage 7 is now locally implemented and coordinator-reviewed through 2.5.173 (2026-11-16), with each substage committed and pushed separately. The next unstarted feature queue is Stage 8, only when requested. Nothing below is
 installed, deployed or physically verified, and this file authorizes no HA access, charger command, restart
 or deployment. Read `AGENTS.md` and [the development handoff](morek-development-handoff.md) first.
 
@@ -96,7 +96,7 @@ One at a time; “Needs” lists the only real dependencies. Stable parent ids; 
 | 30 | 8.3a Savings baseline (backend) | 8.2a | |
 | 31 | 8.3b Savings and summary cards | 8.2b, 8.3a, 7.5 | |
 
-Items 1–15 (Stage 15) are locally implemented and coordinator-reviewed through 2.5.143; Stage 16 and Stage 17 (below) and items 16–19 (Stage 13.1–13.4) are implemented locally and committed (2026-11-16 audit: `git log` shows 16.2 `08254d2e`, 17.1 `d9ec44cc`/`999f5fc5`, 17.2 `cc321c71`, 17.3 `e0f0d7d4`, 17.4 `7fadb671`, 17.5 `4bb08550`, 17.6 `35f5ae5f`, 13.1 `d81c3fd8`, 13.2 `7e352562`, 13.3 `416529c3`, 13.4 `e31463df`). Do not reassign any of them. **Open queue: items 20–31 (Stage 7, then Stage 8)**, started only on the user's request; none is a prerequisite for 5.8. The order is the suggested default and the user may reorder it within the “Needs” column. **D1/D2 are settled; there are no outstanding product-decision gates.** Suggested delegate order (one bounded medium session each): 7.1 → 7.2 → 7.3a → 7.3b → 7.4a → 7.4b → 7.5 → 8.1 → 8.2a → 8.2b → 8.3a → 8.3b. Stage 7/8 substages are not ◆ (they touch no Stage 14 path) but obey the “Binding constraints” block at the start of Stage 7. **Not in the queue:** §9.B reviews, §9.C user-owned items, E1/E2.
+Items 1–15 (Stage 15) are locally implemented and coordinator-reviewed through 2.5.143; Stage 16 and Stage 17 (below) and items 16–19 (Stage 13.1–13.4) are implemented locally and committed (2026-11-16 audit: `git log` shows 16.2 `08254d2e`, 17.1 `d9ec44cc`/`999f5fc5`, 17.2 `cc321c71`, 17.3 `e0f0d7d4`, 17.4 `7fadb671`, 17.5 `4bb08550`, 17.6 `35f5ae5f`, 13.1 `d81c3fd8`, 13.2 `7e352562`, 13.3 `416529c3`, 13.4 `e31463df`). Do not reassign any of them. **Open queue: items 27–31 (Stage 8); items 20–26 (Stage 7) are complete locally through 2.5.173**, started only on the user's request; none is a prerequisite for 5.8. The order is the suggested default and the user may reorder it within the “Needs” column. **D1/D2 are settled; there are no outstanding product-decision gates.** Remaining delegate order (one bounded medium session each): 8.1 → 8.2a → 8.2b → 8.3a → 8.3b. Stage 7/8 substages are not ◆ (they touch no Stage 14 path) but obey the “Binding constraints” block at the start of Stage 7. **Not in the queue:** §9.B reviews, §9.C user-owned items, E1/E2.
 
 ## 4. Standard acceptance for every substage
 
@@ -877,6 +877,8 @@ old card’s backend behaviour disappears when its UI is hidden.
 
 ### Stage 7 — Price chart navigation, evidence tracks, price insights (7.1–7.5)
 
+**Complete locally, coordinator-reviewed (2.5.167–2.5.173, 2026-11-16).** All seven implementation substages are done. Focused mocked checks and builds passed; browser, physical and installed behavior remain unverified. The audit below records the pre-implementation basis, not the current feature gaps.
+
 **Audit (source reading, manifest 2.5.166, HEAD `f0bb93a3`, 2026-11-16; replaces the 2.5.128 audit).** Re-verified facts, not copied claims:
 
 1. **Chart feed.** The sidebar chart uses only `raw.prices.published_intervals`, built by `serialize_published_intervals` from
@@ -1011,7 +1013,7 @@ only if a helper is explicitly used **and labelled**; read-range page = 8 local 
   negative price; otherwise `unknown` with coverage. A month comparison is offered only when both months meet the minimum, share a currency and basis.
   No hourly/quarter-hour re-binning (no bias), no hour-of-day profile in this substage, no absolute-band shares (classification stays in the UI).
   *Acceptance:* partial month, current month, DST months (23/25 h), currency change excluded and counted, negative prices, duplicate days.
-- [ ] **7.5 Live price insights and monthly statistics (UI).** *Needs 7.4a and 7.4b.* *Scope:* bind both into the shared `insights` model (`intro`,
+- [x] **7.5 Live price insights and monthly statistics (UI).** *Locally implemented and coordinator-reviewed 2026-11-16 (manifest 2.5.173). Root reran 35 focused frontend tests, prototype build and check-dist successfully. Earlier focused neighbour checks are recorded in the handoff. Not deployed or visually verified.* *Needs 7.4a and 7.4b.* *Scope:* bind both into the shared `insights` model (`intro`,
   `blocks`, `caution`, `method`; host-supplied text): current-interval assessment, best available window, per-month statistics with “n of N days
   held”, each block showing baseline, coverage, basis, currency and assumptions; unavailable data shows its reason. The absolute band of the current
   price (only for euro c/kWh, from `price-bands.js`) and the relative percentile are two separate lines; the card says opportunities are not the

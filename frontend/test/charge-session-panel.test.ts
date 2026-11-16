@@ -61,7 +61,7 @@ describe('sidebar charge-session card', () => {
     expect(card.dataset.kind).toBe('accepted_waiting'); expect(card.dataset.posture).toBe('pending');
     expect(card.textContent).toMatch(/We asked the charger to enable charging/); expect(card.textContent).toMatch(/unchanged since/);
     // painting only ever reads: no write-type calls from rendering the card
-    const writes = hass.callWS.mock.calls.filter(([m]) => !['spotnav/list_chargers', 'spotnav/get_dashboard', 'spotnav/get_settings', 'spotnav/get_market_options', 'spotnav/get_entity_config', 'spotnav/get_price_days', 'spotnav/morek_schedule'].includes(m.type) ||
+    const writes = hass.callWS.mock.calls.filter(([m]) => !['spotnav/list_chargers', 'spotnav/get_dashboard', 'spotnav/get_settings', 'spotnav/get_market_options', 'spotnav/get_entity_config', 'spotnav/get_price_days','spotnav/get_price_insights', 'spotnav/morek_schedule'].includes(m.type) ||
       (m.type === 'spotnav/morek_schedule' && m.action && m.action !== 'status'));
     expect(writes).toHaveLength(0);
     panel.remove();

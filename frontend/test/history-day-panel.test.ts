@@ -74,7 +74,7 @@ describe('sidebar history day (7.3a) in the real panel', () => {
     expect(panel.historyDay).not.toBeNull();
     panel.stopObservations(false);
     expect(panel.historyDay).toBeNull();
-    const reads = ['spotnav/list_chargers', 'spotnav/get_dashboard', 'spotnav/get_settings', 'spotnav/get_price_days', 'spotnav/get_charging_history', 'spotnav/get_market', 'spotnav/get_market_options', 'spotnav/get_entity_config'];
+    const reads = ['spotnav/list_chargers', 'spotnav/get_dashboard', 'spotnav/get_settings', 'spotnav/get_price_days','spotnav/get_price_insights', 'spotnav/get_charging_history', 'spotnav/get_market', 'spotnav/get_market_options', 'spotnav/get_entity_config'];
     const writes = calls.filter(m => !reads.includes(m.type) || (m.type === 'spotnav/morek_schedule' && m.action && m.action !== 'status'));
     expect(writes.filter(m => m.type !== 'spotnav/morek_schedule').map(m => m.type)).toEqual([]);
     expect(calls.some(m => m.type === 'spotnav/get_charging_history' && ('include_prices' in m || 'from' in m || 'to' in m))).toBe(false);
