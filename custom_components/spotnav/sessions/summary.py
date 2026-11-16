@@ -22,6 +22,7 @@ from .costing import (
     day_bounds,
     SPOT_ALLOCATION,
     SPOT_PRICE_BASIS,
+    ReferenceLookup,
     session_spot,
     SpotAllocation,
     spot_block,
@@ -219,21 +220,25 @@ DELIVERY_ACCOUNTING: Final = {
 }
 
 
-def delivery_allocation(sessions: Iterable[ChargeSession], zone: tzinfo, windows: Sequence[tuple[datetime, datetime]]) -> SpotAllocation:
+def delivery_allocation(
+    sessions: Iterable[ChargeSession], zone: tzinfo, windows: Sequence[tuple[datetime, datetime]],
+    reference: ReferenceLookup | None = None,
+) -> SpotAllocation:
     """The allocation of the closed sessions that touch any of `windows` (so a read prices only what it shows)."""
     spots = [
         spot
         for spot in (session_spot(item) for item in sessions if item.end is not None)
         if any(spot.start < until and spot.end is not None and spot.end > since for since, until in windows)
     ]
-    return SpotAllocation(spots, zone)
+    return SpotAllocation(spots, zone, reference)
 
 
 def delivery_day_row(allocation: SpotAllocation, day: date) -> dict[str, Any]:
     return {
         "period": day.isoformat(),
         "kind": "delivery_day",
-        "spot_cost": spot_block(allocation.delivery_day(day), allocation=SPOT_ALLOCATION),
+        "spot_cost": spot_block(allocation.delivery_day(day), allocation=SPOT_ALLOCATION,
+                                savings=allocation.reference is not None),
     }
 
 
@@ -250,7 +255,8 @@ def delivery_month_rows(allocation: SpotAllocation, key: str) -> tuple[dict[str,
     summary = {
         "period": key,
         "kind": "delivery_month",
-        "spot_cost": spot_block(allocation.delivery_month(first, last), allocation=SPOT_ALLOCATION),
+        "spot_cost": spot_block(allocation.delivery_month(first, last), allocation=SPOT_ALLOCATION,
+                                savings=allocation.reference is not None),
     }
     days = [
         delivery_day_row(allocation, first + timedelta(days=offset)) for offset in range((last - first).days + 1)

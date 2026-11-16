@@ -1269,6 +1269,33 @@ overlapping sessions and an open session are flagged and never `complete`.
   the live APIs supplies such spans yet (the stored record has no placement outside its slices), so live answers use
   `recorded_price_slices` or `unknown`.
 
+### Day-average spot savings (Stage 8.3a, additive, api_version stays 1)
+
+Every `spot_cost` block of `get_charging_history` (`window_spot_cost`, each session's `spot_cost` and `spot_cost_in_window`)
+and of `get_sessions` (`delivery_days`, `delivery_month_summary`, `delivery_month_days`) gains a `savings` block, from the
+same `SpotAllocation` (no second store or controller). Public `ChargeSession.public()` rows (`sessions`, `month_sessions`)
+and the start-day buckets do not carry it. `basis` is `day_average_price`; it is an estimate (`estimate: true`).
+
+* **Method:** the *comparable* priced kWh (priced by 8.2a and with a reference) re-priced at its HA-local delivery day's
+  duration-weighted full-day raw spot average (no fees/taxes), same currency. `actual_cost` is the actual spot cost of that
+  comparable subset only; `spot_cost.amount` stays the whole priced total, unchanged. `amount = reference_cost - actual_cost`
+  (negative is valid), `percentage = amount / reference_cost * 100` only when `reference_cost > 0` (else `null`); aggregates sum
+  amounts first (never a mean of percentages). `comparable_kwh`, `excluded_kwh` (priced but no proven reference), `unpriced_kwh`,
+  `comparable_fraction`, `excluded_reasons` (kWh by reason), `excluded_days` (<= 62) / `excluded_days_count`,
+  `reference_days`, `currency`, `currency_exclusions` (the same object as `spot_cost`'s) and `state`
+  (`complete`, `partial`, `none`, `no_sessions_recorded`) say what it covers.
+* **Reference proof:** from the already-held `PriceRepository` snapshots only (memory; never a fetch, refresh or fallback to
+  another day). The local day (23/24/25 h; one or two display days) must hold clean rows (7.4a `clean_rows`) covering it
+  contiguously, in the session's price area and currency, with a usable rate. The stored `Slice.day_avg_eur` is not used. A
+  day not held, partial, invalid or beyond the ~28 held days is `reference_day_not_held` / `reference_day_partial` /
+  `reference_day_<invalid_prices|overlap|conflicting_duplicate>`; other reasons: `reference_area_unknown`,
+  `reference_currency_unknown`, `reference_currency_mismatch`, `reference_price_rate_missing`, `reference_prices_unavailable`,
+  `price_source_mismatch`. Source labels are the held files' provider names (`reference_sources`, `unknown` if a file has none;
+  `reference_source_state`); recorded slices never stored their provider, so only a retained price that names a source must be
+  among them. Unplaced/receipt-only late energy is never compared.
+* Midnight and DST: each priced piece is split by elapsed overlap per local day *before* its reference is applied, so days,
+  month and history windows agree.
+
 ### Power by month
 
 `spotnav/get_power_month {"api_version": 1, "charger_id" | "site_id", "month"}` (any signed-in user, as the

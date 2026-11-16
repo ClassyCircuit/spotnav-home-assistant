@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from bisect import bisect_left, bisect_right
 import math
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime, time, timedelta, timezone, tzinfo
 from typing import Any, Final
@@ -326,6 +326,8 @@ class SessionSpot:
     unassigned_register_kwh: float | None
     open: bool
     flags: tuple[str, ...] = ()
+    #: The price area the session was priced in (Stage 8.3a: the reference day average must come from the same one).
+    area_id: str | None = None
 
 
 def _finite(value: Any) -> bool:
@@ -486,8 +488,31 @@ def session_spot(
     return SessionSpot(
         str(getattr(session, "id", "")), session.start, end, currency, getattr(session, "major_unit", None),
         getattr(session, "energy_source", None), energy, tuple(pieces), remainder, unplaced, unassigned,
-        end is None, tuple(flags),
+        end is None, tuple(flags), getattr(session, "area_id", None) or None,
     )
+
+
+# ---- Stage 8.3a: day-average savings baseline ---------------------------------------------------------------------
+#
+# The same priced kWh as the actual spot cost, re-priced at its delivery day's duration-weighted full-day raw average
+# (no fees/taxes). `ReferenceLookup` answers for (session, local day); `sessions/savings.py` is the live one.
+
+SAVINGS_BASIS: Final = "day_average_price"
+SAVINGS_PROOF: Final = "held_price_snapshots_contiguous_full_local_day"
+_MAX_EXCLUDED_DAYS: Final = 62
+
+
+@dataclass(frozen=True, slots=True)
+class ReferenceResult:
+    """A local day's average raw price in the session's major currency per kWh, or `None` with the reason why not.
+    `sources` are the held files' provider labels (`unknown` when a file carries none)."""
+
+    price: float | None
+    reason: str | None = None
+    sources: tuple[str, ...] = ()
+
+
+ReferenceLookup = Callable[["SessionSpot", date], ReferenceResult]
 
 
 @dataclass(slots=True)
@@ -512,6 +537,15 @@ class SpotBucket:
     price_sources: set[str] = field(default_factory=set)
     major_unit: str | None = None
     latest_start: datetime | None = None
+    # Stage 8.3a: the priced energy that has a day-average reference (`comparable`) and what it cost either way.
+    comparable_kwh: float = 0.0
+    comparable_actual: float = 0.0
+    comparable_reference: float = 0.0
+    excluded_kwh: float = 0.0
+    excluded_reasons: dict[str, float] = field(default_factory=dict)
+    excluded_days: set[str] = field(default_factory=set)
+    reference_days: set[str] = field(default_factory=set)
+    reference_sources: set[str] = field(default_factory=set)
 
     def touch(self, spot: SessionSpot) -> None:
         self.sessions.add(spot.session_id)
@@ -542,6 +576,30 @@ class SpotBucket:
         if spot.energy_source == "estimated":
             self.estimated_kwh += kwh
 
+    def add_reference(self, spot: SessionSpot, piece: SpotPiece, day: date, fraction: float,
+                      lookup: ReferenceLookup) -> None:
+        """Compare the priced part of a piece's day share with that day's average (only priced energy is compared;
+        unpriced energy is already counted by `add_piece`). A day without a proven reference excludes the energy."""
+        if piece.price is None:
+            return
+        kwh = piece.kwh * fraction
+        ref = lookup(spot, day)
+        reason = ref.reason
+        if reason is None and (ref.price is None or not _finite(ref.price)):
+            reason = "reference_unknown"
+        if reason is None and piece.source and ref.sources and piece.source not in ref.sources:
+            reason = "price_source_mismatch"
+        if reason is not None:
+            self.excluded_kwh += kwh
+            self.excluded_reasons[reason] = self.excluded_reasons.get(reason, 0.0) + kwh
+            self.excluded_days.add(day.isoformat())
+            return
+        self.comparable_kwh += kwh
+        self.comparable_actual += kwh * piece.price
+        self.comparable_reference += kwh * ref.price
+        self.reference_days.add(day.isoformat())
+        self.reference_sources.update(ref.sources or ("unknown",))
+
     def _unpriced(self, kwh: float, reason: str) -> None:
         self.unpriced_kwh += kwh
         self.reasons[reason] = self.reasons.get(reason, 0.0) + kwh
@@ -565,14 +623,18 @@ class SpotBucket:
 
     def merge(self, other: SpotBucket) -> None:
         for name in ("priced_kwh", "cost", "recorded_kwh", "retained_kwh", "unpriced_kwh", "unplaced_kwh",
-                     "unallocated_kwh", "unplaced_ambiguous_kwh", "estimated_kwh"):
+                     "unallocated_kwh", "unplaced_ambiguous_kwh", "estimated_kwh", "comparable_kwh",
+                     "comparable_actual", "comparable_reference", "excluded_kwh"):
             setattr(self, name, getattr(self, name) + getattr(other, name))
         self.sessions |= other.sessions
         self.open_sessions |= other.open_sessions
         self.unplaced_unknown |= other.unplaced_unknown
         self.flags |= other.flags
         self.price_sources |= other.price_sources
-        for name in ("by_source", "reasons"):
+        self.excluded_days |= other.excluded_days
+        self.reference_days |= other.reference_days
+        self.reference_sources |= other.reference_sources
+        for name in ("by_source", "reasons", "excluded_reasons"):
             target = getattr(self, name)
             for key, value in getattr(other, name).items():
                 target[key] = target.get(key, 0.0) + value
@@ -609,6 +671,18 @@ def _day_shares(piece: SpotPiece, zone: tzinfo) -> list[tuple[date, float]]:
             shares.append((day, overlap / total))
         day += timedelta(days=1)
     return shares
+
+
+def _day_window_shares(piece: SpotPiece, zone: tzinfo, since: datetime, until: datetime) -> list[tuple[date, float]]:
+    """The fraction of a piece inside `since..until` falling in each local day (sums to its window fraction)."""
+    total = (piece.end - piece.start).total_seconds()
+    out = []
+    for day, _share in _day_shares(piece, zone):
+        a, b = day_bounds(day, zone)
+        overlap = (min(b, piece.end, until) - max(a, piece.start, since)).total_seconds()
+        if overlap > 0:
+            out.append((day, overlap / total))
+    return out
 
 
 def _window_fraction(piece: SpotPiece, since: datetime, until: datetime) -> float:
@@ -648,9 +722,10 @@ class SpotAllocation:
     all come from the same shares. Allocation inside a price interval is an estimate (`SPOT_ALLOCATION`).
     """
 
-    def __init__(self, spots: Iterable[SessionSpot], zone: tzinfo) -> None:
+    def __init__(self, spots: Iterable[SessionSpot], zone: tzinfo, reference: ReferenceLookup | None = None) -> None:
         self.spots = list(spots)
         self.zone = zone
+        self.reference = reference
         overlapping = _overlapping_sessions(self.spots)
         if overlapping:
             self.spots = [
@@ -662,7 +737,10 @@ class SpotAllocation:
             key = _currency_key(spot)
             for piece in spot.pieces:
                 for day, fraction in _day_shares(piece, zone):
-                    self._days.setdefault(day, {}).setdefault(key, SpotBucket()).add_piece(spot, piece, fraction)
+                    bucket = self._days.setdefault(day, {}).setdefault(key, SpotBucket())
+                    bucket.add_piece(spot, piece, fraction)
+                    if reference is not None:
+                        bucket.add_reference(spot, piece, day, fraction, reference)
 
     def _floating(self, buckets: dict[str | None, SpotBucket], since: datetime, until: datetime) -> None:
         for spot in self.spots:
@@ -699,7 +777,11 @@ class SpotAllocation:
             for piece in spot.pieces:
                 fraction = _window_fraction(piece, since, until)
                 if fraction > 0:
-                    out.setdefault(key, SpotBucket()).add_piece(spot, piece, fraction)
+                    bucket = out.setdefault(key, SpotBucket())
+                    bucket.add_piece(spot, piece, fraction)
+                    if self.reference is not None:
+                        for day, share in _day_window_shares(piece, self.zone, since, until):
+                            bucket.add_reference(spot, piece, day, share, self.reference)
         self._floating(out, since, until)
         return out
 
@@ -712,11 +794,16 @@ class SpotAllocation:
         return days
 
 
-def spot_total(spot: SessionSpot) -> dict[str | None, SpotBucket]:
-    """One session's whole spot-priced energy (no period)."""
+def spot_total(
+    spot: SessionSpot, reference: ReferenceLookup | None = None, zone: tzinfo | None = None
+) -> dict[str | None, SpotBucket]:
+    """One session's whole spot-priced energy (no period); with `reference` and `zone` also its day-average savings."""
     bucket = SpotBucket()
     for piece in spot.pieces:
         bucket.add_piece(spot, piece, 1.0)
+        if reference is not None and zone is not None:
+            for day, share in _day_shares(piece, zone):
+                bucket.add_reference(spot, piece, day, share, reference)
     bucket.add_floating(spot, contained=True)
     return {_currency_key(spot): bucket}
 
@@ -726,7 +813,8 @@ def _num(value: float) -> float:
 
 
 def spot_block(
-    buckets: dict[str | None, SpotBucket], *, allocation: str | None = None, rows_truncated: bool = False
+    buckets: dict[str | None, SpotBucket], *, allocation: str | None = None, rows_truncated: bool = False,
+    savings: bool = False,
 ) -> dict[str, Any]:
     """The wire block `spot_cost` for one row or summary: the reporting currency is the most recent session's;
     energy in another or no currency is counted under `currency_exclusions`, never added and never dropped."""
@@ -806,7 +894,51 @@ def spot_block(
     }
     if allocation is not None:
         block["allocation"] = allocation
+    if savings:
+        block["savings"] = _savings_block(main, chosen, state, exclusions)
     return block
+
+
+def _savings_block(main: SpotBucket, currency: str | None, spot_state: str, exclusions: Any) -> dict[str, Any]:
+    """Stage 8.3a: reference minus actual spot cost of the COMPARABLE subset only (the block's own actual cost, not
+    `spot_cost.amount`, which stays the whole priced total). Percentage = savings / reference, only when the
+    reference is positive; aggregates sum amounts first, so the percentage is never a mean of percentages."""
+    has = main.comparable_kwh > _TOLERANCE_KWH
+    amount = main.comparable_reference - main.comparable_actual
+    excluded = main.excluded_kwh if main.excluded_kwh > _TOLERANCE_KWH else 0.0
+    if spot_state == "no_sessions_recorded":
+        state = spot_state
+    elif not has:
+        state = "none"
+    else:
+        state = "complete" if excluded == 0.0 and spot_state == "complete" else "partial"
+    known = main.total_kwh
+    days = sorted(main.excluded_days)
+    return {
+        "basis": SAVINGS_BASIS,
+        "state": state,
+        "estimate": True,
+        "currency": currency,
+        "unit": "major",
+        "amount": _num(amount) if has else None,
+        "percentage": round(amount / main.comparable_reference * 100, 2)
+        if has and main.comparable_reference > 0 else None,
+        "actual_cost": _num(main.comparable_actual) if has else None,
+        "reference_cost": _num(main.comparable_reference) if has else None,
+        "comparable_kwh": _num(main.comparable_kwh),
+        "excluded_kwh": _num(excluded),
+        "unpriced_kwh": _num(main.unpriced_kwh),
+        "comparable_fraction": round(main.comparable_kwh / known, 4) if known > _TOLERANCE_KWH else None,
+        "excluded_reasons": {key: _num(value) for key, value in sorted(main.excluded_reasons.items())},
+        "excluded_days": days[:_MAX_EXCLUDED_DAYS],
+        "excluded_days_count": len(days),
+        "reference_days": len(main.reference_days),
+        "reference_price_basis": "duration_weighted_full_local_day_raw_spot_no_fees_no_taxes",
+        "reference_proof": SAVINGS_PROOF,
+        "reference_sources": sorted(main.reference_sources),
+        "reference_source_state": "unknown" if "unknown" in main.reference_sources else "held_provider_labels",
+        "currency_exclusions": exclusions,
+    }
 
 
 def placed_days(allocation: SpotAllocation) -> list[date]:

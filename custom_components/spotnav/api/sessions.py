@@ -35,10 +35,12 @@ from homeassistant.core import callback, HomeAssistant
 from homeassistant.util import dt as dt_util
 
 from ..runtime import domain_data
+from ..sessions.costing import ReferenceLookup
 from ..sessions.evidence import evidence_for
 from ..sessions.history import HISTORY_API_VERSION, MAX_SPAN, charging_history
 from ..sessions.inputs import local_zone
 from ..sessions.model import ChargeSession
+from ..sessions.savings import DayAverageReference
 from ..sessions.store import RETENTION_DAYS
 from ..sessions.summary import (
     DELIVERY_ACCOUNTING,
@@ -111,13 +113,14 @@ def sessions_payload(
     now,
     limit: int,
     month: str | None = None,
+    reference: ReferenceLookup | None = None,
 ) -> dict[str, Any]:
     """The JSON answer, built from values only. `month` (validated) defaults to the current one."""
     today = now.astimezone(zone).date()
     chosen = month if month is not None else month_key(today)
     in_window = [m for m in available_months(sessions, zone) if m >= months_back(today, MONTH_LIMIT)]
     # Stage 8.2a: delivery-day spot accounting, one allocation shared by the day rows and the month (read-only).
-    allocation = delivery_allocation(sessions, zone, delivery_windows(today, zone, chosen, DAY_LIMIT))
+    allocation = delivery_allocation(sessions, zone, delivery_windows(today, zone, chosen, DAY_LIMIT), reference)
     delivery_month, delivery_month_days = delivery_month_rows(allocation, chosen)
     return {
         "api_version": SESSIONS_API_VERSION,
@@ -231,6 +234,7 @@ def sessions_answer(hass: HomeAssistant, entry_id: str, request: dict[str, Any])
         now=now,
         limit=limit,
         month=month,
+        reference=DayAverageReference(getattr(domain_data(hass), "price_repository", None), zone),
     )
 
 
@@ -303,7 +307,8 @@ def charging_history_answer(hass: HomeAssistant, entry_id: str, request: dict[st
     store = domain_data(hass).session_store
     sessions = () if store is None else store.closed_raw(entry_id)
     return charging_history(evidence, entry_id, since=start, until=stop, zone=zone, now=dt_util.utcnow(),
-                            sessions=sessions, include_prices=include_prices)
+                            sessions=sessions, include_prices=include_prices,
+                            reference=DayAverageReference(getattr(domain_data(hass), "price_repository", None), zone))
 
 
 @websocket_api.websocket_command(

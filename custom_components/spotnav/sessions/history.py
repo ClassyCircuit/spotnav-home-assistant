@@ -52,7 +52,9 @@ from .evidence import (
     _iso,
     _parse,
 )
-from .costing import SPOT_ALLOCATION, SpotAllocation, day_bounds, session_spot, spot_block, spot_total
+from .costing import (
+    SPOT_ALLOCATION, ReferenceLookup, SpotAllocation, day_bounds, session_spot, spot_block, spot_total,
+)
 from .reconcile import public as reconcile_public
 
 HISTORY_API_VERSION: Final = 1
@@ -369,7 +371,7 @@ def _energy(segments: list[dict[str, Any]], start: datetime, end: datetime) -> d
 
 def charging_history(store: ChargingEvidenceStore, charger_id: str, *, since: datetime, until: datetime, zone: tzinfo,
                      now: datetime, sessions: tuple[Any, ...] = (), include_prices: bool = False,
-                     digests: bool = True) -> dict[str, Any]:
+                     digests: bool = True, reference: ReferenceLookup | None = None) -> dict[str, Any]:
     """One bounded plan-versus-measured answer for `since` <= t < `until` (aware datetimes, at most `MAX_SPAN`)."""
     if since.tzinfo is None or until.tzinfo is None:
         raise ValueError("invalid window")
@@ -490,7 +492,8 @@ def charging_history(store: ChargingEvidenceStore, charger_id: str, *, since: da
     # Stage 8.2a: spot-only cost (no fees/taxes) of the energy placed in this window, through the same allocation
     # the sessions summaries use. Computed for every matching session, not just the rows below.
     spots = [session_spot(session) for session in matching]
-    window_allocation = SpotAllocation(spots, zone)
+    window_allocation = SpotAllocation(spots, zone, reference)
+    with_savings = reference is not None
     for session, spot in list(zip(matching, spots))[:MAX_ROWS]:
         end = session.end
         closed.append({
@@ -502,9 +505,9 @@ def charging_history(store: ChargingEvidenceStore, charger_id: str, *, since: da
             "price_slices_truncated": len(session.intervals) > MAX_ROWS,
             "price_slices_cut": max(0, len(session.intervals) - MAX_ROWS),
             "association": "time_overlap_only",
-            "spot_cost": spot_block(spot_total(spot)),
-            "spot_cost_in_window": spot_block(SpotAllocation([spot], zone).window(since, until),
-                                              allocation=SPOT_ALLOCATION),
+            "spot_cost": spot_block(spot_total(spot, reference, zone), savings=with_savings),
+            "spot_cost_in_window": spot_block(SpotAllocation([spot], zone, reference).window(since, until),
+                                              allocation=SPOT_ALLOCATION, savings=with_savings),
             # Stage 15.8: the register's total against the energy placed above (`energy_kwh`, never changed), with its
             # provenance; the remainder is unplaced late energy with no known time, never flow, power or progress.
             "reconciliation": reconcile_public(session),
@@ -583,7 +586,7 @@ def charging_history(store: ChargingEvidenceStore, charger_id: str, *, since: da
         "sessions": closed, "digests": digest_rows,
         "window_spot_cost": {
             **spot_block(window_allocation.window(since, until), allocation=SPOT_ALLOCATION,
-                         rows_truncated=len(matching) > MAX_ROWS),
+                         rows_truncated=len(matching) > MAX_ROWS, savings=with_savings),
             "local_day": _local_day(since, until, zone),
             "scope": "closed sessions only; an open session is not included",
         },
