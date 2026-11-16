@@ -67,7 +67,7 @@ describe('sidebar price insights (7.5) in the real panel', () => {
     expect(root().textContent).toMatch(/not the charging plan/); expect(root().textContent).not.toMatch(/NaN|undefined/);
     for (let i = 0; i < 4; i++) { panel.paint(); await tick(); }
     expect(insightCalls(calls)).toHaveLength(2);
-    const reads = ['spotnav/list_chargers', 'spotnav/get_dashboard', 'spotnav/get_settings', 'spotnav/get_price_days', 'spotnav/get_charging_history', 'spotnav/get_price_insights', 'spotnav/get_market', 'spotnav/get_market_options', 'spotnav/get_entity_config'];
+    const reads = ['spotnav/list_chargers', 'spotnav/get_dashboard', 'spotnav/get_settings', 'spotnav/get_price_days', 'spotnav/get_charging_history','spotnav/get_sessions', 'spotnav/get_price_insights', 'spotnav/get_market', 'spotnav/get_market_options', 'spotnav/get_entity_config'];
     const writes = calls.filter(m => !reads.includes(m.type) || (m.type === 'spotnav/morek_schedule' && m.action && m.action !== 'status'));
     expect(writes.filter(m => m.type !== 'spotnav/morek_schedule').map(m => m.type)).toEqual([]);
     expect(insightCalls(calls).every(m => Object.keys(m).every(k => ['type', 'api_version', 'charger_id', 'mode', 'duration_minutes', 'month'].includes(k)))).toBe(true);

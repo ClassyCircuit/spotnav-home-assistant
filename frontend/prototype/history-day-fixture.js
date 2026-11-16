@@ -26,7 +26,7 @@ const reconMissing = () => ({ state: 'unknown', reason: 'register_pair_missing',
 const session = (day, a, b, o = {}) => ({ id: `s-${day}`, start: at(day, ...a), end: at(day, ...b), energy_kwh: 8.2, energy_source: 'register', source: 'morek', started_by: 'auto',
   area_id: 'SAMPLE-1', cost: null, cost_basis: 'not_recomputed_here', price_slices: [], price_slices_truncated: false, price_slices_cut: 0, association: 'time_overlap_only',
   reconciliation: recon('consistent', { total_kwh: 8.2 }), overlapping_observed_intervals: 1, ...o });
-const retention = (oldestPower, digestDays = ['2026-11-05']) => ({ oldest_evidence: at('2026-11-02', 22), window_starts_before_oldest_evidence: false,
+const retention = (oldestPower, digestDays = ['2026-11-05']) => ({ oldest_evidence: at('2026-10-30', 22), window_starts_before_oldest_evidence: false,
   oldest_by_kind: { power_w: oldestPower, current_a: null, energy_register_kwh: oldestPower, status: null }, digest_days: digestDays,
   limits: { max_samples_per_kind: 4320, max_age_days: 7, max_digest_days: 62 }, note: 'raw rows are bounded by age and count' });
 
@@ -83,7 +83,7 @@ export function historyAnswer(charger, day) {
       sessions: [session(day, [2, 3], [2, 58], { reconciliation: reconMissing() })] });
     case '2026-11-05': return base(charger, day, { retention: retention(at('2026-11-07', 9)), digests: [digest(day)] });
     case '2026-11-04': return base(charger, day, { retention: retention(at('2026-11-07', 9), []) });
-    case '2026-11-03': { const old = base(charger, day, {}); delete old.truncated; old.retention = { oldest_evidence: at('2026-11-02', 22), window_starts_before_oldest_evidence: true, note: '' }; return old; }
+    case '2026-11-03': { const old = base(charger, day, {}); delete old.truncated; old.retention = { oldest_evidence: at('2026-10-30', 22), window_starts_before_oldest_evidence: true, note: '' }; return old; }
     default: return base(charger, day, {});
   }
 }
@@ -95,4 +95,10 @@ export function fixtureHistoryRequest(context) {
     if (params.date === '2026-11-01') throw new Error('timeout');
     return historyAnswer(context.charger, params.date);
   };
+}
+
+/** The days with a recorded session, in the shape of `spotnav/get_sessions.days` (start day, newest first; fictional). */
+export const SESSION_DAYS = ['2026-11-09', '2026-11-08', '2026-11-06', '2026-10-12'];
+export function fixtureSessionsRequest(context) {
+  return async () => ({ api_version: 1, charger_id: context.charger, days: SESSION_DAYS.map(period => ({ period, sessions: 1, energy_kwh: 8.2 })) });
 }

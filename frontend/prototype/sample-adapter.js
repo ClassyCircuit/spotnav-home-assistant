@@ -1,8 +1,8 @@
 import { createPriceDays } from '../shared-dashboard/price-days.js';
 import { EPOCH, SAMPLE_TODAY, sampleRows, fixtureRequest } from './price-days-fixture.js';
 import { windows, time, day, sampleDate, sampleDays, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks, prices, now, deadline, horizon, cap, socAssumptions, scenario, dailyScenario } from './sample.js';
-import { createHistoryDay } from '../shared-dashboard/history-day.js';
-import { HISTORY_TODAY, HISTORY_ZONE, fixtureHistoryRequest } from './history-day-fixture.js';
+import { createHistoryDay, requestDayPrices, priceReviewNote } from '../shared-dashboard/history-day.js';
+import { HISTORY_TODAY, HISTORY_ZONE, fixtureHistoryRequest, fixtureSessionsRequest } from './history-day-fixture.js';
 import { dailyStates, chooseDailyState, historyFixture } from './daily-sample.js';
 import { evidenceFixture } from './evidence-view.js';
 import { createPriceInsights } from '../shared-dashboard/price-insights.js';
@@ -23,9 +23,14 @@ export function createSampleAdapter(rebuild) {
   const context = {charger:'sample-charger', area:'SAMPLE-1', currency:'EUR', epoch:'sample'};
   const navigation = createPriceDays({request:fixtureRequest(context), onChange:()=>rebuild?.(build())});
   // History day (7.3a): the live panel's own state machine and renderer, fed backend-shaped fixture answers.
-  const historyNavigation = createHistoryDay({request:fixtureHistoryRequest(context), onChange:()=>rebuild?.(build())});
+  const historyNavigation = createHistoryDay({request:fixtureHistoryRequest(context), requestSessions:fixtureSessionsRequest(context), onChange:()=>rebuild?.(build())});
   // Price insights (7.5): the live panel's own state machine and renderer, fed backend-shaped fixture answers.
   const insightNavigation = createPriceInsights({request:fixtureInsightsRequest(context,{missing:missingInsights}), onChange:()=>rebuild?.(build()), now:()=>Date.UTC(2026,10,9,14,30)});
+  // 8.1: the same read-only price request the live panel makes when a history day is chosen (a fixed UTC calendar here).
+  let priceReview = null;
+  const reviewPrices = () => { const shown = historyNavigation.shown(); if (!shown) return; const start = Date.parse(`${shown.day}T00:00:00Z`);
+    priceReview = requestDayPrices({shown, span:[start,start+86400000], marketZone:HISTORY_ZONE, marketToday:SAMPLE_TODAY, priceDays:navigation}); rebuild?.(build()); };
+  const historyAction = (kind,arg) => { if (kind==='retry') historyNavigation.retry(); else if (kind==='prices') reviewPrices(); else if (historyNavigation.select(kind,arg)) reviewPrices(); };
   const hours = ms => (ms-EPOCH)/3600000;
   // Fictional latest readback (remaining period only), in the backend's absolute-instant shape; never history.
   const sampleEffective = () => { const h = x => EPOCH + x * 3600000; const spans = [[now,24,0],[24,24.625,16],[24.625,25,0],[25,25.375,16],[25.375,36,0]].map(([a,b,value])=>({start:h(a),end:h(b),value}));
@@ -40,7 +45,7 @@ export function createSampleAdapter(rebuild) {
     const chart = navPrices ? {prices:navPrices,now,deadline,horizon:[bounds[0],bounds.at(-1)],cap,viewKey:view.viewKey,comparison:false} : {prices,now,deadline,horizon,cap,viewKey:'today::0',comparison:new URLSearchParams(location.search).get('comparison')==='bar'};
     const nav = {snapRange:navPrices ? (a,b)=>snapRange(a,b,bounds) : snapRange, initialRange:navPrices ? c=>navRange ? snapRange(Math.max(bounds[0],navRange[0]),Math.min(bounds.at(-1),navRange[1]),bounds) : initialRange(c,bounds) : initialRange};
     const b = adapterBase();
-    return {...b, format:{...b.format,...nav}, model:{...b.model,chart,priceNav:view?.nav ?? null,insights:insightNavigation.sync({...context,today:INSIGHT_TODAY}).view(),historyDay:historyNavigation.sync({charger:context.charger,epoch:'sample',zone:HISTORY_ZONE,marketZone:HISTORY_ZONE,today:HISTORY_TODAY}).view()}, actions:{...b.actions,priceNav:(kind,arg)=>kind==='retry' ? navigation.retry() : navigation.select(kind,arg),historyNav:(kind,arg)=>kind==='retry' ? historyNavigation.retry() : historyNavigation.select(kind,arg),insightNav:(kind,arg)=>kind==='retry' ? insightNavigation.retry() : kind==='duration' ? insightNavigation.setDuration(arg) : kind==='month' ? insightNavigation.selectMonth(arg) : insightNavigation.selectCompare(arg)}};
+    return {...b, format:{...b.format,...nav}, model:{...b.model,chart,priceNav:view?.nav ?? null,insights:insightNavigation.sync({...context,today:INSIGHT_TODAY}).view(),historyDay:(v=>{if(v.nav)v.nav.priceNote=priceReviewNote(priceReview,v.nav.day);return v;})(historyNavigation.sync({charger:context.charger,epoch:'sample',zone:HISTORY_ZONE,marketZone:HISTORY_ZONE,today:HISTORY_TODAY}).view())}, actions:{...b.actions,priceNav:(kind,arg)=>kind==='retry' ? navigation.retry() : navigation.select(kind,arg),historyNav:historyAction,insightNav:(kind,arg)=>kind==='retry' ? insightNavigation.retry() : kind==='duration' ? insightNavigation.setDuration(arg) : kind==='month' ? insightNavigation.selectMonth(arg) : insightNavigation.selectCompare(arg)}};
   };
   const base = () => adapterBase();
   const adapterBase = () => ({ format:{toAxis:hours,time,day,minutesPerTimeUnit:60,staleLabel:'stale sample',date:sampleDate,tooltipDate:h=>`${sampleDate(h)} 2026`,days:sampleDays,priceGaps,stepSegments,stepPoints,snapRange,initialRange,timeTicks},

@@ -3473,7 +3473,8 @@ footer {
   align-items: center;
   font-size: 13px;
 }
-.history-date input {
+.history-date input,
+.history-date select {
   min-height: 36px;
   max-width: 100%;
   font: inherit;

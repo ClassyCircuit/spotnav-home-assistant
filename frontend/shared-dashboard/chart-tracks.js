@@ -56,7 +56,7 @@ function proposalLane({ horizon: [h0, h1], now, windows }) {
   const baseAt = mid => !known ? piece('unknown', 'no proposal', 'No current proposal: it is stale, unavailable or not calculated.')
     : mid < now ? piece('unknown', 'past', 'Past time: the current proposal does not describe it.') : piece('none', '', 'No proposed charging here.');
   return { key: 'proposal', caption: 'Proposal · current calculated plan',
-    note: known ? 'Not sent; for now and later only. Past time is hatched, not “no plan”.' : 'No current proposal to show.', segments: tile(h0, h1, baseAt, [now], segments) };
+    note: h1 <= now ? 'Past day: the current proposal never describes it, so no proposal is drawn.' : known ? 'Not sent; for now and later only. Past time is hatched, not “no plan”.' : 'No current proposal to show.', segments: tile(h0, h1, baseAt, [now], segments) };
 }
 
 function sentLane({ horizon: [h0, h1], toAxis, tracks, message }) {
@@ -80,7 +80,7 @@ function effectiveLane({ horizon: [h0, h1], now, toAxis, effective }) {
   const segments = ok ? effective.spans.map(s => ({ start: Math.max(toAxis(s.start), now), end: toAxis(s.end), layer: 1, kind: effective.differs ? 'effective-differs' : 'effective', differs: !!effective.differs,
     label: `${s.value} ${effective.unit || 'A'}`, text: `Reported effective limit ${s.value} ${effective.unit || 'A'} in the latest readback${effective.differs ? ' · the readback differs from the last sent schedule (reported difference)' : ''}. A reported limit is neither power nor proof of charging.` })) : [];
   return { key: 'effective', caption: 'Effective · latest readback, remaining period only',
-    note: ok ? `Read ${effective.readAtText || 'recently'}; never restored for past time. Not installed-profile inventory.` : (effective?.reason || 'No fresh readback; effective limits are unknown.'),
+    note: h1 <= now ? 'Past day: the latest readback never describes it, so no effective limit is drawn.' : ok ? `Read ${effective.readAtText || 'recently'}; never restored for past time. Not installed-profile inventory.` : (effective?.reason || 'No fresh readback; effective limits are unknown.'),
     segments: tile(h0, h1, base, [], segments) };
 }
 

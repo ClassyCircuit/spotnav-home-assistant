@@ -181,7 +181,7 @@ describe('actual sidebar read-only host', () => {
     expect(panel.charger).toBe('a');expect(panel.shadowRoot.querySelector('.shell')).toBeTruthy();
     chargers=[...chargers,{charger_id:'b',charger_name:'B'}];panel.hass={...hass,connected:false};panel.hass=hass;await tick();expect(panel.charger).toBe('a');
     panel.remove();const next=document.createElement('spotnav-enhanced-panel');next.hass=hass;document.body.append(next);await tick();expect(next.charger).toBe('a');next.remove();
-    expect(calls.every(m=>['spotnav/list_chargers','spotnav/get_dashboard','spotnav/get_settings','spotnav/get_entity_config','spotnav/get_market_options','spotnav/get_price_days','spotnav/get_price_insights','spotnav/get_charging_history'].includes(m.type)||(m.type==='spotnav/morek_schedule'&&m.action==='status'))).toBe(true);
+    expect(calls.every(m=>['spotnav/list_chargers','spotnav/get_dashboard','spotnav/get_settings','spotnav/get_entity_config','spotnav/get_market_options','spotnav/get_price_days','spotnav/get_price_insights','spotnav/get_charging_history','spotnav/get_sessions'].includes(m.type)||(m.type==='spotnav/morek_schedule'&&m.action==='status'))).toBe(true);
   });
   it('handles multiple, empty, changed and failed lists without stale dashboard', async () => {
     let chargers=[{charger_id:'a',charger_name:'A'},{charger_id:'b',charger_name:'B'}], fail=false;
@@ -406,7 +406,7 @@ describe('actual sidebar read-only host', () => {
     panel.hass={...hass,connected:false}; expect(panel.shadowRoot.textContent).toContain('disconnected');
     panel.hass=hass; await tick(); expect(panel.shadowRoot.querySelector('.shell')).not.toBeNull();
     panel.remove();
-    expect(calls.every(m=>m.type==='spotnav/list_chargers'||m.type==='spotnav/get_dashboard'||m.type==='spotnav/get_settings'||m.type==='spotnav/get_market_options'||m.type==='spotnav/get_price_days'||m.type==='spotnav/get_price_insights'||m.type==='spotnav/get_charging_history'||(m.type==='spotnav/morek_schedule' && m.action==='status'))).toBe(true);
+    expect(calls.every(m=>m.type==='spotnav/list_chargers'||m.type==='spotnav/get_dashboard'||m.type==='spotnav/get_settings'||m.type==='spotnav/get_market_options'||m.type==='spotnav/get_price_days'||m.type==='spotnav/get_price_insights'||m.type==='spotnav/get_charging_history'||m.type==='spotnav/get_sessions'||(m.type==='spotnav/morek_schedule' && m.action==='status'))).toBe(true);
   });
   it('rejects an old charger status after switching', async () => {
     const a=fixture(), b=fixture(); a.generated_at=b.generated_at=new Date().toISOString();
@@ -441,7 +441,7 @@ describe('actual sidebar read-only host', () => {
       // issued until the underlying request settles or the session changes.
       expect(calls.filter(m=>m.type==='spotnav/morek_schedule').length).toBe(1);
       panel.remove();const count=calls.length;await vi.advanceTimersByTimeAsync(90000);await tick();expect(calls).toHaveLength(count);
-      expect(calls.every(m=>m.type==='spotnav/list_chargers'||m.type==='spotnav/get_dashboard'||m.type==='spotnav/get_settings'||m.type==='spotnav/get_market_options'||m.type==='spotnav/get_price_days'||m.type==='spotnav/get_price_insights'||m.type==='spotnav/get_charging_history'||(m.type==='spotnav/morek_schedule'&&m.action==='status'))).toBe(true);
+      expect(calls.every(m=>m.type==='spotnav/list_chargers'||m.type==='spotnav/get_dashboard'||m.type==='spotnav/get_settings'||m.type==='spotnav/get_market_options'||m.type==='spotnav/get_price_days'||m.type==='spotnav/get_price_insights'||m.type==='spotnav/get_charging_history'||m.type==='spotnav/get_sessions'||(m.type==='spotnav/morek_schedule'&&m.action==='status'))).toBe(true);
     } finally { vi.useRealTimers(); }
   });
   it('retains the open dialog and immediately publishes critical status', async () => {

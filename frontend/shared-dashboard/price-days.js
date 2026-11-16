@@ -100,9 +100,19 @@ export function createPriceDays({ request, onChange = () => {} }) {
       return this;
     },
     /** Explicit navigation. `today`/`tomorrow`/`all` need no request; the others load one bounded page. */
-    select(kind, day) {
-      if (!ctx || !st.available || st.loading) return;
+    select(kind, day, options) {
+      if (!ctx || !st.available || st.loading) return 'busy';
       if (kind === 'earlier') { st.earlierOpen = !st.earlierOpen; onChange(); return; }
+      // 8.1 day review: the held market day a page must end at (before today) and the instants of the Home Assistant-local day to show.
+      if (kind === 'review') {
+        if (!heldDay(day) || parse(day) >= parse(st.available.today)) return 'not_held';
+        const range = Array.isArray(options?.range) && options.range.length === 2 && options.range.every(Number.isFinite) && options.range[1] > options.range[0] ? options.range : null;
+        const selection = { kind: 'day', day, range, review: true };
+        if (st.page?.dayRows.get(day)?.held && st.page.dayRows.get(day).intervals) { st.selection = chosen(selection); st.error = null; st.retryDay = null; onChange(); return 'shown'; }
+        void loadPage(day, selection);
+        onChange();
+        return 'loading';
+      }
       if (kind === 'today' || kind === 'tomorrow' || kind === 'all') { st.selection = chosen({ kind, explicit: true }); st.error = null; st.retryDay = null; onChange(); return; }
       const target = kind === 'yesterday' ? addDays(st.available.today, -1) : day;
       if (!heldDay(target) || (kind === 'day' && parse(target) >= parse(st.available.today))) return;
@@ -132,7 +142,7 @@ export function createPriceDays({ request, onChange = () => {} }) {
       // Only an explicit Today is the local calendar day; the default keeps the rolling today/tomorrow horizon.
       if (selection.kind === 'today' && selection.explicit) range = ctx.span?.(today) ?? null;
       else if (selection.kind === 'tomorrow') range = ctx.span?.(tomorrow) ?? null;
-      else if (selection.kind === 'yesterday' || selection.kind === 'day') range = ctx.span?.(selection.day) ?? null;
+      else if (selection.kind === 'yesterday' || selection.kind === 'day') range = selection.range ?? ctx.span?.(selection.day) ?? null;
       else if (selection.kind === 'all' && rows?.length) range = [Date.parse(rows[0].start), Date.parse(rows.at(-1).end)];
       const viewKey = `${selection.kind}:${selection.day || ''}:${showsPage ? page.id : 0}${selection.seq ? `:${selection.seq}` : ''}`;
       const available = st.available, checking = st.status === 'loading' || st.status === 'idle';

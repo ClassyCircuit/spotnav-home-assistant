@@ -193,6 +193,34 @@ describe('bounded pages', () => {
   });
 });
 
+describe('day review selection (8.1)', () => {
+  const days = Array.from({ length: 10 }, (_, i) => [addDays('2026-11-05', i)]);
+  it('loads one page ending at the held market day, shows the Home Assistant day by instant, and refuses unheld, current and busy requests', async () => {
+    const { api, nav } = await ready(held(days));
+    const span = [Date.UTC(2026, 10, 12, 0), Date.UTC(2026, 10, 13, 0)]; // a UTC day that crosses two Stockholm market days
+    expect(nav.select('review', '2026-11-04', { range: span })).toBe('not_held');
+    expect(nav.select('review', TODAY, { range: span })).toBe('not_held'); // today comes from the live feed, never a page
+    expect(api.log.filter(p => p.mode === 'range')).toHaveLength(0);
+    expect(nav.select('review', '2026-11-13', { range: span })).toBe('loading'); await settle();
+    expect(api.log.filter(p => p.mode === 'range')).toEqual([{ mode: 'range', from: addDays('2026-11-13', 1 - PAGE_DAYS), to: '2026-11-13' }]);
+    const view = nav.view(live());
+    expect(view.range).toEqual(span); // the Home Assistant day's own instants, not the market day's calendar
+    expect(view.rows.length).toBeGreaterThan(24 * 2); expect(view.nav.selected).toBe('day');
+    // an already loaded page is reused: no second request
+    expect(nav.select('review', '2026-11-12', { range: span })).toBe('shown');
+    expect(api.log.filter(p => p.mode === 'range')).toHaveLength(1);
+    expect(nav.view(live()).viewKey).not.toBe(view.viewKey);
+    expect(nav.select('review', '2026-11-13', { range: [5, 1] })).toBe('shown'); expect(nav.view(live()).range).toEqual(localDaySpan('2026-11-13', ZONE)); // an unusable range falls back to the market day
+  });
+  it('drops a late review page after a charger change', async () => {
+    const api = backend(held(days)); backend.gate = true;
+    const nav = createPriceDays({ request: api.request, onChange: () => {} }); nav.sync(ctx()); await settle(); api.waiting.splice(0).forEach(go => go()); await settle();
+    backend.gate = true; expect(nav.select('review', '2026-11-13', { range: [Date.UTC(2026, 10, 12), Date.UTC(2026, 10, 13)] })).toBe('loading');
+    nav.sync(ctx({ charger: 'c2' })); api.waiting.splice(0).forEach(go => go()); await settle();
+    expect(nav.view(live()).rows).toEqual(live()); // nothing of the old page remains
+  });
+});
+
 describe('stale and changed context', () => {
   it('discards a late answer after a charger, area, currency or generation change', async () => {
     for (const change of [{ charger: 'c2' }, { area: 'SE3' }, { currency: 'EUR' }, { epoch: '2:0' }]) {
@@ -319,6 +347,22 @@ describe('live adapter and preview use one nav shape', () => {
     expect(current().model.chart.viewKey).toMatch(/^day:2026-11-05:/);
     expect(current().model.chart.horizon[0]).toBeLessThan(-24); // earlier held days joined the sample horizon
     expect(current().model.chart.prices.some(p => p.cents <= 0)).toBe(false);
+  });
+  it('the preview day review uses the same machine: default yesterday, only retained days, held prices requested only on a choice', async () => {
+    const { current: now } = await sampleNav(); await settle();
+    const current = new Proxy({}, { get: (_, key) => now()[key] });
+    const view = () => current.model.historyDay;
+    const nav = view().nav;
+    expect(nav.day).toBe('2026-11-08'); expect(nav.isDefault).toBe(true); expect(current.model.priceNav.selected).toBe('today'); // the default review asks for no price page
+    expect(nav.options.map(o => o.day)).toContain('2026-10-12'); expect(nav.options.some(o => o.day === '2026-11-10')).toBe(false);
+    expect(nav.options.find(o => o.day === '2026-11-07').label).toMatch(/retained rows/); expect(nav.options.find(o => o.day === '2026-11-05').label).toMatch(/summary only/);
+    expect(nav.options.some(o => o.day === '2026-11-04' || o.day === '2026-11-03')).toBe(false); // before the oldest power row: not offered
+    current.actions.historyNav('prev'); await settle(); await settle(); await settle();
+    expect(view().nav.day).toBe('2026-11-07'); expect(view().nav.priceNote).toMatch(/market calendar, Etc\/UTC/);
+    expect(current.model.priceNav.selected).toBe('day'); expect(current.model.priceNav.selectedDay).toBe('2026-11-07');
+    current.actions.historyNav('day', '2026-11-06'); await settle(); await settle(); await settle();
+    expect(view().nav.priceNote).toMatch(/not available, so the price chart is unchanged: unknown, not zero/);
+    current.actions.historyNav('day', '2026-09-01'); await settle(); expect(view().nav.day).toBe('2026-11-06'); // not retained: ignored
   });
   it('the live adapter hands the navigated rows to the one chart adapter and keeps the default feed otherwise', () => {
     const now = Date.now();

@@ -52620,7 +52620,7 @@ function proposalLane({ horizon: [h0, h1], now, windows }) {
   return {
     key: "proposal",
     caption: "Proposal \xB7 current calculated plan",
-    note: known ? "Not sent; for now and later only. Past time is hatched, not \u201Cno plan\u201D." : "No current proposal to show.",
+    note: h1 <= now ? "Past day: the current proposal never describes it, so no proposal is drawn." : known ? "Not sent; for now and later only. Past time is hatched, not \u201Cno plan\u201D." : "No current proposal to show.",
     segments: tile(h0, h1, baseAt, [now], segments)
   };
 }
@@ -52662,7 +52662,7 @@ function effectiveLane({ horizon: [h0, h1], now, toAxis, effective }) {
   return {
     key: "effective",
     caption: "Effective \xB7 latest readback, remaining period only",
-    note: ok3 ? `Read ${effective.readAtText || "recently"}; never restored for past time. Not installed-profile inventory.` : effective?.reason || "No fresh readback; effective limits are unknown.",
+    note: h1 <= now ? "Past day: the latest readback never describes it, so no effective limit is drawn." : ok3 ? `Read ${effective.readAtText || "recently"}; never restored for past time. Not installed-profile inventory.` : effective?.reason || "No fresh readback; effective limits are unknown.",
     segments: tile(h0, h1, base2, [], segments)
   };
 }
@@ -52811,7 +52811,9 @@ var row = (text4, detail = "", cls = "") => `<li${cls ? ` class="${cls}"` : ""}>
 function renderHistoryNav(nav) {
   if (!nav) return "";
   const button = (id, label2, enabled) => `<wa-button size="small" data-history-nav="${id}" ${enabled ? "" : "disabled"}>${escapeText(label2)}</wa-button>`;
-  return `<div class="history-nav" role="group" aria-label="History day"><div class="history-nav-buttons">${button("prev", "\u2039 Earlier day", nav.canPrev)}<strong class="history-day-label">${escapeText(nav.label)}</strong>${button("next", "Later day \u203A", nav.canNext)}${button("yesterday", "Yesterday", true)}${button("today", "Today", !nav.isToday)}<label class="history-date">Day <input type="date" data-history-date min="${escapeText(nav.min)}" max="${escapeText(nav.max)}" value="${escapeText(nav.day)}" aria-label="History day"></label>${nav.canRetry ? button("retry", "Retry", true) : ""}</div><p class="subtext">${escapeText(nav.zoneNote)}</p></div>`;
+  const picker = nav.options?.length ? `<label class="history-date">Retained day <select data-history-date aria-label="Retained history day">${nav.options.map((o9) => `<option value="${escapeText(o9.day)}" ${o9.selected ? "selected" : ""}>${escapeText(o9.label)}</option>`).join("")}</select></label>` : "";
+  const prices = nav.priceNote !== void 0 ? button("prices", "Show this day on the price chart", true) : "";
+  return `<div class="history-nav" role="group" aria-label="History day" data-history-retention="${escapeText(nav.retention || "unknown")}"><div class="history-nav-buttons">${button("prev", "\u2039 Earlier day", nav.canPrev)}<strong class="history-day-label">${escapeText(nav.label)}${nav.isDefault ? " (yesterday, default)" : ""}</strong>${button("next", "Later day \u203A", nav.canNext)}${button("yesterday", "Yesterday", nav.canYesterday)}${button("today", "Today", nav.canToday)}${picker}${prices}${nav.canRetry ? button("retry", "Retry", true) : ""}</div><p class="subtext">${escapeText(nav.zoneNote)}</p><p class="subtext history-retained-note">${escapeText(nav.retentionNote || "")}${nav.sessionsNote ? ` ${escapeText(nav.sessionsNote)}` : ""}</p>${nav.priceNote ? `<p class="subtext history-price-note" role="status">${escapeText(nav.priceNote)}</p>` : ""}</div>`;
 }
 var banner = (kind, text4) => `<p class="history-banner" data-history-banner="${escapeText(kind)}" role="status">${escapeText(text4)}</p>`;
 var basisValue = (r7) => r7.value === null ? "Unavailable" : escapeText(r7.text.slice(r7.label.length + 2));
@@ -52823,7 +52825,7 @@ function renderDigest(d3) {
     d3.outside.length ? `<h4>Flow versus plan</h4>${list(d3.outside, (t6) => row(t6))}` : ""
   ].join("");
   const facts = `${d3.unknownSpans ? `${d3.unknownSpans} span(s) where the plan was unknown. ` : ""}${d3.gapCount !== null ? `${d3.gapCount} capture gap(s), ` : ""}${d3.restartCount !== null ? `${d3.restartCount} restart(s).` : ""}`;
-  return `<section class="history-digest" data-history-section="digest"><h3>Saved day summary</h3><p class="subtext">${d3.partial ? "Raw rows were already partly pruned when this was written. " : ""}${d3.computed ? `Written ${escapeText(d3.computed)}. ` : ""}It was written once and keeps no price rows.</p>${d3.coverage ? `<p>${escapeText(d3.coverage)}</p>` : ""}${d3.energy.length ? `<div class="history-energy">${d3.energy.map((r7) => `<div class="history-basis" data-basis-value="${r7.value === null ? "null" : r7.value}"><b>${escapeText(r7.label)}</b><span>${basisValue(r7)}</span></div>`).join("")}</div><p class="subtext">Separate bases, never added together.</p>` : ""}${lists}<p class="subtext">${escapeText(facts)}</p></section>`;
+  return `<section class="history-digest" data-history-section="digest"><h3>Saved day summary</h3><p class="subtext"><b>Summary only; no per-minute data and no prices.</b> ${d3.partial ? "Raw rows were already partly pruned when this was written. " : ""}${d3.computed ? `Written ${escapeText(d3.computed)}. ` : ""}It was written once and keeps no price rows.</p>${d3.coverage ? `<p>${escapeText(d3.coverage)}</p>` : ""}${d3.energy.length ? `<div class="history-energy">${d3.energy.map((r7) => `<div class="history-basis" data-basis-value="${r7.value === null ? "null" : r7.value}"><b>${escapeText(r7.label)}</b><span>${basisValue(r7)}</span></div>`).join("")}</div><p class="subtext">Separate bases, never added together.</p>` : ""}${lists}<p class="subtext">${escapeText(facts)}</p></section>`;
 }
 function renderHistoryDay(m4) {
   const head = renderHistoryNav(m4.nav);
@@ -52831,6 +52833,7 @@ function renderHistoryDay(m4) {
   const rawBanners = { digest_only: "digest", plan_only: "no-power", none: "none", partial: "partial-raw", unknown: "unknown-raw" };
   const parts = [head];
   if (rawBanners[m4.raw]) parts.push(banner(rawBanners[m4.raw], m4.rawNote));
+  if (m4.notRetained) parts.push(banner("not-retained", m4.notRetained));
   if (m4.refreshFailed) parts.push(banner("refresh-failed", "The latest refresh failed; this is the earlier read of the day."));
   if (m4.legacy) parts.push(banner("legacy", "This integration is older than the card: it does not say when lists are cut or which rows are kept, so missing rows cannot be told from rows that never existed."));
   if (m4.partial) parts.push(`<div class="history-banner" data-history-banner="truncated" role="status"><b>Partial: some lists are cut.</b>${list(m4.truncated, (t6) => row(t6))}</div>`);
@@ -52844,6 +52847,7 @@ function renderHistoryDay(m4) {
     parts.push(`<section data-history-section="flow"><h3>Measured flow</h3>${m4.flow.length ? list(m4.flow, (i7) => row(i7.text, i7.detail)) : '<p class="subtext">No flow interval was found in the measured rows that exist; the coverage line says what was not measured.</p>'}${list(m4.outside, (x2) => row(x2.text, "", `outside-${x2.kind}`))}${m4.isolated ? `<p class="subtext">${escapeText(m4.isolated)}</p>` : ""}<p class="subtext">${escapeText(m4.flowNote)}</p></section>`);
     parts.push(`<section data-history-section="energy"><h3>Energy by basis</h3>${energy2(m4)}</section>`);
   }
+  if (!m4.sessions.length && m4.raw !== "digest_only") parts.push('<section data-history-section="sessions"><h3>Sessions overlapping this day</h3><p class="subtext" data-history-empty="sessions">No session was recorded for this day by the Morek recorder (whether it records every session is unverified). That is not proof that the car did not charge.</p></section>');
   if (m4.sessions.length) parts.push(`<section data-history-section="sessions"><h3>Sessions overlapping this day</h3><ul class="history-list">${m4.sessions.map((s4) => `<li>${escapeText(s4.text)}<small>${escapeText(s4.detail)}</small>${s4.lines.map((l6) => `<small class="history-recon">${escapeText(l6)}</small>`).join("")}</li>`).join("")}</ul><p class="subtext">A session that crosses midnight appears on both days; its energy is not split.</p></section>`);
   if (m4.gaps.length || m4.restarts.length) parts.push(`<section data-history-section="gaps"><h3>Capture gaps and restarts</h3>${list(m4.gaps.slice(0, 5), (t6) => row(`Gap: ${t6}`))}${m4.gaps.length > 5 ? `<p class="subtext">${m4.gaps.length - 5} more gap(s) not listed.</p>` : ""}${m4.restarts.length ? `<p class="subtext">Capture (re)started at ${m4.restarts.slice(0, 5).map(escapeText).join(", ")}${m4.restarts.length > 5 ? ` and ${m4.restarts.length - 5} more` : ""}.</p>` : ""}</section>`);
   parts.push(`<p class="subtext history-retention">${escapeText(m4.retentionNote)}${m4.retention.oldestPower ? ` Measured power rows currently begin ${escapeText(m4.retention.oldestPower)}.` : ""}${m4.retention.digestDays !== null ? ` ${m4.retention.digestDays} day summary(ies) are kept.` : ""}</p>`);
@@ -53479,6 +53483,7 @@ var SETTINGS_NOT_COMMITTED = "spotnav_settings_not_committed";
 var IF_NOT_READY = ["ask", "release", "hold"];
 var IDENTIFY_MODES = ["automatic", "ask", "off"];
 var MARKET_API_VERSION = 1;
+var SESSIONS_API_VERSION = 1;
 var PRICE_DAYS_API_VERSION = 1;
 var HISTORY_API_VERSION = 1;
 var PRICE_INSIGHTS_API_VERSION = 1;
@@ -57892,6 +57897,18 @@ async function updateVehicle(hass, chargerId, request) {
     expected: request.expected
   });
 }
+async function getSessions(hass, chargerId, limit = 20, month = null) {
+  const message = {
+    type: "spotnav/get_sessions",
+    api_version: SESSIONS_API_VERSION,
+    charger_id: chargerId,
+    limit
+  };
+  if (month !== null) {
+    message.month = month;
+  }
+  return await call(hass, message);
+}
 
 // shared-dashboard/price-days.js
 var PAGE_DAYS = 8;
@@ -58005,12 +58022,27 @@ function createPriceDays({ request, onChange = () => {
       return this;
     },
     /** Explicit navigation. `today`/`tomorrow`/`all` need no request; the others load one bounded page. */
-    select(kind, day) {
-      if (!ctx || !st.available || st.loading) return;
+    select(kind, day, options2) {
+      if (!ctx || !st.available || st.loading) return "busy";
       if (kind === "earlier") {
         st.earlierOpen = !st.earlierOpen;
         onChange();
         return;
+      }
+      if (kind === "review") {
+        if (!heldDay(day) || parse2(day) >= parse2(st.available.today)) return "not_held";
+        const range2 = Array.isArray(options2?.range) && options2.range.length === 2 && options2.range.every(Number.isFinite) && options2.range[1] > options2.range[0] ? options2.range : null;
+        const selection2 = { kind: "day", day, range: range2, review: true };
+        if (st.page?.dayRows.get(day)?.held && st.page.dayRows.get(day).intervals) {
+          st.selection = chosen(selection2);
+          st.error = null;
+          st.retryDay = null;
+          onChange();
+          return "shown";
+        }
+        void loadPage(day, selection2);
+        onChange();
+        return "loading";
       }
       if (kind === "today" || kind === "tomorrow" || kind === "all") {
         st.selection = chosen({ kind, explicit: true });
@@ -58059,7 +58091,7 @@ function createPriceDays({ request, onChange = () => {
       let range2 = null;
       if (selection.kind === "today" && selection.explicit) range2 = ctx.span?.(today) ?? null;
       else if (selection.kind === "tomorrow") range2 = ctx.span?.(tomorrow) ?? null;
-      else if (selection.kind === "yesterday" || selection.kind === "day") range2 = ctx.span?.(selection.day) ?? null;
+      else if (selection.kind === "yesterday" || selection.kind === "day") range2 = selection.range ?? ctx.span?.(selection.day) ?? null;
       else if (selection.kind === "all" && rows?.length) range2 = [Date.parse(rows[0].start), Date.parse(rows.at(-1).end)];
       const viewKey = `${selection.kind}:${selection.day || ""}:${showsPage ? page.id : 0}${selection.seq ? `:${selection.seq}` : ""}`;
       const available = st.available, checking = st.status === "loading" || st.status === "idle";
@@ -58133,6 +58165,63 @@ function localDate(at, zone) {
     return new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).format(at);
   } catch {
     return null;
+  }
+}
+function parseRetention(r7, zone) {
+  if (!r7 || typeof r7 !== "object" || !r7.oldest_by_kind || typeof r7.oldest_by_kind !== "object" || !Array.isArray(r7.digest_days)) return null;
+  const stamps = Object.values(r7.oldest_by_kind).map((v2) => Date.parse(v2)).filter(Number.isFinite);
+  return { rawFrom: stamps.length ? localDate(Math.min(...stamps), zone) : null, digests: r7.digest_days.filter((d3) => Number.isFinite(ms(d3))) };
+}
+function retainedDayMap(ret, sessionDays, today) {
+  const lo = addDays2(today, -HISTORY_DAYS_BACK), map3 = /* @__PURE__ */ new Map();
+  const within = (d3) => Number.isFinite(ms(d3)) && ms(d3) >= ms(lo) && ms(d3) <= ms(today);
+  const add2 = (d3, kind) => {
+    if (within(d3)) {
+      if (!map3.has(d3)) map3.set(d3, /* @__PURE__ */ new Set());
+      map3.get(d3).add(kind);
+    }
+  };
+  if (ret?.rawFrom) for (let d3 = ms(ret.rawFrom) < ms(lo) ? lo : ret.rawFrom; ms(d3) <= ms(today); d3 = addDays2(d3, 1)) add2(d3, "raw");
+  for (const d3 of ret?.digests || []) add2(d3, "summary");
+  for (const d3 of sessionDays || []) add2(d3, "sessions");
+  return map3;
+}
+var TAG = (kinds) => kinds.has("raw") ? "retained rows" : kinds.has("summary") ? "summary only" : "sessions only";
+function reviewPriceTarget(span2, marketZone, marketToday) {
+  if (!Array.isArray(span2) || span2.length !== 2 || !marketZone || !Number.isFinite(ms(marketToday))) return null;
+  const first = localDate(span2[0], marketZone), last = localDate(span2[1] - 1, marketZone);
+  if (!first || !last) return null;
+  const days = first === last ? [first] : [first, last];
+  const pageable = days.filter((d3) => ms(d3) < ms(marketToday));
+  return { days, page: pageable.at(-1) ?? null, crossesMarketDays: days.length > 1 };
+}
+function requestDayPrices({ shown, span: span2, marketZone, marketToday, priceDays }) {
+  const base2 = { day: shown.day, marketZone, days: [], crosses: false };
+  if (!priceDays) return { ...base2, status: "unavailable" };
+  if (shown.day === shown.today) {
+    priceDays.select("today");
+    return { ...base2, status: "today" };
+  }
+  const target = reviewPriceTarget(span2, marketZone, marketToday);
+  if (!target?.page) return { ...base2, days: target?.days || [], status: "not_held" };
+  return { ...base2, days: target.days, crosses: target.crossesMarketDays, status: priceDays.select("review", target.page, { range: span2 }) || "unavailable" };
+}
+function priceReviewNote(review, day) {
+  if (!review || review.day !== day) return "";
+  const days = review.days.join(" and ");
+  switch (review.status) {
+    case "today":
+      return "The price chart shows today, as its own Today button does.";
+    case "loading":
+      return `Requested held prices for ${days} (market calendar, ${review.marketZone}). The chart changes only after the read succeeds${review.crosses ? "; this Home Assistant day covers two market days" : ""}; a gap remains unknown.`;
+    case "shown":
+      return `Held prices for ${days} (market calendar, ${review.marketZone}) are drawn on the chart${review.crosses ? "; this Home Assistant day covers two market days, so both are drawn, aligned by instant, and a gap means that price day is not held" : ""}. The evidence tracks are this day's; no current proposal or readback is drawn for a past day.`;
+    case "not_held":
+      return `Held prices for ${days || "this day"} (${review.marketZone}) are not available, so the price chart is unchanged: unknown, not zero.`;
+    case "busy":
+      return "Held prices are still loading; press the button again.";
+    default:
+      return "Held prices for this day could not be requested.";
   }
 }
 var num = (v2) => typeof v2 === "number" && Number.isFinite(v2);
@@ -58258,7 +58347,7 @@ function buildHistoryModel(answer, day, fmt, readAt = NaN) {
   } else if (!Number.isFinite(oldestPower) || oldestPower >= until) {
     const sent2 = answer.comparison.planned_blocks.length || answer.comparison.unknown_plan_spans.length || answer.plans.length || answer.sessions.length;
     raw = digest ? "digest_only" : sent2 ? "plan_only" : "none";
-    rawNote = digest ? "The measured rows of this day are no longer kept; only its saved summary remains (no price rows, lists cut at 50 rows). The summary below is not live evidence." : sent2 ? "No measured power rows are kept for this day, so flow is unknown, not zero. Plans and sessions below are what was recorded." : "No charging evidence is kept for this day. That does not mean nothing happened.";
+    rawNote = digest ? "Summary only: no per-minute data and no prices. The measured rows of this day are no longer kept; only its saved summary remains (lists cut at 50 rows). The summary below is not live evidence." : sent2 ? "No measured power rows are kept for this day, so flow is unknown, not zero. Plans and sessions below are what was recorded." : "No charging evidence is kept for this day. That does not mean nothing happened.";
   } else if (oldestPower > since + PARTIAL_AFTER_S * 1e3) {
     raw = "partial";
     rawNote = `Measured power rows are kept only from ${stamp3(kinds.power_w)}; flow before that is unknown, not zero.`;
@@ -58384,17 +58473,19 @@ function buildHistoryModel(answer, day, fmt, readAt = NaN) {
     sentNote: "Sent means the charger answered a plan version as accepted, not that it was installed or that charging happened. After an uncertain write the plan is unknown."
   };
 }
-function createHistoryDay({ request, onChange = () => {
+function createHistoryDay({ request, requestSessions = null, onChange = () => {
 }, now = () => Date.now() }) {
-  let ctx = null, key3 = null, seq = 0;
-  const initial = () => ({ sel: { kind: "today" }, loading: null, result: null, error: null });
+  let ctx = null, key3 = null, seq = 0, sessSeq = 0;
+  const initial = () => ({ sel: { kind: "default" }, loading: null, result: null, error: null, ret: null, sessions: { status: requestSessions ? "idle" : "off", days: [] } });
   let st = initial();
   const reset = () => {
     seq++;
+    sessSeq++;
     st = initial();
   };
   const keyOf = (c5) => JSON.stringify([c5.charger, c5.epoch, c5.zone]);
-  const effective = () => st.sel.kind === "today" ? ctx.today : st.sel.day;
+  const effective = () => st.sel.kind === "today" ? ctx.today : st.sel.kind === "default" ? addDays2(ctx.today, -1) : st.sel.day;
+  const retained = () => st.ret || st.sessions.days.length ? retainedDayMap(st.ret, st.sessions.days, ctx.today) : null;
   const fmtFor = (c5) => ({ stamp: (iso) => {
     const t6 = instant(iso);
     if (!Number.isFinite(t6)) return "unknown time";
@@ -58426,6 +58517,7 @@ function createHistoryDay({ request, onChange = () => {
       if (mine !== seq || myKey !== key3) return;
       if (!validateHistory(answer, asked)) throw new Error("invalid");
       const at = now();
+      st.ret = parseRetention(answer.retention, ctx.zone) || st.ret;
       st.result = { day, at, model: buildHistoryModel(answer, day, fmtFor(asCtx), at) };
     } catch (error2) {
       if (mine !== seq || myKey !== key3) return;
@@ -58440,6 +58532,21 @@ function createHistoryDay({ request, onChange = () => {
     st.loading = null;
     onChange();
   }
+  async function loadSessions() {
+    const mine = ++sessSeq, myKey = key3, asked = ctx;
+    st.sessions = { status: "loading", days: [] };
+    try {
+      const answer = await requestSessions();
+      if (mine !== sessSeq || myKey !== key3) return;
+      const rows = Array.isArray(answer?.days) ? answer.days : null;
+      if (!(answer?.api_version === 1 && answer.charger_id === asked.charger && rows && rows.length <= 400 && rows.every((r7) => DAY_RE.test(r7?.period || "")))) throw new Error("invalid");
+      st.sessions = { status: "ready", days: rows.filter((r7) => typeof r7.sessions === "number" && r7.sessions > 0).map((r7) => r7.period) };
+    } catch {
+      if (mine !== sessSeq || myKey !== key3) return;
+      st.sessions = { status: "error", days: [] };
+    }
+    onChange();
+  }
   return {
     /** Tell it who is asking. A change of charger, generation/permission epoch or zone drops everything. */
     sync(next) {
@@ -58451,6 +58558,7 @@ function createHistoryDay({ request, onChange = () => {
       }
       ctx = valid ? next : null;
       if (!ctx) return this;
+      if (st.sessions.status === "idle") void loadSessions();
       const day = effective();
       if (st.loading) return this;
       if (st.error?.day === day) return this;
@@ -58458,48 +58566,74 @@ function createHistoryDay({ request, onChange = () => {
       else if (st.sel.kind === "today" && now() - st.result.at > REFRESH_TODAY_MS) void load(day, { silent: true });
       return this;
     },
-    /** `today`, `yesterday`, `prev`, `next` or an explicit `day`; only days inside the retained range are accepted. */
+    /** `today`, `yesterday`, `prev`, `next` or an explicit `day`; only days the metadata confirms as retained are accepted. */
     select(kind, day) {
-      if (!ctx) return;
-      const shown = effective();
-      const target = kind === "today" ? ctx.today : kind === "yesterday" ? addDays2(ctx.today, -1) : kind === "prev" ? addDays2(shown, -1) : kind === "next" ? addDays2(shown, 1) : day;
-      if (!Number.isFinite(ms(target)) || ms(target) > ms(ctx.today) || ms(target) < ms(addDays2(ctx.today, -HISTORY_DAYS_BACK))) return;
+      const map3 = ctx ? retained() : null;
+      if (!ctx || !map3) return false;
+      const shown = effective(), days = [...map3.keys()].sort();
+      const target = kind === "today" ? ctx.today : kind === "yesterday" ? addDays2(ctx.today, -1) : kind === "prev" ? days.filter((d3) => d3 < shown).at(-1) : kind === "next" ? days.find((d3) => d3 > shown) : day;
+      if (typeof target !== "string" || !map3.has(target)) return false;
       st.sel = target === ctx.today ? { kind: "today" } : { kind: "day", day: target };
       st.error = null;
       st.loading = null;
       st.result = null;
       void load(target);
       onChange();
+      return true;
     },
     retry() {
-      if (!ctx || st.loading || !st.error) return;
-      void load(effective());
-      onChange();
+      if (!ctx || st.loading) return;
+      if (st.sessions.status === "error") {
+        void loadSessions();
+        onChange();
+      }
+      if (st.error) {
+        void load(effective());
+        onChange();
+      }
+    },
+    /** The shown local day and whether the user chose it, for the host to request that day's held prices. */
+    shown() {
+      return ctx ? { day: effective(), explicit: st.sel.kind !== "default", zone: ctx.zone, today: ctx.today } : null;
     },
     view() {
       if (!ctx) return { state: "unavailable", message: ZONE_FAILED, nav: null };
-      const shown = effective(), oldest = addDays2(ctx.today, -HISTORY_DAYS_BACK);
+      const shown = effective(), map3 = retained();
+      const days = map3 ? [...map3.keys()].sort() : [];
+      const retention = !map3 ? st.error || st.result ? "unknown" : "checking" : "ready";
+      const options2 = days.slice().reverse().map((d3) => ({ day: d3, label: `${dayLabel2(d3)} \xB7 ${TAG(map3.get(d3))}`, selected: d3 === shown }));
+      if (map3 && !map3.has(shown)) options2.unshift({ day: shown, label: `${dayLabel2(shown)} \xB7 not in the retained list`, selected: true, notRetained: true });
       const nav = {
         day: shown,
         label: dayLabel2(shown),
         isToday: shown === ctx.today,
-        min: oldest,
+        isDefault: st.sel.kind === "default",
+        min: addDays2(ctx.today, -HISTORY_DAYS_BACK),
         max: ctx.today,
         zone: ctx.zone,
         zoneNote: ctx.marketZone && ctx.marketZone !== ctx.zone ? `Days follow Home Assistant time (${ctx.zone}); the price chart follows ${ctx.marketZone}, so a day here is not the chart's day.` : `Day in Home Assistant time (${ctx.zone}).`,
-        canPrev: ms(shown) > ms(oldest),
-        canNext: ms(shown) < ms(ctx.today),
-        canRetry: !!st.error && !st.loading,
+        retention,
+        options: options2,
+        retentionNote: map3 && !st.ret ? "Which raw or summary days are retained could not be determined (an older integration or a failed read), so only days with a recorded session are offered." : retention === "checking" ? "Checking which days are retained\u2026" : retention === "unknown" ? "Which days are retained could not be determined (an older integration or a failed read), so only this day is offered." : `${days.length} retained day(s) within the last ${HISTORY_DAYS_BACK} days are offered; older days are not available here.`,
+        sessionsNote: st.sessions.status === "error" ? "Days with a recorded session could not be read; a day that has only sessions may be missing from this list." : "",
+        canPrev: !!map3 && days.some((d3) => d3 < shown),
+        canNext: !!map3 && days.some((d3) => d3 > shown),
+        canYesterday: !!map3 && map3.has(addDays2(ctx.today, -1)) && shown !== addDays2(ctx.today, -1),
+        canToday: !!map3 && map3.has(ctx.today) && shown !== ctx.today,
+        canRetry: (!!st.error || st.sessions.status === "error") && !st.loading,
         loading: !!st.loading
       };
+      const notRetained = map3 && !map3.has(shown) ? "This day is not in the retained list (older than the raw rows, no day summary and no recorded session). Nothing can be said about it; that is not \u201Cdid not charge\u201D." : "";
+      const withNav = (model) => ({ ...model, nav, ...notRetained ? { notRetained } : {} });
       if (st.loading) return { state: "loading", message: `Loading charging history for ${dayLabel2(shown)}\u2026`, nav };
-      if (st.error && st.result?.day === shown && st.result.refreshFailed) return { ...st.result.model, refreshFailed: true, nav };
+      if (st.error && st.result?.day === shown && st.result.refreshFailed) return withNav({ ...st.result.model, refreshFailed: true });
       if (st.error) return { state: st.error.state, message: st.error.message, nav };
-      if (st.result?.day === shown) return { ...st.result.model, refreshFailed: st.result.refreshFailed === true, nav };
+      if (st.result?.day === shown) return withNav({ ...st.result.model, refreshFailed: st.result.refreshFailed === true });
       return { state: "loading", message: `Loading charging history for ${dayLabel2(shown)}\u2026`, nav };
     },
     dispose() {
       seq++;
+      sessSeq++;
       ctx = null;
       key3 = null;
       st = initial();
@@ -65339,7 +65473,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.173";
+var CARD_VERSION = "2.5.174";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {
@@ -65673,6 +65807,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this.priceDays = null;
     this.historyDay?.dispose();
     this.historyDay = null;
+    this.priceReview = null;
     this.priceInsights?.dispose();
     this.priceInsights = null;
     clearInterval(this.ageTimer);
@@ -65761,12 +65896,22 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     if (!dashboard || !this.charger || !this._hass || !today) {
       this.historyDay?.dispose();
       this.historyDay = null;
+      this.priceReview = null;
       return { state: "unavailable", message: "Charging history needs the Home Assistant time zone, which is unknown here.", nav: null };
     }
-    this.historyDay ||= createHistoryDay({ request: (params) => this.bounded(getChargingHistory(this._hass, this.charger, params.date)), onChange: () => {
+    this.historyDay ||= createHistoryDay({ request: (params) => this.bounded(getChargingHistory(this._hass, this.charger, params.date)), requestSessions: () => this.bounded(getSessions(this._hass, this.charger, 1)), onChange: () => {
       if (this.connected) this.paint();
     } });
-    return this.historyDay.sync({ charger: this.charger, epoch: `${this.generation}:${this.permissionEpoch}`, zone, marketZone: dashboard.market?.timezone || null, today }).view();
+    const view = this.historyDay.sync({ charger: this.charger, epoch: `${this.generation}:${this.permissionEpoch}`, zone, marketZone: dashboard.market?.timezone || null, today }).view();
+    if (view.nav) view.nav.priceNote = priceReviewNote(this.priceReview?.charger === this.charger ? this.priceReview : null, view.nav.day);
+    return view;
+  }
+  // 8.1: the shown history day's held prices (read-only; only on a user's choice or the explicit button, never at the default).
+  reviewPrices() {
+    const shown = this.historyDay?.shown(), decoded = this.rawDashboard ? decodeDashboard(this.rawDashboard) : null, marketZone = decoded?.ok ? decoded.value.market?.timezone : null;
+    if (!shown || !marketZone) return;
+    this.priceReview = { charger: this.charger, ...requestDayPrices({ shown, span: localDaySpan(shown.day, shown.zone), marketZone, marketToday: this.rawDashboard?.prices?.today, priceDays: this.priceDays }) };
+    this.paint();
   }
   // Price insights (7.5): read-only held-price statistics, one live read plus the current month on open, then only on an
   // explicit choice (window length, month, comparison) or at most every few minutes; a failure waits for Retry.
@@ -65791,8 +65936,11 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     else if (kind === "compare") insights.selectCompare(arg);
   }
   historyNav(kind, arg) {
-    if (kind === "retry") this.historyDay?.retry();
-    else this.historyDay?.select(kind, arg);
+    const history = this.historyDay;
+    if (!history) return;
+    if (kind === "retry") history.retry();
+    else if (kind === "prices") this.reviewPrices();
+    else if (history.select(kind, arg)) this.reviewPrices();
   }
   priceNav(kind, arg) {
     if (kind === "retry") this.priceDays?.retry();

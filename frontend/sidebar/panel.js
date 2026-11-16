@@ -1,7 +1,7 @@
 import { mountDashboard } from '../shared-dashboard/dashboard.js';
-import { listChargers, getDashboard, getPriceDays, getPriceInsights, getChargingHistory, morekSchedule, getSettings, updateSettings, performAction, chargeNowAction, getEntityConfig, setVehicleSoc, updateVehicle } from '../src/api.ts';
+import { listChargers, getDashboard, getSessions, getPriceDays, getPriceInsights, getChargingHistory, morekSchedule, getSettings, updateSettings, performAction, chargeNowAction, getEntityConfig, setVehicleSoc, updateVehicle } from '../src/api.ts';
 import { createPriceDays } from '../shared-dashboard/price-days.js';
-import { createHistoryDay, localDate } from '../shared-dashboard/history-day.js';
+import { createHistoryDay, localDate, requestDayPrices, priceReviewNote } from '../shared-dashboard/history-day.js';
 import { createPriceInsights } from '../shared-dashboard/price-insights.js';
 import { localDaySpan } from './price-chart.js';
 import { decodeEntityAnswer, decodeVehicleWriteAnswer, entityErrorKey, fieldErrorKey, ENTITY_CONFLICT } from '../src/entity-config.ts';
@@ -205,7 +205,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     this.chargeBusy=false;this.chargeNotice='';this.learningNotice='';
     this.generation++;
     this.priceDays?.dispose();this.priceDays=null;
-    this.historyDay?.dispose();this.historyDay=null;
+    this.historyDay?.dispose();this.historyDay=null;this.priceReview=null;
     this.priceInsights?.dispose();this.priceInsights=null;
     clearInterval(this.ageTimer); this.ageTimer=null;
     for (const cancel of this.cancellations || []) cancel();
@@ -237,9 +237,18 @@ export class SpotnavEnhancedPanel extends HTMLElement {
   historyView(dashboard) {
     const zone=this._hass?.config?.time_zone;
     const today=typeof zone==='string' && zone ? localDate(Date.now(),zone) : null;
-    if (!dashboard || !this.charger || !this._hass || !today) {this.historyDay?.dispose();this.historyDay=null;return {state:'unavailable',message:'Charging history needs the Home Assistant time zone, which is unknown here.',nav:null};}
-    this.historyDay ||= createHistoryDay({request:params=>this.bounded(getChargingHistory(this._hass,this.charger,params.date)),onChange:()=>{if(this.connected)this.paint();}});
-    return this.historyDay.sync({charger:this.charger,epoch:`${this.generation}:${this.permissionEpoch}`,zone,marketZone:dashboard.market?.timezone || null,today}).view();
+    if (!dashboard || !this.charger || !this._hass || !today) {this.historyDay?.dispose();this.historyDay=null;this.priceReview=null;return {state:'unavailable',message:'Charging history needs the Home Assistant time zone, which is unknown here.',nav:null};}
+    this.historyDay ||= createHistoryDay({request:params=>this.bounded(getChargingHistory(this._hass,this.charger,params.date)),requestSessions:()=>this.bounded(getSessions(this._hass,this.charger,1)),onChange:()=>{if(this.connected)this.paint();}});
+    const view=this.historyDay.sync({charger:this.charger,epoch:`${this.generation}:${this.permissionEpoch}`,zone,marketZone:dashboard.market?.timezone || null,today}).view();
+    if (view.nav) view.nav.priceNote=priceReviewNote(this.priceReview?.charger===this.charger ? this.priceReview : null,view.nav.day);
+    return view;
+  }
+  // 8.1: the shown history day's held prices (read-only; only on a user's choice or the explicit button, never at the default).
+  reviewPrices() {
+    const shown=this.historyDay?.shown(),decoded=this.rawDashboard ? decodeDashboard(this.rawDashboard) : null,marketZone=decoded?.ok ? decoded.value.market?.timezone : null;
+    if (!shown || !marketZone) return;
+    this.priceReview={charger:this.charger,...requestDayPrices({shown,span:localDaySpan(shown.day,shown.zone),marketZone,marketToday:this.rawDashboard?.prices?.today,priceDays:this.priceDays})};
+    this.paint();
   }
   // Price insights (7.5): read-only held-price statistics, one live read plus the current month on open, then only on an
   // explicit choice (window length, month, comparison) or at most every few minutes; a failure waits for Retry.
@@ -254,7 +263,8 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     if (kind==='retry') insights.retry(); else if (kind==='duration') insights.setDuration(arg); else if (kind==='month') insights.selectMonth(arg); else if (kind==='compare') insights.selectCompare(arg);
   }
   historyNav(kind,arg) {
-    if (kind==='retry') this.historyDay?.retry(); else this.historyDay?.select(kind,arg);
+    const history=this.historyDay;if(!history)return;
+    if (kind==='retry') history.retry(); else if (kind==='prices') this.reviewPrices(); else if (history.select(kind,arg)) this.reviewPrices();
   }
   priceNav(kind,arg) {
     if (kind==='retry') this.priceDays?.retry(); else this.priceDays?.select(kind,arg);

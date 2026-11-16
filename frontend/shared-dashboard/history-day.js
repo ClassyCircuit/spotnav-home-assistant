@@ -22,6 +22,56 @@ export function localDate(at, zone) {
   try { return new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(at); } catch { return null; }
 }
 
+/** Which retained days the backend's own metadata confirms (Stage 8.1): the raw window's local dates (oldest evidence or oldest
+ * sample row of any kind up to today), the digest dates and the days with a recorded session. Nothing is guessed: no metadata, no day. */
+export function parseRetention(r, zone) {
+  if (!r || typeof r !== 'object' || !r.oldest_by_kind || typeof r.oldest_by_kind !== 'object' || !Array.isArray(r.digest_days)) return null;
+  // oldest_evidence also includes long-lived plans/capture marks; it cannot prove raw rows still exist.
+  const stamps = Object.values(r.oldest_by_kind).map(v => Date.parse(v)).filter(Number.isFinite);
+  return { rawFrom: stamps.length ? localDate(Math.min(...stamps), zone) : null, digests: r.digest_days.filter(d => Number.isFinite(ms(d))) };
+}
+export function retainedDayMap(ret, sessionDays, today) {
+  const lo = addDays(today, -HISTORY_DAYS_BACK), map = new Map();
+  const within = d => Number.isFinite(ms(d)) && ms(d) >= ms(lo) && ms(d) <= ms(today);
+  const add = (d, kind) => { if (within(d)) { if (!map.has(d)) map.set(d, new Set()); map.get(d).add(kind); } };
+  if (ret?.rawFrom) for (let d = ms(ret.rawFrom) < ms(lo) ? lo : ret.rawFrom; ms(d) <= ms(today); d = addDays(d, 1)) add(d, 'raw');
+  for (const d of ret?.digests || []) add(d, 'summary');
+  for (const d of sessionDays || []) add(d, 'sessions');
+  return map;
+}
+const TAG = kinds => kinds.has('raw') ? 'retained rows' : kinds.has('summary') ? 'summary only' : 'sessions only';
+/** The price (market-calendar) day a page must end at to hold a Home Assistant-local day, from the two zones' own calendars. */
+export function reviewPriceTarget(span, marketZone, marketToday) {
+  if (!Array.isArray(span) || span.length !== 2 || !marketZone || !Number.isFinite(ms(marketToday))) return null;
+  const first = localDate(span[0], marketZone), last = localDate(span[1] - 1, marketZone);
+  if (!first || !last) return null;
+  const days = first === last ? [first] : [first, last];
+  const pageable = days.filter(d => ms(d) < ms(marketToday));
+  return { days, page: pageable.at(-1) ?? null, crossesMarketDays: days.length > 1 };
+}
+
+/** Ask the price-day machine for the held prices of the shown Home Assistant-local day (an explicit, read-only action; never a provider fetch). */
+export function requestDayPrices({ shown, span, marketZone, marketToday, priceDays }) {
+  const base = { day: shown.day, marketZone, days: [], crosses: false };
+  if (!priceDays) return { ...base, status: 'unavailable' };
+  if (shown.day === shown.today) { priceDays.select('today'); return { ...base, status: 'today' }; }
+  const target = reviewPriceTarget(span, marketZone, marketToday);
+  if (!target?.page) return { ...base, days: target?.days || [], status: 'not_held' };
+  return { ...base, days: target.days, crosses: target.crossesMarketDays, status: priceDays.select('review', target.page, { range: span }) || 'unavailable' };
+}
+export function priceReviewNote(review, day) {
+  if (!review || review.day !== day) return '';
+  const days = review.days.join(' and ');
+  switch (review.status) {
+    case 'today': return 'The price chart shows today, as its own Today button does.';
+    case 'loading': return `Requested held prices for ${days} (market calendar, ${review.marketZone}). The chart changes only after the read succeeds${review.crosses ? '; this Home Assistant day covers two market days' : ''}; a gap remains unknown.`;
+    case 'shown': return `Held prices for ${days} (market calendar, ${review.marketZone}) are drawn on the chart${review.crosses ? '; this Home Assistant day covers two market days, so both are drawn, aligned by instant, and a gap means that price day is not held' : ''}. The evidence tracks are this day's; no current proposal or readback is drawn for a past day.`;
+    case 'not_held': return `Held prices for ${days || 'this day'} (${review.marketZone}) are not available, so the price chart is unchanged: unknown, not zero.`;
+    case 'busy': return 'Held prices are still loading; press the button again.';
+    default: return 'Held prices for this day could not be requested.';
+  }
+}
+
 const num = v => typeof v === 'number' && Number.isFinite(v);
 const nonneg = v => num(v) && v >= 0;
 const kwh = v => nonneg(v) ? `${v.toFixed(v < 10 ? 2 : 1)} kWh` : 'unknown';
@@ -121,7 +171,7 @@ export function buildHistoryModel(answer, day, fmt, readAt = NaN) {
   else if (!Number.isFinite(oldestPower) || oldestPower >= until) {
     const sent = answer.comparison.planned_blocks.length || answer.comparison.unknown_plan_spans.length || answer.plans.length || answer.sessions.length;
     raw = digest ? 'digest_only' : sent ? 'plan_only' : 'none';
-    rawNote = digest ? 'The measured rows of this day are no longer kept; only its saved summary remains (no price rows, lists cut at 50 rows). The summary below is not live evidence.'
+    rawNote = digest ? 'Summary only: no per-minute data and no prices. The measured rows of this day are no longer kept; only its saved summary remains (lists cut at 50 rows). The summary below is not live evidence.'
       : sent ? 'No measured power rows are kept for this day, so flow is unknown, not zero. Plans and sessions below are what was recorded.'
         : 'No charging evidence is kept for this day. That does not mean nothing happened.';
   } else if (oldestPower > since + PARTIAL_AFTER_S * 1000) { raw = 'partial'; rawNote = `Measured power rows are kept only from ${stamp(kinds.power_w)}; flow before that is unknown, not zero.`; }
@@ -208,15 +258,22 @@ export function buildHistoryModel(answer, day, fmt, readAt = NaN) {
 
 /**
  * `request(params)` resolves the backend answer (live: the WebSocket, preview: a fixture of the same shape).
+ * `requestSessions()` (optional) resolves `spotnav/get_sessions`; only its `days` list (days with a recorded session) is used.
  * `onChange()` fires when an asynchronous result changed what to draw.
+ *
+ * Stage 8.1: the first view is YESTERDAY (a provisional bootstrap: loading, then what the backend says, never "no charge"). Only days
+ * the backend's metadata confirms as retained (raw window, digest dates, session days; at most 62 local days back) can be chosen.
+ * A choice is kept across refreshes; only a charger/permission/zone change returns to the default.
  */
-export function createHistoryDay({ request, onChange = () => {}, now = () => Date.now() }) {
-  let ctx = null, key = null, seq = 0;
-  const initial = () => ({ sel: { kind: 'today' }, loading: null, result: null, error: null });
+export function createHistoryDay({ request, requestSessions = null, onChange = () => {}, now = () => Date.now() }) {
+  let ctx = null, key = null, seq = 0, sessSeq = 0;
+  const initial = () => ({ sel: { kind: 'default' }, loading: null, result: null, error: null, ret: null, sessions: { status: requestSessions ? 'idle' : 'off', days: [] } });
   let st = initial();
-  const reset = () => { seq++; st = initial(); };
+  const reset = () => { seq++; sessSeq++; st = initial(); };
   const keyOf = c => JSON.stringify([c.charger, c.epoch, c.zone]);
-  const effective = () => st.sel.kind === 'today' ? ctx.today : st.sel.day;
+  const effective = () => st.sel.kind === 'today' ? ctx.today : st.sel.kind === 'default' ? addDays(ctx.today, -1) : st.sel.day;
+  // Days proven by a session read alone are still offered when the retention metadata is unavailable (older integration or failed first read).
+  const retained = () => st.ret || st.sessions.days.length ? retainedDayMap(st.ret, st.sessions.days, ctx.today) : null;
   const fmtFor = c => ({ stamp: iso => {
     const t = instant(iso); if (!Number.isFinite(t)) return 'unknown time';
     try {
@@ -243,6 +300,8 @@ export function createHistoryDay({ request, onChange = () => {}, now = () => Dat
       if (mine !== seq || myKey !== key) return;
       if (!validateHistory(answer, asked)) throw new Error('invalid');
       const at = now();
+      // What is retained comes from the newest answer that carries the signals; an older-integration answer never erases it.
+      st.ret = parseRetention(answer.retention, ctx.zone) || st.ret;
       st.result = { day, at, model: buildHistoryModel(answer, day, fmtFor(asCtx), at) };
     } catch (error) {
       if (mine !== seq || myKey !== key) return;
@@ -254,6 +313,20 @@ export function createHistoryDay({ request, onChange = () => {}, now = () => Dat
     onChange();
   }
 
+  // The days with a recorded session (`get_sessions.days`: latest 62 session days, by start day in the HA zone): one small read per context.
+  async function loadSessions() {
+    const mine = ++sessSeq, myKey = key, asked = ctx;
+    st.sessions = { status: 'loading', days: [] };
+    try {
+      const answer = await requestSessions();
+      if (mine !== sessSeq || myKey !== key) return;
+      const rows = Array.isArray(answer?.days) ? answer.days : null;
+      if (!(answer?.api_version === 1 && answer.charger_id === asked.charger && rows && rows.length <= 400 && rows.every(r => DAY_RE.test(r?.period || '')))) throw new Error('invalid');
+      st.sessions = { status: 'ready', days: rows.filter(r => typeof r.sessions === 'number' && r.sessions > 0).map(r => r.period) };
+    } catch { if (mine !== sessSeq || myKey !== key) return; st.sessions = { status: 'error', days: [] }; }
+    onChange();
+  }
+
   return {
     /** Tell it who is asking. A change of charger, generation/permission epoch or zone drops everything. */
     sync(next) {
@@ -262,6 +335,7 @@ export function createHistoryDay({ request, onChange = () => {}, now = () => Dat
       if (nextKey !== key) { reset(); key = nextKey; }
       ctx = valid ? next : null;
       if (!ctx) return this;
+      if (st.sessions.status === 'idle') void loadSessions();
       const day = effective();
       if (st.loading) return this;
       if (st.error?.day === day) return this; // never repeats on its own
@@ -269,34 +343,51 @@ export function createHistoryDay({ request, onChange = () => {}, now = () => Dat
       else if (st.sel.kind === 'today' && now() - st.result.at > REFRESH_TODAY_MS) void load(day, { silent: true });
       return this;
     },
-    /** `today`, `yesterday`, `prev`, `next` or an explicit `day`; only days inside the retained range are accepted. */
+    /** `today`, `yesterday`, `prev`, `next` or an explicit `day`; only days the metadata confirms as retained are accepted. */
     select(kind, day) {
-      if (!ctx) return;
-      const shown = effective();
-      const target = kind === 'today' ? ctx.today : kind === 'yesterday' ? addDays(ctx.today, -1) : kind === 'prev' ? addDays(shown, -1) : kind === 'next' ? addDays(shown, 1) : day;
-      if (!Number.isFinite(ms(target)) || ms(target) > ms(ctx.today) || ms(target) < ms(addDays(ctx.today, -HISTORY_DAYS_BACK))) return;
+      const map = ctx ? retained() : null;
+      if (!ctx || !map) return false;
+      const shown = effective(), days = [...map.keys()].sort();
+      const target = kind === 'today' ? ctx.today : kind === 'yesterday' ? addDays(ctx.today, -1)
+        : kind === 'prev' ? days.filter(d => d < shown).at(-1) : kind === 'next' ? days.find(d => d > shown) : day;
+      if (typeof target !== 'string' || !map.has(target)) return false;
       st.sel = target === ctx.today ? { kind: 'today' } : { kind: 'day', day: target };
       st.error = null; st.loading = null; st.result = null;
       void load(target);
       onChange();
+      return true;
     },
     retry() {
-      if (!ctx || st.loading || !st.error) return;
-      void load(effective());
-      onChange();
+      if (!ctx || st.loading) return;
+      if (st.sessions.status === 'error') { void loadSessions(); onChange(); }
+      if (st.error) { void load(effective()); onChange(); }
     },
+    /** The shown local day and whether the user chose it, for the host to request that day's held prices. */
+    shown() { return ctx ? { day: effective(), explicit: st.sel.kind !== 'default', zone: ctx.zone, today: ctx.today } : null; },
     view() {
       if (!ctx) return { state: 'unavailable', message: ZONE_FAILED, nav: null };
-      const shown = effective(), oldest = addDays(ctx.today, -HISTORY_DAYS_BACK);
-      const nav = { day: shown, label: dayLabel(shown), isToday: shown === ctx.today, min: oldest, max: ctx.today, zone: ctx.zone,
+      const shown = effective(), map = retained();
+      const days = map ? [...map.keys()].sort() : [];
+      const retention = !map ? (st.error || st.result ? 'unknown' : 'checking') : 'ready';
+      const options = days.slice().reverse().map(d => ({ day: d, label: `${dayLabel(d)} · ${TAG(map.get(d))}`, selected: d === shown }));
+      if (map && !map.has(shown)) options.unshift({ day: shown, label: `${dayLabel(shown)} · not in the retained list`, selected: true, notRetained: true });
+      const nav = { day: shown, label: dayLabel(shown), isToday: shown === ctx.today, isDefault: st.sel.kind === 'default', min: addDays(ctx.today, -HISTORY_DAYS_BACK), max: ctx.today, zone: ctx.zone,
         zoneNote: ctx.marketZone && ctx.marketZone !== ctx.zone ? `Days follow Home Assistant time (${ctx.zone}); the price chart follows ${ctx.marketZone}, so a day here is not the chart's day.` : `Day in Home Assistant time (${ctx.zone}).`,
-        canPrev: ms(shown) > ms(oldest), canNext: ms(shown) < ms(ctx.today), canRetry: !!st.error && !st.loading, loading: !!st.loading };
+        retention, options,
+        retentionNote: map && !st.ret ? 'Which raw or summary days are retained could not be determined (an older integration or a failed read), so only days with a recorded session are offered.' : retention === 'checking' ? 'Checking which days are retained…' : retention === 'unknown' ? 'Which days are retained could not be determined (an older integration or a failed read), so only this day is offered.'
+          : `${days.length} retained day(s) within the last ${HISTORY_DAYS_BACK} days are offered; older days are not available here.`,
+        sessionsNote: st.sessions.status === 'error' ? 'Days with a recorded session could not be read; a day that has only sessions may be missing from this list.' : '',
+        canPrev: !!map && days.some(d => d < shown), canNext: !!map && days.some(d => d > shown),
+        canYesterday: !!map && map.has(addDays(ctx.today, -1)) && shown !== addDays(ctx.today, -1), canToday: !!map && map.has(ctx.today) && shown !== ctx.today,
+        canRetry: (!!st.error || st.sessions.status === 'error') && !st.loading, loading: !!st.loading };
+      const notRetained = map && !map.has(shown) ? 'This day is not in the retained list (older than the raw rows, no day summary and no recorded session). Nothing can be said about it; that is not “did not charge”.' : '';
+      const withNav = model => ({ ...model, nav, ...(notRetained ? { notRetained } : {}) });
       if (st.loading) return { state: 'loading', message: `Loading charging history for ${dayLabel(shown)}…`, nav };
-      if (st.error && st.result?.day === shown && st.result.refreshFailed) return { ...st.result.model, refreshFailed: true, nav };
+      if (st.error && st.result?.day === shown && st.result.refreshFailed) return withNav({ ...st.result.model, refreshFailed: true });
       if (st.error) return { state: st.error.state, message: st.error.message, nav };
-      if (st.result?.day === shown) return { ...st.result.model, refreshFailed: st.result.refreshFailed === true, nav };
+      if (st.result?.day === shown) return withNav({ ...st.result.model, refreshFailed: st.result.refreshFailed === true });
       return { state: 'loading', message: `Loading charging history for ${dayLabel(shown)}…`, nav };
     },
-    dispose() { seq++; ctx = null; key = null; st = initial(); },
+    dispose() { seq++; sessSeq++; ctx = null; key = null; st = initial(); },
   };
 }

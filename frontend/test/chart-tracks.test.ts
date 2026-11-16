@@ -320,3 +320,13 @@ describe('DOM lanes share the chart axis (mocked ECharts)', () => {
     expect(segs(root, 'sent').find(s => s.dataset.kind === 'unknown').title).toContain('not proof that nothing was installed');
   });
 });
+
+describe('a past day on the chart (8.1)', () => {
+  it('draws no current proposal and no effective limit for a day that is entirely before now, and says so', () => {
+    const lanes = buildTracks({ horizon: [0, 100], now: 1000, windows: [{ start: 10, end: 20 }, { start: 900, end: 1200 }], history: null,
+      effective: { state: 'reported', spans: [{ start: 10, end: 20, value: 16 }], unit: 'A', differs: false } }).lanes;
+    const byKey = Object.fromEntries(lanes.map(l => [l.key, l]));
+    expect(byKey.proposal.note).toMatch(/Past day/); expect(byKey.effective.note).toMatch(/Past day/);
+    for (const key of ['proposal', 'effective']) expect(byKey[key].segments.every(s => !/^(proposal|effective)/.test(s.kind))).toBe(true);
+  });
+});
