@@ -9,7 +9,7 @@ import { priceBand, bandColor, priceAxisExtent } from './price-bands.js';
 echarts.use([CustomChart, LineChart, GridComponent, TooltipComponent, MarkLineComponent, MarkAreaComponent, MarkPointComponent, VisualMapComponent, DataZoomComponent, CanvasRenderer]);
 const axis = { axisLine: { lineStyle: { color: '#536b76' } }, axisLabel: { color: '#bed0d5', fontSize: 12 }, splitLine: { lineStyle: { color: '#34444d' } } };
 export function mountCharts(root, data, format, modes) {
-  let { prices, windows, now, deadline, horizon, cap, readings, sentHistory, historyAxis, unit = 'c/kWh' } = data;
+  let { prices, windows, now, deadline, horizon, cap, readings, sentHistory, historyAxis, unit = 'c/kWh', viewKey } = data;
   let { time, date: sampleDate, days: sampleDays, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks } = format;
   time = format.chartTime || time;
   let tooltipDate = format.tooltipDate || sampleDate;
@@ -111,10 +111,11 @@ export function mountCharts(root, data, format, modes) {
   priceChart.on('datazoom', updateView);
   drawTicks();
   priceChart.on('finished', drawTicks);
-  refreshers.push(() => {
+  // A routine refresh keeps the user's range; only an explicit navigation (a new `viewKey`) sets a new one.
+  refreshers.push((navigated) => {
     const z=priceChart.getOption().dataZoom[0];
     const a=Math.max(horizon[0],z.startValue), b=Math.min(horizon[1],z.endValue);
-    setPriceOption(a<b ? [a,b] : initialRange(now));
+    setPriceOption(!navigated && a<b ? [a,b] : initialRange(now));
     drawTicks();
   });
   // Handle two-finger scaling independently of narrow canvas targets. Keep the
@@ -184,10 +185,11 @@ export function mountCharts(root, data, format, modes) {
   for (const mode of modes) resize.observe(root.querySelector(`#price-${mode}`));
   if (powerChart) resize.observe(root.querySelector('#power-chart'));
   return { priceCharts, update(next, nextFormat) {
-    ({prices,windows,now,deadline,horizon,cap,unit='c/kWh'}=next);
+    const navigated=next.viewKey!==viewKey;
+    ({prices,windows,now,deadline,horizon,cap,unit='c/kWh',viewKey}=next);
     ({time,date:sampleDate,days:sampleDays,priceGaps,stepSegments,stepPoints,snapRange,initialRange,timeTicks}=nextFormat);
     time=nextFormat.chartTime || time;
     tooltipDate=nextFormat.tooltipDate || sampleDate;
-    refreshers.forEach(refresh=>refresh());
+    refreshers.forEach(refresh=>refresh(navigated));
   }, dispose() { controller.abort(); resize.disconnect(); Object.values(priceCharts).forEach(chart => chart.dispose()); powerChart?.dispose(); } };
 }

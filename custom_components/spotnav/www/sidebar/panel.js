@@ -52269,11 +52269,11 @@ function priceAxisExtent(prices, unit, extra) {
 // shared-dashboard/charts.js
 use([install3, install, install5, install6, install8, install9, install7, install15, install12, install16]);
 var axis = { axisLine: { lineStyle: { color: "#536b76" } }, axisLabel: { color: "#bed0d5", fontSize: 12 }, splitLine: { lineStyle: { color: "#34444d" } } };
-function mountCharts(root, data, format2, modes) {
-  let { prices, windows, now, deadline, horizon, cap, readings, sentHistory, historyAxis, unit = "c/kWh" } = data;
-  let { time: time2, date: sampleDate, days: sampleDays, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks } = format2;
-  time2 = format2.chartTime || time2;
-  let tooltipDate = format2.tooltipDate || sampleDate;
+function mountCharts(root, data, format3, modes) {
+  let { prices, windows, now, deadline, horizon, cap, readings, sentHistory, historyAxis, unit = "c/kWh", viewKey } = data;
+  let { time: time2, date: sampleDate, days: sampleDays, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks } = format3;
+  time2 = format3.chartTime || time2;
+  let tooltipDate = format3.tooltipDate || sampleDate;
   const controller = new AbortController();
   const signal = controller.signal;
   const priceCharts = {};
@@ -52406,17 +52406,17 @@ ${sampleDate(h3)}` : time2(h3);
     priceChart.on("datazoom", updateView);
     drawTicks();
     priceChart.on("finished", drawTicks);
-    refreshers.push(() => {
+    refreshers.push((navigated) => {
       const z2 = priceChart.getOption().dataZoom[0];
       const a4 = Math.max(horizon[0], z2.startValue), b3 = Math.min(horizon[1], z2.endValue);
-      setPriceOption(a4 < b3 ? [a4, b3] : initialRange(now));
+      setPriceOption(!navigated && a4 < b3 ? [a4, b3] : initialRange(now));
       drawTicks();
     });
     let pinch = null;
     const distance2 = (touches) => Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
     const node = priceChart.getDom();
     node.addEventListener("wheel", (e9) => {
-      if (!format2.chartTime || !e9.deltaY) return;
+      if (!format3.chartTime || !e9.deltaY) return;
       const z2 = priceChart.getOption().dataZoom[0], rect = node.getBoundingClientRect();
       const anchor = priceChart.convertFromPixel({ xAxisIndex: 0 }, e9.clientX - rect.left);
       if (!Number.isFinite(anchor)) return;
@@ -52507,11 +52507,12 @@ ${sampleDate(h3)}` : time2(h3);
   for (const mode of modes) resize.observe(root.querySelector(`#price-${mode}`));
   if (powerChart) resize.observe(root.querySelector("#power-chart"));
   return { priceCharts, update(next, nextFormat) {
-    ({ prices, windows, now, deadline, horizon, cap, unit = "c/kWh" } = next);
+    const navigated = next.viewKey !== viewKey;
+    ({ prices, windows, now, deadline, horizon, cap, unit = "c/kWh", viewKey } = next);
     ({ time: time2, date: sampleDate, days: sampleDays, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks } = nextFormat);
     time2 = nextFormat.chartTime || time2;
     tooltipDate = nextFormat.tooltipDate || sampleDate;
-    refreshers.forEach((refresh) => refresh());
+    refreshers.forEach((refresh) => refresh(navigated));
   }, dispose() {
     controller.abort();
     resize.disconnect();
@@ -52626,6 +52627,16 @@ function renderInsights(insights) {
   if (!insights) return "<p>Price insights unavailable.</p>";
   const blocks = Array.isArray(insights.blocks) ? insights.blocks : [];
   return `<div class="insights-intro">${escapeText(insights.intro)}</div><div class="insight-grid">${blocks.map((b3) => `<section class="insight-block"><h3>${escapeText(b3.title)}</h3><div class="insight-value">${escapeText(b3.value)}</div><strong class="insight-status">${escapeText(b3.status ?? "")}</strong><p>${escapeText(b3.detail ?? "")}</p>${b3.extra ? `<div class="month-range">${escapeText(b3.extra)}</div>` : ""}</section>`).join("")}</div><p class="insight-caution">${escapeText(insights.caution)}</p><wa-details summary="How these insights work"><div class="details-body"><p>${escapeText(insights.method)}</p></div></wa-details>`;
+}
+
+// shared-dashboard/price-nav-view.js
+function renderPriceNav(nav) {
+  if (!nav || !Array.isArray(nav.buttons)) return "";
+  const buttons = nav.buttons.map((b3) => `<wa-button size="small" data-price-nav="${escapeText(b3.id)}" ${b3.enabled ? "" : "disabled"} ${b3.selected ? 'variant="brand" aria-pressed="true"' : 'aria-pressed="false"'} ${b3.enabled ? "" : `title="${escapeText(b3.reason)}"`}>${escapeText(b3.label)}${b3.partial ? " (partial)" : ""}</wa-button>`).join("");
+  const reasons = nav.buttons.filter((b3) => !b3.enabled && b3.reason && b3.id !== "all").map((b3) => `${escapeText(b3.label)}: ${escapeText(b3.reason)}`).join(" \xB7 ");
+  const picker = nav.earlier?.open ? `<label class="price-nav-picker">Held day <select data-price-nav-day aria-label="Earlier held day"><option value="">Choose a day\u2026</option>${nav.earlier.days.map((d3) => `<option value="${escapeText(d3.day)}" ${d3.day === nav.selectedDay ? "selected" : ""}>${escapeText(d3.label)}${d3.partial ? " \xB7 partial" : ""}</option>`).join("")}</select></label><span class="subtext">${escapeText(nav.earlier.hint)}</span>` : "";
+  const retry = nav.canRetry ? '<wa-button size="small" data-price-nav="retry">Retry</wa-button>' : "";
+  return `<div class="price-nav" role="group" aria-label="Price day navigation" data-price-nav-status="${escapeText(nav.status)}"><div class="price-nav-buttons">${buttons}${retry}</div>${picker}<p class="subtext price-nav-note" role="status">${escapeText(nav.message || nav.detail || "")}${nav.message && nav.detail ? ` ${escapeText(nav.detail)}` : ""}</p>${reasons ? `<p class="subtext price-nav-reasons">${reasons}</p>` : ""}</div>`;
 }
 
 // shared-dashboard/vehicle-sources-view.js
@@ -52864,7 +52875,7 @@ function mountDashboard(root, adapter) {
       const title = mode === "bar" ? "Bars" : "Stepped area";
       if (!chartReady) return card(`Prices & plan \xB7 ${title}`, labels.chartEyebrow || "PRICES & PLAN", `<p>Price chart unavailable.</p><p class="subtext">${escapeText(labels.chartIntro)} ${escapeText(labels.chartNote)}</p>${plan}`, `prices prices-${mode}`, tag);
       const extremum = (p4) => p4 ? `${priceNumber(p4.cents)} ${escapeText(unit)} \xB7 ${escapeText(day(p4.start))} ${escapeText(time2(p4.start))}` : "Unknown";
-      return card(`Prices & plan \xB7 ${title}`, labels.chartEyebrow || "PRICES & PLAN", `<div class="chart-intro"><div><strong>${icon} ${mode === "bar" ? "A \xB7 Interval bars" : (chart?.comparison ? "B \xB7 " : "") + "Stepped area"}</strong><p>${escapeText(labels.chartIntro)}</p></div><div class="chart-actions"><wa-button data-zoom="${mode}" size="small" aria-label="Zoom in ${title}">Zoom +</wa-button><wa-button data-reset="${mode}" size="small" aria-label="Reset ${title} overview">Full horizon</wa-button><span>Wheel zooms \xB7 scroll outside chart</span></div></div><div class="price-context"><span>Now <b>${priceNumber(priceAt(chart.now))} ${escapeText(unit)}</b></span><span>Next window starts at <b>${priceNumber(m4.nextPriceUnavailable ? null : priceAt(next?.start))} ${escapeText(unit)}</b></span><span>Horizon low <b>${extremum(extremes[0])}</b></span><span>Horizon high <b>${extremum(extremes[1])}</b></span></div><div id="price-${mode}" class="chart price-chart" role="img" aria-label="Price intervals and proposed windows"></div><p class="legend">${bandsApply(unit) ? `Absolute price bands, ${escapeText(unit)}: ${PRICE_BANDS.map((b3) => `<span class="${b3.css}">\u25CF</span> ${b3.label} ${b3.range}`).join(" ")} (exactly 25 is Medium; display only, not a charging limit)` : `Neutral price color: bands are defined in euro c/kWh and no trusted conversion is available for ${escapeText(unit)}, so nothing is classified.`} <span class="shade"></span> Proposed charging \xB7 gradient + pale track ${Number.isFinite(chart.cap) ? `<span class="cap-key"></span> Soft cap ${priceText(chart.cap)} ${escapeText(unit)}` : ""} <span class="now-key">\u2502</span> Now</p><p class="subtext">${escapeText(labels.chartNote)}</p>${plan}`, `prices prices-${mode}`, tag);
+      return card(`Prices & plan \xB7 ${title}`, labels.chartEyebrow || "PRICES & PLAN", `<div class="chart-intro"><div><strong>${icon} ${mode === "bar" ? "A \xB7 Interval bars" : (chart?.comparison ? "B \xB7 " : "") + "Stepped area"}</strong><p>${escapeText(labels.chartIntro)}</p></div><div class="chart-actions"><wa-button data-zoom="${mode}" size="small" aria-label="Zoom in ${title}">Zoom +</wa-button><wa-button data-reset="${mode}" size="small" aria-label="Reset ${title} overview">Full horizon</wa-button><span>Wheel zooms \xB7 scroll outside chart</span></div></div><div class="price-context"><span>Now <b>${priceNumber(priceAt(chart.now))} ${escapeText(unit)}</b></span><span>Next window starts at <b>${priceNumber(m4.nextPriceUnavailable ? null : priceAt(next?.start))} ${escapeText(unit)}</b></span><span>Horizon low <b>${extremum(extremes[0])}</b></span><span>Horizon high <b>${extremum(extremes[1])}</b></span></div>${renderPriceNav(m4.priceNav)}<div id="price-${mode}" class="chart price-chart" role="img" aria-label="Price intervals and proposed windows"></div><p class="legend">${bandsApply(unit) ? `Absolute price bands, ${escapeText(unit)}: ${PRICE_BANDS.map((b3) => `<span class="${b3.css}">\u25CF</span> ${b3.label} ${b3.range}`).join(" ")} (exactly 25 is Medium; display only, not a charging limit)` : `Neutral price color: bands are defined in euro c/kWh and no trusted conversion is available for ${escapeText(unit)}, so nothing is classified.`} <span class="shade"></span> Proposed charging \xB7 gradient + pale track ${Number.isFinite(chart.cap) ? `<span class="cap-key"></span> Soft cap ${priceText(chart.cap)} ${escapeText(unit)}` : ""} <span class="now-key">\u2502</span> Now</p><p class="subtext">${escapeText(labels.chartNote)}</p>${plan}`, `prices prices-${mode}`, tag);
     };
     const scenario = m4.scenarios;
     const option = (s4) => `<option value="${escapeText(s4.value)}" ${s4.value === scenario.selected ? "selected" : ""}>${escapeText(s4.label)}</option>`;
@@ -52925,6 +52936,13 @@ function mountDashboard(root, adapter) {
         }
       }, { signal });
     });
+    root.querySelectorAll("[data-price-nav]").forEach((button) => bind3(button, () => button.addEventListener("click", () => {
+      if (button.hasAttribute("disabled")) return;
+      current.actions?.priceNav?.(button.dataset.priceNav);
+    }, { signal })));
+    root.querySelectorAll("[data-price-nav-day]").forEach((select) => bind3(select, () => select.addEventListener("change", () => {
+      if (select.value) current.actions?.priceNav?.("day", select.value);
+    }, { signal })));
     const detailsLink = root.querySelector('a[href="#details"]');
     bind3(detailsLink, () => detailsLink.addEventListener("click", (event) => {
       event.preventDefault();
@@ -53199,6 +53217,7 @@ var SETTINGS_NOT_COMMITTED = "spotnav_settings_not_committed";
 var IF_NOT_READY = ["ask", "release", "hold"];
 var IDENTIFY_MODES = ["automatic", "ask", "off"];
 var MARKET_API_VERSION = 1;
+var PRICE_DAYS_API_VERSION = 1;
 var MARKET_STATES = ["loading", "ready", "stale", "unavailable", "invalid"];
 var MARKET_REASONS = ["offline", "invalid"];
 
@@ -57442,6 +57461,14 @@ async function getDashboard(hass, chargerId, version = API_VERSION) {
     charger_id: chargerId
   });
 }
+async function getPriceDays(hass, chargerId, request) {
+  return await call(hass, {
+    type: "spotnav/get_price_days",
+    api_version: PRICE_DAYS_API_VERSION,
+    charger_id: chargerId,
+    ...request
+  });
+}
 async function morekSchedule(hass, chargerId, action, previewId) {
   return await call(hass, {
     type: "spotnav/morek_schedule",
@@ -57584,6 +57611,297 @@ async function updateVehicle(hass, chargerId, request) {
     changes: request.changes,
     expected: request.expected
   });
+}
+
+// shared-dashboard/price-days.js
+var PAGE_DAYS = 8;
+var DAY_MS2 = 864e5;
+var FAILED = "Held price days could not be read.";
+var parse2 = (day) => {
+  const m4 = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day || "");
+  return m4 ? Date.UTC(+m4[1], +m4[2] - 1, +m4[3]) : NaN;
+};
+var format2 = (ms) => new Date(ms).toISOString().slice(0, 10);
+var addDays = (day, n6) => format2(parse2(day) + n6 * DAY_MS2);
+var dayLabel = (day) => Number.isFinite(parse2(day)) ? new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", weekday: "short", day: "numeric", month: "short", year: "numeric" }).format(parse2(day)) : "Unknown day";
+function mergePriceRows(...lists) {
+  const byStart = /* @__PURE__ */ new Map();
+  for (const list3 of lists) for (const row2 of list3 || []) {
+    const start2 = Date.parse(row2?.start), end2 = Date.parse(row2?.end);
+    if (!Number.isFinite(start2) || !Number.isFinite(end2) || end2 <= start2 || !(row2.raw_price === null || Number.isFinite(row2.raw_price))) return { error: "malformed" };
+    const old = byStart.get(start2);
+    if (old) {
+      if (old.end === end2 && old.row.raw_price === row2.raw_price) continue;
+      return { error: "conflict" };
+    }
+    byStart.set(start2, { end: end2, row: row2 });
+  }
+  const sorted = [...byStart.entries()].sort((a4, b3) => a4[0] - b3[0]);
+  for (let i7 = 1; i7 < sorted.length; i7++) if (sorted[i7][0] < sorted[i7 - 1][1].end) return { error: "overlap" };
+  return { rows: sorted.map(([, item]) => item.row) };
+}
+function createPriceDays({ request, onChange = () => {
+} }) {
+  let ctx = null, key3 = null, token = 0, pageId = 0;
+  const initial = () => ({ available: null, status: "idle", error: null, page: null, loading: null, selection: { kind: "today" }, earlierOpen: false, retryDay: null });
+  let st = initial();
+  const reset = () => {
+    token++;
+    st = initial();
+  };
+  const keyOf = (c5) => JSON.stringify([c5.charger, c5.epoch, c5.area, c5.currency]);
+  const current = (mine, myKey) => mine === token && myKey === key3;
+  async function loadAvailable() {
+    const mine = token, myKey = key3, asked = ctx;
+    st.status = "loading";
+    st.error = null;
+    try {
+      const answer = await request({ mode: "available" });
+      if (!current(mine, myKey)) return;
+      const days = Array.isArray(answer?.days) ? answer.days : null;
+      const valid = answer?.api_version === 1 && answer.mode === "available" && answer.charger_id === asked.charger && answer.area_id === asked.area && answer.currency === asked.currency && typeof answer.today === "string" && Number.isFinite(parse2(answer.today)) && days && days.length <= 400 && days.every((row2) => Number.isFinite(parse2(row2?.day)));
+      if (!valid) throw new Error("context");
+      st.available = { today: answer.today, days, byDay: new Map(days.map((row2) => [row2.day, row2])), yesterdayReachable: answer.yesterday_reachable === true };
+      st.status = "ready";
+    } catch {
+      if (!current(mine, myKey)) return;
+      st.status = "error";
+      st.error = FAILED;
+    }
+    onChange();
+  }
+  async function loadPage(day, selection) {
+    const mine = token, myKey = key3, asked = ctx;
+    const oldest = st.available.days.at(-1)?.day ?? day;
+    const from = parse2(addDays(day, 1 - PAGE_DAYS)) < parse2(oldest) ? oldest : addDays(day, 1 - PAGE_DAYS);
+    st.loading = { day };
+    st.error = null;
+    st.retryDay = null;
+    try {
+      const answer = await request({ mode: "range", from, to: day });
+      if (!current(mine, myKey)) return;
+      const wanted = [];
+      for (let d3 = from; parse2(d3) <= parse2(day); d3 = addDays(d3, 1)) wanted.push(d3);
+      const rows = Array.isArray(answer?.days) ? answer.days : null;
+      const valid = answer?.api_version === 1 && answer.mode === "range" && answer.charger_id === asked.charger && answer.area_id === asked.area && answer.currency === asked.currency && answer.from === from && answer.to === day && rows && rows.length === wanted.length && rows.every((row2, i7) => row2?.day === wanted[i7] && typeof row2.held === "boolean");
+      if (!valid) throw new Error("context");
+      const dayRows = new Map(rows.map((row2) => [row2.day, row2]));
+      const merged = mergePriceRows(...rows.map((row2) => row2.held && Array.isArray(row2.intervals) ? row2.intervals : []));
+      if (merged.error) throw new Error("rows");
+      st.page = { id: ++pageId, from, to: day, dayRows, rows: merged.rows };
+      st.selection = selection;
+    } catch (error2) {
+      if (!current(mine, myKey)) return;
+      st.error = error2?.message === "rows" ? "Held prices of this page overlap or conflict; the page was not drawn." : FAILED;
+      st.retryDay = { day, selection };
+    }
+    st.loading = null;
+    onChange();
+  }
+  const heldDay = (day) => st.available?.byDay.get(day);
+  const liveCoversDay = (liveRows, c5, day) => {
+    const span = c5.span?.(day);
+    return !!span && (liveRows || []).some((row2) => {
+      const s4 = Date.parse(row2?.start);
+      return s4 >= span[0] && s4 < span[1];
+    });
+  };
+  return {
+    /** Tell it who is asking; a change of charger, generation, area or currency drops every page and the selection. */
+    sync(next) {
+      const valid = !!(next && next.charger && next.area && /^[A-Z]{3}$/.test(next.currency || ""));
+      const nextKey = valid ? keyOf(next) : null;
+      if (nextKey !== key3) {
+        reset();
+        key3 = nextKey;
+      }
+      ctx = valid ? next : null;
+      if (!ctx) return this;
+      if (st.available && ctx.today && st.available.today !== ctx.today) {
+        reset();
+      }
+      if (st.status === "idle") void loadAvailable();
+      return this;
+    },
+    /** Explicit navigation. `today`/`tomorrow`/`all` need no request; the others load one bounded page. */
+    select(kind, day) {
+      if (!ctx || !st.available || st.loading) return;
+      if (kind === "earlier") {
+        st.earlierOpen = !st.earlierOpen;
+        onChange();
+        return;
+      }
+      if (kind === "today" || kind === "tomorrow" || kind === "all") {
+        st.selection = { kind };
+        st.error = null;
+        st.retryDay = null;
+        onChange();
+        return;
+      }
+      const target = kind === "yesterday" ? addDays(st.available.today, -1) : day;
+      if (!heldDay(target) || kind === "day" && parse2(target) >= parse2(st.available.today)) return;
+      const selection = { kind: kind === "yesterday" ? "yesterday" : "day", day: target };
+      if (st.page?.dayRows.get(target)?.held && st.page.dayRows.get(target).intervals) {
+        st.selection = selection;
+        st.error = null;
+        st.retryDay = null;
+        onChange();
+        return;
+      }
+      void loadPage(target, selection);
+      onChange();
+    },
+    retry() {
+      if (!ctx || st.loading) return;
+      if (st.status === "error") {
+        void loadAvailable();
+        onChange();
+        return;
+      }
+      if (st.retryDay) void loadPage(st.retryDay.day, st.retryDay.selection), onChange();
+    },
+    /** What to draw and the nav model. `liveRows` is the dashboard's own `published_intervals` (today/tomorrow). */
+    view(liveRows) {
+      if (!ctx) return null;
+      const today = st.available?.today ?? ctx.today, tomorrow = today ? addDays(today, 1) : null, yesterday = today ? addDays(today, -1) : null;
+      let page = st.page, error2 = st.error, selection = st.selection;
+      let all = page ? mergePriceRows(page.rows, liveRows) : null;
+      if (all?.error) {
+        st.page = page = null;
+        st.selection = selection = { kind: "today" };
+        st.error = error2 = "Held prices of this page overlap or conflict with the current prices; the page was not drawn.";
+        all = null;
+      }
+      const loaded2 = all?.rows ?? null;
+      const showsPage = page && ["yesterday", "day", "all"].includes(selection.kind);
+      const rows = showsPage ? loaded2 : liveRows || null;
+      let range2 = null;
+      if (selection.kind === "tomorrow") range2 = ctx.span?.(tomorrow) ?? null;
+      else if (selection.kind === "yesterday" || selection.kind === "day") range2 = ctx.span?.(selection.day) ?? null;
+      else if (selection.kind === "all" && rows?.length) range2 = [Date.parse(rows[0].start), Date.parse(rows.at(-1).end)];
+      const viewKey = `${selection.kind}:${selection.day || ""}:${showsPage ? page.id : 0}`;
+      const available = st.available, checking = st.status === "loading" || st.status === "idle";
+      const why = (text4) => checking ? "Checking which days are held\u2026" : st.status === "error" ? "Held days could not be read." : text4;
+      const held = (day) => available?.byDay.get(day);
+      const partial = (row3) => row3 && row3.complete === false;
+      const earlier = available ? available.days.filter((row3) => parse2(row3.day) < parse2(yesterday)) : [];
+      const tomorrowThere = liveCoversDay(liveRows, ctx, tomorrow);
+      const buttons = [
+        { id: "yesterday", label: "Yesterday", enabled: !!held(yesterday), partial: partial(held(yesterday)), reason: held(yesterday) ? "" : why(available && !available.yesterdayReachable ? "Outside what the price provider keeps." : "Yesterday\u2019s prices are not held.") },
+        { id: "today", label: "Today", enabled: true, reason: "" },
+        { id: "tomorrow", label: "Tomorrow", enabled: tomorrowThere, reason: tomorrowThere ? "" : ctx.waitingForTomorrow ? "Tomorrow\u2019s prices are not published yet." : "Tomorrow\u2019s prices are not held." },
+        { id: "earlier", label: "Earlier\u2026", enabled: earlier.length > 0, reason: earlier.length ? "" : why("No earlier prices are held.") },
+        { id: "all", label: "All loaded days", enabled: !!rows?.length, reason: rows?.length ? "" : "No prices are loaded." }
+      ];
+      for (const button of buttons) button.selected = button.id === "earlier" ? st.earlierOpen || selection.kind === "day" : selection.kind === button.id;
+      const row2 = selection.day ? page?.dayRows.get(selection.day) : null;
+      const loadedDays = showsPage ? new Set([...page.dayRows.values()].filter((r7) => r7.held && r7.intervals).map((r7) => r7.day)) : /* @__PURE__ */ new Set();
+      let detail = "";
+      if (selection.kind === "all") detail = `All loaded days: ${loadedDays.size ? `${loadedDays.size} held day${loadedDays.size === 1 ? "" : "s"} of the current page of up to ${PAGE_DAYS} days plus` : ""} today and tomorrow. Not the full price history.`;
+      else if (row2?.held) detail = `${dayLabel(row2.day)} \xB7 ${row2.complete === false ? "partial: the held prices cover only part of this day" : "complete"} \xB7 ${row2.interval_count ?? "unknown"} intervals${row2.resolution_minutes ? ` of ${row2.resolution_minutes} min` : " (mixed lengths)"} \xB7 source ${row2.source || "unknown"}${row2.fetched_at ? ` \xB7 fetched ${ctx.formatInstant ? ctx.formatInstant(row2.fetched_at) : row2.fetched_at}` : ""}`;
+      else if (selection.kind === "tomorrow") detail = "Tomorrow\u2019s published prices.";
+      const unusable = page ? [...page.dayRows.values()].filter((r7) => r7.held && !r7.intervals) : [];
+      if (unusable.length) detail += ` ${unusable.map((r7) => dayLabel(r7.day)).join(", ")}: held, but not drawn (${unusable.some((r7) => r7.reason === "no_price_rate") ? "no usable exchange rate" : "invalid intervals"}).`;
+      const nav = {
+        selected: selection.kind,
+        selectedDay: selection.day || null,
+        status: st.loading ? "loading" : error2 || st.status === "error" ? "error" : checking ? "loading" : "ready",
+        message: st.loading ? `Loading held prices up to ${dayLabel(st.loading.day)}\u2026` : error2 || (st.status === "error" ? FAILED : ""),
+        canRetry: !st.loading && (!!st.retryDay || st.status === "error"),
+        buttons,
+        earlier: { open: st.earlierOpen && earlier.length > 0, days: earlier.map((r7) => ({ day: r7.day, label: dayLabel(r7.day), partial: partial(r7) })), hint: `Pick a held day; one page of up to ${PAGE_DAYS} days ending there is loaded.` },
+        detail: detail.trim()
+      };
+      return { nav, rows, range: range2, viewKey };
+    },
+    dispose() {
+      token++;
+      ctx = null;
+      key3 = null;
+      st = initial();
+    }
+  };
+}
+
+// sidebar/price-chart.js
+function publishedChart(raw, market, now, stale, view = null) {
+  const rows = raw?.prices?.published_intervals;
+  const zone = market?.timezone, currency = market?.currency;
+  if (stale || !Array.isArray(rows) || !rows.length || !zone || !/^[A-Z]{3}$/.test(currency || "")) return null;
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: zone }).format(0);
+  } catch {
+    return null;
+  }
+  const prices = [];
+  let previous = -Infinity;
+  for (const row2 of rows) {
+    if (!row2 || typeof row2.start !== "string" || typeof row2.end !== "string" || !/(?:Z|[+-]\d\d:\d\d)$/i.test(row2.start) || !/(?:Z|[+-]\d\d:\d\d)$/i.test(row2.end)) return null;
+    const start2 = Date.parse(row2.start), end2 = Date.parse(row2.end);
+    if (!Number.isFinite(start2) || !Number.isFinite(end2) || end2 <= start2 || start2 < previous || !(row2.raw_price === null || Number.isFinite(row2.raw_price))) return null;
+    if (row2.raw_price !== null) prices.push({ start: start2, end: end2, cents: displayPrice(row2.raw_price, currency) });
+    previous = end2;
+  }
+  if (!prices.length) return null;
+  const horizon = [Date.parse(rows[0].start), Date.parse(rows.at(-1).end)];
+  const boundaries = [...new Set(rows.flatMap((r7) => [Date.parse(r7.start), Date.parse(r7.end)]))].sort((a4, b3) => a4 - b3);
+  const snapRange = (a4, b3) => {
+    const nearest = (x2) => boundaries.reduce((v2, n6) => Math.abs(n6 - x2) < Math.abs(v2 - x2) ? n6 : v2, boundaries[0]);
+    let start2 = nearest(a4), end2 = nearest(b3);
+    if (start2 >= end2) {
+      const i7 = boundaries.indexOf(start2);
+      if (i7 < boundaries.length - 1) end2 = boundaries[i7 + 1];
+      else start2 = boundaries[i7 - 1];
+    }
+    return [start2, end2];
+  };
+  const time2 = (ms) => new Intl.DateTimeFormat("en-GB", { timeZone: zone, hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "shortOffset" }).format(ms);
+  const date2 = (ms) => new Intl.DateTimeFormat("en-GB", { timeZone: zone, year: "numeric", month: "short", day: "numeric" }).format(ms);
+  const days = (start2, end2) => {
+    const result2 = [];
+    let mid = localMidnightAt(start2, zone);
+    for (let i7 = 0; i7 < 5 && mid < end2; i7++) {
+      const next = localMidnightAt(mid + 36 * 36e5, zone);
+      if (next <= mid) break;
+      result2.push({ start: Math.max(start2, mid), end: Math.min(end2, next), midnight: mid, label: date2(mid) });
+      mid = next;
+    }
+    return result2;
+  };
+  const priceGaps = (start2, end2, items) => {
+    const gaps = [];
+    let cursor = start2;
+    for (const p4 of items) {
+      if (p4.end <= cursor || p4.start >= end2) continue;
+      if (p4.start > cursor) gaps.push([cursor, Math.min(end2, p4.start)]);
+      cursor = Math.max(cursor, Math.min(end2, p4.end));
+    }
+    if (cursor < end2) gaps.push([cursor, end2]);
+    return gaps;
+  };
+  const stepSegments = (items) => items.map((p4) => [[p4.start, p4.cents], [p4.end, p4.cents]]);
+  const stepPoints = (items) => items.flatMap((p4, i7) => [...i7 && items[i7 - 1].end !== p4.start ? [[(items[i7 - 1].end + p4.start) / 2, null]] : [], [p4.start, p4.cents], [p4.end, p4.cents]]);
+  const initialRange = (current) => view?.range ? snapRange(Math.max(horizon[0], view.range[0]), Math.min(horizon[1], view.range[1])) : snapRange(Math.max(horizon[0], Math.min(current - 36e5, horizon[1] - 1)), horizon[1]);
+  const timeTicks = (start2, end2, width) => {
+    const step = [36e5, 72e5, 144e5, 216e5, 432e5, 864e5].find((n6) => n6 >= (end2 - start2) / Math.max(1, Math.floor(width / 100))) || 864e5;
+    const out2 = [];
+    for (let t6 = Math.ceil(start2 / step) * step; t6 < end2; t6 += step) out2.push(t6);
+    return out2;
+  };
+  return { chart: { prices, now, horizon, cap: null, unit: priceUnit(currency), viewKey: view?.key ?? "default" }, format: { chartTime: time2, date: date2, tooltipDate: date2, days, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks } };
+}
+function localDaySpan(day, zone) {
+  const m4 = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day || "");
+  if (!m4 || !zone) return null;
+  try {
+    const label2 = new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" });
+    let probe = Date.UTC(+m4[1], +m4[2] - 1, +m4[3], 12);
+    if (label2.format(probe) !== day) probe += label2.format(probe) < day ? 864e5 : -864e5;
+    const start2 = localMidnightAt(probe, zone), end2 = localMidnightAt(start2 + 36 * 36e5, zone);
+    return label2.format(start2) === day && end2 > start2 ? [start2, end2] : null;
+  } catch {
+    return null;
+  }
 }
 
 // src/settings.ts
@@ -62266,7 +62584,7 @@ function isoWeekday(date2) {
   const d3 = new Date(Date.UTC(Number(m4[1]), Number(m4[2]) - 1, Number(m4[3])));
   return d3.getUTCDay() === 0 ? 7 : d3.getUTCDay();
 }
-function addDays(date2, n6) {
+function addDays2(date2, n6) {
   const m4 = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date2 || "");
   if (!m4) return null;
   const d3 = new Date(Date.UTC(Number(m4[1]), Number(m4[2]) - 1, Number(m4[3]) + n6));
@@ -62332,7 +62650,7 @@ function nextDepartureText(record5, days) {
   }
   const set3 = new Set(record5.departure_weekdays);
   let day = days.nextOccurrence(time2);
-  for (let i7 = 0; i7 < 8 && day; i7 += 1, day = addDays(day, 1)) {
+  for (let i7 = 0; i7 < 8 && day; i7 += 1, day = addDays2(day, 1)) {
     if (set3.has(isoWeekday(day))) return `Next ready-by: ${day} ${time2} (market local time).`;
   }
   return "No weekday is saved, so no departure can be named.";
@@ -62996,74 +63314,6 @@ function learningModel(raw, stale, text4) {
   return { state, source: block.source, lines: lines3, note: text4.note, stale: !!stale, staleText: stale ? text4.stale : null, title: text4.title };
 }
 
-// sidebar/price-chart.js
-function publishedChart(raw, market, now, stale) {
-  const rows = raw?.prices?.published_intervals;
-  const zone = market?.timezone, currency = market?.currency;
-  if (stale || !Array.isArray(rows) || !rows.length || !zone || !/^[A-Z]{3}$/.test(currency || "")) return null;
-  try {
-    new Intl.DateTimeFormat("en", { timeZone: zone }).format(0);
-  } catch {
-    return null;
-  }
-  const prices = [];
-  let previous = -Infinity;
-  for (const row2 of rows) {
-    if (!row2 || typeof row2.start !== "string" || typeof row2.end !== "string" || !/(?:Z|[+-]\d\d:\d\d)$/i.test(row2.start) || !/(?:Z|[+-]\d\d:\d\d)$/i.test(row2.end)) return null;
-    const start2 = Date.parse(row2.start), end2 = Date.parse(row2.end);
-    if (!Number.isFinite(start2) || !Number.isFinite(end2) || end2 <= start2 || start2 < previous || !(row2.raw_price === null || Number.isFinite(row2.raw_price))) return null;
-    if (row2.raw_price !== null) prices.push({ start: start2, end: end2, cents: displayPrice(row2.raw_price, currency) });
-    previous = end2;
-  }
-  if (!prices.length) return null;
-  const horizon = [Date.parse(rows[0].start), Date.parse(rows.at(-1).end)];
-  const boundaries = [...new Set(rows.flatMap((r7) => [Date.parse(r7.start), Date.parse(r7.end)]))].sort((a4, b3) => a4 - b3);
-  const snapRange = (a4, b3) => {
-    const nearest = (x2) => boundaries.reduce((v2, n6) => Math.abs(n6 - x2) < Math.abs(v2 - x2) ? n6 : v2, boundaries[0]);
-    let start2 = nearest(a4), end2 = nearest(b3);
-    if (start2 >= end2) {
-      const i7 = boundaries.indexOf(start2);
-      if (i7 < boundaries.length - 1) end2 = boundaries[i7 + 1];
-      else start2 = boundaries[i7 - 1];
-    }
-    return [start2, end2];
-  };
-  const time2 = (ms) => new Intl.DateTimeFormat("en-GB", { timeZone: zone, hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "shortOffset" }).format(ms);
-  const date2 = (ms) => new Intl.DateTimeFormat("en-GB", { timeZone: zone, year: "numeric", month: "short", day: "numeric" }).format(ms);
-  const days = (start2, end2) => {
-    const result2 = [];
-    let mid = localMidnightAt(start2, zone);
-    for (let i7 = 0; i7 < 5 && mid < end2; i7++) {
-      const next = localMidnightAt(mid + 36 * 36e5, zone);
-      if (next <= mid) break;
-      result2.push({ start: Math.max(start2, mid), end: Math.min(end2, next), midnight: mid, label: date2(mid) });
-      mid = next;
-    }
-    return result2;
-  };
-  const priceGaps = (start2, end2, items) => {
-    const gaps = [];
-    let cursor = start2;
-    for (const p4 of items) {
-      if (p4.end <= cursor || p4.start >= end2) continue;
-      if (p4.start > cursor) gaps.push([cursor, Math.min(end2, p4.start)]);
-      cursor = Math.max(cursor, Math.min(end2, p4.end));
-    }
-    if (cursor < end2) gaps.push([cursor, end2]);
-    return gaps;
-  };
-  const stepSegments = (items) => items.map((p4) => [[p4.start, p4.cents], [p4.end, p4.cents]]);
-  const stepPoints = (items) => items.flatMap((p4, i7) => [...i7 && items[i7 - 1].end !== p4.start ? [[(items[i7 - 1].end + p4.start) / 2, null]] : [], [p4.start, p4.cents], [p4.end, p4.cents]]);
-  const initialRange = (current) => snapRange(Math.max(horizon[0], Math.min(current - 36e5, horizon[1] - 1)), horizon[1]);
-  const timeTicks = (start2, end2, width) => {
-    const step = [36e5, 72e5, 144e5, 216e5, 432e5, 864e5].find((n6) => n6 >= (end2 - start2) / Math.max(1, Math.floor(width / 100))) || 864e5;
-    const out2 = [];
-    for (let t6 = Math.ceil(start2 / step) * step; t6 < end2; t6 += step) out2.push(t6);
-    return out2;
-  };
-  return { chart: { prices, now, horizon, cap: null, unit: priceUnit(currency) }, format: { chartTime: time2, date: date2, tooltipDate: date2, days, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks } };
-}
-
 // sidebar/evidence-freshness.js
 var STRICT_MAX_AGE_MS = 18e4;
 var CLOCK_SKEW_MS = 5e3;
@@ -63500,7 +63750,7 @@ function priceProvenance(prices, market, zone, stale = false, now = Date.now()) 
   };
   return `Current provider route: ${selected}; market/area: ${area}. ${describe("today")} ${describe("tomorrow")} ${stale ? "Dashboard observation stale or unavailable." : "Provider route may differ from held files."}`;
 }
-function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed = false, dashboardFailed = false) {
+function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed = false, dashboardFailed = false, priceView = null) {
   const decoded = decodeDashboard(raw);
   if (!decoded.ok) return null;
   const d3 = decoded.value, zone = d3.market?.timezone || null;
@@ -63585,7 +63835,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
   const unresolved = raw?.plan?.price_policy?.target_shortfall_kwh;
   const policyText = !planStale && raw?.plan?.price_policy?.provisional === true ? `${policyBase}${raw.plan.price_policy.tomorrow_pending === true ? " Planned using available published prices; tomorrow\u2019s prices are pending or unusable, so this plan may change when they arrive." : ""} Provisional: contiguous published prices end ${date(raw.plan.price_policy.price_coverage_end, zone)}. ${Number.isFinite(unresolved) && unresolved > 0 ? `${unresolved.toFixed(1)} kWh of target energy remains unresolved. ` : ""}Future prices and readiness are unknown; this is not necessarily the cheapest complete plan.` : policyBase;
   const warning = live.mismatch || status?.outcomes?.uncertain || status?.operator?.state === "mismatch" || status?.verification?.reason === "limits_or_transitions_differ";
-  const published = publishedChart(raw, d3.market, now, stale || dashboardFailed);
+  const published = publishedChart(priceView?.rows ? { ...raw, prices: { ...raw?.prices, published_intervals: priceView.rows } } : raw, d3.market, now, stale || dashboardFailed, priceView ? { key: priceView.viewKey, range: priceView.range } : null);
   const priceFreshness = priceProvenance(raw?.prices, d3.market, zone, stale || dashboardFailed, now);
   return {
     draftKey: d3.charger.charger_id,
@@ -63604,6 +63854,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
       learning: proposal ? learningModel(rawProposal?.learning, planStale, learningText()) : null,
       reserve: !planStale && proposal ? reserveModel(rawProposal?.reserve, pricedBasis ? planCurrency : null, reserveText()) : null,
       chart: published?.chart,
+      priceNav: priceView?.nav || null,
       totals: !planStale && proposal ? { energy: proposal.planned_kwh, cost: proposal.unpriced ? null : proposal.cost?.value, pricePerKwh: avg } : null,
       vehicle: { status: stale ? "Connection unavailable \xB7 stale dashboard" : d3.charger.available ? d3.connection?.state || U : "Charger unavailable", detail: `Dashboard observed ${date(d3.generated_at, zone)}${stale ? ` \xB7 stale: ${staleReason}` : ""}`, power: live.power, live: live.summary, liveMismatch: live.mismatch, soc: validPercent(soc2) ? soc2 : null, stale: socStale, planStale, socDetail, socEstimated: !useRaw && d3.soc?.estimated === true, policy: policyText },
       assumptions: { startingSoc: projectionValid ? rawProjection.starting_soc : null, capacityKwh: d3.soc?.capacity_kwh, efficiency: d3.soc?.efficiency, projectionSupported: projectionValid, projectionKwhPerPercent: rawProjection?.kwh_per_percent, projectionNote: projectionNoteFull },
@@ -63864,7 +64115,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.166";
+var CARD_VERSION = "2.5.167";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {
@@ -63989,6 +64240,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this.attachShadow({ mode: "open" });
     this.generation = 0;
     this.permissionEpoch = 0;
+    this.priceDays = null;
     this.dashboardEpoch = 0;
     this.statusEpoch = 0;
     this.pendingSettingsWrites = /* @__PURE__ */ new Map();
@@ -64191,6 +64443,8 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this.chargeNotice = "";
     this.learningNotice = "";
     this.generation++;
+    this.priceDays?.dispose();
+    this.priceDays = null;
     clearInterval(this.ageTimer);
     this.ageTimer = null;
     for (const cancel of this.cancellations || []) cancel();
@@ -64238,15 +64492,51 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     const main = this.shadowRoot.querySelector("main");
     if (main) main.hidden = preserveDraft;
   }
+  // Price-day navigation (7.1): the state machine lives across refreshes; it only reads held days, on a user action
+  // (plus one small availability read per charger/area/currency), and drops itself when any of them changes.
+  priceView(dashboard) {
+    const raw = this.rawDashboard, zone = dashboard?.market?.timezone, area = raw?.prices?.area_id;
+    if (!dashboard || !this.charger || !this._hass || !zone || typeof area !== "string" || !area) {
+      this.priceDays?.dispose();
+      this.priceDays = null;
+      return null;
+    }
+    this.priceDays ||= createPriceDays({ request: (params) => this.bounded(getPriceDays(this._hass, this.charger, params)), onChange: () => {
+      if (this.connected) this.paint();
+    } });
+    const format3 = (ms) => {
+      try {
+        return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short", timeZone: zone }).format(Date.parse(ms));
+      } catch {
+        return String(ms);
+      }
+    };
+    const live = raw?.prices?.published_intervals;
+    return this.priceDays.sync({
+      charger: this.charger,
+      epoch: `${this.generation}:${this.permissionEpoch}`,
+      area,
+      currency: dashboard.market.currency,
+      today: typeof raw.prices.today === "string" ? raw.prices.today : null,
+      span: (day) => localDaySpan(day, zone),
+      waitingForTomorrow: raw.prices.waiting_for_tomorrow === true,
+      formatInstant: format3
+    }).view(Array.isArray(live) ? live : null);
+  }
+  priceNav(kind, arg) {
+    if (kind === "retry") this.priceDays?.retry();
+    else this.priceDays?.select(kind, arg);
+  }
   paint() {
     if (!this.rawDashboard) return;
-    const adapter = dashboardAdapter(this.rawDashboard, this.rawStatus, this.statusAt, Date.now(), this.statusFailed, this.dashboardFailed);
+    const decoded = decodeDashboard(this.rawDashboard);
+    const dashboard = decoded.ok ? decoded.value : null;
+    const adapter = dashboardAdapter(this.rawDashboard, this.rawStatus, this.statusAt, Date.now(), this.statusFailed, this.dashboardFailed, this.priceView(dashboard));
     if (!adapter || adapter.draftKey !== this.charger) {
       this.message("Dashboard unavailable or unsupported.");
       return;
     }
-    const decoded = decodeDashboard(this.rawDashboard);
-    const dashboard = decoded.ok ? decoded.value : null;
+    adapter.actions.priceNav = (kind, arg) => this.priceNav(kind, arg);
     this.paintAutomatic(dashboard);
     this.paintChargeNow(dashboard);
     this.paintSession();

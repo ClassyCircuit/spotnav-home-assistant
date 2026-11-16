@@ -954,7 +954,7 @@ ties → earliest; duplicate interval start with identical data is dropped once,
 are excluded and counted, never converted; price basis = raw published spot in the area's major unit per kWh in API calculations (the chart retains its existing EUR-cent display conversion), fiscal additions
 only if a helper is explicitly used **and labelled**; read-range page = 8 local days; availability list ≤ 400 dates.
 
-- [ ] **7.1 Available-day navigation (backend read + UI).** *Scope:* shortcuts Yesterday / Today / Tomorrow / Earlier… / All loaded days, each
+- [x] **7.1 Available-day navigation (backend read + UI).** *Locally implemented 2026-11-16 (manifest 2.5.167), mocked checks only; coordinator reviewed; 23 backend and 31 focused frontend checks plus check-dist passed; not deployed or visually verified.* *Scope:* shortcuts Yesterday / Today / Tomorrow / Earlier… / All loaded days, each
   enabled only for days the repository actually holds. *Delta:* **one** read-only websocket command `spotnav/get_price_days` (new small module;
   engineering-default name, check for clashes), api_version 1, same permission and charger resolution as the dashboard, documented in
   `docs/api.md`: `mode: "available"` → `{area_id, zone, currency, today, days:[{day, state, complete, resolution_minutes, source, fetched_at,

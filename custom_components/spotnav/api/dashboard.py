@@ -1881,21 +1881,16 @@ def serialize_intervals(capture: CapturedDashboard) -> list[dict[str, Any]]:
     return [merged[instant] for instant in sorted(merged)]
 
 
-def serialize_published_intervals(capture: CapturedDashboard) -> list[dict[str, Any]] | None:
-    """Captured published rows, without proposal regridding, in major currency/kWh.
+def published_rows(intervals: Iterable[Any]) -> list[dict[str, Any]] | None:
+    """Published rows (`start`, `end`, `raw_price` in major currency/kWh) of chart intervals, without regridding.
 
-    ChartInterval uses one hundredth of a major unit, not necessarily the
-    currency's actual minor unit. Refuse malformed/overlapping geometry rather
-    than choosing a winner. Existing per-day state and fetched timestamps remain
-    in the enclosing prices object.
+    ChartInterval uses one hundredth of a major unit, not necessarily the currency's actual minor unit. Malformed
+    or overlapping geometry gives `None` rather than a chosen winner. Shared by the dashboard's
+    `published_intervals` and `spotnav/get_price_days` (`api/price_calendar.py`), so both draw one row shape.
     """
-    if capture.intervals is None or capture.area_entry is None:
-        return None
-    if not _text(capture.area_entry.currency) or not _text(capture.area_entry.tz):
-        return None
     result = []
     previous_end = None
-    for row in capture.intervals:
+    for row in intervals:
         start, end = _utc(row.start), _utc(row.end)
         if start is None or end is None or start >= end or (previous_end is not None and start < previous_end):
             return None
@@ -1904,6 +1899,19 @@ def serialize_published_intervals(capture: CapturedDashboard) -> list[dict[str, 
                        "raw_price": None if raw is None else raw / 100})
         previous_end = end
     return result
+
+
+def serialize_published_intervals(capture: CapturedDashboard) -> list[dict[str, Any]] | None:
+    """Captured published rows, without proposal regridding, in major currency/kWh.
+
+    Refuse malformed/overlapping geometry rather than choosing a winner. Existing per-day state and fetched
+    timestamps remain in the enclosing prices object.
+    """
+    if capture.intervals is None or capture.area_entry is None:
+        return None
+    if not _text(capture.area_entry.currency) or not _text(capture.area_entry.tz):
+        return None
+    return published_rows(capture.intervals)
 
 
 def serialize_prices(capture: CapturedDashboard) -> dict[str, Any]:

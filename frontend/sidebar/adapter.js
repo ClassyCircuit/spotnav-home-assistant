@@ -45,7 +45,7 @@ export function priceProvenance(prices, market, zone, stale = false, now = Date.
   return `Current provider route: ${selected}; market/area: ${area}. ${describe('today')} ${describe('tomorrow')} ${stale ? 'Dashboard observation stale or unavailable.' : 'Provider route may differ from held files.'}`;
 }
 
-export function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed = false, dashboardFailed = false) {
+export function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed = false, dashboardFailed = false, priceView = null) {
   const decoded = decodeDashboard(raw);
   if (!decoded.ok) return null;
   const d = decoded.value, zone = d.market?.timezone || null;
@@ -128,7 +128,9 @@ export function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), f
   const unresolved=raw?.plan?.price_policy?.target_shortfall_kwh;
   const policyText=!planStale && raw?.plan?.price_policy?.provisional === true ? `${policyBase}${raw.plan.price_policy.tomorrow_pending===true ? ' Planned using available published prices; tomorrow’s prices are pending or unusable, so this plan may change when they arrive.' : ''} Provisional: contiguous published prices end ${date(raw.plan.price_policy.price_coverage_end,zone)}. ${Number.isFinite(unresolved) && unresolved>0 ? `${unresolved.toFixed(1)} kWh of target energy remains unresolved. ` : ''}Future prices and readiness are unknown; this is not necessarily the cheapest complete plan.` : policyBase;
   const warning = live.mismatch || status?.outcomes?.uncertain || status?.operator?.state === 'mismatch' || status?.verification?.reason === 'limits_or_transitions_differ';
-  const published = publishedChart(raw, d.market, now, stale || dashboardFailed);
+  // 7.1: when the user navigated to held days, the same chart adapter draws the merged rows (`priceView.rows`, the
+  // dashboard's own `published_intervals` shape); with no navigation it is the dashboard feed, as before.
+  const published = publishedChart(priceView?.rows ? {...raw, prices:{...raw?.prices, published_intervals:priceView.rows}} : raw, d.market, now, stale || dashboardFailed, priceView ? {key:priceView.viewKey, range:priceView.range} : null);
   const priceFreshness = priceProvenance(raw?.prices,d.market,zone,stale || dashboardFailed,now);
   return {
     draftKey: d.charger.charger_id,
@@ -136,7 +138,7 @@ export function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), f
       detailsNote:!validDetails ? 'Window energy and costs are unavailable because reconciled planner details are missing.' : proposal?.unpriced ? 'Window costs and prices are unavailable for an unpriced plan.' : !pricedBasis ? 'Window prices and weighted average are unavailable because the cost basis or currency is unknown.' : null,
       minutesPerTimeUnit:1/60000, time: ms=>part(ms,zone,{timeStyle:'short'}), day: ms=>part(ms,zone,{dateStyle:'medium'}), ...published?.format},
     model: {
-      windows, nextWindow, learning:proposal ? learningModel(rawProposal?.learning,planStale,learningText()) : null, reserve:!planStale && proposal ? reserveModel(rawProposal?.reserve,pricedBasis ? planCurrency : null,reserveText()) : null, chart:published?.chart, totals: !planStale && proposal ? {energy:proposal.planned_kwh,cost:proposal.unpriced ? null : proposal.cost?.value,pricePerKwh:avg} : null,
+      windows, nextWindow, learning:proposal ? learningModel(rawProposal?.learning,planStale,learningText()) : null, reserve:!planStale && proposal ? reserveModel(rawProposal?.reserve,pricedBasis ? planCurrency : null,reserveText()) : null, chart:published?.chart, priceNav:priceView?.nav || null, totals: !planStale && proposal ? {energy:proposal.planned_kwh,cost:proposal.unpriced ? null : proposal.cost?.value,pricePerKwh:avg} : null,
       vehicle: {status: stale ? 'Connection unavailable · stale dashboard' : d.charger.available ? (d.connection?.state || U) : 'Charger unavailable', detail:`Dashboard observed ${date(d.generated_at,zone)}${stale ? ` · stale: ${staleReason}` : ''}`, power:live.power,live:live.summary,liveMismatch:live.mismatch, soc:validPercent(soc) ? soc : null, stale:socStale, planStale, socDetail, socEstimated:!useRaw && d.soc?.estimated===true, policy:policyText},
       assumptions:{startingSoc:projectionValid ? rawProjection.starting_soc : null,capacityKwh:d.soc?.capacity_kwh,efficiency:d.soc?.efficiency,projectionSupported:projectionValid,projectionKwhPerPercent:rawProjection?.kwh_per_percent,projectionNote:projectionNoteFull},
       settings: {target:d.soc?.target_percent, minimum:d.settings?.minimum_ready_by_soc, cap:d.settings?.soft_price_cap, readyBy:d.settings?.departure_time},

@@ -1,5 +1,7 @@
 import { mountDashboard } from '../shared-dashboard/dashboard.js';
-import { listChargers, getDashboard, morekSchedule, getSettings, updateSettings, performAction, chargeNowAction, getEntityConfig, setVehicleSoc, updateVehicle } from '../src/api.ts';
+import { listChargers, getDashboard, getPriceDays, morekSchedule, getSettings, updateSettings, performAction, chargeNowAction, getEntityConfig, setVehicleSoc, updateVehicle } from '../src/api.ts';
+import { createPriceDays } from '../shared-dashboard/price-days.js';
+import { localDaySpan } from './price-chart.js';
 import { decodeEntityAnswer, decodeVehicleWriteAnswer, entityErrorKey, fieldErrorKey, ENTITY_CONFLICT } from '../src/entity-config.ts';
 import { vehicleSourcesModel, vehicleSignature, chooseVehicle, sensorWritePlan, propertyWritePlan, CONFIG_REFRESH_MS } from './vehicle-sources.js';
 import { marketCostMethods } from './market-costs-panel.js';
@@ -98,6 +100,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     this.attachShadow({mode:'open'});
     this.generation = 0;
     this.permissionEpoch = 0;
+    this.priceDays = null;
     this.dashboardEpoch = 0;
     this.statusEpoch = 0;
     this.pendingSettingsWrites = new Map();
@@ -197,6 +200,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     if (!preserveDraft) {this.vehicleBase=null;this.vehicleSelected=null;}
     this.chargeBusy=false;this.chargeNotice='';this.learningNotice='';
     this.generation++;
+    this.priceDays?.dispose();this.priceDays=null;
     clearInterval(this.ageTimer); this.ageTimer=null;
     for (const cancel of this.cancellations || []) cancel();
     this.cancellations=new Set();
@@ -211,12 +215,27 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     if (!preserveDraft) {this.view?.dispose(); this.view=null;}
     const main=this.shadowRoot.querySelector('main');if(main)main.hidden=preserveDraft;
   }
+  // Price-day navigation (7.1): the state machine lives across refreshes; it only reads held days, on a user action
+  // (plus one small availability read per charger/area/currency), and drops itself when any of them changes.
+  priceView(dashboard) {
+    const raw=this.rawDashboard, zone=dashboard?.market?.timezone, area=raw?.prices?.area_id;
+    if (!dashboard || !this.charger || !this._hass || !zone || typeof area!=='string' || !area) {this.priceDays?.dispose();this.priceDays=null;return null;}
+    this.priceDays ||= createPriceDays({request:params=>this.bounded(getPriceDays(this._hass,this.charger,params)),onChange:()=>{if(this.connected)this.paint();}});
+    const format=ms=>{try{return new Intl.DateTimeFormat('en',{dateStyle:'medium',timeStyle:'short',timeZone:zone}).format(Date.parse(ms));}catch{return String(ms);}};
+    const live=raw?.prices?.published_intervals;
+    return this.priceDays.sync({charger:this.charger,epoch:`${this.generation}:${this.permissionEpoch}`,area,currency:dashboard.market.currency,today:typeof raw.prices.today==='string'?raw.prices.today:null,
+      span:day=>localDaySpan(day,zone),waitingForTomorrow:raw.prices.waiting_for_tomorrow===true,formatInstant:format}).view(Array.isArray(live)?live:null);
+  }
+  priceNav(kind,arg) {
+    if (kind==='retry') this.priceDays?.retry(); else this.priceDays?.select(kind,arg);
+  }
   paint() {
     if (!this.rawDashboard) return;
-    const adapter=dashboardAdapter(this.rawDashboard,this.rawStatus,this.statusAt,Date.now(),this.statusFailed,this.dashboardFailed);
-    if (!adapter || adapter.draftKey!==this.charger) { this.message('Dashboard unavailable or unsupported.'); return; }
     const decoded=decodeDashboard(this.rawDashboard);
     const dashboard=decoded.ok ? decoded.value : null;
+    const adapter=dashboardAdapter(this.rawDashboard,this.rawStatus,this.statusAt,Date.now(),this.statusFailed,this.dashboardFailed,this.priceView(dashboard));
+    if (!adapter || adapter.draftKey!==this.charger) { this.message('Dashboard unavailable or unsupported.'); return; }
+    adapter.actions.priceNav=(kind,arg)=>this.priceNav(kind,arg);
     this.paintAutomatic(dashboard);
     this.paintChargeNow(dashboard);
     this.paintSession();

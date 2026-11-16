@@ -3428,6 +3428,34 @@ footer {
 .plan-learning b {
   color: var(--ink);
 }
+.price-nav {
+  display: grid;
+  gap: .4rem;
+  margin: .6rem 0;
+}
+.price-nav-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+  align-items: center;
+}
+.price-nav-picker {
+  display: inline-flex;
+  gap: .4rem;
+  align-items: center;
+}
+.price-nav select {
+  max-width: 100%;
+  min-height: 36px;
+}
+.price-nav-note,
+.price-nav-reasons {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.price-nav[data-price-nav-status=error] .price-nav-note {
+  color: var(--warning,#e3b341);
+}
 
 /* shared-dashboard/dark.css */
 :host {

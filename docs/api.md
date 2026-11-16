@@ -616,6 +616,7 @@ and `charger_priority.writable` say whether it may change those (an administrato
 | `spotnav/get_sessions` | A charger's charge sessions: summaries per month and day and the latest sessions, the same for one chosen `month`, or with `format: "csv"` and optional `from` and `to` dates (or a `month`) the sessions of that range as CSV text. |
 | `spotnav/get_charging_history` | Stage 6.3, read-only, any signed-in user (like `get_sessions`). Request `{"api_version": 1, "charger_id", "date" \| "night" \| "from"+"to", "include_prices"?}`: `date` is that local day, `night` is 12:00 that local day to 12:00 the next, `from`/`to` are aware instants; at most 7 days, windows are measured in real instants (a 25-hour DST day is 25 hours). Answers the retained sent-plan versions with the tariff and (only with `include_prices`) raw published prices captured **when each version was made**, measured-power charging intervals with explicit bounds, gaps and restarts, energy by basis (meter counter observed / unobserved, integrated estimate, unknown), planned blocks (from the last *acknowledged* intent, known spans only) as `flow_observed` / `no_flow_observed` / `unknown`, `unknown_plan_spans` after an uncertain write, flow `outside_plan`, `plan_unknown` or `no_plan_evidence`, energy bases `null` when unmeasured (never 0), closed sessions (time overlap only), retention and per-day digests. Errors: `spotnav_invalid_range`, `spotnav_history_unavailable`, `spotnav_unsupported_api_version`. Not exposed: raw OCPP profiles. Only the Morek connector captures evidence; other chargers answer with no data. |
 | `spotnav/get_power_month` | One month of a site's measured import, by day and hour, against its demand-charge parts and import target (see [Power by month](#power-by-month)). |
+| `spotnav/get_price_days` | Stage 7.1, read-only, any signed-in user: which price days the repository holds and one bounded page of their rows (see [Held price days](#held-price-days)). |
 | `spotnav/suggest_import_target` | A suggested import target from Home Assistant's statistics (administrators only; see [A suggested import target](#a-suggested-import-target)). |
 
 Rules that hold across them:
@@ -1251,6 +1252,39 @@ is kept, a request asks for that once more at most once a day. `imported` and `m
 treats them as `false` and `null` where absent. Example answers are in `tests/fixtures/power_month/`
 (`pilot_imported_month.json` has imported days and the month's peak) and
 `tests/fixtures/webhook/get_power_month_*.json`.
+
+### Held price days
+
+`spotnav/get_price_days {"api_version": 1, "charger_id", "mode": "available" | "range", "from"?, "to"?}` (any signed-in
+user, as the dashboard) is the card's *Yesterday / Today / Tomorrow / Earlier… / All loaded days* navigation. It only
+reads what `PriceRepository` already holds in memory: it never fetches from a provider, refreshes, caches or writes, and
+scans no file. Days are **display dates on the price area's own calendar** (`zone`, the area's `tz`, which can differ
+from Home Assistant's zone); `today` is that calendar's date. Prices are the raw published spot in the area's major
+currency unit per kWh, in exactly the dashboard's `prices.published_intervals` row shape (`start`, `end`, `raw_price`;
+`api/dashboard.py:published_rows` builds both); the card converts to its display unit once. Rows are never regridded:
+23- and 25-hour days and mixed 15-minute/hourly days keep their real intervals.
+
+* `available` → `{api_version, charger_id, mode, area_id, zone, currency, today, yesterday_reachable, days: [{day,
+  state, complete, resolution_minutes, source, fetched_at, interval_count}], oldest, newest}`: the held days, newest
+  first, at most 400, no intervals. A day not held is simply absent. `complete: false` is a held partial day.
+  `resolution_minutes` is `null` for a day composed of parts with different resolutions. `yesterday_reachable` says
+  whether the provider keeps yesterday at all (`PriceRepository.archive_reachable`).
+* `range` (`from`/`to`, inclusive `YYYY-MM-DD`, at most 8 dates, not after tomorrow, not older than the repository
+  keeps) → `{…, from, to, days: [{day, held, state, complete, resolution_minutes, source, fetched_at,
+  interval_count, provenance: [{market_day, provider, fetched_at, state}], reason, intervals}]}`, one entry per
+  requested date, oldest first. A held day has `intervals` (the rows above); a day not held has `held: false`,
+  `intervals: null` and `reason`: `not_held`, `outside_provider_reach` or `not_published` (a date after today).
+  A held day the answer cannot honestly price carries `intervals: null` and `reason`: `invalid_intervals`
+  (overlapping or malformed geometry, never repaired) or `no_price_rate` (the day's own exchange rate for the area's
+  currency is unusable). Unknown is never zero.
+
+Refusals: `spotnav_unsupported_api_version`, the charger lookup's codes, `spotnav_no_price_area`,
+`spotnav_unknown_price_area` and `spotnav_invalid_range` (unknown mode, malformed, reversed or unreal dates, more than 8
+days, a date beyond tomorrow or before the repository keeps files). Tests: `tests/test_stage_71_price_days.py`.
+
+The card validates the answer against what it asked (charger, area, currency, mode, range) and discards a late answer
+after a charger, generation, area or currency change; a failure is shown with an explicit *Retry*, never retried on its
+own. *All loaded days* spans the current loaded page of at most 8 days plus today/tomorrow, not the repository.
 
 ### A suggested import target
 

@@ -560,6 +560,10 @@ class PriceRepository:
         """Whether the market-day file is held on the calendar the area is read in now. No I/O."""
         return self._held_file(area_id, day) is not None
 
+    def held_days(self, area_id: str) -> tuple[date, ...]:
+        """The market days this area holds a file for, oldest first. Memory only: no I/O, no fetch, no write."""
+        return tuple(sorted(day for area, day in list(self._days) if area == area_id and self.holds_file(area_id, day)))
+
     def history_reachable(self, area_id: str, day: date) -> bool:
         """Whether a past market-day file is within the area's provider's `history_reach`. No I/O."""
         return not self._out_of_reach(area_id, day)

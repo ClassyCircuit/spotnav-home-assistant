@@ -73,7 +73,7 @@ const pricedWindows = groupBlocks(sampleBlocks).map((w, i) => {
 });
 export const windows = projectSoc(pricedWindows, socAssumptions);
 export const time = h => { if (!Number.isFinite(h)) return 'Unknown'; const seconds = Math.round((((h % 24) + 24) % 24) * 3600); const hh = Math.floor(seconds / 3600), mm = Math.floor(seconds % 3600 / 60), ss = seconds % 60; return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}${ss ? `:${String(ss).padStart(2,'0')}` : ''}`; };
-export const day = h => !Number.isFinite(h) ? 'Unknown' : h < 0 ? 'Yesterday' : h < 24 ? 'Today' : h < 48 ? 'Tomorrow' : 'Next day';
+export const day = h => !Number.isFinite(h) ? 'Unknown' : h < -24 ? 'Earlier' : h < 0 ? 'Yesterday' : h < 24 ? 'Today' : h < 48 ? 'Tomorrow' : 'Next day';
 // Fictional fixed calendar, not local timestamps or a DST model.
 export function sampleDate(h) {
   const d = new Date(Date.UTC(2026, 10, 9 + Math.floor(h / 24)));

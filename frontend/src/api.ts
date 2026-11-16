@@ -11,6 +11,7 @@ import {
   ENTITY_CONFIG_API_VERSION,
   MARKET_API_VERSION,
   POWER_MONTH_API_VERSION,
+  PRICE_DAYS_API_VERSION,
   SESSIONS_API_VERSION,
   SETTINGS_API_VERSION,
   REGION_API_VERSION,
@@ -84,6 +85,24 @@ export async function getDashboard(
     type: "spotnav/get_dashboard",
     api_version: version,
     charger_id: chargerId,
+  });
+}
+
+/**
+ * Held price days of the charger's price area (read-only, never a provider request): `available` lists the held
+ * days' metadata, `range` returns at most eight days of rows in the dashboard's `published_intervals` shape.
+ * Deliberately `unknown`: the navigation model validates the answer against what it asked.
+ */
+export async function getPriceDays(
+  hass: HomeAssistantLike,
+  chargerId: string,
+  request: { mode: "available" } | { mode: "range"; from: string; to: string },
+): Promise<unknown> {
+  return await call<unknown>(hass, {
+    type: "spotnav/get_price_days",
+    api_version: PRICE_DAYS_API_VERSION,
+    charger_id: chargerId,
+    ...request,
   });
 }
 
