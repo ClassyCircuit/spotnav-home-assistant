@@ -1,7 +1,7 @@
 """A guest car: a visitor's car planned by kWh with no vehicle, only once a person said so.
 
-The question offers "Guest car" (also at a one-car charger, there only when its car is ruled out), the camera that
-sees none of the cars puts it first, and nothing switches to a guest by itself. A guest plan is the `manual_kwh`
+The question offers "Guest car" (never at a one-car charger, which asks nothing: its car is the car and a guest is the
+person's choice in the card or the app), the camera that sees none of the cars puts it first, and nothing switches to a guest by itself. A guest plan is the `manual_kwh`
 driver with the remembered guest amount and no vehicle: nothing of a car is read or learned. Once the amount is
 delivered the charger is held until the unplug (a person's Start still charges); the unplug brings the household
 car and its settings back, a restart while plugged in keeps the guest. The dashboard and the webhook carry the guest
@@ -111,31 +111,29 @@ def test_the_new_plan_notification_says_it_is_the_guests() -> None:
 # --------------------------------------------------------------------------------- the question
 
 
-async def test_a_one_car_charger_asks_only_when_its_car_is_ruled_out(world: World) -> None:
+async def test_a_one_car_charger_never_asks_even_when_its_car_is_ruled_out(world: World) -> None:
     await world.start(cars=1)
     await world.plug_in()
     await world.later(ASK_AFTER_S + 60)
     assert world.sent() == [], "a car that says nothing is no question"
-    assert world.identifier.dashboard() is None or world.identifier.dashboard()["state"] == "decided"
+    assert world.identifier.dashboard() is None
     await world.later(LISTEN_FOR_S)
     assert world.sent() == [] and world.identifier.method == METHOD_ONLY_CANDIDATE
     entry = world.identifier.diagnostics()["history"][-1]
-    assert entry["method"] == METHOD_ONLY_CANDIDATE and entry["skipped"] is None and entry["question"] is None
+    assert entry["method"] == METHOD_ONLY_CANDIDATE and entry["skipped"]["reason"] == "only_candidate"
+    assert entry["question"] is None
 
     await world.unplug()
     await world.later(UNPLUG_DEBOUNCE_S + 1)
     await world.plug_in()
     await world.later(40)
     world.car_says("Kia", "plug", "on")
-    world.car_says("Kia", "plug", "off")  # the Kia says it went unplugged after this plug-in: not it
-    await world.later(10)
-    assert world.sent() == [], "the same three minutes' wait"
-    await world.later(ASK_AFTER_S)
-    question = world.sent()[0]
-    assert question["message"] == "Which car is plugged in?"
-    assert titles(question) == ["Kia", "Guest car"], "<car> or Guest car, the car first (owner 2026-11-03)"
-    assert world.identifier.dashboard()["state"] == "asking"
-    assert world.settings.target.vehicle_id == world.cars["Kia"], "nothing switches to a guest by itself"
+    world.car_says("Kia", "plug", "off")  # the Kia says it went unplugged after this plug-in: still the only car
+    await world.later(ASK_AFTER_S + 10)
+    assert world.sent() == [], "Stage 18.3: the sole car is never asked about"
+    assert world.identifier.method == METHOD_ONLY_CANDIDATE
+    assert world.settings.target.vehicle_id == world.cars["Kia"]
+    assert world.identifier.answer_refusal(GUEST_VEHICLE_ID) is None, "a guest is still the person's choice"
 
 
 async def test_two_cars_ask_with_guest_car_and_all_ruled_out_puts_it_first(world: World) -> None:
@@ -364,19 +362,14 @@ class _Camera:
         return {}
 
 
-async def test_the_camera_that_sees_none_of_the_cars_makes_a_one_car_charger_ask_and_never_decides(
-    world: World, hass: HomeAssistant
-) -> None:
+async def test_the_camera_is_not_asked_and_a_one_car_charger_never_asks(world: World, hass: HomeAssistant) -> None:
     await world.start(cars=1)
     world.identifier._camera = _Camera(ANSWER_OTHER)
     await world.plug_in()
     await hass.async_block_till_done()
     await world.later(ASK_AFTER_S + 5)
-    question = world.sent()[0]
-    assert titles(question) == ["Kia", "Guest car"]
+    assert world.sent() == [], "the sole car is the car: neither question nor camera query"
     assert not is_guest(world.settings), "a person confirms a guest"
-    camera = world.identifier.diagnostics()["history"][-1]["camera"]
-    assert camera["answer"] == ANSWER_OTHER and camera["camera_reason"] == "none_of_these" and camera["used"]
 
 
 async def test_the_camera_that_sees_none_of_two_cars_puts_guest_car_first(world: World, hass: HomeAssistant) -> None:
@@ -411,11 +404,11 @@ async def test_the_webhook_carries_the_guest_only_for_an_app_that_reads_it(world
     await world.later(ASK_AFTER_S)
     body = dashboard_api.serialize_dashboard(dashboard_api.capture_dashboard(hass, world.entry), can_act=True)
     assert body["guest"] == {"active": False, "amount_kwh": 10.0, "first": False}
-    assert body["identification"]["state"] == "asking" and len(body["identification"]["candidates"]) == 1
+    assert body["identification"] is None, "one car: no question to show"
     old = _for_app(body, {})
-    assert "guest" not in old and old["identification"] is None, "an older app never meets a one-car question"
+    assert "guest" not in old and old["identification"] is None
     new = _for_app(body, {"reads": ["guest"]})
-    assert new["guest"] == body["guest"] and new["identification"] == body["identification"]
+    assert new["guest"] == body["guest"]
 
     assert await world.identifier.async_answer(GUEST_VEHICLE_ID)
     await hass.async_block_till_done()
@@ -456,15 +449,14 @@ async def test_a_guest_evening_end_to_end_and_its_core_events_replay(hass: HomeA
         # Long enough after the car was chosen in the settings that the plug-in is not answered by that choice.
         await car.settle(RECENT_CHOICE_S + 60)
 
-        # Plugged in: the EV6, the charger's one car, says it is not plugged in. A guest, perhaps: ask.
+        # Plugged in: the EV6, the charger's one car, says it is not plugged in. Nobody is asked; the person says
+        # "Guest car" in the card or the app.
         await car.plug.set(True)
         await car.settle(40)
         hass.states.async_set(plug, "off", {"device_class": "plug"})
         await car.settle(ASK_AFTER_S)
-        question = phone[-1].data
-        assert titles(question) == ["EV6", "Guest car"]
-        # The second button is Guest car: the charger's car comes first.
-        hass.bus.async_fire("mobile_app_notification_action", {"action": question["data"]["actions"][1]["action"]})
+        assert all(call.data["message"] != "Which car is plugged in?" for call in phone), "a one-car charger asks nothing"
+        assert await charger_data(hass, charger.entry_id).identifier.async_answer(GUEST_VEHICLE_ID)
         await car.settle()
         await car.preview.async_recalculate()
         await car.settle()

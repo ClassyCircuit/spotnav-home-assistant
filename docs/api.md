@@ -1107,8 +1107,8 @@ message "Which car is plugged in?" in Home Assistant's language, and `data.actio
 `{"action": "SPOTNAV_ID_<charger id>_<nonce>_<index>", "title": "<car name>"}` per answer: each car and "Guest car" (in
 Home Assistant's language) with one or two cars; with three or more, the likeliest car, "Guest car" and
 `{"action": "URI", "title": "Open SpotNav", "uri": <url>}`. "Guest car" is first when the dashboard's `guest.first`
-says so (every car ruled out, or the camera saw none of them), else last. At a charger with one car the question is
-asked only when that car is ruled out, and its `identification` block is then `asking` with one candidate. The nonce is 128 random bits, new for
+says so (every car ruled out, or the camera saw none of them), else last. A charger with one car never asks (the sole
+configured eligible car is the car), so its `identification` block is `null`. The nonce is 128 random bits, new for
 each question; a `mobile_app_notification_action` event with a matching action is the answer, and the first one
 wins. A retired question is replaced on every phone by the same tag without actions, silently (`alert_once: true`,
 `push: {"interruption-level": "passive"}`); unplugging sends `clear_notification`. A button of a question that is gone (answered, unplugged, a restart) takes the question off the phones.

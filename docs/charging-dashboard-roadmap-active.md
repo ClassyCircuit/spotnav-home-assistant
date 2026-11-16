@@ -701,13 +701,14 @@ but no expensive browser suites. Reuse the shared live/preview UI and ECharts; n
   cards, debug and Charge Now. Don't use fixed widths or viewport hacks that overflow HA's content panel.
   Acceptance: cards reach both content edges, controls fit, keyboard/focus and all write semantics unchanged.
   *Status 2026-11-16: locally implemented/mocked at 2.5.164, review pending; mobile edge-to-edge checked in the local preview only; host-bar Charge Now pixels not visually verified; see handoff.*
-- [ ] **18.3 One-car default without repeated identification prompts.** Trace why one configured car can
+- [x] **18.3 One-car default without repeated identification prompts.** Trace why one configured car can
   still trigger "which car". Use the sole configured eligible car as the default in the canonical vehicle
   resolution path, not a hardcoded BMW name/id or UI-only guess. Preserve an explicitly chosen guest or
   explicit different identity and existing ownership/uncertain/Pause/Stop guards. Zero cars stays unknown;
   multiple cars retains existing guarded identification (no new multi-car UX). A sole-car plug-in should
   resolve consistently in planner, authorization and UI with no redundant prompt/notification. Test one/zero/
   two cars, restart, stale old identification and explicit guest; preserve sensor/source freshness rules.
+  *Status 2026-11-16: locally implemented/mocked at 2.5.165, coordinator reviewed (33 focused tests and check-dist passed); see handoff.*
 - [ ] **18.4 Absolute price bands and stable chart scale.** Read `samples/stepline-chart.js` for visual
   inspiration and adapt existing shared ECharts options, never load its sample data or rebuild the chart.
   Classification in EUR cents/kWh: <8 green (Cheap), 8–<15 yellow (Normal), 15–25 inclusive orange (Medium),

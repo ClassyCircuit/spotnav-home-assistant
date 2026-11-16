@@ -2,9 +2,10 @@
 
 Runs when the mode (`identify_mode`) is not `off` and the charger reports a plug-in (a charger that cannot say
 whether a car is connected never starts it). With two or more vehicles in the charger's vehicle list
-(`AutoSettings.vehicle_ids`, every detected vehicle by default) it finds which; with one (**a one-car charger**) it
-only looks whether that car is ruled out by its own strong - evidence (below), and asks "<car> or Guest car?" only
-then (a car that says nothing is no question). Always ask is the automatic mode there.
+(`AutoSettings.vehicle_ids`, every detected vehicle by default) it finds which; with one (**a one-car charger**: the
+sole configured eligible car, as `resolve_target_vehicle` resolves it for the planner, the authorization and the
+card alike) that car is the car at every plug-in: nothing is read, asked or switched, whatever the mode and whatever
+the car's own (often stale cloud) entities say. A guest car there is only a person's choice (the card or the app).
 
 **Evidence** (`judge`), read only from what Home Assistant already holds: identification never wakes a car,
 and re-reads the cars' plug and tracker entities with `homeassistant.update_entity` at the plug-in and at the
@@ -24,11 +25,11 @@ is a conflict and asks at once; otherwise it asks after `ASK_AFTER_S` and keeps 
 automatic decision per plug-in.
 
 **The camera** (optional, `camera_rule.py`, `camera_identification.py`): while nothing has decided and two or
-more cars are left (one at a one-car charger), the charger's camera is asked once (one retry after an error) before
+more cars are left, the charger's camera is asked once (one retry after an error) before
 the question. Its answer decides alone only at high confidence between cars that differ in colour, each with a
 reference picture; otherwise it puts the car it names first among the question's buttons. Its answer "none of these
 cars" (`camera_rule.ANSWER_OTHER`) never decides a guest: it puts "Guest car" first, and at high confidence it
-counts as the cars with a reference picture ruled out (so a one-car charger asks). A query that takes longer than
+counts as the cars with a reference picture ruled out. A query that takes longer than
 `camera_rule.QUERY_TIMEOUT_S` is ignored. **Always ask** asks at the plug-in, the buttons ordered by evidence, and
 never switches by itself. **Off** does nothing.
 
@@ -371,9 +372,6 @@ class _Session:
     camera_record: dict[str, Any] | None = None
     #: This plug-in's entry in the history (`VehicleIdentifier._history`).
     entry: dict[str, Any] | None = None
-    #: A one-car charger: it asks only when its car is ruled out (`ruled_out`), and never switches by itself.
-    single: bool = False
-    ruled_out: bool = False
     #: The camera saw none of the cars (`camera_rule.ANSWER_OTHER`): "Guest car" goes first; at high confidence the
     #: cars it had a reference picture of are ruled out (`camera_excludes`).
     camera_other: bool = False
@@ -644,8 +642,7 @@ class VehicleIdentifier:
                 "evidence": [],
             }
         return {
-            # A one-car charger that has not asked identifies nothing anyone needs to see.
-            "state": STATE_DECIDED if session.single and session.state == STATE_WAITING else session.state,
+            "state": session.state,
             "method": self._method,
             "vehicle_id": self._planned_vehicle(),
             "since": session.t0.isoformat(),
@@ -819,20 +816,23 @@ class VehicleIdentifier:
             # Chosen just before the car arrived: that is the answer.
             self._method = METHOD_MANUAL
             skipped = SKIPPED_RECENT_CHOICE
+        elif len(cars) == 1:
+            # The sole configured eligible car is the car: no evidence read, no question, no camera. The settings
+            # already resolve to it (`resolve_target_vehicle`), so nothing is written either.
+            self._method = METHOD_ONLY_CANDIDATE
+            skipped = SKIPPED_ONLY_CANDIDATE
         if skipped is not None:
             chosen_at = None if skipped != SKIPPED_RECENT_CHOICE or self._manual_at is None else self._manual_at.isoformat()
             self._open_entry(now, trigger, settings.identify_mode, ids, skipped={"reason": skipped, "chosen_at": chosen_at})
             return
         self._watch()
         current = self._current_vehicle()
-        single = len(ids) == 1
         session = _Session(
             t0=now, mode=settings.identify_mode, cars=ids, names=self._names(cars),
-            order=ordered([Evidence(car, None, None) for car in ids], current), single=single,
+            order=ordered([Evidence(car, None, None) for car in ids], current),
         )
         self._session = session
-        # A one-car charger's car is the only candidate unless it is ruled out and a person says otherwise.
-        self._method = METHOD_ONLY_CANDIDATE if single else METHOD_ASSUMED
+        self._method = METHOD_ASSUMED
         session.entry = self._open_entry(now, trigger, settings.identify_mode, ids)
         watched = [entity for car in ids for entity in self._sources(car) if entity is not None]
         if watched:
@@ -853,7 +853,7 @@ class VehicleIdentifier:
         )
         self._refresh(ids)
         self._evaluate()
-        if session.mode == IDENTIFY_ASK and self._session is session and not single:
+        if session.mode == IDENTIFY_ASK and self._session is session:
             self._ask()
 
     @callback
@@ -878,10 +878,7 @@ class VehicleIdentifier:
         if session is not None and session.state == STATE_ASKING and self._notifier is not None:
             self._notifier.clear_vehicle_question(self.tag, session.phones)
             self._notifier.vehicle_question_settled()
-        if session is not None and session.single and session.state == STATE_WAITING:
-            # A one-car charger that asked nothing: its car was the only candidate.
-            self._record_decision(session.entry, self._current_vehicle(), METHOD_ONLY_CANDIDATE)
-        elif session is not None:
+        if session is not None:
             # Unplugged with nothing decided: the current car was kept.
             self._record_decision(session.entry, self._current_vehicle(), METHOD_ASSUMED, assumed=ASSUMED_UNPLUGGED)
         self._entry = None
@@ -1022,9 +1019,6 @@ class VehicleIdentifier:
         if not session.listening or session.state == STATE_DECIDED:
             return
         evidence = self._evidence(session, dt_util.utcnow())
-        if session.single:
-            self._evaluate_single(session, evidence)
-            return
         if session.state == STATE_WAITING:
             session.order = ordered(evidence, self._current_vehicle(), session.camera_pick)
             # Every car ruled out (by its own reports, or the camera that saw none of them): "Guest car" goes first.
@@ -1041,21 +1035,6 @@ class VehicleIdentifier:
             self._ask()
         else:
             self._maybe_ask_camera(session, evidence)
-
-    def _evaluate_single(self, session: _Session, evidence: Sequence[Evidence]) -> None:
-        """A one-car charger: its car is ruled out by its own strong - evidence (or the camera that saw none of the
-        cars at high confidence) or not. Ruled out, it asks "<car> or Guest car?" once the ask deadline is past; else
-        nothing (no question for a car that says nothing), and the camera may be asked. It never switches by itself. The
-        car's button stays first (owner's choice), so "Guest car" is never put first here."""
-        if session.state != STATE_WAITING:
-            return
-        session.ruled_out = any(item.negative is not None for item in evidence) or bool(session.camera_excludes)
-        session.likely = frozenset(item.vehicle_id for item in evidence if item.positive == STRONG and not item.negative)
-        if session.ruled_out:
-            if dt_util.utcnow() >= session.t0 + timedelta(seconds=ASK_AFTER_S):
-                self._ask()
-            return
-        self._maybe_ask_camera(session, evidence)
 
     # ------------------------------------------------------------------ the camera
 
@@ -1089,7 +1068,7 @@ class VehicleIdentifier:
             remaining=len(remaining),
             elapsed_s=(dt_util.utcnow() - session.t0).total_seconds(),
             window_s=ASK_AFTER_S,
-            minimum=1 if session.single else 2,
+            minimum=2,
         ):
             return
         if not camera.ready_for(remaining):
@@ -1167,7 +1146,7 @@ class VehicleIdentifier:
         references = self._camera.reference_signatures(remaining)
         if answer == ANSWER_OTHER:
             # None of the cars: never a guest by itself (a person confirms one). "Guest car" goes first, and at high
-            # confidence the cars it has a reference picture of are ruled out, so a one-car charger asks.
+            # confidence the cars it has a reference picture of are ruled out.
             session.camera_other = True
             if confidence == CONFIDENCE_HIGH:
                 session.camera_excludes = frozenset(car for car in remaining if references.get(car))
@@ -1176,12 +1155,6 @@ class VehicleIdentifier:
                 history.update(camera_reason=REASON_NONE_OF_THESE, used=True)
                 self._save()
             self._evaluate()
-            return
-        if session.single:
-            # A one-car charger's car is the only candidate: the camera naming it decides nothing new.
-            if history is not None:
-                history.update(camera_reason=camera_reason(answer, confidence, remaining, references, now)[0])
-                self._save()
             return
         verdict = camera_verdict(answer, confidence, remaining, references, now)
         if history is not None:
@@ -1210,12 +1183,6 @@ class VehicleIdentifier:
         session = self._session
         if session is not None:
             session.listening = False
-            if session.single and session.state == STATE_WAITING and not session.ruled_out:
-                # A one-car charger whose car said nothing against it: it is the car, and nobody is asked.
-                session.state = STATE_DECIDED
-                self._record_decision(session.entry, self._current_vehicle(), METHOD_ONLY_CANDIDATE)
-                self._remember(METHOD_ONLY_CANDIDATE)
-                return
             self._ask()
 
     @callback
@@ -1234,9 +1201,6 @@ class VehicleIdentifier:
         session = self._session
         if session is None or session.state != STATE_WAITING or self._connected is False:
             # No question for an empty charger: a replug within the debounce asks, if it still has to.
-            return
-        if session.single and not session.ruled_out:
-            # A one-car charger asks only when its car is ruled out.
             return
         session.state = STATE_ASKING
         session.nonce = secrets.token_hex(16)

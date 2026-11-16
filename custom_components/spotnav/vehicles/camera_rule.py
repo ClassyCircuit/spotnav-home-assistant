@@ -283,8 +283,7 @@ def may_query(
     *, attempts: int, failed: bool, waiting: bool, remaining: int, elapsed_s: float, window_s: float, minimum: int = 2
 ) -> bool:
     """Whether to ask the camera now: while waiting (no one answered, nothing decided, no question yet) with
-    `minimum` or more candidates left (two; one at a one-car charger, where the answer can only be its car or none of
-    them), inside the window before the question, for the first time or once more after an error."""
+    `minimum` or more candidates left (two: a one-car charger asks no camera), inside the window before the question, for the first time or once more after an error."""
     if not waiting or remaining < minimum or elapsed_s >= window_s:
         return False
     if attempts == 0:

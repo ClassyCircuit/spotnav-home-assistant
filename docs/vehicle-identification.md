@@ -105,10 +105,9 @@ connected never starts identification, so the choice stays yours.
    With a [camera](#the-camera), SpotNav also asks the camera while the cars' own reports have not decided.
 4. In **Always ask** mode, SpotNav asks at once. The cars are ordered by what they report, and SpotNav
    never switches by itself.
-5. **At a charger with one car**, SpotNav only looks whether that car is ruled out by the same reports: its plug
-   sensor went to "not plugged in" around or after the plug-in, a fresh position away from home, or it is
-   identified at another SpotNav charger. Then it asks "<car> or Guest car?" after the same three minutes. A car
-   that says nothing is no question: it is the car, as before. **Always ask** asks there only in the same case.
+5. **At a charger with one car** (the only configured, eligible car), SpotNav asks nothing, in every mode: it
+   is the car, whatever its own (often stale cloud) plug and position entities say, and nothing is re-read or
+   written. A guest car there is only your choice in the card or the app.
 
 While SpotNav identifies the car, the card's and the app's status line leads with **Identifying the car…**, and
 while the question is open with **Waiting for an answer: which car is plugged in?**. The line is gone as soon as
@@ -130,8 +129,8 @@ The question goes to the phones chosen under **Settings → Notifications**, as 
 in?**. This event is on by default. It is a notification with a button per car and one for **Guest car**. Android
 shows at most three buttons: with one or two cars each car and **Guest car**; with three or more, the likeliest car,
 **Guest car**, and a third that opens SpotNav (the rest are in the card and the app). With two or more cars **Guest car**
-comes first when every car is ruled out, or when the camera saw none of them; else last. At a charger with one car
-the car's button comes first: "<car> or Guest car?". The card shows the same question as a banner
+comes first when every car is ruled out, or when the camera saw none of them; else last. A charger with one car
+asks nothing. The card shows the same question as a banner
 with a button per car and **Guest car**, and so does the SpotNav app.
 
 ![The card's question: "Which car is plugged in?" with a button per car](images/card-identify-question.png)
@@ -289,7 +288,7 @@ out.
 - In every other case the camera **only puts its car first** on the question's buttons, and the question is asked
   as usual, after three minutes.
 - **None of these cars** never makes a guest by itself: with two or more cars it puts **Guest car** first, and when the model is sure it
-  counts as the cars with a reference picture ruled out, so a charger with one car asks.
+  counts as the cars with a reference picture ruled out (never asked with one car).
 - **A car's own report outranks the camera.** If, after the camera decided, a car's plug sensor or position
   settles it within the 30 minutes SpotNav listens, SpotNav switches to that car (recorded as decided by the plug
   sensor or the position). If the camera's car reports that it is not plugged in or away and nothing else
