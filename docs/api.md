@@ -617,6 +617,7 @@ and `charger_priority.writable` say whether it may change those (an administrato
 | `spotnav/get_charging_history` | Stage 6.3, read-only, any signed-in user (like `get_sessions`). Request `{"api_version": 1, "charger_id", "date" \| "night" \| "from"+"to", "include_prices"?}`: `date` is that local day, `night` is 12:00 that local day to 12:00 the next, `from`/`to` are aware instants; at most 7 days, windows are measured in real instants (a 25-hour DST day is 25 hours). Answers the retained sent-plan versions with the tariff and (only with `include_prices`) raw published prices captured **when each version was made**, measured-power charging intervals with explicit bounds, gaps and restarts, energy by basis (meter counter observed / unobserved, integrated estimate, unknown), planned blocks (from the last *acknowledged* intent, known spans only) as `flow_observed` / `no_flow_observed` / `unknown`, `unknown_plan_spans` after an uncertain write, flow `outside_plan`, `plan_unknown` or `no_plan_evidence`, energy bases `null` when unmeasured (never 0), closed sessions (time overlap only), retention and per-day digests. Errors: `spotnav_invalid_range`, `spotnav_history_unavailable`, `spotnav_unsupported_api_version`. Not exposed: raw OCPP profiles. Only the Morek connector captures evidence; other chargers answer with no data. **Stage 7.3a additive fields (api_version stays 1):** `truncated` has one `{truncated, cut, limit}` per capped list (`plans`, `intervals`, `gaps`, `restarts`, `planned_blocks`, `outside_plan`, `unknown_plan_spans`, `sessions`; `cut` is how many rows beyond the 200-row cap were counted and not returned) plus `price_slices` `{truncated, cut, limit, per: "session", sessions: [ids]}`; each session row also has `price_slices_truncated` and `price_slices_cut`; `plans_truncated` is unchanged. `retention.oldest_by_kind` is the earliest retained *sample* time per kind (`power_w`, `current_a`, `energy_register_kwh`, `status`; gap rows excluded; `null` = none kept) and is the signal for whether raw flow can still exist for a day (`oldest_evidence` can be an older plan or capture mark); `retention.digest_days` lists every kept digest date (at most 62); `retention.limits` gives `max_samples_per_kind` (4320, about 3 days at the 60 s tick), `max_age_days` and `max_digest_days`. A planned block that starts before the retained power rows carries the reason `block_starts_before_retained_power`. No pruning boundary is inferred beyond these facts. The wire shape is pinned by `tests/fixtures/history/answer_shape.json`. |
 | `spotnav/get_power_month` | One month of a site's measured import, by day and hour, against its demand-charge parts and import target (see [Power by month](#power-by-month)). |
 | `spotnav/get_price_days` | Stage 7.1, read-only, any signed-in user: which price days the repository holds and one bounded page of their rows (see [Held price days](#held-price-days)). |
+| `spotnav/get_price_insights` | Stage 7.4a, read-only, any signed-in user: the current price against a trailing baseline and the cheapest contiguous window ahead, from held prices only (see [Live price insights](#live-price-insights)). |
 | `spotnav/suggest_import_target` | A suggested import target from Home Assistant's statistics (administrators only; see [A suggested import target](#a-suggested-import-target)). |
 
 Rules that hold across them:
@@ -1285,6 +1286,46 @@ days, a date beyond tomorrow or before the repository keeps files). Tests: `test
 The card validates the answer against what it asked (charger, area, currency, mode, range) and discards a late answer
 after a charger, generation, area or currency change; a failure is shown with an explicit *Retry*, never retried on its
 own. *All loaded days* spans the current loaded page of at most 8 days plus today/tomorrow, not the repository.
+
+### Live price insights
+
+`spotnav/get_price_insights {"api_version": 1, "charger_id", "mode": "live", "duration_minutes"?}` (any signed-in user, as the
+dashboard; Stage 7.4b adds `mode: "monthly"` to this same command). `duration_minutes` is a whole number 15..720 in steps of 15
+(default 60). It computes from what `PriceRepository` already holds in memory (at most 30 baseline days plus today/tomorrow):
+no provider fetch, refresh, backfill, store or write, and no plan, charger or setting is touched. Method: `pricing/price_insights.py`
+(pure). Prices are the raw published spot in the area's major currency unit per kWh (`basis`: `{kind: "published_spot", unit:
+"major_per_kwh", currency, fees: "none"}`), converted with each day's own usable rate; a day with no usable rate is excluded and
+counted, never converted. These are prices, not charged costs. Days are the price area's own calendar (`zone`); instants are UTC
+with the same instant in the area's zone beside them (`*_local`); DST days keep their real 23/25 elapsed hours.
+
+Answer: `{api_version, charger_id, mode, area_id, zone, currency, basis, now, now_local, today, window_minutes, baseline, current,
+cheapest_window, live_days_skipped, resolution_minutes, assumptions, unknown_reason, provenance}`.
+
+* `baseline` = `{status: "known"|"unknown", unknown_reason, window_from, window_to, days_expected (30), days_held, days_used,
+  days_excluded: {count, reasons}, minimum_days (7), seconds_expected, seconds_used, resolution_minutes}`: the trailing 30
+  *completed* local days. A day is used only when fully held: finite prices, no overlap or conflicting duplicate (an identical
+  duplicate is dropped once), rows covering the day's real span exactly. Otherwise it is excluded with a reason counted in
+  `reasons`: `not_held`, `partial`, `invalid_prices`, `conflicting_duplicate`, `overlap`, `no_price_rate`. Fewer than 7 used days:
+  `unknown`, `unknown_reason: "baseline_too_short"`. A past day is never excluded for being old.
+* `current` = `{status, unknown_reason, interval: {start, end, start_local, end_local, duration_seconds, price, elapsed_seconds} | null,
+  comparison}`; `comparison` = `{status, unknown_reason, percentile (0-100) | null, cheaper_seconds, equal_seconds,
+  baseline_seconds}`. Percentile = (seconds strictly cheaper + half the seconds equal) / baseline seconds, by duration, no
+  resampling. Unknown: `not_held`, `day_stale`/`day_invalid`/..., `no_price_rate`, `invalid_prices`, `conflicting_duplicate`,
+  `overlap`, `no_current_interval`; a missing baseline leaves the price known with `comparison.unknown_reason: "baseline_unknown"`.
+* `cheapest_window` = `{status, unknown_reason, duration_minutes, start, end, start_local, end_local, mean_price, comparison,
+  horizon: {from, until, runs, *_local} | null}`: the contiguous published stretch of exactly that length with the lowest
+  duration-weighted mean, from now (the current interval counts only from now) to the end of publication; ties go to the
+  earliest; a gap or the published end refuses a window (`no_contiguous_window`; `no_future_prices` when nothing is published
+  ahead). It needs no baseline; `comparison` is the window mean's percentile among the baseline's *interval* prices, or unknown.
+* Only `ready`/`incomplete` days feed `current` and the window; a `stale`/`invalid` live day is left out and named in
+  `live_days_skipped` (`{day: reason}`). Tomorrow not yet published is not guessed.
+* `unknown_reason` is `null` while the current price or the window is known; each component carries its own code.
+* `provenance` = `{baseline_providers: [{provider, files}] (held baseline days), live: [{day, state, source, fetched_at,
+  providers}]}`: the actual provider labels of the held files.
+* No cheap/expensive label is returned: classification stays the card's fixed absolute bands (euro c/kWh).
+
+Refusals: `spotnav_unsupported_api_version`, the charger lookup's codes, `spotnav_invalid_insight_request` (mode other than `live`,
+or a bad `duration_minutes`), `spotnav_no_price_area`, `spotnav_unknown_price_area`. Tests: `tests/test_stage_74a_price_insights.py`.
 
 ### A suggested import target
 

@@ -34,6 +34,7 @@ from .api.manual_action import async_setup_manual_action_api
 from .api.import_target import async_setup_import_target_api
 from .api.power_month import async_setup_power_month_api
 from .api.price_calendar import async_setup_price_calendar_api
+from .api.price_insights import async_setup_price_insights_api
 from .api.target_suggestion import async_setup_target_suggestion_api
 from .api.own_mode import async_setup_own_mode_api
 from .api.plan_preview import async_setup_plan_preview_api
@@ -193,6 +194,7 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     async_setup_site_settings_api(hass)
     async_setup_price_source_api(hass)
     async_setup_price_calendar_api(hass)
+    async_setup_price_insights_api(hass)
     async_setup_grid_tariff_api(hass)
     async_setup_entsoe_key_api(hass)
     async_setup_setup_api(hass)

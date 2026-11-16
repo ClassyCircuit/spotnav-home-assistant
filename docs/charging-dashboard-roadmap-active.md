@@ -994,7 +994,7 @@ only if a helper is explicitly used **and labelled**; read-range page = 8 local 
   intervals). Mismatches and missing observations are hatched unknown, never absent; suggested cheap opportunities are not the plan; a reported limit
   is never drawn as kW; the current plan is never used for a past day. *Acceptance:* proposal≠sent, sent≠effective and planned-without-flow cases
   legible; DST day; two versions in one day; preview parity; no change to the price chart's interactions or absolute colouring.
-- [ ] **7.4a Live price-insight methods (backend).** *Delta:* a pure module (no `hass`, no clock; suggested `pricing/price_insights.py`) and **one**
+- [x] **7.4a Live price-insight methods (backend).** *Locally implemented 2026-11-16 (manifest 2.5.171), real-repository mocked checks only (34 new backend tests); coordinator reviewed (57 focused backend tests and check-dist passed); not deployed; see the handoff.* *Delta:* a pure module (no `hass`, no clock; suggested `pricing/price_insights.py`) and **one**
   new read-only command `spotnav/get_price_insights` (mode `live`; 7.4b adds mode `monthly` to the same command; any signed-in user; `docs/api.md`).
   *Inventory first (in the substage's notes):* the held days, basis, resolution and coverage it reads; inspect `planner.cheapest_slots` and reuse it
   only if it can answer an unconstrained contiguous window, otherwise keep the small pure function. *Methods:* (1) the current interval versus the
