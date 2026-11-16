@@ -78,10 +78,32 @@ wa-input::part(base){background:var(--surface-input);border-color:var(--edge-inp
 wa-input[disabled]::part(base){background:var(--surface-input-off)}wa-input[disabled]::part(input){color:var(--ink-off);-webkit-text-fill-color:var(--ink-off)}
 wa-input:focus-within::part(base){outline:3px solid var(--focus);outline-offset:2px}
 dialog{background:#1a202b;color:var(--ink)}
-/* Sidebar-only surfaces: Charge Now details, session/schedule notes, log viewer (Morek debug panel inherits the base above). */
-#charge-options,#log-viewer,#charge-session>*,#schedule-check>*{background:#1a202b;color:var(--ink);border:1px solid #3a4c60;border-radius:12px;padding:10px 14px}
+/* Sidebar-only surfaces: Charge Now card, log viewer (session/schedule notes are full-width sections styled by panel.js; their children stay unboxed) (Morek debug panel inherits the base above). */
+#charge-controls,#log-viewer{background:#1a202b;color:var(--ink);border:1px solid #3a4c60;border-radius:12px;padding:10px 14px}
+#charge-options{background:none;color:var(--ink);border:0;padding:0}
 #charge-options label,.log-controls label{color:var(--ink)}
 #charge-options[open]>summary,#log-viewer[open]>summary{margin-bottom:8px}
 #log-viewer{margin:16px;display:block}.log-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin:8px 0}.log-controls label{display:grid;gap:4px;font-size:12px}
 .log-lines{margin:8px 0;padding:10px;max-height:420px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid #3a4c60;border-radius:8px;font:12px/1.45 ui-monospace,Consolas,monospace}
 .log-status,.log-note{font-size:12px;line-height:1.45;color:var(--ink-off)}
+
+/* Stage 18.2: Charge Now is one card (same field/block language as the plan controls) and mobile cards run edge to edge.
+   Outer gutters go; internal padding, safe-area handling and vertical spacing stay. No fixed widths: everything wraps. */
+#charge-controls{display:grid;gap:10px;flex:1 1 100%;min-width:0;max-width:100%;box-sizing:border-box}
+#charge-options>summary{min-height:44px;display:flex;align-items:center;font-weight:700}
+.cn-fields{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin:4px 0 8px;min-width:0}
+.cn-fields label{display:grid;gap:4px;font-size:12px;min-width:0;flex:1 1 180px}
+.cn-fields [hidden]{display:none!important}
+.cn-fields select,.cn-fields input{max-width:100%;box-sizing:border-box;padding:8px;min-height:42px;font:inherit}
+.cn-actions{display:flex;flex-wrap:wrap;gap:8px}.cn-actions button,.cn-fields button{min-height:44px;max-width:100%;white-space:normal}
+#charge-state,#charge-notice{font-size:12px;line-height:1.45;color:var(--ink-off);overflow-wrap:anywhere}#charge-notice:empty{display:none}
+@media(max-width:800px){
+.shell{padding-left:0;padding-right:0}.masthead{padding-left:16px;padding-right:16px}.alert{margin-left:0;margin-right:0;border-radius:0;border-left:0;border-right:0;padding-left:16px;padding-right:16px}
+.dashboard{gap:12px}.panel{border-radius:0;border-left:0;border-right:0;box-shadow:none}
+#charge-controls,#log-viewer{border-radius:0;border-left-width:0;border-right-width:0}
+#log-viewer{margin:12px 0}
+/* The host bar pads 16px; the Charge Now card cancels that so it reaches both edges like the cards below. */
+.hostbar>#charge-controls{margin-left:-16px;margin-right:-16px;max-width:none}
+dialog{width:calc(100vw - 16px)}
+.panel,.log-lines,.dashboard>*{max-width:100%;overflow-wrap:anywhere}
+}

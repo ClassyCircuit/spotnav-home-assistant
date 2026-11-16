@@ -481,6 +481,19 @@ than assumed. Older entries below that say "the roadmap" mean the archived text.
 **User restriction (2026-11-14): ONLY FAST tests.** No full isolated runner, browser/Playwright or broad suites; run focused
 module files individually with a short timeout and report unrun checks. (Also recorded in the active roadmap §4.)
 
+### 2026-11-16 — Stage 18.2 Charge Now layout and full-width mobile cards (2.5.164; local mocked; review pending; no HA/charger action)
+
+- **Charge Now:** `#charge-controls` is now one card (grid): collapsible `#charge-options` (flat, no second box) holding a wrapping `.cn-fields` row
+  (duration, custom end, replace button), then `.cn-actions` with the main `#charge-now` button, then status/notice text. All ids, handlers, confirmations,
+  permission/stale/unknown logic untouched (markup order only; no nested form). Host-bar inline Charge Now CSS moved to shared `dark.css`.
+- **`#charge-session>*`/`#schedule-check>*` generic boxes removed** (they boxed the title/detail children of sections that panel.js already styles inline).
+- **Mobile (<=800px, dark.css):** `.shell` side padding 0 (masthead keeps 16px), `.panel`/alert/Charge Now card/log viewer lose side borders and radius, host-bar Charge Now card
+  cancels the bar's 16px padding, dialog width 100vw-16px. Internal padding, vertical gaps and safe-area handling kept; desktop `.shell` max-width/padding unchanged.
+- **Tests:** new `test/charge-now-layout.test.ts` (5 structural: ids/no form/single button, wrapping card CSS, no hard-coded host styles, mobile gutter rules, desktop width kept);
+  with `dark-theme.test.ts` and `charge-now.test.ts` 28 pass. `npm run build`, `check-dist` pass.
+- **Visual:** local preview (shared dashboard, iframes 320/375/430): every `.panel` spans left 0 to content width, no horizontal overflow. The sidebar host bar
+  Charge Now card and the log viewer could **not** be visually inspected (sidebar browser fixture server would not start), so those pixels are unverified. No full suite, Playwright or HA.
+
 ### 2026-11-16 — Stage 18.1 dark theme across owned UI (2.5.163; local mocked; review pending; no HA/charger action)
 
 - **Cause:** in the sidebar shadow root the Web Awesome `.wa-dark` palette never matched (the class is on the host) and dark.css only restyled
@@ -4908,3 +4921,6 @@ Implementation sub-agent; no HA, charger, deployment, commit or push; no browser
 
 
 **Stage 18.1 coordinator review:** shared dark tokens and shadow-host palette scoping reviewed; 33 focused dark-theme/log-viewer/bundle tests and check-dist passed. No browser or installed visual verification. Layout work continues in 18.2; legacy card retains HA theme variables.
+
+
+**18.2 coordinator review:** fixed `.cn-fields [hidden]` so grid labels cannot expose the custom-end input. 28 focused layout/dark/Charge Now tests passed (JSDOM CSS parsing warnings), build and check-dist passed. Mobile shared-preview widths were checked by the delegate; host Charge Now/debug and desktop remain visually unverified.

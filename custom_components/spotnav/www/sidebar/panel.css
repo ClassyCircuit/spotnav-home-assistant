@@ -4892,15 +4892,19 @@ dialog {
   background: #1a202b;
   color: var(--ink);
 }
-#charge-options,
-#log-viewer,
-#charge-session > *,
-#schedule-check > * {
+#charge-controls,
+#log-viewer {
   background: #1a202b;
   color: var(--ink);
   border: 1px solid #3a4c60;
   border-radius: 12px;
   padding: 10px 14px;
+}
+#charge-options {
+  background: none;
+  color: var(--ink);
+  border: 0;
+  padding: 0;
 }
 #charge-options label,
 .log-controls label {
@@ -4945,4 +4949,116 @@ dialog {
   font-size: 12px;
   line-height: 1.45;
   color: var(--ink-off);
+}
+#charge-controls {
+  display: grid;
+  gap: 10px;
+  flex: 1 1 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+#charge-options > summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-weight: 700;
+}
+.cn-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: end;
+  margin: 4px 0 8px;
+  min-width: 0;
+}
+.cn-fields label {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  min-width: 0;
+  flex: 1 1 180px;
+}
+.cn-fields [hidden] {
+  display: none !important;
+}
+.cn-fields select,
+.cn-fields input {
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 8px;
+  min-height: 42px;
+  font: inherit;
+}
+.cn-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.cn-actions button,
+.cn-fields button {
+  min-height: 44px;
+  max-width: 100%;
+  white-space: normal;
+}
+#charge-state,
+#charge-notice {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-off);
+  overflow-wrap: anywhere;
+}
+#charge-notice:empty {
+  display: none;
+}
+@media (max-width: 800px) {
+  .shell {
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .masthead {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .alert {
+    margin-left: 0;
+    margin-right: 0;
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .dashboard {
+    gap: 12px;
+  }
+  .panel {
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+    box-shadow: none;
+  }
+  #charge-controls,
+  #log-viewer {
+    border-radius: 0;
+    border-left-width: 0;
+    border-right-width: 0;
+  }
+  #log-viewer {
+    margin: 12px 0;
+  }
+  .hostbar > #charge-controls {
+    margin-left: -16px;
+    margin-right: -16px;
+    max-width: none;
+  }
+  dialog {
+    width: calc(100vw - 16px);
+  }
+  .panel,
+  .log-lines,
+  .dashboard > * {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
 }

@@ -693,13 +693,14 @@ but no expensive browser suites. Reuse the shared live/preview UI and ECharts; n
   Preserve actions, permissions and unknown outcomes. Acceptance: no owned white/light form surface or
   unreadable text, including expanded/disabled controls; targeted styles/renderer checks and required build.
   *Status 2026-11-16: locally implemented/mocked at 2.5.163, coordinator reviewed (33 focused tests and check-dist passed); visual inspection not done (unverified); see handoff.*
-- [ ] **18.2 Charge Now layout and full-width mobile cards.** Match Charge Now spacing, alignment,
+- [x] **18.2 Charge Now layout and full-width mobile cards.** Match Charge Now spacing, alignment,
   duration/custom-end fields and actions to the rest of the plan controls; wrap naturally without horizontal
   overflow. At mobile width (existing breakpoint, about 800 px), remove outer horizontal gutters between
   viewport/panel edges and card borders; retain comfortable internal padding, safe-area handling and vertical
   card spacing. Desktop layout remains intentional. Check 320/375/430 px plus desktop, expanded advanced
   cards, debug and Charge Now. Don't use fixed widths or viewport hacks that overflow HA's content panel.
   Acceptance: cards reach both content edges, controls fit, keyboard/focus and all write semantics unchanged.
+  *Status 2026-11-16: locally implemented/mocked at 2.5.164, review pending; mobile edge-to-edge checked in the local preview only; host-bar Charge Now pixels not visually verified; see handoff.*
 - [ ] **18.3 One-car default without repeated identification prompts.** Trace why one configured car can
   still trigger "which car". Use the sole configured eligible car as the default in the canonical vehicle
   resolution path, not a hardcoded BMW name/id or UI-only guess. Preserve an explicitly chosen guest or
