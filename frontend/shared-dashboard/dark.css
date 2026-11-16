@@ -59,3 +59,29 @@ dialog[open]{align-items:stretch}
 @media(max-width:800px){.pp-days{gap:6px 10px}}
 .notify-setup{grid-column:1/-1}.notify-setup summary{cursor:pointer;font-weight:700;color:#d6e4f5;min-height:44px;display:flex;align-items:center}.ns-body{display:grid;gap:12px}.ns-block{background:#242e3b;border:1px solid #3a4c60;border-radius:12px;padding:14px;display:grid;gap:10px;min-width:0}.ns-block h3{font-size:13px;margin:0;color:#c7d5e4}.ns-line,.ns-note,.ns-help{margin:0;font-size:12px;line-height:1.45;color:#c5d0df;overflow-wrap:anywhere}.ns-note{color:#ffcf97}.ns-list{margin:0;padding:0;list-style:none;display:grid;gap:8px}.ns-list li{font-size:12px;line-height:1.45;color:#c5d0df;overflow-wrap:anywhere;border-left:3px solid #55606e;padding-left:8px}.ns-list li[data-level=warning]{border-left-color:#ffb938}.ns-list li[data-level=error]{border-left-color:#ff8a8a}.ns-tag{font-weight:700;color:#f0f3f8;margin-right:4px}.ns-days{display:grid;gap:4px 14px;border:1px solid #33445a;border-radius:10px;padding:10px;margin:0;min-width:0}.ns-days legend{font-size:12px;color:#c5d0df;padding:0 4px}.ns-block label.ns-opt{display:flex;align-items:center;gap:6px;min-height:36px;font-size:12px;color:#c5d0df}.ns-opt input{width:20px;height:20px;accent-color:#7fb4ff}.ns-goto,#reload-notify-setup{color:#d6e4f5;background:#1b2a3d;border:1px solid #5d7694;border-radius:8px;padding:4px 10px;min-height:32px;font:inherit;font-size:12px;cursor:pointer}#reload-notify-setup{justify-self:start;min-height:36px}.ns-block wa-button{justify-self:start}
 @media(max-width:800px){.ns-days{gap:2px 10px}}
+/* Stage 18.1: one dark baseline for native and Web Awesome surfaces. The Web Awesome dark palette is
+   `.wa-dark` (document) / `:host(.wa-dark)` (sidebar shadow root, see sidebar-bundle.mjs); these rules only
+   cover what that palette does not reach. Status colors (warn/error borders, banners) are deliberately untouched. */
+:root{--surface-input:#161e29;--surface-input-off:#293342;--edge-input:#8191a4;--ink-off:#c5d0df;--ink-hint:#9fb0c4;--focus:#a9ceff;--surface-code:#0d131b;--wa-color-surface-default:#1a202b;--wa-color-surface-raised:#242e3b;--wa-color-surface-lowered:#11151d;--wa-color-surface-border:#3a4c60;--wa-color-text-normal:#f0f3f8;--wa-color-text-quiet:#c5d0df;--wa-color-text-link:#a9ceff;--wa-color-focus:#a9ceff;--wa-form-control-background-color:#161e29;--wa-form-control-border-color:#8191a4;--wa-form-control-value-color:#f0f3f8;--wa-form-control-label-color:#f0f3f8;--wa-form-control-placeholder-color:#9fb0c4;--wa-color-neutral-fill-normal:#303c4b;--wa-color-neutral-on-normal:#f0f3f8;--wa-color-neutral-border-normal:#667588;--wa-color-neutral-fill-quiet:#242e3b;--wa-color-neutral-on-quiet:#c5d0df}
+:where(button,select,textarea,input:not([type=checkbox],[type=radio],[type=range])){background:var(--surface-input);color:var(--ink);border:1px solid var(--edge-input);border-radius:8px;font:inherit;color-scheme:dark}
+:where(button){background:#303c4b;border-color:#667588;cursor:pointer;padding:6px 12px;min-height:36px}
+:where(button:hover:not(:disabled)){background:#3a4859}
+:where(input,select,textarea)::placeholder{color:var(--ink-hint);opacity:1}
+:where(button,select,textarea,input):disabled,:where(input,textarea)[readonly]{background:var(--surface-input-off);color:var(--ink-off);opacity:1}
+:where(button,select,textarea,input,summary,a):focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+:where(option,optgroup){background:var(--surface-input);color:var(--ink)}
+:where(details){color:var(--ink)}:where(summary){color:#d6e4f5;cursor:pointer}
+:where(pre,code,kbd){background:var(--surface-code);color:#e2e8f0}
+wa-details{--wa-color-surface-default:#1a202b;--wa-color-surface-border:#3a4c60;--wa-color-text-normal:#f0f3f8}
+wa-details::part(base){background:#1a202b;border-color:#3a4c60;color:#f0f3f8}wa-details::part(header),wa-details::part(summary){color:#d6e4f5}wa-details::part(content){background:#1a202b;color:#f0f3f8}
+wa-input::part(base){background:var(--surface-input);border-color:var(--edge-input)}wa-input::part(input){color:#f0f3f8;background:transparent}wa-input::part(input)::placeholder{color:var(--ink-hint)}
+wa-input[disabled]::part(base){background:var(--surface-input-off)}wa-input[disabled]::part(input){color:var(--ink-off);-webkit-text-fill-color:var(--ink-off)}
+wa-input:focus-within::part(base){outline:3px solid var(--focus);outline-offset:2px}
+dialog{background:#1a202b;color:var(--ink)}
+/* Sidebar-only surfaces: Charge Now details, session/schedule notes, log viewer (Morek debug panel inherits the base above). */
+#charge-options,#log-viewer,#charge-session>*,#schedule-check>*{background:#1a202b;color:var(--ink);border:1px solid #3a4c60;border-radius:12px;padding:10px 14px}
+#charge-options label,.log-controls label{color:var(--ink)}
+#charge-options[open]>summary,#log-viewer[open]>summary{margin-bottom:8px}
+#log-viewer{margin:16px;display:block}.log-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin:8px 0}.log-controls label{display:grid;gap:4px;font-size:12px}
+.log-lines{margin:8px 0;padding:10px;max-height:420px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid #3a4c60;border-radius:8px;font:12px/1.45 ui-monospace,Consolas,monospace}
+.log-status,.log-note{font-size:12px;line-height:1.45;color:var(--ink-off)}

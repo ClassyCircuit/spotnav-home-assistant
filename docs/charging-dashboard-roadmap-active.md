@@ -685,13 +685,14 @@ items stay checked, not deleted, so decisions and verification remain traceable.
 no HA access, charging commands or deployment. UI/browser inspection is authorized for these UI fixes,
 but no expensive browser suites. Reuse the shared live/preview UI and ECharts; no parallel UI or planner.
 
-- [ ] **18.1 Dark theme across all UI surfaces.** Inventory live/sidebar/shared/legacy card and preview
+- [x] **18.1 Dark theme across all UI surfaces.** Inventory live/sidebar/shared/legacy card and preview
   styles, explicit light colors, native inputs and Web Awesome shadow/part tokens. Make Charge Now details,
   plan inputs, Morek debug/log views, every advanced expandable, dialogs/selects/buttons/disabled/focus/error
   states and other owned surfaces consistently dark with readable contrast. Reuse a small shared token set;
   don't change HA's global theme or hide warnings. Check relevant expanded states and dark preview parity.
   Preserve actions, permissions and unknown outcomes. Acceptance: no owned white/light form surface or
   unreadable text, including expanded/disabled controls; targeted styles/renderer checks and required build.
+  *Status 2026-11-16: locally implemented/mocked at 2.5.163, coordinator reviewed (33 focused tests and check-dist passed); visual inspection not done (unverified); see handoff.*
 - [ ] **18.2 Charge Now layout and full-width mobile cards.** Match Charge Now spacing, alignment,
   duration/custom-end fields and actions to the rest of the plan controls; wrap naturally without horizontal
   overflow. At mobile width (existing breakpoint, about 800 px), remove outer horizontal gutters between

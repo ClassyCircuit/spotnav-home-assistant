@@ -481,6 +481,25 @@ than assumed. Older entries below that say "the roadmap" mean the archived text.
 **User restriction (2026-11-14): ONLY FAST tests.** No full isolated runner, browser/Playwright or broad suites; run focused
 module files individually with a short timeout and report unrun checks. (Also recorded in the active roadmap §4.)
 
+### 2026-11-16 — Stage 18.1 dark theme across owned UI (2.5.163; local mocked; review pending; no HA/charger action)
+
+- **Cause:** in the sidebar shadow root the Web Awesome `.wa-dark` palette never matched (the class is on the host) and dark.css only restyled
+  individual controls, so Charge Now details, plan `wa-input`/`wa-details`, native buttons/inputs, the Morek debug panel buttons and the log viewer fell
+  back to light defaults.
+- **Change:** `frontend/shared-dashboard/dark.css` (shared by sidebar, shared dashboard and preview) now sets dark WA surface/text/form/neutral tokens and a
+  small own token set, `color-scheme:dark` native control defaults via zero-specificity `:where()` rules (button/input/select/textarea/option, disabled,
+  readonly, placeholder, focus-visible), `wa-details`/`wa-input`/dialog parts, `pre/code`, Charge Now `#charge-options`, session/schedule notes and the
+  `#log-viewer` (`.log-lines` etc.). `scripts/sidebar-bundle.mjs` rewrites `.wa-dark` to `:host(.wa-dark)` so the full WA dark palette reaches the shadow root.
+  Existing more-specific rules (advanced sections, banners, warn/error borders, status colours) are untouched.
+- **Covered surfaces:** live sidebar host bar/Charge Now/auto controls/banners, plan controls, vehicle/market-cost/plan-charger/notification advanced
+  sections, Morek evidence + debug panel, log viewer, proposal dialog, shared dashboard and preview (same dark.css). No writes, permissions or action semantics changed.
+- **Intentionally not changed:** the legacy Lovelace card (`card-styles.ts`/`visual-styles.ts`) uses Home Assistant theme variables; its light hex values are
+  only fallbacks when no HA theme exists, so it follows HA's own theme. Charge Now geometry/mobile width (18.2), vehicle default (18.3), chart bands (18.4) untouched.
+- **Tests:** `test/dark-theme.test.ts` (5: control states, WA parts/log viewer/Charge Now coverage, status colours kept, contrast ratios, bundle host scoping),
+  `test/log-viewer.test.ts` + `test/bundle.test.ts` (28 together), `node --test shared-dashboard/boundaries.test.mjs`, `tsc --noEmit`, `npm run build`, `npm run check-dist`.
+- **Unrun / limits:** no browser/visual inspection was done (**visual result unverified**), full suites, Playwright, HA-fixture tests, installed behaviour.
+  `#charge-session>*`/`#schedule-check>*` get a generic dark box; expect pixel polish in 18.2.
+
 ### 2026-11-14 — Stage 15.10 Morek behind-plan check and power-learner feed (2.5.143; local mocked; **coordinator reviewed**; no live HA/charger action)
 
 - **What changed.** The existing 60 s Morek capture tick (`AutoPlannerController._async_capture_tick`, Morek-owned and known plugged in only)
@@ -4886,3 +4905,6 @@ Implementation sub-agent; no HA, charger, deployment, commit or push; no browser
 - **Unrun / limits:** `test/sidebar.test.ts` (about 33 s), full frontend suite, browser/Playwright, HA-fixture Python tests (none needed), installed behaviour, i18n for this area,
   delivery of a notification to a phone (an available notify service is not proof of delivery), editing the tap-through url. Not installed, deployed or live-verified; no HA,
   charger or hardware access was used.
+
+
+**Stage 18.1 coordinator review:** shared dark tokens and shadow-host palette scoping reviewed; 33 focused dark-theme/log-viewer/bundle tests and check-dist passed. No browser or installed visual verification. Layout work continues in 18.2; legacy card retains HA theme variables.
