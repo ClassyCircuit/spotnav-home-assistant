@@ -52246,11 +52246,31 @@ var capForSave = (text4, currency, saved) => {
   return String(Number(normalized) / 100);
 };
 
+// shared-dashboard/price-bands.js
+var BAND_UNIT = "c/kWh";
+var PRICE_BANDS = [
+  { key: "cheap", label: "Cheap", range: "<8", color: "#37c48f", css: "band-green" },
+  { key: "normal", label: "Normal", range: "8\u2013<15", color: "#e9b34e", css: "band-amber" },
+  { key: "medium", label: "Medium", range: "15\u201325", color: "#ef8845", css: "band-orange" },
+  { key: "expensive", label: "Expensive", range: ">25", color: "#ec6266", css: "band-red" }
+];
+var NEUTRAL_COLOR = "#75b8e8";
+var bandsApply = (unit) => unit === BAND_UNIT;
+var priceBand = (value2, unit) => !bandsApply(unit) || !Number.isFinite(value2) ? null : PRICE_BANDS[value2 < 8 ? 0 : value2 < 15 ? 1 : value2 <= 25 ? 2 : 3];
+var bandColor = (value2, unit) => priceBand(value2, unit)?.color || NEUTRAL_COLOR;
+function priceAxisExtent(prices, unit, extra) {
+  const values = [...prices.map((p4) => p4.cents), ...Number.isFinite(extra) ? [extra] : []].filter(Number.isFinite);
+  const lo = values.length ? Math.min(...values) : 0, hi = values.length ? Math.max(...values) : 0;
+  if (bandsApply(unit)) return { min: Math.min(0, Math.floor(lo / 10) * 10), max: Math.max(30, Math.ceil(hi / 10) * 10), interval: 10 };
+  const min3 = Math.min(0, lo), max3 = Math.max(hi, 0);
+  return { min: min3, max: max3 > min3 ? max3 + (max3 - min3) * 0.05 : min3 + 1 };
+}
+
 // shared-dashboard/charts.js
 use([install3, install, install5, install6, install8, install9, install7, install15, install12, install16]);
 var axis = { axisLine: { lineStyle: { color: "#536b76" } }, axisLabel: { color: "#bed0d5", fontSize: 12 }, splitLine: { lineStyle: { color: "#34444d" } } };
 function mountCharts(root, data, format2, modes) {
-  let { prices, windows, now, deadline, horizon, cap, readings, sentHistory, bands, historyAxis, unit = "c/kWh" } = data;
+  let { prices, windows, now, deadline, horizon, cap, readings, sentHistory, historyAxis, unit = "c/kWh" } = data;
   let { time: time2, date: sampleDate, days: sampleDays, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks } = format2;
   time2 = format2.chartTime || time2;
   let tooltipDate = format2.tooltipDate || sampleDate;
@@ -52265,22 +52285,31 @@ function mountCharts(root, data, format2, modes) {
       const s4 = api.coord([api.value(0), api.value(2)]), e9 = api.coord([api.value(1), api.value(2)]), zero = api.coord([api.value(0), 0]);
       const rect = graphic_exports2.clipRectByRect({ x: s4[0], y: Math.min(s4[1], zero[1]), width: Math.max(1, e9[0] - s4[0]), height: Math.max(2, Math.abs(zero[1] - s4[1])) }, params.coordSys);
       if (!rect) return null;
-      const color3 = !bands ? "#75b8e8" : api.value(2) <= bands[0] ? "#37c48f" : api.value(2) <= bands[1] ? "#e9b34e" : api.value(2) <= bands[2] ? "#ef8845" : "#ec6266";
-      const fill2 = mode === "bar" ? color3 : "rgba(0,0,0,0)";
-      const children = [{ type: "rect", shape: rect, style: { fill: fill2 } }];
+      const color3 = bandColor(api.value(2), unit);
+      if (mode === "bar") return { type: "group", children: [{ type: "rect", shape: rect, style: { fill: color3 } }] };
+      const top = graphic_exports2.clipPointsByRect([[s4[0], s4[1]], [e9[0], e9[1]]], params.coordSys);
+      const children = [{ type: "rect", shape: rect, style: { fill: color3, opacity: 0.2 } }];
+      if (top.length === 2) children.push({ type: "line", shape: { x1: top[0][0], y1: top[0][1], x2: top[1][0], y2: top[1][1] }, style: { stroke: color3, lineWidth: 3 }, silent: true });
+      const prev = api.value(3);
+      if (Number.isFinite(prev)) {
+        const from = api.coord([api.value(0), prev]), joint = graphic_exports2.clipPointsByRect([[s4[0], from[1]], [s4[0], s4[1]]], params.coordSys);
+        if (joint.length === 2) children.push({ type: "line", shape: { x1: joint[0][0], y1: joint[0][1], x2: joint[1][0], y2: joint[1][1] }, style: { stroke: color3, lineWidth: 3 }, silent: true });
+      }
       return { type: "group", children };
+    };
+    const stepData = () => {
+      const seg = stepSegments(prices);
+      return seg.map(([s4, e9], i7) => [s4[0], e9[0], s4[1], i7 && seg[i7 - 1][1][0] === s4[0] ? seg[i7 - 1][0][1] : null]);
     };
     const setPriceOption = (initial) => priceChart.setOption({
       animation: false,
       grid: { left: 48, right: 20, top: 82, bottom: 92, show: true, backgroundColor: "#101f30", borderWidth: 0 },
-      tooltip: { trigger: "item", confine: true, hideDelay: 0, transitionDuration: 0, backgroundColor: "#233942", borderColor: "#5b7b7a", textStyle: { color: "#f0faf8" }, formatter: (p4) => `${escapeText(tooltipDate(p4.value[0]))} ${escapeText(time2(p4.value[0]))}\u2013${escapeText(tooltipDate(p4.value[1]))} ${escapeText(time2(p4.value[1]))}<br>${priceText(p4.value[2])} ${escapeText(unit)}${windows.filter((w2) => w2.start < p4.value[1] && w2.end > p4.value[0]).map((w2) => `<br>Proposal: ${escapeText(tooltipDate(w2.start))} ${escapeText(time2(w2.start))}\u2013${escapeText(time2(w2.end))}`).join("")}` },
+      tooltip: { trigger: "item", confine: true, hideDelay: 0, transitionDuration: 0, backgroundColor: "#233942", borderColor: "#5b7b7a", textStyle: { color: "#f0faf8" }, formatter: (p4) => `${escapeText(tooltipDate(p4.value[0]))} ${escapeText(time2(p4.value[0]))}\u2013${escapeText(tooltipDate(p4.value[1]))} ${escapeText(time2(p4.value[1]))}<br>${priceText(p4.value[2])} ${escapeText(unit)}${priceBand(p4.value[2], unit) ? ` \xB7 ${priceBand(p4.value[2], unit).label}` : ""}${windows.filter((w2) => w2.start < p4.value[1] && w2.end > p4.value[0]).map((w2) => `<br>Proposal: ${escapeText(tooltipDate(w2.start))} ${escapeText(time2(w2.start))}\u2013${escapeText(time2(w2.end))}`).join("")}` },
       xAxis: { ...axis, type: "value", min: horizon[0], max: horizon[1], axisLabel: { show: false }, axisTick: { show: false }, splitLine: { show: false } },
-      yAxis: { ...axis, axisLabel: { ...axis.axisLabel, formatter: priceText }, type: "value", name: unit, nameTextStyle: { color: "#bed0d5", align: "left" }, ...bands ? { interval: 10, min: (value2) => Math.min(0, Math.floor(value2.min / 10) * 10), max: (value2) => Math.ceil(value2.max / 10) * 10 } : { scale: true } },
+      yAxis: { ...axis, axisLabel: { ...axis.axisLabel, formatter: priceText }, type: "value", name: unit, nameTextStyle: { color: "#bed0d5", align: "left" }, ...priceAxisExtent(prices, unit, cap) },
       dataZoom: [{ type: "inside", xAxisIndex: 0, startValue: initial[0], endValue: initial[1], filterMode: "weakFilter", zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false, preventDefaultMouseMove: false }, { type: "slider", xAxisIndex: 0, startValue: initial[0], endValue: initial[1], filterMode: "weakFilter", height: 28, bottom: 12, borderColor: "#4b6871", backgroundColor: "#142630", fillerColor: "rgba(91,205,180,.22)", textStyle: { color: "#d0e1df" }, showDetail: false }],
-      ...mode === "step" && bands ? { visualMap: { show: false, type: "piecewise", seriesIndex: 1, dimension: 1, pieces: [{ lte: bands[0], color: "#37c48f" }, { gt: bands[0], lte: bands[1], color: "#e9b34e" }, { gt: bands[1], lte: bands[2], color: "#ef8845" }, { gt: bands[2], color: "#ec6266" }] } } : {},
       series: [
-        { type: "custom", clip: true, name: "Sample price", renderItem, encode: { x: [0, 1], y: 2 }, data: stepSegments(prices).map(([s4, e9]) => [s4[0], e9[0], s4[1]]) },
-        ...mode === "step" ? [{ type: "line", name: "Stepped price", data: stepPoints(prices), showSymbol: false, connectNulls: false, silent: true, z: 2, lineStyle: { width: 3, ...!bands ? { color: "#75b8e8" } : {} }, areaStyle: { opacity: 0.18, ...!bands ? { color: "#75b8e8" } : {} } }] : [],
+        { type: "custom", clip: true, name: "Sample price", renderItem, encode: { x: [0, 1], y: 2 }, data: stepData() },
         {
           type: "line",
           symbol: "none",
@@ -52290,10 +52319,10 @@ function mountCharts(root, data, format2, modes) {
           markArea: { silent: true, label: { show: false }, data: [[{ xAxis: horizon[0], itemStyle: { color: "#000000" } }, { xAxis: now }]] },
           markPoint: { symbol: "pin", symbolSize: 54, label: { color: "#fff", fontSize: 11, fontWeight: "bold", formatter: (p4) => priceText(p4.value) }, data: [(() => {
             const p4 = prices.reduce((a4, b3) => a4.cents < b3.cents ? a4 : b3);
-            return { name: "LOW", coord: [(p4.start + p4.end) / 2, p4.cents], value: p4.cents, itemStyle: { color: "#16825d" } };
+            return { name: "LOW", coord: [(p4.start + p4.end) / 2, p4.cents], value: p4.cents, itemStyle: { color: bandColor(p4.cents, unit) } };
           })(), (() => {
             const p4 = prices.reduce((a4, b3) => a4.cents > b3.cents ? a4 : b3);
-            return { name: "HIGH", coord: [(p4.start + p4.end) / 2, p4.cents], value: p4.cents, itemStyle: { color: "#b93f50" } };
+            return { name: "HIGH", coord: [(p4.start + p4.end) / 2, p4.cents], value: p4.cents, itemStyle: { color: bandColor(p4.cents, unit) } };
           })()] },
           markLine: { silent: true, symbol: "none", label: { color: "#e5d2ac", fontSize: 11 }, lineStyle: { color: "#d4a969", type: "dashed" }, data: [...Number.isFinite(cap) ? [{ yAxis: cap, label: { formatter: `Cap ${priceText(cap)} ${unit}`, position: "insideEndTop" } }] : [], { xAxis: now, label: { formatter: "Now", position: "insideStartTop", color: "#8fc5ff" }, lineStyle: { color: "#398dff", type: "solid", width: 2 } }, ...Number.isFinite(deadline) ? [{ xAxis: deadline, label: { formatter: "Ready by", position: "insideStartTop" }, lineStyle: { color: "#e1c390" } }] : []] }
         }
@@ -52478,7 +52507,7 @@ ${sampleDate(h3)}` : time2(h3);
   for (const mode of modes) resize.observe(root.querySelector(`#price-${mode}`));
   if (powerChart) resize.observe(root.querySelector("#power-chart"));
   return { priceCharts, update(next, nextFormat) {
-    ({ prices, windows, now, deadline, horizon, cap, bands, unit = "c/kWh" } = next);
+    ({ prices, windows, now, deadline, horizon, cap, unit = "c/kWh" } = next);
     ({ time: time2, date: sampleDate, days: sampleDays, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks } = nextFormat);
     time2 = nextFormat.chartTime || time2;
     tooltipDate = nextFormat.tooltipDate || sampleDate;
@@ -52823,10 +52852,9 @@ function mountDashboard(root, adapter) {
     const tag = sample ? "SAMPLE" : "";
     const modes = chart?.comparison === true ? ["bar", "step"] : ["step"];
     const prices = Array.isArray(chart?.prices) ? chart.prices.filter((p4) => Number.isFinite(p4?.start) && Number.isFinite(p4?.end) && p4.end > p4.start && Number.isFinite(p4.cents)) : [];
-    const validBands = Array.isArray(chart?.bands) && chart.bands.length === 3 && chart.bands.every(Number.isFinite) && chart.bands[0] < chart.bands[1] && chart.bands[1] < chart.bands[2];
     const unit = chart?.unit || "c/kWh";
     const priceNumber = priceText;
-    const chartReady = prices.length > 0 && Array.isArray(chart?.horizon) && chart.horizon.length === 2 && chart.horizon.every(Number.isFinite) && chart.horizon[0] < chart.horizon[1] && Number.isFinite(chart.now) && (chart.bands == null || validBands) && ["date", "days", "priceGaps", "stepSegments", "stepPoints", "snapRange", "initialRange", "timeTicks"].every((key3) => typeof f3[key3] === "function");
+    const chartReady = prices.length > 0 && Array.isArray(chart?.horizon) && chart.horizon.length === 2 && chart.horizon.every(Number.isFinite) && chart.horizon[0] < chart.horizon[1] && Number.isFinite(chart.now) && ["date", "days", "priceGaps", "stepSegments", "stepPoints", "snapRange", "initialRange", "timeTicks"].every((key3) => typeof f3[key3] === "function");
     const readings = Array.isArray(m4.history?.readings) ? m4.history.readings.filter((r7) => Number.isFinite(r7?.time)).map((r7) => ({ time: r7.time, kw: Number.isFinite(r7.kw) && r7.kw >= 0 ? r7.kw : null })) : [];
     const sentHistory = m4.history?.sentHistory;
     const historyReady = readings.length >= 2 && readings.every((r7, i7) => !i7 || r7.time > readings[i7 - 1].time) && Number.isFinite(sentHistory?.start) && Number.isFinite(sentHistory?.end) && sentHistory.end > sentHistory.start;
@@ -52836,7 +52864,7 @@ function mountDashboard(root, adapter) {
       const title = mode === "bar" ? "Bars" : "Stepped area";
       if (!chartReady) return card(`Prices & plan \xB7 ${title}`, labels.chartEyebrow || "PRICES & PLAN", `<p>Price chart unavailable.</p><p class="subtext">${escapeText(labels.chartIntro)} ${escapeText(labels.chartNote)}</p>${plan}`, `prices prices-${mode}`, tag);
       const extremum = (p4) => p4 ? `${priceNumber(p4.cents)} ${escapeText(unit)} \xB7 ${escapeText(day(p4.start))} ${escapeText(time2(p4.start))}` : "Unknown";
-      return card(`Prices & plan \xB7 ${title}`, labels.chartEyebrow || "PRICES & PLAN", `<div class="chart-intro"><div><strong>${icon} ${mode === "bar" ? "A \xB7 Interval bars" : (chart?.comparison ? "B \xB7 " : "") + "Stepped area"}</strong><p>${escapeText(labels.chartIntro)}</p></div><div class="chart-actions"><wa-button data-zoom="${mode}" size="small" aria-label="Zoom in ${title}">Zoom +</wa-button><wa-button data-reset="${mode}" size="small" aria-label="Reset ${title} overview">Full horizon</wa-button><span>Wheel zooms \xB7 scroll outside chart</span></div></div><div class="price-context"><span>Now <b>${priceNumber(priceAt(chart.now))} ${escapeText(unit)}</b></span><span>Next window starts at <b>${priceNumber(m4.nextPriceUnavailable ? null : priceAt(next?.start))} ${escapeText(unit)}</b></span><span>Horizon low <b>${extremum(extremes[0])}</b></span><span>Horizon high <b>${extremum(extremes[1])}</b></span></div><div id="price-${mode}" class="chart price-chart" role="img" aria-label="Price intervals and proposed windows"></div><p class="legend">${escapeText(labels.bands)} ${validBands ? `<span class="band-green">\u25CF</span> \u2264${chart.bands[0]} <span class="band-amber">\u25CF</span> &gt;${chart.bands[0]}\u2013${chart.bands[1]} <span class="band-orange">\u25CF</span> &gt;${chart.bands[1]}\u2013${chart.bands[2]} <span class="band-red">\u25CF</span> &gt;${chart.bands[2]} ${escapeText(unit)}` : "Neutral price color."} <span class="shade"></span> Proposed charging \xB7 gradient + pale track ${Number.isFinite(chart.cap) ? `<span class="cap-key"></span> Soft cap ${priceText(chart.cap)} ${escapeText(unit)}` : ""} <span class="now-key">\u2502</span> Now</p><p class="subtext">${escapeText(labels.chartNote)}</p>${plan}`, `prices prices-${mode}`, tag);
+      return card(`Prices & plan \xB7 ${title}`, labels.chartEyebrow || "PRICES & PLAN", `<div class="chart-intro"><div><strong>${icon} ${mode === "bar" ? "A \xB7 Interval bars" : (chart?.comparison ? "B \xB7 " : "") + "Stepped area"}</strong><p>${escapeText(labels.chartIntro)}</p></div><div class="chart-actions"><wa-button data-zoom="${mode}" size="small" aria-label="Zoom in ${title}">Zoom +</wa-button><wa-button data-reset="${mode}" size="small" aria-label="Reset ${title} overview">Full horizon</wa-button><span>Wheel zooms \xB7 scroll outside chart</span></div></div><div class="price-context"><span>Now <b>${priceNumber(priceAt(chart.now))} ${escapeText(unit)}</b></span><span>Next window starts at <b>${priceNumber(m4.nextPriceUnavailable ? null : priceAt(next?.start))} ${escapeText(unit)}</b></span><span>Horizon low <b>${extremum(extremes[0])}</b></span><span>Horizon high <b>${extremum(extremes[1])}</b></span></div><div id="price-${mode}" class="chart price-chart" role="img" aria-label="Price intervals and proposed windows"></div><p class="legend">${bandsApply(unit) ? `Absolute price bands, ${escapeText(unit)}: ${PRICE_BANDS.map((b3) => `<span class="${b3.css}">\u25CF</span> ${b3.label} ${b3.range}`).join(" ")} (exactly 25 is Medium; display only, not a charging limit)` : `Neutral price color: bands are defined in euro c/kWh and no trusted conversion is available for ${escapeText(unit)}, so nothing is classified.`} <span class="shade"></span> Proposed charging \xB7 gradient + pale track ${Number.isFinite(chart.cap) ? `<span class="cap-key"></span> Soft cap ${priceText(chart.cap)} ${escapeText(unit)}` : ""} <span class="now-key">\u2502</span> Now</p><p class="subtext">${escapeText(labels.chartNote)}</p>${plan}`, `prices prices-${mode}`, tag);
     };
     const scenario = m4.scenarios;
     const option = (s4) => `<option value="${escapeText(s4.value)}" ${s4.value === scenario.selected ? "selected" : ""}>${escapeText(s4.label)}</option>`;
@@ -63033,7 +63061,7 @@ function publishedChart(raw, market, now, stale) {
     for (let t6 = Math.ceil(start2 / step) * step; t6 < end2; t6 += step) out2.push(t6);
     return out2;
   };
-  return { chart: { prices, now, horizon, cap: null, bands: null, unit: priceUnit(currency) }, format: { chartTime: time2, date: date2, tooltipDate: date2, days, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks } };
+  return { chart: { prices, now, horizon, cap: null, unit: priceUnit(currency) }, format: { chartTime: time2, date: date2, tooltipDate: date2, days, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks } };
 }
 
 // sidebar/evidence-freshness.js
@@ -63585,7 +63613,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
       targetNote: d3.settings?.driver === "target_soc" && d3.soc?.value != null ? `Plan energy, projected SOC and cost are estimates based on the last-known SOC${d3.soc.estimated ? " and an energy-derived SOC estimate" : ""}; an old reading may not reflect driving since then.` : "",
       warning: warning ? { title: "Morek health requires attention", detail: `${health}${status?.outcomes?.uncertain && (status?.operator?.state === "mismatch" || status?.verification?.reason === "limits_or_transitions_differ") ? " \xB7 Effective limits mismatch the sent schedule." : ""}${live.mismatch ? " \xB7 Reported charger state and measured flow disagree." : ""}` } : null,
       evidence: { status: evidence2.summary, context: `Morek status observed ${date(observedAt, zone)}${statusFresh ? "" : " \xB7 stale or unavailable"}`, readiness, proposal: evidence2.proposal, sent: evidence2.sent, readback: evidence2.readback, measurement: live.summary, dispatch: `${statusFresh && status?.reconciliation?.reason === "plan_input_provenance_unavailable" ? "Plan input provenance unavailable: review mode, target, vehicle, SOC and capacity. The checked schedule path requires a cheapest-price target-SOC plan; switching does not guarantee Resume or charging. " : ""}${status?.outcomes?.uncertain && status?.outcomes?.state !== "storage_unavailable" ? "A recorded uncertain action may have applied; do not retry blindly. " : ""}A final 0 A limit may remain. Readback is not profile inventory; ACK or readback does not prove physical charging. Preserve person Stop and household protection.` },
-      labels: { settingsNote: "Read-only preview. Plan controls are unavailable in this slice.", saveLabel: "Save plan \xB7 unavailable", powerNote: live.reported ? `Charger reports \u201C${live.reported}\u201D${live.mismatch ? " \xB7 mismatch with measurement" : ""}` : "Reported state unknown; not measured power", deadlineNote: d3.settings?.departure_enabled === false ? "Ready-by is off" : deadlineCurrent && Number.isFinite(deadline) ? `Ready by ${date(deadline, zone)}; not a predicted finish` : "Ready-by time or current plan unavailable", planLabel: "Backend policy:", chartIntro: "Published source price before configured fiscal additions; source-included charges may apply.", chartNote: `Held published intervals only. ${priceFreshness} Unpublished future and history are unavailable. Cap is omitted if its basis differs or is unknown.`, bands: "", dialogNote: "Proposal only; not necessarily sent.", footer: "Dashboard and Morek status are separate observations." }
+      labels: { settingsNote: "Read-only preview. Plan controls are unavailable in this slice.", saveLabel: "Save plan \xB7 unavailable", powerNote: live.reported ? `Charger reports \u201C${live.reported}\u201D${live.mismatch ? " \xB7 mismatch with measurement" : ""}` : "Reported state unknown; not measured power", deadlineNote: d3.settings?.departure_enabled === false ? "Ready-by is off" : deadlineCurrent && Number.isFinite(deadline) ? `Ready by ${date(deadline, zone)}; not a predicted finish` : "Ready-by time or current plan unavailable", planLabel: "Backend policy:", chartIntro: "Published source price before configured fiscal additions; source-included charges may apply.", chartNote: `Held published intervals only. ${priceFreshness} Unpublished future and history are unavailable. Cap is omitted if its basis differs or is unknown.`, dialogNote: "Proposal only; not necessarily sent.", footer: "Dashboard and Morek status are separate observations." }
     },
     actions: {}
   };
@@ -63836,7 +63864,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.165";
+var CARD_VERSION = "2.5.166";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {

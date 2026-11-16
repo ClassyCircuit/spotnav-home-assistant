@@ -14,7 +14,7 @@ const make=(r=rows,m=market,stale=false)=>publishedChart({prices:{published_inte
 describe('published source chart',()=>{
   it('preserves partial intervals, negative values, missing gaps and DST offsets',()=>{
     const {chart,format}=make();
-    expect(chart.unit).toBe('SEK/kWh');expect(chart.bands).toBeNull();expect(chart.cap).toBeNull();
+    expect(chart.unit).toBe('SEK/kWh');expect(chart.cap).toBeNull();
     expect(chart.prices.map(p=>p.cents)).toEqual([-0.15,0.35]);
     expect(chart.prices[1].end-chart.prices[1].start).toBe(17*60000);
     expect(format.stepPoints(chart.prices)).toContainEqual([Date.parse('2026-10-25T00:45:00Z'),null]);

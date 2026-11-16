@@ -1,10 +1,12 @@
 # SpotNav Enhanced / Morek development handoff
 
-Last updated: 2026-11-14. This file is a **public-repository handoff**, not a place for
+Last updated: 2026-11-16. This file is a **public-repository handoff**, not a place for
 passwords, access tokens, HA configuration exports, logs, or private household information.
 Re-check the live system and Git state before acting; observations below may become stale.
 
 ## Current handoff and approved direction
+
+**Stage 18 complete locally (2.5.166):** four substages implemented by separate Claude medium delegates, coordinator-reviewed and committed/pushed in order: dark UI, Charge Now/mobile layout, sole-car identification default, absolute price bands. No deployment. Visual checks covered shared mobile preview only; dark/Charge Now host/debug and chart appearance remain unverified in a browser. Stage 7/8 remain future features.
 
 **2026-11-16 — Stage 18.3 sole-car default (manifest 2.5.165; local mocked; coordinator review pending; no HA access, charger command, deployment, commit or push).** **Root cause:** the planner, authorization, card and Morek readiness already resolve the car through `resolve_target_vehicle` (vehicles/vehicle_discovery.py), which returns the sole eligible car for an unset/stale stored id. The repeated "Which car is plugged in? <car> / Guest car" question came from `VehicleIdentifier` (vehicles/identification.py): a one-car charger still asked once its car was "ruled out" by its own entities (a cloud plug sensor saying "not plugged" or a position away, an identification elsewhere) or by the camera's "none of these" - exactly the stale reports a cloud car gives. **Fix:** a one-car charger is now decided in `_begin` like the zero-car case (`SKIPPED_ONLY_CANDIDATE`, method `only_candidate`, no session, no `_refresh` of the car, no state subscriptions/timers, no camera query, no notification, no settings write; `claims()` stays true). The old `single`/`ruled_out`/`_evaluate_single` paths were removed. **Priority at a plug-in:** identification off -> manual; zero cars -> only_candidate/unknown; a person's recent choice (<= `RECENT_CHOICE_S`) -> manual; exactly one eligible car -> that car; two or more -> existing guarded evidence/camera/question. Resolver order is unchanged: explicit guest -> no vehicle; stored id still among the charger's eligible cars -> it; else exactly one eligible car -> it; else unknown. A guest car stays a person's choice (`async_answer(GUEST)` still works at a one-car charger from the card/app); removed/stale stored ids never resurrect a car. SOC source freshness, report-time provenance, identity/generation checks and Pause/Stop/ownership guards are untouched (the sole-car fallback names the vehicle only; a reading stamped for another vehicle is still refused in `live_vehicle_facts`). User docs (`docs/vehicle-identification.md`, `docs/api.md`) corrected. **Tests:** new `tests/test_stage_183_sole_car_default.py` (9, ~1.6 s; real resolver and real `VehicleIdentifier` on a fake hass; verified failing on the old code): one/zero/two cars, stale and removed stored ids, explicit guest, configured explicit choice, restart trigger, ruled-out evidence with `automatic` and `ask`, no re-read, only history stored, two cars still ask. `test_camera_rule` 24 passed. `tests/test_guest_car.py` one-car cases (4 tests) were rewritten to the new rule but need the HA pytest plugin and **cannot run on this Windows machine** (unverified). Ruff clean on touched files; `npm run build` and `check-dist` pass at 2.5.165 (frontend unchanged). **Unrun:** HA-fixture identification/guest suites, frontend suites, browser, anything live. Not verified on the user's installation.
 
@@ -495,6 +497,21 @@ module files individually with a short timeout and report unrun checks. (Also re
   with `dark-theme.test.ts` and `charge-now.test.ts` 28 pass. `npm run build`, `check-dist` pass.
 - **Visual:** local preview (shared dashboard, iframes 320/375/430): every `.panel` spans left 0 to content width, no horizontal overflow. The sidebar host bar
   Charge Now card and the log viewer could **not** be visually inspected (sidebar browser fixture server would not start), so those pixels are unverified. No full suite, Playwright or HA.
+
+### 2026-11-16 — Stage 18.4 absolute price bands and stable chart scale (2.5.166; local mocked; review pending; no HA/charger action)
+
+- **Change:** new `shared-dashboard/price-bands.js` (one source for cutoffs, colours, axis extent). EUR c/kWh: `<8` Cheap green, `8–<15` Normal yellow, `15–25` Medium
+  orange (exactly 25 orange), `>25` Expensive red; negatives green. `shared-dashboard/charts.js` (shared by live sidebar and preview) now draws the stepped area from
+  the existing custom series (translucent fill to 0 + solid top edge + vertical joint, each coloured by that interval's own price; no visualMap/gradient, so exact
+  boundaries are exact) and removed the separate line series. Y axis is numeric from the whole horizon (and soft cap), not the zoom: min `min(0, floor10(low))`,
+  max `max(30, ceil10(high))`, interval 10, so a 1–3 c day stays low and spikes/negatives are not clipped. Tooltip adds the band name. Legend (`dashboard.js`) lists the
+  numeric ranges/unit and states display only, not a charging limit. Bar mode uses the same colours.
+- **Other currencies:** classification applies only when the chart unit is exactly `c/kWh` (the existing `priceUnit`/`displayPrice` EUR conversion). SEK/NOK/unknown
+  stay neutral blue with a zero-baseline whole-data axis and a legend saying no trusted conversion exists; nothing is converted or fetched. The preview's old
+  `bands:[30,45,60]`, `labels.bands` and the live `bands:null` were removed; the preview sample is EUR so it classifies identically to live.
+- **Unchanged:** price basis/provenance text, zoom/pan/pinch, snapping, gap/DST handling, proposal overlays, pins, soft-cap and Now lines, resize.
+- **Tests:** `test/price-bands.test.ts` (7; drives the real `mountCharts` with echarts mocked: 8/15/25 boundaries, 1–3 c axis 0..30, negative/spike extent, refresh keeps extent, missing not zero, SEK neutral, cap in extent), `test/sidebar-price-chart.test.ts` (12 together), `dark-theme` + `bundle` (26 with the first two), `shared-dashboard/boundaries` + `prototype/sample` node tests (11), `tsc --noEmit`, `npm run build`, `npm run check-dist`.
+- **Unrun / limits:** **no browser/visual inspection was done (visual result unverified)** — the look of the coloured stepped area, vertical joints, legend wrapping and dark theme is unchecked; echarts is mocked in tests. No full suites, Playwright, HA-fixture tests or installed behaviour. 18.1/18.2 visual limits above still apply. The vertical joint uses the newer interval's colour; the first visible interval at a zoom edge has no joint.
 
 ### 2026-11-16 — Stage 18.1 dark theme across owned UI (2.5.163; local mocked; review pending; no HA/charger action)
 
@@ -4929,3 +4946,6 @@ Implementation sub-agent; no HA, charger, deployment, commit or push; no browser
 
 
 **18.3 coordinator review:** sole-car early resolution and removed single-car camera/question branches reviewed; explicit guest resolution is unchanged. New resolver/identifier and camera-rule tests passed together (33, 1.86 s), check-dist passed. Real-HA guest/identification suites remain unrun; no live validation.
+
+
+**18.4 coordinator review:** absolute thresholds and fixed minimum 0–30 c/kWh axis reviewed. HIGH/LOW annotation colours now use the same absolute bands, avoiding a red marker for a cheap daily high. 33 focused price-band/sidebar-chart/bundle tests passed in 1.87 s; build/check-dist passed. All Stage 18 substages are locally reviewed; hardware and remaining visual limitations are unchanged.

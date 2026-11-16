@@ -678,7 +678,7 @@ assumed, and whether the ECB table cadence matches. Mocked checks never prove ph
 
 ## Stage 18 — Consistent dark UI, mobile layout, single-car default and price perspective
 
-**Approved 2026-11-16; current priority ahead of Stage 7/8.** Implement 18.1 → 18.2 → 18.3 → 18.4,
+**Locally implemented and coordinator-reviewed, 2026-11-16 (2.5.163–2.5.166); no deployment or live verification.** All four substages are complete; next unstarted features remain Stage 7/8 when requested. Implementation order was 18.1 → 18.2 → 18.3 → 18.4,
 one fresh Claude Sonnet 5.5 medium per similarly sized work block. Coordinator reviews important correctness
 and maintainability, requests corrections only where material, then commits/pushes each substage. Completed
 items stay checked, not deleted, so decisions and verification remain traceable. Fast focused tests only;
@@ -700,7 +700,7 @@ but no expensive browser suites. Reuse the shared live/preview UI and ECharts; n
   card spacing. Desktop layout remains intentional. Check 320/375/430 px plus desktop, expanded advanced
   cards, debug and Charge Now. Don't use fixed widths or viewport hacks that overflow HA's content panel.
   Acceptance: cards reach both content edges, controls fit, keyboard/focus and all write semantics unchanged.
-  *Status 2026-11-16: locally implemented/mocked at 2.5.164, review pending; mobile edge-to-edge checked in the local preview only; host-bar Charge Now pixels not visually verified; see handoff.*
+  *Status 2026-11-16: locally implemented/mocked at 2.5.164, coordinator reviewed (28 focused tests, build/check-dist passed); mobile edge-to-edge checked in the local preview only; host-bar Charge Now pixels not visually verified; see handoff.*
 - [x] **18.3 One-car default without repeated identification prompts.** Trace why one configured car can
   still trigger "which car". Use the sole configured eligible car as the default in the canonical vehicle
   resolution path, not a hardcoded BMW name/id or UI-only guess. Preserve an explicitly chosen guest or
@@ -709,7 +709,7 @@ but no expensive browser suites. Reuse the shared live/preview UI and ECharts; n
   resolve consistently in planner, authorization and UI with no redundant prompt/notification. Test one/zero/
   two cars, restart, stale old identification and explicit guest; preserve sensor/source freshness rules.
   *Status 2026-11-16: locally implemented/mocked at 2.5.165, coordinator reviewed (33 focused tests and check-dist passed); see handoff.*
-- [ ] **18.4 Absolute price bands and stable chart scale.** Read `samples/stepline-chart.js` for visual
+- [x] **18.4 Absolute price bands and stable chart scale.** Read `samples/stepline-chart.js` for visual
   inspiration and adapt existing shared ECharts options, never load its sample data or rebuild the chart.
   Classification in EUR cents/kWh: <8 green (Cheap), 8–<15 yellow (Normal), 15–25 inclusive orange (Medium),
   >25 red (Expensive). Color price line/area honestly by these absolute thresholds with a clear legend;
@@ -721,6 +721,7 @@ but no expensive browser suites. Reuse the shared live/preview UI and ECharts; n
   an exchange rate. Unknown conversion gets neutral styling with an honest explanation. This is display
   classification only, never a planner price cap or charging decision. Test 8/15/25 boundaries, 1–3 cheap
   range, negative/spike/missing data, units, preview/live parity and range preservation; required build/dist.
+  *Status 2026-11-16: locally implemented/mocked at 2.5.166, coordinator reviewed (33 focused tests, build/check-dist passed); no browser/visual inspection done (unverified); see handoff.*
 
 For each substage bump integration version and run frontend build/check-dist when integration/card changes;
 use focused fast tests, report visual and hardware limits truthfully, update this checklist and handoff.

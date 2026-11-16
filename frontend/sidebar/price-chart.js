@@ -33,5 +33,5 @@ export function publishedChart(raw, market, now, stale) {
   const stepPoints=items=>items.flatMap((p,i)=>[...(i&&items[i-1].end!==p.start?[[(items[i-1].end+p.start)/2,null]]:[]),[p.start,p.cents],[p.end,p.cents]]);
   const initialRange=current=>snapRange(Math.max(horizon[0],Math.min(current-3600000,horizon[1]-1)),horizon[1]);
   const timeTicks=(start,end,width)=>{const step=[3600000,7200000,14400000,21600000,43200000,86400000].find(n=>n>=(end-start)/Math.max(1,Math.floor(width/100)))||86400000;const out=[];for(let t=Math.ceil(start/step)*step;t<end;t+=step)out.push(t);return out;};
-  return {chart:{prices,now,horizon,cap:null,bands:null,unit:priceUnit(currency)}, format:{chartTime:time,date,tooltipDate:date,days,priceGaps,stepSegments,stepPoints,snapRange,initialRange,timeTicks}};
+  return {chart:{prices,now,horizon,cap:null,unit:priceUnit(currency)}, format:{chartTime:time,date,tooltipDate:date,days,priceGaps,stepSegments,stepPoints,snapRange,initialRange,timeTicks}};
 }
