@@ -379,7 +379,7 @@ def test_default_and_explicit_durations_and_invalid_ones(world: SimpleNamespace)
     for bad in (0, 14, 20, 735, -15, 15.0, "60", True, None):
         connection = ask(world, duration_minutes=bad)
         assert [code for code, _ in connection.errors] == ["spotnav_invalid_insight_request"], bad
-    assert [code for code, _ in ask(world, mode="monthly").errors] == ["spotnav_invalid_insight_request"]
+    assert [code for code, _ in ask(world, mode="yearly").errors] == ["spotnav_invalid_insight_request"]
     assert ask(world, mode=None).errors[0][0] == "spotnav_invalid_insight_request"
 
 

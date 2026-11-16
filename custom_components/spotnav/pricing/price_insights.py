@@ -19,6 +19,12 @@ shorter interval never counts as an extra vote.
   constant price is piecewise linear in the start, so the optimum starts at an interval boundary, or ends at one
   (start = boundary minus length), or sits at the clipped edges of the stretch; exactly those are tried, ties
   go to the earliest. A gap or the end of publication refuses a window. It does not need the baseline.
+
+Monthly statistics (Stage 7.4b, `monthly_insights`): one local month of the price area, from the same day rules.
+Only *fully held* days enter the price population; a partial day is counted and its coverage reported on its own,
+never mixed in. Fewer than 7 such days: statistics are `unknown` with the coverage that exists. Quantiles are the
+lower weighted quantile: the cheapest price whose cumulative time reaches q of the population time (deterministic,
+an actual published price, no interpolation). "Negative share" is time strictly below zero. No resampling.
 """
 
 from __future__ import annotations
@@ -377,4 +383,112 @@ def live_insights(
         "unknown_reason": None
         if current["status"] == "known" or window["status"] == "known"
         else current["unknown_reason"],
+    }
+
+
+MONTHLY_ASSUMPTIONS: Final = (
+    "raw_published_spot_no_fees",
+    "duration_weighted_by_instant",
+    "no_resampling",
+    "completed_local_days_only",
+    "only_fully_held_days_in_population",
+    "partial_days_reported_not_averaged",
+    "lower_weighted_quantile",
+    "negative_share_is_time_strictly_below_zero",
+)
+QUANTILES: Final = (("p10", 10), ("p50", 50), ("p90", 90))
+
+
+def _covered_us(rows: tuple[PriceRow, ...] | None, span_start: datetime, span_end: datetime) -> int:
+    """Microseconds of a day's clean rows inside the day's span (an unclean day covers nothing we may state)."""
+    clean, _reason = clean_rows(rows or ())
+    if not clean:
+        return 0
+    low, high = _us(span_start), _us(span_end)
+    return sum(max(0, min(_us(row.end), high) - max(_us(row.start), low)) for row in clean)
+
+
+def weighted_quantile(prices: tuple[float, ...], cumulative: tuple[int, ...], percent: int) -> float:
+    """Lower weighted quantile of ascending `prices` with running `cumulative` time: the first price whose
+    cumulative time reaches `percent` % of the total."""
+    threshold = -(-percent * cumulative[-1] // 100)
+    return prices[bisect_left(cumulative, threshold)]
+
+
+def monthly_insights(
+    *, month: str, days: tuple[DayInput, ...], days_in_month: int, calendar_complete: bool
+) -> dict[str, Any]:
+    """Statistics of the `days` the caller selected for `month` (all of its days, or its completed days only).
+
+    `days` are distinct local days of the price area, oldest first, possibly none (the month's first day is
+    today). Pure: the caller decides which days are expected and states `calendar_complete`."""
+    keys = [item.day for item in days]
+    if len(set(keys)) != len(keys):
+        raise ValueError("monthly_insights needs distinct days")
+    reasons: dict[str, int] = {}
+    held = complete = partial = 0
+    expected_us = valid_us = partial_us = 0
+    resolutions: set[int] = set()
+    weighted: list[tuple[float, int]] = []
+    for day in days:
+        expected_us += _us(day.span_end) - _us(day.span_start)
+        held += day.rows is not None
+        rows, reason = _full_day(day)
+        if rows is None:
+            reason = reason or "invalid_prices"
+            reasons[reason] = reasons.get(reason, 0) + 1
+            if reason == "partial":
+                partial += 1
+                partial_us += _covered_us(day.rows, day.span_start, day.span_end)
+            continue
+        complete += 1
+        for row in rows:
+            length = _us(row.end) - _us(row.start)
+            weighted.append((row.price, length))
+            valid_us += length
+            resolutions.add(length // 60_000_000)
+    known = complete >= MIN_BASELINE_DAYS and valid_us > 0
+    statistics: dict[str, Any] | None = None
+    if known:
+        weighted.sort()
+        prices = tuple(price for price, _ in weighted)
+        cumulative = tuple(accumulate(length for _, length in weighted))
+        negative = sum(length for price, length in weighted if price < 0)
+        statistics = {
+            "mean": _q(math.fsum(price * length for price, length in weighted) / valid_us),
+            "min": prices[0],
+            "max": prices[-1],
+            **{name: weighted_quantile(prices, cumulative, percent) for name, percent in QUANTILES},
+            "negative_seconds": _seconds(negative),
+            "negative_share": round(100 * negative / valid_us, 4),
+            "population_seconds": _seconds(valid_us),
+        }
+    return {
+        "month": month,
+        "scope": "complete_calendar_month" if calendar_complete else "completed_days_to_date",
+        "calendar_complete": calendar_complete,
+        "as_of_day": days[-1].day.isoformat() if days else None,
+        "days_in_month": days_in_month,
+        "days_expected": len(days),
+        "days_held": held,
+        "days_complete": complete,
+        "days_partial": partial,
+        "days_excluded": {"count": len(days) - complete, "reasons": dict(sorted(reasons.items()))},
+        "minimum_days": MIN_BASELINE_DAYS,
+        "coverage": {
+            "seconds_expected": _seconds(expected_us),
+            "seconds_valid": _seconds(valid_us),
+            "seconds_partial": _seconds(partial_us),
+            "valid_ratio": round(valid_us / expected_us, 6) if expected_us else None,
+        },
+        "status": "known" if known else "unknown",
+        "unknown_reason": None
+        if known
+        else ("no_completed_days" if not days else "too_few_complete_days"),
+        "statistics": statistics,
+        "resolution_minutes": sorted(resolutions),
+        # Offered for the UI's month-to-month rule: the month itself meets the minimum. Comparing needs the
+        # other month's answer too, with the same currency and basis (carried by every answer).
+        "comparable": {"meets_minimum": known, "minimum_days": MIN_BASELINE_DAYS, "days_complete": complete},
+        "assumptions": list(MONTHLY_ASSUMPTIONS),
     }

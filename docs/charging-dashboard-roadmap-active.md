@@ -1005,7 +1005,7 @@ only if a helper is explicitly used **and labelled**; read-range page = 8 local 
   (classification is the frontend's absolute band), never a future guess (tomorrow unpublished = not included), no new store, no D1 dependency (these
   are prices, not costs). *Acceptance:* missing history, partial days, duplicate/conflicting intervals, negative prices, DST 23/25 h, mixed
   15-min/hourly, area/currency change, gap refusal, ties, partially elapsed interval; fast tests at the module boundary.
-- [ ] **7.4b Monthly price statistics (backend).** *Needs 7.4a.* *Delta:* mode `monthly` of the same command, `month` = local `YYYY-MM` in the price
+- [x] **7.4b Monthly price statistics (backend).** *Locally implemented 2026-11-16 (manifest 2.5.172), real-repository mocked checks only (43 new backend tests); coordinator reviewed (100 focused backend tests and check-dist passed); not deployed; see the handoff and `docs/api.md` "Monthly price statistics".* *Needs 7.4a.* *Delta:* mode `monthly` of the same command, `month` = local `YYYY-MM` in the price
   area's zone. Per month: `days_expected` (calendar days, or completed days for the current month), `days_complete`, `days_partial`, coverage seconds
   vs expected seconds, and — only when ≥ 7 fully held days (engineering default) — duration-weighted mean, min, max, p10/p50/p90, share of time at a
   negative price; otherwise `unknown` with coverage. A month comparison is offered only when both months meet the minimum, share a currency and basis.

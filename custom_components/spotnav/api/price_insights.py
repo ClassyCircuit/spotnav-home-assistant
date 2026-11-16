@@ -1,5 +1,5 @@
-"""`spotnav/get_price_insights` (API v1, mode `live`): the current price against the trailing baseline, and the
-cheapest contiguous window ahead. Stage 7.4a; mode `monthly` is 7.4b's, on this same command.
+"""`spotnav/get_price_insights` (API v1): mode `live` is the current price against the trailing baseline and the
+cheapest contiguous window ahead (Stage 7.4a); mode `monthly` is one local month's price statistics (Stage 7.4b).
 
 Read-only and never a request: the answer is computed from what `PriceRepository` already holds in memory
 (`day_snapshot`, at most 30 baseline days and today/tomorrow); nothing is fetched, refreshed, backfilled, stored or
@@ -8,6 +8,10 @@ The method is `pricing/price_insights.py`; this module only gathers rows and sta
 
 Request: `{api_version: 1, charger_id, mode: "live", duration_minutes?}`; `duration_minutes` is 15..720 in steps of
 15 (default 60), a number of whole minutes (not a boolean or a string).
+Monthly: `{api_version: 1, charger_id, mode: "monthly", month?}`; `month` is a strict `YYYY-MM` string in the price
+area's calendar, default the current month; not a future month, not a month starting before the repository's
+retention bound (`HISTORY_KEEP_DAYS`). The current month counts completed local days only (today is excluded).
+`month` is refused in live mode and `duration_minutes` in monthly mode. At most 31 days are read, from memory.
 
 Prices are the raw published spot in the area's major currency unit per kWh (`basis`), converted with the day's own
 usable rate exactly as the dashboard's rows are (`planning.planner.document_rate`); no fee, tax or invented rate. A
@@ -21,6 +25,8 @@ duration), `spotnav_no_price_area`, `spotnav_unknown_price_area`.
 
 from __future__ import annotations
 
+import calendar
+import re
 from collections import Counter
 from datetime import date, datetime, timedelta
 from typing import Any, Final
@@ -42,8 +48,9 @@ from ..pricing.price_insights import (
     DayInput,
     PriceRow,
     live_insights,
+    monthly_insights,
 )
-from ..pricing.price_repository import DaySnapshot, PriceRepository
+from ..pricing.price_repository import HISTORY_KEEP_DAYS, DaySnapshot, PriceRepository
 from ..pricing.price_source import effective_settings
 from ..runtime import domain_data
 from ..util import aware_iso
@@ -63,8 +70,10 @@ class PriceInsightsRefusal(Exception):
         self.message = message
 
 
-def _day_input(repository: PriceRepository, area_id: str, tz: str, currency: str, day: date) -> DayInput:
-    snapshot = repository.day_snapshot(area_id, day)
+def _day_input(
+    repository: PriceRepository, area_id: str, tz: str, currency: str, day: date, snapshot: DaySnapshot | None = None
+) -> DayInput:
+    snapshot = snapshot or repository.day_snapshot(area_id, day)
     start, end = display_day_span(day, tz)
     if snapshot.document is None:
         return DayInput(day, start, end, None, state=snapshot.state)
@@ -148,6 +157,57 @@ def insights_answer(
     }
 
 
+_MONTH: Final = re.compile(r"[0-9]{4}-(0[1-9]|1[0-2])")
+
+
+def _month_of(msg: dict[str, Any], today: date) -> date:
+    """The first day of the requested month (default: the current one), or a refusal."""
+    if "month" not in msg:
+        return today.replace(day=1)
+    text = msg["month"]
+    try:
+        if type(text) is not str or not _MONTH.fullmatch(text):
+            raise ValueError
+        first = date(int(text[:4]), int(text[5:]), 1)
+    except ValueError:
+        raise PriceInsightsRefusal(ERROR_INVALID_INSIGHT_REQUEST, "month must be a calendar month as YYYY-MM") from None
+    if first > today:
+        raise PriceInsightsRefusal(ERROR_INVALID_INSIGHT_REQUEST, "month is in the future")
+    if first < today - timedelta(days=HISTORY_KEEP_DAYS):
+        raise PriceInsightsRefusal(ERROR_INVALID_INSIGHT_REQUEST, "month starts before the days prices are kept for")
+    return first
+
+
+def monthly_answer(
+    repository: PriceRepository, area_id: str, tz: str, currency: str, now: datetime, msg: dict[str, Any]
+) -> dict[str, Any]:
+    """One month's statistics for one price area at `now`, computed from memory only (one snapshot per day)."""
+    zone = time_zones.require_zone(tz)
+    today = now.astimezone(zone).date()
+    first = _month_of(msg, today)
+    length = calendar.monthrange(first.year, first.month)[1]
+    last = first + timedelta(days=length - 1)
+    through = min(last, today - timedelta(days=1))  # today is never a completed day
+    dates = [first + timedelta(days=offset) for offset in range((through - first).days + 1)]
+    snapshots = [repository.day_snapshot(area_id, day) for day in dates]
+    days = tuple(_day_input(repository, area_id, tz, currency, day, snap) for day, snap in zip(dates, snapshots))
+    answer = monthly_insights(
+        month=f"{first.year:04d}-{first.month:02d}", days=days, days_in_month=length, calendar_complete=last < today
+    )
+    return {
+        **answer,
+        "basis": {"kind": "published_spot", "unit": "major_per_kwh", "currency": currency, "fees": "none"},
+        "currency": currency,
+        "zone": tz,
+        "now": now.isoformat(),
+        "now_local": now.astimezone(zone).isoformat(),
+        "today": today.isoformat(),
+        "window_from": first.isoformat(),
+        "window_to": last.isoformat(),
+        "provenance": {"providers": _providers([snap for snap in snapshots if snap.document is not None])},
+    }
+
+
 def _minutes_of(msg: dict[str, Any]) -> int:
     minutes = msg.get("duration_minutes", DEFAULT_WINDOW_MINUTES)
     if (
@@ -164,9 +224,14 @@ def _minutes_of(msg: dict[str, Any]) -> int:
 
 def price_insights_answer(hass: HomeAssistant, charger_id: str, msg: dict[str, Any]) -> dict[str, Any]:
     """The answer for one charger's price area (WebSocket), or a `PriceInsightsRefusal`."""
-    if msg.get("mode") != "live":
-        raise PriceInsightsRefusal(ERROR_INVALID_INSIGHT_REQUEST, "mode must be live")
-    minutes = _minutes_of(msg)
+    mode = msg.get("mode")
+    if mode not in ("live", "monthly"):
+        raise PriceInsightsRefusal(ERROR_INVALID_INSIGHT_REQUEST, "mode must be live or monthly")
+    if mode == "live" and "month" in msg:
+        raise PriceInsightsRefusal(ERROR_INVALID_INSIGHT_REQUEST, "month belongs to mode monthly")
+    if mode == "monthly" and "duration_minutes" in msg:
+        raise PriceInsightsRefusal(ERROR_INVALID_INSIGHT_REQUEST, "duration_minutes belongs to mode live")
+    minutes = _minutes_of(msg) if mode == "live" else 0
     store = domain_data(hass).auto_store
     repository: PriceRepository | None = domain_data(hass).price_repository
     if store is None or repository is None:
@@ -177,11 +242,15 @@ def price_insights_answer(hass: HomeAssistant, charger_id: str, msg: dict[str, A
     area = repository.area_entry(area_id)
     if area is None or time_zones.zone(area.tz) is None:
         raise PriceInsightsRefusal(ERROR_UNKNOWN_PRICE_AREA, "The price area is not known")
-    answer = insights_answer(repository, area_id, area.tz, area.currency, dt_util.utcnow(), minutes)
+    now = dt_util.utcnow()
+    if mode == "monthly":
+        answer = monthly_answer(repository, area_id, area.tz, area.currency, now, msg)
+    else:
+        answer = insights_answer(repository, area_id, area.tz, area.currency, now, minutes)
     return {
         "api_version": PRICE_INSIGHTS_API_VERSION,
         "charger_id": charger_id,
-        "mode": "live",
+        "mode": mode,
         "area_id": area_id,
         **answer,
     }
@@ -194,13 +263,14 @@ def price_insights_answer(hass: HomeAssistant, charger_id: str, msg: dict[str, A
         vol.Optional("charger_id"): object,
         vol.Optional("mode"): object,
         vol.Optional("duration_minutes"): object,
+        vol.Optional("month"): object,
     }
 )
 @callback
 def websocket_get_price_insights(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
 ) -> None:
-    """Live price insights of the charger's area; read-only, from held prices."""
+    """Live or monthly price insights of the charger's area; read-only, from held prices."""
     version = msg.get("api_version")
     if type(version) is not int or version != PRICE_INSIGHTS_API_VERSION:
         send_unsupported_version(connection, msg, PRICE_INSIGHTS_API_VERSION)
