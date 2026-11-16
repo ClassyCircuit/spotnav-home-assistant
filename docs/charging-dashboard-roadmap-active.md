@@ -676,6 +676,52 @@ input-evidence → recalculation → worker-compare path.
 (`fcntl` plugin), installed behaviour, whether the installed vehicle integration reports capacity/timestamps as
 assumed, and whether the ECB table cadence matches. Mocked checks never prove physical charging.
 
+## Stage 18 — Consistent dark UI, mobile layout, single-car default and price perspective
+
+**Approved 2026-11-16; current priority ahead of Stage 7/8.** Implement 18.1 → 18.2 → 18.3 → 18.4,
+one fresh Claude Sonnet 5.5 medium per similarly sized work block. Coordinator reviews important correctness
+and maintainability, requests corrections only where material, then commits/pushes each substage. Completed
+items stay checked, not deleted, so decisions and verification remain traceable. Fast focused tests only;
+no HA access, charging commands or deployment. UI/browser inspection is authorized for these UI fixes,
+but no expensive browser suites. Reuse the shared live/preview UI and ECharts; no parallel UI or planner.
+
+- [ ] **18.1 Dark theme across all UI surfaces.** Inventory live/sidebar/shared/legacy card and preview
+  styles, explicit light colors, native inputs and Web Awesome shadow/part tokens. Make Charge Now details,
+  plan inputs, Morek debug/log views, every advanced expandable, dialogs/selects/buttons/disabled/focus/error
+  states and other owned surfaces consistently dark with readable contrast. Reuse a small shared token set;
+  don't change HA's global theme or hide warnings. Check relevant expanded states and dark preview parity.
+  Preserve actions, permissions and unknown outcomes. Acceptance: no owned white/light form surface or
+  unreadable text, including expanded/disabled controls; targeted styles/renderer checks and required build.
+- [ ] **18.2 Charge Now layout and full-width mobile cards.** Match Charge Now spacing, alignment,
+  duration/custom-end fields and actions to the rest of the plan controls; wrap naturally without horizontal
+  overflow. At mobile width (existing breakpoint, about 800 px), remove outer horizontal gutters between
+  viewport/panel edges and card borders; retain comfortable internal padding, safe-area handling and vertical
+  card spacing. Desktop layout remains intentional. Check 320/375/430 px plus desktop, expanded advanced
+  cards, debug and Charge Now. Don't use fixed widths or viewport hacks that overflow HA's content panel.
+  Acceptance: cards reach both content edges, controls fit, keyboard/focus and all write semantics unchanged.
+- [ ] **18.3 One-car default without repeated identification prompts.** Trace why one configured car can
+  still trigger "which car". Use the sole configured eligible car as the default in the canonical vehicle
+  resolution path, not a hardcoded BMW name/id or UI-only guess. Preserve an explicitly chosen guest or
+  explicit different identity and existing ownership/uncertain/Pause/Stop guards. Zero cars stays unknown;
+  multiple cars retains existing guarded identification (no new multi-car UX). A sole-car plug-in should
+  resolve consistently in planner, authorization and UI with no redundant prompt/notification. Test one/zero/
+  two cars, restart, stale old identification and explicit guest; preserve sensor/source freshness rules.
+- [ ] **18.4 Absolute price bands and stable chart scale.** Read `samples/stepline-chart.js` for visual
+  inspiration and adapt existing shared ECharts options, never load its sample data or rebuild the chart.
+  Classification in EUR cents/kWh: <8 green (Cheap), 8–<15 yellow (Normal), 15–25 inclusive orange (Medium),
+  >25 red (Expensive). Color price line/area honestly by these absolute thresholds with a clear legend;
+  no min/max-relative palette. Use a zero baseline and minimum upper axis extent 30 c/kWh so a 1–3 c day
+  stays visibly low; extend the axis for negative prices and spikes without clipping, preserving threshold
+  positions and no downward autoscaling on cheap days. Preserve displayed price basis, units, zoom/tooltips,
+  gaps, DST/resolution, proposal overlays and update stability. Convert thresholds through existing trusted
+  unit/currency metadata where supported; never apply EUR cent cutoffs blindly to another currency or invent
+  an exchange rate. Unknown conversion gets neutral styling with an honest explanation. This is display
+  classification only, never a planner price cap or charging decision. Test 8/15/25 boundaries, 1–3 cheap
+  range, negative/spike/missing data, units, preview/live parity and range preservation; required build/dist.
+
+For each substage bump integration version and run frontend build/check-dist when integration/card changes;
+use focused fast tests, report visual and hardware limits truthfully, update this checklist and handoff.
+
 ## 8. Later feature stages
 
 ### Stage 13 — Useful configuration without the old card (13.1–13.4)
