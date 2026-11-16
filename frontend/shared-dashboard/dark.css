@@ -110,3 +110,14 @@ dialog{width:calc(100vw - 16px)}
 .history-banner{background:#223d3a;color:#c4e3da}.history-banner[data-history-banner="error"],.history-banner[data-history-banner="invalid"],.history-banner[data-history-banner="permission"]{background:#422b29;color:#ffddd1}
 .history-banner[data-history-banner="truncated"],.history-banner[data-history-banner="legacy"],.history-banner[data-history-banner="partial-raw"],.history-banner[data-history-banner="unknown-raw"]{background:#3d3318;color:#f3dca5}
 .history-day h3,.history-day h4{color:#e7f2f1}
+/* Aligned evidence tracks (7.3b): a palette of its own (blue/violet/cyan), never the price-band colours. Hatch = unknown. */
+.track-lanes{display:grid;gap:8px;margin:4px 0 10px}.track-lane{min-width:0}.track-caption{font-size:12px;line-height:1.35;color:#d5dfe9;padding:0 2px 3px}.track-caption small{display:block;font-size:11px;color:#a9b9c9}
+.track-bar{position:relative;height:22px;overflow:hidden;background:#17283a;border-radius:3px}.track-seg{position:absolute;top:0;bottom:0;box-sizing:border-box;overflow:hidden;white-space:nowrap;text-align:center;font-size:11px;line-height:22px;color:#08131e;padding:0 2px}
+.seg-proposal{background:#a7e8cf}.seg-proposal-exception{background:#a7e8cf;box-shadow:inset 0 0 0 2px #fff}.seg-sent{background:#8da2ff}.seg-sent-summary{background:#8da2ff99;outline:1px dashed #cfd8ff;outline-offset:-2px}
+.seg-effective{background:#c79cff}.seg-effective-differs{background:#c79cff;box-shadow:inset 0 0 0 2px #ff7ad9}
+.seg-flow{background:#4cc9f0}.seg-flow-outside_plan{background:#4cc9f0;box-shadow:inset 0 0 0 2px #ff7ad9}.seg-flow-plan_unknown{background:#4cc9f0;box-shadow:inset 0 0 0 2px #fff;outline:1px dotted #08131e;outline-offset:-4px}.seg-flow-no_plan_evidence{background:#4cc9f0;box-shadow:inset 0 -4px 0 #ff7ad9}
+.seg-no-flow{background:#2a4a5e;color:#d5dfe9}.seg-none,.seg-future{background:transparent;color:#a9b9c9}
+.seg-unknown,.seg-unloaded{color:#d9e3ec;background:repeating-linear-gradient(135deg,#9bb2c533 0 4px,transparent 4px 9px);border-top:1px dashed #5f7385;border-bottom:1px dashed #5f7385}.seg-unloaded{background:repeating-linear-gradient(135deg,#9bb2c51a 0 3px,transparent 3px 10px);color:#a9b9c9}
+.seg-stale{opacity:.55}.edge-open-start{border-left:3px dotted #08131e}.edge-open-end{border-right:3px dotted #08131e}
+.track-legend .tk{display:inline-block;width:14px;height:10px;border-radius:2px;margin:0 3px 0 2px;vertical-align:baseline}.tk-proposal{background:#a7e8cf}.tk-sent{background:#8da2ff}.tk-effective{background:#c79cff}.tk-flow{background:#4cc9f0}.tk-unknown{background:repeating-linear-gradient(135deg,#9bb2c566 0 3px,transparent 3px 6px);border:1px dashed #5f7385}
+@media(max-width:800px){.track-caption{font-size:12px}.track-bar{height:24px}.track-seg{line-height:24px}}

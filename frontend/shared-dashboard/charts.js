@@ -9,7 +9,7 @@ import { priceBand, bandColor, priceAxisExtent } from './price-bands.js';
 echarts.use([CustomChart, LineChart, GridComponent, TooltipComponent, MarkLineComponent, MarkAreaComponent, MarkPointComponent, VisualMapComponent, DataZoomComponent, CanvasRenderer]);
 const axis = { axisLine: { lineStyle: { color: '#536b76' } }, axisLabel: { color: '#bed0d5', fontSize: 12 }, splitLine: { lineStyle: { color: '#34444d' } } };
 export function mountCharts(root, data, format, modes) {
-  let { prices, windows, now, deadline, horizon, cap, readings, sentHistory, historyAxis, unit = 'c/kWh', viewKey } = data;
+  let { prices, windows, tracks = null, now, deadline, horizon, cap, readings, sentHistory, historyAxis, unit = 'c/kWh', viewKey } = data;
   let { time, date: sampleDate, days: sampleDays, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks, tickLabel } = format;
   time = format.chartTime || time;
   let tooltipDate = format.tooltipDate || sampleDate;
@@ -97,6 +97,37 @@ export function mountCharts(root, data, format, modes) {
       elements.push(gap);
     }
     days.replaceChildren(...elements);
+    drawLanes(z);
+  };
+  // Evidence tracks (7.3b): DOM lanes below the chart positioned with the chart's own axis conversion, so zoom, pan and
+  // resize move them with the price intervals. They add nothing to the chart's series, grid or y extent.
+  const laneRoot = root.querySelector(`[data-track-lanes="${mode}"]`);
+  const drawLanes = z => {
+    if (!laneRoot) return;
+    const px = h => priceChart.convertToPixel({xAxisIndex:0}, h);
+    const left = px(z.startValue), width = px(z.endValue) - left;
+    if (!tracks?.lanes?.length || !Number.isFinite(left) || !(width > 0)) { laneRoot.replaceChildren(); return; }
+    laneRoot.replaceChildren(...tracks.lanes.map(lane => {
+      const el = document.createElement('div'); el.className = 'track-lane'; el.dataset.lane = lane.key;
+      const caption = document.createElement('div'); caption.className = 'track-caption'; caption.textContent = lane.caption;
+      if (lane.note) { const note = document.createElement('small'); note.textContent = lane.note; caption.append(note); }
+      const bar = document.createElement('div'); bar.className = 'track-bar'; bar.style.marginLeft = `${left}px`; bar.style.width = `${width}px`;
+      for (const s of lane.segments) {
+        const a = Math.max(s.start, z.startValue), b = Math.min(s.end, z.endValue);
+        if (!(b > a)) continue;
+        const from = px(a), span = px(b) - from;
+        const seg = document.createElement('div');
+        seg.className = `track-seg seg-${s.kind}${s.stale ? ' seg-stale' : ''}${s.openStart ? ' edge-open-start' : ''}${s.openEnd ? ' edge-open-end' : ''}`;
+        seg.dataset.kind = s.kind; seg.dataset.start = s.start; seg.dataset.end = s.end;
+        if (s.version != null) seg.dataset.version = s.version;
+        seg.style.left = `${from - left}px`; seg.style.width = `${span}px`;
+        seg.title = s.text || ''; 
+        if (s.label && span >= 64) seg.textContent = s.label;
+        bar.append(seg);
+      }
+      el.append(caption, bar);
+      return el;
+    }));
   };
   let correcting = false;
   const updateView = () => {
@@ -186,7 +217,7 @@ export function mountCharts(root, data, format, modes) {
   if (powerChart) resize.observe(root.querySelector('#power-chart'));
   return { priceCharts, update(next, nextFormat) {
     const navigated=next.viewKey!==viewKey;
-    ({prices,windows,now,deadline,horizon,cap,unit='c/kWh',viewKey}=next);
+    ({prices,windows,tracks=null,now,deadline,horizon,cap,unit='c/kWh',viewKey}=next);
     ({time,date:sampleDate,days:sampleDays,priceGaps,stepSegments,stepPoints,snapRange,initialRange,timeTicks,tickLabel}=nextFormat);
     time=nextFormat.chartTime || time;
     tooltipDate=nextFormat.tooltipDate || sampleDate;

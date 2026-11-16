@@ -39,6 +39,9 @@ export function createSampleAdapter(rebuild) {
   // History day (7.3a): the live panel's own state machine and renderer, fed backend-shaped fixture answers.
   const historyNavigation = createHistoryDay({request:fixtureHistoryRequest(context), onChange:()=>rebuild?.(build())});
   const hours = ms => (ms-EPOCH)/3600000;
+  // Fictional latest readback (remaining period only), in the backend's absolute-instant shape; never history.
+  const sampleEffective = () => { const h = x => EPOCH + x * 3600000; const spans = [[now,24,0],[24,24.625,16],[24.625,25,0],[25,25.375,16],[25.375,36,0]].map(([a,b,value])=>({start:h(a),end:h(b),value}));
+    return dailyScenario === 'unavailable' || dailyScenario === 'stale' ? {state:'unknown',reason:'Fictional sample: no fresh readback in this scenario.'} : {state:'reported',readAt:h(now-0.02),readAtText:'14:29',unit:'A',spans,differs:dailyScenario==='mismatch'}; };
   const build = () => {
     const view = navigation.sync({...context, today:SAMPLE_TODAY, span:d=>{const s=Date.parse(`${d}T00:00:00Z`);return Number.isFinite(s)?[s,s+86400000]:null;}, waitingForTomorrow:false}).view(sampleRows);
     // Default (Today): the sample's own chart, untouched. Another selection draws the merged held rows in the sample's hour axis.
@@ -52,9 +55,9 @@ export function createSampleAdapter(rebuild) {
     return {...b, format:{...b.format,...nav}, model:{...b.model,chart,priceNav:view?.nav ?? null,historyDay:historyNavigation.sync({charger:context.charger,epoch:'sample',zone:HISTORY_ZONE,marketZone:HISTORY_ZONE,today:HISTORY_TODAY}).view()}, actions:{...b.actions,priceNav:(kind,arg)=>kind==='retry' ? navigation.retry() : navigation.select(kind,arg),historyNav:(kind,arg)=>kind==='retry' ? historyNavigation.retry() : historyNavigation.select(kind,arg)}};
   };
   const base = () => adapterBase();
-  const adapterBase = () => ({ format:{time,day,minutesPerTimeUnit:60,staleLabel:'stale sample',date:sampleDate,tooltipDate:h=>`${sampleDate(h)} 2026`,days:sampleDays,priceGaps,stepSegments,stepPoints,snapRange,initialRange,timeTicks},
+  const adapterBase = () => ({ format:{toAxis:hours,time,day,minutesPerTimeUnit:60,staleLabel:'stale sample',date:sampleDate,tooltipDate:h=>`${sampleDate(h)} 2026`,days:sampleDays,priceGaps,stepSegments,stepPoints,snapRange,initialRange,timeTicks},
     actions:{selectScenario(selected) { const url = new URL(location.href); url.searchParams.set('state',selected); location.href = url.href; }},
-    model:{sample:true,windows:windows.map((w,i,a)=>i===a.length-1 ? {...w,reserveMinutes:6,reserveKwh:0.6,reserveCost:0.12} : w),reserve:sampleReserve,learning:sampleLearning,assumptions:socAssumptions,vehicle:state,settings:{target:80,minimum:40,cap:35,readyBy:'07:00',reserve:10},untilDeadline:'16h 30m',targetNote,nextPriceUnavailable:scenario==='missing',
+    model:{sample:true,effectiveTrack:sampleEffective(),windows:windows.map((w,i,a)=>i===a.length-1 ? {...w,reserveMinutes:6,reserveKwh:0.6,reserveCost:0.12} : w),reserve:sampleReserve,learning:sampleLearning,assumptions:socAssumptions,vehicle:state,settings:{target:80,minimum:40,cap:35,readyBy:'07:00',reserve:10},untilDeadline:'16h 30m',targetNote,nextPriceUnavailable:scenario==='missing',
       scenarios:{label:'Sample scenario',selected:dailyScenario,options:Object.entries(dailyStates).map(([value,s])=>({value,label:s.label})),note:'Local illustration only · no settings or charger actions'},
       warning:state.warning ? {title:dailyScenario==='mismatch'?'Schedule needs attention':'Sample state needs attention',detail:dailyScenario==='mismatch'?'Sample effective limits differ from the last sent plan. This is not proof of charging; measured power is shown separately.':state.policy}:null,
       chart:{prices,now,deadline,horizon,cap,comparison:new URLSearchParams(location.search).get('comparison')==='bar'},

@@ -35,7 +35,7 @@ export function reconcile(oldNode, newNode, preserveValue = () => false) {
     if (keepValue && ['value','checked'].includes(attr.name)) continue;
     if (oldNode.getAttribute(attr.name)!==attr.value) oldNode.setAttribute(attr.name,attr.value);
   }
-  if ((keepValue && oldNode.tagName==='SELECT') || oldNode.id==='morek-debug' || oldNode.classList.contains('price-chart') || oldNode.id==='power-chart') return oldNode;
+  if ((keepValue && oldNode.tagName==='SELECT') || oldNode.id==='morek-debug' || oldNode.classList.contains('price-chart') || oldNode.classList.contains('track-lanes') || oldNode.id==='power-chart') return oldNode;
   const desired=[...newNode.childNodes];
   let cursor=oldNode.firstChild;
   for (const next of desired) {

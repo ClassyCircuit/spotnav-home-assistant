@@ -10,6 +10,7 @@ import { displayPrice } from '../shared-dashboard/price-format.js';
 import { observationFreshness } from '../src/observation-freshness.ts';
 import { liveCharging } from './live-charging.js';
 import { chargeSession } from './charge-session.js';
+import { effectiveTrack } from './effective-track.js';
 
 const U = 'Unknown';
 const reserveText = () => ({explain:translate('en','reserve.explain'), limits:Object.fromEntries(['two_hour_limit','no_eligible_time','window_limit','unknown'].map(k=>[k,translate('en',`reserve.limit.${k}`)]))});
@@ -138,7 +139,7 @@ export function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), f
       detailsNote:!validDetails ? 'Window energy and costs are unavailable because reconciled planner details are missing.' : proposal?.unpriced ? 'Window costs and prices are unavailable for an unpriced plan.' : !pricedBasis ? 'Window prices and weighted average are unavailable because the cost basis or currency is unknown.' : null,
       minutesPerTimeUnit:1/60000, time: ms=>part(ms,zone,{timeStyle:'short'}), day: ms=>part(ms,zone,{dateStyle:'medium'}), ...published?.format},
     model: {
-      windows, nextWindow, learning:proposal ? learningModel(rawProposal?.learning,planStale,learningText()) : null, reserve:!planStale && proposal ? reserveModel(rawProposal?.reserve,pricedBasis ? planCurrency : null,reserveText()) : null, chart:published?.chart, priceNav:priceView?.nav || null, totals: !planStale && proposal ? {energy:proposal.planned_kwh,cost:proposal.unpriced ? null : proposal.cost?.value,pricePerKwh:avg} : null,
+      effectiveTrack:effectiveTrack(status, observedAt, failed, now, zone), windows, nextWindow, learning:proposal ? learningModel(rawProposal?.learning,planStale,learningText()) : null, reserve:!planStale && proposal ? reserveModel(rawProposal?.reserve,pricedBasis ? planCurrency : null,reserveText()) : null, chart:published?.chart, priceNav:priceView?.nav || null, totals: !planStale && proposal ? {energy:proposal.planned_kwh,cost:proposal.unpriced ? null : proposal.cost?.value,pricePerKwh:avg} : null,
       vehicle: {status: stale ? 'Connection unavailable · stale dashboard' : d.charger.available ? (d.connection?.state || U) : 'Charger unavailable', detail:`Dashboard observed ${date(d.generated_at,zone)}${stale ? ` · stale: ${staleReason}` : ''}`, power:live.power,live:live.summary,liveMismatch:live.mismatch, soc:validPercent(soc) ? soc : null, stale:socStale, planStale, socDetail, socEstimated:!useRaw && d.soc?.estimated===true, policy:policyText},
       assumptions:{startingSoc:projectionValid ? rawProjection.starting_soc : null,capacityKwh:d.soc?.capacity_kwh,efficiency:d.soc?.efficiency,projectionSupported:projectionValid,projectionKwhPerPercent:rawProjection?.kwh_per_percent,projectionNote:projectionNoteFull},
       settings: {target:d.soc?.target_percent, minimum:d.settings?.minimum_ready_by_soc, cap:d.settings?.soft_price_cap, readyBy:d.settings?.departure_time},

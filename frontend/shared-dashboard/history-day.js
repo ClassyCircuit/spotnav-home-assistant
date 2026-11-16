@@ -52,8 +52,57 @@ const RECON = { reconciled: 'Register total reconciled', consistent: 'Register t
   unknown: 'Register total unknown', uncertain: 'Register total uncertain', skipped: 'Register total not checked' };
 const words = text => String(text ?? 'unknown').replace(/_/g, ' ');
 
+
+const bounded = (a, b, lo, hi) => { const s = Math.max(a, lo), e = Math.min(b, hi); return Number.isFinite(s) && Number.isFinite(e) && e > s ? { start: s, end: e } : null; };
+/**
+ * Numeric spans for the aligned price-axis tracks (7.3b): validated absolute instants (ms) straight from the backend answer,
+ * clipped to the loaded day window; never parsed from the display strings above. Flow and its verdicts are the backend's.
+ */
+export function historyTracks(answer, { raw, since, until, oldestPower, digest, readAt, zone, day }) {
+  const o = answer.observed, c = answer.comparison, cov = o.coverage;
+  const known = [], unknown = [];
+  const addBlock = (b, summary) => {
+    const a = instant(b.start), e = instant(b.end), u = instant(b.intent_uncertain_after);
+    const limit = num(b.limit) ? b.limit : null, unit = typeof b.unit === 'string' ? b.unit : '';
+    const cut = Number.isFinite(u) && u < e ? Math.max(a, u) : e;
+    const k = bounded(a, cut, since, until);
+    if (k) known.push({ ...k, version: b.version ?? null, limit, unit, summary });
+    const rest = cut < e ? bounded(cut, e, since, until) : null;
+    if (rest) unknown.push({ ...rest, reason: 'intent_uncertain' });
+  };
+  if (raw === 'digest_only' && digest) (digest.planned_blocks || []).forEach(b => addBlock(b, true));
+  else c.planned_blocks.forEach(b => addBlock(b, false));
+  for (const u of c.unknown_plan_spans) {
+    const span = bounded(instant(u.from), u.until ? instant(u.until) : until, since, until);
+    if (span) unknown.push({ ...span, reason: u.reason });
+  }
+  const detail = raw === 'full' || raw === 'partial';
+  const measured = { detail, note: '', flow: [], outside: [], noFlow: [], unknown: [] };
+  if (!detail) measured.note = raw === 'digest_only' ? 'Only the saved day summary remains, so no measured flow is drawn (see the history panel).' : 'No measured power rows are kept for this day.';
+  else {
+    const upto = Number.isFinite(readAt) ? Math.min(until, readAt) : until;
+    for (const i of o.intervals) {
+      const a = instant(i.first_sample), b = Math.max(instant(i.last_sample), a + 60000), span = bounded(a, b, since, until);
+      if (span) measured.flow.push({ ...span, startBounded: i.start_bounded === true, endBounded: i.end_bounded === true, peakW: num(i.peak_w) ? i.peak_w : null });
+    }
+    for (const x of c.outside_plan) { const span = bounded(instant(x.start), instant(x.end), since, until); if (span) measured.outside.push({ ...span, kind: x.kind }); }
+    for (const b of c.planned_blocks) if (b.verdict === 'no_flow_observed') { const span = bounded(instant(b.start), instant(b.end), since, upto); if (span) measured.noFlow.push(span); }
+    // Whole-window quiet only when the backend reports NO observed flow at all (no interval, outside-plan row or isolated sample)
+    // and its coverage says the entire window was measured and trusted; otherwise quiet time stays unknown, never invented.
+    const wholeWindow = nonneg(cov.window_seconds) && cov.window_seconds > 0 && cov.trusted_seconds >= cov.window_seconds && cov.window_seconds * 1000 >= upto - since - MINUTE;
+    if (cov.no_data_seconds === 0 && cov.untrusted_seconds === 0 && wholeWindow && o.intervals.length === 0 && c.outside_plan.length === 0 && o.isolated_flow_samples === 0
+      && Number.isFinite(upto) && upto > since) measured.noFlow.push({ start: since, end: upto });
+    // A gap row with no end is one unreadable reading (a single capture tick), not an open-ended outage.
+    for (const g of o.gaps) { const span = bounded(instant(g.from), g.to ? instant(g.to) : instant(g.from) + 60000, since, until); if (span) measured.unknown.push(span); }
+    if (raw === 'partial' && Number.isFinite(oldestPower)) { const span = bounded(since, oldestPower, since, until); if (span) measured.unknown.push(span); }
+  }
+  const when = ms => { try { return new Intl.DateTimeFormat('en-GB', { timeZone: zone, day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(ms); } catch { return 'unknown'; } };
+  return { day, zone, coverage: [since, until], readAt, raw, sent: { known, unknown }, measured,
+    coverageText: `History loaded for ${dayLabel(day)} only (${when(since)}–${when(until)}, ${zone}); other times are unknown` };
+}
+
 /** The display model of one validated answer; `fmt.stamp(iso)` formats an instant in the day's zone. */
-export function buildHistoryModel(answer, day, fmt) {
+export function buildHistoryModel(answer, day, fmt, readAt = NaN) {
   const since = instant(answer.window.since), until = instant(answer.window.until);
   const r = answer.retention, kinds = r.oldest_by_kind && typeof r.oldest_by_kind === 'object' ? r.oldest_by_kind : null;
   const signals = !!kinds && Array.isArray(r.digest_days) && answer.truncated && typeof answer.truncated === 'object';
@@ -150,6 +199,7 @@ export function buildHistoryModel(answer, day, fmt) {
     coverage: { text: `Measured power covers ${duration(cov.trusted_seconds)} of ${duration(cov.window_seconds)}; ${duration(cov.untrusted_seconds)} untrusted; ${duration(cov.no_data_seconds)} with no data (unknown, not zero).`,
       none: !nonneg(cov.trusted_seconds) },
     sent, flow, outside, energyRows, energyNotes, sessions, gaps, restarts, unacked, digest: digestModel,
+    tracks: historyTracks(answer, { raw, since, until, oldestPower, digest, readAt, zone: answer.window.zone, day }),
     isolated: nonneg(o.isolated_flow_samples) && o.isolated_flow_samples > 0 ? `${o.isolated_flow_samples} single reading(s) above the flow threshold were not enough to count as charging.` : '',
     flowNote: 'Flow comes only from measured power readings (threshold about 100 W, unverified for the installed charger). A plan, its acknowledgement, a limit read back, the battery level or the charger status never counts as flow.',
     sentNote: 'Sent means the charger answered a plan version as accepted, not that it was installed or that charging happened. After an uncertain write the plan is unknown.',
@@ -192,7 +242,8 @@ export function createHistoryDay({ request, onChange = () => {}, now = () => Dat
       const answer = await request({ date: day });
       if (mine !== seq || myKey !== key) return;
       if (!validateHistory(answer, asked)) throw new Error('invalid');
-      st.result = { day, at: now(), model: buildHistoryModel(answer, day, fmtFor(asCtx)) };
+      const at = now();
+      st.result = { day, at, model: buildHistoryModel(answer, day, fmtFor(asCtx), at) };
     } catch (error) {
       if (mine !== seq || myKey !== key) return;
       // A failed refresh keeps the earlier read clearly stale and waits for an explicit retry.

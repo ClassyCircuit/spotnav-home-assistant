@@ -986,7 +986,7 @@ only if a helper is explicitly used **and labelled**; read-range page = 8 local 
   JavaScript planning or interpretation beyond rendering. *Acceptance:* each status and unknown/gap/truncation case renders distinctly; Morek-only
   and retention (3 days at full cadence, not 7) stated; opening writes nothing; stale-day/charger responses dropped; adapter and renderer tests;
   build/check-dist. *Exclusions:* no tracks on the price axis (7.3b), no cost, no new store, no retention change.
-- [ ] **7.3b Aligned tracks on the price axis.** *Needs 7.3a and 7.1.* *Scope:* tracks sharing the price time axis (zoom/pan stays aligned):
+- [x] **7.3b Aligned tracks on the price axis.** *Locally implemented 2026-11-16 (manifest 2.5.170), mocked checks only (ECharts mocked, no browser); coordinator reviewed (56 focused tests and check-dist passed); not deployed or visually verified; see the handoff.* *Needs 7.3a and 7.1.* *Scope:* tracks sharing the price time axis (zoom/pan stays aligned):
   **Proposal** (the *current* plan only, with `minimum-exception` marking, drawn only while the visible range reaches now/future; a past day has no
   proposal track unless the history lists that recorded version), **Sent** (spans of the acknowledged versions the history reports, **each span
   carrying its own version id**; several versions in one day appear one after another, and spans after an uncertain write are `unknown`), **Effective**

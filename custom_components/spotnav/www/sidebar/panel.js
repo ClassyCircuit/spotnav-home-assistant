@@ -41551,9 +41551,9 @@ var VisualMapping = (
         }
       }
       for (var i7 = 0, len2 = pieceList.length; i7 < len2; i7++) {
-        var piece = pieceList[i7];
-        var interval = piece.interval;
-        var close_1 = piece.close;
+        var piece2 = pieceList[i7];
+        var interval = piece2.interval;
+        var close_1 = piece2.close;
         if (interval) {
           if (interval[0] === -Infinity) {
             if (littleThan(close_1[1], value2, interval[1])) {
@@ -41674,9 +41674,9 @@ var VisualMapping = (
 function preprocessForPiecewise(thisOption) {
   var pieceList = thisOption.pieceList;
   thisOption.hasSpecialVisual = false;
-  each(pieceList, function(piece, index) {
-    piece.originIndex = index;
-    if (piece.visual != null) {
+  each(pieceList, function(piece2, index) {
+    piece2.originIndex = index;
+    if (piece2.visual != null) {
       thisOption.hasSpecialVisual = true;
     }
   });
@@ -41772,9 +41772,9 @@ function getSpecifiedVisual(value2) {
   var pieceList = thisOption.pieceList;
   if (thisOption.hasSpecialVisual) {
     var pieceIndex = VisualMapping.findPieceIndex(value2, pieceList);
-    var piece = pieceList[pieceIndex];
-    if (piece && piece.visual) {
-      return piece.visual[this.type];
+    var piece2 = pieceList[pieceIndex];
+    if (piece2 && piece2.visual) {
+      return piece2.visual[this.type];
     }
   }
 }
@@ -50688,13 +50688,13 @@ function visualMapPreprocessor(option) {
     }
     var pieces = opt4.pieces;
     if (pieces && isArray(pieces)) {
-      each9(pieces, function(piece) {
-        if (isObject(piece)) {
-          if (has(piece, "start") && !has(piece, "min")) {
-            piece.min = piece.start;
+      each9(pieces, function(piece2) {
+        if (isObject(piece2)) {
+          if (has(piece2, "start") && !has(piece2, "min")) {
+            piece2.min = piece2.start;
           }
-          if (has(piece, "end") && !has(piece, "max")) {
-            piece.max = piece.end;
+          if (has(piece2, "end") && !has(piece2, "max")) {
+            piece2.max = piece2.end;
           }
         }
       });
@@ -50768,12 +50768,12 @@ var PiecewiseModel = (
         } else {
           mappingOption.dataExtent = this.getExtent();
           mappingOption.mappingMethod = "piecewise";
-          mappingOption.pieceList = map(this._pieceList, function(piece) {
-            piece = clone(piece);
+          mappingOption.pieceList = map(this._pieceList, function(piece2) {
+            piece2 = clone(piece2);
             if (state !== "inRange") {
-              piece.visual = null;
+              piece2.visual = null;
             }
-            return piece;
+            return piece2;
           });
         }
       });
@@ -50783,9 +50783,9 @@ var PiecewiseModel = (
       var visualTypesInPieces = {};
       var visualTypes = VisualMapping_default.listVisualTypes();
       var isCategory2 = this.isCategory();
-      each(option.pieces, function(piece) {
+      each(option.pieces, function(piece2) {
         each(visualTypes, function(visualType) {
-          if (piece.hasOwnProperty(visualType)) {
+          if (piece2.hasOwnProperty(visualType)) {
             visualTypesInPieces[visualType] = 1;
           }
         });
@@ -50809,16 +50809,16 @@ var PiecewiseModel = (
       var pieceList = this._pieceList;
       var selected = (isInit ? thisOption : newOption).selected || {};
       thisOption.selected = selected;
-      each(pieceList, function(piece, index) {
-        var key3 = this.getSelectedMapKey(piece);
+      each(pieceList, function(piece2, index) {
+        var key3 = this.getSelectedMapKey(piece2);
         if (!selected.hasOwnProperty(key3)) {
           selected[key3] = true;
         }
       }, this);
       if (thisOption.selectedMode === "single") {
         var hasSel_1 = false;
-        each(pieceList, function(piece, index) {
-          var key3 = this.getSelectedMapKey(piece);
+        each(pieceList, function(piece2, index) {
+          var key3 = this.getSelectedMapKey(piece2);
           if (selected[key3]) {
             hasSel_1 ? selected[key3] = false : hasSel_1 = true;
           }
@@ -50828,8 +50828,8 @@ var PiecewiseModel = (
     PiecewiseModel2.prototype.getItemSymbol = function() {
       return this.get("itemSymbol");
     };
-    PiecewiseModel2.prototype.getSelectedMapKey = function(piece) {
-      return this._mode === "categories" ? piece.value + "" : piece.index + "";
+    PiecewiseModel2.prototype.getSelectedMapKey = function(piece2) {
+      return this._mode === "categories" ? piece2.value + "" : piece2.index + "";
     };
     PiecewiseModel2.prototype.getPieceList = function() {
       return this._pieceList;
@@ -50862,15 +50862,15 @@ var PiecewiseModel = (
       }, this);
       return result2;
     };
-    PiecewiseModel2.prototype.getRepresentValue = function(piece) {
+    PiecewiseModel2.prototype.getRepresentValue = function(piece2) {
       var representValue;
       if (this.isCategory()) {
-        representValue = piece.value;
+        representValue = piece2.value;
       } else {
-        if (piece.value != null) {
-          representValue = piece.value;
+        if (piece2.value != null) {
+          representValue = piece2.value;
         } else {
-          var pieceInterval = piece.interval || [];
+          var pieceInterval = piece2.interval || [];
           representValue = pieceInterval[0] === -Infinity && pieceInterval[1] === Infinity ? 0 : (pieceInterval[0] + pieceInterval[1]) / 2;
         }
       }
@@ -50921,8 +50921,8 @@ var PiecewiseModel = (
         });
       }
       var curr = -Infinity;
-      each(pieceList, function(piece) {
-        var interval = piece.interval;
+      each(pieceList, function(piece2) {
+        var interval = piece2.interval;
         if (interval) {
           interval[0] > curr && setStop([curr, interval[0]], "outOfRange");
           setStop(interval.slice());
@@ -50988,9 +50988,9 @@ var resetMethods = {
       });
     }
     reformIntervals(outPieceList);
-    each(outPieceList, function(piece, index2) {
-      piece.index = index2;
-      piece.text = this.formatValueText(piece.interval);
+    each(outPieceList, function(piece2, index2) {
+      piece2.index = index2;
+      piece2.text = this.formatValueText(piece2.interval);
     }, this);
   },
   categories: function(outPieceList) {
@@ -51053,10 +51053,10 @@ var resetMethods = {
     }, this);
     normalizeReverse(thisOption, outPieceList);
     reformIntervals(outPieceList);
-    each(outPieceList, function(piece) {
-      var close = piece.close;
+    each(outPieceList, function(piece2) {
+      var close = piece2.close;
       var edgeSymbols = [["<", "\u2264"][close[1]], [">", "\u2265"][close[0]]];
-      piece.text = piece.text || this.formatValueText(piece.value != null ? piece.value : piece.interval, false, edgeSymbols);
+      piece2.text = piece2.text || this.formatValueText(piece2.value != null ? piece2.value : piece2.interval, false, edgeSymbols);
     }, this);
   }
 };
@@ -51092,11 +51092,11 @@ var PiecewiseVisualMapView = (
       var silent = !visualMapModel.get("selectedMode");
       endsText && this._renderEndsText(thisGroup, endsText[0], itemSize, showLabel, itemAlign);
       each(viewData.viewPieceList, function(item) {
-        var piece = item.piece;
+        var piece2 = item.piece;
         var itemGroup = new Group_default();
-        itemGroup.onclick = bind(this._onItemClick, this, piece);
+        itemGroup.onclick = bind(this._onItemClick, this, piece2);
         this._enableHoverLink(itemGroup, item.indexInModelPieceList);
-        var representValue = visualMapModel.getRepresentValue(piece);
+        var representValue = visualMapModel.getRepresentValue(piece2);
         this._createItemSymbol(itemGroup, representValue, [0, 0, itemSize[0], itemSize[1]], silent);
         if (showLabel) {
           var visualState = this.visualMapModel.getValueState(representValue);
@@ -51105,7 +51105,7 @@ var PiecewiseVisualMapView = (
             style: createTextStyle(textStyleModel, {
               x: align === "right" ? -textGap : itemSize[0] + textGap,
               y: itemSize[1] / 2,
-              text: piece.text,
+              text: piece2.text,
               verticalAlign: textStyleModel.get("verticalAlign") || "middle",
               align,
               opacity: retrieve2(textStyleModel.get("opacity"), visualState === "outOfRange" ? 0.5 : 1)
@@ -51167,9 +51167,9 @@ var PiecewiseVisualMapView = (
     };
     PiecewiseVisualMapView2.prototype._getViewData = function() {
       var visualMapModel = this.visualMapModel;
-      var viewPieceList = map(visualMapModel.getPieceList(), function(piece, index) {
+      var viewPieceList = map(visualMapModel.getPieceList(), function(piece2, index) {
         return {
-          piece,
+          piece: piece2,
           indexInModelPieceList: index
         };
       });
@@ -51200,7 +51200,7 @@ var PiecewiseVisualMapView = (
       itemSymbol.silent = silent;
       group.add(itemSymbol);
     };
-    PiecewiseVisualMapView2.prototype._onItemClick = function(piece) {
+    PiecewiseVisualMapView2.prototype._onItemClick = function(piece2) {
       var visualMapModel = this.visualMapModel;
       var option = visualMapModel.option;
       var selectedMode = option.selectedMode;
@@ -51208,7 +51208,7 @@ var PiecewiseVisualMapView = (
         return;
       }
       var selected = clone(option.selected);
-      var newKey = visualMapModel.getSelectedMapKey(piece);
+      var newKey = visualMapModel.getSelectedMapKey(piece2);
       if (selectedMode === "single" || selectedMode === true) {
         selected[newKey] = true;
         each(selected, function(o9, key3) {
@@ -52270,7 +52270,7 @@ function priceAxisExtent(prices, unit, extra) {
 use([install3, install, install5, install6, install8, install9, install7, install15, install12, install16]);
 var axis = { axisLine: { lineStyle: { color: "#536b76" } }, axisLabel: { color: "#bed0d5", fontSize: 12 }, splitLine: { lineStyle: { color: "#34444d" } } };
 function mountCharts(root, data, format3, modes) {
-  let { prices, windows, now, deadline, horizon, cap, readings, sentHistory, historyAxis, unit = "c/kWh", viewKey } = data;
+  let { prices, windows, tracks = null, now, deadline, horizon, cap, readings, sentHistory, historyAxis, unit = "c/kWh", viewKey } = data;
   let { time: time2, date: sampleDate, days: sampleDays, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks, tickLabel } = format3;
   time2 = format3.chartTime || time2;
   let tooltipDate = format3.tooltipDate || sampleDate;
@@ -52392,6 +52392,52 @@ ${sampleDate(h3)}` : time2(h3);
         elements.push(gap);
       }
       days.replaceChildren(...elements);
+      drawLanes(z2);
+    };
+    const laneRoot = root.querySelector(`[data-track-lanes="${mode}"]`);
+    const drawLanes = (z2) => {
+      if (!laneRoot) return;
+      const px = (h3) => priceChart.convertToPixel({ xAxisIndex: 0 }, h3);
+      const left = px(z2.startValue), width = px(z2.endValue) - left;
+      if (!tracks?.lanes?.length || !Number.isFinite(left) || !(width > 0)) {
+        laneRoot.replaceChildren();
+        return;
+      }
+      laneRoot.replaceChildren(...tracks.lanes.map((lane) => {
+        const el = document.createElement("div");
+        el.className = "track-lane";
+        el.dataset.lane = lane.key;
+        const caption = document.createElement("div");
+        caption.className = "track-caption";
+        caption.textContent = lane.caption;
+        if (lane.note) {
+          const note = document.createElement("small");
+          note.textContent = lane.note;
+          caption.append(note);
+        }
+        const bar = document.createElement("div");
+        bar.className = "track-bar";
+        bar.style.marginLeft = `${left}px`;
+        bar.style.width = `${width}px`;
+        for (const s4 of lane.segments) {
+          const a4 = Math.max(s4.start, z2.startValue), b3 = Math.min(s4.end, z2.endValue);
+          if (!(b3 > a4)) continue;
+          const from = px(a4), span = px(b3) - from;
+          const seg = document.createElement("div");
+          seg.className = `track-seg seg-${s4.kind}${s4.stale ? " seg-stale" : ""}${s4.openStart ? " edge-open-start" : ""}${s4.openEnd ? " edge-open-end" : ""}`;
+          seg.dataset.kind = s4.kind;
+          seg.dataset.start = s4.start;
+          seg.dataset.end = s4.end;
+          if (s4.version != null) seg.dataset.version = s4.version;
+          seg.style.left = `${from - left}px`;
+          seg.style.width = `${span}px`;
+          seg.title = s4.text || "";
+          if (s4.label && span >= 64) seg.textContent = s4.label;
+          bar.append(seg);
+        }
+        el.append(caption, bar);
+        return el;
+      }));
     };
     let correcting = false;
     const updateView = () => {
@@ -52508,7 +52554,7 @@ ${sampleDate(h3)}` : time2(h3);
   if (powerChart) resize.observe(root.querySelector("#power-chart"));
   return { priceCharts, update(next, nextFormat) {
     const navigated = next.viewKey !== viewKey;
-    ({ prices, windows, now, deadline, horizon, cap, unit = "c/kWh", viewKey } = next);
+    ({ prices, windows, tracks = null, now, deadline, horizon, cap, unit = "c/kWh", viewKey } = next);
     ({ time: time2, date: sampleDate, days: sampleDays, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks, tickLabel } = nextFormat);
     time2 = nextFormat.chartTime || time2;
     tooltipDate = nextFormat.tooltipDate || sampleDate;
@@ -52519,6 +52565,149 @@ ${sampleDate(h3)}` : time2(h3);
     Object.values(priceCharts).forEach((chart) => chart.dispose());
     powerChart?.dispose();
   } };
+}
+
+// shared-dashboard/chart-tracks.js
+var finite = Number.isFinite;
+var sameKey = (a4, b3) => a4.kind === b3.kind && a4.text === b3.text && a4.label === b3.label && a4.version === b3.version && !!a4.stale === !!b3.stale && !!a4.differs === !!b3.differs;
+function tile(h0, h1, baseAt, cuts, segments) {
+  const valid = segments.filter((s4) => finite(s4.start) && finite(s4.end) && s4.end > s4.start && s4.end > h0 && s4.start < h1);
+  const points2 = /* @__PURE__ */ new Set([h0, h1]);
+  for (const c5 of cuts) if (finite(c5) && c5 > h0 && c5 < h1) points2.add(c5);
+  for (const s4 of valid) {
+    if (s4.start > h0) points2.add(s4.start);
+    if (s4.end < h1) points2.add(s4.end);
+  }
+  const xs = [...points2].sort((a4, b3) => a4 - b3), out2 = [];
+  for (let i7 = 0; i7 < xs.length - 1; i7++) {
+    const a4 = xs[i7], b3 = xs[i7 + 1], mid = (a4 + b3) / 2;
+    const cover = valid.filter((s4) => s4.start <= mid && mid < s4.end);
+    let piece2;
+    if (!cover.length) piece2 = { ...baseAt(mid) };
+    else {
+      const top = Math.max(...cover.map((s4) => s4.layer || 1)), hit = cover.filter((s4) => (s4.layer || 1) === top);
+      piece2 = hit.every((s4) => sameKey(s4, hit[0])) ? { ...hit[0] } : { kind: "unknown", label: "conflict", text: "Conflicting evidence: spans overlap here, so this time is unknown.", conflict: true };
+      piece2.openStart = hit.some((s4) => s4.openStart && s4.start === a4);
+      piece2.openEnd = hit.some((s4) => s4.openEnd && s4.end === b3);
+    }
+    delete piece2.layer;
+    piece2.start = a4;
+    piece2.end = b3;
+    const last = out2.at(-1);
+    if (last && last.end === a4 && sameKey(last, piece2) && !last.openEnd && !piece2.openStart) {
+      last.end = b3;
+      last.openEnd = piece2.openEnd;
+    } else out2.push(piece2);
+  }
+  return out2;
+}
+var piece = (kind, label2, text4) => ({ kind, label: label2, text: text4 });
+var peak = (w2) => finite(w2) ? `${(w2 / 1e3).toFixed(1)} kW` : "unknown";
+function proposalLane({ horizon: [h0, h1], now, windows }) {
+  const known = Array.isArray(windows);
+  const segments = known ? windows.filter((w2) => w2 && finite(w2.start) && finite(w2.end) && w2.end > w2.start && w2.end > now).map((w2) => {
+    const exception = w2.control === "minimum-exception", reserve = finite(w2.reserveMinutes) && w2.reserveMinutes > 0;
+    return {
+      start: Math.max(w2.start, now),
+      end: w2.end,
+      layer: 1,
+      kind: exception ? "proposal-exception" : "proposal",
+      label: exception ? "above-cap minimum" : "proposal",
+      text: `Proposed charging (calculated, not sent)${exception ? " \xB7 above-cap minimum" : ""}${reserve ? ` \xB7 includes ${Math.round(w2.reserveMinutes)} min reserve` : ""}`
+    };
+  }) : [];
+  const baseAt = (mid) => !known ? piece("unknown", "no proposal", "No current proposal: it is stale, unavailable or not calculated.") : mid < now ? piece("unknown", "past", "Past time: the current proposal does not describe it.") : piece("none", "", "No proposed charging here.");
+  return {
+    key: "proposal",
+    caption: "Proposal \xB7 current calculated plan",
+    note: known ? "Not sent; for now and later only. Past time is hatched, not \u201Cno plan\u201D." : "No current proposal to show.",
+    segments: tile(h0, h1, baseAt, [now], segments)
+  };
+}
+function sentLane({ horizon: [h0, h1], toAxis, tracks, message }) {
+  if (!tracks) return {
+    key: "sent",
+    caption: "Sent \xB7 acknowledged plan versions",
+    note: message || "Charging history is not loaded; nothing is known about what was sent.",
+    segments: tile(h0, h1, () => piece("unloaded", "not loaded", "Charging history is not loaded for this time."), [], [])
+  };
+  const [c0, c1] = tracks.coverage.map(toAxis);
+  const segments = [
+    ...tracks.sent.known.map((b3) => ({
+      start: toAxis(b3.start),
+      end: toAxis(b3.end),
+      layer: 1,
+      kind: b3.summary ? "sent-summary" : "sent",
+      version: b3.version ?? null,
+      label: `${b3.version ?? "plan ?"}${finite(b3.limit) ? ` \xB7 ${b3.limit}${b3.unit ? ` ${b3.unit}` : ""}` : ""}`,
+      text: `${b3.summary ? "Saved day summary: " : ""}Plan version ${b3.version ?? "unknown"} was acknowledged by the charger${finite(b3.limit) ? ` with limit ${b3.limit}${b3.unit ? ` ${b3.unit}` : ""}` : ""}. Acknowledged is not installed and not charging.`
+    })),
+    ...tracks.sent.unknown.map((u4) => ({ start: toAxis(u4.start), end: toAxis(u4.end), layer: 2, kind: "unknown", label: "unknown", text: `What the charger had installed is unknown here (${String(u4.reason || "uncertain write").replace(/_/g, " ")}).` }))
+  ];
+  const baseAt = (mid) => mid >= c0 && mid < c1 ? piece("unknown", "no known plan", "No acknowledged plan span is known here; that is not proof that nothing was installed.") : piece("unloaded", "not loaded", "The loaded history day does not cover this time, so it is unknown.");
+  return { key: "sent", caption: "Sent \xB7 acknowledged plan versions", note: `${tracks.coverageText}. Each span names its own plan version.`, segments: tile(h0, h1, baseAt, [c0, c1], segments) };
+}
+function effectiveLane({ horizon: [h0, h1], now, toAxis, effective }) {
+  const base2 = () => piece("unknown", "unknown", effective?.state === "reported" ? "Outside the latest readback\u2019s remaining period: unknown." : effective?.reason || "No fresh readback.");
+  const ok3 = effective?.state === "reported";
+  const segments = ok3 ? effective.spans.map((s4) => ({
+    start: Math.max(toAxis(s4.start), now),
+    end: toAxis(s4.end),
+    layer: 1,
+    kind: effective.differs ? "effective-differs" : "effective",
+    differs: !!effective.differs,
+    label: `${s4.value} ${effective.unit || "A"}`,
+    text: `Reported effective limit ${s4.value} ${effective.unit || "A"} in the latest readback${effective.differs ? " \xB7 the readback differs from the last sent schedule (reported difference)" : ""}. A reported limit is neither power nor proof of charging.`
+  })) : [];
+  return {
+    key: "effective",
+    caption: "Effective \xB7 latest readback, remaining period only",
+    note: ok3 ? `Read ${effective.readAtText || "recently"}; never restored for past time. Not installed-profile inventory.` : effective?.reason || "No fresh readback; effective limits are unknown.",
+    segments: tile(h0, h1, base2, [], segments)
+  };
+}
+function measuredLane({ horizon: [h0, h1], now, toAxis, tracks, message, refreshFailed }) {
+  if (!tracks) return {
+    key: "measured",
+    caption: "Measured \xB7 observed power flow",
+    note: message || "Charging history is not loaded; nothing is known about measured flow.",
+    segments: tile(h0, h1, (mid) => mid < now ? piece("unloaded", "not loaded", "Charging history is not loaded for this time.") : piece("future", "not yet", "This time has not happened yet."), [now], [])
+  };
+  const [c0, c1] = tracks.coverage.map(toAxis), M2 = tracks.measured, stale = !!refreshFailed;
+  const fit = (a4, b3) => ({ start: toAxis(a4), end: Math.min(toAxis(b3), now) });
+  const mk = (list4, extra) => list4.map((x2) => ({ ...fit(x2.start, x2.end), stale, ...extra(x2) })).filter((s4) => s4.end > s4.start);
+  const segments = M2.detail ? [
+    ...mk(M2.noFlow, () => ({ layer: 1, kind: "no-flow", label: "no flow observed", text: "No flow observed: measured readings cover this time and show none." })),
+    ...mk(M2.flow, (x2) => ({
+      layer: 1,
+      kind: "flow",
+      label: peak(x2.peakW),
+      openStart: !x2.startBounded,
+      openEnd: !x2.endBounded,
+      text: `Flow observed (measured power, peak ${peak(x2.peakW)})${x2.startBounded ? "" : " \xB7 start is open (a data gap, restart or the data start is beside it)"}${x2.endBounded ? "" : " \xB7 end is open"}.`
+    })),
+    ...mk(M2.outside, (x2) => ({
+      layer: 2,
+      kind: `flow-${x2.kind}`,
+      label: { outside_plan: "outside plan", plan_unknown: "plan unknown", no_plan_evidence: "no plan evidence" }[x2.kind] || x2.kind,
+      text: { outside_plan: "Flow outside the sent plan", plan_unknown: "Flow while the sent plan was unknown", no_plan_evidence: "Flow with no plan evidence" }[x2.kind] || `Flow: ${x2.kind}`
+    })),
+    ...mk(M2.unknown, () => ({ layer: 3, kind: "unknown", label: "not measured", text: "Not measured here (capture gap or rows no longer kept): unknown, not zero." }))
+  ] : [];
+  const baseAt = (mid) => mid >= now ? piece("future", "not yet", "This time has not happened yet.") : mid >= c0 && mid < c1 ? piece("unknown", "unknown", M2.detail ? "No measured classification here: unknown, not zero." : `Detailed power is not kept for this day: unknown. ${M2.note || ""}`.trim()) : piece("unloaded", "not loaded", "The loaded history day does not cover this time, so it is unknown.");
+  return {
+    key: "measured",
+    caption: "Measured \xB7 observed power flow",
+    note: `${tracks.coverageText}.${stale ? " Earlier read; the latest refresh failed." : ""}${M2.detail ? "" : ` ${M2.note || "No detailed power is drawn."}`}`,
+    segments: tile(h0, h1, baseAt, [c0, c1, now], segments)
+  };
+}
+function buildTracks({ horizon, now, toAxis = (x2) => x2, windows = null, history = null, effective = null }) {
+  if (!Array.isArray(horizon) || horizon.length !== 2 || !horizon.every(finite) || !(horizon[0] < horizon[1]) || !finite(now)) return null;
+  const tracks = history?.state === "ready" && history.tracks ? history.tracks : null;
+  const message = history?.message || (history ? "" : "Charging history is not part of this view.");
+  const ctx = { horizon, now, toAxis, tracks, message, refreshFailed: history?.refreshFailed === true };
+  return { lanes: [proposalLane({ horizon, now, windows }), sentLane(ctx), effectiveLane({ horizon, now, toAxis, effective }), measuredLane(ctx)] };
 }
 
 // shared-dashboard/plan-data.js
@@ -52834,7 +53023,7 @@ function reconcile(oldNode, newNode, preserveValue = () => false) {
     if (keepValue && ["value", "checked"].includes(attr.name)) continue;
     if (oldNode.getAttribute(attr.name) !== attr.value) oldNode.setAttribute(attr.name, attr.value);
   }
-  if (keepValue && oldNode.tagName === "SELECT" || oldNode.id === "morek-debug" || oldNode.classList.contains("price-chart") || oldNode.id === "power-chart") return oldNode;
+  if (keepValue && oldNode.tagName === "SELECT" || oldNode.id === "morek-debug" || oldNode.classList.contains("price-chart") || oldNode.classList.contains("track-lanes") || oldNode.id === "power-chart") return oldNode;
   const desired = [...newNode.childNodes];
   let cursor = oldNode.firstChild;
   for (const next of desired) {
@@ -52910,6 +53099,7 @@ function mountDashboard(root, adapter) {
     const unit = chart?.unit || "c/kWh";
     const priceNumber = priceText;
     const chartReady = prices.length > 0 && Array.isArray(chart?.horizon) && chart.horizon.length === 2 && chart.horizon.every(Number.isFinite) && chart.horizon[0] < chart.horizon[1] && Number.isFinite(chart.now) && ["date", "days", "priceGaps", "stepSegments", "stepPoints", "snapRange", "initialRange", "timeTicks"].every((key3) => typeof f3[key3] === "function");
+    const tracks = chartReady ? buildTracks({ horizon: chart.horizon, now: chart.now, toAxis: typeof f3.toAxis === "function" ? f3.toAxis : void 0, windows: knownPlan && !(state.planStale ?? state.stale) ? chartWindows : null, history: m4.historyDay ?? null, effective: m4.effectiveTrack ?? null }) : null;
     const readings = Array.isArray(m4.history?.readings) ? m4.history.readings.filter((r7) => Number.isFinite(r7?.time)).map((r7) => ({ time: r7.time, kw: Number.isFinite(r7.kw) && r7.kw >= 0 ? r7.kw : null })) : [];
     const sentHistory = m4.history?.sentHistory;
     const historyReady = readings.length >= 2 && readings.every((r7, i7) => !i7 || r7.time > readings[i7 - 1].time) && Number.isFinite(sentHistory?.start) && Number.isFinite(sentHistory?.end) && sentHistory.end > sentHistory.start;
@@ -52919,7 +53109,7 @@ function mountDashboard(root, adapter) {
       const title = mode === "bar" ? "Bars" : "Stepped area";
       if (!chartReady) return card(`Prices & plan \xB7 ${title}`, labels.chartEyebrow || "PRICES & PLAN", `<p>Price chart unavailable.</p><p class="subtext">${escapeText(labels.chartIntro)} ${escapeText(labels.chartNote)}</p>${plan}`, `prices prices-${mode}`, tag);
       const extremum = (p4) => p4 ? `${priceNumber(p4.cents)} ${escapeText(unit)} \xB7 ${escapeText(day(p4.start))} ${escapeText(time2(p4.start))}` : "Unknown";
-      return card(`Prices & plan \xB7 ${title}`, labels.chartEyebrow || "PRICES & PLAN", `<div class="chart-intro"><div><strong>${icon} ${mode === "bar" ? "A \xB7 Interval bars" : (chart?.comparison ? "B \xB7 " : "") + "Stepped area"}</strong><p>${escapeText(labels.chartIntro)}</p></div><div class="chart-actions"><wa-button data-zoom="${mode}" size="small" aria-label="Zoom in ${title}">Zoom +</wa-button><wa-button data-reset="${mode}" size="small" aria-label="Reset ${title} overview">Full horizon</wa-button><span>Wheel zooms \xB7 scroll outside chart</span></div></div><div class="price-context"><span>Now <b>${priceNumber(priceAt(chart.now))} ${escapeText(unit)}</b></span><span>Next window starts at <b>${priceNumber(m4.nextPriceUnavailable ? null : priceAt(next?.start))} ${escapeText(unit)}</b></span><span>Horizon low <b>${extremum(extremes[0])}</b></span><span>Horizon high <b>${extremum(extremes[1])}</b></span></div>${renderPriceNav(m4.priceNav)}<div id="price-${mode}" class="chart price-chart" role="img" aria-label="Price intervals and proposed windows"></div><p class="legend">${bandsApply(unit) ? `Absolute price bands, ${escapeText(unit)}: ${PRICE_BANDS.map((b3) => `<span class="${b3.css}">\u25CF</span> ${b3.label} ${b3.range}`).join(" ")} (exactly 25 is Medium; display only, not a charging limit)` : `Neutral price color: bands are defined in euro c/kWh and no trusted conversion is available for ${escapeText(unit)}, so nothing is classified.`} <span class="shade"></span> Proposed charging \xB7 gradient + pale track ${Number.isFinite(chart.cap) ? `<span class="cap-key"></span> Soft cap ${priceText(chart.cap)} ${escapeText(unit)}` : ""} <span class="now-key">\u2502</span> Now</p><p class="subtext">${escapeText(labels.chartNote)}</p>${plan}`, `prices prices-${mode}`, tag);
+      return card(`Prices & plan \xB7 ${title}`, labels.chartEyebrow || "PRICES & PLAN", `<div class="chart-intro"><div><strong>${icon} ${mode === "bar" ? "A \xB7 Interval bars" : (chart?.comparison ? "B \xB7 " : "") + "Stepped area"}</strong><p>${escapeText(labels.chartIntro)}</p></div><div class="chart-actions"><wa-button data-zoom="${mode}" size="small" aria-label="Zoom in ${title}">Zoom +</wa-button><wa-button data-reset="${mode}" size="small" aria-label="Reset ${title} overview">Full horizon</wa-button><span>Wheel zooms \xB7 scroll outside chart</span></div></div><div class="price-context"><span>Now <b>${priceNumber(priceAt(chart.now))} ${escapeText(unit)}</b></span><span>Next window starts at <b>${priceNumber(m4.nextPriceUnavailable ? null : priceAt(next?.start))} ${escapeText(unit)}</b></span><span>Horizon low <b>${extremum(extremes[0])}</b></span><span>Horizon high <b>${extremum(extremes[1])}</b></span></div>${renderPriceNav(m4.priceNav)}<div id="price-${mode}" class="chart price-chart" role="img" aria-label="Price intervals and proposed windows"></div><div class="track-lanes" data-track-lanes="${mode}" role="group" aria-label="Evidence tracks on the price time axis: proposal, sent, effective, measured"></div><p class="legend track-legend">Tracks share the price time axis. <span class="tk tk-proposal"></span> Proposal: the current calculated plan, not sent \xB7 <span class="tk tk-sent"></span> Sent: plan versions the charger acknowledged, from the loaded history day (acknowledged is not installed) \xB7 <span class="tk tk-effective"></span> Effective: the latest fresh readback, remaining period only; a reported limit, not power \xB7 <span class="tk tk-flow"></span> Measured: observed power flow of the loaded history day \xB7 <span class="tk tk-unknown"></span> Hatched: unknown or not loaded, never zero.</p><p class="legend">${bandsApply(unit) ? `Absolute price bands, ${escapeText(unit)}: ${PRICE_BANDS.map((b3) => `<span class="${b3.css}">\u25CF</span> ${b3.label} ${b3.range}`).join(" ")} (exactly 25 is Medium; display only, not a charging limit)` : `Neutral price color: bands are defined in euro c/kWh and no trusted conversion is available for ${escapeText(unit)}, so nothing is classified.`} <span class="shade"></span> Proposed charging \xB7 gradient + pale track ${Number.isFinite(chart.cap) ? `<span class="cap-key"></span> Soft cap ${priceText(chart.cap)} ${escapeText(unit)}` : ""} <span class="now-key">\u2502</span> Now</p><p class="subtext">${escapeText(labels.chartNote)}</p>${plan}`, `prices prices-${mode}`, tag);
     };
     const scenario = m4.scenarios;
     const option = (s4) => `<option value="${escapeText(s4.value)}" ${s4.value === scenario.selected ? "selected" : ""}>${escapeText(s4.label)}</option>`;
@@ -53180,8 +53370,8 @@ function mountDashboard(root, adapter) {
       chartMount = null;
     }
     if ((chartReady || historyReady) && !chartMount) {
-      chartMount = mountCharts(root, { ...chart, prices, windows: chartWindows, readings: historyReady ? readings : null, sentHistory: historyReady ? sentHistory : null, historyAxis: m4.history?.axis }, f3, chartReady ? modes : []);
-    } else if (chartMount && chartReady) chartMount.update({ ...chart, prices, windows: chartWindows }, f3);
+      chartMount = mountCharts(root, { ...chart, prices, windows: chartWindows, tracks, readings: historyReady ? readings : null, sentHistory: historyReady ? sentHistory : null, historyAxis: m4.history?.axis }, f3, chartReady ? modes : []);
+    } else if (chartMount && chartReady) chartMount.update({ ...chart, prices, windows: chartWindows, tracks }, f3);
     return chartMount;
   }
   render2();
@@ -56186,7 +56376,7 @@ function zoneClock(timeZone) {
     timeZoneName: "shortOffset",
     hour: "2-digit"
   });
-  const clock5 = {
+  const clock6 = {
     timeZone: requested,
     msOfDay(instantMs2) {
       const parts = partsOf(instantMs2);
@@ -56201,8 +56391,8 @@ function zoneClock(timeZone) {
       return parts.find((part2) => part2.type === "timeZoneName")?.value ?? "";
     }
   };
-  clocks.set(requested, clock5);
-  return clock5;
+  clocks.set(requested, clock6);
+  return clock6;
 }
 function localDayKey(instantMs2, timeZone) {
   return zoneClock(timeZone).dayKey(instantMs2);
@@ -56211,12 +56401,12 @@ function msOfDay(instantMs2, timeZone) {
   return zoneClock(timeZone).msOfDay(instantMs2);
 }
 function localMidnightAt(instantMs2, timeZone) {
-  const clock5 = zoneClock(timeZone);
-  const estimate = instantMs2 - clock5.msOfDay(instantMs2);
+  const clock6 = zoneClock(timeZone);
+  const estimate = instantMs2 - clock6.msOfDay(instantMs2);
   let best = estimate;
   let bestDistance = Number.POSITIVE_INFINITY;
   for (const candidate of [estimate - HOUR_MS, estimate, estimate + HOUR_MS]) {
-    const reading = clock5.msOfDay(candidate);
+    const reading = clock6.msOfDay(candidate);
     const distance2 = Math.min(reading, 24 * HOUR_MS - reading);
     if (distance2 < bestDistance) {
       best = candidate;
@@ -57889,6 +58079,7 @@ function createPriceDays({ request, onChange = () => {
 var HISTORY_DAYS_BACK = 62;
 var REFRESH_TODAY_MS = 3e5;
 var PARTIAL_AFTER_S = 660;
+var MINUTE = 6e4;
 var DAY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 var ZONE_FAILED = "Charging history needs the Home Assistant time zone, which is unknown here.";
 var LISTS = [
@@ -57950,7 +58141,75 @@ var RECON = {
   skipped: "Register total not checked"
 };
 var words = (text4) => String(text4 ?? "unknown").replace(/_/g, " ");
-function buildHistoryModel(answer, day, fmt) {
+var bounded = (a4, b3, lo, hi) => {
+  const s4 = Math.max(a4, lo), e9 = Math.min(b3, hi);
+  return Number.isFinite(s4) && Number.isFinite(e9) && e9 > s4 ? { start: s4, end: e9 } : null;
+};
+function historyTracks(answer, { raw, since, until, oldestPower, digest, readAt, zone, day }) {
+  const o9 = answer.observed, c5 = answer.comparison, cov = o9.coverage;
+  const known = [], unknown2 = [];
+  const addBlock = (b3, summary) => {
+    const a4 = instant(b3.start), e9 = instant(b3.end), u4 = instant(b3.intent_uncertain_after);
+    const limit = num(b3.limit) ? b3.limit : null, unit = typeof b3.unit === "string" ? b3.unit : "";
+    const cut = Number.isFinite(u4) && u4 < e9 ? Math.max(a4, u4) : e9;
+    const k2 = bounded(a4, cut, since, until);
+    if (k2) known.push({ ...k2, version: b3.version ?? null, limit, unit, summary });
+    const rest = cut < e9 ? bounded(cut, e9, since, until) : null;
+    if (rest) unknown2.push({ ...rest, reason: "intent_uncertain" });
+  };
+  if (raw === "digest_only" && digest) (digest.planned_blocks || []).forEach((b3) => addBlock(b3, true));
+  else c5.planned_blocks.forEach((b3) => addBlock(b3, false));
+  for (const u4 of c5.unknown_plan_spans) {
+    const span = bounded(instant(u4.from), u4.until ? instant(u4.until) : until, since, until);
+    if (span) unknown2.push({ ...span, reason: u4.reason });
+  }
+  const detail = raw === "full" || raw === "partial";
+  const measured = { detail, note: "", flow: [], outside: [], noFlow: [], unknown: [] };
+  if (!detail) measured.note = raw === "digest_only" ? "Only the saved day summary remains, so no measured flow is drawn (see the history panel)." : "No measured power rows are kept for this day.";
+  else {
+    const upto = Number.isFinite(readAt) ? Math.min(until, readAt) : until;
+    for (const i7 of o9.intervals) {
+      const a4 = instant(i7.first_sample), b3 = Math.max(instant(i7.last_sample), a4 + 6e4), span = bounded(a4, b3, since, until);
+      if (span) measured.flow.push({ ...span, startBounded: i7.start_bounded === true, endBounded: i7.end_bounded === true, peakW: num(i7.peak_w) ? i7.peak_w : null });
+    }
+    for (const x2 of c5.outside_plan) {
+      const span = bounded(instant(x2.start), instant(x2.end), since, until);
+      if (span) measured.outside.push({ ...span, kind: x2.kind });
+    }
+    for (const b3 of c5.planned_blocks) if (b3.verdict === "no_flow_observed") {
+      const span = bounded(instant(b3.start), instant(b3.end), since, upto);
+      if (span) measured.noFlow.push(span);
+    }
+    const wholeWindow = nonneg(cov.window_seconds) && cov.window_seconds > 0 && cov.trusted_seconds >= cov.window_seconds && cov.window_seconds * 1e3 >= upto - since - MINUTE;
+    if (cov.no_data_seconds === 0 && cov.untrusted_seconds === 0 && wholeWindow && o9.intervals.length === 0 && c5.outside_plan.length === 0 && o9.isolated_flow_samples === 0 && Number.isFinite(upto) && upto > since) measured.noFlow.push({ start: since, end: upto });
+    for (const g2 of o9.gaps) {
+      const span = bounded(instant(g2.from), g2.to ? instant(g2.to) : instant(g2.from) + 6e4, since, until);
+      if (span) measured.unknown.push(span);
+    }
+    if (raw === "partial" && Number.isFinite(oldestPower)) {
+      const span = bounded(since, oldestPower, since, until);
+      if (span) measured.unknown.push(span);
+    }
+  }
+  const when2 = (ms2) => {
+    try {
+      return new Intl.DateTimeFormat("en-GB", { timeZone: zone, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(ms2);
+    } catch {
+      return "unknown";
+    }
+  };
+  return {
+    day,
+    zone,
+    coverage: [since, until],
+    readAt,
+    raw,
+    sent: { known, unknown: unknown2 },
+    measured,
+    coverageText: `History loaded for ${dayLabel2(day)} only (${when2(since)}\u2013${when2(until)}, ${zone}); other times are unknown`
+  };
+}
+function buildHistoryModel(answer, day, fmt, readAt = NaN) {
   const since = instant(answer.window.since), until = instant(answer.window.until);
   const r7 = answer.retention, kinds = r7.oldest_by_kind && typeof r7.oldest_by_kind === "object" ? r7.oldest_by_kind : null;
   const signals = !!kinds && Array.isArray(r7.digest_days) && answer.truncated && typeof answer.truncated === "object";
@@ -57995,7 +58254,7 @@ function buildHistoryModel(answer, day, fmt) {
       nonneg(b3.covered_fraction) ? `measured rows cover ${Math.round(b3.covered_fraction * 100)}% of the block` : ""
     ].filter(Boolean).join(" \xB7 ")
   }));
-  const unknown = answer.comparison.unknown_plan_spans.map((u4) => ({
+  const unknown2 = answer.comparison.unknown_plan_spans.map((u4) => ({
     kind: "unknown",
     start: instant(u4.from),
     version: null,
@@ -58004,8 +58263,8 @@ function buildHistoryModel(answer, day, fmt) {
     verdictText: "Plan unknown",
     detail: words(u4.reason)
   }));
-  const sent = [...blocks, ...unknown].sort((a4, b3) => a4.start - b3.start);
-  const edge = (bounded) => bounded === true ? "bounded" : "open (data gap, restart or data start beside it)";
+  const sent = [...blocks, ...unknown2].sort((a4, b3) => a4.start - b3.start);
+  const edge = (bounded2) => bounded2 === true ? "bounded" : "open (data gap, restart or data start beside it)";
   const flow = o9.intervals.map((i7) => ({
     text: `${span(i7.first_sample, i7.last_sample)} \xB7 ${i7.samples ?? "?"} readings \xB7 peak ${num(i7.peak_w) ? `${(i7.peak_w / 1e3).toFixed(1)} kW` : "unknown"}`,
     detail: `start ${edge(i7.start_bounded)} \xB7 end ${edge(i7.end_bounded)}`
@@ -58089,6 +58348,7 @@ function buildHistoryModel(answer, day, fmt) {
     restarts,
     unacked,
     digest: digestModel,
+    tracks: historyTracks(answer, { raw, since, until, oldestPower, digest, readAt, zone: answer.window.zone, day }),
     isolated: nonneg(o9.isolated_flow_samples) && o9.isolated_flow_samples > 0 ? `${o9.isolated_flow_samples} single reading(s) above the flow threshold were not enough to count as charging.` : "",
     flowNote: "Flow comes only from measured power readings (threshold about 100 W, unverified for the installed charger). A plan, its acknowledgement, a limit read back, the battery level or the charger status never counts as flow.",
     sentNote: "Sent means the charger answered a plan version as accepted, not that it was installed or that charging happened. After an uncertain write the plan is unknown."
@@ -58135,7 +58395,8 @@ function createHistoryDay({ request, onChange = () => {
       const answer = await request({ date: day });
       if (mine !== seq || myKey !== key3) return;
       if (!validateHistory(answer, asked)) throw new Error("invalid");
-      st.result = { day, at: now(), model: buildHistoryModel(answer, day, fmtFor(asCtx)) };
+      const at = now();
+      st.result = { day, at, model: buildHistoryModel(answer, day, fmtFor(asCtx), at) };
     } catch (error2) {
       if (mine !== seq || myKey !== key3) return;
       if (silent && st.result) {
@@ -58355,7 +58616,7 @@ function booleanValue(source, key3) {
   const value2 = source[key3];
   return typeof value2 === "boolean" ? value2 : bad();
 }
-function finite(source, key3) {
+function finite2(source, key3) {
   const value2 = source[key3];
   return typeof value2 === "number" && Number.isFinite(value2) ? value2 : bad();
 }
@@ -58504,7 +58765,7 @@ function decodeTarget(source) {
   exactKeys(source, TARGET_KEYS);
   let targetPercent = null;
   if (source["target_percent"] !== null) {
-    const percent2 = finite(source, "target_percent");
+    const percent2 = finite2(source, "target_percent");
     if (percent2 < 0 || percent2 > 100) {
       return bad();
     }
@@ -58519,7 +58780,7 @@ function decodeFrame(raw) {
   const source = record(raw);
   exactKeys(source, ["x", "y", "w", "h"]);
   const [x2, y3, w2, h3] = ["x", "y", "w", "h"].map((key3) => {
-    const value2 = finite(source, key3);
+    const value2 = finite2(source, key3);
     return value2 < 0 || value2 > 1 ? bad() : value2;
   });
   return x2 + w2 > 1.000001 || y3 + h3 > 1.000001 ? bad() : { x: x2, y: y3, w: w2, h: h3 };
@@ -58564,15 +58825,15 @@ function decodeSettingsRecord(raw) {
   }
   return {
     revision,
-    ...present.includes("soft_price_cap") ? { soft_price_cap: source["soft_price_cap"] === null ? null : finite(source, "soft_price_cap") } : {},
-    ...present.includes("minimum_ready_by_soc") ? { minimum_ready_by_soc: source["minimum_ready_by_soc"] === null ? null : finite(source, "minimum_ready_by_soc") } : {},
+    ...present.includes("soft_price_cap") ? { soft_price_cap: source["soft_price_cap"] === null ? null : finite2(source, "soft_price_cap") } : {},
+    ...present.includes("minimum_ready_by_soc") ? { minimum_ready_by_soc: source["minimum_ready_by_soc"] === null ? null : finite2(source, "minimum_ready_by_soc") } : {},
     ...present.includes("time_reserve_percent") ? { time_reserve_percent: whole(source, "time_reserve_percent") } : {},
     ...present.includes("cap_price_basis") ? { cap_price_basis: source["cap_price_basis"] === null ? null : oneOf(source, "cap_price_basis", ["nord_pool", "configured_variable_cost"]) } : {},
     area_id: textOrNull(source, "area_id"),
     overrides: list2(source, "overrides").map((item) => decodeOverride(record(item))),
     phases: wholeOrNull(source, "phases"),
     amps: wholeOrNull(source, "amps"),
-    requested_kwh: finite(source, "requested_kwh"),
+    requested_kwh: finite2(source, "requested_kwh"),
     ...present.includes("fill_to_limit") ? { fill_to_limit: booleanValue(source, "fill_to_limit") } : {},
     max_periods: periodsOrNull(source, "max_periods"),
     departure_enabled: booleanValue(source, "departure_enabled"),
@@ -60213,10 +60474,10 @@ function demandMonth(raw) {
     price_per_kw: nonNegativeOrNull(item, "price_per_kw"),
     days_counted: wholeNumber(item, "days_counted", 0, 31),
     peaks: arrayValue(item, "peaks").map((entry) => {
-      const peak = record2(entry);
-      exactKeys2(peak, ["date", "start", "kw"]);
-      const kw = numberValue(peak, "kw");
-      return kw < 0 ? bad2() : { date: text2(peak, "date"), start: text2(peak, "start"), kw };
+      const peak2 = record2(entry);
+      exactKeys2(peak2, ["date", "start", "kw"]);
+      const kw = numberValue(peak2, "kw");
+      return kw < 0 ? bad2() : { date: text2(peak2, "date"), start: text2(peak2, "start"), kw };
     })
   };
 }
@@ -62116,7 +62377,7 @@ var marketCostMethods = {
   },
   paintMarketCosts(adapter, dashboard) {
     const admin = this._hass?.user?.is_admin === true, charger = this.charger;
-    const unknown = this.unknownCostWrites.has(charger) || this.pendingCostWrites.has(charger);
+    const unknown2 = this.unknownCostWrites.has(charger) || this.pendingCostWrites.has(charger);
     const block = dashboard?.grid_tariff ?? null;
     if (this.costDirty && this.costBase && !this.costConflict && this.settingsRecord && this.marketOptions && costSignature(this.settingsRecord, this.marketOptions, block, this.costBase.areaId) !== this.costBase.signature) {
       this.costConflict = true;
@@ -62134,11 +62395,11 @@ var marketCostMethods = {
       dashboard,
       dashboardFresh: !!dashboard && dashFresh(dashboard, this.dashboardFailed),
       areaDraft: this.marketArea,
-      blocked: this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.paramBusy || this.notifyBusy || staleRecord || unknown,
-      conflict: this.costConflict || unknown,
+      blocked: this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.paramBusy || this.notifyBusy || staleRecord || unknown2,
+      conflict: this.costConflict || unknown2,
       busy: this.costBusy,
       awaitingRead: this.costAwaitingRead,
-      notice: this.costNotice || (unknown ? "A previous market/cost save has an unknown outcome. Reload to confirm it." : staleRecord ? "Settings changed elsewhere or the record is stale. Reload before changing market or costs." : "")
+      notice: this.costNotice || (unknown2 ? "A previous market/cost save has an unknown outcome. Reload to confirm it." : staleRecord ? "Settings changed elsewhere or the record is stale. Reload before changing market or costs." : "")
     });
     adapter.actions.editCosts = (name) => this.editCosts(name);
     adapter.actions.selectMarketArea = (id) => this.selectMarketArea(id);
@@ -62260,7 +62521,7 @@ var marketCostMethods = {
       });
       this.costNotice = "Saving\u2026";
       this.paint();
-      const unknown = (text4) => {
+      const unknown2 = (text4) => {
         this.unknownCostWrites.add(charger);
         if (this.connected && generation === this.generation) {
           this.costConflict = true;
@@ -62273,7 +62534,7 @@ var marketCostMethods = {
           this.unknownCostWrites.add(charger);
           return;
         }
-        settle(answer, unknown);
+        settle(answer, unknown2);
       } catch (error2) {
         const code = error2?.code;
         if (!current()) {
@@ -62291,7 +62552,7 @@ var marketCostMethods = {
           this.costNotice = `${label2} not saved: ${translate2("en", settingsErrorKey(code))} (${code}).`;
           return;
         }
-        unknown("Save outcome unknown; the request may still complete. Wait, then reload before retrying.");
+        unknown2("Save outcome unknown; the request may still complete. Wait, then reload before retrying.");
       }
     });
   },
@@ -62326,10 +62587,10 @@ var marketCostMethods = {
       this.paint();
       return;
     }
-    await this.dispatchCostWrite("Area and taxes", () => updateSettings(hass, charger, record5.revision, plan.body), (raw, unknown) => {
+    await this.dispatchCostWrite("Area and taxes", () => updateSettings(hass, charger, record5.revision, plan.body), (raw, unknown2) => {
       const answer = decodeSettingsAnswer(raw);
       if (!answer.ok) {
-        unknown("Save response unavailable; outcome unknown. Reload before retrying.");
+        unknown2("Save response unavailable; outcome unknown. Reload before retrying.");
         return;
       }
       const a4 = answer.value;
@@ -62389,9 +62650,9 @@ var marketCostMethods = {
       this.paint();
       return;
     }
-    await this.dispatchCostWrite("Grid tariff", () => updateGridTariff(hass, charger, plan.expected, plan.body), (answer, unknown) => {
+    await this.dispatchCostWrite("Grid tariff", () => updateGridTariff(hass, charger, plan.expected, plan.body), (answer, unknown2) => {
       if (!answer || answer.ok !== true) {
-        unknown("Save response unavailable; outcome unknown. Reload before retrying.");
+        unknown2("Save response unavailable; outcome unknown. Reload before retrying.");
         return;
       }
       this.settingsRecord = null;
@@ -62434,9 +62695,9 @@ var marketCostMethods = {
       this.paint();
       return;
     }
-    await this.dispatchCostWrite("Price entry", () => choosePriceSource(hass, charger, plan.entryId), (answer, unknown) => {
+    await this.dispatchCostWrite("Price entry", () => choosePriceSource(hass, charger, plan.entryId), (answer, unknown2) => {
       if (!answer || answer.ok !== true) {
-        unknown("Save response unavailable; outcome unknown. Reload before retrying.");
+        unknown2("Save response unavailable; outcome unknown. Reload before retrying.");
         return;
       }
       this.settingsRecord = null;
@@ -63173,7 +63434,7 @@ var planParamMethods = {
   },
   paintPlanParams(adapter, dashboard, morekOwned) {
     const admin = this._hass?.user?.is_admin === true, charger = this.charger;
-    const unknown = this.unknownSettingsWrites.has(charger) || this.pendingSettingsWrites.has(charger);
+    const unknown2 = this.unknownSettingsWrites.has(charger) || this.pendingSettingsWrites.has(charger);
     if (this.paramDirty && this.paramBase && !this.paramConflict && this.settingsRecord && paramSignature(this.settingsRecord, dashboard) !== this.paramBase.signature) {
       this.paramConflict = true;
       this.paramNotice = "The plan or charger parameters changed while editing. Reload before saving again.";
@@ -63186,11 +63447,11 @@ var planParamMethods = {
       dashboardFresh: !!dashboard && dashFresh2(dashboard, this.dashboardFailed),
       now: Date.now(),
       morekOwned,
-      blocked: this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || this.notifyBusy || unknown,
-      conflict: this.paramConflict || this.settingsConflict || unknown,
+      blocked: this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || this.notifyBusy || unknown2,
+      conflict: this.paramConflict || this.settingsConflict || unknown2,
       busy: this.paramBusy,
       awaitingRead: this.paramAwaitingRead,
-      notice: this.paramNotice || (unknown ? "A previous settings save has an unknown outcome. Reload to confirm it." : this.settingsConflict ? "Settings changed elsewhere or the record is stale. Reload before changing these parameters." : "")
+      notice: this.paramNotice || (unknown2 ? "A previous settings save has an unknown outcome. Reload to confirm it." : this.settingsConflict ? "Settings changed elsewhere or the record is stale. Reload before changing these parameters." : "")
     });
     adapter.actions.editParams = () => this.editParams();
     adapter.actions.saveParams = (kind, values) => this.saveParams(kind, values);
@@ -63256,7 +63517,7 @@ var planParamMethods = {
       });
       this.paramNotice = "Saving\u2026";
       this.paint();
-      const unknown = (text4) => {
+      const unknown2 = (text4) => {
         this.unknownSettingsWrites.add(charger);
         if (this.connected && generation === this.generation) {
           this.paramConflict = true;
@@ -63269,7 +63530,7 @@ var planParamMethods = {
           this.unknownSettingsWrites.add(charger);
           return;
         }
-        if (!answer.ok) unknown("Save response unavailable; outcome unknown. Reload before retrying.");
+        if (!answer.ok) unknown2("Save response unavailable; outcome unknown. Reload before retrying.");
         else if (answer.value.ok) {
           this.settingsRecord = answer.value.settings;
           this.settingsConflict = false;
@@ -63299,7 +63560,7 @@ var planParamMethods = {
           return;
         }
         if (REFUSED2(code)) this.paramNotice = `${label2} not saved: ${translate2("en", settingsErrorKey(code))} (${code}).`;
-        else unknown("Save outcome unknown; the request may still complete. Wait, then reload before retrying.");
+        else unknown2("Save outcome unknown; the request may still complete. Wait, then reload before retrying.");
       }
     } finally {
       if (this.connected && generation === this.generation && charger === this.charger) {
@@ -63523,7 +63784,7 @@ var notifySetupMethods = {
   },
   paintNotifySetup(adapter, dashboard) {
     const admin = this._hass?.user?.is_admin === true, charger = this.charger;
-    const unknown = this.unknownSettingsWrites.has(charger) || this.pendingSettingsWrites.has(charger);
+    const unknown2 = this.unknownSettingsWrites.has(charger) || this.pendingSettingsWrites.has(charger);
     if (this.notifyDirty && this.notifyBase && !this.notifyConflict && this.settingsRecord && notifySignature(this.settingsRecord) !== this.notifyBase.signature) {
       this.notifyConflict = true;
       this.notifyNotice = "The notification settings changed while editing. Reload before saving again.";
@@ -63538,11 +63799,11 @@ var notifySetupMethods = {
       status,
       statusFresh: !!status && observationFreshness(this.statusAt, Date.now(), this.statusFailed) === "fresh",
       now: Date.now(),
-      blocked: this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || this.paramBusy || unknown,
-      conflict: this.notifyConflict || this.settingsConflict || unknown,
+      blocked: this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || this.paramBusy || unknown2,
+      conflict: this.notifyConflict || this.settingsConflict || unknown2,
       busy: this.notifyBusy,
       awaitingRead: this.notifyAwaitingRead,
-      notice: this.notifyNotice || (unknown ? "A previous settings save has an unknown outcome. Reload to confirm it." : this.settingsConflict ? "Settings changed elsewhere or the record is stale. Reload before changing notifications." : "")
+      notice: this.notifyNotice || (unknown2 ? "A previous settings save has an unknown outcome. Reload to confirm it." : this.settingsConflict ? "Settings changed elsewhere or the record is stale. Reload before changing notifications." : "")
     });
     adapter.actions.editNotify = () => this.editNotify();
     adapter.actions.saveNotify = (values) => this.saveNotify(values);
@@ -63597,7 +63858,7 @@ var notifySetupMethods = {
       });
       this.notifyNotice = "Saving\u2026";
       this.paint();
-      const unknown = (text4) => {
+      const unknown2 = (text4) => {
         this.unknownSettingsWrites.add(charger);
         if (this.connected && generation === this.generation) {
           this.notifyConflict = true;
@@ -63610,7 +63871,7 @@ var notifySetupMethods = {
           this.unknownSettingsWrites.add(charger);
           return;
         }
-        if (!answer.ok) unknown("Save response unavailable; outcome unknown. Reload before retrying.");
+        if (!answer.ok) unknown2("Save response unavailable; outcome unknown. Reload before retrying.");
         else if (answer.value.ok) {
           this.settingsRecord = answer.value.settings;
           this.settingsConflict = false;
@@ -63640,7 +63901,7 @@ var notifySetupMethods = {
           return;
         }
         if (REFUSED3(code)) this.notifyNotice = `Notifications not saved: ${translate2("en", settingsErrorKey(code))} (${code}).`;
-        else unknown("Save outcome unknown; the request may still complete. Wait, then reload before retrying.");
+        else unknown2("Save outcome unknown; the request may still complete. Wait, then reload before retrying.");
       }
     } finally {
       if (this.connected && generation === this.generation && charger === this.charger) {
@@ -63743,15 +64004,15 @@ var STATES2 = /* @__PURE__ */ new Set(["current", "last_known", "idle", "unknown
 function judgementFor(ready, key3, observedAtMs) {
   const block = ready?.freshness;
   if (block === void 0 || block === null) return null;
-  const unknown = { state: "unknown", link: null };
-  if (typeof block !== "object" || Array.isArray(block)) return unknown;
+  const unknown2 = { state: "unknown", link: null };
+  if (typeof block !== "object" || Array.isArray(block)) return unknown2;
   const quantities = block.quantities;
-  if (!quantities || typeof quantities !== "object" || Array.isArray(quantities)) return unknown;
+  if (!quantities || typeof quantities !== "object" || Array.isArray(quantities)) return unknown2;
   const item = quantities[JUDGED[key3]];
-  if (!item || typeof item !== "object" || !STATES2.has(item.state)) return unknown;
+  if (!item || typeof item !== "object" || !STATES2.has(item.state)) return unknown2;
   const reported = Date.parse(item.reported_at || "");
-  if (!Number.isFinite(reported) || reported !== observedAtMs) return unknown;
-  if (item.age_s != null && !(typeof item.age_s === "number" && Number.isFinite(item.age_s) && item.age_s >= 0)) return unknown;
+  if (!Number.isFinite(reported) || reported !== observedAtMs) return unknown2;
+  if (item.age_s != null && !(typeof item.age_s === "number" && Number.isFinite(item.age_s) && item.age_s >= 0)) return unknown2;
   const link = item.link && typeof item.link === "object" && typeof item.link.state === "string" ? item.link.state : null;
   return { state: item.state, link };
 }
@@ -63780,14 +64041,14 @@ var num2 = (value2, digits) => Number(value2.toFixed(digits)).toString();
 function liveCharging(status, observedAt, failed, now = Date.now()) {
   const fresh2 = observationFreshness(observedAt, now, failed) === "fresh";
   const ready = fresh2 ? status?.readiness : null;
-  const unknown = (reason) => ({ power: "Unknown", summary: `${reason} Measured power and charging are unknown.`, mismatch: false, reported: null, measured: null });
-  if (!fresh2) return unknown("Morek status is unavailable or stale.");
-  if (ready?.control === "unavailable") return unknown("The charger is offline or its control is unavailable.");
+  const unknown2 = (reason) => ({ power: "Unknown", summary: `${reason} Measured power and charging are unknown.`, mismatch: false, reported: null, measured: null });
+  if (!fresh2) return unknown2("Morek status is unavailable or stale.");
+  if (ready?.control === "unavailable") return unknown2("The charger is offline or its control is unavailable.");
   const live = ready?.live;
-  if (!live || typeof live !== "object") return unknown("No live charger observation is available.");
+  if (!live || typeof live !== "object") return unknown2("No live charger observation is available.");
   const own = Number.isInteger(live.connector_id) ? live.connector_id : null;
   const expected = Number.isInteger(status?.connector_id) ? status.connector_id : null;
-  if (own === null || expected === null || own !== expected) return unknown("The live readings are not confirmed to belong to this connector.");
+  if (own === null || expected === null || own !== expected) return unknown2("The live readings are not confirmed to belong to this connector.");
   const reported = read(ready, "status", now, (r7) => typeof r7.value === "string" && r7.value !== "");
   const reportedFresh = reported?.fresh ? reported : null;
   const power = read(ready, "power_w", now);
@@ -64122,6 +64383,41 @@ function startOutcome(state, reason, { age, young, raw, waitNote, txn, guidance,
   }
 }
 
+// sidebar/effective-track.js
+var unknown = (reason) => ({ state: "unknown", reason });
+var clock4 = (ms2, zone) => {
+  try {
+    return new Intl.DateTimeFormat("en-GB", { timeZone: zone || "UTC", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(ms2);
+  } catch {
+    return "recently";
+  }
+};
+function effectiveTrack(status, observedAt, failed, now, zone = null) {
+  if (!status) return unknown("Morek status is unavailable, so effective limits are unknown.");
+  if (observationFreshness(observedAt, now, failed) !== "fresh") return unknown("The Morek status read is stale or failed, so no readback is shown as current.");
+  const eff = status.effective;
+  if (!eff || typeof eff !== "object" || !Array.isArray(eff.periods)) return unknown("No effective readback is available.");
+  const readAt = Date.parse(eff.fetched_at || "");
+  if (observationFreshness(Number.isFinite(readAt) ? readAt : null, now) !== "fresh") return unknown("The latest readback is too old, or has no usable time, to describe the charger now.");
+  const start2 = Date.parse(eff.schedule_start || ""), seconds = eff.duration_s;
+  if (!Number.isFinite(start2) || typeof seconds !== "number" || !Number.isFinite(seconds) || seconds <= 0) return unknown("The readback does not say what period it covers.");
+  const end2 = start2 + seconds * 1e3;
+  if (end2 <= now) return unknown("The period covered by the latest readback has ended.");
+  const points2 = eff.periods.map((p4) => ({ at: Date.parse(p4?.at || ""), value: p4?.amps }));
+  if (!points2.length) return unknown("The readback lists no limits.");
+  if (points2.some((p4, i7) => !Number.isFinite(p4.at) || typeof p4.value !== "number" || !Number.isFinite(p4.value) || p4.value < 0 || p4.at < start2 || p4.at >= end2 || i7 > 0 && p4.at <= points2[i7 - 1].at))
+    return unknown("The readback has a malformed or out-of-order period, so its limits are not shown.");
+  const spans = [];
+  points2.forEach((p4, i7) => {
+    const a4 = Math.max(p4.at, now, start2), b3 = Math.min(i7 + 1 < points2.length ? points2[i7 + 1].at : end2, end2);
+    if (b3 > a4) spans.push({ start: a4, end: b3, value: p4.value });
+  });
+  if (!spans.length) return unknown("The readback has no remaining period.");
+  const associated = !!status.verification?.readback_at && status.verification.readback_at === eff.fetched_at;
+  const unit = typeof eff.rate_unit === "string" && /^[A-Za-z/]{1,8}$/.test(eff.rate_unit) ? eff.rate_unit : "A";
+  return { state: "reported", readAt, readAtText: clock4(readAt, zone), unit, spans, differs: associated && status.verification?.reason === "limits_or_transitions_differ" };
+}
+
 // sidebar/adapter.js
 var U = "Unknown";
 var reserveText = () => ({ explain: translate2("en", "reserve.explain"), limits: Object.fromEntries(["two_hour_limit", "no_eligible_time", "window_limit", "unknown"].map((k2) => [k2, translate2("en", `reserve.limit.${k2}`)])) });
@@ -64263,6 +64559,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
       ...published?.format
     },
     model: {
+      effectiveTrack: effectiveTrack(status, observedAt, failed, now, zone),
       windows,
       nextWindow,
       learning: proposal ? learningModel(rawProposal?.learning, planStale, learningText()) : null,
@@ -64420,7 +64717,7 @@ var CLASSES = /* @__PURE__ */ new Set(["healthy", "unknown", "differs_unconfirme
 var LINK_STATES = /* @__PURE__ */ new Set(["up", "down", "unknown"]);
 var BOOT_STATES = /* @__PURE__ */ new Set(["none", "unknown", "waiting", "requested", "blocked", "closed"]);
 var isObject5 = (v2) => v2 !== null && typeof v2 === "object" && !Array.isArray(v2);
-var clock4 = (ms2) => new Date(ms2).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+var clock5 = (ms2) => new Date(ms2).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 var stamp = (value2, now) => {
   const ms2 = typeof value2 === "string" ? Date.parse(value2) : NaN;
   return Number.isFinite(ms2) && Number.isFinite(now) && ms2 <= now + CLOCK_SKEW_MS3 ? ms2 : null;
@@ -64439,18 +64736,18 @@ function checkItem(status, now, link, facts) {
   const reconciliation = status?.reconciliation;
   if (!isObject5(reconciliation) || reconciliation.check === void 0 || reconciliation.check === null) return null;
   const check = reconciliation.check;
-  const unknown = (text4) => ({ kind: "check_unknown", level: "info", text: text4 });
-  if (!isObject5(check)) return unknown("The schedule check result isn\u2019t readable, so it isn\u2019t known whether the charger\u2019s schedule matches.");
+  const unknown2 = (text4) => ({ kind: "check_unknown", level: "info", text: text4 });
+  if (!isObject5(check)) return unknown2("The schedule check result isn\u2019t readable, so it isn\u2019t known whether the charger\u2019s schedule matches.");
   if (check.class === null || check.class === void 0) return null;
   const at = stamp(check.at, now);
-  if (!CLASSES.has(check.class) || at === null) return unknown("The schedule check result isn\u2019t readable, so it isn\u2019t known whether the charger\u2019s schedule matches.");
-  facts.push(`Schedule check: ${check.class}${typeof check.reason === "string" ? ` (${check.reason})` : ""} at ${clock4(at)}`);
+  if (!CLASSES.has(check.class) || at === null) return unknown2("The schedule check result isn\u2019t readable, so it isn\u2019t known whether the charger\u2019s schedule matches.");
+  facts.push(`Schedule check: ${check.class}${typeof check.reason === "string" ? ` (${check.reason})` : ""} at ${clock5(at)}`);
   if (Number.isFinite(check.rechecks) && check.rechecks > 0) facts.push(`Re-checks in this episode: ${check.rechecks}`);
-  if (now - at > MAX_CHECK_AGE_MS) return unknown("The last schedule check was over a day ago, so it says nothing about the charger\u2019s schedule now.");
+  if (now - at > MAX_CHECK_AGE_MS) return unknown2("The last schedule check was over a day ago, so it says nothing about the charger\u2019s schedule now.");
   const events = Array.isArray(check.events) ? check.events : [];
   const last = events[events.length - 1];
   const afterRepair = isObject5(last) && last.trigger === "post_repair" && last.class === check.class;
-  const t6 = clock4(at);
+  const t6 = clock5(at);
   const repair = isObject5(reconciliation.repair) ? reconciliation.repair : {};
   const blocker = isObject5(reconciliation.blocker) ? reconciliation.blocker.code : null;
   switch (check.class) {
@@ -64483,9 +64780,9 @@ function bootItem(status, now, facts) {
   if (!isObject5(boot) || !BOOT_STATES.has(boot.state)) return null;
   const at = stamp(boot.at, now);
   const reason = typeof boot.reason === "string" ? boot.reason : "";
-  if (boot.state !== "none" && boot.state !== "unknown") facts.push(`Charger restart: ${boot.state}${reason ? ` (${reason})` : ""}${at !== null ? ` at ${clock4(at)}` : ""}`);
+  if (boot.state !== "none" && boot.state !== "unknown") facts.push(`Charger restart: ${boot.state}${reason ? ` (${reason})` : ""}${at !== null ? ` at ${clock5(at)}` : ""}`);
   if (at === null) return null;
-  const t6 = clock4(at);
+  const t6 = clock5(at);
   if (boot.state === "requested") {
     const ready = status.readiness;
     const ssAt = stamp(ready.session_start_at, now);
@@ -64493,9 +64790,9 @@ function bootItem(status, now, facts) {
     if (ssAt === null || ssAt < at || typeof ss.state !== "string") {
       return { kind: "boot_pending", level: "info", text: `The charger restarted at ${t6}. Restart recovery is pending and unconfirmed: it isn\u2019t known whether SpotNav has asked the charger to enable charging since then.` };
     }
-    facts.push(`Start request after restart: ${ss.state}${typeof ss.reason === "string" ? ` (${ss.reason})` : ""} at ${clock4(ssAt)}`);
+    facts.push(`Start request after restart: ${ss.state}${typeof ss.reason === "string" ? ` (${ss.reason})` : ""} at ${clock5(ssAt)}`);
     if (ss.state === "accepted") {
-      return { kind: "boot_requested", level: "info", text: `The charger restarted at ${t6}. SpotNav asked it to enable charging at ${clock4(ssAt)} and the charger accepted the request. Only the charger can confirm that charging started.` };
+      return { kind: "boot_requested", level: "info", text: `The charger restarted at ${t6}. SpotNav asked it to enable charging at ${clock5(ssAt)} and the charger accepted the request. Only the charger can confirm that charging started.` };
     }
     if (ss.state === "starting") return { kind: "boot_asking", level: "info", text: `The charger restarted at ${t6}. SpotNav is asking it to enable charging now.` };
     if (ss.state === "blocked" || ss.state === "rejected") {
@@ -64514,22 +64811,22 @@ function scheduleNotes(status, now = Date.now()) {
   if (!status || status.supported === false) return null;
   const facts = [];
   const link = linkInfo(status, now);
-  if (link.state !== "unknown") facts.push(`Link to the charger: ${link.state === "up" ? "up" : "down"}${link.since !== null ? ` since ${clock4(link.since)}` : ""}`);
+  if (link.state !== "unknown") facts.push(`Link to the charger: ${link.state === "up" ? "up" : "down"}${link.since !== null ? ` since ${clock5(link.since)}` : ""}`);
   const items = [];
   const check = checkItem(status, now, link, facts);
   if (check) items.push(check);
   const boot = bootItem(status, now, facts);
   if (boot) items.push(boot);
   if (link.state === "down") {
-    items.push({ kind: "link_lost", level: "info", text: `Connection lost${link.since !== null ? ` at ${clock4(link.since)}` : ""}. SpotNav checks the schedule again when the charger reconnects.` });
+    items.push({ kind: "link_lost", level: "info", text: `Connection lost${link.since !== null ? ` at ${clock5(link.since)}` : ""}. SpotNav checks the schedule again when the charger reconnects.` });
   } else if (!items.length && link.state === "up" && link.since !== null) {
-    items.push({ kind: "link_quiet", level: "info", text: `Link to the charger unchanged since ${clock4(link.since)}.` });
+    items.push({ kind: "link_quiet", level: "info", text: `Link to the charger unchanged since ${clock5(link.since)}.` });
   }
   return items.length ? { items, facts } : null;
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.169";
+var CARD_VERSION = "2.5.170";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {
@@ -65423,9 +65720,9 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
         return;
       }
       this.settingsRecord = decoded.value.settings;
-      const unknown = this.unknownSettingsWrites.has(charger) || this.pendingSettingsWrites.has(charger);
-      this.settingsConflict = unknown || this.settingsDirty && this.draftRevision != null && this.draftRevision !== this.settingsRecord.revision;
-      this.settingsNotice = unknown ? "A previous dispatched save has an unknown outcome. Wait for it to settle, then explicitly reload settings." : this.settingsConflict ? "Settings changed while disconnected. Reload settings before saving this draft." : "";
+      const unknown2 = this.unknownSettingsWrites.has(charger) || this.pendingSettingsWrites.has(charger);
+      this.settingsConflict = unknown2 || this.settingsDirty && this.draftRevision != null && this.draftRevision !== this.settingsRecord.revision;
+      this.settingsNotice = unknown2 ? "A previous dispatched save has an unknown outcome. Wait for it to settle, then explicitly reload settings." : this.settingsConflict ? "Settings changed while disconnected. Reload settings before saving this draft." : "";
     } catch {
       if (this.connected && generation === this.generation) this.settingsNotice = "Settings unavailable.";
     } finally {
@@ -65523,7 +65820,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
   }
   paintVehicleSources(adapter, dashboard) {
     const admin = this._hass?.user?.is_admin === true, charger = this.charger;
-    const unknown = this.unknownVehicleWrites.has(charger) || this.pendingVehicleWrites.has(charger);
+    const unknown2 = this.unknownVehicleWrites.has(charger) || this.pendingVehicleWrites.has(charger);
     const ctx = this.vehicleContext();
     if (this.vehicleDirty && this.vehicleBase && ctx && !this.vehicleConflict && (ctx.vehicleId !== this.vehicleBase.vehicleId || vehicleSignature(ctx.vehicle, ctx.props) !== this.vehicleBase.signature)) {
       this.vehicleConflict = true;
@@ -65549,10 +65846,10 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       savedId: this.settingsRecord?.target?.vehicle_id || null,
       selectedId: this.vehicleSelected,
       entityState,
-      blocked: this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.costBusy || this.paramBusy || this.notifyBusy || unknown,
-      conflict: this.vehicleConflict || unknown,
+      blocked: this.settingsBusy || this.morekBusy || this.autoBusy || this.chargeBusy || this.costBusy || this.paramBusy || this.notifyBusy || unknown2,
+      conflict: this.vehicleConflict || unknown2,
       busy: this.vehicleBusy,
-      notice: unknown && !this.vehicleNotice ? "A previous vehicle save has an unknown outcome. Reload vehicle sources to confirm it." : this.vehicleNotice
+      notice: unknown2 && !this.vehicleNotice ? "A previous vehicle save has an unknown outcome. Reload vehicle sources to confirm it." : this.vehicleNotice
     });
     adapter.actions.editVehicle = () => this.editVehicle();
     adapter.actions.selectVehicle = (id) => this.selectVehicle(id);
