@@ -2183,26 +2183,26 @@ var init_chunk_M45NRQFW = __esm({
       noResults: "No matching results",
       notCompleted: "Not completed",
       now: "Now",
-      numCharacters: (num3) => {
-        if (num3 === 1) return "1 character";
-        return `${num3} characters`;
+      numCharacters: (num4) => {
+        if (num4 === 1) return "1 character";
+        return `${num4} characters`;
       },
-      numCharactersRemaining: (num3) => {
-        if (num3 === 1) return "1 character remaining";
-        return `${num3} characters remaining`;
+      numCharactersRemaining: (num4) => {
+        if (num4 === 1) return "1 character remaining";
+        return `${num4} characters remaining`;
       },
-      numOptionsAvailable: (num3) => {
-        if (num3 === 0) return "No options available";
-        if (num3 === 1) return "1 option available";
-        return `${num3} options available`;
+      numOptionsAvailable: (num4) => {
+        if (num4 === 0) return "No options available";
+        if (num4 === 1) return "1 option available";
+        return `${num4} options available`;
       },
-      numOptionsSelected: (num3) => {
-        if (num3 === 0) return "No options selected";
-        if (num3 === 1) return "1 option selected";
-        return `${num3} options selected`;
+      numOptionsSelected: (num4) => {
+        if (num4 === 0) return "No options selected";
+        if (num4 === 1) return "1 option selected";
+        return `${num4} options selected`;
       },
-      numRowsCopied: (num3) => num3 === 1 ? "1 row copied" : `${num3} rows copied`,
-      numRowsSelected: (num3) => num3 === 1 ? "1 row selected" : `${num3} rows selected`,
+      numRowsCopied: (num4) => num4 === 1 ? "1 row copied" : `${num4} rows copied`,
+      numRowsSelected: (num4) => num4 === 1 ? "1 row selected" : `${num4} rows selected`,
       optionPosition: (label2, position, total2) => `${label2}, ${position} of ${total2}`,
       optionsLoadError: "Options could not be loaded",
       pageXOfY: (page, total2) => `Page ${page} of ${total2}`,
@@ -2244,7 +2244,7 @@ var init_chunk_M45NRQFW = __esm({
       search: "Search",
       second: "Second",
       seek: "Seek",
-      seekProgress: (current, duration) => `${current} of ${duration}`,
+      seekProgress: (current, duration2) => `${current} of ${duration2}`,
       selectAColorFromTheScreen: "Select a color from the screen",
       selectAllRows: "Select all rows",
       selected: "Selected",
@@ -5775,15 +5775,15 @@ async function animate(el, keyframes, options) {
   return el.animate(keyframes, options).finished.catch(() => {
   });
 }
-function parseDuration(duration) {
-  duration = duration.toString().toLowerCase();
-  if (duration.indexOf("ms") > -1) {
-    return parseFloat(duration) || 0;
+function parseDuration(duration2) {
+  duration2 = duration2.toString().toLowerCase();
+  if (duration2.indexOf("ms") > -1) {
+    return parseFloat(duration2) || 0;
   }
-  if (duration.indexOf("s") > -1) {
-    return (parseFloat(duration) || 0) * 1e3;
+  if (duration2.indexOf("s") > -1) {
+    return (parseFloat(duration2) || 0) * 1e3;
   }
-  return parseFloat(duration) || 0;
+  return parseFloat(duration2) || 0;
 }
 var init_chunk_L6CIKOFQ = __esm({
   "node_modules/@awesome.me/webawesome/dist/chunks/chunk.L6CIKOFQ.js"() {
@@ -5917,7 +5917,7 @@ var init_chunk_Z7CHPABS = __esm({
           }
           this.closeOthersWithSameName();
           this.isAnimating = true;
-          const duration = parseDuration(getComputedStyle(this.body).getPropertyValue("--show-duration"));
+          const duration2 = parseDuration(getComputedStyle(this.body).getPropertyValue("--show-duration"));
           await animate(
             this.body,
             [
@@ -5925,7 +5925,7 @@ var init_chunk_Z7CHPABS = __esm({
               { height: `${this.body.scrollHeight}px`, opacity: "1" }
             ],
             {
-              duration,
+              duration: duration2,
               easing: "linear"
             }
           );
@@ -5944,14 +5944,14 @@ var init_chunk_Z7CHPABS = __esm({
             return;
           }
           this.isAnimating = true;
-          const duration = parseDuration(getComputedStyle(this.body).getPropertyValue("--hide-duration"));
+          const duration2 = parseDuration(getComputedStyle(this.body).getPropertyValue("--hide-duration"));
           await animate(
             this.body,
             [
               { height: `${this.body.scrollHeight}px`, opacity: "1" },
               { height: "0", opacity: "0" }
             ],
-            { duration, easing: "linear" }
+            { duration: duration2, easing: "linear" }
           );
           if (this.animationGeneration !== generation) {
             return;
@@ -8114,16 +8114,16 @@ var Handler = (function(_super) {
     }
   };
   Handler2.prototype.findHover = function(x2, y3, exclude) {
-    var list3 = this.storage.getDisplayList();
+    var list4 = this.storage.getDisplayList();
     var out2 = new HoveredResult(x2, y3);
-    setHoverTarget(list3, out2, x2, y3, exclude);
+    setHoverTarget(list4, out2, x2, y3, exclude);
     if (this._pointerSize && !out2.target) {
       var candidates = [];
       var pointerSize = this._pointerSize;
       var targetSizeHalf = pointerSize / 2;
       var pointerRect = new BoundingRect_default(x2 - targetSizeHalf, y3 - targetSizeHalf, pointerSize, pointerSize);
-      for (var i7 = list3.length - 1; i7 >= 0; i7--) {
-        var el = list3[i7];
+      for (var i7 = list4.length - 1; i7 >= 0; i7--) {
+        var el = list4[i7];
         if (el !== exclude && !el.ignore && !el.ignoreCoarsePointer && (!el.parent || !el.parent.ignoreCoarsePointer)) {
           tmpRect.copy(el.getBoundingRect());
           if (el.transform) {
@@ -8221,9 +8221,9 @@ function isHover(displayable, x2, y3) {
   }
   return false;
 }
-function setHoverTarget(list3, out2, x2, y3, exclude) {
-  for (var i7 = list3.length - 1; i7 >= 0; i7--) {
-    var el = list3[i7];
+function setHoverTarget(list4, out2, x2, y3, exclude) {
+  for (var i7 = list4.length - 1; i7 >= 0; i7--) {
+    var el = list4[i7];
     var hoverCheckResult = void 0;
     if (el !== exclude && !el.ignore && (hoverCheckResult = isHover(el, x2, y3))) {
       !out2.topTarget && (out2.topTarget = el);
@@ -9572,15 +9572,15 @@ var LRU = (function() {
     this._maxSize = maxSize;
   }
   LRU2.prototype.put = function(key3, value2) {
-    var list3 = this._list;
+    var list4 = this._list;
     var map3 = this._map;
     var removed = null;
     if (map3[key3] == null) {
-      var len2 = list3.len();
+      var len2 = list4.len();
       var entry = this._lastRemovedEntry;
       if (len2 >= this._maxSize && len2 > 0) {
-        var leastUsedEntry = list3.head;
-        list3.remove(leastUsedEntry);
+        var leastUsedEntry = list4.head;
+        list4.remove(leastUsedEntry);
         delete map3[leastUsedEntry.key];
         removed = leastUsedEntry.value;
         this._lastRemovedEntry = leastUsedEntry;
@@ -9591,18 +9591,18 @@ var LRU = (function() {
         entry = new Entry(value2);
       }
       entry.key = key3;
-      list3.insertEntry(entry);
+      list4.insertEntry(entry);
       map3[key3] = entry;
     }
     return removed;
   };
   LRU2.prototype.get = function(key3) {
     var entry = this._map[key3];
-    var list3 = this._list;
+    var list4 = this._list;
     if (entry != null) {
-      if (entry !== list3.tail) {
-        list3.remove(entry);
-        list3.insertEntry(entry);
+      if (entry !== list4.tail) {
+        list4.remove(entry);
+        list4.insertEntry(entry);
       }
       return entry.value;
     }
@@ -10566,8 +10566,8 @@ var Animator = (function() {
   Animator2.prototype.isPaused = function() {
     return !!this._paused;
   };
-  Animator2.prototype.duration = function(duration) {
-    this._maxTime = duration;
+  Animator2.prototype.duration = function(duration2) {
+    this._maxTime = duration2;
     this._force = true;
     return this;
   };
@@ -12602,7 +12602,7 @@ function is1DArraySame(arr0, arr1) {
 }
 function animateToShallow(animatable, topKey, animateObj, target, cfg, animationProps, animators, reverse) {
   var targetKeys = keys(target);
-  var duration = cfg.duration;
+  var duration2 = cfg.duration;
   var delay = cfg.delay;
   var additive = cfg.additive;
   var setToFinal = cfg.setToFinal;
@@ -12689,7 +12689,7 @@ function animateToShallow(animatable, topKey, animateObj, target, cfg, animation
     if (sourceClone) {
       animator.whenWithKeys(0, sourceClone, animationKeys);
     }
-    animator.whenWithKeys(duration == null ? 500 : duration, reverse ? reversedTarget : target, animationKeys).delay(delay || 0);
+    animator.whenWithKeys(duration2 == null ? 500 : duration2, reverse ? reversedTarget : target, animationKeys).delay(delay || 0);
     animatable.addAnimator(animator, topKey);
     animators.push(animator);
   }
@@ -13395,15 +13395,15 @@ function nice(val, mode) {
   val = nf * exp10;
   return round(val, -exponent);
 }
-function reformIntervals(list3) {
-  list3.sort(function(a4, b3) {
+function reformIntervals(list4) {
+  list4.sort(function(a4, b3) {
     return littleThan2(a4, b3, 0) ? -1 : 1;
   });
   var curr = -Infinity;
   var currClose = 1;
-  for (var i7 = 0; i7 < list3.length; ) {
-    var interval = list3[i7].interval;
-    var close_1 = list3[i7].close;
+  for (var i7 = 0; i7 < list4.length; ) {
+    var interval = list4[i7].interval;
+    var close_1 = list4[i7].close;
     for (var lg = 0; lg < 2; lg++) {
       if (interval[lg] <= curr) {
         interval[lg] = curr;
@@ -13413,12 +13413,12 @@ function reformIntervals(list3) {
       currClose = close_1[lg];
     }
     if (interval[0] === interval[1] && close_1[0] * close_1[1] !== 1) {
-      list3.splice(i7, 1);
+      list4.splice(i7, 1);
     } else {
       i7++;
     }
   }
-  return list3;
+  return list4;
   function littleThan2(a4, b3, lg2) {
     return a4.interval[lg2] < b3.interval[lg2] || a4.interval[lg2] === b3.interval[lg2] && (a4.close[lg2] - b3.close[lg2] === (!lg2 ? 1 : -1) || !lg2 && littleThan2(a4, b3, 1));
   }
@@ -13985,11 +13985,11 @@ var ListIterator = (
   (function() {
     function ListIterator2() {
     }
-    ListIterator2.prototype.reset = function(list3, start2, end2, step) {
-      this._list = list3;
+    ListIterator2.prototype.reset = function(list4, start2, end2, step) {
+      this._list = list4;
       this._step = step = step || 1;
       this._idx = start2;
-      this._end = end2 != null ? end2 : step > 0 ? list3.length : 0;
+      this._end = end2 != null ? end2 : step > 0 ? list4.length : 0;
       this.item = null;
       this.key = NaN;
       return this;
@@ -19681,31 +19681,31 @@ function getAnimationConfig(animationType, animatableModel, dataIndex, extraOpts
   var animationEnabled = animatableModel && animatableModel.isAnimationEnabled();
   var isUpdate = animationType === "update";
   if (animationEnabled) {
-    var duration = void 0;
+    var duration2 = void 0;
     var easing = void 0;
     var delay = void 0;
     if (extraOpts) {
-      duration = retrieve2(extraOpts.duration, 200);
+      duration2 = retrieve2(extraOpts.duration, 200);
       easing = retrieve2(extraOpts.easing, "cubicOut");
       delay = 0;
     } else {
-      duration = animatableModel.getShallow(isUpdate ? "animationDurationUpdate" : "animationDuration");
+      duration2 = animatableModel.getShallow(isUpdate ? "animationDurationUpdate" : "animationDuration");
       easing = animatableModel.getShallow(isUpdate ? "animationEasingUpdate" : "animationEasing");
       delay = animatableModel.getShallow(isUpdate ? "animationDelayUpdate" : "animationDelay");
     }
     if (animationPayload) {
-      animationPayload.duration != null && (duration = animationPayload.duration);
+      animationPayload.duration != null && (duration2 = animationPayload.duration);
       animationPayload.easing != null && (easing = animationPayload.easing);
       animationPayload.delay != null && (delay = animationPayload.delay);
     }
     if (isFunction(delay)) {
       delay = delay(dataIndex, extraDelayParams);
     }
-    if (isFunction(duration)) {
-      duration = duration(dataIndex);
+    if (isFunction(duration2)) {
+      duration2 = duration2(dataIndex);
     }
     var config = {
-      duration: duration || 0,
+      duration: duration2 || 0,
       delay,
       easing
     };
@@ -19734,11 +19734,11 @@ function animateOrSetProps(animationType, el, props, animatableModel, dataIndex,
   }
   var animationConfig = getAnimationConfig(animationType, animatableModel, dataIndex, isRemove ? removeOpt || {} : null, animatableModel && animatableModel.getAnimationDelayParams ? animatableModel.getAnimationDelayParams(el, dataIndex) : null);
   if (animationConfig && animationConfig.duration > 0) {
-    var duration = animationConfig.duration;
+    var duration2 = animationConfig.duration;
     var animationDelay = animationConfig.delay;
     var animationEasing = animationConfig.easing;
     var animateConfig = {
-      duration,
+      duration: duration2,
       delay: animationDelay || 0,
       easing: animationEasing,
       done: cb,
@@ -21471,8 +21471,8 @@ function makeValueReadable(value2, valueType, useUTC) {
   function stringToUserReadable(str) {
     return str && trim(str) ? str : "-";
   }
-  function isNumberUserReadable(num3) {
-    return isNullableNumberFinite(num3);
+  function isNumberUserReadable(num4) {
+    return isNullableNumberFinite(num4);
   }
   var isTypeTime = valueType === "time";
   var isValueDate = value2 instanceof Date;
@@ -21569,11 +21569,11 @@ var CoordinateSystemManager = (
       function dealCreate(creatorMap, canBeNonSeriesBox) {
         var coordinateSystems = [];
         each(creatorMap, function(creator, type) {
-          var list3 = creator.create(ecModel, api);
-          coordinateSystems = coordinateSystems.concat(list3 || []);
+          var list4 = creator.create(ecModel, api);
+          coordinateSystems = coordinateSystems.concat(list4 || []);
           if (true) {
             if (canBeNonSeriesBox) {
-              each(list3, function(master) {
+              each(list4, function(master) {
                 return assert(!master.update);
               });
             }
@@ -22413,8 +22413,8 @@ function doGuessOrdinal(data, sourceFormat, seriesLayoutBy, dimensionsDefine, st
       }
     } else {
       for (var i7 = 0; i7 < dataArrayRows.length && i7 < maxLoop; i7++) {
-        var row2 = dataArrayRows[startIndex + i7];
-        if (row2 && (result2 = detectValue(row2[dimIndex])) != null) {
+        var row3 = dataArrayRows[startIndex + i7];
+        if (row3 && (result2 = detectValue(row3[dimIndex])) != null) {
           return result2;
         }
       }
@@ -22842,15 +22842,15 @@ var GlobalModel = (
       return this._payload;
     };
     GlobalModel2.prototype.getComponent = function(mainType, idx) {
-      var list3 = this._componentsMap.get(mainType);
-      if (list3) {
-        var cmpt = list3[idx || 0];
+      var list4 = this._componentsMap.get(mainType);
+      if (list4) {
+        var cmpt = list4[idx || 0];
         if (cmpt) {
           return cmpt;
         } else if (idx == null) {
-          for (var i7 = 0; i7 < list3.length; i7++) {
-            if (list3[i7]) {
-              return list3[i7];
+          for (var i7 = 0; i7 < list4.length; i7++) {
+            if (list4[i7]) {
+              return list4[i7];
             }
           }
         }
@@ -24228,8 +24228,8 @@ var rawSourceItemGetterMap = (_b = {}, _b[SOURCE_FORMAT_ARRAY_ROWS + "_" + SERIE
   var item = out2 || [];
   var data = rawData;
   for (var i7 = 0; i7 < data.length; i7++) {
-    var row2 = data[i7];
-    item[i7] = row2 ? row2[idx] : null;
+    var row3 = data[i7];
+    item[i7] = row3 ? row3[idx] : null;
   }
   return item;
 }, _b[SOURCE_FORMAT_OBJECT_ROWS] = getItemSimply, _b[SOURCE_FORMAT_KEYED_COLUMNS] = function(rawData, startIndex, dimsDef, idx, out2) {
@@ -24254,8 +24254,8 @@ var countSimply = function(rawData, startIndex, dimsDef) {
 var rawSourceDataCounterMap = (_c = {}, _c[SOURCE_FORMAT_ARRAY_ROWS + "_" + SERIES_LAYOUT_BY_COLUMN] = function(rawData, startIndex, dimsDef) {
   return Math.max(0, rawData.length - startIndex);
 }, _c[SOURCE_FORMAT_ARRAY_ROWS + "_" + SERIES_LAYOUT_BY_ROW] = function(rawData, startIndex, dimsDef) {
-  var row2 = rawData[0];
-  return row2 ? Math.max(0, row2.length - startIndex) : 0;
+  var row3 = rawData[0];
+  return row3 ? Math.max(0, row3.length - startIndex) : 0;
 }, _c[SOURCE_FORMAT_OBJECT_ROWS] = countSimply, _c[SOURCE_FORMAT_KEYED_COLUMNS] = function(rawData, startIndex, dimsDef) {
   var dimName = dimsDef[0].name;
   var col = dimName != null ? rawData[dimName] : null;
@@ -28548,8 +28548,8 @@ function normalizeSymbolOffset(symbolOffset, symbolSize) {
 }
 
 // node_modules/zrender/lib/canvas/helper.js
-function isSafeNum(num3) {
-  return isFinite(num3);
+function isSafeNum(num4) {
+  return isFinite(num4);
 }
 function createLinearGradient(ctx, obj, rect) {
   var x2 = obj.x == null ? 0 : obj.x;
@@ -29872,8 +29872,8 @@ var ECharts = (
     };
     ECharts2.prototype.getSvgDataURL = function() {
       var zr = this._zr;
-      var list3 = zr.storage.getDisplayList();
-      each(list3, function(el) {
+      var list4 = zr.storage.getDisplayList();
+      each(list4, function(el) {
         el.stopAnimation(null, true);
       });
       return zr.painter.toDataURL();
@@ -30960,9 +30960,9 @@ var ECharts = (
       function updateStates(model, view) {
         var stateAnimationModel = model.getModel("stateAnimation");
         var enableAnimation = model.isAnimationEnabled();
-        var duration = stateAnimationModel.get("duration");
-        var stateTransition = duration > 0 ? {
-          duration,
+        var duration2 = stateAnimationModel.get("duration");
+        var stateTransition = duration2 > 0 ? {
+          duration: duration2,
           delay: stateAnimationModel.get("delay"),
           easing: stateAnimationModel.get("easing")
           // additive: stateAnimationModel.get('additive')
@@ -32162,9 +32162,9 @@ var SeriesData = (
       "use strict";
       var fCtx = ctx || ctxCompat || this;
       var dimIndices = map2(normalizeDimensions(dims), this._getStoreDimIndex, this);
-      var list3 = cloneListForMapAndSample(this);
-      list3._store = this._store.map(dimIndices, fCtx ? bind(cb, fCtx) : cb);
-      return list3;
+      var list4 = cloneListForMapAndSample(this);
+      list4._store = this._store.map(dimIndices, fCtx ? bind(cb, fCtx) : cb);
+      return list4;
     };
     SeriesData2.prototype.modify = function(dims, cb, ctx, ctxCompat) {
       var _this = this;
@@ -32181,19 +32181,19 @@ var SeriesData = (
       this._store.modify(dimIndices, fCtx ? bind(cb, fCtx) : cb);
     };
     SeriesData2.prototype.downSample = function(dimension, rate, sampleValue, sampleIndex) {
-      var list3 = cloneListForMapAndSample(this);
-      list3._store = this._store.downSample(this._getStoreDimIndex(dimension), rate, sampleValue, sampleIndex);
-      return list3;
+      var list4 = cloneListForMapAndSample(this);
+      list4._store = this._store.downSample(this._getStoreDimIndex(dimension), rate, sampleValue, sampleIndex);
+      return list4;
     };
     SeriesData2.prototype.minmaxDownSample = function(valueDimension, rate) {
-      var list3 = cloneListForMapAndSample(this);
-      list3._store = this._store.minmaxDownSample(this._getStoreDimIndex(valueDimension), rate);
-      return list3;
+      var list4 = cloneListForMapAndSample(this);
+      list4._store = this._store.minmaxDownSample(this._getStoreDimIndex(valueDimension), rate);
+      return list4;
     };
     SeriesData2.prototype.lttbDownSample = function(valueDimension, rate) {
-      var list3 = cloneListForMapAndSample(this);
-      list3._store = this._store.lttbDownSample(this._getStoreDimIndex(valueDimension), rate);
-      return list3;
+      var list4 = cloneListForMapAndSample(this);
+      list4._store = this._store.lttbDownSample(this._getStoreDimIndex(valueDimension), rate);
+      return list4;
     };
     SeriesData2.prototype.getRawDataItem = function(idx) {
       return this._store.getRawDataItem(idx);
@@ -32295,13 +32295,13 @@ var SeriesData = (
         }
       });
     };
-    SeriesData2.prototype.cloneShallow = function(list3) {
-      if (!list3) {
-        list3 = new SeriesData2(this._schema ? this._schema : map2(this.dimensions, this._getDimInfo, this), this.hostModel);
+    SeriesData2.prototype.cloneShallow = function(list4) {
+      if (!list4) {
+        list4 = new SeriesData2(this._schema ? this._schema : map2(this.dimensions, this._getDimInfo, this), this.hostModel);
       }
-      transferProperties(list3, this);
-      list3._store = this._store;
-      return list3;
+      transferProperties(list4, this);
+      list4._store = this._store;
+      return list4;
     };
     SeriesData2.prototype.wrapMethod = function(methodName, injectFunction) {
       var originalMethod = this[methodName];
@@ -32353,9 +32353,9 @@ var SeriesData = (
         return dimensions;
       };
       cloneListForMapAndSample = function(original) {
-        var list3 = new SeriesData2(original._schema ? original._schema : map2(original.dimensions, original._getDimInfo, original), original.hostModel);
-        transferProperties(list3, original);
-        return list3;
+        var list4 = new SeriesData2(original._schema ? original._schema : map2(original.dimensions, original._getDimInfo, original), original.hostModel);
+        transferProperties(list4, original);
+        return list4;
       };
       transferProperties = function(target, source) {
         each(TRANSFERABLE_PROPERTIES.concat(source.__wrappedMethods || []), function(propName) {
@@ -43051,12 +43051,12 @@ function applyKeyframeAnimation(el, animationOpts, animatableModel) {
     return;
   }
   var keyframes = animationOpts.keyframes;
-  var duration = animationOpts.duration;
-  if (animatableModel && duration == null) {
+  var duration2 = animationOpts.duration;
+  if (animatableModel && duration2 == null) {
     var config = getAnimationConfig("enter", animatableModel, 0);
-    duration = config && config.duration;
+    duration2 = config && config.duration;
   }
-  if (!keyframes || !duration) {
+  if (!keyframes || !duration2) {
     return;
   }
   var stateToRestore = getStateToRestore(el);
@@ -43103,7 +43103,7 @@ function applyKeyframeAnimation(el, animationOpts, animatableModel) {
       each(propKeys, function(key3) {
         savedTarget[key3] = ((targetPropName ? el[targetPropName] : el) || {})[key3];
       });
-      animator.whenWithKeys(duration * kf.percent, kfValues, propKeys, kf.easing);
+      animator.whenWithKeys(duration2 * kf.percent, kfValues, propKeys, kf.easing);
     });
     if (!animator) {
       return;
@@ -43113,7 +43113,7 @@ function applyKeyframeAnimation(el, animationOpts, animatableModel) {
         warn("End frame with percent: 1 is missing in the keyframeAnimation.", true);
       }
     }
-    animator.delay(animationOpts.delay || 0).duration(duration).start(animationOpts.easing);
+    animator.delay(animationOpts.delay || 0).duration(duration2).start(animationOpts.easing);
   });
 }
 
@@ -45793,16 +45793,16 @@ function assembleArrow(tooltipModel, borderColor, arrowPosition) {
   var styleCss = ["position:absolute;width:" + arrowSize + "px;height:" + arrowSize + "px;z-index:-1;", positionStyle + ";" + transformStyle + ";", "border-bottom:" + borderStyle, "border-right:" + borderStyle, "background-color:" + backgroundColor2 + ";"];
   return '<div style="' + styleCss.join("") + '"></div>';
 }
-function assembleTransition(duration, onlyFadeTransition, enableDisplayTransition) {
+function assembleTransition(duration2, onlyFadeTransition, enableDisplayTransition) {
   var transitionCurve = "cubic-bezier(0.23,1,0.32,1)";
   var transitionOption = "";
   var transitionText = "";
   if (enableDisplayTransition) {
-    transitionOption = " " + duration / 2 + "s " + transitionCurve;
+    transitionOption = " " + duration2 / 2 + "s " + transitionCurve;
     transitionText = "opacity" + transitionOption + ",visibility" + transitionOption;
   }
   if (!onlyFadeTransition) {
-    transitionOption = " " + duration + "s " + transitionCurve;
+    transitionOption = " " + duration2 + "s " + transitionCurve;
     transitionText += (transitionText.length ? "," : "") + (env_default.transformSupported ? "" + CSS_TRANSFORM_VENDOR + transitionOption : ",left" + transitionOption + ",top" + transitionOption);
   }
   return CSS_TRANSITION_VENDOR + ":" + transitionText;
@@ -51688,11 +51688,11 @@ var CanvasPainter = (function() {
       }
       return this;
     }
-    var list3 = this.storage.getDisplayList(true);
-    this._updateLayerStatus(list3, opt4.paintAll);
+    var list4 = this.storage.getDisplayList(true);
+    this._updateLayerStatus(list4, opt4.paintAll);
     this._redrawId = Math.random();
     var prevList = this._prevDisplayList;
-    this._paintList(list3, prevList, this._redrawId);
+    this._paintList(list4, prevList, this._redrawId);
     var bgColor = this._backgroundColor;
     eachLayer(this._i, function(layer, zlevel, zlevel2, idx) {
       if (layer.refresh) {
@@ -51700,11 +51700,11 @@ var CanvasPainter = (function() {
       }
     }, EACH_LAYER_NOT_BUILTIN);
     if (this._opts.useDirtyRect) {
-      this._prevDisplayList = list3.slice();
+      this._prevDisplayList = list4.slice();
     }
     return this;
   };
-  CanvasPainter2.prototype._paintHoverList = function(list3) {
+  CanvasPainter2.prototype._paintHoverList = function(list4) {
     var hoverLayer = this._i.hoverlayer;
     var hoverLayerDirty = this._hoverLayerDirty;
     this._hoverLayerDirty = HOVER_LAYER_DIRTY_NO;
@@ -51725,8 +51725,8 @@ var CanvasPainter = (function() {
       beforeBrushParam: {}
     };
     var ctx;
-    for (var i7 = 0, len2 = list3.length; i7 < len2; i7++) {
-      var el = list3[i7];
+    for (var i7 = 0, len2 = list4.length; i7 < len2; i7++) {
+      var el = list4[i7];
       if (!el.__inHover) {
         continue;
       }
@@ -51756,24 +51756,24 @@ var CanvasPainter = (function() {
   CanvasPainter2.prototype.paintOne = function(ctx, el) {
     brushSingle(ctx, el);
   };
-  CanvasPainter2.prototype._paintList = function(list3, prevList, redrawId) {
+  CanvasPainter2.prototype._paintList = function(list4, prevList, redrawId) {
     if (this._redrawId !== redrawId) {
       return;
     }
-    var finished = this._doPaintList(list3, prevList);
+    var finished = this._doPaintList(list4, prevList);
     if (this._needsManuallyCompositing) {
       this._compositeManually();
     }
     if (!finished) {
       var self_1 = this;
       requestAnimationFrame_default(function() {
-        self_1._paintList(list3, prevList, redrawId);
+        self_1._paintList(list4, prevList, redrawId);
       });
     } else {
       eachLayer(this._i, function(layer) {
         layer.afterBrush && layer.afterBrush();
       }, EACH_LAYER_BUILTIN_NOT_HOVER);
-      this._paintHoverList(list3);
+      this._paintHoverList(list4);
     }
   };
   CanvasPainter2.prototype._compositeManually = function() {
@@ -51787,7 +51787,7 @@ var CanvasPainter = (function() {
       }
     }, EACH_LAYER_BUILTIN);
   };
-  CanvasPainter2.prototype._doPaintList = function(list3, prevList) {
+  CanvasPainter2.prototype._doPaintList = function(list4, prevList) {
     var painter = this;
     var finished = true;
     eachLayer(this._i, function(layer) {
@@ -51800,7 +51800,7 @@ var CanvasPainter = (function() {
       if (!needDraw && !layer.__dirty) {
         return;
       }
-      var repaintRects = painter._opts.useDirtyRect && !isIncrementalLayer(layer) ? layer.createRepaintRects(list3, prevList, painter._width, painter._height) : null;
+      var repaintRects = painter._opts.useDirtyRect && !isIncrementalLayer(layer) ? layer.createRepaintRects(list4, prevList, painter._width, painter._height) : null;
       var firstLayerKey = painter._i.layerStack[0];
       var contentRetained = true;
       if (layer.__dirty) {
@@ -51810,7 +51810,7 @@ var CanvasPainter = (function() {
         layer.clear(false, clearColor, repaintRects);
       }
       eachCursorInLayer(layer, function(cursor) {
-        var cursorFinished = painter._paintPerCursor(layer, cursor, list3, repaintRects, contentRetained);
+        var cursorFinished = painter._paintPerCursor(layer, cursor, list4, repaintRects, contentRetained);
         finished = finished && cursorFinished;
       });
     }, EACH_LAYER_BUILTIN_NOT_HOVER);
@@ -51823,7 +51823,7 @@ var CanvasPainter = (function() {
     }
     return finished;
   };
-  CanvasPainter2.prototype._paintPerCursor = function(layer, layerCursor, list3, repaintRects, contentRetained) {
+  CanvasPainter2.prototype._paintPerCursor = function(layer, layerCursor, list4, repaintRects, contentRetained) {
     var ctx = layer.ctx;
     if (repaintRects) {
       if (!repaintRects.length) {
@@ -51836,18 +51836,18 @@ var CanvasPainter = (function() {
           ctx.beginPath();
           ctx.rect(rect.x * dpr2, rect.y * dpr2, rect.width * dpr2, rect.height * dpr2);
           ctx.clip();
-          this._paintPerCursorInRect(layer, layerCursor, list3, rect, contentRetained);
+          this._paintPerCursorInRect(layer, layerCursor, list4, rect, contentRetained);
           ctx.restore();
         }
       }
     } else {
       ctx.save();
-      this._paintPerCursorInRect(layer, layerCursor, list3, null, contentRetained);
+      this._paintPerCursorInRect(layer, layerCursor, list4, null, contentRetained);
       ctx.restore();
     }
     return layerCursor.drawIdx >= layerCursor.endIdx;
   };
-  CanvasPainter2.prototype._paintPerCursorInRect = function(layer, layerCursor, list3, repaintRect, contentRetained) {
+  CanvasPainter2.prototype._paintPerCursorInRect = function(layer, layerCursor, list4, repaintRect, contentRetained) {
     var scope = {
       inHover: false,
       allClipped: false,
@@ -51863,7 +51863,7 @@ var CanvasPainter = (function() {
     var notClearIdx = layerCursor.notClearIdx;
     var idx = notClearIdx >= 0 ? Math.min(notClearIdx, drawIdxBegin) : drawIdxBegin;
     for (; idx < layerCursor.endIdx; idx++) {
-      var el = list3[idx];
+      var el = list4[idx];
       if (idx < drawIdxBegin && !el.notClear) {
         continue;
       }
@@ -51985,12 +51985,12 @@ var CanvasPainter = (function() {
     });
     return layers;
   };
-  CanvasPainter2.prototype._updateLayerStatus = function(list3, paintAll) {
+  CanvasPainter2.prototype._updateLayerStatus = function(list4, paintAll) {
     var painter = this;
     if (painter._singleCanvas) {
-      for (var i7 = 1; i7 < list3.length; i7++) {
-        var el = list3[i7];
-        if (el.zlevel !== list3[i7 - 1].zlevel || el.incremental) {
+      for (var i7 = 1; i7 < list4.length; i7++) {
+        var el = list4[i7];
+        if (el.zlevel !== list4[i7 - 1].zlevel || el.incremental) {
           painter._needsManuallyCompositing = true;
           break;
         }
@@ -52008,8 +52008,8 @@ var CanvasPainter = (function() {
     var currLayer = null;
     var currCursor = null;
     var aboveIncrementalInCurrZLevel = false;
-    for (var idx = 0, len2 = list3.length; idx < len2; idx++) {
-      var el = list3[idx];
+    for (var idx = 0, len2 = list4.length; idx < len2; idx++) {
+      var el = list4[idx];
       var zlevel = el.zlevel;
       var elIncremental = el.incremental;
       var zlevel2 = void 0;
@@ -52069,11 +52069,11 @@ var CanvasPainter = (function() {
           cursorStack.splice(i8, 1);
         } else {
           var endIdxNew = cursor.endIdxNew;
-          if (isIncrementalLayer(layer) ? endIdxNew < cursor.drawIdx : endIdxNew !== cursor.endIdx || !endIdxNew || list3[endIdxNew - 1].id !== cursor.last) {
+          if (isIncrementalLayer(layer) ? endIdxNew < cursor.drawIdx : endIdxNew !== cursor.endIdx || !endIdxNew || list4[endIdxNew - 1].id !== cursor.last) {
             layer.__dirty = true;
           }
           cursor.endIdx = cursor.endIdxNew;
-          cursor.last = endIdxNew ? list3[endIdxNew - 1].id : NaN;
+          cursor.last = endIdxNew ? list4[endIdxNew - 1].id : NaN;
         }
       }
       if (layer.__dirty) {
@@ -52524,9 +52524,9 @@ ${sampleDate(h3)}` : time2(h3);
 // shared-dashboard/plan-data.js
 var validSocAssumptions = ({ startingSoc, capacityKwh, efficiency } = {}) => Number.isFinite(startingSoc) && startingSoc >= 0 && startingSoc <= 100 && Number.isFinite(capacityKwh) && capacityKwh > 0 && Number.isFinite(efficiency) && efficiency > 0 && efficiency <= 1;
 var total = (rows) => {
-  const energy2 = rows.length > 0 && rows.every((row2) => Number.isFinite(row2.energy) && row2.energy >= 0) ? rows.reduce((s4, row2) => s4 + row2.energy, 0) : null;
-  const cost = rows.length > 0 && rows.every((row2) => Number.isFinite(row2.cost)) ? rows.reduce((s4, row2) => s4 + row2.cost, 0) : null;
-  const validEnergy = Number.isFinite(energy2) ? energy2 : null;
+  const energy3 = rows.length > 0 && rows.every((row3) => Number.isFinite(row3.energy) && row3.energy >= 0) ? rows.reduce((s4, row3) => s4 + row3.energy, 0) : null;
+  const cost = rows.length > 0 && rows.every((row3) => Number.isFinite(row3.cost)) ? rows.reduce((s4, row3) => s4 + row3.cost, 0) : null;
+  const validEnergy = Number.isFinite(energy3) ? energy3 : null;
   const validCost = Number.isFinite(cost) ? cost : null;
   const average = validEnergy > 0 && validCost != null ? validCost * 100 / validEnergy : null;
   return { energy: validEnergy, cost: validCost, centsPerKwh: Number.isFinite(average) ? average : null };
@@ -52617,9 +52617,53 @@ function renderEvidence(data, power, count2) {
 }
 
 // shared-dashboard/history-view.js
-function renderHistory(h3, chartAvailable = false) {
-  if (!h3) return "<p>Charging history unavailable. A proposed window is not measured history.</p>";
-  return `<div class="history-head"><div><strong>${escapeText(h3.title)}</strong><p class="subtext">${escapeText(h3.subtitle)}</p></div><label class="history-select">Session <select disabled aria-label="Session selector unavailable"><option>${escapeText(h3.session)}</option></select></label></div><div class="history-comparison"><span><b>Last sent:</b> ${escapeText(h3.sent)}</span><span><b>Observed outside sent window:</b> ${escapeText(h3.outside)}</span><span><b>Coverage in sent window:</b> ${escapeText(h3.coverage)}</span></div>${chartAvailable ? '<div id="power-chart" class="chart power" role="img" aria-label="Measured power and shaded last sent plan"></div>' : "<p>Measured power history unavailable.</p>"}<p class="subtext">${escapeText(h3.note)}</p><div class="missing"><strong>Missing session example</strong><span>Previous session: energy unknown, not 0 kWh. A proposed window is not measured history.</span></div>`;
+var list = (items, render2) => items.length ? `<ul class="history-list">${items.map(render2).join("")}</ul>` : "";
+var row = (text4, detail = "", cls = "") => `<li${cls ? ` class="${cls}"` : ""}>${escapeText(text4)}${detail ? `<small>${escapeText(detail)}</small>` : ""}</li>`;
+function renderHistoryNav(nav) {
+  if (!nav) return "";
+  const button = (id, label2, enabled) => `<wa-button size="small" data-history-nav="${id}" ${enabled ? "" : "disabled"}>${escapeText(label2)}</wa-button>`;
+  return `<div class="history-nav" role="group" aria-label="History day"><div class="history-nav-buttons">${button("prev", "\u2039 Earlier day", nav.canPrev)}<strong class="history-day-label">${escapeText(nav.label)}</strong>${button("next", "Later day \u203A", nav.canNext)}${button("yesterday", "Yesterday", true)}${button("today", "Today", !nav.isToday)}<label class="history-date">Day <input type="date" data-history-date min="${escapeText(nav.min)}" max="${escapeText(nav.max)}" value="${escapeText(nav.day)}" aria-label="History day"></label>${nav.canRetry ? button("retry", "Retry", true) : ""}</div><p class="subtext">${escapeText(nav.zoneNote)}</p></div>`;
+}
+var banner = (kind, text4) => `<p class="history-banner" data-history-banner="${escapeText(kind)}" role="status">${escapeText(text4)}</p>`;
+var basisValue = (r7) => r7.value === null ? "Unavailable" : escapeText(r7.text.slice(r7.label.length + 2));
+var energy2 = (m4) => `<div class="history-energy" aria-label="Energy by basis">${m4.energyRows.map((r7) => `<div class="history-basis" data-basis-value="${r7.value === null ? "null" : r7.value}"><b>${escapeText(r7.label)}</b><span>${basisValue(r7)}</span><small>${escapeText(r7.detail)}</small></div>`).join("")}<div class="history-basis"><b>Recorder-placed session energy</b><span>${m4.sessions.length ? "Per session below" : "No session overlaps this day"}</span><small>Never added to the bases beside it</small></div></div>${list(m4.energyNotes, (t6) => row(t6))}`;
+function renderDigest(d3) {
+  const lists = [
+    d3.flow.length ? `<h4>Flow intervals in the summary</h4>${list(d3.flow, (i7) => row(i7.text, i7.detail))}` : "",
+    d3.blocks.length ? `<h4>Sent-plan blocks in the summary</h4>${list(d3.blocks, (b3) => row(`${b3.text} \u2014 ${b3.verdictText}`, "", `verdict-${b3.verdict}`))}` : "",
+    d3.outside.length ? `<h4>Flow versus plan</h4>${list(d3.outside, (t6) => row(t6))}` : ""
+  ].join("");
+  const facts = `${d3.unknownSpans ? `${d3.unknownSpans} span(s) where the plan was unknown. ` : ""}${d3.gapCount !== null ? `${d3.gapCount} capture gap(s), ` : ""}${d3.restartCount !== null ? `${d3.restartCount} restart(s).` : ""}`;
+  return `<section class="history-digest" data-history-section="digest"><h3>Saved day summary</h3><p class="subtext">${d3.partial ? "Raw rows were already partly pruned when this was written. " : ""}${d3.computed ? `Written ${escapeText(d3.computed)}. ` : ""}It was written once and keeps no price rows.</p>${d3.coverage ? `<p>${escapeText(d3.coverage)}</p>` : ""}${d3.energy.length ? `<div class="history-energy">${d3.energy.map((r7) => `<div class="history-basis" data-basis-value="${r7.value === null ? "null" : r7.value}"><b>${escapeText(r7.label)}</b><span>${basisValue(r7)}</span></div>`).join("")}</div><p class="subtext">Separate bases, never added together.</p>` : ""}${lists}<p class="subtext">${escapeText(facts)}</p></section>`;
+}
+function renderHistoryDay(m4) {
+  const head = renderHistoryNav(m4.nav);
+  if (m4.state !== "ready") return `<div class="history-day" data-history-state="${escapeText(m4.state)}">${head}${banner(m4.state, m4.message)}</div>`;
+  const rawBanners = { digest_only: "digest", plan_only: "no-power", none: "none", partial: "partial-raw", unknown: "unknown-raw" };
+  const parts = [head];
+  if (rawBanners[m4.raw]) parts.push(banner(rawBanners[m4.raw], m4.rawNote));
+  if (m4.refreshFailed) parts.push(banner("refresh-failed", "The latest refresh failed; this is the earlier read of the day."));
+  if (m4.legacy) parts.push(banner("legacy", "This integration is older than the card: it does not say when lists are cut or which rows are kept, so missing rows cannot be told from rows that never existed."));
+  if (m4.partial) parts.push(`<div class="history-banner" data-history-banner="truncated" role="status"><b>Partial: some lists are cut.</b>${list(m4.truncated, (t6) => row(t6))}</div>`);
+  if (m4.raw === "digest_only" && m4.digest) parts.push(renderDigest(m4.digest));
+  const measured = ["full", "partial", "unknown"].includes(m4.raw);
+  if (measured || m4.sent.length) parts.push(`<section data-history-section="coverage"><p>${escapeText(m4.coverage.text)}</p></section>`);
+  if (m4.sent.length || measured) {
+    parts.push(`<section data-history-section="sent"><h3>Sent plan and measured flow</h3>${m4.sent.length ? list(m4.sent, (b3) => row(`${b3.text} \u2014 ${b3.verdictText}`, b3.detail, `${b3.kind} verdict-${b3.verdict}`)) : '<p class="subtext">No sent plan is known for this day.</p>'}<p class="subtext">${escapeText(m4.sentNote)}</p>${m4.unacked ? `<p class="subtext">${m4.unacked} recorded plan version(s) were not acknowledged and are not treated as sent.</p>` : ""}</section>`);
+  }
+  if (measured) {
+    parts.push(`<section data-history-section="flow"><h3>Measured flow</h3>${m4.flow.length ? list(m4.flow, (i7) => row(i7.text, i7.detail)) : '<p class="subtext">No flow interval was found in the measured rows that exist; the coverage line says what was not measured.</p>'}${list(m4.outside, (x2) => row(x2.text, "", `outside-${x2.kind}`))}${m4.isolated ? `<p class="subtext">${escapeText(m4.isolated)}</p>` : ""}<p class="subtext">${escapeText(m4.flowNote)}</p></section>`);
+    parts.push(`<section data-history-section="energy"><h3>Energy by basis</h3>${energy2(m4)}</section>`);
+  }
+  if (m4.sessions.length) parts.push(`<section data-history-section="sessions"><h3>Sessions overlapping this day</h3><ul class="history-list">${m4.sessions.map((s4) => `<li>${escapeText(s4.text)}<small>${escapeText(s4.detail)}</small>${s4.lines.map((l6) => `<small class="history-recon">${escapeText(l6)}</small>`).join("")}</li>`).join("")}</ul><p class="subtext">A session that crosses midnight appears on both days; its energy is not split.</p></section>`);
+  if (m4.gaps.length || m4.restarts.length) parts.push(`<section data-history-section="gaps"><h3>Capture gaps and restarts</h3>${list(m4.gaps.slice(0, 5), (t6) => row(`Gap: ${t6}`))}${m4.gaps.length > 5 ? `<p class="subtext">${m4.gaps.length - 5} more gap(s) not listed.</p>` : ""}${m4.restarts.length ? `<p class="subtext">Capture (re)started at ${m4.restarts.slice(0, 5).map(escapeText).join(", ")}${m4.restarts.length > 5 ? ` and ${m4.restarts.length - 5} more` : ""}.</p>` : ""}</section>`);
+  parts.push(`<p class="subtext history-retention">${escapeText(m4.retentionNote)}${m4.retention.oldestPower ? ` Measured power rows currently begin ${escapeText(m4.retention.oldestPower)}.` : ""}${m4.retention.digestDays !== null ? ` ${m4.retention.digestDays} day summary(ies) are kept.` : ""}</p>`);
+  return `<div class="history-day" data-history-state="ready" data-history-raw="${escapeText(m4.raw)}">${parts.join("")}</div>`;
+}
+function renderHistory(h3, chartAvailable = false, day = null) {
+  const panel = day ? renderHistoryDay(day) : "";
+  if (!h3) return panel || "<p>Charging history unavailable. A proposed window is not measured history.</p>";
+  return `${panel}<div class="history-head"><div><strong>${escapeText(h3.title)}</strong><p class="subtext">${escapeText(h3.subtitle)}</p></div><label class="history-select">Session <select disabled aria-label="Session selector unavailable"><option>${escapeText(h3.session)}</option></select></label></div><div class="history-comparison"><span><b>Last sent:</b> ${escapeText(h3.sent)}</span><span><b>Observed outside sent window:</b> ${escapeText(h3.outside)}</span><span><b>Coverage in sent window:</b> ${escapeText(h3.coverage)}</span></div>${chartAvailable ? '<div id="power-chart" class="chart power" role="img" aria-label="Measured power and shaded last sent plan"></div>' : "<p>Measured power history unavailable.</p>"}<p class="subtext">${escapeText(h3.note)}</p><div class="missing"><strong>Missing session example</strong><span>Previous session: energy unknown, not 0 kWh. A proposed window is not measured history.</span></div>`;
 }
 
 // shared-dashboard/insight-view.js
@@ -52895,7 +52939,7 @@ function mountDashboard(root, adapter) {
       ${card("Price insights", labels.insightEyebrow || "PRICE DATA", renderInsights(m4.insights), "insights", tag)}
       ${modes.map(priceCard).join("")}
       ${card("Plan activity & freshness", labels.evidenceEyebrow || "EVIDENCE", renderEvidence(m4.evidence, state.power, knownPlan ? windows.length : null), "morek", tag)}
-      ${card("Recent charging", labels.historyEyebrow || "HISTORY", renderHistory(m4.history, historyReady), "history", tag)}
+      ${card("Recent charging", labels.historyEyebrow || "HISTORY", renderHistory(m4.history, historyReady, m4.historyDay), "history", tag)}
       ${m4.vehicleSources ? card("Vehicle sources & properties", "ADVANCED", renderVehicleSources(m4.vehicleSources), "vehicle-sources", tag) : ""}
       ${m4.marketCosts ? card("Market & charging costs", "ADVANCED", renderMarketCosts(m4.marketCosts), "market-costs", tag) : ""}
       ${m4.planParams ? card("Plan & charger parameters", "ADVANCED", renderPlanParams(m4.planParams), "plan-params", tag) : ""}
@@ -52942,6 +52986,13 @@ function mountDashboard(root, adapter) {
     }, { signal })));
     root.querySelectorAll("[data-price-nav-day]").forEach((select) => bind3(select, () => select.addEventListener("change", () => {
       if (select.value) current.actions?.priceNav?.("day", select.value);
+    }, { signal })));
+    root.querySelectorAll("[data-history-nav]").forEach((button) => bind3(button, () => button.addEventListener("click", () => {
+      if (button.hasAttribute("disabled")) return;
+      current.actions?.historyNav?.(button.dataset.historyNav);
+    }, { signal })));
+    root.querySelectorAll("[data-history-date]").forEach((input) => bind3(input, () => input.addEventListener("change", () => {
+      if (input.value) current.actions?.historyNav?.("day", input.value);
     }, { signal })));
     const detailsLink = root.querySelector('a[href="#details"]');
     bind3(detailsLink, () => detailsLink.addEventListener("click", (event) => {
@@ -53218,6 +53269,7 @@ var IF_NOT_READY = ["ask", "release", "hold"];
 var IDENTIFY_MODES = ["automatic", "ask", "off"];
 var MARKET_API_VERSION = 1;
 var PRICE_DAYS_API_VERSION = 1;
+var HISTORY_API_VERSION = 1;
 var MARKET_STATES = ["loading", "ready", "stale", "unavailable", "invalid"];
 var MARKET_REASONS = ["offline", "invalid"];
 
@@ -57469,6 +57521,14 @@ async function getPriceDays(hass, chargerId, request) {
     ...request
   });
 }
+async function getChargingHistory(hass, chargerId, date2) {
+  return await call(hass, {
+    type: "spotnav/get_charging_history",
+    api_version: HISTORY_API_VERSION,
+    charger_id: chargerId,
+    date: date2
+  });
+}
 async function morekSchedule(hass, chargerId, action, previewId) {
   return await call(hass, {
     type: "spotnav/morek_schedule",
@@ -57621,20 +57681,20 @@ var parse2 = (day) => {
   const m4 = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day || "");
   return m4 ? Date.UTC(+m4[1], +m4[2] - 1, +m4[3]) : NaN;
 };
-var format2 = (ms) => new Date(ms).toISOString().slice(0, 10);
+var format2 = (ms2) => new Date(ms2).toISOString().slice(0, 10);
 var addDays = (day, n6) => format2(parse2(day) + n6 * DAY_MS2);
 var dayLabel = (day) => Number.isFinite(parse2(day)) ? new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", weekday: "short", day: "numeric", month: "short", year: "numeric" }).format(parse2(day)) : "Unknown day";
 function mergePriceRows(...lists) {
   const byStart = /* @__PURE__ */ new Map();
-  for (const list3 of lists) for (const row2 of list3 || []) {
-    const start2 = Date.parse(row2?.start), end2 = Date.parse(row2?.end);
-    if (!Number.isFinite(start2) || !Number.isFinite(end2) || end2 <= start2 || !(row2.raw_price === null || Number.isFinite(row2.raw_price))) return { error: "malformed" };
+  for (const list4 of lists) for (const row3 of list4 || []) {
+    const start2 = Date.parse(row3?.start), end2 = Date.parse(row3?.end);
+    if (!Number.isFinite(start2) || !Number.isFinite(end2) || end2 <= start2 || !(row3.raw_price === null || Number.isFinite(row3.raw_price))) return { error: "malformed" };
     const old = byStart.get(start2);
     if (old) {
-      if (old.end === end2 && old.row.raw_price === row2.raw_price) continue;
+      if (old.end === end2 && old.row.raw_price === row3.raw_price) continue;
       return { error: "conflict" };
     }
-    byStart.set(start2, { end: end2, row: row2 });
+    byStart.set(start2, { end: end2, row: row3 });
   }
   const sorted = [...byStart.entries()].sort((a4, b3) => a4[0] - b3[0]);
   for (let i7 = 1; i7 < sorted.length; i7++) if (sorted[i7][0] < sorted[i7 - 1][1].end) return { error: "overlap" };
@@ -57660,9 +57720,9 @@ function createPriceDays({ request, onChange = () => {
       const answer = await request({ mode: "available" });
       if (!current(mine, myKey)) return;
       const days = Array.isArray(answer?.days) ? answer.days : null;
-      const valid = answer?.api_version === 1 && answer.mode === "available" && answer.charger_id === asked.charger && answer.area_id === asked.area && answer.currency === asked.currency && typeof answer.today === "string" && Number.isFinite(parse2(answer.today)) && days && days.length <= 400 && days.every((row2) => Number.isFinite(parse2(row2?.day)));
+      const valid = answer?.api_version === 1 && answer.mode === "available" && answer.charger_id === asked.charger && answer.area_id === asked.area && answer.currency === asked.currency && typeof answer.today === "string" && Number.isFinite(parse2(answer.today)) && days && days.length <= 400 && days.every((row3) => Number.isFinite(parse2(row3?.day)));
       if (!valid) throw new Error("context");
-      st.available = { today: answer.today, days, byDay: new Map(days.map((row2) => [row2.day, row2])), yesterdayReachable: answer.yesterday_reachable === true };
+      st.available = { today: answer.today, days, byDay: new Map(days.map((row3) => [row3.day, row3])), yesterdayReachable: answer.yesterday_reachable === true };
       st.status = "ready";
     } catch {
       if (!current(mine, myKey)) return;
@@ -57684,10 +57744,10 @@ function createPriceDays({ request, onChange = () => {
       const wanted = [];
       for (let d3 = from; parse2(d3) <= parse2(day); d3 = addDays(d3, 1)) wanted.push(d3);
       const rows = Array.isArray(answer?.days) ? answer.days : null;
-      const valid = answer?.api_version === 1 && answer.mode === "range" && answer.charger_id === asked.charger && answer.area_id === asked.area && answer.currency === asked.currency && answer.from === from && answer.to === day && rows && rows.length === wanted.length && rows.every((row2, i7) => row2?.day === wanted[i7] && typeof row2.held === "boolean");
+      const valid = answer?.api_version === 1 && answer.mode === "range" && answer.charger_id === asked.charger && answer.area_id === asked.area && answer.currency === asked.currency && answer.from === from && answer.to === day && rows && rows.length === wanted.length && rows.every((row3, i7) => row3?.day === wanted[i7] && typeof row3.held === "boolean");
       if (!valid) throw new Error("context");
-      const dayRows = new Map(rows.map((row2) => [row2.day, row2]));
-      const merged = mergePriceRows(...rows.map((row2) => row2.held && Array.isArray(row2.intervals) ? row2.intervals : []));
+      const dayRows = new Map(rows.map((row3) => [row3.day, row3]));
+      const merged = mergePriceRows(...rows.map((row3) => row3.held && Array.isArray(row3.intervals) ? row3.intervals : []));
       if (merged.error) throw new Error("rows");
       st.page = { id: ++pageId, from, to: day, dayRows, rows: merged.rows };
       st.selection = chosen(selection);
@@ -57702,8 +57762,8 @@ function createPriceDays({ request, onChange = () => {
   const heldDay = (day) => st.available?.byDay.get(day);
   const liveCoversDay = (liveRows, c5, day) => {
     const span = c5.span?.(day);
-    return !!span && (liveRows || []).some((row2) => {
-      const s4 = Date.parse(row2?.start);
+    return !!span && (liveRows || []).some((row3) => {
+      const s4 = Date.parse(row3?.start);
       return s4 >= span[0] && s4 < span[1];
     });
   };
@@ -57785,8 +57845,8 @@ function createPriceDays({ request, onChange = () => {
       const available = st.available, checking = st.status === "loading" || st.status === "idle";
       const why = (text4) => checking ? "Checking which days are held\u2026" : st.status === "error" ? "Held days could not be read." : text4;
       const held = (day) => available?.byDay.get(day);
-      const partial = (row3) => row3 && row3.complete === false;
-      const earlier = available ? available.days.filter((row3) => parse2(row3.day) < parse2(yesterday)) : [];
+      const partial = (row4) => row4 && row4.complete === false;
+      const earlier = available ? available.days.filter((row4) => parse2(row4.day) < parse2(yesterday)) : [];
       const tomorrowThere = liveCoversDay(liveRows, ctx, tomorrow);
       const buttons = [
         { id: "yesterday", label: "Yesterday", enabled: !!held(yesterday), partial: partial(held(yesterday)), reason: held(yesterday) ? "" : why(available && !available.yesterdayReachable ? "Outside what the price provider keeps." : "Yesterday\u2019s prices are not held.") },
@@ -57796,11 +57856,11 @@ function createPriceDays({ request, onChange = () => {
         { id: "all", label: "All loaded days", enabled: !!rows?.length, reason: rows?.length ? "" : "No prices are loaded." }
       ];
       for (const button of buttons) button.selected = button.id === "earlier" ? st.earlierOpen || selection.kind === "day" : selection.kind === button.id;
-      const row2 = selection.day ? page?.dayRows.get(selection.day) : null;
+      const row3 = selection.day ? page?.dayRows.get(selection.day) : null;
       const loadedDays = showsPage ? new Set([...page.dayRows.values()].filter((r7) => r7.held && r7.intervals).map((r7) => r7.day)) : /* @__PURE__ */ new Set();
       let detail = "";
       if (selection.kind === "all") detail = `All loaded days: ${loadedDays.size ? `${loadedDays.size} held day${loadedDays.size === 1 ? "" : "s"} of the current page of up to ${PAGE_DAYS} days plus` : ""} today and tomorrow. Not the full price history.`;
-      else if (row2?.held) detail = `${dayLabel(row2.day)} \xB7 ${row2.complete === false ? "partial: the held prices cover only part of this day" : "complete"} \xB7 ${row2.interval_count ?? "unknown"} intervals${row2.resolution_minutes ? ` of ${row2.resolution_minutes} min` : " (mixed lengths)"} \xB7 source ${row2.source || "unknown"}${row2.fetched_at ? ` \xB7 fetched ${ctx.formatInstant ? ctx.formatInstant(row2.fetched_at) : row2.fetched_at}` : ""}`;
+      else if (row3?.held) detail = `${dayLabel(row3.day)} \xB7 ${row3.complete === false ? "partial: the held prices cover only part of this day" : "complete"} \xB7 ${row3.interval_count ?? "unknown"} intervals${row3.resolution_minutes ? ` of ${row3.resolution_minutes} min` : " (mixed lengths)"} \xB7 source ${row3.source || "unknown"}${row3.fetched_at ? ` \xB7 fetched ${ctx.formatInstant ? ctx.formatInstant(row3.fetched_at) : row3.fetched_at}` : ""}`;
       else if (selection.kind === "tomorrow") detail = "Tomorrow\u2019s published prices.";
       const unusable = page ? [...page.dayRows.values()].filter((r7) => r7.held && !r7.intervals) : [];
       if (unusable.length) detail += ` ${unusable.map((r7) => dayLabel(r7.day)).join(", ")}: held, but not drawn (${unusable.some((r7) => r7.reason === "no_price_rate") ? "no usable exchange rate" : "invalid intervals"}).`;
@@ -57825,6 +57885,337 @@ function createPriceDays({ request, onChange = () => {
   };
 }
 
+// shared-dashboard/history-day.js
+var HISTORY_DAYS_BACK = 62;
+var REFRESH_TODAY_MS = 3e5;
+var PARTIAL_AFTER_S = 660;
+var DAY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+var ZONE_FAILED = "Charging history needs the Home Assistant time zone, which is unknown here.";
+var LISTS = [
+  ["intervals", "measured flow intervals"],
+  ["gaps", "capture gaps"],
+  ["restarts", "capture restarts"],
+  ["planned_blocks", "sent-plan blocks"],
+  ["outside_plan", "flow-versus-plan rows"],
+  ["unknown_plan_spans", "unknown-plan spans"],
+  ["sessions", "sessions"],
+  ["plans", "plan versions"]
+];
+var ms = (day) => {
+  const m4 = DAY_RE.exec(day || "");
+  return m4 ? Date.UTC(+m4[1], +m4[2] - 1, +m4[3]) : NaN;
+};
+var addDays2 = (day, n6) => new Date(ms(day) + n6 * 864e5).toISOString().slice(0, 10);
+var dayLabel2 = (day) => Number.isFinite(ms(day)) ? new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", weekday: "short", day: "numeric", month: "short", year: "numeric" }).format(ms(day)) : "Unknown day";
+function localDate(at, zone) {
+  try {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).format(at);
+  } catch {
+    return null;
+  }
+}
+var num = (v2) => typeof v2 === "number" && Number.isFinite(v2);
+var nonneg = (v2) => num(v2) && v2 >= 0;
+var kwh = (v2) => nonneg(v2) ? `${v2.toFixed(v2 < 10 ? 2 : 1)} kWh` : "unknown";
+var duration = (s4) => {
+  if (!nonneg(s4)) return "unknown";
+  const m4 = Math.round(s4 / 60), h3 = Math.floor(m4 / 60);
+  return h3 ? `${h3} h ${m4 % 60} min` : `${m4} min`;
+};
+var instant = (v2) => {
+  const t6 = Date.parse(v2);
+  return Number.isFinite(t6) ? t6 : NaN;
+};
+function validateHistory(answer, asked) {
+  const w2 = answer?.window, o9 = answer?.observed, c5 = answer?.comparison, r7 = answer?.retention;
+  const arrays = [o9?.intervals, o9?.gaps, o9?.capture_restarts, c5?.planned_blocks, c5?.outside_plan, c5?.unknown_plan_spans, answer?.sessions, answer?.plans, answer?.digests];
+  const ok3 = answer?.api_version === 1 && answer.charger_id === asked.charger && w2?.zone === asked.zone && typeof w2.local_since === "string" && w2.local_since.startsWith(`${asked.day}T00:00`) && w2.local_until?.startsWith?.(addDays2(asked.day, 1)) && Number.isFinite(instant(w2.since)) && Number.isFinite(instant(w2.until)) && instant(w2.until) > instant(w2.since) && arrays.every(Array.isArray) && o9.coverage && typeof o9.coverage === "object" && o9.energy && typeof o9.energy === "object" && r7 && typeof r7 === "object" && arrays.slice(0, 7).every((list4) => list4.length <= 200) && arrays[0].every((i7) => Number.isFinite(instant(i7?.first_sample)) && Number.isFinite(instant(i7?.last_sample))) && arrays[3].every((b3) => Number.isFinite(instant(b3?.start)) && Number.isFinite(instant(b3?.end)) && typeof b3.verdict === "string") && arrays[4].every((x2) => Number.isFinite(instant(x2?.start)) && Number.isFinite(instant(x2?.end)) && typeof x2.kind === "string") && arrays[6].every((s4) => s4 && typeof s4 === "object" && Number.isFinite(instant(s4.start)) && Number.isFinite(instant(s4.end)));
+  return !!ok3;
+}
+var VERDICT = { flow_observed: "Flow observed", no_flow_observed: "No flow observed", unknown: "Unknown" };
+var OUTSIDE = { outside_plan: "Flow outside the sent plan", plan_unknown: "Flow while the sent plan was unknown", no_plan_evidence: "Flow with no plan evidence" };
+var REASON = {
+  block_starts_before_retained_evidence: "starts before the retained evidence",
+  block_starts_before_retained_power: "starts before the retained power rows",
+  no_power_samples: "no measured power rows",
+  partial_coverage: "measured rows do not cover the whole block",
+  unplaced_meter_energy: "meter energy with no known time overlaps it"
+};
+var RECON = {
+  reconciled: "Register total reconciled",
+  consistent: "Register total matches placed energy",
+  inconsistent: "Register total disagrees with placed energy",
+  unknown: "Register total unknown",
+  uncertain: "Register total uncertain",
+  skipped: "Register total not checked"
+};
+var words = (text4) => String(text4 ?? "unknown").replace(/_/g, " ");
+function buildHistoryModel(answer, day, fmt) {
+  const since = instant(answer.window.since), until = instant(answer.window.until);
+  const r7 = answer.retention, kinds = r7.oldest_by_kind && typeof r7.oldest_by_kind === "object" ? r7.oldest_by_kind : null;
+  const signals = !!kinds && Array.isArray(r7.digest_days) && answer.truncated && typeof answer.truncated === "object";
+  const oldestPower = kinds ? instant(kinds.power_w) : NaN;
+  const digest = answer.digests.find((d3) => d3?.date === day) || null;
+  const o9 = answer.observed, cov = o9.coverage;
+  const stamp2 = (iso) => fmt.stamp(iso);
+  const span = (a4, b3) => `${stamp2(a4)}\u2013${stamp2(b3)}`;
+  const limits = r7.limits && nonneg(r7.limits.max_samples_per_kind) ? r7.limits : { max_samples_per_kind: 4320, max_age_days: 7, max_digest_days: 62 };
+  const rawDays = Math.round(limits.max_samples_per_kind / 1440 * 10) / 10;
+  const retentionNote = `Measured detail is kept for about the last ${rawDays} days at one reading per minute (${limits.max_samples_per_kind} rows per kind; the ${limits.max_age_days}-day age limit only applies to sparser rows), not a guaranteed ${limits.max_age_days} days. Day summaries are kept up to ${limits.max_digest_days} days, without price rows. Session records last longer but carry no per-minute evidence.`;
+  let raw, rawNote;
+  if (!kinds) {
+    raw = "unknown";
+    rawNote = "This Home Assistant integration does not report which measured rows are retained, so what is missing cannot be told apart from what did not happen.";
+  } else if (!Number.isFinite(oldestPower) || oldestPower >= until) {
+    const sent2 = answer.comparison.planned_blocks.length || answer.comparison.unknown_plan_spans.length || answer.plans.length || answer.sessions.length;
+    raw = digest ? "digest_only" : sent2 ? "plan_only" : "none";
+    rawNote = digest ? "The measured rows of this day are no longer kept; only its saved summary remains (no price rows, lists cut at 50 rows). The summary below is not live evidence." : sent2 ? "No measured power rows are kept for this day, so flow is unknown, not zero. Plans and sessions below are what was recorded." : "No charging evidence is kept for this day. That does not mean nothing happened.";
+  } else if (oldestPower > since + PARTIAL_AFTER_S * 1e3) {
+    raw = "partial";
+    rawNote = `Measured power rows are kept only from ${stamp2(kinds.power_w)}; flow before that is unknown, not zero.`;
+  } else raw = "full";
+  const truncated = [];
+  if (signals) for (const [name, label2] of LISTS) {
+    const t6 = answer.truncated[name];
+    if (t6?.truncated === true && nonneg(t6.cut)) truncated.push(`${label2}: first ${t6.limit ?? 200} shown, ${t6.cut} more not shown`);
+  }
+  if (signals && answer.truncated.price_slices?.truncated === true) truncated.push(`price slices of ${answer.truncated.price_slices.sessions?.length ?? "some"} session(s): ${answer.truncated.price_slices.cut} not shown`);
+  if (!signals && answer.plans_truncated === true) truncated.push("plan versions: the list is cut");
+  const blocks = answer.comparison.planned_blocks.map((b3) => ({
+    kind: "known",
+    start: instant(b3.start),
+    version: b3.version ?? null,
+    text: `${span(b3.start, b3.end)} \xB7 limit ${b3.limit}${b3.unit ? ` ${b3.unit}` : ""} \xB7 plan ${b3.version ?? "unknown"}`,
+    verdict: b3.verdict,
+    verdictText: VERDICT[b3.verdict] || "Unknown",
+    detail: [
+      ...(b3.reasons || []).map((x2) => REASON[x2] || words(x2)),
+      b3.intent_uncertain_after ? `intent uncertain after ${stamp2(b3.intent_uncertain_after)}` : "",
+      b3.open_ended_in_profile ? "open-ended in the profile" : "",
+      nonneg(b3.covered_fraction) ? `measured rows cover ${Math.round(b3.covered_fraction * 100)}% of the block` : ""
+    ].filter(Boolean).join(" \xB7 ")
+  }));
+  const unknown = answer.comparison.unknown_plan_spans.map((u4) => ({
+    kind: "unknown",
+    start: instant(u4.from),
+    version: null,
+    text: `${stamp2(u4.from)}\u2013${u4.until ? stamp2(u4.until) : "end of day"} \xB7 what the charger had installed is unknown`,
+    verdict: "unknown",
+    verdictText: "Plan unknown",
+    detail: words(u4.reason)
+  }));
+  const sent = [...blocks, ...unknown].sort((a4, b3) => a4.start - b3.start);
+  const edge = (bounded) => bounded === true ? "bounded" : "open (data gap, restart or data start beside it)";
+  const flow = o9.intervals.map((i7) => ({
+    text: `${span(i7.first_sample, i7.last_sample)} \xB7 ${i7.samples ?? "?"} readings \xB7 peak ${num(i7.peak_w) ? `${(i7.peak_w / 1e3).toFixed(1)} kW` : "unknown"}`,
+    detail: `start ${edge(i7.start_bounded)} \xB7 end ${edge(i7.end_bounded)}`
+  }));
+  const outside = answer.comparison.outside_plan.map((x2) => ({ kind: x2.kind, text: `${OUTSIDE[x2.kind] || words(x2.kind)}: ${span(x2.start, x2.end)} \xB7 ${duration(x2.seconds)}` }));
+  const energy3 = o9.energy, cvg = energy3.coverage || {};
+  const basis = (label2, value2, key3, note) => ({
+    label: label2,
+    value: value2 === null || value2 === void 0 ? null : value2,
+    text: value2 === null || value2 === void 0 ? `${label2}: unavailable (no measurement segment in this day)` : `${label2}: ${kwh(value2)}`,
+    detail: `${cvg[key3]?.segments ?? 0} segment(s), ${duration(cvg[key3]?.seconds)}${note ? ` \xB7 ${note}` : ""}`
+  });
+  const energyRows = [
+    basis("Meter-counter delta", energy3.meter_counter_kwh, "meter", "placed in time by observed readings"),
+    basis("Power-integrated estimate", energy3.power_integrated_estimate_kwh, "power", "an estimate from power readings"),
+    basis("Meter energy with unknown placement", energy3.meter_counter_unobserved_kwh, "unobserved", "happened while capture was not watching; no known time")
+  ];
+  const energyNotes = [
+    `These bases are separate measurements of the same charging and are never added together.`,
+    nonneg(energy3.unknown_seconds) && energy3.unknown_seconds > 0 ? `${duration(energy3.unknown_seconds)} of energy could not be measured (${Object.entries(energy3.unknown_segments || {}).map(([k2, n6]) => `${words(k2)} \xD7${n6}`).join(", ") || "unknown cause"}).` : "",
+    Array.isArray(energy3.edge_segments_not_prorated) && energy3.edge_segments_not_prorated.length ? `${energy3.edge_segments_not_prorated.length} segment(s) cross the day boundary and are not counted here.` : ""
+  ].filter(Boolean);
+  const sessions = answer.sessions.map((s4) => {
+    const rec = s4.reconciliation && typeof s4.reconciliation === "object" ? s4.reconciliation : null;
+    const lines3 = [];
+    if (rec) {
+      lines3.push(`${RECON[rec.state] || `Register total ${words(rec.state)}`}${rec.reason ? ` (${words(rec.reason)})` : ""}`);
+      if (nonneg(rec.total_kwh) && ["reconciled", "consistent"].includes(rec.state)) lines3.push(`Register total ${kwh(rec.total_kwh)} against ${kwh(rec.placed_kwh)} placed in time`);
+      if (nonneg(rec.unplaced_late_kwh) && rec.unplaced_late_kwh > 0) lines3.push(`Unplaced late energy ${kwh(rec.unplaced_late_kwh)}: no known time, not part of the placed energy above, not priced`);
+      if (nonneg(rec.unassigned_register_kwh) && rec.unassigned_register_kwh > 0) lines3.push(`Later register rise ${kwh(rec.unassigned_register_kwh)}: seen by receipt time only, not assigned to this session`);
+      if (["uncertain", "unknown", "skipped", "inconsistent"].includes(rec.state) || nonneg(rec.unassigned_register_kwh) && rec.unassigned_register_kwh > 0) lines3.push("The session total is not certified");
+    } else lines3.push("Register reconciliation unavailable");
+    return {
+      text: `${span(s4.start, s4.end)} \xB7 placed energy ${kwh(s4.energy_kwh)} (source: ${words(s4.energy_source)})`,
+      lines: lines3,
+      detail: `${words(s4.source)} \xB7 started by ${words(s4.started_by)}${s4.price_slices_truncated === true ? ` \xB7 ${s4.price_slices_cut} price slice(s) not shown` : ""}`
+    };
+  });
+  const gaps = o9.gaps.map((g2) => `${words(g2.kind)} ${stamp2(g2.from)}${g2.to ? `\u2013${stamp2(g2.to)}` : ""}${g2.reason ? ` (${words(g2.reason)})` : ""}`);
+  const restarts = o9.capture_restarts.map(stamp2);
+  const unacked = answer.plans.filter((p4) => p4?.acked_intent !== true).length;
+  const digestModel = digest ? {
+    partial: digest.partial_retention === true,
+    computed: digest.computed_at ? stamp2(digest.computed_at) : null,
+    flow: (digest.observed_intervals || []).map((i7) => ({ text: `${span(i7.first_sample, i7.last_sample)} \xB7 ${i7.samples ?? "?"} readings \xB7 peak ${num(i7.peak_w) ? `${(i7.peak_w / 1e3).toFixed(1)} kW` : "unknown"}`, detail: `start ${edge(i7.start_bounded)} \xB7 end ${edge(i7.end_bounded)}` })),
+    blocks: (digest.planned_blocks || []).map((b3) => ({ text: `${span(b3.start, b3.end)} \xB7 limit ${b3.limit} \xB7 plan ${b3.version ?? "unknown"}`, verdictText: VERDICT[b3.verdict] || "Unknown", verdict: b3.verdict })),
+    outside: (digest.outside_plan || []).map((x2) => `${OUTSIDE[x2.kind] || words(x2.kind)}: ${span(x2.start, x2.end)}`),
+    unknownSpans: (digest.unknown_plan_spans || []).length,
+    gapCount: digest.gap_count ?? null,
+    restartCount: digest.restart_count ?? null,
+    coverage: digest.coverage ? `${duration(digest.coverage.trusted_seconds)} measured, ${duration(digest.coverage.untrusted_seconds)} untrusted, ${duration(digest.coverage.no_data_seconds)} no data` : null,
+    energy: digest.energy ? [basis("Meter-counter delta", digest.energy.meter_counter_kwh, "meter"), basis("Power-integrated estimate", digest.energy.power_integrated_estimate_kwh, "power")].map((row3) => ({ ...row3, detail: "" })) : []
+  } : null;
+  return {
+    state: "ready",
+    day,
+    zone: answer.window.zone,
+    raw,
+    rawNote,
+    retentionNote,
+    legacy: !signals,
+    truncated,
+    partial: truncated.length > 0,
+    retention: {
+      oldestPower: kinds?.power_w ? stamp2(kinds.power_w) : null,
+      oldestRegister: kinds?.energy_register_kwh ? stamp2(kinds.energy_register_kwh) : null,
+      digestDays: signals ? r7.digest_days.length : null,
+      newestDigest: signals && r7.digest_days.length ? r7.digest_days.at(-1) : null
+    },
+    coverage: {
+      text: `Measured power covers ${duration(cov.trusted_seconds)} of ${duration(cov.window_seconds)}; ${duration(cov.untrusted_seconds)} untrusted; ${duration(cov.no_data_seconds)} with no data (unknown, not zero).`,
+      none: !nonneg(cov.trusted_seconds)
+    },
+    sent,
+    flow,
+    outside,
+    energyRows,
+    energyNotes,
+    sessions,
+    gaps,
+    restarts,
+    unacked,
+    digest: digestModel,
+    isolated: nonneg(o9.isolated_flow_samples) && o9.isolated_flow_samples > 0 ? `${o9.isolated_flow_samples} single reading(s) above the flow threshold were not enough to count as charging.` : "",
+    flowNote: "Flow comes only from measured power readings (threshold about 100 W, unverified for the installed charger). A plan, its acknowledgement, a limit read back, the battery level or the charger status never counts as flow.",
+    sentNote: "Sent means the charger answered a plan version as accepted, not that it was installed or that charging happened. After an uncertain write the plan is unknown."
+  };
+}
+function createHistoryDay({ request, onChange = () => {
+}, now = () => Date.now() }) {
+  let ctx = null, key3 = null, seq = 0;
+  const initial = () => ({ sel: { kind: "today" }, loading: null, result: null, error: null });
+  let st = initial();
+  const reset = () => {
+    seq++;
+    st = initial();
+  };
+  const keyOf = (c5) => JSON.stringify([c5.charger, c5.epoch, c5.zone]);
+  const effective = () => st.sel.kind === "today" ? ctx.today : st.sel.day;
+  const fmtFor = (c5) => ({ stamp: (iso) => {
+    const t6 = instant(iso);
+    if (!Number.isFinite(t6)) return "unknown time";
+    try {
+      const time2 = new Intl.DateTimeFormat("en-GB", { timeZone: c5.zone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(t6);
+      const date2 = localDate(t6, c5.zone);
+      return date2 === (c5.shownDay || date2) ? time2 : `${time2} (${new Intl.DateTimeFormat("en-GB", { timeZone: c5.zone, day: "numeric", month: "short" }).format(t6)})`;
+    } catch {
+      return String(iso);
+    }
+  } });
+  const failure = (error2) => {
+    const code = typeof error2?.code === "string" ? error2.code : "";
+    if (/unauthorized|permission|forbidden/i.test(code)) return { state: "permission", message: "You do not have permission to read charging history." };
+    if (code === "spotnav_history_unavailable") return { state: "unavailable", message: "Charging evidence is not kept for this installation, so there is no history to show." };
+    if (code === "spotnav_unsupported_api_version") return { state: "error", message: "The installed integration does not speak this history version; update the integration and card together." };
+    if (error2?.message === "invalid") return { state: "invalid", message: "The history answer could not be understood and was not shown." };
+    return { state: "error", message: "Charging history could not be read." };
+  };
+  async function load(day, { silent = false } = {}) {
+    const mine = ++seq, myKey = key3, asked = { charger: ctx.charger, day, zone: ctx.zone }, asCtx = { ...ctx, shownDay: day };
+    if (!silent) {
+      st.result = null;
+      st.loading = { day };
+    }
+    st.error = null;
+    try {
+      const answer = await request({ date: day });
+      if (mine !== seq || myKey !== key3) return;
+      if (!validateHistory(answer, asked)) throw new Error("invalid");
+      st.result = { day, at: now(), model: buildHistoryModel(answer, day, fmtFor(asCtx)) };
+    } catch (error2) {
+      if (mine !== seq || myKey !== key3) return;
+      if (silent && st.result) {
+        st.result = { ...st.result, refreshFailed: true };
+        st.error = { day, ...failure(error2) };
+      } else {
+        st.error = { day, ...failure(error2) };
+        st.result = null;
+      }
+    }
+    st.loading = null;
+    onChange();
+  }
+  return {
+    /** Tell it who is asking. A change of charger, generation/permission epoch or zone drops everything. */
+    sync(next) {
+      const valid = !!(next && next.charger && typeof next.zone === "string" && next.zone && Number.isFinite(ms(next.today)));
+      const nextKey = valid ? keyOf(next) : null;
+      if (nextKey !== key3) {
+        reset();
+        key3 = nextKey;
+      }
+      ctx = valid ? next : null;
+      if (!ctx) return this;
+      const day = effective();
+      if (st.loading) return this;
+      if (st.error?.day === day) return this;
+      if (st.result?.day !== day) void load(day);
+      else if (st.sel.kind === "today" && now() - st.result.at > REFRESH_TODAY_MS) void load(day, { silent: true });
+      return this;
+    },
+    /** `today`, `yesterday`, `prev`, `next` or an explicit `day`; only days inside the retained range are accepted. */
+    select(kind, day) {
+      if (!ctx) return;
+      const shown = effective();
+      const target = kind === "today" ? ctx.today : kind === "yesterday" ? addDays2(ctx.today, -1) : kind === "prev" ? addDays2(shown, -1) : kind === "next" ? addDays2(shown, 1) : day;
+      if (!Number.isFinite(ms(target)) || ms(target) > ms(ctx.today) || ms(target) < ms(addDays2(ctx.today, -HISTORY_DAYS_BACK))) return;
+      st.sel = target === ctx.today ? { kind: "today" } : { kind: "day", day: target };
+      st.error = null;
+      st.loading = null;
+      st.result = null;
+      void load(target);
+      onChange();
+    },
+    retry() {
+      if (!ctx || st.loading || !st.error) return;
+      void load(effective());
+      onChange();
+    },
+    view() {
+      if (!ctx) return { state: "unavailable", message: ZONE_FAILED, nav: null };
+      const shown = effective(), oldest = addDays2(ctx.today, -HISTORY_DAYS_BACK);
+      const nav = {
+        day: shown,
+        label: dayLabel2(shown),
+        isToday: shown === ctx.today,
+        min: oldest,
+        max: ctx.today,
+        zone: ctx.zone,
+        zoneNote: ctx.marketZone && ctx.marketZone !== ctx.zone ? `Days follow Home Assistant time (${ctx.zone}); the price chart follows ${ctx.marketZone}, so a day here is not the chart's day.` : `Day in Home Assistant time (${ctx.zone}).`,
+        canPrev: ms(shown) > ms(oldest),
+        canNext: ms(shown) < ms(ctx.today),
+        canRetry: !!st.error && !st.loading,
+        loading: !!st.loading
+      };
+      if (st.loading) return { state: "loading", message: `Loading charging history for ${dayLabel2(shown)}\u2026`, nav };
+      if (st.error && st.result?.day === shown && st.result.refreshFailed) return { ...st.result.model, refreshFailed: true, nav };
+      if (st.error) return { state: st.error.state, message: st.error.message, nav };
+      if (st.result?.day === shown) return { ...st.result.model, refreshFailed: st.result.refreshFailed === true, nav };
+      return { state: "loading", message: `Loading charging history for ${dayLabel2(shown)}\u2026`, nav };
+    },
+    dispose() {
+      seq++;
+      ctx = null;
+      key3 = null;
+      st = initial();
+    }
+  };
+}
+
 // sidebar/price-chart.js
 function publishedChart(raw, market, now, stale, view = null) {
   const rows = raw?.prices?.published_intervals;
@@ -57837,11 +58228,11 @@ function publishedChart(raw, market, now, stale, view = null) {
   }
   const prices = [];
   let previous = -Infinity;
-  for (const row2 of rows) {
-    if (!row2 || typeof row2.start !== "string" || typeof row2.end !== "string" || !/(?:Z|[+-]\d\d:\d\d)$/i.test(row2.start) || !/(?:Z|[+-]\d\d:\d\d)$/i.test(row2.end)) return null;
-    const start2 = Date.parse(row2.start), end2 = Date.parse(row2.end);
-    if (!Number.isFinite(start2) || !Number.isFinite(end2) || end2 <= start2 || start2 < previous || !(row2.raw_price === null || Number.isFinite(row2.raw_price))) return null;
-    if (row2.raw_price !== null) prices.push({ start: start2, end: end2, cents: displayPrice(row2.raw_price, currency) });
+  for (const row3 of rows) {
+    if (!row3 || typeof row3.start !== "string" || typeof row3.end !== "string" || !/(?:Z|[+-]\d\d:\d\d)$/i.test(row3.start) || !/(?:Z|[+-]\d\d:\d\d)$/i.test(row3.end)) return null;
+    const start2 = Date.parse(row3.start), end2 = Date.parse(row3.end);
+    if (!Number.isFinite(start2) || !Number.isFinite(end2) || end2 <= start2 || start2 < previous || !(row3.raw_price === null || Number.isFinite(row3.raw_price))) return null;
+    if (row3.raw_price !== null) prices.push({ start: start2, end: end2, cents: displayPrice(row3.raw_price, currency) });
     previous = end2;
   }
   if (!prices.length) return null;
@@ -57857,8 +58248,8 @@ function publishedChart(raw, market, now, stale, view = null) {
     }
     return [start2, end2];
   };
-  const time2 = (ms) => new Intl.DateTimeFormat("en-GB", { timeZone: zone, hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "shortOffset" }).format(ms);
-  const date2 = (ms) => new Intl.DateTimeFormat("en-GB", { timeZone: zone, year: "numeric", month: "short", day: "numeric" }).format(ms);
+  const time2 = (ms2) => new Intl.DateTimeFormat("en-GB", { timeZone: zone, hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "shortOffset" }).format(ms2);
+  const date2 = (ms2) => new Intl.DateTimeFormat("en-GB", { timeZone: zone, year: "numeric", month: "short", day: "numeric" }).format(ms2);
   const days = (start2, end2) => {
     const result2 = [];
     let mid = localMidnightAt(start2, zone);
@@ -57909,8 +58300,8 @@ function publishedChart(raw, market, now, stale, view = null) {
     }
     return out2;
   };
-  const tickLabel = (ms) => localMidnightAt(ms, zone) === ms ? `${time2(ms)}
-${date2(ms)}` : time2(ms);
+  const tickLabel = (ms2) => localMidnightAt(ms2, zone) === ms2 ? `${time2(ms2)}
+${date2(ms2)}` : time2(ms2);
   return { chart: { prices, now, horizon, cap: null, unit: priceUnit(currency), viewKey: view?.key ?? "default" }, format: { chartTime: time2, date: date2, tooltipDate: date2, days, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks, tickLabel } };
 }
 function localDaySpan(day, zone) {
@@ -57990,7 +58381,7 @@ function oneOf(source, key3, allowed) {
   }
   return value2;
 }
-function list(source, key3) {
+function list2(source, key3) {
   const value2 = source[key3];
   return Array.isArray(value2) ? value2 : bad();
 }
@@ -58059,7 +58450,7 @@ var OPTIONAL_RECORD_KEYS = [
 ];
 var ALL_WEEKDAYS = [1, 2, 3, 4, 5, 6, 7];
 function weekdays(source, key3) {
-  const days = list(source, key3).map(
+  const days = list2(source, key3).map(
     (day) => typeof day === "number" && Number.isInteger(day) && day >= 1 && day <= 7 ? day : bad()
   );
   return days.length === 0 || new Set(days).size !== days.length ? bad() : [...days].sort((a4, b3) => a4 - b3);
@@ -58089,11 +58480,11 @@ var NOTIFICATION_KEYS = ["targets", "events", "url", "available"];
 var NOTIFY_SERVICE_KEYS = ["service", "name"];
 function decodeNotifications(source) {
   exactKeys(source, NOTIFICATION_KEYS);
-  const targets = list(source, "targets").map((item) => typeof item === "string" ? item : bad());
-  const events = list(source, "events").map(
+  const targets = list2(source, "targets").map((item) => typeof item === "string" ? item : bad());
+  const events = list2(source, "events").map(
     (item) => typeof item === "string" && NOTIFICATION_EVENTS.includes(item) ? item : bad()
   );
-  const available = list(source, "available").map((item) => {
+  const available = list2(source, "available").map((item) => {
     const entry = record(item);
     exactKeys(entry, NOTIFY_SERVICE_KEYS);
     return { service: text(entry, "service"), name: text(entry, "name") };
@@ -58151,7 +58542,7 @@ function vehicleIds(source) {
   if (source["vehicle_ids"] === null) {
     return null;
   }
-  const ids = list(source, "vehicle_ids").map((item) => typeof item === "string" && item !== "" ? item : bad());
+  const ids = list2(source, "vehicle_ids").map((item) => typeof item === "string" && item !== "" ? item : bad());
   return ids.length === 0 || new Set(ids).size !== ids.length ? bad() : ids;
 }
 function decodeSettingsRecord(raw) {
@@ -58161,7 +58552,7 @@ function decodeSettingsRecord(raw) {
   const hasWeekdays = present.includes("departure_weekdays");
   exactKeys(source, [...RECORD_KEYS, ...present]);
   if (present.includes("fiscal_included")) {
-    for (const item of list(source, "fiscal_included")) {
+    for (const item of list2(source, "fiscal_included")) {
       if (item !== "vat" && item !== "tax" && item !== "transfer") {
         return bad();
       }
@@ -58178,7 +58569,7 @@ function decodeSettingsRecord(raw) {
     ...present.includes("time_reserve_percent") ? { time_reserve_percent: whole(source, "time_reserve_percent") } : {},
     ...present.includes("cap_price_basis") ? { cap_price_basis: source["cap_price_basis"] === null ? null : oneOf(source, "cap_price_basis", ["nord_pool", "configured_variable_cost"]) } : {},
     area_id: textOrNull(source, "area_id"),
-    overrides: list(source, "overrides").map((item) => decodeOverride(record(item))),
+    overrides: list2(source, "overrides").map((item) => decodeOverride(record(item))),
     phases: wholeOrNull(source, "phases"),
     amps: wholeOrNull(source, "amps"),
     requested_kwh: finite(source, "requested_kwh"),
@@ -58435,9 +58826,9 @@ var AMPS_MIN = 1;
 var AMPS_MAX = 80;
 function replacementFor(kind, record5, values, range2 = null, opened = null, days = null) {
   const body = encodeBody(record5);
-  const energy2 = kind === "energy" || kind === "plan" ? checkEnergy(values.energy) : null;
-  if (energy2 !== null && !energy2.ok) {
-    return energy2;
+  const energy3 = kind === "energy" || kind === "plan" ? checkEnergy(values.energy) : null;
+  if (energy3 !== null && !energy3.ok) {
+    return energy3;
   }
   const amps = kind === "current" || kind === "plan" ? currentCheck(values, record5, range2) : null;
   if (amps !== null && !amps.ok) {
@@ -58518,12 +58909,12 @@ function replacementFor(kind, record5, values, range2 = null, opened = null, day
     next.target = target;
     changed = true;
   }
-  if (energy2 !== null && energy2.ok && (opened === null || energy2.value !== opened.requested_kwh)) {
-    next.requested_kwh = energy2.value;
-    changed = changed || energy2.value !== record5.requested_kwh;
+  if (energy3 !== null && energy3.ok && (opened === null || energy3.value !== opened.requested_kwh)) {
+    next.requested_kwh = energy3.value;
+    changed = changed || energy3.value !== record5.requested_kwh;
   }
   const fillShown = opened === null ? record5.fill_to_limit === true : opened.fill_to_limit === true;
-  if (energy2 !== null && energy2.ok && record5.fill_to_limit !== void 0 && values.fill !== fillShown) {
+  if (energy3 !== null && energy3.ok && record5.fill_to_limit !== void 0 && values.fill !== fillShown) {
     next.fill_to_limit = values.fill;
     changed = changed || values.fill !== record5.fill_to_limit;
   }
@@ -58598,8 +58989,8 @@ var DIRECTION_HINTS = ["use_power", "magnitude"];
 var HIGH_LOAD_DAYS = ["all", "weekdays", "mon_sat"];
 var DEMAND_TOP_N = [1, 3, 5];
 var MAX_DEMAND_COMPONENTS = 3;
-function referencePictures(list3) {
-  return list3.flatMap((entry) => {
+function referencePictures(list4) {
+  return list4.flatMap((entry) => {
     if (!isRecord2(entry) || entry.kind !== "day" && entry.kind !== "night" || typeof entry.taken_at !== "string") {
       return [];
     }
@@ -58689,10 +59080,10 @@ function instantMs(value2) {
   const parsed = Date.parse(value2);
   return Number.isFinite(parsed) ? parsed : bad2();
 }
-function instant(source, key3) {
+function instant2(source, key3) {
   const value2 = source[key3];
-  const ms = instantMs(value2);
-  return { text: value2, ms };
+  const ms2 = instantMs(value2);
+  return { text: value2, ms: ms2 };
 }
 function isValidTimeZone(timeZone) {
   try {
@@ -58853,17 +59244,17 @@ function priceSource(raw) {
 }
 function decodeInterval(raw, timeZone, previous) {
   const source = record2(raw);
-  const start2 = instant(source, "start");
-  const end2 = instant(source, "end");
+  const start2 = instant2(source, "start");
+  const end2 = instant2(source, "end");
   const day = text2(source, "day");
-  const duration = numberValue(source, "duration_minutes");
+  const duration2 = numberValue(source, "duration_minutes");
   if (end2.ms <= start2.ms) {
     bad2();
   }
-  if (!(duration > 0)) {
+  if (!(duration2 > 0)) {
     bad2();
   }
-  if (Math.abs(end2.ms - start2.ms - duration * 6e4) > DURATION_TOLERANCE_MS) {
+  if (Math.abs(end2.ms - start2.ms - duration2 * 6e4) > DURATION_TOLERANCE_MS) {
     bad2();
   }
   if (timeZone !== null && localDayKey(start2.ms, timeZone) !== day) {
@@ -58881,7 +59272,7 @@ function decodeInterval(raw, timeZone, previous) {
     end: end2.text,
     endMs: end2.ms,
     day,
-    duration_minutes: duration,
+    duration_minutes: duration2,
     raw_price: numberOrNull(source, "raw_price"),
     effective_price: numberOrNull(source, "effective_price"),
     proposal_planned: booleanValue2(source, "proposal_planned"),
@@ -58968,8 +59359,8 @@ function decodePeriods(source) {
   const periods = [];
   for (const raw of arrayValue(source, "periods")) {
     const entry = record2(raw);
-    const start2 = instant(entry, "start");
-    const end2 = instant(entry, "end");
+    const start2 = instant2(entry, "start");
+    const end2 = instant2(entry, "end");
     if (end2.ms <= start2.ms) {
       bad2();
     }
@@ -59176,15 +59567,15 @@ function decodeStrategyRow(source) {
 function decodeStrategy(source) {
   exactKeys2(source, ["selected", "available"]);
   const selected = enumOrNull(source, "selected", STRATEGIES2);
-  const rows = arrayValue(source, "available").map((row2) => decodeStrategyRow(record2(row2)));
+  const rows = arrayValue(source, "available").map((row3) => decodeStrategyRow(record2(row3)));
   const seen = /* @__PURE__ */ new Set();
-  for (const row2 of rows) {
-    if (seen.has(row2.strategy)) {
+  for (const row3 of rows) {
+    if (seen.has(row3.strategy)) {
       return bad2();
     }
-    seen.add(row2.strategy);
+    seen.add(row3.strategy);
   }
-  const enabled = rows.filter((row2) => row2.available).map((row2) => row2.strategy);
+  const enabled = rows.filter((row3) => row3.available).map((row3) => row3.strategy);
   if (selected === null ? enabled.length !== 0 : !enabled.includes(selected)) {
     return bad2();
   }
@@ -59709,8 +60100,8 @@ function setupOrNull(root) {
       const item = record2(entry);
       const writes = "field" in item || "value" in item;
       exactKeys2(item, writes ? ["id", "dismissible", "field", "value"] : ["id", "dismissible"]);
-      const row2 = { id: text2(item, "id"), dismissible: booleanValue2(item, "dismissible") };
-      return writes ? { ...row2, write: { field: text2(item, "field"), value: booleanValue2(item, "value") } } : row2;
+      const row3 = { id: text2(item, "id"), dismissible: booleanValue2(item, "dismissible") };
+      return writes ? { ...row3, write: { field: text2(item, "field"), value: booleanValue2(item, "value") } } : row3;
     });
     return { items };
   } catch {
@@ -60430,7 +60821,7 @@ function decodeField(raw) {
   }
   return bad3();
 }
-function list2(source, key3) {
+function list3(source, key3) {
   const value2 = source[key3];
   return Array.isArray(value2) ? value2 : bad3();
 }
@@ -60589,7 +60980,7 @@ function decodeMeter(raw) {
     powerInverted: flag(source, "power_inverted"),
     estimated: flag(source, "estimated"),
     disabledEntities: textList(source, "disabled_entities"),
-    entities: list2(source, "entities").map(decodeDetectedEntity),
+    entities: list3(source, "entities").map(decodeDetectedEntity),
     warnings: textList(source, "warnings"),
     applied: flag(source, "applied")
   };
@@ -60825,10 +61216,10 @@ function decodeConfig(raw) {
       name: text3(siteSource, "name"),
       chargerCount: count2,
       measurement: decodeMeasurement(siteSource["measurement"]),
-      warnings: list2(siteSource, "warnings").map(decodeWarning),
-      meters: list2(detection, "meters").map(decodeMeter),
-      batteries: list2(detection, "batteries").map(decodeBattery),
-      chargers: rawChargers === void 0 ? [] : list2(detection, "chargers").map(decodeChargerCurrent)
+      warnings: list3(siteSource, "warnings").map(decodeWarning),
+      meters: list3(detection, "meters").map(decodeMeter),
+      batteries: list3(detection, "batteries").map(decodeBattery),
+      chargers: rawChargers === void 0 ? [] : list3(detection, "chargers").map(decodeChargerCurrent)
     };
   }
   return {
@@ -61024,7 +61415,7 @@ function sensorModel(vehicle, entityState) {
   if (base2 && !candidates.some((c5) => c5.entityId === base2)) options.push({ value: base2, text: `${label(selected)} (no longer offered)` });
   return { status, level, text: text4, base: base2, options };
 }
-function propertiesModel(props, row2, canWrite) {
+function propertiesModel(props, row3, canWrite) {
   if (!props) return null;
   const source = props.capacitySource;
   const reported = ok(props.reportedCapacityKwh) && props.reportedCapacityKwh > 0 ? props.reportedCapacityKwh : null;
@@ -61042,7 +61433,7 @@ function propertiesModel(props, row2, canWrite) {
     phases: {
       base: String(props.onboardPhases === 1 ? 1 : 3),
       display: phases === 1 ? "1-phase" : phases === 3 ? "3-phase (entered by you)" : "3-phase (the default; nothing entered)",
-      suggestion: row2 && row2.suggested_onboard_phases === 1 && props.onboardPhases !== 1 ? "Recent charges look single-phase. Nothing was changed; set 1-phase below if that is right." : "",
+      suggestion: row3 && row3.suggested_onboard_phases === 1 && props.onboardPhases !== 1 ? "Recent charges look single-phase. Nothing was changed; set 1-phase below if that is right." : "",
       editable: canWrite
     }
   };
@@ -61066,11 +61457,11 @@ function vehicleSourcesModel(input) {
   if (!vehicle) return { ...model, sensor: null, reading: null, properties: null };
   const sensor = sensorModel(vehicle, input.entityState);
   sensor.canEdit = canEdit && configFresh && input.dashboardFresh !== false;
-  const row2 = (input.rows || []).find((r8) => r8.id === vehicle.id) || null;
+  const row3 = (input.rows || []).find((r8) => r8.id === vehicle.id) || null;
   const props = (input.config.vehicleProperties || []).find((p4) => p4.id === vehicle.id) || null;
-  const properties = propertiesModel(props, row2, canEdit && configFresh);
+  const properties = propertiesModel(props, row3, canEdit && configFresh);
   const r7 = input.reading && input.reading.vehicleId === vehicle.id ? input.reading : null;
-  const reading = r7 && ok(r7.value) ? { text: `${r7.value}%${r7.stale ? " \xB7 stale or unconfirmed" : ""} \u2014 ${r7.detail}`, stale: !!r7.stale } : row2 && ok(row2.soc_percent) ? { text: `${row2.soc_percent}% \xB7 last value, age unknown \u2014 not shown as a current reading.`, stale: true } : { text: "No valid reading from this car.", stale: true };
+  const reading = r7 && ok(r7.value) ? { text: `${r7.value}%${r7.stale ? " \xB7 stale or unconfirmed" : ""} \u2014 ${r7.detail}`, stale: !!r7.stale } : row3 && ok(row3.soc_percent) ? { text: `${row3.soc_percent}% \xB7 last value, age unknown \u2014 not shown as a current reading.`, stale: true } : { text: "No valid reading from this car.", stale: true };
   return { ...model, sensor, reading, properties, propertiesMissing: !props };
 }
 function sensorWritePlan(vehicle, draft) {
@@ -61271,8 +61662,8 @@ function decodeMarketOptions(raw) {
   }
 }
 var FISCAL_COMPONENTS = ["vat", "tax", "transfer"];
-function fiscalFormFrom(row2, component) {
-  const fiscal = row2 === null ? null : row2[component];
+function fiscalFormFrom(row3, component) {
+  const fiscal = row3 === null ? null : row3[component];
   const stored = fiscal === null ? null : fiscal.value;
   return {
     enabled: fiscal !== null && fiscal.enabled,
@@ -61349,9 +61740,9 @@ function sameFiscal(left, right) {
 function sameRow(left, right) {
   return left.area_id === right.area_id && sameFiscal(left.vat, right.vat) && sameFiscal(left.tax, right.tax) && sameFiscal(left.transfer, right.transfer);
 }
-function rowStatesNothing(row2) {
+function rowStatesNothing(row3) {
   for (const component of FISCAL_COMPONENTS) {
-    const fiscal = row2[component];
+    const fiscal = row3[component];
     if (fiscal.enabled || fiscal.value !== null) {
       return false;
     }
@@ -61384,15 +61775,15 @@ function marketReplacement(base2, values, options) {
     }
     components[component] = stated.value;
   }
-  const row2 = {
+  const row3 = {
     area_id: areaId,
     vat: components.vat,
     tax: components.tax,
     transfer: components.transfer
   };
   const existing = base2.overrides.find((item) => item.area_id === areaId) ?? null;
-  const changed = areaId !== base2.area_id ? true : existing === null ? !rowStatesNothing(row2) : !sameRow(existing, row2);
-  const overrides = existing === null && rowStatesNothing(row2) ? base2.overrides : existing === null ? [...base2.overrides, row2] : base2.overrides.map((item) => item.area_id === areaId ? row2 : item);
+  const changed = areaId !== base2.area_id ? true : existing === null ? !rowStatesNothing(row3) : !sameRow(existing, row3);
+  const overrides = existing === null && rowStatesNothing(row3) ? base2.overrides : existing === null ? [...base2.overrides, row3] : base2.overrides.map((item) => item.area_id === areaId ? row3 : item);
   return {
     ok: true,
     body: { ...encodeBody(base2), area_id: areaId, overrides },
@@ -61489,10 +61880,10 @@ var figureText = (n6) => ok2(n6) ? String(n6) : "";
 var modeOf = (form) => !form.enabled ? "off" : form.intent === "suggested" ? "suggested" : "custom";
 function costSignature(record5, options, block, areaId) {
   const id = areaId ?? record5?.area_id ?? null;
-  const row2 = record5 ? record5.overrides.find((o9) => o9.area_id === id) || null : null;
+  const row3 = record5 ? record5.overrides.find((o9) => o9.area_id === id) || null : null;
   return JSON.stringify([
     record5?.area_id ?? null,
-    row2,
+    row3,
     options ? options.state : null,
     options && id ? marketIncluded(options, id) : null,
     block ? [block.write_revision, block.transfer_percent.policy, block.transfer_percent.explicit_value, block.transfer_high.policy, block.transfer_high.explicit_value, block.high_load_window] : null
@@ -61538,14 +61929,14 @@ function currencyLine(dashboard, area) {
   return `Currency ${cur}${major ? ` (${major}${minor ? `, minor unit ${minor}` : ""})` : ""}. Prices and the chart show ${priceUnit(cur)}; flat fees are entered in ${minor ? `${minor}/kWh` : "the area\u2019s minor unit (unknown)"} exactly as stored, and VAT and the grid fee percentage in %.`;
 }
 function feeRows(record5, options, areaId, canEdit) {
-  const row2 = record5.overrides.find((o9) => o9.area_id === areaId) || null;
+  const row3 = record5.overrides.find((o9) => o9.area_id === areaId) || null;
   const included = marketIncluded(options, areaId);
   const rows = [];
   for (const key3 of FISCAL_COMPONENTS) {
-    const form = fiscalFormFrom(row2, key3);
+    const form = fiscalFormFrom(row3, key3);
     const suggestion = marketSuggestion(options, areaId, key3);
     const unit = fiscalUnit(options, areaId, key3) ? key3 === "vat" ? "%" : `${fiscalUnit(options, areaId, key3)}/kWh` : key3 === "vat" ? "%" : "unit unknown";
-    const stored = row2 ? row2[key3] : null;
+    const stored = row3 ? row3[key3] : null;
     const base2 = modeOf(form);
     if (included.includes(key3)) {
       rows.push({ key: key3, label: LABELS[key3], included: true, unit, mode: "included", figure: figureText(stored?.value ?? null), modes: [], hint: `Already included in this area\u2019s published price \u2014 nothing is added${stored && stored.value !== null ? ` (a stored figure of ${stored.value} ${unit} is kept but not used)` : ""}.`, canEdit: false });
@@ -61650,13 +62041,13 @@ function tariffWritePlan(block, values) {
   if (block.writable !== true) return { ok: false, notice: "Administrator permission is required." };
   if (gridTariffIncluded(block)) return { ok: false, notice: "The published price already includes the grid fee; nothing can be added." };
   const body = storedBody(block);
-  const num3 = (t6) => {
+  const num4 = (t6) => {
     const s4 = typeof t6 === "string" ? t6.trim().replace(",", ".") : "";
     return s4 === "" ? null : Number(s4);
   };
   const p4 = values?.percent || { mode: "off", figure: "" };
   if (p4.mode === "custom") {
-    const n6 = num3(p4.figure);
+    const n6 = num4(p4.figure);
     if (n6 === null) return { ok: false, notice: "Enter the grid fee percentage, or switch it off." };
     if (!ok2(n6) || n6 < 0 || n6 > 1e3) return { ok: false, notice: "The grid fee percentage must be a number from 0 to 1000." };
     body.transfer_percent = { enabled: true, value: n6 };
@@ -61664,7 +62055,7 @@ function tariffWritePlan(block, values) {
   const h3 = values?.high || { mode: "off", figure: "" };
   if (h3.mode === "custom") {
     if (!block.transfer_high.unit) return { ok: false, notice: "The area\u2019s unit is unknown, so the high-load fee cannot be set." };
-    const n6 = num3(h3.figure);
+    const n6 = num4(h3.figure);
     if (n6 === null) return { ok: false, notice: "Enter the high-load fee, or switch it off." };
     if (!ok2(n6) || n6 < 0 || n6 > HIGH_LOAD_MAX) return { ok: false, notice: `The high-load fee must be a number from 0 to ${HIGH_LOAD_MAX}.` };
     const w2 = values?.window || {};
@@ -62087,8 +62478,8 @@ function morekEvidence(state, observedAt, failed, now = Date.now()) {
   const readAt = Date.parse(state?.effective?.fetched_at ?? "");
   const readFresh = statusFresh && fresh2(readAt);
   const start2 = Date.parse(state?.effective?.schedule_start ?? "");
-  const duration = state?.effective?.duration_s;
-  const end2 = Number.isFinite(start2) && typeof duration === "number" && Number.isFinite(duration) && duration > 0 ? start2 + duration * 1e3 : NaN;
+  const duration2 = state?.effective?.duration_s;
+  const end2 = Number.isFinite(start2) && typeof duration2 === "number" && Number.isFinite(duration2) && duration2 > 0 ? start2 + duration2 * 1e3 : NaN;
   const coverage = Number.isFinite(end2) ? `${time2(state?.effective?.schedule_start)} \u2013 ${localTime(new Date(end2).toISOString())}` : "coverage unavailable";
   const validCoverage = Number.isFinite(start2) && Number.isFinite(end2) && start2 <= now && now < end2;
   const outcomeUnknown = state?.outcomes?.uncertain === true;
@@ -62116,13 +62507,13 @@ function morekEvidence(state, observedAt, failed, now = Date.now()) {
 }
 function transitions(doc, profile) {
   const start2 = new Date(profile.chargingSchedule.startSchedule).getTime();
-  const list3 = doc.createElement("ul");
+  const list4 = doc.createElement("ul");
   for (const period of profile.chargingSchedule.chargingSchedulePeriod) {
     const line = doc.createElement("li");
     line.textContent = `${localTime(new Date(start2 + period.startPeriod * 1e3).toISOString())}: ${period.limit} A`;
-    list3.append(line);
+    list4.append(line);
   }
-  return list3;
+  return list4;
 }
 var PREVIEW_REFUSALS = {
   pause_auto_first: "Pause Auto 'Until I resume' before sending.",
@@ -62339,13 +62730,13 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
       coverage.textContent = `Reported duration: ${state.effective.duration_s ?? "not reported"} seconds \xB7 unit: ${state.effective.rate_unit ?? "not reported"} \xB7 schedule start: ${localTime(state.effective.schedule_start ?? null)}.`;
       section.append(coverage);
     }
-    const list3 = doc.createElement("ul");
+    const list4 = doc.createElement("ul");
     for (const period of state.effective.periods) {
       const line = doc.createElement("li");
       line.textContent = `${localTime(period.at)}: ${period.amps} A`;
-      list3.append(line);
+      list4.append(line);
     }
-    section.append(list3);
+    section.append(list4);
   }
   if (typeof error2 === "string" && error2.trim() !== "") {
     const message = doc.createElement("p");
@@ -62576,7 +62967,7 @@ function setupRowText(language, id) {
 var DEFAULT_CURRENT_RANGE = { minA: 6, maxA: 32 };
 function chargerCarsOf(dashboard) {
   if (dashboard.vehicle_choices.length === 0) {
-    return dashboard.vehicles.map((row2) => ({ id: row2.id, name: row2.name }));
+    return dashboard.vehicles.map((row3) => ({ id: row3.id, name: row3.name }));
   }
   const allowed = dashboard.settings?.vehicle_ids ?? null;
   return dashboard.vehicle_choices.filter((choice) => allowed === null || allowed.includes(choice.id));
@@ -62607,7 +62998,7 @@ function isoWeekday(date2) {
   const d3 = new Date(Date.UTC(Number(m4[1]), Number(m4[2]) - 1, Number(m4[3])));
   return d3.getUTCDay() === 0 ? 7 : d3.getUTCDay();
 }
-function addDays2(date2, n6) {
+function addDays3(date2, n6) {
   const m4 = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date2 || "");
   if (!m4) return null;
   const d3 = new Date(Date.UTC(Number(m4[1]), Number(m4[2]) - 1, Number(m4[3]) + n6));
@@ -62673,7 +63064,7 @@ function nextDepartureText(record5, days) {
   }
   const set3 = new Set(record5.departure_weekdays);
   let day = days.nextOccurrence(time2);
-  for (let i7 = 0; i7 < 8 && day; i7 += 1, day = addDays2(day, 1)) {
+  for (let i7 = 0; i7 < 8 && day; i7 += 1, day = addDays3(day, 1)) {
     if (set3.has(isoWeekday(day))) return `Next ready-by: ${day} ${time2} (market local time).`;
   }
   return "No weekday is saved, so no departure can be named.";
@@ -63039,29 +63430,29 @@ function notifySignature(record5) {
   const n6 = record5?.notifications;
   return JSON.stringify(n6 ? [n6.targets, n6.events, n6.url] : null);
 }
-var row = (id, group, level, text4, goto = null) => ({ id, group, level, text: text4, goto, gotoLabel: goto ? GOTO2[goto] : null });
+var row2 = (id, group, level, text4, goto = null) => ({ id, group, level, text: text4, goto, gotoLabel: goto ? GOTO2[goto] : null });
 function setupDiagnostics({ dashboard, status, statusFresh, now }) {
   const out2 = [];
-  if (!dashboard) return [row("dashboard", "setup", "info", "No dashboard observation yet, so setup problems are unknown.")];
+  if (!dashboard) return [row2("dashboard", "setup", "info", "No dashboard observation yet, so setup problems are unknown.")];
   const rows = setupRowsOf(dashboard.setup ?? null);
-  if (dashboard.setup == null) out2.push(row("setup-unknown", "setup", "info", "The backend did not report what is left to set up, so that is unknown (it is shown to administrators only)."));
+  if (dashboard.setup == null) out2.push(row2("setup-unknown", "setup", "info", "The backend did not report what is left to set up, so that is unknown (it is shown to administrators only)."));
   for (const r7 of rows) {
     if (!(r7.id in MEASUREMENT_ROWS)) continue;
     const goto = MEASUREMENT_ROWS[r7.id];
-    out2.push(row(`setup-${r7.id}`, "measurement", r7.id === "grid_power_sign" || r7.id === "grid_current_sign" ? "warning" : "info", `${setupRowText("en", r7.id)}${goto ? "" : " This is set up in Home Assistant (the SpotNav card or the site settings), not here."}`, goto));
+    out2.push(row2(`setup-${r7.id}`, "measurement", r7.id === "grid_power_sign" || r7.id === "grid_current_sign" ? "warning" : "info", `${setupRowText("en", r7.id)}${goto ? "" : " This is set up in Home Assistant (the SpotNav card or the site settings), not here."}`, goto));
   }
   const soc2 = dashboard.soc;
-  if (soc2 && soc2.value == null && !rows.some((r7) => r7.id === "car_level" || r7.id === "vehicle")) out2.push(row("soc-missing", "measurement", "info", "The car\u2019s charge level has no valid reading now, so an SOC plan relies on the last known or an estimated level. Choose or check the level sensor.", "vehicle-sources"));
+  if (soc2 && soc2.value == null && !rows.some((r7) => r7.id === "car_level" || r7.id === "vehicle")) out2.push(row2("soc-missing", "measurement", "info", "The car\u2019s charge level has no valid reading now, so an SOC plan relies on the last known or an estimated level. Choose or check the level sensor.", "vehicle-sources"));
   const prices = dashboard.prices;
   if (prices) {
-    if (prices.provider && !prices.provider.name) out2.push(row("price-provider", "pricing", "warning", `No price provider is configured for the saved area${prices.provider.notice ? ` (${prices.provider.notice.code.replace(/_/g, " ")})` : ""}. Prices may be missing or held from before.`, "market-costs"));
-    if (typeof prices.state === "string" && prices.state !== "ready") out2.push(row("price-state", "pricing", "warning", `Held price data is \u201C${prices.state.replace(/_/g, " ")}\u201D${prices.reason ? ` (${String(prices.reason).replace(/_/g, " ")})` : ""}, so plans may use incomplete prices. Held data is not proof the provider answered just now.`, "market-costs"));
-    else if (prices.interval_count === 0) out2.push(row("price-none", "pricing", "warning", "No price intervals are held, so a price-based plan cannot be made.", "market-costs"));
+    if (prices.provider && !prices.provider.name) out2.push(row2("price-provider", "pricing", "warning", `No price provider is configured for the saved area${prices.provider.notice ? ` (${prices.provider.notice.code.replace(/_/g, " ")})` : ""}. Prices may be missing or held from before.`, "market-costs"));
+    if (typeof prices.state === "string" && prices.state !== "ready") out2.push(row2("price-state", "pricing", "warning", `Held price data is \u201C${prices.state.replace(/_/g, " ")}\u201D${prices.reason ? ` (${String(prices.reason).replace(/_/g, " ")})` : ""}, so plans may use incomplete prices. Held data is not proof the provider answered just now.`, "market-costs"));
+    else if (prices.interval_count === 0) out2.push(row2("price-none", "pricing", "warning", "No price intervals are held, so a price-based plan cannot be made.", "market-costs"));
   }
-  if (!statusFresh) out2.push(row("status-stale", "execution", "info", "Morek status is unavailable or stale, so execution blockers are unknown. This is not proof that nothing is blocked.", "morek"));
+  if (!statusFresh) out2.push(row2("status-stale", "execution", "info", "Morek status is unavailable or stale, so execution blockers are unknown. This is not proof that nothing is blocked.", "morek"));
   else {
-    const banner = recoveryBanner(status, now);
-    if (banner) out2.push(row(`exec-${banner.code || "blocker"}`, "execution", banner.level === "error" ? "error" : banner.level === "warning" ? "warning" : "info", banner.text, "morek"));
+    const banner2 = recoveryBanner(status, now);
+    if (banner2) out2.push(row2(`exec-${banner2.code || "blocker"}`, "execution", banner2.level === "error" ? "error" : banner2.level === "warning" ? "warning" : "info", banner2.text, "morek"));
   }
   return out2;
 }
@@ -63383,9 +63774,9 @@ var CURRENT_FLOW_A = 1;
 function read(ready, key3, now, unitCheck) {
   return evidence(ready, key3, ready?.live?.[key3], now, (r7) => unitCheck ? unitCheck(r7) : typeof r7.value === "number" && Number.isFinite(r7.value));
 }
-var ago = (ms) => ms < 6e4 ? `${Math.floor(ms / 1e3)} s ago` : ms < 36e5 ? `${Math.floor(ms / 6e4)} min ago` : `${Math.floor(ms / 36e5)} h ago`;
-var clock2 = (ms) => new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-var num = (value2, digits) => Number(value2.toFixed(digits)).toString();
+var ago = (ms2) => ms2 < 6e4 ? `${Math.floor(ms2 / 1e3)} s ago` : ms2 < 36e5 ? `${Math.floor(ms2 / 6e4)} min ago` : `${Math.floor(ms2 / 36e5)} h ago`;
+var clock2 = (ms2) => new Date(ms2).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+var num2 = (value2, digits) => Number(value2.toFixed(digits)).toString();
 function liveCharging(status, observedAt, failed, now = Date.now()) {
   const fresh2 = observationFreshness(observedAt, now, failed) === "fresh";
   const ready = fresh2 ? status?.readiness : null;
@@ -63401,25 +63792,25 @@ function liveCharging(status, observedAt, failed, now = Date.now()) {
   const reportedFresh = reported?.fresh ? reported : null;
   const power = read(ready, "power_w", now);
   const current = read(ready, "current_a", now);
-  const energy2 = read(ready, "energy_register_kwh", now, (r7) => typeof r7.value === "number" && Number.isFinite(r7.value) && r7.value >= 0);
+  const energy3 = read(ready, "energy_register_kwh", now, (r7) => typeof r7.value === "number" && Number.isFinite(r7.value) && r7.value >= 0);
   const flow = [power && { kind: "power", ...power }, current && { kind: "current", ...current }].filter(Boolean).find((item) => item.fresh) || null;
   const normalized = reportedFresh && typeof live.status.normalized === "string" ? live.status.normalized : null;
   const parts = [];
   parts.push(reportedFresh ? `Charger reports \u201C${reportedFresh.value}\u201D for connector ${own}, ${reportedFresh.judged === "current" && reportedFresh.age > STRICT_MAX_AGE_MS ? `unchanged since ${clock2(reportedFresh.at)}` : ago(reportedFresh.age)}; a reported state is not measured power.` : reported ? `Last reported connector state \u201C${reported.value}\u201D ${reported.judged === "last_known" ? `is last known (${ago(reported.age)}); the charger connection is not confirmed now` : `is stale (${ago(reported.age)})`}; current state unknown.` : `Connector ${own} reported state unknown.`);
   let powerText = "Unknown";
   if (power?.fresh) {
-    powerText = power.value === 0 ? "0 W measured" : `${power.value >= 1e3 ? num(power.value / 1e3, 2) + " kW" : num(power.value, 0) + " W"} measured`;
+    powerText = power.value === 0 ? "0 W measured" : `${power.value >= 1e3 ? num2(power.value / 1e3, 2) + " kW" : num2(power.value, 0) + " W"} measured`;
     parts.push(`Measured power ${powerText}, ${ago(power.age)}.`);
   } else if (current?.fresh) {
-    powerText = `${num(current.value, 1)} A measured (power unknown)`;
-    parts.push(`Measured current ${num(current.value, 1)} A, ${ago(current.age)}; power is not derived from it.`);
+    powerText = `${num2(current.value, 1)} A measured (power unknown)`;
+    parts.push(`Measured current ${num2(current.value, 1)} A, ${ago(current.age)}; power is not derived from it.`);
   } else if (power || current) {
     const old = power || current;
     powerText = "Unknown";
     const why = old.judged === "idle" ? "; no reading is expected while nothing is charging" : old.judged === "last_known" ? "; the charger connection is not confirmed now" : "";
     parts.push(`Last measured ${power ? "power" : "current"} is ${why ? "old" : "stale"} (${ago(old.age)}${why}); not shown as current.`);
   } else parts.push("No measured power or current source is available for this connector.");
-  if (energy2) parts.push(`Cumulative energy register ${num(energy2.value, 2)} kWh${energy2.fresh ? "" : " (stale)"}, ${ago(energy2.age)}; this is not this session\u2019s energy.`);
+  if (energy3) parts.push(`Cumulative energy register ${num2(energy3.value, 2)} kWh${energy3.fresh ? "" : " (stale)"}, ${ago(energy3.age)}; this is not this session\u2019s energy.`);
   else parts.push("Energy register unavailable.");
   let mismatch = false;
   if (flow && reportedFresh && normalized) {
@@ -63460,9 +63851,9 @@ var PAUSED = /* @__PURE__ */ new Set(["paused_until_resume", "legacy_pause_activ
 var FINISHED = /* @__PURE__ */ new Set(["session_completed", "car_completion_reported", "session_ended_or_completion_ambiguous"]);
 var DISAGREES = /* @__PURE__ */ new Set(["limits_or_transitions_differ", "verification_superseded"]);
 var LOGGING = /* @__PURE__ */ new Set(["ocpp_sensitive_logging_enabled", "unsupported_ocpp_logging_or_interface"]);
-var ago2 = (ms) => ms < 6e4 ? `${Math.max(0, Math.floor(ms / 1e3))} s ago` : ms < 36e5 ? `${Math.floor(ms / 6e4)} min ago` : `${Math.floor(ms / 36e5)} h ago`;
-var clock3 = (ms) => new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-var num2 = (value2, digits) => Number(value2.toFixed(digits)).toString();
+var ago2 = (ms2) => ms2 < 6e4 ? `${Math.max(0, Math.floor(ms2 / 1e3))} s ago` : ms2 < 36e5 ? `${Math.floor(ms2 / 6e4)} min ago` : `${Math.floor(ms2 / 36e5)} h ago`;
+var clock3 = (ms2) => new Date(ms2).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+var num3 = (value2, digits) => Number(value2.toFixed(digits)).toString();
 var stamped = (ready, key3, reading, now, accept) => evidence(ready, key3, reading, now, (r7) => accept(r7.value));
 function chargingEnabled(ready) {
   const value2 = ready?.charging_enabled;
@@ -63570,7 +63961,7 @@ function chargeSession(status, observedAt, failed, now = Date.now()) {
   const enabled = chargingEnabled(ready);
   if (enabled) facts.push(`Charging enabled: ${enabled.state === "enabled" ? "switch is on (not proof of authorization)" : enabled.reason === "control_off" ? "switch is off" : enabled.reason === "control_unavailable" ? "switch missing or unavailable" : "not confirmed"}`);
   else if (control?.fresh) facts.push(`Charge-control switch: ${control.value}${control.value === "off" && txn.kind !== "observed" ? " (normal before authorization)" : ""}`);
-  if (flow?.fresh) facts.push(`Measured ${flow.kind === "power" ? flow.value >= 1e3 ? `${num2(flow.value / 1e3, 2)} kW` : `${num2(flow.value, 0)} W` : `${num2(flow.value, 1)} A`} (${when(flow)})`);
+  if (flow?.fresh) facts.push(`Measured ${flow.kind === "power" ? flow.value >= 1e3 ? `${num3(flow.value / 1e3, 2)} kW` : `${num3(flow.value, 0)} W` : `${num3(flow.value, 1)} A`} (${when(flow)})`);
   else facts.push("Measured power: unknown");
   const done = (r7) => {
     r7.facts = facts;
@@ -63736,18 +64127,18 @@ var U = "Unknown";
 var reserveText = () => ({ explain: translate2("en", "reserve.explain"), limits: Object.fromEntries(["two_hour_limit", "no_eligible_time", "window_limit", "unknown"].map((k2) => [k2, translate2("en", `reserve.limit.${k2}`)])) });
 var learningText = () => Object.fromEntries(LEARNING_KEYS.map((k2) => [k2, translate2("en", `learning.${k2}`)]));
 var date = (value2, zone) => {
-  const ms = typeof value2 === "number" ? value2 : Date.parse(value2 || "");
-  if (!Number.isFinite(ms)) return U;
+  const ms2 = typeof value2 === "number" ? value2 : Date.parse(value2 || "");
+  if (!Number.isFinite(ms2)) return U;
   try {
-    return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short", timeZone: zone || "UTC" }).format(ms) + (zone ? "" : " UTC");
+    return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short", timeZone: zone || "UTC" }).format(ms2) + (zone ? "" : " UTC");
   } catch {
     return U;
   }
 };
-var part = (ms, zone, options) => {
-  if (!Number.isFinite(ms)) return U;
+var part = (ms2, zone, options) => {
+  if (!Number.isFinite(ms2)) return U;
   try {
-    return new Intl.DateTimeFormat("en", { ...options, timeZone: zone || "UTC" }).format(ms) + (zone ? "" : " UTC");
+    return new Intl.DateTimeFormat("en", { ...options, timeZone: zone || "UTC" }).format(ms2) + (zone ? "" : " UTC");
   } catch {
     return U;
   }
@@ -63757,9 +64148,9 @@ function priceProvenance(prices, market, zone, stale = false, now = Date.now()) 
   const selected = prices?.provider?.name || (prices?.provider?.key ? providerName(prices.provider.key) : "Unavailable");
   const area = [market?.area_name, market?.area_id].filter(Boolean).join(" \xB7 ") || "Unknown";
   const fetched = (value2) => {
-    const ms = Date.parse(value2 || "");
-    if (!Number.isFinite(ms) || ms > now) return "unknown or future timestamp";
-    const hours = (now - ms) / 36e5;
+    const ms2 = Date.parse(value2 || "");
+    if (!Number.isFinite(ms2) || ms2 > now) return "unknown or future timestamp";
+    const hours = (now - ms2) / 36e5;
     return `${date(value2, zone)} (${hours < 1 ? "less than 1 hour ago" : `${Math.floor(hours)} hours ago`})`;
   };
   const describe = (prefix) => {
@@ -63817,7 +64208,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
   const rawProposal = raw?.plan?.proposal;
   const details = rawProposal?.window_details;
   const rawProjection = rawProposal?.projection;
-  const validDetails = Array.isArray(details) && proposal && details.length === proposal.periods.length && details.every((item, i7) => item && Date.parse(item.start) === proposal.periods[i7].startMs && Date.parse(item.end) === proposal.periods[i7].endMs && Number.isFinite(item.energy_kwh) && item.energy_kwh >= 0 && (item.cost === null || Number.isFinite(item.cost)) && (item.projected_soc === void 0 || validPercent(item.projected_soc))) && Number.isFinite(proposal.planned_kwh) && Math.abs(details.reduce((sum, row2) => sum + row2.energy_kwh, 0) - proposal.planned_kwh) < Math.max(1e-6, Math.abs(proposal.planned_kwh) * 1e-8) && (proposal.unpriced || !proposal.cost || details.every((row2) => Number.isFinite(row2.cost)) && Math.abs(details.reduce((sum, row2) => sum + row2.cost, 0) - proposal.cost.value) < Math.max(1e-6, Math.abs(proposal.cost.value) * 1e-8));
+  const validDetails = Array.isArray(details) && proposal && details.length === proposal.periods.length && details.every((item, i7) => item && Date.parse(item.start) === proposal.periods[i7].startMs && Date.parse(item.end) === proposal.periods[i7].endMs && Number.isFinite(item.energy_kwh) && item.energy_kwh >= 0 && (item.cost === null || Number.isFinite(item.cost)) && (item.projected_soc === void 0 || validPercent(item.projected_soc))) && Number.isFinite(proposal.planned_kwh) && Math.abs(details.reduce((sum, row3) => sum + row3.energy_kwh, 0) - proposal.planned_kwh) < Math.max(1e-6, Math.abs(proposal.planned_kwh) * 1e-8) && (proposal.unpriced || !proposal.cost || details.every((row3) => Number.isFinite(row3.cost)) && Math.abs(details.reduce((sum, row3) => sum + row3.cost, 0) - proposal.cost.value) < Math.max(1e-6, Math.abs(proposal.cost.value) * 1e-8));
   const planCurrency = proposal?.cost?.currency || d3.market?.currency || null;
   const pricedBasis = rawProposal?.cost_basis === "configured_variable_cost" && !proposal?.unpriced && proposal?.cost?.currency === planCurrency && /^[A-Z]{3}$/.test(planCurrency || "");
   const projectionValid = !planStale && validPercent(rawProjection?.starting_soc) && Number.isFinite(rawProjection?.kwh_per_percent) && rawProjection.kwh_per_percent > 0;
@@ -63867,8 +64258,8 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
       costBasis: pricedBasis ? "configured variable cost, including configured additions" : null,
       detailsNote: !validDetails ? "Window energy and costs are unavailable because reconciled planner details are missing." : proposal?.unpriced ? "Window costs and prices are unavailable for an unpriced plan." : !pricedBasis ? "Window prices and weighted average are unavailable because the cost basis or currency is unknown." : null,
       minutesPerTimeUnit: 1 / 6e4,
-      time: (ms) => part(ms, zone, { timeStyle: "short" }),
-      day: (ms) => part(ms, zone, { dateStyle: "medium" }),
+      time: (ms2) => part(ms2, zone, { timeStyle: "short" }),
+      day: (ms2) => part(ms2, zone, { dateStyle: "medium" }),
       ...published?.format
     },
     model: {
@@ -64029,10 +64420,10 @@ var CLASSES = /* @__PURE__ */ new Set(["healthy", "unknown", "differs_unconfirme
 var LINK_STATES = /* @__PURE__ */ new Set(["up", "down", "unknown"]);
 var BOOT_STATES = /* @__PURE__ */ new Set(["none", "unknown", "waiting", "requested", "blocked", "closed"]);
 var isObject5 = (v2) => v2 !== null && typeof v2 === "object" && !Array.isArray(v2);
-var clock4 = (ms) => new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+var clock4 = (ms2) => new Date(ms2).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 var stamp = (value2, now) => {
-  const ms = typeof value2 === "string" ? Date.parse(value2) : NaN;
-  return Number.isFinite(ms) && Number.isFinite(now) && ms <= now + CLOCK_SKEW_MS3 ? ms : null;
+  const ms2 = typeof value2 === "string" ? Date.parse(value2) : NaN;
+  return Number.isFinite(ms2) && Number.isFinite(now) && ms2 <= now + CLOCK_SKEW_MS3 ? ms2 : null;
 };
 function linkInfo(status, now) {
   const link = status?.link;
@@ -64138,7 +64529,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.168";
+var CARD_VERSION = "2.5.169";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {
@@ -64264,6 +64655,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this.generation = 0;
     this.permissionEpoch = 0;
     this.priceDays = null;
+    this.historyDay = null;
     this.dashboardEpoch = 0;
     this.statusEpoch = 0;
     this.pendingSettingsWrites = /* @__PURE__ */ new Map();
@@ -64468,6 +64860,8 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this.generation++;
     this.priceDays?.dispose();
     this.priceDays = null;
+    this.historyDay?.dispose();
+    this.historyDay = null;
     clearInterval(this.ageTimer);
     this.ageTimer = null;
     for (const cancel of this.cancellations || []) cancel();
@@ -64527,11 +64921,11 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this.priceDays ||= createPriceDays({ request: (params) => this.bounded(getPriceDays(this._hass, this.charger, params)), onChange: () => {
       if (this.connected) this.paint();
     } });
-    const format3 = (ms) => {
+    const format3 = (ms2) => {
       try {
-        return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short", timeZone: zone }).format(Date.parse(ms));
+        return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short", timeZone: zone }).format(Date.parse(ms2));
       } catch {
-        return String(ms);
+        return String(ms2);
       }
     };
     const live = raw?.prices?.published_intervals;
@@ -64545,6 +64939,25 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       waitingForTomorrow: raw.prices.waiting_for_tomorrow === true,
       formatInstant: format3
     }).view(Array.isArray(live) ? live : null);
+  }
+  // History day (7.3a): one Home Assistant-local day of retained evidence, read once per charger/permission/day, on a
+  // user action afterwards; today is re-read at most every few minutes. It never writes and never asks a provider.
+  historyView(dashboard) {
+    const zone = this._hass?.config?.time_zone;
+    const today = typeof zone === "string" && zone ? localDate(Date.now(), zone) : null;
+    if (!dashboard || !this.charger || !this._hass || !today) {
+      this.historyDay?.dispose();
+      this.historyDay = null;
+      return { state: "unavailable", message: "Charging history needs the Home Assistant time zone, which is unknown here.", nav: null };
+    }
+    this.historyDay ||= createHistoryDay({ request: (params) => this.bounded(getChargingHistory(this._hass, this.charger, params.date)), onChange: () => {
+      if (this.connected) this.paint();
+    } });
+    return this.historyDay.sync({ charger: this.charger, epoch: `${this.generation}:${this.permissionEpoch}`, zone, marketZone: dashboard.market?.timezone || null, today }).view();
+  }
+  historyNav(kind, arg) {
+    if (kind === "retry") this.historyDay?.retry();
+    else this.historyDay?.select(kind, arg);
   }
   priceNav(kind, arg) {
     if (kind === "retry") this.priceDays?.retry();
@@ -64560,6 +64973,8 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       return;
     }
     adapter.actions.priceNav = (kind, arg) => this.priceNav(kind, arg);
+    adapter.model.historyDay = this.historyView(dashboard);
+    adapter.actions.historyNav = (kind, arg) => this.historyNav(kind, arg);
     this.paintAutomatic(dashboard);
     this.paintChargeNow(dashboard);
     this.paintSession();
@@ -64648,14 +65063,14 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     const summary = document.createElement("summary");
     summary.textContent = "What SpotNav sees";
     facts.append(summary);
-    const list3 = document.createElement("ul");
-    list3.style.margin = "4px 0 0";
+    const list4 = document.createElement("ul");
+    list4.style.margin = "4px 0 0";
     for (const fact of info.facts) {
       const li = document.createElement("li");
       li.textContent = fact;
-      list3.append(li);
+      list4.append(li);
     }
-    facts.append(list3);
+    facts.append(list4);
     nodes.push(facts);
     el.replaceChildren(...nodes);
   }
@@ -64700,12 +65115,12 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
   paintRecovery() {
     const el = this.shadowRoot.querySelector("#recovery-banner");
     if (!el) return;
-    const banner = fresh(this.statusAt, this.statusFailed) ? recoveryBanner(decodeMorekState(this.rawStatus), Date.now()) : null;
-    el.hidden = !banner;
-    el.textContent = banner?.text || "";
-    el.dataset.level = banner?.level || "";
-    el.dataset.code = banner?.code || "";
-    if (banner) Object.assign(el.style, { padding: "12px 16px", color: "#fff", fontWeight: "600", background: banner.level === "error" ? "#8f1d1d" : banner.level === "warning" ? "#8a5a00" : "#1f4f7a" });
+    const banner2 = fresh(this.statusAt, this.statusFailed) ? recoveryBanner(decodeMorekState(this.rawStatus), Date.now()) : null;
+    el.hidden = !banner2;
+    el.textContent = banner2?.text || "";
+    el.dataset.level = banner2?.level || "";
+    el.dataset.code = banner2?.code || "";
+    if (banner2) Object.assign(el.style, { padding: "12px 16px", color: "#fff", fontWeight: "600", background: banner2.level === "error" ? "#8f1d1d" : banner2.level === "warning" ? "#8a5a00" : "#1f4f7a" });
   }
   paintAutomatic(dashboard) {
     const control = dashboard?.control, active = control?.pause?.choice;

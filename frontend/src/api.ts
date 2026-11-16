@@ -12,6 +12,7 @@ import {
   MARKET_API_VERSION,
   POWER_MONTH_API_VERSION,
   PRICE_DAYS_API_VERSION,
+  HISTORY_API_VERSION,
   SESSIONS_API_VERSION,
   SETTINGS_API_VERSION,
   REGION_API_VERSION,
@@ -103,6 +104,23 @@ export async function getPriceDays(
     api_version: PRICE_DAYS_API_VERSION,
     charger_id: chargerId,
     ...request,
+  });
+}
+
+/**
+ * One Home Assistant-local day of retained charging evidence (`spotnav/get_charging_history`, read-only; any signed-in
+ * user). Deliberately `unknown`: the history day model validates the answer against what it asked.
+ */
+export async function getChargingHistory(
+  hass: HomeAssistantLike,
+  chargerId: string,
+  date: string,
+): Promise<unknown> {
+  return await call<unknown>(hass, {
+    type: "spotnav/get_charging_history",
+    api_version: HISTORY_API_VERSION,
+    charger_id: chargerId,
+    date,
   });
 }
 

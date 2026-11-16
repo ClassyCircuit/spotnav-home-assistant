@@ -43,7 +43,10 @@ from .evidence import (
     DISPATCH_ACK_RECEIVED,
     KIND_POWER,
     KIND_REGISTER,
+    MAX_DIGEST_DAYS,
     MAX_POWER_GAP_S,
+    MAX_SAMPLES_PER_KIND,
+    RETENTION_DAYS,
     SAMPLE_KINDS,
     ChargingEvidenceStore,
     _iso,
@@ -374,6 +377,8 @@ def charging_history(store: ChargingEvidenceStore, charger_id: str, *, since: da
         raise ValueError("invalid window")
     pad = timedelta(seconds=MAX_POWER_GAP_S)
     oldest = store.oldest_evidence(charger_id)
+    oldest_by_kind = store.oldest_by_kind(charger_id)
+    oldest_power = oldest_by_kind.get(KIND_POWER)
     plans, spans = _plan_rows(store, charger_id)
 
     power_segments = store.energy_segments(charger_id, KIND_POWER, since=since - pad, until=until + pad)
@@ -399,11 +404,10 @@ def charging_history(store: ChargingEvidenceStore, charger_id: str, *, since: da
     for kind in SAMPLE_KINDS:
         for row in store.gaps(charger_id, kind):
             first, last = _parse(row.get("r")), _parse(row.get("r2")) or _parse(row.get("r"))
-            if first is not None and last >= since and first < until and len(gaps) < MAX_ROWS:
+            if first is not None and last >= since and first < until:
                 gaps.append({"kind": kind, "from": row["r"], "to": row.get("r2"), "reason": row.get("g"),
                              "source": row.get("s")})
-    restarts = [at for at in store.capture_starts(charger_id)
-                if (when := _parse(at)) is not None and since <= when < until][:MAX_ROWS]
+    restarts = [at for at in store.capture_starts(charger_id) if (when := _parse(at)) is not None and since <= when < until]
 
     # Last acknowledged intent and the comparison with measured flow. Only spans the events support are compared;
     # after an uncertain write the plan is unknown, and flow there is never called inside or outside a plan.
@@ -455,6 +459,8 @@ def charging_history(store: ChargingEvidenceStore, charger_id: str, *, since: da
         else:
             verdict = "unknown"
             reasons.append("no_power_samples" if not coverage["power_samples_in_retention"] else "partial_coverage")
+            if (oldest_power is None or a < oldest_power) and not pruned_start:
+                reasons.append("block_starts_before_retained_power")  # plans can outlive the power rows they would be compared with
             if unplaced >= MIN_METER_KWH:
                 reasons.append("unplaced_meter_energy")
         block.update({"verdict": verdict, "reasons": reasons, "covered_fraction": round(fraction, 3),
@@ -478,16 +484,18 @@ def charging_history(store: ChargingEvidenceStore, charger_id: str, *, since: da
                             "kind": "no_plan_evidence"})
 
     closed = []
-    for session in sessions:
+    matching = [session for session in sessions
+                if session.end is not None and session.end > since and session.start < until]
+    for session in matching[:MAX_ROWS]:
         end = session.end
-        if end is None or end <= since or session.start >= until:
-            continue
         closed.append({
             "id": session.id, "start": _iso(session.start), "end": _iso(end), "energy_kwh": round(session.energy_kwh, 3),
             "energy_source": session.energy_source, "source": session.source, "started_by": session.started_by,
             "area_id": session.area_id, "cost": None, "cost_basis": "not_recomputed_here",
             "price_slices": [{"start": _iso(s.start), "end": _iso(s.end), "kwh": round(s.kwh, 4),
                               "eur_per_kwh": s.eur_per_kwh, "fx": s.fx} for s in session.intervals[:MAX_ROWS]],
+            "price_slices_truncated": len(session.intervals) > MAX_ROWS,
+            "price_slices_cut": max(0, len(session.intervals) - MAX_ROWS),
             "association": "time_overlap_only",
             # Stage 15.8: the register's total against the energy placed above (`energy_kwh`, never changed), with its
             # provenance; the remainder is unplaced late energy with no known time, never flow, power or progress.
@@ -495,8 +503,6 @@ def charging_history(store: ChargingEvidenceStore, charger_id: str, *, since: da
             "overlapping_observed_intervals": sum(1 for it in intervals if _parse(it["first_sample"]) < end
                                                   and _parse(it["last_sample"]) > session.start),
         })
-        if len(closed) >= MAX_ROWS:
-            break
 
     in_window = [row for row in plans if
                  (row["acked_intent"] and _parse(row["acked_at"]) < until
@@ -523,12 +529,31 @@ def charging_history(store: ChargingEvidenceStore, charger_id: str, *, since: da
             if a < until and datetime.combine(day + timedelta(days=1), time.min, tzinfo=zone) > since:
                 digest_rows.append(value)
 
+    cut = {
+        "plans": len(in_window), "intervals": len(intervals), "gaps": len(gaps), "restarts": len(restarts),
+        "planned_blocks": len(blocks), "outside_plan": len(outside), "unknown_plan_spans": len(unknown_out),
+        "sessions": len(matching),
+    }
+    truncated = {name: {"truncated": total > MAX_ROWS, "cut": max(0, total - MAX_ROWS), "limit": MAX_ROWS}
+                 for name, total in cut.items()}
+    slices_cut = sum(row["price_slices_cut"] for row in closed)
+    truncated["price_slices"] = {"truncated": slices_cut > 0, "cut": slices_cut, "limit": MAX_ROWS,
+                                 "per": "session", "sessions": [row["id"] for row in closed if row["price_slices_truncated"]]}
+
     return {
         "api_version": HISTORY_API_VERSION, "charger_id": charger_id,
         "window": {"since": _iso(since), "until": _iso(until), "zone": getattr(zone, "key", str(zone)),
                    "local_since": since.astimezone(zone).isoformat(), "local_until": until.astimezone(zone).isoformat()},
         "retention": {"oldest_evidence": None if oldest is None else _iso(oldest),
                       "window_starts_before_oldest_evidence": oldest is None or since < oldest,
+                      # Per sample kind: the earliest *retained* observation (gap rows excluded), `None` when none is kept.
+                      # A plan, capture mark or digest can be older than every power row, so this, not `oldest_evidence`,
+                      # says whether raw flow for a day can still exist. No pruning boundary is inferred from it.
+                      "oldest_by_kind": {kind: None if oldest_by_kind.get(kind) is None else _iso(oldest_by_kind[kind])
+                                         for kind in SAMPLE_KINDS},
+                      "digest_days": sorted(store.digests(charger_id)),
+                      "limits": {"max_samples_per_kind": MAX_SAMPLES_PER_KIND, "max_age_days": RETENTION_DAYS,
+                                 "max_digest_days": MAX_DIGEST_DAYS},
                       "note": "raw rows are bounded by age and count; earlier days exist only as digests, if any"},
         "provenance": {
             "flow_source": "measured power_w samples only", "min_flow_w": MIN_FLOW_W, "debounce_samples": DEBOUNCE_SAMPLES,
@@ -539,11 +564,12 @@ def charging_history(store: ChargingEvidenceStore, charger_id: str, *, since: da
             "readback": "effective-limit readback only; never an inventory of installed profiles",
             "not_used_as_flow": ["schedules", "offered limits", "ACK", "readback", "connector status", "current"],
         },
-        "plans": plan_out, "plans_truncated": len(in_window) > MAX_ROWS, "price_snapshots": snapshots,
+        "plans": plan_out, "plans_truncated": len(in_window) > MAX_ROWS, "truncated": truncated,
+        "price_snapshots": snapshots,
         "observed": {"intervals": intervals[:MAX_ROWS], "isolated_flow_samples": isolated,
                      "coverage": coverage, "energy": _energy([{**s, "kind": "register"} for s in register_segments]
                                                   + [{**s, "kind": "power"} for s in power_segments], since, until),
-                     "gaps": gaps, "capture_restarts": restarts},
+                     "gaps": gaps[:MAX_ROWS], "capture_restarts": restarts[:MAX_ROWS]},
         "comparison": {"planned_blocks": blocks[:MAX_ROWS], "outside_plan": outside[:MAX_ROWS],
                        "unknown_plan_spans": unknown_out[:MAX_ROWS], "basis": "acknowledged_intent_known_spans_only"},
         "sessions": closed, "digests": digest_rows,

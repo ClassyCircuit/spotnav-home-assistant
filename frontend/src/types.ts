@@ -279,6 +279,7 @@ export const SESSIONS_API_VERSION = 1;
 /** The site's power by month (`spotnav/get_power_month`), independent of the others. */
 export const POWER_MONTH_API_VERSION = 1;
 export const PRICE_DAYS_API_VERSION = 1;
+export const HISTORY_API_VERSION = 1;
 
 /**
  * The five catalogue states in the backend's vocabulary: `loading` (attempt running, nothing held),

@@ -973,7 +973,7 @@ only if a helper is explicitly used **and labelled**; read-range page = 8 local 
   defects found: hourly↔15-minute change inside one horizon, 23/25-hour axis ticks, container resize/orientation keeping the range, tooltip for
   negative values and gaps, the paged data of 7.1. Preserve zoom, tooltip, wheel, reset and the Stage 18.4 absolute bands/axis. May close as
   “verified, no defect” with the fixtures kept. Physical touch stays unverified.
-- [ ] **7.3a History client, small backend delta and evidence panel.** *Backend delta (first, small, additive; API version stays 1):* in
+- [x] **7.3a History client, small backend delta and evidence panel.** *Locally implemented 2026-11-16 (manifest 2.5.169), mocked checks only; coordinator reviewed (49 backend and 27 focused frontend tests; build/check-dist passed); not deployed or visually verified; see the handoff.* *Backend delta (first, small, additive; API version stays 1):* in
   `charging_history` add `truncated` (a boolean and the cut count for each capped list: intervals, gaps, restarts, planned_blocks, outside_plan,
   unknown_plan_spans, sessions, per-session price_slices), `retention.oldest_by_kind` (oldest retained row per sample kind, so a pruned power
   window is detected without guessing), and `retention.digest_days` (the ≤ 62 digest dates). Tests with > 200 rows and with plans older than power

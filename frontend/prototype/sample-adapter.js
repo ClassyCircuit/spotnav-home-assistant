@@ -1,6 +1,8 @@
 import { createPriceDays } from '../shared-dashboard/price-days.js';
 import { EPOCH, SAMPLE_TODAY, sampleRows, fixtureRequest } from './price-days-fixture.js';
 import { windows, time, day, sampleDate, sampleDays, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks, prices, now, deadline, horizon, cap, socAssumptions, scenario, dailyScenario } from './sample.js';
+import { createHistoryDay } from '../shared-dashboard/history-day.js';
+import { HISTORY_TODAY, HISTORY_ZONE, fixtureHistoryRequest } from './history-day-fixture.js';
 import { dailyStates, chooseDailyState, historyFixture } from './daily-sample.js';
 import { evidenceFixture } from './evidence-view.js';
 import { history, monthlyRange, baselineRange, futureRange } from './insight-fixture.js';
@@ -34,6 +36,8 @@ export function createSampleAdapter(rebuild) {
   // Price-day navigation (7.1): the live panel's own state machine, fed fixtures of the backend's answers.
   const context = {charger:'sample-charger', area:'SAMPLE-1', currency:'EUR', epoch:'sample'};
   const navigation = createPriceDays({request:fixtureRequest(context), onChange:()=>rebuild?.(build())});
+  // History day (7.3a): the live panel's own state machine and renderer, fed backend-shaped fixture answers.
+  const historyNavigation = createHistoryDay({request:fixtureHistoryRequest(context), onChange:()=>rebuild?.(build())});
   const hours = ms => (ms-EPOCH)/3600000;
   const build = () => {
     const view = navigation.sync({...context, today:SAMPLE_TODAY, span:d=>{const s=Date.parse(`${d}T00:00:00Z`);return Number.isFinite(s)?[s,s+86400000]:null;}, waitingForTomorrow:false}).view(sampleRows);
@@ -45,7 +49,7 @@ export function createSampleAdapter(rebuild) {
     const chart = navPrices ? {prices:navPrices,now,deadline,horizon:[bounds[0],bounds.at(-1)],cap,viewKey:view.viewKey,comparison:false} : {prices,now,deadline,horizon,cap,viewKey:'today::0',comparison:new URLSearchParams(location.search).get('comparison')==='bar'};
     const nav = {snapRange:navPrices ? (a,b)=>snapRange(a,b,bounds) : snapRange, initialRange:navPrices ? c=>navRange ? snapRange(Math.max(bounds[0],navRange[0]),Math.min(bounds.at(-1),navRange[1]),bounds) : initialRange(c,bounds) : initialRange};
     const b = adapterBase();
-    return {...b, format:{...b.format,...nav}, model:{...b.model,chart,priceNav:view?.nav ?? null}, actions:{...b.actions,priceNav:(kind,arg)=>kind==='retry' ? navigation.retry() : navigation.select(kind,arg)}};
+    return {...b, format:{...b.format,...nav}, model:{...b.model,chart,priceNav:view?.nav ?? null,historyDay:historyNavigation.sync({charger:context.charger,epoch:'sample',zone:HISTORY_ZONE,marketZone:HISTORY_ZONE,today:HISTORY_TODAY}).view()}, actions:{...b.actions,priceNav:(kind,arg)=>kind==='retry' ? navigation.retry() : navigation.select(kind,arg),historyNav:(kind,arg)=>kind==='retry' ? historyNavigation.retry() : historyNavigation.select(kind,arg)}};
   };
   const base = () => adapterBase();
   const adapterBase = () => ({ format:{time,day,minutesPerTimeUnit:60,staleLabel:'stale sample',date:sampleDate,tooltipDate:h=>`${sampleDate(h)} 2026`,days:sampleDays,priceGaps,stepSegments,stepPoints,snapRange,initialRange,timeTicks},

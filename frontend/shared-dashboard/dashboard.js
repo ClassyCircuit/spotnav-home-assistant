@@ -97,7 +97,7 @@ export function mountDashboard(root, adapter) {
       ${card('Price insights',labels.insightEyebrow || 'PRICE DATA',renderInsights(m.insights),'insights',tag)}
       ${modes.map(priceCard).join('')}
       ${card('Plan activity & freshness',labels.evidenceEyebrow || 'EVIDENCE',renderEvidence(m.evidence,state.power,knownPlan ? windows.length : null),'morek',tag)}
-      ${card('Recent charging',labels.historyEyebrow || 'HISTORY',renderHistory(m.history,historyReady),'history',tag)}
+      ${card('Recent charging',labels.historyEyebrow || 'HISTORY',renderHistory(m.history,historyReady,m.historyDay),'history',tag)}
       ${m.vehicleSources ? card('Vehicle sources & properties','ADVANCED',renderVehicleSources(m.vehicleSources),'vehicle-sources',tag) : ''}
       ${m.marketCosts ? card('Market & charging costs','ADVANCED',renderMarketCosts(m.marketCosts),'market-costs',tag) : ''}
       ${m.planParams ? card('Plan & charger parameters','ADVANCED',renderPlanParams(m.planParams),'plan-params',tag) : ''}
@@ -119,6 +119,9 @@ export function mountDashboard(root, adapter) {
     // Price-day navigation (7.1): explicit user actions only; the host decides what to load and keeps the range on routine refreshes.
     root.querySelectorAll('[data-price-nav]').forEach(button=>bind(button,()=>button.addEventListener('click',()=>{if(button.hasAttribute('disabled'))return;current.actions?.priceNav?.(button.dataset.priceNav);},{signal})));
     root.querySelectorAll('[data-price-nav-day]').forEach(select=>bind(select,()=>select.addEventListener('change',()=>{if(select.value)current.actions?.priceNav?.('day',select.value);},{signal})));
+    // History day (7.3a): explicit, read-only navigation; the host decides what to load and keeps the day on refreshes.
+    root.querySelectorAll('[data-history-nav]').forEach(button=>bind(button,()=>button.addEventListener('click',()=>{if(button.hasAttribute('disabled'))return;current.actions?.historyNav?.(button.dataset.historyNav);},{signal})));
+    root.querySelectorAll('[data-history-date]').forEach(input=>bind(input,()=>input.addEventListener('change',()=>{if(input.value)current.actions?.historyNav?.('day',input.value);},{signal})));
     const detailsLink=root.querySelector('a[href="#details"]');bind(detailsLink,()=>detailsLink.addEventListener('click', event => { event.preventDefault(); root.querySelector('#details').open = true; }, {signal}));
     const scenarioInput=root.querySelector('#sample-state');bind(scenarioInput,()=>scenarioInput.addEventListener('change', event => current.actions?.selectScenario?.(event.target.value), {signal}));
     const showMode=()=>{const mode=root.querySelector('[data-setting="driver"]')?.value;root.querySelectorAll('[data-mode]').forEach(el=>{el.hidden=el.dataset.mode!==mode;});};

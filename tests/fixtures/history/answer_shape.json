@@ -1,0 +1,180 @@
+{
+ "top": [
+  "api_version",
+  "charger_id",
+  "comparison",
+  "digests",
+  "observed",
+  "plans",
+  "plans_truncated",
+  "price_snapshots",
+  "provenance",
+  "retention",
+  "sessions",
+  "truncated",
+  "window"
+ ],
+ "window": [
+  "local_since",
+  "local_until",
+  "since",
+  "until",
+  "zone"
+ ],
+ "retention": [
+  "digest_days",
+  "limits",
+  "note",
+  "oldest_by_kind",
+  "oldest_evidence",
+  "window_starts_before_oldest_evidence"
+ ],
+ "oldest_by_kind": [
+  "current_a",
+  "energy_register_kwh",
+  "power_w",
+  "status"
+ ],
+ "limits": [
+  "max_age_days",
+  "max_digest_days",
+  "max_samples_per_kind"
+ ],
+ "truncated": [
+  "gaps",
+  "intervals",
+  "outside_plan",
+  "planned_blocks",
+  "plans",
+  "price_slices",
+  "restarts",
+  "sessions",
+  "unknown_plan_spans"
+ ],
+ "truncated_row": [
+  "cut",
+  "limit",
+  "truncated"
+ ],
+ "price_slices_signal": [
+  "cut",
+  "limit",
+  "per",
+  "sessions",
+  "truncated"
+ ],
+ "observed": [
+  "capture_restarts",
+  "coverage",
+  "energy",
+  "gaps",
+  "intervals",
+  "isolated_flow_samples"
+ ],
+ "coverage": [
+  "no_data_seconds",
+  "power_samples_in_retention",
+  "resolution_note",
+  "trusted_seconds",
+  "untrusted_seconds",
+  "window_seconds"
+ ],
+ "energy": [
+  "coverage",
+  "edge_segments_not_prorated",
+  "meter_counter_kwh",
+  "meter_counter_unobserved_kwh",
+  "note",
+  "power_integrated_estimate_kwh",
+  "unknown_seconds",
+  "unknown_segments"
+ ],
+ "interval": [
+  "basis",
+  "end_bounded",
+  "end_earliest",
+  "end_latest",
+  "first_sample",
+  "last_sample",
+  "peak_w",
+  "samples",
+  "start_bounded",
+  "start_earliest",
+  "start_latest"
+ ],
+ "gap": [
+  "from",
+  "kind",
+  "reason",
+  "source",
+  "to"
+ ],
+ "comparison": [
+  "basis",
+  "outside_plan",
+  "planned_blocks",
+  "unknown_plan_spans"
+ ],
+ "block": [
+  "covered_fraction",
+  "end",
+  "intent_uncertain_after",
+  "limit",
+  "meter_counter_kwh_inside",
+  "meter_counter_kwh_unplaced_overlap",
+  "open_ended_in_profile",
+  "power_flow_overlap",
+  "reasons",
+  "start",
+  "unit",
+  "verdict",
+  "version"
+ ],
+ "outside": [
+  "end",
+  "interval",
+  "kind",
+  "seconds",
+  "start",
+  "tolerance_seconds"
+ ],
+ "unknown_span": [
+  "from",
+  "reason",
+  "until"
+ ],
+ "session": [
+  "area_id",
+  "association",
+  "cost",
+  "cost_basis",
+  "end",
+  "energy_kwh",
+  "energy_source",
+  "id",
+  "overlapping_observed_intervals",
+  "price_slices",
+  "price_slices_cut",
+  "price_slices_truncated",
+  "reconciliation",
+  "source",
+  "start",
+  "started_by"
+ ],
+ "reconciliation": [
+  "evaluated_at",
+  "final",
+  "placed_kwh",
+  "placement",
+  "placement_reasons",
+  "provenance",
+  "quality",
+  "reason",
+  "register_close_kwh",
+  "register_open_kwh",
+  "state",
+  "total_kwh",
+  "unassigned_register_kwh",
+  "unplaced_late_kwh"
+ ]
+}

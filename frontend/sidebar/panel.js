@@ -1,6 +1,7 @@
 import { mountDashboard } from '../shared-dashboard/dashboard.js';
-import { listChargers, getDashboard, getPriceDays, morekSchedule, getSettings, updateSettings, performAction, chargeNowAction, getEntityConfig, setVehicleSoc, updateVehicle } from '../src/api.ts';
+import { listChargers, getDashboard, getPriceDays, getChargingHistory, morekSchedule, getSettings, updateSettings, performAction, chargeNowAction, getEntityConfig, setVehicleSoc, updateVehicle } from '../src/api.ts';
 import { createPriceDays } from '../shared-dashboard/price-days.js';
+import { createHistoryDay, localDate } from '../shared-dashboard/history-day.js';
 import { localDaySpan } from './price-chart.js';
 import { decodeEntityAnswer, decodeVehicleWriteAnswer, entityErrorKey, fieldErrorKey, ENTITY_CONFLICT } from '../src/entity-config.ts';
 import { vehicleSourcesModel, vehicleSignature, chooseVehicle, sensorWritePlan, propertyWritePlan, CONFIG_REFRESH_MS } from './vehicle-sources.js';
@@ -101,6 +102,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     this.generation = 0;
     this.permissionEpoch = 0;
     this.priceDays = null;
+    this.historyDay = null;
     this.dashboardEpoch = 0;
     this.statusEpoch = 0;
     this.pendingSettingsWrites = new Map();
@@ -201,6 +203,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     this.chargeBusy=false;this.chargeNotice='';this.learningNotice='';
     this.generation++;
     this.priceDays?.dispose();this.priceDays=null;
+    this.historyDay?.dispose();this.historyDay=null;
     clearInterval(this.ageTimer); this.ageTimer=null;
     for (const cancel of this.cancellations || []) cancel();
     this.cancellations=new Set();
@@ -226,6 +229,18 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     return this.priceDays.sync({charger:this.charger,epoch:`${this.generation}:${this.permissionEpoch}`,area,currency:dashboard.market.currency,today:typeof raw.prices.today==='string'?raw.prices.today:null,
       span:day=>localDaySpan(day,zone),waitingForTomorrow:raw.prices.waiting_for_tomorrow===true,formatInstant:format}).view(Array.isArray(live)?live:null);
   }
+  // History day (7.3a): one Home Assistant-local day of retained evidence, read once per charger/permission/day, on a
+  // user action afterwards; today is re-read at most every few minutes. It never writes and never asks a provider.
+  historyView(dashboard) {
+    const zone=this._hass?.config?.time_zone;
+    const today=typeof zone==='string' && zone ? localDate(Date.now(),zone) : null;
+    if (!dashboard || !this.charger || !this._hass || !today) {this.historyDay?.dispose();this.historyDay=null;return {state:'unavailable',message:'Charging history needs the Home Assistant time zone, which is unknown here.',nav:null};}
+    this.historyDay ||= createHistoryDay({request:params=>this.bounded(getChargingHistory(this._hass,this.charger,params.date)),onChange:()=>{if(this.connected)this.paint();}});
+    return this.historyDay.sync({charger:this.charger,epoch:`${this.generation}:${this.permissionEpoch}`,zone,marketZone:dashboard.market?.timezone || null,today}).view();
+  }
+  historyNav(kind,arg) {
+    if (kind==='retry') this.historyDay?.retry(); else this.historyDay?.select(kind,arg);
+  }
   priceNav(kind,arg) {
     if (kind==='retry') this.priceDays?.retry(); else this.priceDays?.select(kind,arg);
   }
@@ -236,6 +251,8 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     const adapter=dashboardAdapter(this.rawDashboard,this.rawStatus,this.statusAt,Date.now(),this.statusFailed,this.dashboardFailed,this.priceView(dashboard));
     if (!adapter || adapter.draftKey!==this.charger) { this.message('Dashboard unavailable or unsupported.'); return; }
     adapter.actions.priceNav=(kind,arg)=>this.priceNav(kind,arg);
+    adapter.model.historyDay=this.historyView(dashboard);
+    adapter.actions.historyNav=(kind,arg)=>this.historyNav(kind,arg);
     this.paintAutomatic(dashboard);
     this.paintChargeNow(dashboard);
     this.paintSession();

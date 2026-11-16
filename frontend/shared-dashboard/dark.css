@@ -107,3 +107,6 @@ dialog{background:#1a202b;color:var(--ink)}
 dialog{width:calc(100vw - 16px)}
 .panel,.log-lines,.dashboard>*{max-width:100%;overflow-wrap:anywhere}
 }
+.history-banner{background:#223d3a;color:#c4e3da}.history-banner[data-history-banner="error"],.history-banner[data-history-banner="invalid"],.history-banner[data-history-banner="permission"]{background:#422b29;color:#ffddd1}
+.history-banner[data-history-banner="truncated"],.history-banner[data-history-banner="legacy"],.history-banner[data-history-banner="partial-raw"],.history-banner[data-history-banner="unknown-raw"]{background:#3d3318;color:#f3dca5}
+.history-day h3,.history-day h4{color:#e7f2f1}

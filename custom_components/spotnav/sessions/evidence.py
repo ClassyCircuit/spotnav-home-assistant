@@ -372,6 +372,14 @@ class ChargingEvidenceStore:
         found = [stamp for stamp in stamps if stamp is not None]
         return min(found) if found else None
 
+    def oldest_by_kind(self, charger_id: str) -> dict[str, datetime | None]:
+        """The earliest retained observation time of each sample kind (explicit gap rows excluded); `None`: none kept."""
+        out: dict[str, datetime | None] = {}
+        for kind, rows in self._charger(charger_id, create=False).get("samples", {}).items():
+            times = [when for row in rows if row.get("v") is not None and (when := _parse(row.get("t"))) is not None]
+            out[kind] = min(times) if times else None
+        return out
+
     def digests(self, charger_id: str) -> dict[str, dict[str, Any]]:
         return deepcopy(self._charger(charger_id, create=False).get("days", {}))
 
