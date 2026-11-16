@@ -1,9 +1,9 @@
 # Active roadmap — Morek charging, HA sidebar and trustworthy history
 
-Status: **in progress. This is the only work queue.** Created 2026-11-14 by splitting the old roadmap, which
+Status: **feature implementation complete locally; verification items remain. This is the only work queue.** Created 2026-11-14 by splitting the old roadmap, which
 is now frozen as a historical reference:
 [archive/charging-dashboard-roadmap-2026-11-14.md](archive/charging-dashboard-roadmap-2026-11-14.md)
-(“the archive”). Initial audit basis: manifest 2.5.128, HEAD `6a50a7ae`. Stage 15 is locally implemented and coordinator-reviewed through 2.5.143 with focused mocked checks; see its entries and the handoff for unrun checks. Stages 16, 17, 13 and 18 are implemented locally and committed. Stage 7 is now locally implemented and coordinator-reviewed through 2.5.173 (2026-11-16), with each substage committed and pushed separately. The next unstarted feature queue is Stage 8, only when requested. Nothing below is
+(“the archive”). Initial audit basis: manifest 2.5.128, HEAD `6a50a7ae`. Stage 15 is locally implemented and coordinator-reviewed through 2.5.143 with focused mocked checks; see its entries and the handoff for unrun checks. Stages 16, 17, 13 and 18 are implemented locally and committed. Stages 7 and 8 are locally implemented and coordinator-reviewed through 2.5.178 (2026-11-16), with each substage committed and pushed separately. No unstarted feature substage remains in this roadmap; §9 retains outstanding reviews and user-owned validation. Nothing below is
 installed, deployed or physically verified, and this file authorizes no HA access, charger command, restart
 or deployment. Read `AGENTS.md` and [the development handoff](morek-development-handoff.md) first.
 
@@ -96,7 +96,7 @@ One at a time; “Needs” lists the only real dependencies. Stable parent ids; 
 | 30 | 8.3a Savings baseline (backend) | 8.2a | |
 | 31 | 8.3b Savings and summary cards | 8.2b, 8.3a, 7.5 | |
 
-Items 1–15 (Stage 15) are locally implemented and coordinator-reviewed through 2.5.143; Stage 16 and Stage 17 (below) and items 16–19 (Stage 13.1–13.4) are implemented locally and committed (2026-11-16 audit: `git log` shows 16.2 `08254d2e`, 17.1 `d9ec44cc`/`999f5fc5`, 17.2 `cc321c71`, 17.3 `e0f0d7d4`, 17.4 `7fadb671`, 17.5 `4bb08550`, 17.6 `35f5ae5f`, 13.1 `d81c3fd8`, 13.2 `7e352562`, 13.3 `416529c3`, 13.4 `e31463df`). Do not reassign any of them. **Open queue: items 27–31 (Stage 8); items 20–26 (Stage 7) are complete locally through 2.5.173**, started only on the user's request; none is a prerequisite for 5.8. The order is the suggested default and the user may reorder it within the “Needs” column. **D1/D2 are settled; there are no outstanding product-decision gates.** Remaining delegate order (one bounded medium session each): 8.1 → 8.2a → 8.2b → 8.3a → 8.3b. Stage 7/8 substages are not ◆ (they touch no Stage 14 path) but obey the “Binding constraints” block at the start of Stage 7. **Not in the queue:** §9.B reviews, §9.C user-owned items, E1/E2.
+Items 1–15 (Stage 15) are locally implemented and coordinator-reviewed through 2.5.143; Stage 16 and Stage 17 (below) and items 16–19 (Stage 13.1–13.4) are implemented locally and committed (2026-11-16 audit: `git log` shows 16.2 `08254d2e`, 17.1 `d9ec44cc`/`999f5fc5`, 17.2 `cc321c71`, 17.3 `e0f0d7d4`, 17.4 `7fadb671`, 17.5 `4bb08550`, 17.6 `35f5ae5f`, 13.1 `d81c3fd8`, 13.2 `7e352562`, 13.3 `416529c3`, 13.4 `e31463df`). Do not reassign any of them. **Implementation queue complete: items 20–31 (Stages 7/8) are complete locally and coordinator-reviewed through 2.5.178.** None is a prerequisite for 5.8. The order is the suggested default and the user may reorder it within the “Needs” column. **D1/D2 are settled; there are no outstanding product-decision gates.** No remaining feature delegation is assigned. Stage 7/8 substages are not ◆ (they touch no Stage 14 path) but obey the “Binding constraints” block at the start of Stage 7. **Not in the queue:** §9.B reviews, §9.C user-owned items, E1/E2.
 
 ## 4. Standard acceptance for every substage
 
@@ -1021,6 +1021,8 @@ only if a helper is explicitly used **and labelled**; read-range page = 8 local 
 
 ### Stage 8 — Day review, costs, savings (8.1–8.3)
 
+**Complete locally, coordinator-reviewed (2.5.174–2.5.178, 2026-11-16).** All five substages are done. Focused tests and builds passed; no deployment, browser or physical validation. The audit below records the pre-implementation basis. Historical provider provenance remains unknown for old slices, and savings require a full held reference day; missing data stays unknown.
+
 **Audit (source reading, manifest 2.5.166).** Reuse Stage 6/7 evidence and the existing session store; add no store and no retention.
 (1) Evidence by age: per-minute flow ≈ last 3 days (see Stage 7 audit 3), digests ≤ 62 days, sessions ≤ 730 days without placement evidence.
 (2) A session keeps its kWh split over price intervals with the **raw spot price and fx** of each slice (immutable, `price_slices`); no cost is stored,
@@ -1051,7 +1053,7 @@ Use the same priced kWh and currency for actual cost and comparison. Savings = r
   `model.totals`, a forecast) stay visibly separate from historical totals; one shared formatter; label estimate, basis, currency and missing prices.
   *Acceptance:* same inputs give the same totals in every card; partial data, negative prices, midnight session and unknown never becomes zero.
 - [x] **8.3a Day-average spot savings (backend).** *Locally implemented and coordinator-reviewed (manifest 2.5.177); root reran 101 focused savings/cost/contract/history tests successfully; backend only, no browser/deployment/live verification; see the handoff for limits.* *Needs 8.2a; D2 settled.* Keep `day_average_price` as the baseline method, using the same charged/priced kWh at that delivery day's duration-weighted average raw spot price. Use a complete valid published local day (23/24/25 hours as appropriate); if the full-day reference is missing, report reference/savings unknown for that portion, not an average of a selectively cheap subset. Split midnight sessions by delivery day before applying the reference. Share the same cost/coverage/allocation path as 8.2a; no plug-in-time baseline or new power simulation. Return actual spot cost, reference spot cost, savings amount, nullable percentage, comparable kWh, coverage, currency and `savings_basis: day_average_price`. Negative savings are valid; zero/negative reference yields no percentage; partial aggregates explicitly identify excluded energy/days. Forecast savings stay separate from historical estimates. *Acceptance:* weighted hourly/quarter-hour/DST averages; midnight splits; same-kWh comparison; partial/missing reference; currency separation; negative/zero prices; day/month totals consistent.
-- [ ] **8.3b Savings and summary cards.** *Needs 8.2b, 8.3a and 7.5.* *Scope:* day/month summary cards reusing 7.5's monthly framing; totals identical to
+- [x] **8.3b Savings and summary cards.** *Locally implemented and coordinator-reviewed (manifest 2.5.178). Root reran 71 focused savings/cost/history/panel tests plus build, check-dist and prototype build successfully. Malformed reference-source lists fail closed. No browser, deployment or live verification; see the handoff.* *Needs 8.2b, 8.3a and 7.5.* *Scope:* day/month summary cards reusing 7.5's monthly framing; totals identical to
   8.2b's. *Acceptance:* baseline, coverage and estimate labels visible; forecast vs historical distinct; negative savings shown; consistent totals; preview
   parity; i18n.
 

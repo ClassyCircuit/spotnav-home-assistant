@@ -20,14 +20,19 @@ const energy = m => `<div class="history-energy" aria-label="Energy by basis">${
 
 const costBlock = (c, cls = '') => `<div class="history-basis${cls}" data-spot-cost="${e(c.state)}"><b>${e(c.headline)}</b>${c.lines.map(l => `<small>${e(l)}</small>`).join('')}</div>`;
 
+// Stage 8.3b: the spot cost and the historical savings estimate side by side as two cards; neither is derived from the other here.
+const savingsBlock = c => `<div class="history-basis" data-spot-savings="${e(c.state)}"><b>${e(c.headline)}</b>${(c.lines || []).map(l => `<small>${e(l)}</small>`).join('')}</div>`;
+const summaryCards = (cost, savings) => `<div class="history-energy history-summary" aria-label="Spot cost and estimated savings">${costBlock(cost)}${savings ? savingsBlock(savings) : ''}</div>`;
+
 /** Spot-only cost of the closed sessions in one month (Stage 8.2b): a month selector and the backend's month and delivery-day figures. */
 function renderMonthCost(m) {
   const picker = m.options?.length ? `<label class="history-date">Month <select data-history-month aria-label="Spot cost month">${m.options.map(o => `<option value="${e(o.value)}" ${o.selected ? 'selected' : ''}>${e(o.label)}</option>`).join('')}</select></label>` : '';
   let body;
   if (m.state === 'ready') {
-    body = `${costBlock(m.total)}${m.days.length ? `<h4>Days with a recorded session (delivery day, Home Assistant time)</h4>${list(m.days, d => row(d.text, '', `spot-${d.state}`))}` : ''}${m.emptyDays ? `<p class="subtext">${m.emptyDays} day(s) with no recorded session: no cost shown for them (not zero, not proof that nothing was charged).</p>` : ''}`;
+    body = `${summaryCards(m.total, m.savings)}${m.days.length ? `<h4>Days with a recorded session (delivery day, Home Assistant time)</h4>${list(m.days, d => row(d.text, d.detail, `spot-${d.state}`))}` : ''}${m.emptyDays ? `<p class="subtext">${m.emptyDays} day(s) with no recorded session: no cost shown for them (not zero, not proof that nothing was charged).</p>` : ''}`;
   } else body = banner(m.state === 'error' ? 'error' : m.state === 'invalid' ? 'invalid' : m.state === 'legacy' ? 'legacy' : 'loading', m.message);
-  return `<section data-history-section="month-cost" data-month-cost-state="${e(m.state)}"><h3>Spot cost by month</h3>${picker}${body}</section>`;
+  const read = m.readNote ? `<p class="subtext history-month-read" data-month-read${m.refreshing ? ' data-month-refreshing' : ''}>${e(m.readNote)}</p>` : '';
+  return `<section data-history-section="month-cost" data-month-cost-state="${e(m.state)}"><h3>Spot cost and estimated savings by month</h3>${picker}${read}${body}</section>`;
 }
 
 function renderDigest(d) {
@@ -60,7 +65,7 @@ export function renderHistoryDay(m) {
     parts.push(`<section data-history-section="flow"><h3>Measured flow</h3>${m.flow.length ? list(m.flow, i => row(i.text, i.detail)) : '<p class="subtext">No flow interval was found in the measured rows that exist; the coverage line says what was not measured.</p>'}${list(m.outside, x => row(x.text, '', `outside-${x.kind}`))}${m.isolated ? `<p class="subtext">${e(m.isolated)}</p>` : ''}<p class="subtext">${e(m.flowNote)}</p></section>`);
     parts.push(`<section data-history-section="energy"><h3>Energy by basis</h3>${energy(m)}</section>`);
   }
-  parts.push(`<section data-history-section="cost"><h3>Spot cost of this day</h3>${costBlock(m.cost)}</section>`);
+  parts.push(`<section data-history-section="cost"><h3>Spot cost and estimated savings of this day</h3>${summaryCards(m.cost, m.savings)}</section>`);
   if (!m.sessions.length && m.raw !== 'digest_only') parts.push('<section data-history-section="sessions"><h3>Sessions overlapping this day</h3><p class="subtext" data-history-empty="sessions">No session was recorded for this day by the Morek recorder (whether it records every session is unverified). That is not proof that the car did not charge.</p></section>');
   if (m.sessions.length) parts.push(`<section data-history-section="sessions"><h3>Sessions overlapping this day</h3><ul class="history-list">${m.sessions.map(s => `<li>${e(s.text)}<small>${e(s.detail)}</small>${s.lines.map(l => `<small class="history-recon">${e(l)}</small>`).join('')}${s.costLines.map(l => `<small class="history-cost">${e(l)}</small>`).join('')}</li>`).join('')}</ul><p class="subtext">A session that crosses midnight appears on both days; its placed energy is not split above, but its spot cost for this day is the share that fell on this day.</p></section>`);
   if (m.gaps.length || m.restarts.length) parts.push(`<section data-history-section="gaps"><h3>Capture gaps and restarts</h3>${list(m.gaps.slice(0, 5), t => row(`Gap: ${t}`))}${m.gaps.length > 5 ? `<p class="subtext">${m.gaps.length - 5} more gap(s) not listed.</p>` : ''}${m.restarts.length ? `<p class="subtext">Capture (re)started at ${m.restarts.slice(0, 5).map(e).join(', ')}${m.restarts.length > 5 ? ` and ${m.restarts.length - 5} more` : ''}.</p>` : ''}</section>`);

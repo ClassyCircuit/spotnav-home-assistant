@@ -24,11 +24,17 @@ const spotBlock = (o = {}) => ({ amount: null, currency: null, unit: 'major', ma
   unallocated_kwh: 0, estimated_kwh: 0, energy_sources: {}, sessions: 1,
   coverage: { state: 'none', complete: false, partial: false, priced_fraction: 0, reasons: ['unpriced_energy'], unpriced_reasons: { no_price_slice: 8.2 } }, currency_exclusions: null, ...o });
 const ALLOC = 'price_interval_overlap_estimate';
+// Stage 8.3a: the backend's `savings` block (day-average reference minus actual spot cost of the COMPARABLE subset only).
+const savings = (o = {}) => ({ basis: 'day_average_price', state: 'none', estimate: true, currency: 'EUR', unit: 'major', amount: null, percentage: null, actual_cost: null, reference_cost: null,
+  comparable_kwh: 0, excluded_kwh: 0, unpriced_kwh: 0, comparable_fraction: null, excluded_reasons: {}, excluded_days: [], excluded_days_count: 0, reference_days: 0,
+  reference_price_basis: 'duration_weighted_full_local_day_raw_spot_no_fees_no_taxes', reference_proof: 'held_price_snapshots_full_local_day', reference_sources: [], reference_source_state: 'held_provider_labels', currency_exclusions: null, ...o });
+const saved = (amount, pct, actual, reference, kwh, o = {}) => savings({ state: 'complete', amount, percentage: pct, actual_cost: actual, reference_cost: reference, comparable_kwh: kwh, comparable_fraction: 1, reference_days: 1, reference_sources: ['Fixture provider'], ...o });
+const withSavings = (block, sav) => ({ ...block, savings: sav });
 const priced = (amount, kwh, o = {}) => spotBlock({ amount, currency: 'EUR', major_unit: '€', basis: 'recorded_price_slices', price_source_state: 'not_recorded', priced_kwh: kwh, unpriced_kwh: 0, unplaced_unknown_sessions: 0,
   energy_sources: { register: kwh }, coverage: { state: 'complete', complete: true, partial: false, priced_fraction: 1, reasons: [], unpriced_reasons: {} }, ...o });
 const partial = (amount, kwh, unpriced, o = {}) => priced(amount, kwh, { unpriced_kwh: unpriced, coverage: { state: 'partial', complete: false, partial: true, priced_fraction: Math.round(kwh / (kwh + unpriced) * 10000) / 10000,
   reasons: ['unpriced_energy'], unpriced_reasons: { no_price_slice: unpriced } }, ...o });
-const noSessions = (o = {}) => spotBlock({ sessions: 0, unpriced_kwh: 0, unplaced_unknown_sessions: 0, coverage: { state: 'no_sessions_recorded', complete: false, partial: false, priced_fraction: null, reasons: [], unpriced_reasons: {} }, ...o });
+const noSessions = (o = {}) => spotBlock({ savings: savings({ state: 'no_sessions_recorded' }), sessions: 0, unpriced_kwh: 0, unplaced_unknown_sessions: 0, coverage: { state: 'no_sessions_recorded', complete: false, partial: false, priced_fraction: null, reasons: [], unpriced_reasons: {} }, ...o });
 const prov = { basis: 'recorder_register_pair', endpoint: null, when_delivered: 'unknown', note: '', window_seconds: 21600 };
 // A session evaluated against the register (late evidence kept) and one that never was (no stored record).
 const recon = (state, o = {}) => ({ state, reason: null, placed_kwh: 8.2, total_kwh: null, unplaced_late_kwh: null, placement: null, placement_reasons: [], final: false,
@@ -77,8 +83,8 @@ export function historyAnswer(charger, day) {
     case '2026-11-09': return base(charger, day, { plans: [plan('p1')], observed: { intervals: [interval(day, [2, 5], [2, 55])], isolated_flow_samples: 0,
       coverage: coverage(52000, 0, 52800), energy: energy(7.9, 8.1), gaps: [], capture_restarts: [] },
       comparison: { planned_blocks: [block(day, [2], [3], 'flow_observed')], outside_plan: [], unknown_plan_spans: [], basis: 'acknowledged_intent_known_spans_only' },
-      sessions: [session(day, [2, 3], [2, 58], { spot_cost: priced(1.23, 8.2), spot_cost_in_window: priced(1.23, 8.2, { allocation: ALLOC }) })],
-      window_spot_cost: priced(1.23, 8.2, { allocation: ALLOC, local_day: day, scope: CLOSED }) });
+      sessions: [session(day, [2, 3], [2, 58], { spot_cost: priced(1.23, 8.2, { savings: saved(0.27, 18, 1.23, 1.5, 8.2) }), spot_cost_in_window: priced(1.23, 8.2, { allocation: ALLOC, savings: saved(0.27, 18, 1.23, 1.5, 8.2) }) })],
+      window_spot_cost: priced(1.23, 8.2, { allocation: ALLOC, local_day: day, scope: CLOSED, savings: saved(0.27, 18, 1.23, 1.5, 8.2) }) });
     case '2026-11-08': {
       const gaps = Array.from({ length: 200 }, (_, i) => ({ kind: 'power_w', from: at(day, 5, i % 60), to: null, reason: 'unreadable', source: 'ha' }));
       return base(charger, day, { plans: [plan('p1'), plan('p2')], truncated: { ...noCuts(), gaps: cap(12) },
@@ -88,14 +94,14 @@ export function historyAnswer(charger, day) {
           outside_plan: [{ interval: 0, start: at(day, 21, 50), end: at(day, 22), seconds: 600, kind: 'outside_plan', tolerance_seconds: 120 }, { interval: 1, start: at(day, 23, 10), end: at(day, 23, 40), seconds: 1800, kind: 'plan_unknown' }],
           unknown_plan_spans: [{ from: at(day, 22, 30), until: null, reason: 'dispatch_started' }], basis: 'acknowledged_intent_known_spans_only' },
         sessions: [session(day, [21, 45], [23, 45], { reconciliation: recon('uncertain', { reason: 'late_register_unassigned', unplaced_late_kwh: 1.4, unassigned_register_kwh: 0.6 }),
-          spot_cost: partial(0.84, 5, 3.2, { unplaced_kwh: 1.4 }), spot_cost_in_window: partial(0.84, 5, 3.2, { allocation: ALLOC, unplaced_kwh: 1.4 }) })],
-        window_spot_cost: partial(0.84, 5, 3.2, { allocation: ALLOC, unplaced_kwh: 1.4, local_day: day, scope: CLOSED }) });
+          spot_cost: partial(0.84, 5, 3.2, { unplaced_kwh: 1.4, savings: savings({ state: 'none', excluded_kwh: 5, excluded_reasons: { reference_day_partial: 5 }, excluded_days: [day], excluded_days_count: 1, unpriced_kwh: 3.2 }) }), spot_cost_in_window: partial(0.84, 5, 3.2, { allocation: ALLOC, unplaced_kwh: 1.4, savings: savings({ state: 'none', excluded_kwh: 5, excluded_reasons: { reference_day_partial: 5 }, excluded_days: [day], excluded_days_count: 1, unpriced_kwh: 3.2 }) }) })],
+        window_spot_cost: partial(0.84, 5, 3.2, { allocation: ALLOC, unplaced_kwh: 1.4, local_day: day, scope: CLOSED, savings: savings({ state: 'none', excluded_kwh: 5, excluded_reasons: { reference_day_partial: 5 }, excluded_days: [day], excluded_days_count: 1, unpriced_kwh: 3.2 }) }) });
     }
     case '2026-11-07': return base(charger, day, { retention: retention(at(day, 9), ['2026-11-05']), observed: { intervals: [interval(day, [10, 0], [10, 50])], isolated_flow_samples: 0,
       coverage: coverage(50000, 0), energy: energy(7.1, 7.3), gaps: [], capture_restarts: [] },
       // a session that crosses midnight: this day holds only its share; the whole session is a different number
-      sessions: [session(day, [0, 0], [1, 0], { start: at('2026-11-06', 23), energy_kwh: 6, spot_cost: priced(-0.2, 6), spot_cost_in_window: priced(-0.1, 3, { allocation: ALLOC }) })],
-      window_spot_cost: priced(-0.1, 3, { allocation: ALLOC, local_day: day, scope: CLOSED }) });
+      sessions: [session(day, [0, 0], [1, 0], { start: at('2026-11-06', 23), energy_kwh: 6, spot_cost: priced(-0.2, 6, { savings: saved(-0.15, null, -0.2, -0.35, 6) }), spot_cost_in_window: priced(-0.1, 3, { allocation: ALLOC, savings: saved(-0.1, null, -0.1, -0.2, 3) }) })],
+      window_spot_cost: priced(-0.1, 3, { allocation: ALLOC, local_day: day, scope: CLOSED, savings: saved(-0.1, null, -0.1, -0.2, 3) }) });
     case '2026-11-06': return base(charger, day, { retention: retention(at('2026-11-07', 9)), plans: [plan('p1')],
       observed: { intervals: [], isolated_flow_samples: 0, coverage: { ...coverage(0, 0), power_samples_in_retention: true }, energy: energy(null, null), gaps: [], capture_restarts: [] },
       comparison: { planned_blocks: [block(day, [2], [3], 'unknown', { reasons: ['block_starts_before_retained_power', 'partial_coverage'], covered_fraction: 0 })], outside_plan: [], unknown_plan_spans: [], basis: 'acknowledged_intent_known_spans_only' },
@@ -129,10 +135,14 @@ export function fixtureSessionsRequest(context) {
   const base = month => ({ api_version: 1, charger_id: context.charger, days: SESSION_DAYS.map(period => ({ period, sessions: 1, energy_kwh: 8.2 })), month, available_months: ['2026-11', '2026-10', '2026-09'], open: null });
   return async (params = {}) => {
     if (params.month === '2026-09') return { ...base('2026-09') };      // an older month answered by an old integration: no delivery keys
-    if (params.month === '2026-10') return { ...base('2026-10'), ...delivery('2026-10', priced(-0.35, 40, { allocation: ALLOC, sessions: 5, currency_exclusions: { kwh: 6, sessions: 1, currencies: { SEK: 6 }, missing_currency_kwh: 0 } }),
-      { '2026-10-12': priced(-0.35, 8.2, { allocation: ALLOC }) }) };
+    if (params.month === '2026-10') return { ...base('2026-10'), ...delivery('2026-10', priced(-0.35, 40, { allocation: ALLOC, sessions: 5, currency_exclusions: { kwh: 6, sessions: 1, currencies: { SEK: 6 }, missing_currency_kwh: 0 },
+      // a zero reference: the amount is real, the percentage is null; 34 of the 40 priced kWh were comparable
+      savings: saved(0.3, null, -0.3, 0, 34, { state: 'partial', comparable_fraction: 0.7391, excluded_kwh: 6, excluded_reasons: { reference_day_not_held: 6 }, excluded_days: ['2026-10-03'], excluded_days_count: 1, reference_days: 4 }) }),
+      { '2026-10-12': priced(-0.35, 8.2, { allocation: ALLOC, savings: saved(0.3, null, -0.3, 0, 8.2) }) }) };
     // November so far: 3 + 1 sessions with a price, one partial; the month's unpriced energy includes timeless energy no day holds.
-    return { ...base('2026-11'), ...delivery('2026-11', partial(1.97, 16.2, 4.6, { allocation: ALLOC, sessions: 4, unallocated_kwh: 1.4, unplaced_kwh: 1.4 }),
-      { '2026-11-09': priced(1.23, 8.2, { allocation: ALLOC }), '2026-11-08': partial(0.84, 5, 3.2, { allocation: ALLOC, unplaced_kwh: 1.4 }), '2026-11-07': priced(-0.1, 3, { allocation: ALLOC }) }) };
+    return { ...base('2026-11'), ...delivery('2026-11', partial(1.97, 16.2, 4.6, { allocation: ALLOC, sessions: 4, unallocated_kwh: 1.4, unplaced_kwh: 1.4,
+      // priced 16.2 kWh, but only 11.2 kWh had a full-day reference: savings compare that subset only (never 1.97 minus a subset reference)
+      savings: saved(0.17, 13.08, 1.13, 1.3, 11.2, { state: 'partial', comparable_fraction: 0.7179, excluded_kwh: 5, excluded_reasons: { reference_day_partial: 5 }, excluded_days: ['2026-11-08'], excluded_days_count: 1, unpriced_kwh: 4.6, reference_days: 2 }) }),
+      { '2026-11-09': priced(1.23, 8.2, { allocation: ALLOC, savings: saved(0.27, 18, 1.23, 1.5, 8.2) }), '2026-11-08': partial(0.84, 5, 3.2, { allocation: ALLOC, unplaced_kwh: 1.4, savings: savings({ state: 'none', excluded_kwh: 5, excluded_reasons: { reference_day_partial: 5 }, excluded_days: ['2026-11-08'], excluded_days_count: 1, unpriced_kwh: 3.2 }) }), '2026-11-07': priced(-0.1, 3, { allocation: ALLOC, savings: saved(-0.1, null, -0.1, -0.2, 3) }) }) };
   };
 }

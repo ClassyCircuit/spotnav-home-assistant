@@ -77,14 +77,15 @@ describe('day review: the selected day within the window versus the whole midnig
   it('shows the day cost from window_spot_cost and both numbers for a midnight session', () => {
     const m = modelOf('2026-11-07');
     expect(m.cost.headline).toContain('-€0.10');
-    expect(m.sessions[0].costLines).toEqual(['Spot cost in this day: -€0.10 (estimate)', 'Whole session (crosses midnight; not this day’s cost): -€0.20']);
+    expect(m.sessions[0].costLines).toEqual(['Spot cost in this day: -€0.10 (estimate)', 'Whole session (crosses midnight; not this day’s cost): -€0.20',
+      'Estimated savings in this day: -€0.10 (costs more than reference)', 'Whole session estimated savings (not this day’s): -€0.15 (costs more than reference)']);
     const html = renderHistoryDay({ ...m, nav: null, monthCost: null });
     expect(html).toContain('data-history-section="cost"');
     expect(html).toContain('Spot cost in this day: -€0.10');
   });
 
   it('a session inside one day shows only its own figure; an older backend shows no cost, never the fiscal one', () => {
-    expect(modelOf('2026-11-09').sessions[0].costLines).toEqual(['Spot cost in this day: €1.23 (estimate)']);
+    expect(modelOf('2026-11-09').sessions[0].costLines).toEqual(['Spot cost in this day: €1.23 (estimate)', 'Estimated savings in this day: €0.27 (18% of the reference)']);
     const old = modelOf('2026-11-09', a => { delete a.window_spot_cost; for (const s of a.sessions) { delete s.spot_cost; delete s.spot_cost_in_window; s.cost = 9.99; } });
     expect(old.cost.state).toBe('legacy');
     expect(old.cost.headline).toContain('does not report spot-only cost');

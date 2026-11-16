@@ -154,6 +154,40 @@ describe('sidebar history day (7.3a) in the real panel', () => {
     panel.remove();
   });
 
+  it('shows the month savings card beside the unchanged spot cost, the read time, and refreshes the current month at most once per five minutes without writing (8.3b)', async () => {
+    const cur = localToday().slice(0, 7), prev = shift(`${cur}-01`, -1).slice(0, 7);
+    const toFixture = text => text.split(prev).join('@@P').split(cur).join('@@C').split('@@C').join('2026-11').split('@@P').join('2026-10');
+    const toReal = text => text.split('2026-11').join('@@C').split('2026-10').join('@@P').split('@@C').join(cur).split('@@P').join(prev);
+    let failNext = false;
+    const sessions = msg => { if (failNext) { failNext = false; return Promise.reject(new Error('timeout')); } const answer = fixtureSessionsRequest({charger: msg.charger_id})(msg.month ? {month: toFixture(msg.month)} : {}); return answer.then(a => JSON.parse(toReal(JSON.stringify(a)))); };
+    const {calls, hass} = setup({}, null, {sessions}); const panel = await open(hass); await tick();
+    const reads = () => calls.filter(m => m.type === 'spotnav/get_sessions');
+    const section = () => panel.shadowRoot.querySelector('[data-history-section="month-cost"]');
+    expect(reads()).toHaveLength(1);
+    expect(section().querySelector('[data-spot-cost]').textContent).toContain('Partial spot cost €1.97');
+    const savings = section().querySelector('[data-spot-savings]');
+    expect(savings.dataset.spotSavings).toBe('partial');
+    expect(savings.textContent).toContain('Partial estimated savings €0.17 (13.1% of the reference) for 11.2 kWh compared');
+    expect(savings.textContent).toContain('not a supplier-bill saving');
+    expect(section().querySelector('[data-month-read]').textContent).toContain('Read at ');
+    const real = Date.now, base = real.call(Date);
+    try {
+      Date.now = () => base + 240000; panel.paint(); await tick();
+      expect(reads()).toHaveLength(1);
+      failNext = true; Date.now = () => base + 301000; panel.paint(); await tick();
+      expect(reads()).toHaveLength(2);
+      expect(section().textContent).toContain('€1.97');
+      expect(section().querySelector('[data-month-read]').textContent).toContain('latest refresh failed');
+      Date.now = () => base + 900000; for (let i = 0; i < 3; i++) { panel.paint(); await tick(); }
+      expect(reads()).toHaveLength(2);
+      panel.shadowRoot.querySelector('[data-history-nav="retry"]').click(); await tick(); await tick();
+      expect(reads()).toHaveLength(3);
+      expect(section().querySelector('[data-month-read]').textContent).not.toContain('refresh failed');
+    } finally { Date.now = real; }
+    expect(calls.filter(m => !['spotnav/list_chargers', 'spotnav/get_dashboard', 'spotnav/get_settings', 'spotnav/get_price_days', 'spotnav/get_price_insights', 'spotnav/get_charging_history', 'spotnav/get_sessions', 'spotnav/get_market', 'spotnav/get_market_options', 'spotnav/get_entity_config', 'spotnav/morek_schedule'].includes(m.type))).toEqual([]);
+    panel.remove();
+  });
+
   it('an older backend (no delivery keys) says spot cost is not reported for the month and the day, never zero (8.2b)', async () => {
     const {hass} = setup(); const panel = await open(hass); await tick();
     expect(panel.shadowRoot.querySelector('[data-history-section="month-cost"]').dataset.monthCostState).toBe('legacy');

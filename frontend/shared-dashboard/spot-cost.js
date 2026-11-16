@@ -83,10 +83,88 @@ export function describeSpotCost(raw, scope = 'day') {
     if (nonneg(b.unplaced_ambiguous_kwh) && b.unplaced_ambiguous_kwh > 0) lines.push(`Late energy ${kwhText(b.unplaced_ambiguous_kwh)} of sessions crossing the edge of this ${scope}: not summed, not priced.`);
     if (nonneg(b.unplaced_unknown_sessions) && b.unplaced_unknown_sessions > 0) lines.push(`${b.unplaced_unknown_sessions} session(s) may hold late energy of unknown size.`);
     if (b.unallocated_kwh > 0) lines.push(`${kwhText(b.unallocated_kwh)} of a session that crosses the edge has no price interval and cannot be assigned to this ${scope}: left out, not zero.`);
-    const x = b.currency_exclusions;
-    if (x && x.kwh > 0) lines.push(`Left out: ${kwhText(x.kwh)} in ${Object.keys(x.currencies || {}).join(', ') || 'no stored currency'}${nonneg(x.missing_currency_kwh) && x.missing_currency_kwh > 0 ? ` (${kwhText(x.missing_currency_kwh)} with no currency)` : ''}; currencies are never added or converted.`);
+    const x = exclusionLine(b.currency_exclusions);
+    if (x) lines.push(x);
   }
   return { state: state === 'no_sessions_recorded' ? state : b.amount === null ? 'none' : state, amount: b.amount, headline, brief, lines };
+}
+
+function exclusionLine(x) {
+  if (!x || !(x.kwh > 0)) return '';
+  return `Left out: ${kwhText(x.kwh)} in ${Object.keys(x.currencies || {}).join(', ') || 'no stored currency'}${nonneg(x.missing_currency_kwh) && x.missing_currency_kwh > 0 ? ` (${kwhText(x.missing_currency_kwh)} with no currency)` : ''}; currencies are never added or converted.`;
+}
+
+// ---- Historical day-average savings (Stage 8.3b): the backend's `spot_cost.savings` block (8.3a), shown, never recomputed. ----
+export const SAVINGS_BASIS = 'day_average_price';
+const TOLERANCE_KWH = 0.005;
+const SAVINGS_REASON = { reference_day_not_held: 'full-day prices not held', reference_day_partial: 'full-day prices incomplete', reference_day_invalid_prices: 'full-day prices unreadable',
+  reference_day_overlap: 'full-day prices overlap', reference_day_conflicting_duplicate: 'full-day prices conflict', reference_area_unknown: 'price area unknown', reference_currency_unknown: 'reference currency unknown',
+  reference_currency_mismatch: 'reference currency differs', reference_price_rate_missing: 'exchange rate missing', reference_prices_unavailable: 'prices unavailable', price_source_mismatch: 'price source differs' };
+
+/** One backend `savings` block, validated against the spot block it sits in; `null` when it is not what the contract promises. */
+export function parseSavings(s, spot) {
+  if (!s || typeof s !== 'object' || s.basis !== SAVINGS_BASIS || s.estimate !== true || s.unit !== 'major' || !STATES.includes(s.state)) return null;
+  const orNum = v => v === null || num(v);
+  if (!['amount', 'percentage', 'actual_cost', 'reference_cost'].every(k => orNum(s[k])) || !(s.currency === null || typeof s.currency === 'string')) return null;
+  if (!['comparable_kwh', 'excluded_kwh', 'unpriced_kwh'].every(k => nonneg(s[k]))) return null;
+  if (s.excluded_reasons !== undefined && (typeof s.excluded_reasons !== 'object' || s.excluded_reasons === null)) return null;
+  if (s.excluded_days !== undefined && !(Array.isArray(s.excluded_days) && s.excluded_days.every(d => typeof d === 'string'))) return null;
+  if (s.excluded_days_count !== undefined && !nonneg(s.excluded_days_count)) return null;
+  if (s.reference_sources !== undefined && !(Array.isArray(s.reference_sources) && s.reference_sources.every(source => typeof source === 'string'))) return null;
+  if (s.amount !== null) {
+    // The compared energy is a subset of what was priced, in the same currency; anything else is not shown as a number.
+    if (!s.currency || s.actual_cost === null || s.reference_cost === null || !(s.comparable_kwh > 0) || !['complete', 'partial'].includes(s.state)) return null;
+    if (spot.currency && s.currency !== spot.currency) return null;
+    if (s.comparable_kwh > spot.priced_kwh + TOLERANCE_KWH) return null;
+  } else if (['complete', 'partial'].includes(s.state)) return null;
+  return s;
+}
+
+const pctText = p => `${Number(p.toFixed(1))}%`;
+
+/**
+ * The savings of one `spot_cost` block as display text (`scope` is wording only). Returns `{state, amount, headline, brief, lines}`;
+ * `state`: `invalid`, `legacy` (no savings key: an older backend), `no_sessions_recorded`, `none` (nothing comparable), `partial`, `complete`.
+ * Amount and percentage are the backend's. The savings `actual_cost` covers only the compared subset and is never mixed with `spot_cost.amount`.
+ */
+export function describeSavings(rawSpot, scope = 'day') {
+  const spot = parseSpotCost(rawSpot);
+  const invalid = { state: 'invalid', amount: null, headline: 'Estimated savings not shown: the answer could not be understood.', brief: 'not shown (could not be understood)', lines: [] };
+  if (!spot) return invalid;
+  if (!('savings' in spot)) return { state: 'legacy', amount: null, headline: 'Estimated savings are not reported by this integration (not zero).', brief: 'not reported', lines: [] };
+  const s = parseSavings(spot.savings, spot);
+  if (!s) return invalid;
+  if (s.state === 'no_sessions_recorded') return { state: s.state, amount: null, headline: `No session recorded for this ${scope}: no savings to show (that is not zero savings).`, brief: 'no session recorded', lines: [] };
+  const lines = ['Historical estimate from recorded prices, not a supplier-bill saving and not the plan’s forecast.',
+    'Baseline: the same compared energy priced at that delivery day’s full-day average spot price (duration-weighted, raw price, no fees, taxes or margin).'];
+  let headline, brief;
+  if (s.amount === null) {
+    headline = `Estimated savings unknown: no priced energy had a full-day reference price${s.unpriced_kwh > 0 ? ` (${kwhText(s.unpriced_kwh)} unpriced)` : ''}.`; brief = 'unknown (no full-day reference)';
+  } else {
+    const money = formatMoney(s.amount, s.currency, spot.major_unit);
+    const p = s.percentage !== null && s.reference_cost > 0 ? ` (${pctText(s.percentage)} of the reference)` : '';
+    const sign = s.amount < 0 ? ': costs more than the reference' : s.amount === 0 ? ': the same as the reference' : '';
+    const head = s.state === 'partial' ? `Partial estimated savings ${money}${p}${sign} for ${kwhText(s.comparable_kwh)} compared. This is not a complete comparison.` : `Estimated savings ${money}${p}${sign} for ${kwhText(s.comparable_kwh)} compared.`;
+    headline = head; brief = `${s.state === 'partial' ? 'partial ' : ''}${money}${p}${s.amount < 0 ? ' (costs more than reference)' : ''}`;
+    lines.push(`Compared energy ${kwhText(s.comparable_kwh)}: reference cost ${formatMoney(s.reference_cost, s.currency, spot.major_unit)}; actual spot cost of that same energy ${formatMoney(s.actual_cost, s.currency, spot.major_unit)}.`);
+    if (spot.priced_kwh - s.comparable_kwh > TOLERANCE_KWH) lines.push(`The spot cost shown beside this covers ${kwhText(spot.priced_kwh)} priced; savings compare only ${kwhText(s.comparable_kwh)} of it. The two costs cover different energy: never subtract one from the other.`);
+    if (s.amount < 0) lines.push('Negative savings are valid: this charging cost more than the same energy at the day-average price.');
+    if (s.percentage === null || !(s.reference_cost > 0)) lines.push(`Percentage not meaningful: the reference cost is ${s.reference_cost < 0 ? 'negative' : 'zero'}, so none is shown (this is not 0%).`);
+  }
+  if (nonneg(s.comparable_fraction ?? NaN)) lines.push(`Comparison covers ${pct(s.comparable_fraction)} of the energy placed for this ${scope}.`);
+  if (s.excluded_kwh > TOLERANCE_KWH) {
+    const reasons = Object.entries(s.excluded_reasons || {}).filter(([, v]) => nonneg(v) && v > 0).map(([k, v]) => `${SAVINGS_REASON[k] || words(k)} ${kwhText(v)}`);
+    const shown = s.excluded_days || [], count = nonneg(s.excluded_days_count) ? s.excluded_days_count : shown.length;
+    lines.push(`Left out of the comparison: ${kwhText(s.excluded_kwh)} priced energy with no full-day reference${reasons.length ? ` (${reasons.join('; ')})` : ''}${count ? `; days: ${shown.slice(0, 5).join(', ')}${count > Math.min(5, shown.length) ? ` and ${count - Math.min(5, shown.length)} more` : ''}` : ''}.`);
+  }
+  if (s.unpriced_kwh > TOLERANCE_KWH) lines.push(`${kwhText(s.unpriced_kwh)} unpriced energy is not compared.`);
+  if (nonneg(s.reference_days) && s.reference_days > 0) {
+    const named = (s.reference_sources || []).filter(n => typeof n === 'string' && n && n !== 'unknown');
+    lines.push(`Reference from ${s.reference_days} delivery day(s). ${named.length && s.reference_source_state === 'held_provider_labels' ? `Reference price source: ${named.join(', ')}.` : 'Reference price source unknown.'}`);
+  }
+  const x = exclusionLine(s.currency_exclusions);
+  if (x) lines.push(x);
+  return { state: s.amount === null ? 'none' : s.state, amount: s.amount, headline, brief, lines };
 }
 
 /** One session's share of the shown day and its whole cost, side by side; the whole session is never the day's cost. */
@@ -97,7 +175,13 @@ export function sessionCostLines(s, crossesDays) {
   const out = [];
   if (inDay) out.push(`Spot cost in this day: ${inDay.brief}`);
   const same = s.spot_cost && s.spot_cost_in_window && s.spot_cost.amount === s.spot_cost_in_window.amount && s.spot_cost.priced_kwh === s.spot_cost_in_window.priced_kwh && s.spot_cost.unpriced_kwh === s.spot_cost_in_window.unpriced_kwh;
-  if (whole && (crossesDays || !inDay || !same)) out.push(`Whole session${crossesDays ? ' (crosses midnight; not this day’s cost)' : ''}: ${whole.brief}`);
+  const showWhole = whole && (crossesDays || !inDay || !same);
+  if (showWhole) out.push(`Whole session${crossesDays ? ' (crosses midnight; not this day’s cost)' : ''}: ${whole.brief}`);
+  // Estimated savings (8.3b) only where the backend sent them; each line names the energy it covers (the day's share or the whole session).
+  const sav = block => block && typeof block === 'object' && 'savings' in block ? describeSavings(block, 'day') : null;
+  const dayS = sav(s.spot_cost_in_window), wholeS = sav(s.spot_cost);
+  if (dayS) out.push(`Estimated savings in this day: ${dayS.brief}`);
+  if (wholeS && showWhole) out.push(`Whole session estimated savings${crossesDays ? ' (not this day’s)' : ''}: ${wholeS.brief}`);
   return out;
 }
 
@@ -126,12 +210,13 @@ export function monthCostModel(parsed, { isCurrent }) {
   if (!parsed) return { state: 'invalid', message: 'The month’s spot cost could not be understood and was not shown.' };
   if (parsed.legacy) return { state: 'legacy', message: 'This integration does not report spot-only cost by month, so none is shown. Its older cost fields include fees and taxes and are not shown here.' };
   const total = describeSpotCost(parsed.month_block, 'month');
+  const savings = describeSavings(parsed.month_block, 'month');
   const lines = [...total.lines];
   const b = parseSpotCost(parsed.month_block);
   if (b && (b.unpriced_kwh > 0 || b.unallocated_kwh > 0 || b.unplaced_kwh > 0)) lines.push('The month can hold energy with no recorded time; it counts for the month but for no single day, so the days below need not add up to the month’s unpriced energy.');
   if (parsed.open && isCurrent) lines.push('A charge is running now; this summary covers closed sessions only and leaves it out.');
-  const rows = parsed.days.map(d => ({ day: d.period, ...describeSpotCost(d.block, 'day') }));
+  const rows = parsed.days.map(d => ({ day: d.period, ...describeSpotCost(d.block, 'day'), savingsBrief: describeSavings(d.block, 'day') }));
   const withSessions = rows.filter(r => r.state !== 'no_sessions_recorded');
-  return { state: 'ready', month: parsed.month, total: { ...total, lines }, days: withSessions.map(r => ({ day: r.day, text: `${r.day.slice(8)}: ${r.brief}`, state: r.state })),
+  return { state: 'ready', month: parsed.month, total: { ...total, lines }, savings, days: withSessions.map(r => ({ day: r.day, text: `${r.day.slice(8)}: ${r.brief}`, detail: `Estimated savings: ${r.savingsBrief.brief}`, state: r.state })),
     emptyDays: rows.length - withSessions.length };
 }
