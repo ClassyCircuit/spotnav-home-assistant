@@ -12,7 +12,8 @@
   "retention",
   "sessions",
   "truncated",
-  "window"
+  "window",
+  "window_spot_cost"
  ],
  "window": [
   "local_since",
@@ -158,6 +159,8 @@
   "price_slices_truncated",
   "reconciliation",
   "source",
+  "spot_cost",
+  "spot_cost_in_window",
   "start",
   "started_by"
  ],

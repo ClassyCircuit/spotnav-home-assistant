@@ -1221,6 +1221,54 @@ ignores values it does not know. With `format: "csv"` and a `month` the CSV is
 that whole month and the file is named by its first and last day; `month` together with `from` or `to` is
 refused.
 
+### Spot-only cost and delivery days (Stage 8.2a, additive, api_version stays 1)
+
+`get_sessions` and `get_charging_history` add one block, `spot_cost`, built by one shared pure calculation
+(`sessions/costing.py`: `session_spot`, `SpotAllocation`, `spot_block`). It is **raw published spot price only**
+(`price_basis: "raw_published_spot_no_fees_no_taxes"`): no VAT, grid fee, energy tax, margin or supplier invoice, and a
+fee/tax setting never changes it. The existing fiscal fields (`cost`, `reference_cost`, `savings`, `cost_basis`, the
+start-day `this_month`, `last_month`, `months`, `days`, `month_summary`, `month_days`) are unchanged and must not be shown
+under a spot-only label. It is read from the stored placement alone: no provider fetch, no store, no today's price.
+
+`spot_cost` fields: `amount` (major unit, may be negative; `null` = unknown, never 0), `currency`, `unit`
+(`"major"`), `major_unit`, `basis` (`recorded_price_slices`, `retained_price_intervals`, `unknown`; an aggregate that
+mixes the first two says `mixed`), `price_basis`, `price_source` (`null`: the provider was not stored with old slices,
+so a client labels it "spot price", never "Nord Pool" unless a source is known) with `price_source_state`
+(`not_recorded`/`unknown`) and `price_sources` (named only for retained prices), `priced_kwh`, `unpriced_kwh`,
+`unplaced_kwh` (receipt-only late energy of sessions inside the period; never priced, never added to energy),
+`unplaced_ambiguous_kwh` (late energy of sessions that cross the period edge, not summed), `unplaced_unknown_sessions`,
+`unallocated_kwh` (session energy with no price interval whose session crosses the period edge: possible, not summed),
+`estimated_kwh`, `energy_sources` (priced kWh per `register`/`integrated_power`/`estimated`, never added across a
+session's two bases), `sessions`, `coverage` (`state` `complete`/`partial`/`none`/`no_sessions_recorded`, `complete`,
+`partial`, `priced_fraction`, `reasons`, `unpriced_reasons` kWh by reason such as `no_price_slice`, `untrusted_rate`,
+`missing_currency`, `conflicting_slice`) and `currency_exclusions` (`null` or `{kwh, sessions, currencies, missing_currency_kwh}`:
+energy in another or no currency is counted here, never added and never dropped). The reporting currency is the most
+recent session's. A partial amount is labelled `partial`; `amount` covers only `priced_kwh`. A euro price needs rate 1 and
+any other currency needs the rate's date, else that energy is unpriced (`untrusted_rate`). Identical duplicate slices
+count once; overlapping/conflicting slices, slices exceeding the session's energy and unreadable rows price nothing and
+are flagged (`conflicting_slices`, `slice_energy_exceeds_session_energy`, `invalid_slices`, `duplicate_slices`);
+overlapping sessions and an open session are flagged and never `complete`.
+
+* **Session rows** (`sessions`, `open`, `month_sessions`): `spot_cost` for the whole session plus `by_delivery_day`
+  (`{day, amount, priced_kwh, unpriced_kwh, allocation}`), the share of each local day.
+* **Delivery days** (new keys on `get_sessions`: `delivery_accounting`, `delivery_days`, `delivery_month_summary`,
+  `delivery_month_days`): a *delivery day* is the Home Assistant local calendar day; energy is allocated by actual elapsed overlap
+  of each price interval with the day (23/25-hour days exact), labelled `allocation: "price_interval_overlap_estimate"`;
+  every slice is counted once, so a month is the sum of its delivery days (`priced_kwh` and `amount` equal exactly). Energy
+  with no placement is never moved to the start day: it is `unpriced_kwh` only for a period that contains the whole
+  session, else `unallocated_kwh`. A month's `unpriced_kwh` can therefore exceed the sum of its days by sessions that lie
+  in the month but in no single day. `delivery_days` covers the last 62 local days that have activity;
+  `delivery_month_days` has a row for each day of `month` (nothing recorded = `no_sessions_recorded`, `amount: null`).
+  The start-day fields above are "sessions started that day", a different quantity.
+* **History** (`get_charging_history`): each session row gains `spot_cost` (whole session) and `spot_cost_in_window`; the
+  answer gains `window_spot_cost` (all matching closed sessions, not only the first 200 rows; `rows_truncated` is a coverage
+  reason) with `local_day` set when the window is exactly one local day, in which case it equals that day's `delivery_days` row.
+  Open sessions are not part of history.
+* **Retained prices:** `costing.session_spot(..., spans, retained)` can price energy a caller proves was placed (`PlacedSpan` with
+  a `price_source`) against retained intervals only when area, source, currency, rate and instants all match; nothing in
+  the live APIs supplies such spans yet (the stored record has no placement outside its slices), so live answers use
+  `recorded_price_slices` or `unknown`.
+
 ### Power by month
 
 `spotnav/get_power_month {"api_version": 1, "charger_id" | "site_id", "month"}` (any signed-in user, as the

@@ -52,6 +52,7 @@ from .evidence import (
     _iso,
     _parse,
 )
+from .costing import SPOT_ALLOCATION, SpotAllocation, day_bounds, session_spot, spot_block, spot_total
 from .reconcile import public as reconcile_public
 
 HISTORY_API_VERSION: Final = 1
@@ -486,7 +487,11 @@ def charging_history(store: ChargingEvidenceStore, charger_id: str, *, since: da
     closed = []
     matching = [session for session in sessions
                 if session.end is not None and session.end > since and session.start < until]
-    for session in matching[:MAX_ROWS]:
+    # Stage 8.2a: spot-only cost (no fees/taxes) of the energy placed in this window, through the same allocation
+    # the sessions summaries use. Computed for every matching session, not just the rows below.
+    spots = [session_spot(session) for session in matching]
+    window_allocation = SpotAllocation(spots, zone)
+    for session, spot in list(zip(matching, spots))[:MAX_ROWS]:
         end = session.end
         closed.append({
             "id": session.id, "start": _iso(session.start), "end": _iso(end), "energy_kwh": round(session.energy_kwh, 3),
@@ -497,6 +502,9 @@ def charging_history(store: ChargingEvidenceStore, charger_id: str, *, since: da
             "price_slices_truncated": len(session.intervals) > MAX_ROWS,
             "price_slices_cut": max(0, len(session.intervals) - MAX_ROWS),
             "association": "time_overlap_only",
+            "spot_cost": spot_block(spot_total(spot)),
+            "spot_cost_in_window": spot_block(SpotAllocation([spot], zone).window(since, until),
+                                              allocation=SPOT_ALLOCATION),
             # Stage 15.8: the register's total against the energy placed above (`energy_kwh`, never changed), with its
             # provenance; the remainder is unplaced late energy with no known time, never flow, power or progress.
             "reconciliation": reconcile_public(session),
@@ -573,7 +581,19 @@ def charging_history(store: ChargingEvidenceStore, charger_id: str, *, since: da
         "comparison": {"planned_blocks": blocks[:MAX_ROWS], "outside_plan": outside[:MAX_ROWS],
                        "unknown_plan_spans": unknown_out[:MAX_ROWS], "basis": "acknowledged_intent_known_spans_only"},
         "sessions": closed, "digests": digest_rows,
+        "window_spot_cost": {
+            **spot_block(window_allocation.window(since, until), allocation=SPOT_ALLOCATION,
+                         rows_truncated=len(matching) > MAX_ROWS),
+            "local_day": _local_day(since, until, zone),
+            "scope": "closed sessions only; an open session is not included",
+        },
     }
+
+
+def _local_day(since: datetime, until: datetime, zone: tzinfo) -> str | None:
+    """The local date when the window is exactly one local calendar day (then it equals that delivery day)."""
+    day = since.astimezone(zone).date()
+    return day.isoformat() if (since, until) == day_bounds(day, zone) else None
 
 
 # ---- digests -----------------------------------------------------------------------------------------------------

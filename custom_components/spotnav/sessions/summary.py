@@ -18,6 +18,14 @@ import calendar
 from datetime import date, datetime, timedelta, tzinfo
 from typing import Any, Final
 
+from .costing import (
+    day_bounds,
+    SPOT_ALLOCATION,
+    SPOT_PRICE_BASIS,
+    session_spot,
+    SpotAllocation,
+    spot_block,
+)
 from .model import ChargeSession
 
 SAVINGS_BASIS: Final = "day_average_price"
@@ -192,3 +200,68 @@ def sessions_csv(
                 cells.append("" if value is None else _safe(value) if isinstance(value, str) else value)
         writer.writerow(cells)
     return out.getvalue()
+
+
+# ---- Stage 8.2a: delivery-day accounting (spot-only) --------------------------------------------------------------
+#
+# A *delivery day* is the Home Assistant local calendar day in which a price interval's energy was delivered. The
+# fields above group a whole session on the day it started; these group the energy it placed, by actual elapsed time
+# (23/25-hour days included), and are a different thing: never show one as the other. A month is the sum of its
+# delivery days. All of it is `SpotAllocation`, the same code `get_charging_history` uses for its window.
+
+DELIVERY_ACCOUNTING: Final = {
+    "day": "home_assistant_local_calendar_day",
+    "allocation": SPOT_ALLOCATION,
+    "price_basis": SPOT_PRICE_BASIS,
+    "month": "sum_of_delivery_days",
+    "legacy_fields": "this_month, last_month, months, days, month_summary, month_days and sessions group a whole "
+                     "session on the local day it started and carry the person's fiscal cost; they are not delivery days",
+}
+
+
+def delivery_allocation(sessions: Iterable[ChargeSession], zone: tzinfo, windows: Sequence[tuple[datetime, datetime]]) -> SpotAllocation:
+    """The allocation of the closed sessions that touch any of `windows` (so a read prices only what it shows)."""
+    spots = [
+        spot
+        for spot in (session_spot(item) for item in sessions if item.end is not None)
+        if any(spot.start < until and spot.end is not None and spot.end > since for since, until in windows)
+    ]
+    return SpotAllocation(spots, zone)
+
+
+def delivery_day_row(allocation: SpotAllocation, day: date) -> dict[str, Any]:
+    return {
+        "period": day.isoformat(),
+        "kind": "delivery_day",
+        "spot_cost": spot_block(allocation.delivery_day(day), allocation=SPOT_ALLOCATION),
+    }
+
+
+def delivery_days(allocation: SpotAllocation, first: date, last: date) -> list[dict[str, Any]]:
+    """The local days `first..last` that hold any session activity, newest first."""
+    days = sorted((d for d in allocation.days_touched() if first <= d <= last), reverse=True)
+    return [delivery_day_row(allocation, day) for day in days]
+
+
+def delivery_month_rows(allocation: SpotAllocation, key: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """The month `key`'s delivery summary and one delivery row for every day of it (a day with nothing recorded says
+    `no_sessions_recorded`, not zero)."""
+    first, last = month_bounds(key)
+    summary = {
+        "period": key,
+        "kind": "delivery_month",
+        "spot_cost": spot_block(allocation.delivery_month(first, last), allocation=SPOT_ALLOCATION),
+    }
+    days = [
+        delivery_day_row(allocation, first + timedelta(days=offset)) for offset in range((last - first).days + 1)
+    ]
+    return summary, days
+
+
+def delivery_windows(today: date, zone: tzinfo, key: str, days_back: int) -> list[tuple[datetime, datetime]]:
+    """The two UTC windows a sessions read shows: the last `days_back` local days and the chosen month."""
+    first, last = month_bounds(key)
+    return [
+        (day_bounds(today - timedelta(days=days_back - 1), zone)[0], day_bounds(today, zone)[1]),
+        (day_bounds(first, zone)[0], day_bounds(last, zone)[1]),
+    ]

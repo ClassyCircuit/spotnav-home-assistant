@@ -18,9 +18,9 @@ from __future__ import annotations
 from bisect import bisect_left, bisect_right
 import math
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass, replace
-from datetime import date, datetime, timezone
-from typing import Any
+from dataclasses import dataclass, field, replace
+from datetime import date, datetime, time, timedelta, timezone, tzinfo
+from typing import Any, Final
 
 from ..planning.planner import document_rate, effective_minor_per_kwh, FiscalChoice, PlannerInputError
 
@@ -251,3 +251,579 @@ def price_slices(slices: Sequence[Slice], fiscal: FiscalChoice | None) -> Costin
         cost += item.kwh * effective_minor_per_kwh(item.eur_per_kwh * item.fx, fiscal, item.start)
         reference += item.kwh * effective_minor_per_kwh(item.day_avg_eur * item.fx, fiscal, item.start)
     return Costing(priced, cost, reference)
+
+
+# ---- Stage 8.2a: spot-only cost of the energy a session placed ---------------------------------------------------
+#
+# One pure path for `get_sessions` rows, delivery-day/month summaries and `get_charging_history`. It reads only what
+# a session stored (`intervals`: kWh per price interval with the raw price and rate) and never a fee, tax, VAT,
+# margin, today's price or the network. Cost = sum(placed kWh x raw spot price x stored rate), in the major unit.
+# Whatever cannot be priced from proof stays unknown and is counted, never zero and never dropped.
+
+SPOT_BASIS_RECORDED: Final = "recorded_price_slices"
+SPOT_BASIS_RETAINED: Final = "retained_price_intervals"
+SPOT_BASIS_UNKNOWN: Final = "unknown"
+SPOT_BASIS_MIXED: Final = "mixed"  # an aggregate whose priced energy came from both bases
+SPOT_PRICE_BASIS: Final = "raw_published_spot_no_fees_no_taxes"
+SPOT_ALLOCATION: Final = "price_interval_overlap_estimate"
+_TOLERANCE_KWH: Final = 1e-6
+
+
+@dataclass(frozen=True, slots=True)
+class PlacedSpan:
+    """Energy a caller can prove was delivered evenly between two instants, with no recorded price slice. It is
+    priced only against retained prices of the same `price_source` (named by the caller, never guessed)."""
+
+    start: datetime
+    end: datetime
+    kwh: float
+    price_source: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RetainedPrice:
+    """One retained historical price interval with its provenance (area, source, currency, rate)."""
+
+    utc_start: datetime
+    utc_end: datetime
+    eur_per_kwh: float
+    fx: float
+    fx_date: date | None
+    area_id: str | None
+    currency: str | None
+    source: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class SpotPiece:
+    """Energy placed in one price interval: `price` (major unit per kWh) is `None` when it could not be trusted."""
+
+    start: datetime
+    end: datetime
+    kwh: float
+    price: float | None
+    basis: str
+    reason: str | None = None
+    source: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SessionSpot:
+    """What one session's stored energy placement says, priced spot-only; see `spot_total` / `SpotAllocation`."""
+
+    session_id: str
+    start: datetime
+    end: datetime | None
+    currency: str | None
+    major_unit: str | None
+    energy_source: str | None
+    energy_kwh: float
+    pieces: tuple[SpotPiece, ...]
+    #: Energy with no usable time or price interval (session energy minus every valid piece).
+    remainder_kwh: float
+    #: The receipt-only late energy (`reconciled` only; `None` when unknown): never priced, never in `energy_kwh`.
+    unplaced_late_kwh: float | None
+    unassigned_register_kwh: float | None
+    open: bool
+    flags: tuple[str, ...] = ()
+
+
+def _finite(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def _rate_reason(currency: str | None, fx: float, fx_date: date | None) -> str | None:
+    """Why this rate is not trustworthy for `currency`, or `None`. A euro price needs rate 1; any other currency
+    needs the day its rate is from."""
+    if not currency:
+        return "missing_currency"
+    if currency.upper() == "EUR":
+        return None if abs(fx - 1.0) < 1e-9 else "untrusted_rate"
+    return "untrusted_rate" if fx_date is None else None
+
+
+def _recorded_pieces(session: Any, currency: str | None) -> tuple[list[SpotPiece], list[str], float]:
+    """The session's stored slices as pieces: bad rows skipped and flagged, identical duplicates counted once,
+    overlapping/conflicting slices kept as placed but unpriced. Returns (pieces, flags, kWh of the pieces)."""
+    flags: list[str] = []
+    seen: set[tuple[Any, ...]] = set()
+    rows = []
+    for item in getattr(session, "intervals", ()) or ():
+        try:
+            start, end, kwh = item.start, item.end, item.kwh
+            eur, fx = item.eur_per_kwh, item.fx
+            fx_date = getattr(item, "fx_date", None)
+            ok = (
+                isinstance(start, datetime) and isinstance(end, datetime) and start.tzinfo is not None
+                and end.tzinfo is not None and end > start and _finite(kwh) and kwh >= 0 and _finite(eur)
+                and _finite(fx) and fx > 0
+            )
+        except (AttributeError, TypeError):
+            ok = False
+        if not ok:
+            if "invalid_slices" not in flags:
+                flags.append("invalid_slices")
+            continue
+        if kwh <= 0:
+            continue
+        key = (start, end, float(kwh), float(eur), float(fx))
+        if key in seen:
+            if "duplicate_slices" not in flags:
+                flags.append("duplicate_slices")
+            continue
+        seen.add(key)
+        rows.append((start, end, float(kwh), float(eur), float(fx), fx_date if isinstance(fx_date, date) else None))
+    rows.sort(key=lambda row: (row[0], row[1]))
+    conflicting: set[int] = set()
+    group: list[int] = []
+    group_end = None
+    for index, row in enumerate(rows):
+        if group and row[0] < group_end:
+            group.append(index)
+            group_end = max(group_end, row[1])
+            continue
+        if len(group) > 1:
+            conflicting.update(group)
+        group, group_end = [index], row[1]
+    if len(group) > 1:
+        conflicting.update(group)
+    if conflicting:
+        flags.append("conflicting_slices")
+    pieces = []
+    for index, (start, end, kwh, eur, fx, fx_date) in enumerate(rows):
+        reason = "conflicting_slice" if index in conflicting else _rate_reason(currency, fx, fx_date)
+        pieces.append(SpotPiece(start, end, kwh, None if reason else eur * fx, SPOT_BASIS_RECORDED, reason))
+    return pieces, flags, sum(piece.kwh for piece in pieces)
+
+
+def _retained_pieces(
+    spans: Sequence[PlacedSpan], retained: Sequence[RetainedPrice], *, area_id: str | None, currency: str | None,
+    recorded: Sequence[SpotPiece],
+) -> tuple[list[SpotPiece], list[str]]:
+    """Price proven-placed spans against retained prices that match area, source, currency and instants. Anything
+    without that proof is a placed-but-unpriced piece (never today's price, never another source's)."""
+    out: list[SpotPiece] = []
+    flags: list[str] = []
+    by_start: dict[datetime, list[RetainedPrice]] = {}
+    for price in retained:
+        by_start.setdefault(price.utc_start, []).append(price)
+    if any(len(rows) > 1 for rows in by_start.values()):
+        flags.append("conflicting_retained_prices")  # a start with two rows prices nothing
+    for span in spans:
+        if not (isinstance(span.start, datetime) and isinstance(span.end, datetime) and span.end > span.start
+                and _finite(span.kwh) and span.kwh > 0):
+            flags.append("invalid_placed_span")
+            continue
+        total = (span.end - span.start).total_seconds()
+        if any(span.start < piece.end and piece.start < span.end for piece in recorded):
+            # Already carried by a recorded price slice: pricing it again would count that energy twice.
+            out.append(SpotPiece(span.start, span.end, span.kwh, None, SPOT_BASIS_RETAINED, "already_priced_window"))
+            continue
+        candidates = sorted(
+            (rows[0] for rows in by_start.values() if len(rows) == 1
+             and rows[0].utc_start < span.end and rows[0].utc_end > span.start),
+            key=lambda row: row.utc_start,
+        )
+        cursor = span.start
+        for row in candidates:
+            if row.utc_start > cursor:
+                out.append(SpotPiece(cursor, row.utc_start, span.kwh * (row.utc_start - cursor).total_seconds() / total,
+                                     None, SPOT_BASIS_RETAINED, "no_retained_price"))
+            begin, finish = max(row.utc_start, cursor), min(row.utc_end, span.end)
+            if finish <= begin:
+                continue
+            kwh = span.kwh * (finish - begin).total_seconds() / total
+            if not area_id or row.area_id != area_id or not span.price_source or row.source != span.price_source:
+                reason = "price_provenance_mismatch"
+            elif not currency or row.currency is None or row.currency.upper() != currency.upper():
+                reason = "currency_mismatch"
+            elif not (_finite(row.eur_per_kwh) and _finite(row.fx) and row.fx > 0):
+                reason = "untrusted_rate"
+            else:
+                reason = _rate_reason(currency, row.fx, row.fx_date)
+            out.append(SpotPiece(begin, finish, kwh, None if reason else row.eur_per_kwh * row.fx,
+                                 SPOT_BASIS_RETAINED, reason, row.source if reason is None else None))
+            cursor = finish
+        if cursor < span.end:
+            out.append(SpotPiece(cursor, span.end, span.kwh * (span.end - cursor).total_seconds() / total,
+                                 None, SPOT_BASIS_RETAINED, "no_retained_price"))
+    return out, flags
+
+
+def session_spot(
+    session: Any, *, spans: Sequence[PlacedSpan] = (), retained: Sequence[RetainedPrice] = (),
+) -> SessionSpot:
+    """The spot-only pricing of one session (any `ChargeSession`-like object), from its stored placement alone.
+
+    `spans`/`retained` are optional proven placements and retained prices for energy with no recorded slice; the
+    live API has no such placement and passes none. Fee/tax/VAT settings are never read.
+    """
+    currency = getattr(session, "currency", None) or None
+    energy = getattr(session, "energy_kwh", 0.0)
+    energy = float(energy) if _finite(energy) and energy > 0 else 0.0
+    pieces, flags, placed = _recorded_pieces(session, currency)
+    if spans:
+        extra, extra_flags = _retained_pieces(
+            spans, retained, area_id=getattr(session, "area_id", None), currency=currency, recorded=pieces)
+        pieces += extra
+        flags += extra_flags
+        placed += sum(piece.kwh for piece in extra)
+    if placed > energy + max(0.001, 0.001 * energy):
+        # More energy placed than the session recorded: neither figure can be trusted, so nothing is priced.
+        flags.append("slice_energy_exceeds_session_energy")
+        pieces = [replace(piece, price=None, reason="slice_energy_exceeds_session_energy") for piece in pieces]
+    remainder = max(0.0, energy - placed)
+    if remainder <= _TOLERANCE_KWH:
+        remainder = 0.0
+    late = getattr(session, "late", None)
+    unplaced = unassigned = None
+    if isinstance(late, dict):
+        if late.get("state") == "reconciled" and _finite(late.get("unplaced_late_kwh")):
+            unplaced = max(0.0, float(late["unplaced_late_kwh"]))
+        if _finite(late.get("unassigned_register_kwh")):
+            unassigned = max(0.0, float(late["unassigned_register_kwh"]))
+    end = getattr(session, "end", None)
+    return SessionSpot(
+        str(getattr(session, "id", "")), session.start, end, currency, getattr(session, "major_unit", None),
+        getattr(session, "energy_source", None), energy, tuple(pieces), remainder, unplaced, unassigned,
+        end is None, tuple(flags),
+    )
+
+
+@dataclass(slots=True)
+class SpotBucket:
+    """Running totals of spot-priced energy for one period and one currency."""
+
+    priced_kwh: float = 0.0
+    cost: float = 0.0
+    recorded_kwh: float = 0.0
+    retained_kwh: float = 0.0
+    unpriced_kwh: float = 0.0
+    unplaced_kwh: float = 0.0
+    unallocated_kwh: float = 0.0
+    unplaced_ambiguous_kwh: float = 0.0
+    estimated_kwh: float = 0.0
+    sessions: set[str] = field(default_factory=set)
+    open_sessions: set[str] = field(default_factory=set)
+    unplaced_unknown: set[str] = field(default_factory=set)
+    by_source: dict[str, float] = field(default_factory=dict)
+    reasons: dict[str, float] = field(default_factory=dict)
+    flags: set[str] = field(default_factory=set)
+    price_sources: set[str] = field(default_factory=set)
+    major_unit: str | None = None
+    latest_start: datetime | None = None
+
+    def touch(self, spot: SessionSpot) -> None:
+        self.sessions.add(spot.session_id)
+        if spot.open:
+            self.open_sessions.add(spot.session_id)
+        self.flags.update(spot.flags)
+        if spot.major_unit:
+            self.major_unit = spot.major_unit
+        if self.latest_start is None or spot.start > self.latest_start:
+            self.latest_start = spot.start
+
+    def add_piece(self, spot: SessionSpot, piece: SpotPiece, fraction: float) -> None:
+        self.touch(spot)
+        kwh = piece.kwh * fraction
+        if piece.price is None:
+            self._unpriced(kwh, piece.reason or "unpriced")
+            return
+        self.priced_kwh += kwh
+        self.cost += kwh * piece.price
+        if piece.basis == SPOT_BASIS_RETAINED:
+            self.retained_kwh += kwh
+            if piece.source:
+                self.price_sources.add(piece.source)
+        else:
+            self.recorded_kwh += kwh
+        key = spot.energy_source or "unknown"
+        self.by_source[key] = self.by_source.get(key, 0.0) + kwh
+        if spot.energy_source == "estimated":
+            self.estimated_kwh += kwh
+
+    def _unpriced(self, kwh: float, reason: str) -> None:
+        self.unpriced_kwh += kwh
+        self.reasons[reason] = self.reasons.get(reason, 0.0) + kwh
+
+    def add_floating(self, spot: SessionSpot, *, contained: bool) -> None:
+        """The session's energy with no price interval and its late energy have no time: whole-period facts when
+        the session lies inside the period, otherwise only possible (never summed) membership."""
+        self.touch(spot)
+        if spot.remainder_kwh > 0:
+            if contained:
+                self._unpriced(spot.remainder_kwh, "no_price_slice")
+            else:
+                self.unallocated_kwh += spot.remainder_kwh
+        if spot.unplaced_late_kwh is None:
+            self.unplaced_unknown.add(spot.session_id)
+        elif spot.unplaced_late_kwh > 0:
+            if contained:
+                self.unplaced_kwh += spot.unplaced_late_kwh
+            else:
+                self.unplaced_ambiguous_kwh += spot.unplaced_late_kwh
+
+    def merge(self, other: SpotBucket) -> None:
+        for name in ("priced_kwh", "cost", "recorded_kwh", "retained_kwh", "unpriced_kwh", "unplaced_kwh",
+                     "unallocated_kwh", "unplaced_ambiguous_kwh", "estimated_kwh"):
+            setattr(self, name, getattr(self, name) + getattr(other, name))
+        self.sessions |= other.sessions
+        self.open_sessions |= other.open_sessions
+        self.unplaced_unknown |= other.unplaced_unknown
+        self.flags |= other.flags
+        self.price_sources |= other.price_sources
+        for name in ("by_source", "reasons"):
+            target = getattr(self, name)
+            for key, value in getattr(other, name).items():
+                target[key] = target.get(key, 0.0) + value
+        self.major_unit = other.major_unit or self.major_unit
+        if other.latest_start is not None and (self.latest_start is None or other.latest_start > self.latest_start):
+            self.latest_start = other.latest_start
+
+    @property
+    def total_kwh(self) -> float:
+        return self.priced_kwh + self.unpriced_kwh
+
+
+def _boundary(day: date, zone: tzinfo) -> datetime:
+    """Local midnight of `day` as a UTC instant (the one definition every day edge uses, so edges telescope)."""
+    return datetime.combine(day, time.min, tzinfo=zone).astimezone(timezone.utc)
+
+
+def day_bounds(day: date, zone: tzinfo) -> tuple[datetime, datetime]:
+    """The UTC instants of the local day `day` (23, 24 or 25 hours long)."""
+    return _boundary(day, zone), _boundary(day + timedelta(days=1), zone)
+
+
+def _day_shares(piece: SpotPiece, zone: tzinfo) -> list[tuple[date, float]]:
+    """The fraction of a piece falling in each local day by elapsed time (sums to 1; one entry for most pieces)."""
+    total = (piece.end - piece.start).total_seconds()
+    day = piece.start.astimezone(zone).date()
+    shares = []
+    while True:
+        a, b = day_bounds(day, zone)
+        if a >= piece.end:
+            break
+        overlap = (min(b, piece.end) - max(a, piece.start)).total_seconds()
+        if overlap > 0:
+            shares.append((day, overlap / total))
+        day += timedelta(days=1)
+    return shares
+
+
+def _window_fraction(piece: SpotPiece, since: datetime, until: datetime) -> float:
+    overlap = (min(until, piece.end) - max(since, piece.start)).total_seconds()
+    return max(0.0, overlap / (piece.end - piece.start).total_seconds())
+
+
+def _inside(spot: SessionSpot, since: datetime, until: datetime) -> bool:
+    return spot.end is not None and spot.start >= since and spot.end <= until
+
+
+def _touches(spot: SessionSpot, since: datetime, until: datetime) -> bool:
+    return spot.start < until and (spot.end is None or spot.end > since)
+
+
+def _currency_key(spot: SessionSpot) -> str | None:
+    return spot.currency.upper() if spot.currency else None
+
+
+def _overlapping_sessions(spots: Sequence[SessionSpot]) -> set[str]:
+    """Closed sessions whose spans overlap another's: their energy may have been recorded twice."""
+    flagged: set[str] = set()
+    latest: SessionSpot | None = None
+    for spot in sorted((s for s in spots if s.end is not None), key=lambda s: s.start):
+        if latest is not None and spot.start < latest.end:
+            flagged.update((spot.session_id, latest.session_id))
+        if latest is None or spot.end > latest.end:
+            latest = spot
+    return flagged
+
+
+class SpotAllocation:
+    """Sessions' spot pieces allocated by actual elapsed overlap to local delivery days and arbitrary windows.
+
+    Every piece is counted once: a day's share is its overlap with that day over its whole length, so the days of
+    a midnight-crossing interval (or a 23/25-hour day) add back to the whole. Day, month and history-window totals
+    all come from the same shares. Allocation inside a price interval is an estimate (`SPOT_ALLOCATION`).
+    """
+
+    def __init__(self, spots: Iterable[SessionSpot], zone: tzinfo) -> None:
+        self.spots = list(spots)
+        self.zone = zone
+        overlapping = _overlapping_sessions(self.spots)
+        if overlapping:
+            self.spots = [
+                replace(s, flags=s.flags + ("overlapping_sessions",)) if s.session_id in overlapping else s
+                for s in self.spots
+            ]
+        self._days: dict[date, dict[str | None, SpotBucket]] = {}
+        for spot in self.spots:
+            key = _currency_key(spot)
+            for piece in spot.pieces:
+                for day, fraction in _day_shares(piece, zone):
+                    self._days.setdefault(day, {}).setdefault(key, SpotBucket()).add_piece(spot, piece, fraction)
+
+    def _floating(self, buckets: dict[str | None, SpotBucket], since: datetime, until: datetime) -> None:
+        for spot in self.spots:
+            if _touches(spot, since, until) and (spot.remainder_kwh > 0 or spot.unplaced_late_kwh != 0
+                                                 or not spot.pieces):
+                buckets.setdefault(_currency_key(spot), SpotBucket()).add_floating(
+                    spot, contained=_inside(spot, since, until))
+
+    def delivery_day(self, day: date) -> dict[str | None, SpotBucket]:
+        """The day's buckets per currency (merged copies, safe to keep)."""
+        out: dict[str | None, SpotBucket] = {}
+        for key, bucket in self._days.get(day, {}).items():
+            out.setdefault(key, SpotBucket()).merge(bucket)
+        self._floating(out, *day_bounds(day, self.zone))
+        return out
+
+    def delivery_month(self, first: date, last: date) -> dict[str | None, SpotBucket]:
+        """The month's buckets: the sum of its delivery days' placed energy plus energy whose session lies inside
+        the month but in no single day."""
+        out: dict[str | None, SpotBucket] = {}
+        day = first
+        while day <= last:
+            for key, bucket in self._days.get(day, {}).items():
+                out.setdefault(key, SpotBucket()).merge(bucket)
+            day += timedelta(days=1)
+        self._floating(out, _boundary(first, self.zone), _boundary(last + timedelta(days=1), self.zone))
+        return out
+
+    def window(self, since: datetime, until: datetime) -> dict[str | None, SpotBucket]:
+        """The same, for any window of absolute instants (a history request)."""
+        out: dict[str | None, SpotBucket] = {}
+        for spot in self.spots:
+            key = _currency_key(spot)
+            for piece in spot.pieces:
+                fraction = _window_fraction(piece, since, until)
+                if fraction > 0:
+                    out.setdefault(key, SpotBucket()).add_piece(spot, piece, fraction)
+        self._floating(out, since, until)
+        return out
+
+    def days_touched(self) -> set[date]:
+        days = set(self._days)
+        for spot in self.spots:
+            days.add(spot.start.astimezone(self.zone).date())
+            if spot.end is not None:
+                days.add(spot.end.astimezone(self.zone).date())
+        return days
+
+
+def spot_total(spot: SessionSpot) -> dict[str | None, SpotBucket]:
+    """One session's whole spot-priced energy (no period)."""
+    bucket = SpotBucket()
+    for piece in spot.pieces:
+        bucket.add_piece(spot, piece, 1.0)
+    bucket.add_floating(spot, contained=True)
+    return {_currency_key(spot): bucket}
+
+
+def _num(value: float) -> float:
+    return round(value + 0.0, 4)
+
+
+def spot_block(
+    buckets: dict[str | None, SpotBucket], *, allocation: str | None = None, rows_truncated: bool = False
+) -> dict[str, Any]:
+    """The wire block `spot_cost` for one row or summary: the reporting currency is the most recent session's;
+    energy in another or no currency is counted under `currency_exclusions`, never added and never dropped."""
+    chosen = None
+    latest = None
+    for key, bucket in buckets.items():
+        if key is not None and bucket.latest_start is not None and (latest is None or bucket.latest_start > latest):
+            chosen, latest = key, bucket.latest_start
+    main = buckets.get(chosen) if chosen is not None else None
+    if main is None:
+        main = SpotBucket()
+    others = {key: bucket for key, bucket in buckets.items() if bucket is not main}
+    exclusions = None
+    if others:
+        exclusions = {
+            "kwh": _num(sum(b.total_kwh for b in others.values())),
+            "sessions": len(set().union(*(b.sessions for b in others.values()))),
+            "currencies": {key: _num(b.total_kwh) for key, b in sorted(others.items(), key=lambda i: str(i[0]))
+                           if key is not None},
+            "missing_currency_kwh": _num(others[None].total_kwh) if None in others else 0.0,
+        }
+    sessions = len(main.sessions.union(*(b.sessions for b in others.values())))
+    reasons = set(main.flags)
+    if main.unpriced_kwh > _TOLERANCE_KWH:
+        reasons.add("unpriced_energy")
+    if main.unallocated_kwh > _TOLERANCE_KWH:
+        reasons.add("energy_without_placement_overlaps_period")
+    if main.unplaced_kwh > _TOLERANCE_KWH or main.unplaced_ambiguous_kwh > _TOLERANCE_KWH:
+        reasons.add("unplaced_late_energy_not_priced")
+    if exclusions:
+        reasons.add("currency_exclusions")
+    if main.open_sessions:
+        reasons.add("open_session")
+    if rows_truncated:
+        reasons.add("rows_truncated")
+    has_cost = main.priced_kwh > _TOLERANCE_KWH
+    if not sessions:
+        state = "no_sessions_recorded"
+    elif not has_cost:
+        state = "none"
+    else:
+        state = "partial" if reasons else "complete"
+    basis = SPOT_BASIS_UNKNOWN
+    if has_cost:
+        recorded, retained = main.recorded_kwh > _TOLERANCE_KWH, main.retained_kwh > _TOLERANCE_KWH
+        basis = (SPOT_BASIS_MIXED if recorded and retained else SPOT_BASIS_RETAINED if retained
+                 else SPOT_BASIS_RECORDED)
+    known = main.total_kwh
+    block: dict[str, Any] = {
+        "amount": _num(main.cost) if has_cost else None,
+        "currency": chosen,
+        "unit": "major",
+        "major_unit": main.major_unit,
+        "basis": basis,
+        "price_basis": SPOT_PRICE_BASIS,
+        "price_source": None,
+        "price_source_state": "not_recorded" if main.recorded_kwh > 0 else "unknown",
+        "price_sources": sorted(main.price_sources),
+        "priced_kwh": _num(main.priced_kwh),
+        "unpriced_kwh": _num(main.unpriced_kwh),
+        "unplaced_kwh": _num(main.unplaced_kwh),
+        "unplaced_ambiguous_kwh": _num(main.unplaced_ambiguous_kwh),
+        "unplaced_unknown_sessions": len(main.unplaced_unknown),
+        "unallocated_kwh": _num(main.unallocated_kwh),
+        "estimated_kwh": _num(main.estimated_kwh),
+        "energy_sources": {key: _num(value) for key, value in sorted(main.by_source.items())},
+        "sessions": sessions,
+        "coverage": {
+            "state": state,
+            "complete": state == "complete",
+            "partial": state == "partial",
+            "priced_fraction": round(main.priced_kwh / known, 4) if known > _TOLERANCE_KWH else None,
+            "reasons": sorted(reasons),
+            "unpriced_reasons": {key: _num(value) for key, value in sorted(main.reasons.items())},
+        },
+        "currency_exclusions": exclusions,
+    }
+    if allocation is not None:
+        block["allocation"] = allocation
+    return block
+
+
+def placed_days(allocation: SpotAllocation) -> list[date]:
+    """The local days that hold placed energy, oldest first."""
+    return sorted(allocation._days)
+
+
+def session_spot_row(session: Any, zone: tzinfo | None = None) -> dict[str, Any]:
+    """One session's `spot_cost` block; with `zone`, also the estimate of what each local delivery day received."""
+    spot = session_spot(session)
+    block = spot_block(spot_total(spot))
+    if zone is not None:
+        allocation = SpotAllocation([spot], zone)
+        block["by_delivery_day"] = [
+            {"day": day.isoformat(), "allocation": SPOT_ALLOCATION,
+             **{key: value for key, value in spot_block(allocation.delivery_day(day)).items()
+                if key in ("amount", "priced_kwh", "unpriced_kwh")}}
+            for day in placed_days(allocation)
+        ]
+    return block

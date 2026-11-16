@@ -18,6 +18,11 @@ const interval = (day, a, b, o = {}) => ({ first_sample: at(day, ...a), last_sam
   end_earliest: at(day, ...b), end_latest: at(day, b[0], (b[1] || 0) + 1), start_bounded: true, end_bounded: true, samples: 41, peak_w: 6800, basis: 'measured_power', ...o });
 const block = (day, a, b, verdict, o = {}) => ({ version: 'p1', start: at(day, ...a), end: at(day, ...b), limit: 16, unit: 'A', open_ended_in_profile: false,
   intent_uncertain_after: null, verdict, reasons: [], covered_fraction: 1, power_flow_overlap: verdict === 'flow_observed', meter_counter_kwh_inside: 0, meter_counter_kwh_unplaced_overlap: 0, ...o });
+// Stage 8.2a: the backend's spot-only block (no fees/taxes). Preview rows carry no price slices, so nothing is priced.
+const spotBlock = (o = {}) => ({ amount: null, currency: null, unit: 'major', major_unit: null, basis: 'unknown', price_basis: 'raw_published_spot_no_fees_no_taxes',
+  price_source: null, price_source_state: 'unknown', price_sources: [], priced_kwh: 0, unpriced_kwh: 8.2, unplaced_kwh: 0, unplaced_ambiguous_kwh: 0, unplaced_unknown_sessions: 1,
+  unallocated_kwh: 0, estimated_kwh: 0, energy_sources: {}, sessions: 1,
+  coverage: { state: 'none', complete: false, partial: false, priced_fraction: 0, reasons: ['unpriced_energy'], unpriced_reasons: { no_price_slice: 8.2 } }, currency_exclusions: null, ...o });
 const prov = { basis: 'recorder_register_pair', endpoint: null, when_delivered: 'unknown', note: '', window_seconds: 21600 };
 // A session evaluated against the register (late evidence kept) and one that never was (no stored record).
 const recon = (state, o = {}) => ({ state, reason: null, placed_kwh: 8.2, total_kwh: null, unplaced_late_kwh: null, placement: null, placement_reasons: [], final: false,
@@ -25,6 +30,7 @@ const recon = (state, o = {}) => ({ state, reason: null, placed_kwh: 8.2, total_
 const reconMissing = () => ({ state: 'unknown', reason: 'register_pair_missing', placed_kwh: 8.2, total_kwh: null, unplaced_late_kwh: null, placement: null, placement_reasons: [], final: false, provenance: prov });
 const session = (day, a, b, o = {}) => ({ id: `s-${day}`, start: at(day, ...a), end: at(day, ...b), energy_kwh: 8.2, energy_source: 'register', source: 'morek', started_by: 'auto',
   area_id: 'SAMPLE-1', cost: null, cost_basis: 'not_recomputed_here', price_slices: [], price_slices_truncated: false, price_slices_cut: 0, association: 'time_overlap_only',
+  spot_cost: spotBlock(), spot_cost_in_window: spotBlock({ allocation: 'price_interval_overlap_estimate' }),
   reconciliation: recon('consistent', { total_kwh: 8.2 }), overlapping_observed_intervals: 1, ...o });
 const retention = (oldestPower, digestDays = ['2026-11-05']) => ({ oldest_evidence: at('2026-10-30', 22), window_starts_before_oldest_evidence: false,
   oldest_by_kind: { power_w: oldestPower, current_a: null, energy_register_kwh: oldestPower, status: null }, digest_days: digestDays,
@@ -37,7 +43,7 @@ function base(charger, day, over) {
     plans: [], plans_truncated: false, truncated: noCuts(), price_snapshots: {},
     observed: { intervals: [], isolated_flow_samples: 0, coverage: coverage(0, 0), energy: energy(null, null), gaps: [], capture_restarts: [] },
     comparison: { planned_blocks: [], outside_plan: [], unknown_plan_spans: [], basis: 'acknowledged_intent_known_spans_only' },
-    sessions: [], digests: [], ...over };
+    sessions: [], digests: [], window_spot_cost: spotBlock({ sessions: 0, unpriced_kwh: 0, coverage: { state: 'no_sessions_recorded', complete: false, partial: false, priced_fraction: null, reasons: [], unpriced_reasons: {} }, allocation: 'price_interval_overlap_estimate', local_day: day, scope: 'closed sessions only; an open session is not included' }), ...over };
 }
 
 const plan = id => ({ id, acked_intent: true, intent: 'schedule', dispatch_state: 'ack_received', acked_at: at('2026-11-08', 1) });

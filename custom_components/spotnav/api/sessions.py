@@ -41,7 +41,12 @@ from ..sessions.inputs import local_zone
 from ..sessions.model import ChargeSession
 from ..sessions.store import RETENTION_DAYS
 from ..sessions.summary import (
+    DELIVERY_ACCOUNTING,
     available_months,
+    delivery_allocation,
+    delivery_days,
+    delivery_month_rows,
+    delivery_windows,
     month_bounds,
     month_days,
     month_key,
@@ -90,6 +95,10 @@ SESSIONS_RESPONSE_KEYS: Final = (
     "month_days",
     "month_sessions",
     "available_months",
+    "delivery_accounting",
+    "delivery_days",
+    "delivery_month_summary",
+    "delivery_month_days",
 )
 
 
@@ -107,6 +116,9 @@ def sessions_payload(
     today = now.astimezone(zone).date()
     chosen = month if month is not None else month_key(today)
     in_window = [m for m in available_months(sessions, zone) if m >= months_back(today, MONTH_LIMIT)]
+    # Stage 8.2a: delivery-day spot accounting, one allocation shared by the day rows and the month (read-only).
+    allocation = delivery_allocation(sessions, zone, delivery_windows(today, zone, chosen, DAY_LIMIT))
+    delivery_month, delivery_month_days = delivery_month_rows(allocation, chosen)
     return {
         "api_version": SESSIONS_API_VERSION,
         "charger_id": charger_id,
@@ -123,6 +135,10 @@ def sessions_payload(
         "month_days": month_days(sessions, zone, chosen),
         "month_sessions": [item.public(zone) for item in month_sessions(sessions, zone, chosen)],
         "available_months": in_window,
+        "delivery_accounting": DELIVERY_ACCOUNTING,
+        "delivery_days": delivery_days(allocation, today - timedelta(days=DAY_LIMIT - 1), today),
+        "delivery_month_summary": delivery_month,
+        "delivery_month_days": delivery_month_days,
     }
 
 

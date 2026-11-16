@@ -25,7 +25,7 @@ from typing import Any, Final
 from homeassistant.util import dt as dt_util
 
 from ..planning.planner import FiscalChoice
-from .costing import price_slices, Slice, subtract_slices
+from .costing import price_slices, Slice, session_spot_row, subtract_slices
 from .reconcile import clean_late, clean_pair
 
 #: Where a session's energy comes from: the charger's energy register, SpotNav's own integration of a
@@ -405,4 +405,6 @@ class ChargeSession:
             "reference_cost": None if reference is None else round(reference / 100, 4),
             "savings": None if savings is None else round(savings / 100, 4),
             "savings_estimate": True,
+            # Stage 8.2a: the spot-only cost of the placed energy (no fees or taxes), beside the fiscal fields above.
+            "spot_cost": session_spot_row(self, zone),
         }

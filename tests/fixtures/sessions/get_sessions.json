@@ -88,6 +88,1342 @@
       "solar_share": null
     }
   ],
+  "delivery_accounting": {
+    "allocation": "price_interval_overlap_estimate",
+    "day": "home_assistant_local_calendar_day",
+    "legacy_fields": "this_month, last_month, months, days, month_summary, month_days and sessions group a whole session on the local day it started and carry the person's fiscal cost; they are not delivery days",
+    "month": "sum_of_delivery_days",
+    "price_basis": "raw_published_spot_no_fees_no_taxes"
+  },
+  "delivery_days": [
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-21",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": 0.0,
+          "reasons": [
+            "currency_exclusions",
+            "unpriced_energy"
+          ],
+          "state": "none",
+          "unpriced_reasons": {
+            "no_price_slice": 11.0
+          }
+        },
+        "currency": "SEK",
+        "currency_exclusions": {
+          "currencies": {},
+          "kwh": 0.0,
+          "missing_currency_kwh": 0.0,
+          "sessions": 1
+        },
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": "kr",
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 2,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 1,
+        "unpriced_kwh": 11.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-20",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [
+            "currency_exclusions"
+          ],
+          "state": "none",
+          "unpriced_reasons": {}
+        },
+        "currency": null,
+        "currency_exclusions": {
+          "currencies": {},
+          "kwh": 0.0,
+          "missing_currency_kwh": 0.0,
+          "sessions": 1
+        },
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": null,
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 1,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 0,
+        "unpriced_kwh": 0.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-14",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": 0.0,
+          "reasons": [
+            "unpriced_energy"
+          ],
+          "state": "none",
+          "unpriced_reasons": {
+            "no_price_slice": 24.2
+          }
+        },
+        "currency": "SEK",
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": "kr",
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 1,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 1,
+        "unpriced_kwh": 24.2
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-02",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": 0.0,
+          "reasons": [
+            "unpriced_energy"
+          ],
+          "state": "none",
+          "unpriced_reasons": {
+            "no_price_slice": 21.0
+          }
+        },
+        "currency": "SEK",
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": "kr",
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 1,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 1,
+        "unpriced_kwh": 21.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-01",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [
+            "energy_without_placement_overlaps_period"
+          ],
+          "state": "none",
+          "unpriced_reasons": {}
+        },
+        "currency": "SEK",
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": "kr",
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 1,
+        "unallocated_kwh": 18.4,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 1,
+        "unpriced_kwh": 0.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-08-31",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [
+            "energy_without_placement_overlaps_period"
+          ],
+          "state": "none",
+          "unpriced_reasons": {}
+        },
+        "currency": "SEK",
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": "kr",
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 1,
+        "unallocated_kwh": 18.4,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 1,
+        "unpriced_kwh": 0.0
+      }
+    }
+  ],
+  "delivery_month_days": [
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-01",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [
+            "energy_without_placement_overlaps_period"
+          ],
+          "state": "none",
+          "unpriced_reasons": {}
+        },
+        "currency": "SEK",
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": "kr",
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 1,
+        "unallocated_kwh": 18.4,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 1,
+        "unpriced_kwh": 0.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-02",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": 0.0,
+          "reasons": [
+            "unpriced_energy"
+          ],
+          "state": "none",
+          "unpriced_reasons": {
+            "no_price_slice": 21.0
+          }
+        },
+        "currency": "SEK",
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": "kr",
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 1,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 1,
+        "unpriced_kwh": 21.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-03",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [],
+          "state": "no_sessions_recorded",
+          "unpriced_reasons": {}
+        },
+        "currency": null,
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": null,
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 0,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 0,
+        "unpriced_kwh": 0.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-04",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [],
+          "state": "no_sessions_recorded",
+          "unpriced_reasons": {}
+        },
+        "currency": null,
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": null,
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 0,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 0,
+        "unpriced_kwh": 0.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-05",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [],
+          "state": "no_sessions_recorded",
+          "unpriced_reasons": {}
+        },
+        "currency": null,
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": null,
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 0,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 0,
+        "unpriced_kwh": 0.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-06",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [],
+          "state": "no_sessions_recorded",
+          "unpriced_reasons": {}
+        },
+        "currency": null,
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": null,
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 0,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 0,
+        "unpriced_kwh": 0.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-07",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [],
+          "state": "no_sessions_recorded",
+          "unpriced_reasons": {}
+        },
+        "currency": null,
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": null,
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 0,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 0,
+        "unpriced_kwh": 0.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-08",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [],
+          "state": "no_sessions_recorded",
+          "unpriced_reasons": {}
+        },
+        "currency": null,
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": null,
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 0,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 0,
+        "unpriced_kwh": 0.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-09",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [],
+          "state": "no_sessions_recorded",
+          "unpriced_reasons": {}
+        },
+        "currency": null,
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": null,
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 0,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 0,
+        "unpriced_kwh": 0.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-10",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [],
+          "state": "no_sessions_recorded",
+          "unpriced_reasons": {}
+        },
+        "currency": null,
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": null,
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 0,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 0,
+        "unpriced_kwh": 0.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-11",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [],
+          "state": "no_sessions_recorded",
+          "unpriced_reasons": {}
+        },
+        "currency": null,
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": null,
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 0,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 0,
+        "unpriced_kwh": 0.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-12",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [],
+          "state": "no_sessions_recorded",
+          "unpriced_reasons": {}
+        },
+        "currency": null,
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": null,
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 0,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 0,
+        "unpriced_kwh": 0.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-13",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [],
+          "state": "no_sessions_recorded",
+          "unpriced_reasons": {}
+        },
+        "currency": null,
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": null,
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 0,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 0,
+        "unpriced_kwh": 0.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-14",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": 0.0,
+          "reasons": [
+            "unpriced_energy"
+          ],
+          "state": "none",
+          "unpriced_reasons": {
+            "no_price_slice": 24.2
+          }
+        },
+        "currency": "SEK",
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": "kr",
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 1,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 1,
+        "unpriced_kwh": 24.2
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-15",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [],
+          "state": "no_sessions_recorded",
+          "unpriced_reasons": {}
+        },
+        "currency": null,
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": null,
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 0,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 0,
+        "unpriced_kwh": 0.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-16",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [],
+          "state": "no_sessions_recorded",
+          "unpriced_reasons": {}
+        },
+        "currency": null,
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": null,
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 0,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 0,
+        "unpriced_kwh": 0.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-17",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [],
+          "state": "no_sessions_recorded",
+          "unpriced_reasons": {}
+        },
+        "currency": null,
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": null,
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 0,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 0,
+        "unpriced_kwh": 0.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-18",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [],
+          "state": "no_sessions_recorded",
+          "unpriced_reasons": {}
+        },
+        "currency": null,
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": null,
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 0,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 0,
+        "unpriced_kwh": 0.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-19",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [],
+          "state": "no_sessions_recorded",
+          "unpriced_reasons": {}
+        },
+        "currency": null,
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": null,
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 0,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 0,
+        "unpriced_kwh": 0.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-20",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [
+            "currency_exclusions"
+          ],
+          "state": "none",
+          "unpriced_reasons": {}
+        },
+        "currency": null,
+        "currency_exclusions": {
+          "currencies": {},
+          "kwh": 0.0,
+          "missing_currency_kwh": 0.0,
+          "sessions": 1
+        },
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": null,
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 1,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 0,
+        "unpriced_kwh": 0.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-21",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": 0.0,
+          "reasons": [
+            "currency_exclusions",
+            "unpriced_energy"
+          ],
+          "state": "none",
+          "unpriced_reasons": {
+            "no_price_slice": 11.0
+          }
+        },
+        "currency": "SEK",
+        "currency_exclusions": {
+          "currencies": {},
+          "kwh": 0.0,
+          "missing_currency_kwh": 0.0,
+          "sessions": 1
+        },
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": "kr",
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 2,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 1,
+        "unpriced_kwh": 11.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-22",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [],
+          "state": "no_sessions_recorded",
+          "unpriced_reasons": {}
+        },
+        "currency": null,
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": null,
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 0,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 0,
+        "unpriced_kwh": 0.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-23",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [],
+          "state": "no_sessions_recorded",
+          "unpriced_reasons": {}
+        },
+        "currency": null,
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": null,
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 0,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 0,
+        "unpriced_kwh": 0.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-24",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [],
+          "state": "no_sessions_recorded",
+          "unpriced_reasons": {}
+        },
+        "currency": null,
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": null,
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 0,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 0,
+        "unpriced_kwh": 0.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-25",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [],
+          "state": "no_sessions_recorded",
+          "unpriced_reasons": {}
+        },
+        "currency": null,
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": null,
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 0,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 0,
+        "unpriced_kwh": 0.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-26",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [],
+          "state": "no_sessions_recorded",
+          "unpriced_reasons": {}
+        },
+        "currency": null,
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": null,
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 0,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 0,
+        "unpriced_kwh": 0.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-27",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [],
+          "state": "no_sessions_recorded",
+          "unpriced_reasons": {}
+        },
+        "currency": null,
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": null,
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 0,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 0,
+        "unpriced_kwh": 0.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-28",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [],
+          "state": "no_sessions_recorded",
+          "unpriced_reasons": {}
+        },
+        "currency": null,
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": null,
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 0,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 0,
+        "unpriced_kwh": 0.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-29",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [],
+          "state": "no_sessions_recorded",
+          "unpriced_reasons": {}
+        },
+        "currency": null,
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": null,
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 0,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 0,
+        "unpriced_kwh": 0.0
+      }
+    },
+    {
+      "kind": "delivery_day",
+      "period": "2026-09-30",
+      "spot_cost": {
+        "allocation": "price_interval_overlap_estimate",
+        "amount": null,
+        "basis": "unknown",
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [],
+          "state": "no_sessions_recorded",
+          "unpriced_reasons": {}
+        },
+        "currency": null,
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": null,
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 0,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 0,
+        "unpriced_kwh": 0.0
+      }
+    }
+  ],
+  "delivery_month_summary": {
+    "kind": "delivery_month",
+    "period": "2026-09",
+    "spot_cost": {
+      "allocation": "price_interval_overlap_estimate",
+      "amount": null,
+      "basis": "unknown",
+      "coverage": {
+        "complete": false,
+        "partial": false,
+        "priced_fraction": 0.0,
+        "reasons": [
+          "currency_exclusions",
+          "energy_without_placement_overlaps_period",
+          "unpriced_energy"
+        ],
+        "state": "none",
+        "unpriced_reasons": {
+          "no_price_slice": 56.2
+        }
+      },
+      "currency": "SEK",
+      "currency_exclusions": {
+        "currencies": {},
+        "kwh": 9.5,
+        "missing_currency_kwh": 9.5,
+        "sessions": 1
+      },
+      "energy_sources": {},
+      "estimated_kwh": 0.0,
+      "major_unit": "kr",
+      "price_basis": "raw_published_spot_no_fees_no_taxes",
+      "price_source": null,
+      "price_source_state": "unknown",
+      "price_sources": [],
+      "priced_kwh": 0.0,
+      "sessions": 5,
+      "unallocated_kwh": 18.4,
+      "unit": "major",
+      "unplaced_ambiguous_kwh": 0.0,
+      "unplaced_kwh": 0.0,
+      "unplaced_unknown_sessions": 4,
+      "unpriced_kwh": 56.2
+    }
+  },
   "last_month": {
     "average_price_minor_per_kwh": 65.761,
     "cost": 12.1,
@@ -605,6 +1941,40 @@
       "savings_estimate": true,
       "solar_share": null,
       "source": null,
+      "spot_cost": {
+        "amount": null,
+        "basis": "unknown",
+        "by_delivery_day": [],
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": 0.0,
+          "reasons": [
+            "unpriced_energy"
+          ],
+          "state": "none",
+          "unpriced_reasons": {
+            "no_price_slice": 11.0
+          }
+        },
+        "currency": "SEK",
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": "kr",
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 1,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 1,
+        "unpriced_kwh": 11.0
+      },
       "start": "2026-09-21T07:00:00+02:00",
       "started_by": "other",
       "strategy": "cheapest",
@@ -628,6 +1998,43 @@
       "savings_estimate": true,
       "solar_share": null,
       "source": null,
+      "spot_cost": {
+        "amount": null,
+        "basis": "unknown",
+        "by_delivery_day": [],
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [
+            "currency_exclusions"
+          ],
+          "state": "none",
+          "unpriced_reasons": {}
+        },
+        "currency": null,
+        "currency_exclusions": {
+          "currencies": {},
+          "kwh": 9.5,
+          "missing_currency_kwh": 9.5,
+          "sessions": 1
+        },
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": null,
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 1,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 0,
+        "unpriced_kwh": 0.0
+      },
       "start": "2026-09-20T23:00:00+02:00",
       "started_by": "manual",
       "strategy": "cheapest",
@@ -651,6 +2058,40 @@
       "savings_estimate": true,
       "solar_share": 0.124,
       "source": null,
+      "spot_cost": {
+        "amount": null,
+        "basis": "unknown",
+        "by_delivery_day": [],
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": 0.0,
+          "reasons": [
+            "unpriced_energy"
+          ],
+          "state": "none",
+          "unpriced_reasons": {
+            "no_price_slice": 24.2
+          }
+        },
+        "currency": "SEK",
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": "kr",
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 1,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 1,
+        "unpriced_kwh": 24.2
+      },
       "start": "2026-09-14T06:00:00+02:00",
       "started_by": "hybrid",
       "strategy": "cheapest",
@@ -674,6 +2115,40 @@
       "savings_estimate": true,
       "solar_share": 0.905,
       "source": null,
+      "spot_cost": {
+        "amount": null,
+        "basis": "unknown",
+        "by_delivery_day": [],
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": 0.0,
+          "reasons": [
+            "unpriced_energy"
+          ],
+          "state": "none",
+          "unpriced_reasons": {
+            "no_price_slice": 21.0
+          }
+        },
+        "currency": "SEK",
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": "kr",
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 1,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 1,
+        "unpriced_kwh": 21.0
+      },
       "start": "2026-09-02T12:00:00+02:00",
       "started_by": "solar",
       "strategy": "solar",
@@ -748,6 +2223,41 @@
     "savings_estimate": true,
     "solar_share": null,
     "source": null,
+    "spot_cost": {
+      "amount": null,
+      "basis": "unknown",
+      "by_delivery_day": [],
+      "coverage": {
+        "complete": false,
+        "partial": false,
+        "priced_fraction": 0.0,
+        "reasons": [
+          "open_session",
+          "unpriced_energy"
+        ],
+        "state": "none",
+        "unpriced_reasons": {
+          "no_price_slice": 3.2
+        }
+      },
+      "currency": "SEK",
+      "currency_exclusions": null,
+      "energy_sources": {},
+      "estimated_kwh": 0.0,
+      "major_unit": "kr",
+      "price_basis": "raw_published_spot_no_fees_no_taxes",
+      "price_source": null,
+      "price_source_state": "unknown",
+      "price_sources": [],
+      "priced_kwh": 0.0,
+      "sessions": 1,
+      "unallocated_kwh": 0.0,
+      "unit": "major",
+      "unplaced_ambiguous_kwh": 0.0,
+      "unplaced_kwh": 0.0,
+      "unplaced_unknown_sessions": 1,
+      "unpriced_kwh": 3.2
+    },
     "start": "2026-09-22T11:30:00+02:00",
     "started_by": "manual",
     "strategy": "cheapest",
@@ -773,6 +2283,40 @@
       "savings_estimate": true,
       "solar_share": null,
       "source": null,
+      "spot_cost": {
+        "amount": null,
+        "basis": "unknown",
+        "by_delivery_day": [],
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": 0.0,
+          "reasons": [
+            "unpriced_energy"
+          ],
+          "state": "none",
+          "unpriced_reasons": {
+            "no_price_slice": 11.0
+          }
+        },
+        "currency": "SEK",
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": "kr",
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 1,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 1,
+        "unpriced_kwh": 11.0
+      },
       "start": "2026-09-21T07:00:00+02:00",
       "started_by": "other",
       "strategy": "cheapest",
@@ -796,6 +2340,43 @@
       "savings_estimate": true,
       "solar_share": null,
       "source": null,
+      "spot_cost": {
+        "amount": null,
+        "basis": "unknown",
+        "by_delivery_day": [],
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": null,
+          "reasons": [
+            "currency_exclusions"
+          ],
+          "state": "none",
+          "unpriced_reasons": {}
+        },
+        "currency": null,
+        "currency_exclusions": {
+          "currencies": {},
+          "kwh": 9.5,
+          "missing_currency_kwh": 9.5,
+          "sessions": 1
+        },
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": null,
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 1,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 0,
+        "unpriced_kwh": 0.0
+      },
       "start": "2026-09-20T23:00:00+02:00",
       "started_by": "manual",
       "strategy": "cheapest",
@@ -819,6 +2400,40 @@
       "savings_estimate": true,
       "solar_share": 0.124,
       "source": null,
+      "spot_cost": {
+        "amount": null,
+        "basis": "unknown",
+        "by_delivery_day": [],
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": 0.0,
+          "reasons": [
+            "unpriced_energy"
+          ],
+          "state": "none",
+          "unpriced_reasons": {
+            "no_price_slice": 24.2
+          }
+        },
+        "currency": "SEK",
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": "kr",
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 1,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 1,
+        "unpriced_kwh": 24.2
+      },
       "start": "2026-09-14T06:00:00+02:00",
       "started_by": "hybrid",
       "strategy": "cheapest",
@@ -842,6 +2457,40 @@
       "savings_estimate": true,
       "solar_share": 0.905,
       "source": null,
+      "spot_cost": {
+        "amount": null,
+        "basis": "unknown",
+        "by_delivery_day": [],
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": 0.0,
+          "reasons": [
+            "unpriced_energy"
+          ],
+          "state": "none",
+          "unpriced_reasons": {
+            "no_price_slice": 21.0
+          }
+        },
+        "currency": "SEK",
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": "kr",
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 1,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 1,
+        "unpriced_kwh": 21.0
+      },
       "start": "2026-09-02T12:00:00+02:00",
       "started_by": "solar",
       "strategy": "solar",
@@ -865,6 +2514,40 @@
       "savings_estimate": true,
       "solar_share": null,
       "source": null,
+      "spot_cost": {
+        "amount": null,
+        "basis": "unknown",
+        "by_delivery_day": [],
+        "coverage": {
+          "complete": false,
+          "partial": false,
+          "priced_fraction": 0.0,
+          "reasons": [
+            "unpriced_energy"
+          ],
+          "state": "none",
+          "unpriced_reasons": {
+            "no_price_slice": 18.4
+          }
+        },
+        "currency": "SEK",
+        "currency_exclusions": null,
+        "energy_sources": {},
+        "estimated_kwh": 0.0,
+        "major_unit": "kr",
+        "price_basis": "raw_published_spot_no_fees_no_taxes",
+        "price_source": null,
+        "price_source_state": "unknown",
+        "price_sources": [],
+        "priced_kwh": 0.0,
+        "sessions": 1,
+        "unallocated_kwh": 0.0,
+        "unit": "major",
+        "unplaced_ambiguous_kwh": 0.0,
+        "unplaced_kwh": 0.0,
+        "unplaced_unknown_sessions": 1,
+        "unpriced_kwh": 18.4
+      },
       "start": "2026-08-31T22:30:00+02:00",
       "started_by": "plan_window",
       "strategy": "cheapest",
