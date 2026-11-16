@@ -157,7 +157,7 @@ describe('history day: validation of the wire', () => {
   it('malformed rows fall back to invalid, never a partial render', async () => {
     const bad = await html('2026-11-09', async p => answerFor('2026-11-09', x => { x.sessions = [null]; }));
     expect(bad).toContain('data-history-state="invalid"');
-    expect(bad).not.toContain('data-history-section');
+    expect(bad).not.toMatch(/data-history-section="(cost|sessions|sent|flow|energy|coverage)"/);
   });
 });
 

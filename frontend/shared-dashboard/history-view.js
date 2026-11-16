@@ -18,6 +18,18 @@ const basisValue = r => r.value === null ? 'Unavailable' : e(r.text.slice(r.labe
 /** Energy bases side by side, each with its own coverage; nothing is added up here. */
 const energy = m => `<div class="history-energy" aria-label="Energy by basis">${m.energyRows.map(r => `<div class="history-basis" data-basis-value="${r.value === null ? 'null' : r.value}"><b>${e(r.label)}</b><span>${basisValue(r)}</span><small>${e(r.detail)}</small></div>`).join('')}<div class="history-basis"><b>Recorder-placed session energy</b><span>${m.sessions.length ? 'Per session below' : 'No session overlaps this day'}</span><small>Never added to the bases beside it</small></div></div>${list(m.energyNotes, t => row(t))}`;
 
+const costBlock = (c, cls = '') => `<div class="history-basis${cls}" data-spot-cost="${e(c.state)}"><b>${e(c.headline)}</b>${c.lines.map(l => `<small>${e(l)}</small>`).join('')}</div>`;
+
+/** Spot-only cost of the closed sessions in one month (Stage 8.2b): a month selector and the backend's month and delivery-day figures. */
+function renderMonthCost(m) {
+  const picker = m.options?.length ? `<label class="history-date">Month <select data-history-month aria-label="Spot cost month">${m.options.map(o => `<option value="${e(o.value)}" ${o.selected ? 'selected' : ''}>${e(o.label)}</option>`).join('')}</select></label>` : '';
+  let body;
+  if (m.state === 'ready') {
+    body = `${costBlock(m.total)}${m.days.length ? `<h4>Days with a recorded session (delivery day, Home Assistant time)</h4>${list(m.days, d => row(d.text, '', `spot-${d.state}`))}` : ''}${m.emptyDays ? `<p class="subtext">${m.emptyDays} day(s) with no recorded session: no cost shown for them (not zero, not proof that nothing was charged).</p>` : ''}`;
+  } else body = banner(m.state === 'error' ? 'error' : m.state === 'invalid' ? 'invalid' : m.state === 'legacy' ? 'legacy' : 'loading', m.message);
+  return `<section data-history-section="month-cost" data-month-cost-state="${e(m.state)}"><h3>Spot cost by month</h3>${picker}${body}</section>`;
+}
+
 function renderDigest(d) {
   const lists = [d.flow.length ? `<h4>Flow intervals in the summary</h4>${list(d.flow, i => row(i.text, i.detail))}` : '',
     d.blocks.length ? `<h4>Sent-plan blocks in the summary</h4>${list(d.blocks, b => row(`${b.text} — ${b.verdictText}`, '', `verdict-${b.verdict}`))}` : '',
@@ -29,7 +41,8 @@ function renderDigest(d) {
 /** One local day of charging history (Stage 7.3a): states are drawn distinctly; nothing here sends or changes anything. */
 export function renderHistoryDay(m) {
   const head = renderHistoryNav(m.nav);
-  if (m.state !== 'ready') return `<div class="history-day" data-history-state="${e(m.state)}">${head}${banner(m.state, m.message)}</div>`;
+  const month = m.monthCost ? renderMonthCost(m.monthCost) : '';
+  if (m.state !== 'ready') return `<div class="history-day" data-history-state="${e(m.state)}">${head}${banner(m.state, m.message)}${month}</div>`;
   const rawBanners = { digest_only: 'digest', plan_only: 'no-power', none: 'none', partial: 'partial-raw', unknown: 'unknown-raw' };
   const parts = [head];
   if (rawBanners[m.raw]) parts.push(banner(rawBanners[m.raw], m.rawNote));
@@ -47,9 +60,11 @@ export function renderHistoryDay(m) {
     parts.push(`<section data-history-section="flow"><h3>Measured flow</h3>${m.flow.length ? list(m.flow, i => row(i.text, i.detail)) : '<p class="subtext">No flow interval was found in the measured rows that exist; the coverage line says what was not measured.</p>'}${list(m.outside, x => row(x.text, '', `outside-${x.kind}`))}${m.isolated ? `<p class="subtext">${e(m.isolated)}</p>` : ''}<p class="subtext">${e(m.flowNote)}</p></section>`);
     parts.push(`<section data-history-section="energy"><h3>Energy by basis</h3>${energy(m)}</section>`);
   }
+  parts.push(`<section data-history-section="cost"><h3>Spot cost of this day</h3>${costBlock(m.cost)}</section>`);
   if (!m.sessions.length && m.raw !== 'digest_only') parts.push('<section data-history-section="sessions"><h3>Sessions overlapping this day</h3><p class="subtext" data-history-empty="sessions">No session was recorded for this day by the Morek recorder (whether it records every session is unverified). That is not proof that the car did not charge.</p></section>');
-  if (m.sessions.length) parts.push(`<section data-history-section="sessions"><h3>Sessions overlapping this day</h3><ul class="history-list">${m.sessions.map(s => `<li>${e(s.text)}<small>${e(s.detail)}</small>${s.lines.map(l => `<small class="history-recon">${e(l)}</small>`).join('')}</li>`).join('')}</ul><p class="subtext">A session that crosses midnight appears on both days; its energy is not split.</p></section>`);
+  if (m.sessions.length) parts.push(`<section data-history-section="sessions"><h3>Sessions overlapping this day</h3><ul class="history-list">${m.sessions.map(s => `<li>${e(s.text)}<small>${e(s.detail)}</small>${s.lines.map(l => `<small class="history-recon">${e(l)}</small>`).join('')}${s.costLines.map(l => `<small class="history-cost">${e(l)}</small>`).join('')}</li>`).join('')}</ul><p class="subtext">A session that crosses midnight appears on both days; its placed energy is not split above, but its spot cost for this day is the share that fell on this day.</p></section>`);
   if (m.gaps.length || m.restarts.length) parts.push(`<section data-history-section="gaps"><h3>Capture gaps and restarts</h3>${list(m.gaps.slice(0, 5), t => row(`Gap: ${t}`))}${m.gaps.length > 5 ? `<p class="subtext">${m.gaps.length - 5} more gap(s) not listed.</p>` : ''}${m.restarts.length ? `<p class="subtext">Capture (re)started at ${m.restarts.slice(0, 5).map(e).join(', ')}${m.restarts.length > 5 ? ` and ${m.restarts.length - 5} more` : ''}.</p>` : ''}</section>`);
+  if (month) parts.push(month);
   parts.push(`<p class="subtext history-retention">${e(m.retentionNote)}${m.retention.oldestPower ? ` Measured power rows currently begin ${e(m.retention.oldestPower)}.` : ''}${m.retention.digestDays !== null ? ` ${m.retention.digestDays} day summary(ies) are kept.` : ''}</p>`);
   return `<div class="history-day" data-history-state="ready" data-history-raw="${e(m.raw)}">${parts.join('')}</div>`;
 }

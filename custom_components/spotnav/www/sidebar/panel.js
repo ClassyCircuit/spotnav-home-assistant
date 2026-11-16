@@ -2183,26 +2183,26 @@ var init_chunk_M45NRQFW = __esm({
       noResults: "No matching results",
       notCompleted: "Not completed",
       now: "Now",
-      numCharacters: (num5) => {
-        if (num5 === 1) return "1 character";
-        return `${num5} characters`;
+      numCharacters: (num6) => {
+        if (num6 === 1) return "1 character";
+        return `${num6} characters`;
       },
-      numCharactersRemaining: (num5) => {
-        if (num5 === 1) return "1 character remaining";
-        return `${num5} characters remaining`;
+      numCharactersRemaining: (num6) => {
+        if (num6 === 1) return "1 character remaining";
+        return `${num6} characters remaining`;
       },
-      numOptionsAvailable: (num5) => {
-        if (num5 === 0) return "No options available";
-        if (num5 === 1) return "1 option available";
-        return `${num5} options available`;
+      numOptionsAvailable: (num6) => {
+        if (num6 === 0) return "No options available";
+        if (num6 === 1) return "1 option available";
+        return `${num6} options available`;
       },
-      numOptionsSelected: (num5) => {
-        if (num5 === 0) return "No options selected";
-        if (num5 === 1) return "1 option selected";
-        return `${num5} options selected`;
+      numOptionsSelected: (num6) => {
+        if (num6 === 0) return "No options selected";
+        if (num6 === 1) return "1 option selected";
+        return `${num6} options selected`;
       },
-      numRowsCopied: (num5) => num5 === 1 ? "1 row copied" : `${num5} rows copied`,
-      numRowsSelected: (num5) => num5 === 1 ? "1 row selected" : `${num5} rows selected`,
+      numRowsCopied: (num6) => num6 === 1 ? "1 row copied" : `${num6} rows copied`,
+      numRowsSelected: (num6) => num6 === 1 ? "1 row selected" : `${num6} rows selected`,
       optionPosition: (label2, position, total2) => `${label2}, ${position} of ${total2}`,
       optionsLoadError: "Options could not be loaded",
       pageXOfY: (page, total2) => `Page ${page} of ${total2}`,
@@ -21471,8 +21471,8 @@ function makeValueReadable(value2, valueType, useUTC) {
   function stringToUserReadable(str) {
     return str && trim(str) ? str : "-";
   }
-  function isNumberUserReadable(num5) {
-    return isNullableNumberFinite(num5);
+  function isNumberUserReadable(num6) {
+    return isNullableNumberFinite(num6);
   }
   var isTypeTime = valueType === "time";
   var isValueDate = value2 instanceof Date;
@@ -28548,8 +28548,8 @@ function normalizeSymbolOffset(symbolOffset, symbolSize) {
 }
 
 // node_modules/zrender/lib/canvas/helper.js
-function isSafeNum(num5) {
-  return isFinite(num5);
+function isSafeNum(num6) {
+  return isFinite(num6);
 }
 function createLinearGradient(ctx, obj, rect) {
   var x2 = obj.x == null ? 0 : obj.x;
@@ -52818,6 +52818,15 @@ function renderHistoryNav(nav) {
 var banner = (kind, text4) => `<p class="history-banner" data-history-banner="${escapeText(kind)}" role="status">${escapeText(text4)}</p>`;
 var basisValue = (r7) => r7.value === null ? "Unavailable" : escapeText(r7.text.slice(r7.label.length + 2));
 var energy2 = (m4) => `<div class="history-energy" aria-label="Energy by basis">${m4.energyRows.map((r7) => `<div class="history-basis" data-basis-value="${r7.value === null ? "null" : r7.value}"><b>${escapeText(r7.label)}</b><span>${basisValue(r7)}</span><small>${escapeText(r7.detail)}</small></div>`).join("")}<div class="history-basis"><b>Recorder-placed session energy</b><span>${m4.sessions.length ? "Per session below" : "No session overlaps this day"}</span><small>Never added to the bases beside it</small></div></div>${list(m4.energyNotes, (t6) => row(t6))}`;
+var costBlock = (c5, cls = "") => `<div class="history-basis${cls}" data-spot-cost="${escapeText(c5.state)}"><b>${escapeText(c5.headline)}</b>${c5.lines.map((l6) => `<small>${escapeText(l6)}</small>`).join("")}</div>`;
+function renderMonthCost(m4) {
+  const picker = m4.options?.length ? `<label class="history-date">Month <select data-history-month aria-label="Spot cost month">${m4.options.map((o9) => `<option value="${escapeText(o9.value)}" ${o9.selected ? "selected" : ""}>${escapeText(o9.label)}</option>`).join("")}</select></label>` : "";
+  let body;
+  if (m4.state === "ready") {
+    body = `${costBlock(m4.total)}${m4.days.length ? `<h4>Days with a recorded session (delivery day, Home Assistant time)</h4>${list(m4.days, (d3) => row(d3.text, "", `spot-${d3.state}`))}` : ""}${m4.emptyDays ? `<p class="subtext">${m4.emptyDays} day(s) with no recorded session: no cost shown for them (not zero, not proof that nothing was charged).</p>` : ""}`;
+  } else body = banner(m4.state === "error" ? "error" : m4.state === "invalid" ? "invalid" : m4.state === "legacy" ? "legacy" : "loading", m4.message);
+  return `<section data-history-section="month-cost" data-month-cost-state="${escapeText(m4.state)}"><h3>Spot cost by month</h3>${picker}${body}</section>`;
+}
 function renderDigest(d3) {
   const lists = [
     d3.flow.length ? `<h4>Flow intervals in the summary</h4>${list(d3.flow, (i7) => row(i7.text, i7.detail))}` : "",
@@ -52829,7 +52838,8 @@ function renderDigest(d3) {
 }
 function renderHistoryDay(m4) {
   const head = renderHistoryNav(m4.nav);
-  if (m4.state !== "ready") return `<div class="history-day" data-history-state="${escapeText(m4.state)}">${head}${banner(m4.state, m4.message)}</div>`;
+  const month = m4.monthCost ? renderMonthCost(m4.monthCost) : "";
+  if (m4.state !== "ready") return `<div class="history-day" data-history-state="${escapeText(m4.state)}">${head}${banner(m4.state, m4.message)}${month}</div>`;
   const rawBanners = { digest_only: "digest", plan_only: "no-power", none: "none", partial: "partial-raw", unknown: "unknown-raw" };
   const parts = [head];
   if (rawBanners[m4.raw]) parts.push(banner(rawBanners[m4.raw], m4.rawNote));
@@ -52847,9 +52857,11 @@ function renderHistoryDay(m4) {
     parts.push(`<section data-history-section="flow"><h3>Measured flow</h3>${m4.flow.length ? list(m4.flow, (i7) => row(i7.text, i7.detail)) : '<p class="subtext">No flow interval was found in the measured rows that exist; the coverage line says what was not measured.</p>'}${list(m4.outside, (x2) => row(x2.text, "", `outside-${x2.kind}`))}${m4.isolated ? `<p class="subtext">${escapeText(m4.isolated)}</p>` : ""}<p class="subtext">${escapeText(m4.flowNote)}</p></section>`);
     parts.push(`<section data-history-section="energy"><h3>Energy by basis</h3>${energy2(m4)}</section>`);
   }
+  parts.push(`<section data-history-section="cost"><h3>Spot cost of this day</h3>${costBlock(m4.cost)}</section>`);
   if (!m4.sessions.length && m4.raw !== "digest_only") parts.push('<section data-history-section="sessions"><h3>Sessions overlapping this day</h3><p class="subtext" data-history-empty="sessions">No session was recorded for this day by the Morek recorder (whether it records every session is unverified). That is not proof that the car did not charge.</p></section>');
-  if (m4.sessions.length) parts.push(`<section data-history-section="sessions"><h3>Sessions overlapping this day</h3><ul class="history-list">${m4.sessions.map((s4) => `<li>${escapeText(s4.text)}<small>${escapeText(s4.detail)}</small>${s4.lines.map((l6) => `<small class="history-recon">${escapeText(l6)}</small>`).join("")}</li>`).join("")}</ul><p class="subtext">A session that crosses midnight appears on both days; its energy is not split.</p></section>`);
+  if (m4.sessions.length) parts.push(`<section data-history-section="sessions"><h3>Sessions overlapping this day</h3><ul class="history-list">${m4.sessions.map((s4) => `<li>${escapeText(s4.text)}<small>${escapeText(s4.detail)}</small>${s4.lines.map((l6) => `<small class="history-recon">${escapeText(l6)}</small>`).join("")}${s4.costLines.map((l6) => `<small class="history-cost">${escapeText(l6)}</small>`).join("")}</li>`).join("")}</ul><p class="subtext">A session that crosses midnight appears on both days; its placed energy is not split above, but its spot cost for this day is the share that fell on this day.</p></section>`);
   if (m4.gaps.length || m4.restarts.length) parts.push(`<section data-history-section="gaps"><h3>Capture gaps and restarts</h3>${list(m4.gaps.slice(0, 5), (t6) => row(`Gap: ${t6}`))}${m4.gaps.length > 5 ? `<p class="subtext">${m4.gaps.length - 5} more gap(s) not listed.</p>` : ""}${m4.restarts.length ? `<p class="subtext">Capture (re)started at ${m4.restarts.slice(0, 5).map(escapeText).join(", ")}${m4.restarts.length > 5 ? ` and ${m4.restarts.length - 5} more` : ""}.</p>` : ""}</section>`);
+  if (month) parts.push(month);
   parts.push(`<p class="subtext history-retention">${escapeText(m4.retentionNote)}${m4.retention.oldestPower ? ` Measured power rows currently begin ${escapeText(m4.retention.oldestPower)}.` : ""}${m4.retention.digestDays !== null ? ` ${m4.retention.digestDays} day summary(ies) are kept.` : ""}</p>`);
   return `<div class="history-day" data-history-state="ready" data-history-raw="${escapeText(m4.raw)}">${parts.join("")}</div>`;
 }
@@ -53203,6 +53215,9 @@ function mountDashboard(root, adapter) {
       if (input.value) current.actions?.historyNav?.("day", input.value);
     }, { signal })));
     root.querySelectorAll("[data-insight-duration]").forEach((select) => bind3(select, () => select.addEventListener("change", () => current.actions?.insightNav?.("duration", Number(select.value)), { signal })));
+    root.querySelectorAll("[data-history-month]").forEach((select) => bind3(select, () => select.addEventListener("change", () => {
+      if (select.value) current.actions?.historyNav?.("month", select.value);
+    }, { signal })));
     root.querySelectorAll("[data-insight-month]").forEach((select) => bind3(select, () => select.addEventListener("change", () => {
       if (select.value) current.actions?.insightNav?.("month", select.value);
     }, { signal })));
@@ -58137,12 +58152,150 @@ function createPriceDays({ request, onChange = () => {
   };
 }
 
+// shared-dashboard/spot-cost.js
+var SPOT_PRICE_BASIS = "raw_published_spot_no_fees_no_taxes";
+var BASIS = { recorded_price_slices: "recorded price slices", retained_price_intervals: "retained price intervals", mixed: "recorded slices and retained prices", unknown: "unknown" };
+var STATES2 = ["complete", "partial", "none", "no_sessions_recorded"];
+var REASON = {
+  no_price_slice: "no price slice stored",
+  untrusted_rate: "exchange rate not trusted",
+  missing_currency: "no currency stored",
+  conflicting_slice: "conflicting price slices",
+  unpriced_energy: "energy without a price",
+  energy_without_placement_overlaps_period: "energy with no recorded time overlaps this period",
+  unplaced_late_energy_not_priced: "late energy with no known time is not priced",
+  currency_exclusions: "energy in another currency is left out",
+  open_session: "a charge is still running",
+  rows_truncated: "the list of sessions is cut",
+  conflicting_slices: "conflicting price slices",
+  slice_energy_exceeds_session_energy: "price slices exceed the session energy",
+  invalid_slices: "unreadable price slices",
+  duplicate_slices: "duplicate price slices"
+};
+var words = (text4) => String(text4 ?? "unknown").replace(/_/g, " ");
+var num = (v2) => typeof v2 === "number" && Number.isFinite(v2);
+var nonneg = (v2) => num(v2) && v2 >= 0;
+var kwhText = (v2) => nonneg(v2) ? `${v2.toFixed(v2 < 10 ? 2 : 1)} kWh` : "unknown";
+var pct = (v2) => `${Math.round(v2 * 100)}%`;
+function formatMoney(amount, currency, majorUnit) {
+  if (!num(amount)) return "unknown";
+  const digits = amount !== 0 && Math.abs(amount) < 5e-3 ? 4 : 2;
+  if (typeof currency === "string" && /^[A-Z]{3}$/.test(currency)) {
+    try {
+      return new Intl.NumberFormat("en-GB", { style: "currency", currency, minimumFractionDigits: digits, maximumFractionDigits: digits }).format(amount);
+    } catch {
+    }
+  }
+  return `${amount.toFixed(digits)} ${typeof majorUnit === "string" && majorUnit ? majorUnit : currency || "(currency unknown)"}`;
+}
+function parseSpotCost(b3) {
+  if (!b3 || typeof b3 !== "object" || b3.price_basis !== SPOT_PRICE_BASIS || b3.unit !== "major") return null;
+  const c5 = b3.coverage;
+  if (!c5 || typeof c5 !== "object" || !STATES2.includes(c5.state) || !Array.isArray(c5.reasons) || !(b3.basis in BASIS)) return null;
+  if (!(b3.amount === null || num(b3.amount)) || !(b3.currency === null || typeof b3.currency === "string")) return null;
+  if (b3.amount !== null && !b3.currency) return null;
+  if (!["priced_kwh", "unpriced_kwh", "unplaced_kwh", "unallocated_kwh"].every((k2) => nonneg(b3[k2]))) return null;
+  if (b3.amount !== null && !(b3.priced_kwh > 0)) return null;
+  const ex = b3.currency_exclusions;
+  if (!(ex === null || ex === void 0 || typeof ex === "object" && nonneg(ex.kwh))) return null;
+  return b3;
+}
+var sourceText = (b3) => {
+  const named = typeof b3.price_source === "string" && b3.price_source ? [b3.price_source] : Array.isArray(b3.price_sources) ? b3.price_sources.filter((s4) => typeof s4 === "string" && s4) : [];
+  if (named.length) return `Price source: ${named.join(", ")}.`;
+  return b3.price_source_state === "not_recorded" ? "Spot price source not recorded for these slices." : "Spot price source unknown.";
+};
+function describeSpotCost(raw, scope = "day") {
+  const b3 = parseSpotCost(raw);
+  if (!b3) return { state: "invalid", amount: null, headline: "Spot cost not shown: the answer could not be understood.", brief: "not shown (could not be understood)", lines: [] };
+  const state = b3.coverage.state, money3 = formatMoney(b3.amount, b3.currency, b3.major_unit);
+  const total2 = b3.priced_kwh + b3.unpriced_kwh;
+  const lines4 = [];
+  let headline, brief;
+  if (state === "no_sessions_recorded") {
+    headline = `No session recorded for this ${scope}: no cost to show (that is not zero cost and not proof that nothing was charged).`;
+    brief = "no session recorded";
+  } else if (b3.amount === null) {
+    headline = `Spot cost unknown: no energy could be priced${b3.unpriced_kwh > 0 ? ` (${kwhText(b3.unpriced_kwh)} unpriced)` : ""}.`;
+    brief = "unknown (no priced energy)";
+  } else if (state === "partial") {
+    headline = `Partial spot cost ${money3} for ${kwhText(b3.priced_kwh)} priced; ${kwhText(b3.unpriced_kwh)} unpriced. This is not a complete total.`;
+    brief = `${money3} partial (${kwhText(b3.priced_kwh)} priced)`;
+  } else {
+    headline = `Spot cost ${money3}${b3.allocation ? " (estimate)" : ""} for ${kwhText(b3.priced_kwh)} priced.`;
+    brief = `${money3}${b3.allocation ? " (estimate)" : ""}`;
+  }
+  if (b3.amount !== null && b3.amount < 0) lines4.push("Negative: prices were below zero, so this is a net credit, not an error.");
+  if (state !== "no_sessions_recorded") {
+    lines4.push(`Basis: ${BASIS[b3.basis]}. Spot price only: raw published price, no fees, taxes or margin. ${sourceText(b3)}`);
+    if (b3.allocation) lines4.push("Allocation is an estimate: each price interval\u2019s energy is split by the elapsed time that falls inside the period.");
+    if (b3.coverage.priced_fraction !== null && b3.coverage.priced_fraction !== void 0 && num(b3.coverage.priced_fraction)) lines4.push(`Coverage: ${pct(b3.coverage.priced_fraction)} of ${kwhText(total2)} placed energy priced across ${b3.sessions ?? "?"} session(s).`);
+    const reasons = Object.entries(b3.coverage.unpriced_reasons || {}).filter(([, v2]) => nonneg(v2) && v2 > 0).map(([k2, v2]) => `${REASON[k2] || words(k2)} ${kwhText(v2)}`);
+    if (reasons.length) lines4.push(`Unpriced because: ${reasons.join("; ")}.`);
+    const flags = (b3.coverage.reasons || []).filter((r7) => REASON[r7] && !/^(unpriced_energy)$/.test(r7)).map((r7) => REASON[r7]);
+    if (flags.length) lines4.push(`Notes: ${flags.join("; ")}.`);
+    if (b3.unplaced_kwh > 0) lines4.push(`Late energy with no known time ${kwhText(b3.unplaced_kwh)}: not priced and not in this cost.`);
+    if (nonneg(b3.unplaced_ambiguous_kwh) && b3.unplaced_ambiguous_kwh > 0) lines4.push(`Late energy ${kwhText(b3.unplaced_ambiguous_kwh)} of sessions crossing the edge of this ${scope}: not summed, not priced.`);
+    if (nonneg(b3.unplaced_unknown_sessions) && b3.unplaced_unknown_sessions > 0) lines4.push(`${b3.unplaced_unknown_sessions} session(s) may hold late energy of unknown size.`);
+    if (b3.unallocated_kwh > 0) lines4.push(`${kwhText(b3.unallocated_kwh)} of a session that crosses the edge has no price interval and cannot be assigned to this ${scope}: left out, not zero.`);
+    const x2 = b3.currency_exclusions;
+    if (x2 && x2.kwh > 0) lines4.push(`Left out: ${kwhText(x2.kwh)} in ${Object.keys(x2.currencies || {}).join(", ") || "no stored currency"}${nonneg(x2.missing_currency_kwh) && x2.missing_currency_kwh > 0 ? ` (${kwhText(x2.missing_currency_kwh)} with no currency)` : ""}; currencies are never added or converted.`);
+  }
+  return { state: state === "no_sessions_recorded" ? state : b3.amount === null ? "none" : state, amount: b3.amount, headline, brief, lines: lines4 };
+}
+function sessionCostLines(s4, crossesDays) {
+  const inDay = s4.spot_cost_in_window === void 0 ? void 0 : describeSpotCost(s4.spot_cost_in_window, "day");
+  const whole2 = s4.spot_cost === void 0 ? void 0 : describeSpotCost(s4.spot_cost, "session");
+  if (inDay === void 0 && whole2 === void 0) return ["Spot cost not reported by this integration (not zero)."];
+  const out2 = [];
+  if (inDay) out2.push(`Spot cost in this day: ${inDay.brief}`);
+  const same = s4.spot_cost && s4.spot_cost_in_window && s4.spot_cost.amount === s4.spot_cost_in_window.amount && s4.spot_cost.priced_kwh === s4.spot_cost_in_window.priced_kwh && s4.spot_cost.unpriced_kwh === s4.spot_cost_in_window.unpriced_kwh;
+  if (whole2 && (crossesDays || !inDay || !same)) out2.push(`Whole session${crossesDays ? " (crosses midnight; not this day\u2019s cost)" : ""}: ${whole2.brief}`);
+  return out2;
+}
+var DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+var MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+var monthKey = (day) => typeof day === "string" && DAY_RE.test(day) ? day.slice(0, 7) : null;
+var monthName = (month) => {
+  const m4 = MONTH_RE.exec(month || "");
+  return m4 ? new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", month: "long", year: "numeric" }).format(Date.UTC(+month.slice(0, 4), +month.slice(5, 7) - 1, 1)) : "Unknown month";
+};
+function parseDeliveryMonth(answer, charger, expected = null) {
+  if (!answer || typeof answer !== "object" || answer.api_version !== 1 || answer.charger_id !== charger) return null;
+  const available = Array.isArray(answer.available_months) ? answer.available_months.filter((m4) => typeof m4 === "string" && MONTH_RE.test(m4)) : [];
+  if (!("delivery_month_summary" in answer) && !("delivery_month_days" in answer)) return { legacy: true, month: MONTH_RE.test(answer.month || "") ? answer.month : expected, available };
+  const month = answer.month, s4 = answer.delivery_month_summary, days = answer.delivery_month_days;
+  if (typeof month !== "string" || !MONTH_RE.test(month) || expected && month !== expected || !s4 || typeof s4 !== "object" || s4.kind !== "delivery_month" || s4.period !== month || !Array.isArray(days) || days.length > 31) return null;
+  if (!days.every((d3) => d3 && d3.kind === "delivery_day" && typeof d3.period === "string" && DAY_RE.test(d3.period) && d3.period.startsWith(`${month}-`))) return null;
+  return { legacy: false, month, available, month_block: s4.spot_cost, days: days.map((d3) => ({ period: d3.period, block: d3.spot_cost })), open: answer.open !== null && answer.open !== void 0 && typeof answer.open === "object" };
+}
+function monthCostModel(parsed, { isCurrent }) {
+  if (!parsed) return { state: "invalid", message: "The month\u2019s spot cost could not be understood and was not shown." };
+  if (parsed.legacy) return { state: "legacy", message: "This integration does not report spot-only cost by month, so none is shown. Its older cost fields include fees and taxes and are not shown here." };
+  const total2 = describeSpotCost(parsed.month_block, "month");
+  const lines4 = [...total2.lines];
+  const b3 = parseSpotCost(parsed.month_block);
+  if (b3 && (b3.unpriced_kwh > 0 || b3.unallocated_kwh > 0 || b3.unplaced_kwh > 0)) lines4.push("The month can hold energy with no recorded time; it counts for the month but for no single day, so the days below need not add up to the month\u2019s unpriced energy.");
+  if (parsed.open && isCurrent) lines4.push("A charge is running now; this summary covers closed sessions only and leaves it out.");
+  const rows = parsed.days.map((d3) => ({ day: d3.period, ...describeSpotCost(d3.block, "day") }));
+  const withSessions = rows.filter((r7) => r7.state !== "no_sessions_recorded");
+  return {
+    state: "ready",
+    month: parsed.month,
+    total: { ...total2, lines: lines4 },
+    days: withSessions.map((r7) => ({ day: r7.day, text: `${r7.day.slice(8)}: ${r7.brief}`, state: r7.state })),
+    emptyDays: rows.length - withSessions.length
+  };
+}
+
 // shared-dashboard/history-day.js
 var HISTORY_DAYS_BACK = 62;
 var REFRESH_TODAY_MS = 3e5;
 var PARTIAL_AFTER_S = 660;
 var MINUTE = 6e4;
-var DAY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+var MONTH_CACHE = 3;
+var MONTHS_BACK = 24;
+var DAY_RE2 = /^(\d{4})-(\d{2})-(\d{2})$/;
 var ZONE_FAILED = "Charging history needs the Home Assistant time zone, which is unknown here.";
 var LISTS = [
   ["intervals", "measured flow intervals"],
@@ -58155,7 +58308,7 @@ var LISTS = [
   ["plans", "plan versions"]
 ];
 var ms = (day) => {
-  const m4 = DAY_RE.exec(day || "");
+  const m4 = DAY_RE2.exec(day || "");
   return m4 ? Date.UTC(+m4[1], +m4[2] - 1, +m4[3]) : NaN;
 };
 var addDays2 = (day, n6) => new Date(ms(day) + n6 * 864e5).toISOString().slice(0, 10);
@@ -58224,11 +58377,11 @@ function priceReviewNote(review, day) {
       return "Held prices for this day could not be requested.";
   }
 }
-var num = (v2) => typeof v2 === "number" && Number.isFinite(v2);
-var nonneg = (v2) => num(v2) && v2 >= 0;
-var kwh = (v2) => nonneg(v2) ? `${v2.toFixed(v2 < 10 ? 2 : 1)} kWh` : "unknown";
+var num2 = (v2) => typeof v2 === "number" && Number.isFinite(v2);
+var nonneg2 = (v2) => num2(v2) && v2 >= 0;
+var kwh = (v2) => nonneg2(v2) ? `${v2.toFixed(v2 < 10 ? 2 : 1)} kWh` : "unknown";
 var duration = (s4) => {
-  if (!nonneg(s4)) return "unknown";
+  if (!nonneg2(s4)) return "unknown";
   const m4 = Math.round(s4 / 60), h3 = Math.floor(m4 / 60);
   return h3 ? `${h3} h ${m4 % 60} min` : `${m4} min`;
 };
@@ -58244,7 +58397,7 @@ function validateHistory(answer, asked) {
 }
 var VERDICT = { flow_observed: "Flow observed", no_flow_observed: "No flow observed", unknown: "Unknown" };
 var OUTSIDE = { outside_plan: "Flow outside the sent plan", plan_unknown: "Flow while the sent plan was unknown", no_plan_evidence: "Flow with no plan evidence" };
-var REASON = {
+var REASON2 = {
   block_starts_before_retained_evidence: "starts before the retained evidence",
   block_starts_before_retained_power: "starts before the retained power rows",
   no_power_samples: "no measured power rows",
@@ -58259,7 +58412,7 @@ var RECON = {
   uncertain: "Register total uncertain",
   skipped: "Register total not checked"
 };
-var words = (text4) => String(text4 ?? "unknown").replace(/_/g, " ");
+var words2 = (text4) => String(text4 ?? "unknown").replace(/_/g, " ");
 var bounded = (a4, b3, lo, hi) => {
   const s4 = Math.max(a4, lo), e9 = Math.min(b3, hi);
   return Number.isFinite(s4) && Number.isFinite(e9) && e9 > s4 ? { start: s4, end: e9 } : null;
@@ -58269,7 +58422,7 @@ function historyTracks(answer, { raw, since, until, oldestPower, digest, readAt,
   const known = [], unknown2 = [];
   const addBlock = (b3, summary) => {
     const a4 = instant(b3.start), e9 = instant(b3.end), u4 = instant(b3.intent_uncertain_after);
-    const limit = num(b3.limit) ? b3.limit : null, unit = typeof b3.unit === "string" ? b3.unit : "";
+    const limit = num2(b3.limit) ? b3.limit : null, unit = typeof b3.unit === "string" ? b3.unit : "";
     const cut = Number.isFinite(u4) && u4 < e9 ? Math.max(a4, u4) : e9;
     const k2 = bounded(a4, cut, since, until);
     if (k2) known.push({ ...k2, version: b3.version ?? null, limit, unit, summary });
@@ -58289,7 +58442,7 @@ function historyTracks(answer, { raw, since, until, oldestPower, digest, readAt,
     const upto = Number.isFinite(readAt) ? Math.min(until, readAt) : until;
     for (const i7 of o9.intervals) {
       const a4 = instant(i7.first_sample), b3 = Math.max(instant(i7.last_sample), a4 + 6e4), span2 = bounded(a4, b3, since, until);
-      if (span2) measured.flow.push({ ...span2, startBounded: i7.start_bounded === true, endBounded: i7.end_bounded === true, peakW: num(i7.peak_w) ? i7.peak_w : null });
+      if (span2) measured.flow.push({ ...span2, startBounded: i7.start_bounded === true, endBounded: i7.end_bounded === true, peakW: num2(i7.peak_w) ? i7.peak_w : null });
     }
     for (const x2 of c5.outside_plan) {
       const span2 = bounded(instant(x2.start), instant(x2.end), since, until);
@@ -58299,7 +58452,7 @@ function historyTracks(answer, { raw, since, until, oldestPower, digest, readAt,
       const span2 = bounded(instant(b3.start), instant(b3.end), since, upto);
       if (span2) measured.noFlow.push(span2);
     }
-    const wholeWindow = nonneg(cov.window_seconds) && cov.window_seconds > 0 && cov.trusted_seconds >= cov.window_seconds && cov.window_seconds * 1e3 >= upto - since - MINUTE;
+    const wholeWindow = nonneg2(cov.window_seconds) && cov.window_seconds > 0 && cov.trusted_seconds >= cov.window_seconds && cov.window_seconds * 1e3 >= upto - since - MINUTE;
     if (cov.no_data_seconds === 0 && cov.untrusted_seconds === 0 && wholeWindow && o9.intervals.length === 0 && c5.outside_plan.length === 0 && o9.isolated_flow_samples === 0 && Number.isFinite(upto) && upto > since) measured.noFlow.push({ start: since, end: upto });
     for (const g2 of o9.gaps) {
       const span2 = bounded(instant(g2.from), g2.to ? instant(g2.to) : instant(g2.from) + 6e4, since, until);
@@ -58337,7 +58490,7 @@ function buildHistoryModel(answer, day, fmt, readAt = NaN) {
   const o9 = answer.observed, cov = o9.coverage;
   const stamp3 = (iso) => fmt.stamp(iso);
   const span2 = (a4, b3) => `${stamp3(a4)}\u2013${stamp3(b3)}`;
-  const limits = r7.limits && nonneg(r7.limits.max_samples_per_kind) ? r7.limits : { max_samples_per_kind: 4320, max_age_days: 7, max_digest_days: 62 };
+  const limits = r7.limits && nonneg2(r7.limits.max_samples_per_kind) ? r7.limits : { max_samples_per_kind: 4320, max_age_days: 7, max_digest_days: 62 };
   const rawDays = Math.round(limits.max_samples_per_kind / 1440 * 10) / 10;
   const retentionNote = `Measured detail is kept for about the last ${rawDays} days at one reading per minute (${limits.max_samples_per_kind} rows per kind; the ${limits.max_age_days}-day age limit only applies to sparser rows), not a guaranteed ${limits.max_age_days} days. Day summaries are kept up to ${limits.max_digest_days} days, without price rows. Session records last longer but carry no per-minute evidence.`;
   let raw, rawNote;
@@ -58355,7 +58508,7 @@ function buildHistoryModel(answer, day, fmt, readAt = NaN) {
   const truncated = [];
   if (signals) for (const [name, label2] of LISTS) {
     const t6 = answer.truncated[name];
-    if (t6?.truncated === true && nonneg(t6.cut)) truncated.push(`${label2}: first ${t6.limit ?? 200} shown, ${t6.cut} more not shown`);
+    if (t6?.truncated === true && nonneg2(t6.cut)) truncated.push(`${label2}: first ${t6.limit ?? 200} shown, ${t6.cut} more not shown`);
   }
   if (signals && answer.truncated.price_slices?.truncated === true) truncated.push(`price slices of ${answer.truncated.price_slices.sessions?.length ?? "some"} session(s): ${answer.truncated.price_slices.cut} not shown`);
   if (!signals && answer.plans_truncated === true) truncated.push("plan versions: the list is cut");
@@ -58367,10 +58520,10 @@ function buildHistoryModel(answer, day, fmt, readAt = NaN) {
     verdict: b3.verdict,
     verdictText: VERDICT[b3.verdict] || "Unknown",
     detail: [
-      ...(b3.reasons || []).map((x2) => REASON[x2] || words(x2)),
+      ...(b3.reasons || []).map((x2) => REASON2[x2] || words2(x2)),
       b3.intent_uncertain_after ? `intent uncertain after ${stamp3(b3.intent_uncertain_after)}` : "",
       b3.open_ended_in_profile ? "open-ended in the profile" : "",
-      nonneg(b3.covered_fraction) ? `measured rows cover ${Math.round(b3.covered_fraction * 100)}% of the block` : ""
+      nonneg2(b3.covered_fraction) ? `measured rows cover ${Math.round(b3.covered_fraction * 100)}% of the block` : ""
     ].filter(Boolean).join(" \xB7 ")
   }));
   const unknown2 = answer.comparison.unknown_plan_spans.map((u4) => ({
@@ -58380,15 +58533,15 @@ function buildHistoryModel(answer, day, fmt, readAt = NaN) {
     text: `${stamp3(u4.from)}\u2013${u4.until ? stamp3(u4.until) : "end of day"} \xB7 what the charger had installed is unknown`,
     verdict: "unknown",
     verdictText: "Plan unknown",
-    detail: words(u4.reason)
+    detail: words2(u4.reason)
   }));
   const sent = [...blocks, ...unknown2].sort((a4, b3) => a4.start - b3.start);
   const edge = (bounded2) => bounded2 === true ? "bounded" : "open (data gap, restart or data start beside it)";
   const flow = o9.intervals.map((i7) => ({
-    text: `${span2(i7.first_sample, i7.last_sample)} \xB7 ${i7.samples ?? "?"} readings \xB7 peak ${num(i7.peak_w) ? `${(i7.peak_w / 1e3).toFixed(1)} kW` : "unknown"}`,
+    text: `${span2(i7.first_sample, i7.last_sample)} \xB7 ${i7.samples ?? "?"} readings \xB7 peak ${num2(i7.peak_w) ? `${(i7.peak_w / 1e3).toFixed(1)} kW` : "unknown"}`,
     detail: `start ${edge(i7.start_bounded)} \xB7 end ${edge(i7.end_bounded)}`
   }));
-  const outside = answer.comparison.outside_plan.map((x2) => ({ kind: x2.kind, text: `${OUTSIDE[x2.kind] || words(x2.kind)}: ${span2(x2.start, x2.end)} \xB7 ${duration(x2.seconds)}` }));
+  const outside = answer.comparison.outside_plan.map((x2) => ({ kind: x2.kind, text: `${OUTSIDE[x2.kind] || words2(x2.kind)}: ${span2(x2.start, x2.end)} \xB7 ${duration(x2.seconds)}` }));
   const energy3 = o9.energy, cvg = energy3.coverage || {};
   const basis = (label2, value2, key3, note) => ({
     label: label2,
@@ -58403,34 +58556,39 @@ function buildHistoryModel(answer, day, fmt, readAt = NaN) {
   ];
   const energyNotes = [
     `These bases are separate measurements of the same charging and are never added together.`,
-    nonneg(energy3.unknown_seconds) && energy3.unknown_seconds > 0 ? `${duration(energy3.unknown_seconds)} of energy could not be measured (${Object.entries(energy3.unknown_segments || {}).map(([k2, n6]) => `${words(k2)} \xD7${n6}`).join(", ") || "unknown cause"}).` : "",
+    nonneg2(energy3.unknown_seconds) && energy3.unknown_seconds > 0 ? `${duration(energy3.unknown_seconds)} of energy could not be measured (${Object.entries(energy3.unknown_segments || {}).map(([k2, n6]) => `${words2(k2)} \xD7${n6}`).join(", ") || "unknown cause"}).` : "",
     Array.isArray(energy3.edge_segments_not_prorated) && energy3.edge_segments_not_prorated.length ? `${energy3.edge_segments_not_prorated.length} segment(s) cross the day boundary and are not counted here.` : ""
   ].filter(Boolean);
   const sessions = answer.sessions.map((s4) => {
     const rec = s4.reconciliation && typeof s4.reconciliation === "object" ? s4.reconciliation : null;
     const lines4 = [];
     if (rec) {
-      lines4.push(`${RECON[rec.state] || `Register total ${words(rec.state)}`}${rec.reason ? ` (${words(rec.reason)})` : ""}`);
-      if (nonneg(rec.total_kwh) && ["reconciled", "consistent"].includes(rec.state)) lines4.push(`Register total ${kwh(rec.total_kwh)} against ${kwh(rec.placed_kwh)} placed in time`);
-      if (nonneg(rec.unplaced_late_kwh) && rec.unplaced_late_kwh > 0) lines4.push(`Unplaced late energy ${kwh(rec.unplaced_late_kwh)}: no known time, not part of the placed energy above, not priced`);
-      if (nonneg(rec.unassigned_register_kwh) && rec.unassigned_register_kwh > 0) lines4.push(`Later register rise ${kwh(rec.unassigned_register_kwh)}: seen by receipt time only, not assigned to this session`);
-      if (["uncertain", "unknown", "skipped", "inconsistent"].includes(rec.state) || nonneg(rec.unassigned_register_kwh) && rec.unassigned_register_kwh > 0) lines4.push("The session total is not certified");
+      lines4.push(`${RECON[rec.state] || `Register total ${words2(rec.state)}`}${rec.reason ? ` (${words2(rec.reason)})` : ""}`);
+      if (nonneg2(rec.total_kwh) && ["reconciled", "consistent"].includes(rec.state)) lines4.push(`Register total ${kwh(rec.total_kwh)} against ${kwh(rec.placed_kwh)} placed in time`);
+      if (nonneg2(rec.unplaced_late_kwh) && rec.unplaced_late_kwh > 0) lines4.push(`Unplaced late energy ${kwh(rec.unplaced_late_kwh)}: no known time, not part of the placed energy above, not priced`);
+      if (nonneg2(rec.unassigned_register_kwh) && rec.unassigned_register_kwh > 0) lines4.push(`Later register rise ${kwh(rec.unassigned_register_kwh)}: seen by receipt time only, not assigned to this session`);
+      if (["uncertain", "unknown", "skipped", "inconsistent"].includes(rec.state) || nonneg2(rec.unassigned_register_kwh) && rec.unassigned_register_kwh > 0) lines4.push("The session total is not certified");
     } else lines4.push("Register reconciliation unavailable");
+    const crosses = localDate(instant(s4.start), answer.window.zone) !== localDate(Math.max(instant(s4.start), instant(s4.end) - 1), answer.window.zone);
     return {
-      text: `${span2(s4.start, s4.end)} \xB7 placed energy ${kwh(s4.energy_kwh)} (source: ${words(s4.energy_source)})`,
+      text: `${span2(s4.start, s4.end)} \xB7 placed energy ${kwh(s4.energy_kwh)} (source: ${words2(s4.energy_source)})`,
       lines: lines4,
-      detail: `${words(s4.source)} \xB7 started by ${words(s4.started_by)}${s4.price_slices_truncated === true ? ` \xB7 ${s4.price_slices_cut} price slice(s) not shown` : ""}`
+      costLines: sessionCostLines(s4, crosses),
+      detail: `${words2(s4.source)} \xB7 started by ${words2(s4.started_by)}${s4.price_slices_truncated === true ? ` \xB7 ${s4.price_slices_cut} price slice(s) not shown` : ""}`
     };
   });
-  const gaps = o9.gaps.map((g2) => `${words(g2.kind)} ${stamp3(g2.from)}${g2.to ? `\u2013${stamp3(g2.to)}` : ""}${g2.reason ? ` (${words(g2.reason)})` : ""}`);
+  const wc = answer.window_spot_cost;
+  const cost = wc === void 0 ? { state: "legacy", headline: "This integration does not report spot-only cost, so none is shown (not zero). Its older cost fields include fees and taxes and are not shown here.", lines: [] } : wc && typeof wc === "object" && wc.local_day === day ? describeSpotCost(wc, "day") : { state: "invalid", headline: "Spot cost not shown: the answer could not be understood.", lines: [] };
+  if (cost.state !== "legacy" && cost.state !== "invalid") cost.lines.push("Closed sessions only; a charge still running is not included. Plan totals elsewhere are a forecast on their own cost basis and are not this historical spot cost.");
+  const gaps = o9.gaps.map((g2) => `${words2(g2.kind)} ${stamp3(g2.from)}${g2.to ? `\u2013${stamp3(g2.to)}` : ""}${g2.reason ? ` (${words2(g2.reason)})` : ""}`);
   const restarts = o9.capture_restarts.map(stamp3);
   const unacked = answer.plans.filter((p4) => p4?.acked_intent !== true).length;
   const digestModel = digest ? {
     partial: digest.partial_retention === true,
     computed: digest.computed_at ? stamp3(digest.computed_at) : null,
-    flow: (digest.observed_intervals || []).map((i7) => ({ text: `${span2(i7.first_sample, i7.last_sample)} \xB7 ${i7.samples ?? "?"} readings \xB7 peak ${num(i7.peak_w) ? `${(i7.peak_w / 1e3).toFixed(1)} kW` : "unknown"}`, detail: `start ${edge(i7.start_bounded)} \xB7 end ${edge(i7.end_bounded)}` })),
+    flow: (digest.observed_intervals || []).map((i7) => ({ text: `${span2(i7.first_sample, i7.last_sample)} \xB7 ${i7.samples ?? "?"} readings \xB7 peak ${num2(i7.peak_w) ? `${(i7.peak_w / 1e3).toFixed(1)} kW` : "unknown"}`, detail: `start ${edge(i7.start_bounded)} \xB7 end ${edge(i7.end_bounded)}` })),
     blocks: (digest.planned_blocks || []).map((b3) => ({ text: `${span2(b3.start, b3.end)} \xB7 limit ${b3.limit} \xB7 plan ${b3.version ?? "unknown"}`, verdictText: VERDICT[b3.verdict] || "Unknown", verdict: b3.verdict })),
-    outside: (digest.outside_plan || []).map((x2) => `${OUTSIDE[x2.kind] || words(x2.kind)}: ${span2(x2.start, x2.end)}`),
+    outside: (digest.outside_plan || []).map((x2) => `${OUTSIDE[x2.kind] || words2(x2.kind)}: ${span2(x2.start, x2.end)}`),
     unknownSpans: (digest.unknown_plan_spans || []).length,
     gapCount: digest.gap_count ?? null,
     restartCount: digest.restart_count ?? null,
@@ -58455,7 +58613,7 @@ function buildHistoryModel(answer, day, fmt, readAt = NaN) {
     },
     coverage: {
       text: `Measured power covers ${duration(cov.trusted_seconds)} of ${duration(cov.window_seconds)}; ${duration(cov.untrusted_seconds)} untrusted; ${duration(cov.no_data_seconds)} with no data (unknown, not zero).`,
-      none: !nonneg(cov.trusted_seconds)
+      none: !nonneg2(cov.trusted_seconds)
     },
     sent,
     flow,
@@ -58463,24 +58621,34 @@ function buildHistoryModel(answer, day, fmt, readAt = NaN) {
     energyRows,
     energyNotes,
     sessions,
+    cost,
     gaps,
     restarts,
     unacked,
     digest: digestModel,
     tracks: historyTracks(answer, { raw, since, until, oldestPower, digest, readAt, zone: answer.window.zone, day }),
-    isolated: nonneg(o9.isolated_flow_samples) && o9.isolated_flow_samples > 0 ? `${o9.isolated_flow_samples} single reading(s) above the flow threshold were not enough to count as charging.` : "",
+    isolated: nonneg2(o9.isolated_flow_samples) && o9.isolated_flow_samples > 0 ? `${o9.isolated_flow_samples} single reading(s) above the flow threshold were not enough to count as charging.` : "",
     flowNote: "Flow comes only from measured power readings (threshold about 100 W, unverified for the installed charger). A plan, its acknowledgement, a limit read back, the battery level or the charger status never counts as flow.",
     sentNote: "Sent means the charger answered a plan version as accepted, not that it was installed or that charging happened. After an uncertain write the plan is unknown."
   };
 }
 function createHistoryDay({ request, requestSessions = null, onChange = () => {
 }, now = () => Date.now() }) {
-  let ctx = null, key3 = null, seq = 0, sessSeq = 0;
-  const initial = () => ({ sel: { kind: "default" }, loading: null, result: null, error: null, ret: null, sessions: { status: requestSessions ? "idle" : "off", days: [] } });
+  let ctx = null, key3 = null, seq = 0, sessSeq = 0, monthSeq = 0;
+  const initial = () => ({
+    sel: { kind: "default" },
+    loading: null,
+    result: null,
+    error: null,
+    ret: null,
+    sessions: { status: requestSessions ? "idle" : "off", days: [], current: null, month: null },
+    month: { sel: null, read: null, cache: /* @__PURE__ */ new Map() }
+  });
   let st = initial();
   const reset = () => {
     seq++;
     sessSeq++;
+    monthSeq++;
     st = initial();
   };
   const keyOf = (c5) => JSON.stringify([c5.charger, c5.epoch, c5.zone]);
@@ -58534,18 +58702,55 @@ function createHistoryDay({ request, requestSessions = null, onChange = () => {
   }
   async function loadSessions() {
     const mine = ++sessSeq, myKey = key3, asked = ctx;
-    st.sessions = { status: "loading", days: [] };
+    st.sessions = { status: "loading", days: [], current: null, month: null, readFor: null };
     try {
-      const answer = await requestSessions();
+      const answer = await requestSessions({});
       if (mine !== sessSeq || myKey !== key3) return;
       const rows = Array.isArray(answer?.days) ? answer.days : null;
-      if (!(answer?.api_version === 1 && answer.charger_id === asked.charger && rows && rows.length <= 400 && rows.every((r7) => DAY_RE.test(r7?.period || "")))) throw new Error("invalid");
-      st.sessions = { status: "ready", days: rows.filter((r7) => typeof r7.sessions === "number" && r7.sessions > 0).map((r7) => r7.period) };
+      if (!(answer?.api_version === 1 && answer.charger_id === asked.charger && rows && rows.length <= 400 && rows.every((r7) => DAY_RE2.test(r7?.period || "")))) throw new Error("invalid");
+      const current = parseDeliveryMonth(answer, asked.charger);
+      st.sessions = { status: "ready", days: rows.filter((r7) => typeof r7.sessions === "number" && r7.sessions > 0).map((r7) => r7.period), current, month: current?.month || monthKey(asked.today), readFor: monthKey(asked.today) };
     } catch {
       if (mine !== sessSeq || myKey !== key3) return;
-      st.sessions = { status: "error", days: [] };
+      st.sessions = { status: "error", days: [], current: null, month: null };
     }
     onChange();
+  }
+  async function loadMonth(month) {
+    const mine = ++monthSeq, myKey = key3, charger = ctx.charger;
+    st.month.read = { month, status: "loading" };
+    try {
+      const answer = await requestSessions({ month });
+      if (mine !== monthSeq || myKey !== key3 || st.month.sel !== month) return;
+      const parsed = parseDeliveryMonth(answer, charger, month);
+      if (!parsed) throw new Error("invalid");
+      st.month.cache.set(month, parsed);
+      while (st.month.cache.size > MONTH_CACHE) st.month.cache.delete(st.month.cache.keys().next().value);
+      st.month.read = { month, status: "ready" };
+    } catch {
+      if (mine !== monthSeq || myKey !== key3 || st.month.sel !== month) return;
+      st.month.read = { month, status: "error" };
+    }
+    onChange();
+  }
+  const currentMonth = () => st.sessions.month || monthKey(ctx.today);
+  const monthChoices = () => {
+    const cur = currentMonth(), lo = monthKey(addDays2(`${cur}-01`, -31 * MONTHS_BACK));
+    const found = (st.sessions.current?.available || []).filter((m4) => m4 <= cur && m4 >= lo);
+    return [.../* @__PURE__ */ new Set([cur, ...found])].sort().reverse();
+  };
+  function monthView() {
+    if (st.sessions.status === "off" || !ctx) return null;
+    const cur = currentMonth(), sel = st.month.sel || cur, choices = monthChoices();
+    const options2 = choices.map((m4) => ({ value: m4, label: m4 === cur ? `${monthName(m4)} (so far)` : monthName(m4), selected: m4 === sel }));
+    const base2 = { options: options2, selected: sel, isCurrent: sel === cur, busy: st.month.read?.status === "loading" };
+    if (sel === cur) {
+      if (st.sessions.status === "ready") return { ...base2, ...monthCostModel(st.sessions.current, { isCurrent: true }) };
+      return { ...base2, state: st.sessions.status === "error" ? "error" : "loading", message: st.sessions.status === "error" ? "The month\u2019s spot cost could not be read. Press Retry." : "Reading the month\u2019s spot cost\u2026" };
+    }
+    const hit = st.month.cache.get(sel);
+    if (hit) return { ...base2, ...monthCostModel(hit, { isCurrent: false }) };
+    return { ...base2, state: st.month.read?.status === "error" ? "error" : "loading", message: st.month.read?.status === "error" ? "That month\u2019s spot cost could not be read. Press Retry." : `Reading ${monthName(sel)}\u2026` };
   }
   return {
     /** Tell it who is asking. A change of charger, generation/permission epoch or zone drops everything. */
@@ -58558,6 +58763,11 @@ function createHistoryDay({ request, requestSessions = null, onChange = () => {
       }
       ctx = valid ? next : null;
       if (!ctx) return this;
+      if (st.sessions.status === "ready" && st.sessions.readFor && monthKey(ctx.today) !== st.sessions.readFor) {
+        monthSeq++;
+        st.month = { sel: null, read: null, cache: /* @__PURE__ */ new Map() };
+        st.sessions = { ...st.sessions, status: "idle" };
+      }
       if (st.sessions.status === "idle") void loadSessions();
       const day = effective();
       if (st.loading) return this;
@@ -58581,8 +58791,29 @@ function createHistoryDay({ request, requestSessions = null, onChange = () => {
       onChange();
       return true;
     },
+    /** Choose the month of the spot-cost summary (only a month the backend lists, at most 24 back); the current month needs no read. */
+    selectMonth(month) {
+      if (!ctx || st.sessions.status === "off" || typeof month !== "string" || !monthChoices().includes(month)) return false;
+      monthSeq++;
+      if (month === currentMonth()) {
+        st.month.sel = null;
+        st.month.read = null;
+        onChange();
+        return true;
+      }
+      st.month.sel = month;
+      st.month.read = null;
+      if (!st.month.cache.has(month)) void loadMonth(month);
+      onChange();
+      return true;
+    },
     retry() {
-      if (!ctx || st.loading) return;
+      if (!ctx) return;
+      if (st.month.sel && st.month.read?.status === "error") {
+        void loadMonth(st.month.sel);
+        onChange();
+      }
+      if (st.loading) return;
       if (st.sessions.status === "error") {
         void loadSessions();
         onChange();
@@ -58620,20 +58851,22 @@ function createHistoryDay({ request, requestSessions = null, onChange = () => {
         canNext: !!map3 && days.some((d3) => d3 > shown),
         canYesterday: !!map3 && map3.has(addDays2(ctx.today, -1)) && shown !== addDays2(ctx.today, -1),
         canToday: !!map3 && map3.has(ctx.today) && shown !== ctx.today,
-        canRetry: (!!st.error || st.sessions.status === "error") && !st.loading,
+        canRetry: (!!st.error || st.sessions.status === "error" || st.month.read?.status === "error") && !st.loading,
         loading: !!st.loading
       };
       const notRetained = map3 && !map3.has(shown) ? "This day is not in the retained list (older than the raw rows, no day summary and no recorded session). Nothing can be said about it; that is not \u201Cdid not charge\u201D." : "";
-      const withNav = (model) => ({ ...model, nav, ...notRetained ? { notRetained } : {} });
-      if (st.loading) return { state: "loading", message: `Loading charging history for ${dayLabel2(shown)}\u2026`, nav };
+      const monthCost = monthView();
+      const withNav = (model) => ({ ...model, nav, monthCost, ...notRetained ? { notRetained } : {} });
+      if (st.loading) return { state: "loading", message: `Loading charging history for ${dayLabel2(shown)}\u2026`, nav, monthCost };
       if (st.error && st.result?.day === shown && st.result.refreshFailed) return withNav({ ...st.result.model, refreshFailed: true });
-      if (st.error) return { state: st.error.state, message: st.error.message, nav };
+      if (st.error) return { state: st.error.state, message: st.error.message, nav, monthCost };
       if (st.result?.day === shown) return withNav({ ...st.result.model, refreshFailed: st.result.refreshFailed === true });
-      return { state: "loading", message: `Loading charging history for ${dayLabel2(shown)}\u2026`, nav };
+      return { state: "loading", message: `Loading charging history for ${dayLabel2(shown)}\u2026`, nav, monthCost };
     },
     dispose() {
       seq++;
       sessSeq++;
+      monthSeq++;
       ctx = null;
       key3 = null;
       st = initial();
@@ -58651,14 +58884,14 @@ var MAX_MONTHS = 14;
 var MIN_DAYS = 7;
 var CACHE_MONTHS = 3;
 var DAY_MS3 = 864e5;
-var MONTH_RE = /^(\d{4})-(0[1-9]|1[0-2])$/;
-var DAY_RE2 = /^(\d{4})-(\d{2})-(\d{2})$/;
-var num2 = (v2) => typeof v2 === "number" && Number.isFinite(v2);
+var MONTH_RE2 = /^(\d{4})-(0[1-9]|1[0-2])$/;
+var DAY_RE3 = /^(\d{4})-(\d{2})-(\d{2})$/;
+var num3 = (v2) => typeof v2 === "number" && Number.isFinite(v2);
 var count = (v2) => Number.isInteger(v2) && v2 >= 0;
 var nullableCount = (v2) => v2 === null || v2 === void 0 || count(v2);
 var instant2 = (v2) => typeof v2 === "string" ? Date.parse(v2) : NaN;
 var dayMs = (day) => {
-  const m4 = DAY_RE2.exec(day || "");
+  const m4 = DAY_RE3.exec(day || "");
   return m4 ? Date.UTC(+m4[1], +m4[2] - 1, +m4[3]) : NaN;
 };
 var zoneOk = (zone) => {
@@ -58669,8 +58902,8 @@ var zoneOk = (zone) => {
     return false;
   }
 };
-var words2 = (code) => String(code ?? "unknown").replace(/_/g, " ");
-var REASON2 = {
+var words3 = (code) => String(code ?? "unknown").replace(/_/g, " ");
+var REASON3 = {
   baseline_too_short: "fewer than 7 complete recent days are held",
   baseline_unknown: "the recent-days baseline is not available",
   too_few_complete_days: "fewer than 7 complete days are held for this month",
@@ -58688,15 +58921,15 @@ var REASON2 = {
   day_invalid: "the held day is invalid",
   inconsistent: "the answer contradicts itself"
 };
-var reasonText = (code) => REASON2[code] || words2(code);
+var reasonText = (code) => REASON3[code] || words3(code);
 var EXCLUDED = { not_held: "not held", partial: "incomplete", invalid_prices: "invalid prices", conflicting_duplicate: "conflicting rows", overlap: "overlapping rows", no_price_rate: "no exchange rate" };
 var monthLabel = (month) => {
-  const m4 = MONTH_RE.exec(month || "");
+  const m4 = MONTH_RE2.exec(month || "");
   return m4 ? new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", month: "long", year: "numeric" }).format(Date.UTC(+m4[1], +m4[2] - 1, 1)) : "Unknown month";
 };
-var monthOf = (day) => typeof day === "string" && DAY_RE2.test(day) ? day.slice(0, 7) : null;
+var monthOf = (day) => typeof day === "string" && DAY_RE3.test(day) ? day.slice(0, 7) : null;
 var prevMonth = (month) => {
-  const m4 = MONTH_RE.exec(month);
+  const m4 = MONTH_RE2.exec(month);
   return m4 ? new Date(Date.UTC(+m4[1], +m4[2] - 2, 1)).toISOString().slice(0, 7) : null;
 };
 var durationText = (minutes) => {
@@ -58720,7 +58953,7 @@ function excluded(x2) {
   const reasons = x2.reasons && typeof x2.reasons === "object" ? Object.entries(x2.reasons).filter(([, n6]) => count(n6) && n6 > 0) : [];
   return { count: x2.count, reasons };
 }
-var excludedText = (x2) => !x2 || x2.count === 0 ? "" : `${x2.count} excluded${x2.reasons.length ? ` (${x2.reasons.map(([code, n6]) => `${n6} ${EXCLUDED[code] || words2(code)}`).join(", ")})` : ""}`;
+var excludedText = (x2) => !x2 || x2.count === 0 ? "" : `${x2.count} excluded${x2.reasons.length ? ` (${x2.reasons.map(([code, n6]) => `${n6} ${EXCLUDED[code] || words3(code)}`).join(", ")})` : ""}`;
 function providers(list4, key3) {
   const out2 = [];
   for (const row3 of Array.isArray(list4) ? list4 : []) for (const label2 of key3 === "providers" ? Array.isArray(row3?.providers) ? row3.providers : [] : [row3?.provider]) if (typeof label2 === "string" && label2 && !out2.includes(label2)) out2.push(label2);
@@ -58738,20 +58971,20 @@ function parseComparison(c5, baseline) {
   if (!c5 || typeof c5 !== "object") return { known: false, reason: "baseline_unknown" };
   if (c5.status !== "known") return { known: false, reason: c5.unknown_reason || "baseline_unknown" };
   if (!baseline?.known) return { known: false, reason: baseline?.reason || "baseline_unknown" };
-  return num2(c5.percentile) && c5.percentile >= 0 && c5.percentile <= 100 ? { known: true, percentile: c5.percentile } : { known: false, reason: "inconsistent" };
+  return num3(c5.percentile) && c5.percentile >= 0 && c5.percentile <= 100 ? { known: true, percentile: c5.percentile } : { known: false, reason: "inconsistent" };
 }
 function parseCurrent(cur, baseline) {
   if (!cur || typeof cur !== "object") return { known: false, reason: "not_reported" };
   const i7 = cur.interval, start2 = instant2(i7?.start), end2 = instant2(i7?.end);
   if (cur.status !== "known") return { known: false, reason: cur.unknown_reason || "no_current_interval" };
-  if (!i7 || !num2(i7.price) || !(end2 > start2)) return { known: false, reason: "inconsistent" };
+  if (!i7 || !num3(i7.price) || !(end2 > start2)) return { known: false, reason: "inconsistent" };
   return { known: true, price: i7.price, start: start2, end: end2, comparison: parseComparison(cur.comparison, baseline) };
 }
 function parseWindow(w2, duration2, baseline) {
   if (!w2 || typeof w2 !== "object") return { known: false, reason: "not_reported" };
   if (w2.status !== "known") return { known: false, reason: w2.unknown_reason || "no_contiguous_window" };
   const start2 = instant2(w2.start), end2 = instant2(w2.end);
-  if (!num2(w2.mean_price) || !(end2 > start2) || w2.duration_minutes !== duration2 || end2 - start2 !== duration2 * 6e4) return { known: false, reason: "inconsistent" };
+  if (!num3(w2.mean_price) || !(end2 > start2) || w2.duration_minutes !== duration2 || end2 - start2 !== duration2 * 6e4) return { known: false, reason: "inconsistent" };
   const h3 = w2.horizon, from = instant2(h3?.from), until = instant2(h3?.until);
   return { known: true, price: w2.mean_price, start: start2, end: end2, horizon: Number.isFinite(from) && Number.isFinite(until) && until > from ? { from, until } : null, comparison: parseComparison(w2.comparison, baseline) };
 }
@@ -58770,9 +59003,9 @@ function parseLive(answer, asked) {
 }
 var STAT_KEYS = ["mean", "min", "max", "p10", "p50", "p90"];
 function parseStats(s4) {
-  if (!s4 || typeof s4 !== "object" || !STAT_KEYS.every((k2) => num2(s4[k2]))) return null;
+  if (!s4 || typeof s4 !== "object" || !STAT_KEYS.every((k2) => num3(s4[k2]))) return null;
   if (!(s4.min <= s4.p10 && s4.p10 <= s4.p50 && s4.p50 <= s4.p90 && s4.p90 <= s4.max && s4.min <= s4.mean && s4.mean <= s4.max)) return null;
-  if (!num2(s4.negative_share) || s4.negative_share < 0 || s4.negative_share > 100 || !(num2(s4.negative_seconds) && s4.negative_seconds >= 0)) return null;
+  if (!num3(s4.negative_share) || s4.negative_share < 0 || s4.negative_share > 100 || !(num3(s4.negative_seconds) && s4.negative_seconds >= 0)) return null;
   return { mean: s4.mean, min: s4.min, max: s4.max, p10: s4.p10, p50: s4.p50, p90: s4.p90, negativeShare: s4.negative_share, negativeSeconds: s4.negative_seconds };
 }
 function parseMonthly(answer, asked) {
@@ -58781,7 +59014,7 @@ function parseMonthly(answer, asked) {
   if (![answer.days_expected, answer.days_complete, answer.days_partial].every(count) || !nullableCount(answer.days_held) || !ex || !cov || typeof cov !== "object") return null;
   if (answer.days_complete + answer.days_partial > answer.days_expected) return null;
   const ratio = cov.valid_ratio === null ? null : cov.valid_ratio;
-  if (!nullableCount(cov.seconds_expected) || !nullableCount(cov.seconds_valid) || !nullableCount(cov.seconds_partial) || ratio !== null && !(num2(ratio) && ratio >= 0 && ratio <= 1)) return null;
+  if (!nullableCount(cov.seconds_expected) || !nullableCount(cov.seconds_valid) || !nullableCount(cov.seconds_partial) || ratio !== null && !(num3(ratio) && ratio >= 0 && ratio <= 1)) return null;
   if (count(cov.seconds_expected) && count(cov.seconds_valid) && cov.seconds_valid > cov.seconds_expected) return null;
   const stats = answer.status === "known" ? parseStats(answer.statistics) : null;
   if (answer.status === "known" && (!stats || answer.days_complete < min3 || answer.comparable?.meets_minimum !== true)) return null;
@@ -62861,7 +63094,7 @@ function feeRows(record5, options2, areaId, canEdit) {
 function tariffModel(block2, canEdit) {
   if (!block2) return null;
   const included = gridTariffIncluded(block2);
-  const high = block2.transfer_high, pct = block2.transfer_percent;
+  const high = block2.transfer_high, pct2 = block2.transfer_percent;
   const stored = block2.high_load_window;
   const win = stored || SUGGESTED_WINDOW;
   const highUnit = high.unit;
@@ -62871,7 +63104,7 @@ function tariffModel(block2, canEdit) {
     included,
     canEdit: edit,
     writable: block2.writable === true,
-    percent: { mode: pct.policy === "manual" ? "custom" : "off", figure: figureText(pct.explicit_value), unit: "%", policy: pct.policy },
+    percent: { mode: pct2.policy === "manual" ? "custom" : "off", figure: figureText(pct2.explicit_value), unit: "%", policy: pct2.policy },
     high: { mode: high.policy === "manual" ? "custom" : "off", figure: figureText(high.explicit_value), unit: highUnit ? highUnit : "unit unknown", unitKnown: !!highUnit, policy: high.policy },
     window: { ...win, stored: !!stored, suggested: !stored },
     notes: [
@@ -62879,7 +63112,7 @@ function tariffModel(block2, canEdit) {
       demandCount ? `${demandCount} demand-charge component${demandCount === 1 ? "" : "s"} are kept exactly as stored (this area does not edit them).` : ""
     ].filter(Boolean),
     summary: [
-      `Grid fee as % of the raw price: ${pct.policy === "included" ? "included in the published price" : pct.policy === "manual" ? `${pct.explicit_value}%` : "off"}.`,
+      `Grid fee as % of the raw price: ${pct2.policy === "included" ? "included in the published price" : pct2.policy === "manual" ? `${pct2.explicit_value}%` : "off"}.`,
       `High-load grid fee: ${high.policy === "included" ? "included in the published price" : high.policy === "manual" ? `${high.explicit_value} ${highUnit || "unit unknown"}` : "off"}${stored ? ` \xB7 hours stored (${DAY_CHOICES.find((d3) => d3[0] === stored.days)?.[1] || stored.days}, ${MONTHS2[stored.from_month - 1]}\u2013${MONTHS2[stored.to_month - 1]}, ${String(stored.from_hour).padStart(2, "0")}:00\u2013${String(stored.to_hour % 24).padStart(2, "0")}:00)` : " \xB7 no hours stored"}.`
     ]
   };
@@ -62949,13 +63182,13 @@ function tariffWritePlan(block2, values) {
   if (block2.writable !== true) return { ok: false, notice: "Administrator permission is required." };
   if (gridTariffIncluded(block2)) return { ok: false, notice: "The published price already includes the grid fee; nothing can be added." };
   const body = storedBody(block2);
-  const num5 = (t6) => {
+  const num6 = (t6) => {
     const s4 = typeof t6 === "string" ? t6.trim().replace(",", ".") : "";
     return s4 === "" ? null : Number(s4);
   };
   const p4 = values?.percent || { mode: "off", figure: "" };
   if (p4.mode === "custom") {
-    const n6 = num5(p4.figure);
+    const n6 = num6(p4.figure);
     if (n6 === null) return { ok: false, notice: "Enter the grid fee percentage, or switch it off." };
     if (!ok2(n6) || n6 < 0 || n6 > 1e3) return { ok: false, notice: "The grid fee percentage must be a number from 0 to 1000." };
     body.transfer_percent = { enabled: true, value: n6 };
@@ -62963,7 +63196,7 @@ function tariffWritePlan(block2, values) {
   const h3 = values?.high || { mode: "off", figure: "" };
   if (h3.mode === "custom") {
     if (!block2.transfer_high.unit) return { ok: false, notice: "The area\u2019s unit is unknown, so the high-load fee cannot be set." };
-    const n6 = num5(h3.figure);
+    const n6 = num6(h3.figure);
     if (n6 === null) return { ok: false, notice: "Enter the high-load fee, or switch it off." };
     if (!ok2(n6) || n6 < 0 || n6 > HIGH_LOAD_MAX) return { ok: false, notice: `The high-load fee must be a number from 0 to ${HIGH_LOAD_MAX}.` };
     const w2 = values?.window || {};
@@ -64647,7 +64880,7 @@ var JUDGED = {
   current_a: "current_a",
   energy_register_kwh: "energy_register_kwh"
 };
-var STATES2 = /* @__PURE__ */ new Set(["current", "last_known", "idle", "unknown"]);
+var STATES3 = /* @__PURE__ */ new Set(["current", "last_known", "idle", "unknown"]);
 function judgementFor(ready, key3, observedAtMs) {
   const block2 = ready?.freshness;
   if (block2 === void 0 || block2 === null) return null;
@@ -64656,7 +64889,7 @@ function judgementFor(ready, key3, observedAtMs) {
   const quantities = block2.quantities;
   if (!quantities || typeof quantities !== "object" || Array.isArray(quantities)) return unknown2;
   const item = quantities[JUDGED[key3]];
-  if (!item || typeof item !== "object" || !STATES2.has(item.state)) return unknown2;
+  if (!item || typeof item !== "object" || !STATES3.has(item.state)) return unknown2;
   const reported = Date.parse(item.reported_at || "");
   if (!Number.isFinite(reported) || reported !== observedAtMs) return unknown2;
   if (item.age_s != null && !(typeof item.age_s === "number" && Number.isFinite(item.age_s) && item.age_s >= 0)) return unknown2;
@@ -64684,7 +64917,7 @@ function read(ready, key3, now, unitCheck) {
 }
 var ago = (ms2) => ms2 < 6e4 ? `${Math.floor(ms2 / 1e3)} s ago` : ms2 < 36e5 ? `${Math.floor(ms2 / 6e4)} min ago` : `${Math.floor(ms2 / 36e5)} h ago`;
 var clock2 = (ms2) => new Date(ms2).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-var num3 = (value2, digits) => Number(value2.toFixed(digits)).toString();
+var num4 = (value2, digits) => Number(value2.toFixed(digits)).toString();
 function liveCharging(status, observedAt, failed, now = Date.now()) {
   const fresh2 = observationFreshness(observedAt, now, failed) === "fresh";
   const ready = fresh2 ? status?.readiness : null;
@@ -64707,18 +64940,18 @@ function liveCharging(status, observedAt, failed, now = Date.now()) {
   parts.push(reportedFresh ? `Charger reports \u201C${reportedFresh.value}\u201D for connector ${own}, ${reportedFresh.judged === "current" && reportedFresh.age > STRICT_MAX_AGE_MS ? `unchanged since ${clock2(reportedFresh.at)}` : ago(reportedFresh.age)}; a reported state is not measured power.` : reported ? `Last reported connector state \u201C${reported.value}\u201D ${reported.judged === "last_known" ? `is last known (${ago(reported.age)}); the charger connection is not confirmed now` : `is stale (${ago(reported.age)})`}; current state unknown.` : `Connector ${own} reported state unknown.`);
   let powerText = "Unknown";
   if (power?.fresh) {
-    powerText = power.value === 0 ? "0 W measured" : `${power.value >= 1e3 ? num3(power.value / 1e3, 2) + " kW" : num3(power.value, 0) + " W"} measured`;
+    powerText = power.value === 0 ? "0 W measured" : `${power.value >= 1e3 ? num4(power.value / 1e3, 2) + " kW" : num4(power.value, 0) + " W"} measured`;
     parts.push(`Measured power ${powerText}, ${ago(power.age)}.`);
   } else if (current?.fresh) {
-    powerText = `${num3(current.value, 1)} A measured (power unknown)`;
-    parts.push(`Measured current ${num3(current.value, 1)} A, ${ago(current.age)}; power is not derived from it.`);
+    powerText = `${num4(current.value, 1)} A measured (power unknown)`;
+    parts.push(`Measured current ${num4(current.value, 1)} A, ${ago(current.age)}; power is not derived from it.`);
   } else if (power || current) {
     const old = power || current;
     powerText = "Unknown";
     const why = old.judged === "idle" ? "; no reading is expected while nothing is charging" : old.judged === "last_known" ? "; the charger connection is not confirmed now" : "";
     parts.push(`Last measured ${power ? "power" : "current"} is ${why ? "old" : "stale"} (${ago(old.age)}${why}); not shown as current.`);
   } else parts.push("No measured power or current source is available for this connector.");
-  if (energy3) parts.push(`Cumulative energy register ${num3(energy3.value, 2)} kWh${energy3.fresh ? "" : " (stale)"}, ${ago(energy3.age)}; this is not this session\u2019s energy.`);
+  if (energy3) parts.push(`Cumulative energy register ${num4(energy3.value, 2)} kWh${energy3.fresh ? "" : " (stale)"}, ${ago(energy3.age)}; this is not this session\u2019s energy.`);
   else parts.push("Energy register unavailable.");
   let mismatch = false;
   if (flow && reportedFresh && normalized) {
@@ -64761,7 +64994,7 @@ var DISAGREES = /* @__PURE__ */ new Set(["limits_or_transitions_differ", "verifi
 var LOGGING = /* @__PURE__ */ new Set(["ocpp_sensitive_logging_enabled", "unsupported_ocpp_logging_or_interface"]);
 var ago2 = (ms2) => ms2 < 6e4 ? `${Math.max(0, Math.floor(ms2 / 1e3))} s ago` : ms2 < 36e5 ? `${Math.floor(ms2 / 6e4)} min ago` : `${Math.floor(ms2 / 36e5)} h ago`;
 var clock3 = (ms2) => new Date(ms2).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-var num4 = (value2, digits) => Number(value2.toFixed(digits)).toString();
+var num5 = (value2, digits) => Number(value2.toFixed(digits)).toString();
 var stamped = (ready, key3, reading, now, accept) => evidence(ready, key3, reading, now, (r7) => accept(r7.value));
 function chargingEnabled(ready) {
   const value2 = ready?.charging_enabled;
@@ -64869,7 +65102,7 @@ function chargeSession(status, observedAt, failed, now = Date.now()) {
   const enabled = chargingEnabled(ready);
   if (enabled) facts.push(`Charging enabled: ${enabled.state === "enabled" ? "switch is on (not proof of authorization)" : enabled.reason === "control_off" ? "switch is off" : enabled.reason === "control_unavailable" ? "switch missing or unavailable" : "not confirmed"}`);
   else if (control?.fresh) facts.push(`Charge-control switch: ${control.value}${control.value === "off" && txn.kind !== "observed" ? " (normal before authorization)" : ""}`);
-  if (flow?.fresh) facts.push(`Measured ${flow.kind === "power" ? flow.value >= 1e3 ? `${num4(flow.value / 1e3, 2)} kW` : `${num4(flow.value, 0)} W` : `${num4(flow.value, 1)} A`} (${when(flow)})`);
+  if (flow?.fresh) facts.push(`Measured ${flow.kind === "power" ? flow.value >= 1e3 ? `${num5(flow.value / 1e3, 2)} kW` : `${num5(flow.value, 0)} W` : `${num5(flow.value, 1)} A`} (${when(flow)})`);
   else facts.push("Measured power: unknown");
   const done = (r7) => {
     r7.facts = facts;
@@ -65473,7 +65706,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.175";
+var CARD_VERSION = "2.5.176";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {
@@ -65899,7 +66132,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       this.priceReview = null;
       return { state: "unavailable", message: "Charging history needs the Home Assistant time zone, which is unknown here.", nav: null };
     }
-    this.historyDay ||= createHistoryDay({ request: (params) => this.bounded(getChargingHistory(this._hass, this.charger, params.date)), requestSessions: () => this.bounded(getSessions(this._hass, this.charger, 1)), onChange: () => {
+    this.historyDay ||= createHistoryDay({ request: (params) => this.bounded(getChargingHistory(this._hass, this.charger, params.date)), requestSessions: (params) => this.bounded(getSessions(this._hass, this.charger, 1, params?.month ?? null)), onChange: () => {
       if (this.connected) this.paint();
     } });
     const view = this.historyDay.sync({ charger: this.charger, epoch: `${this.generation}:${this.permissionEpoch}`, zone, marketZone: dashboard.market?.timezone || null, today }).view();
@@ -65940,6 +66173,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     if (!history) return;
     if (kind === "retry") history.retry();
     else if (kind === "prices") this.reviewPrices();
+    else if (kind === "month") history.selectMonth(arg);
     else if (history.select(kind, arg)) this.reviewPrices();
   }
   priceNav(kind, arg) {

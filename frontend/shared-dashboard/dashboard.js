@@ -127,6 +127,7 @@ export function mountDashboard(root, adapter) {
     root.querySelectorAll('[data-history-date]').forEach(input=>bind(input,()=>input.addEventListener('change',()=>{if(input.value)current.actions?.historyNav?.('day',input.value);},{signal})));
     // Price insights (7.5): explicit read-only choices (window length, month, comparison month, retry); nothing is saved.
     root.querySelectorAll('[data-insight-duration]').forEach(select=>bind(select,()=>select.addEventListener('change',()=>current.actions?.insightNav?.('duration',Number(select.value)),{signal})));
+    root.querySelectorAll('[data-history-month]').forEach(select=>bind(select,()=>select.addEventListener('change',()=>{if(select.value)current.actions?.historyNav?.('month',select.value);},{signal})));
     root.querySelectorAll('[data-insight-month]').forEach(select=>bind(select,()=>select.addEventListener('change',()=>{if(select.value)current.actions?.insightNav?.('month',select.value);},{signal})));
     root.querySelectorAll('[data-insight-compare]').forEach(select=>bind(select,()=>select.addEventListener('change',()=>current.actions?.insightNav?.('compare',select.value),{signal})));
     root.querySelectorAll('[data-insight-compare-previous]').forEach(button=>bind(button,()=>button.addEventListener('click',()=>current.actions?.insightNav?.('compare','previous'),{signal})));

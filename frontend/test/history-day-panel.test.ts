@@ -16,7 +16,7 @@ vi.mock('echarts/components', () => ({ GridComponent: {}, TooltipComponent: {}, 
 vi.mock('echarts/renderers', () => ({ CanvasRenderer: {} }));
 globalThis.ResizeObserver = class { observe() {} disconnect() {} };
 import '../sidebar/panel.js';
-import { historyAnswer, HISTORY_ZONE } from '../prototype/history-day-fixture.js';
+import { historyAnswer, HISTORY_ZONE, fixtureSessionsRequest } from '../prototype/history-day-fixture.js';
 import { localDaySpan } from '../sidebar/price-chart.js';
 import { localDate } from '../shared-dashboard/history-day.js';
 
@@ -32,7 +32,7 @@ const ZONE = HISTORY_ZONE; // The response fixture and HA calendar must use the 
 const localToday = () => new Intl.DateTimeFormat('en-CA', {timeZone: ZONE, year: 'numeric', month: '2-digit', day: '2-digit'}).format(new Date());
 const shift = (day, n) => new Date(Date.parse(day + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
 
-function setup(hassExtra = {}, pending = null, {sessionDays = [], priceDays = null, raw: rawEdit = null} = {}) {
+function setup(hassExtra = {}, pending = null, {sessionDays = [], priceDays = null, raw: rawEdit = null, sessions = null} = {}) {
   const raw = JSON.parse(readFileSync('../tests/fixtures/dashboard/target_soc_two_vehicles.json', 'utf8'));
   raw.generated_at = new Date().toISOString(); raw.charger.charger_id = 'a'; rawEdit?.(raw);
   const calls = [];
@@ -40,6 +40,7 @@ function setup(hassExtra = {}, pending = null, {sessionDays = [], priceDays = nu
     calls.push(msg);
     if (msg.type === 'spotnav/list_chargers') return Promise.resolve({api_version: 1, chargers: [{charger_id: 'a', charger_name: 'A'}, {charger_id: 'b', charger_name: 'B'}]});
     if (msg.type === 'spotnav/get_dashboard') return Promise.resolve({...raw, charger: {...raw.charger, charger_id: msg.charger_id}});
+    if (msg.type === 'spotnav/get_sessions' && sessions) return Promise.resolve(sessions(msg));
     if (msg.type === 'spotnav/get_sessions') return Promise.resolve({api_version: 1, charger_id: msg.charger_id, days: sessionDays.map(period => ({period, sessions: 1, energy_kwh: 5}))});
     if (msg.type === 'spotnav/get_price_days' && priceDays) return Promise.resolve(priceDays(msg));
     if (msg.type === 'spotnav/get_charging_history') {
@@ -125,6 +126,38 @@ describe('sidebar history day (7.3a) in the real panel', () => {
     panel.historyNav('day', shift(today, -10)); await tick(); await tick();
     expect(note()).toMatch(/not available, so the price chart is unchanged: unknown, not zero/);
     expect(calls.filter(m => !['spotnav/list_chargers', 'spotnav/get_dashboard', 'spotnav/get_settings', 'spotnav/get_price_days', 'spotnav/get_price_insights', 'spotnav/get_charging_history', 'spotnav/get_sessions', 'spotnav/get_market', 'spotnav/get_market_options', 'spotnav/get_entity_config', 'spotnav/morek_schedule'].includes(m.type))).toEqual([]);
+    panel.remove();
+  });
+
+  it('shows the spot-only month cost from the opening sessions read, reads another month only on choice, and never writes (8.2b)', async () => {
+    const cur = localToday().slice(0, 7), prev = shift(`${cur}-01`, -1).slice(0, 7);
+    const toFixture = text => text.split(prev).join('@@P').split(cur).join('@@C').split('@@C').join('2026-11').split('@@P').join('2026-10');
+    const toReal = text => text.split('2026-11').join('@@C').split('2026-10').join('@@P').split('@@C').join(cur).split('@@P').join(prev);
+    const sessions = msg => { const answer = fixtureSessionsRequest({charger: msg.charger_id})(msg.month ? {month: toFixture(msg.month)} : {}); return answer.then(a => JSON.parse(toReal(JSON.stringify(a)))); };
+    const {calls, hass} = setup({}, null, {sessions}); const panel = await open(hass); await tick();
+    const reads = () => calls.filter(m => m.type === 'spotnav/get_sessions');
+    expect(reads()).toEqual([{type: 'spotnav/get_sessions', api_version: 1, charger_id: 'a', limit: 1}]);
+    const section = () => panel.shadowRoot.querySelector('[data-history-section="month-cost"]');
+    expect(section().dataset.monthCostState).toBe('ready');
+    expect(section().textContent).toContain('Partial spot cost €1.97');
+    expect(section().textContent).toContain('no fees, taxes or margin');
+    for (let i = 0; i < 3; i++) { panel.paint(); await tick(); }
+    expect(reads()).toHaveLength(1);
+    const select = panel.shadowRoot.querySelector('select[data-history-month]');
+    select.value = prev; select.dispatchEvent(new Event('change')); await tick(); await tick();
+    expect(reads().at(-1)).toEqual({type: 'spotnav/get_sessions', api_version: 1, charger_id: 'a', limit: 1, month: prev});
+    expect(reads()).toHaveLength(2);
+    expect(section().textContent).toContain('-€0.35');
+    const again = panel.shadowRoot.querySelector('select[data-history-month]'); again.value = cur; again.dispatchEvent(new Event('change')); await tick();
+    expect(section().textContent).toContain('€1.97'); expect(reads()).toHaveLength(2);
+    expect(calls.filter(m => !['spotnav/list_chargers', 'spotnav/get_dashboard', 'spotnav/get_settings', 'spotnav/get_price_days', 'spotnav/get_price_insights', 'spotnav/get_charging_history', 'spotnav/get_sessions', 'spotnav/get_market', 'spotnav/get_market_options', 'spotnav/get_entity_config', 'spotnav/morek_schedule'].includes(m.type))).toEqual([]);
+    panel.remove();
+  });
+
+  it('an older backend (no delivery keys) says spot cost is not reported for the month and the day, never zero (8.2b)', async () => {
+    const {hass} = setup(); const panel = await open(hass); await tick();
+    expect(panel.shadowRoot.querySelector('[data-history-section="month-cost"]').dataset.monthCostState).toBe('legacy');
+    expect(panel.shadowRoot.querySelector('[data-history-section="month-cost"]').textContent).toContain('does not report spot-only cost by month');
     panel.remove();
   });
 

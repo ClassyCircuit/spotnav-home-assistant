@@ -238,7 +238,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     const zone=this._hass?.config?.time_zone;
     const today=typeof zone==='string' && zone ? localDate(Date.now(),zone) : null;
     if (!dashboard || !this.charger || !this._hass || !today) {this.historyDay?.dispose();this.historyDay=null;this.priceReview=null;return {state:'unavailable',message:'Charging history needs the Home Assistant time zone, which is unknown here.',nav:null};}
-    this.historyDay ||= createHistoryDay({request:params=>this.bounded(getChargingHistory(this._hass,this.charger,params.date)),requestSessions:()=>this.bounded(getSessions(this._hass,this.charger,1)),onChange:()=>{if(this.connected)this.paint();}});
+    this.historyDay ||= createHistoryDay({request:params=>this.bounded(getChargingHistory(this._hass,this.charger,params.date)),requestSessions:params=>this.bounded(getSessions(this._hass,this.charger,1,params?.month ?? null)),onChange:()=>{if(this.connected)this.paint();}});
     const view=this.historyDay.sync({charger:this.charger,epoch:`${this.generation}:${this.permissionEpoch}`,zone,marketZone:dashboard.market?.timezone || null,today}).view();
     if (view.nav) view.nav.priceNote=priceReviewNote(this.priceReview?.charger===this.charger ? this.priceReview : null,view.nav.day);
     return view;
@@ -264,7 +264,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
   }
   historyNav(kind,arg) {
     const history=this.historyDay;if(!history)return;
-    if (kind==='retry') history.retry(); else if (kind==='prices') this.reviewPrices(); else if (history.select(kind,arg)) this.reviewPrices();
+    if (kind==='retry') history.retry(); else if (kind==='prices') this.reviewPrices(); else if (kind==='month') history.selectMonth(arg); else if (history.select(kind,arg)) this.reviewPrices();
   }
   priceNav(kind,arg) {
     if (kind==='retry') this.priceDays?.retry(); else this.priceDays?.select(kind,arg);

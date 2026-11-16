@@ -7,7 +7,10 @@
 export const HISTORY_DAYS_BACK = 62;       // the digest limit; older days have no evidence (sessions live elsewhere)
 export const REFRESH_TODAY_MS = 300000;    // the default day is re-read at most this often; a past day never is
 const PARTIAL_AFTER_S = 660;               // MAX_POWER_GAP_S: power rows starting later than this after midnight are partial
+import { describeSpotCost, sessionCostLines, parseDeliveryMonth, monthCostModel, monthKey, monthName } from './spot-cost.js';
 const MINUTE = 60000;
+const MONTH_CACHE = 3;                     // months other than the current one kept in memory (never persisted)
+const MONTHS_BACK = 24;                    // get_sessions answers this many months back
 const DAY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const ZONE_FAILED = 'Charging history needs the Home Assistant time zone, which is unknown here.';
 const LISTS = [['intervals', 'measured flow intervals'], ['gaps', 'capture gaps'], ['restarts', 'capture restarts'],
@@ -224,9 +227,17 @@ export function buildHistoryModel(answer, day, fmt, readAt = NaN) {
       if (nonneg(rec.unassigned_register_kwh) && rec.unassigned_register_kwh > 0) lines.push(`Later register rise ${kwh(rec.unassigned_register_kwh)}: seen by receipt time only, not assigned to this session`);
       if (['uncertain', 'unknown', 'skipped', 'inconsistent'].includes(rec.state) || (nonneg(rec.unassigned_register_kwh) && rec.unassigned_register_kwh > 0)) lines.push('The session total is not certified');
     } else lines.push('Register reconciliation unavailable');
-    return { text: `${span(s.start, s.end)} · placed energy ${kwh(s.energy_kwh)} (source: ${words(s.energy_source)})`, lines,
+    const crosses = localDate(instant(s.start), answer.window.zone) !== localDate(Math.max(instant(s.start), instant(s.end) - 1), answer.window.zone);
+    return { text: `${span(s.start, s.end)} · placed energy ${kwh(s.energy_kwh)} (source: ${words(s.energy_source)})`, lines, costLines: sessionCostLines(s, crosses),
       detail: `${words(s.source)} · started by ${words(s.started_by)}${s.price_slices_truncated === true ? ` · ${s.price_slices_cut} price slice(s) not shown` : ''}` };
   });
+
+  // Stage 8.2b: the day's spot-only cost is the backend's `window_spot_cost` (the closed sessions' share of this local day), never the fiscal fields.
+  const wc = answer.window_spot_cost;
+  const cost = wc === undefined ? { state: 'legacy', headline: 'This integration does not report spot-only cost, so none is shown (not zero). Its older cost fields include fees and taxes and are not shown here.', lines: [] }
+    : wc && typeof wc === 'object' && wc.local_day === day ? describeSpotCost(wc, 'day')
+      : { state: 'invalid', headline: 'Spot cost not shown: the answer could not be understood.', lines: [] };
+  if (cost.state !== 'legacy' && cost.state !== 'invalid') cost.lines.push('Closed sessions only; a charge still running is not included. Plan totals elsewhere are a forecast on their own cost basis and are not this historical spot cost.');
 
   const gaps = o.gaps.map(g => `${words(g.kind)} ${stamp(g.from)}${g.to ? `–${stamp(g.to)}` : ''}${g.reason ? ` (${words(g.reason)})` : ''}`);
   const restarts = o.capture_restarts.map(stamp);
@@ -248,7 +259,7 @@ export function buildHistoryModel(answer, day, fmt, readAt = NaN) {
       digestDays: signals ? r.digest_days.length : null, newestDigest: signals && r.digest_days.length ? r.digest_days.at(-1) : null },
     coverage: { text: `Measured power covers ${duration(cov.trusted_seconds)} of ${duration(cov.window_seconds)}; ${duration(cov.untrusted_seconds)} untrusted; ${duration(cov.no_data_seconds)} with no data (unknown, not zero).`,
       none: !nonneg(cov.trusted_seconds) },
-    sent, flow, outside, energyRows, energyNotes, sessions, gaps, restarts, unacked, digest: digestModel,
+    sent, flow, outside, energyRows, energyNotes, sessions, cost, gaps, restarts, unacked, digest: digestModel,
     tracks: historyTracks(answer, { raw, since, until, oldestPower, digest, readAt, zone: answer.window.zone, day }),
     isolated: nonneg(o.isolated_flow_samples) && o.isolated_flow_samples > 0 ? `${o.isolated_flow_samples} single reading(s) above the flow threshold were not enough to count as charging.` : '',
     flowNote: 'Flow comes only from measured power readings (threshold about 100 W, unverified for the installed charger). A plan, its acknowledgement, a limit read back, the battery level or the charger status never counts as flow.',
@@ -258,7 +269,7 @@ export function buildHistoryModel(answer, day, fmt, readAt = NaN) {
 
 /**
  * `request(params)` resolves the backend answer (live: the WebSocket, preview: a fixture of the same shape).
- * `requestSessions()` (optional) resolves `spotnav/get_sessions`; only its `days` list (days with a recorded session) is used.
+ * `requestSessions({month?})` (optional) resolves `spotnav/get_sessions`; its `days` list (days with a recorded session) and the 8.2a delivery-month spot cost are used.
  * `onChange()` fires when an asynchronous result changed what to draw.
  *
  * Stage 8.1: the first view is YESTERDAY (a provisional bootstrap: loading, then what the backend says, never "no charge"). Only days
@@ -266,10 +277,11 @@ export function buildHistoryModel(answer, day, fmt, readAt = NaN) {
  * A choice is kept across refreshes; only a charger/permission/zone change returns to the default.
  */
 export function createHistoryDay({ request, requestSessions = null, onChange = () => {}, now = () => Date.now() }) {
-  let ctx = null, key = null, seq = 0, sessSeq = 0;
-  const initial = () => ({ sel: { kind: 'default' }, loading: null, result: null, error: null, ret: null, sessions: { status: requestSessions ? 'idle' : 'off', days: [] } });
+  let ctx = null, key = null, seq = 0, sessSeq = 0, monthSeq = 0;
+  const initial = () => ({ sel: { kind: 'default' }, loading: null, result: null, error: null, ret: null, sessions: { status: requestSessions ? 'idle' : 'off', days: [], current: null, month: null },
+    month: { sel: null, read: null, cache: new Map() } });
   let st = initial();
-  const reset = () => { seq++; sessSeq++; st = initial(); };
+  const reset = () => { seq++; sessSeq++; monthSeq++; st = initial(); };
   const keyOf = c => JSON.stringify([c.charger, c.epoch, c.zone]);
   const effective = () => st.sel.kind === 'today' ? ctx.today : st.sel.kind === 'default' ? addDays(ctx.today, -1) : st.sel.day;
   // Days proven by a session read alone are still offered when the retention metadata is unavailable (older integration or failed first read).
@@ -316,15 +328,52 @@ export function createHistoryDay({ request, requestSessions = null, onChange = (
   // The days with a recorded session (`get_sessions.days`: latest 62 session days, by start day in the HA zone): one small read per context.
   async function loadSessions() {
     const mine = ++sessSeq, myKey = key, asked = ctx;
-    st.sessions = { status: 'loading', days: [] };
+    st.sessions = { status: 'loading', days: [], current: null, month: null, readFor: null };
     try {
-      const answer = await requestSessions();
+      const answer = await requestSessions({});
       if (mine !== sessSeq || myKey !== key) return;
       const rows = Array.isArray(answer?.days) ? answer.days : null;
       if (!(answer?.api_version === 1 && answer.charger_id === asked.charger && rows && rows.length <= 400 && rows.every(r => DAY_RE.test(r?.period || '')))) throw new Error('invalid');
-      st.sessions = { status: 'ready', days: rows.filter(r => typeof r.sessions === 'number' && r.sessions > 0).map(r => r.period) };
-    } catch { if (mine !== sessSeq || myKey !== key) return; st.sessions = { status: 'error', days: [] }; }
+      // The same read also carries the current month's delivery-day spot cost (8.2a): reused, never a second request.
+      const current = parseDeliveryMonth(answer, asked.charger);
+      st.sessions = { status: 'ready', days: rows.filter(r => typeof r.sessions === 'number' && r.sessions > 0).map(r => r.period), current, month: current?.month || monthKey(asked.today), readFor: monthKey(asked.today) };
+    } catch { if (mine !== sessSeq || myKey !== key) return; st.sessions = { status: 'error', days: [], current: null, month: null }; }
     onChange();
+  }
+
+  // One other month, on the user's choice only: one bounded read per month (at most MONTH_CACHE kept), bound to the same context key.
+  async function loadMonth(month) {
+    const mine = ++monthSeq, myKey = key, charger = ctx.charger;
+    st.month.read = { month, status: 'loading' };
+    try {
+      const answer = await requestSessions({ month });
+      if (mine !== monthSeq || myKey !== key || st.month.sel !== month) return;
+      const parsed = parseDeliveryMonth(answer, charger, month);
+      if (!parsed) throw new Error('invalid');
+      st.month.cache.set(month, parsed);
+      while (st.month.cache.size > MONTH_CACHE) st.month.cache.delete(st.month.cache.keys().next().value);
+      st.month.read = { month, status: 'ready' };
+    } catch { if (mine !== monthSeq || myKey !== key || st.month.sel !== month) return; st.month.read = { month, status: 'error' }; }
+    onChange();
+  }
+  const currentMonth = () => st.sessions.month || monthKey(ctx.today);
+  const monthChoices = () => {
+    const cur = currentMonth(), lo = monthKey(addDays(`${cur}-01`, -31 * MONTHS_BACK));
+    const found = (st.sessions.current?.available || []).filter(m => m <= cur && m >= lo);
+    return [...new Set([cur, ...found])].sort().reverse();
+  };
+  function monthView() {
+    if (st.sessions.status === 'off' || !ctx) return null;
+    const cur = currentMonth(), sel = st.month.sel || cur, choices = monthChoices();
+    const options = choices.map(m => ({ value: m, label: m === cur ? `${monthName(m)} (so far)` : monthName(m), selected: m === sel }));
+    const base = { options, selected: sel, isCurrent: sel === cur, busy: st.month.read?.status === 'loading' };
+    if (sel === cur) {
+      if (st.sessions.status === 'ready') return { ...base, ...monthCostModel(st.sessions.current, { isCurrent: true }) };
+      return { ...base, state: st.sessions.status === 'error' ? 'error' : 'loading', message: st.sessions.status === 'error' ? 'The month’s spot cost could not be read. Press Retry.' : 'Reading the month’s spot cost…' };
+    }
+    const hit = st.month.cache.get(sel);
+    if (hit) return { ...base, ...monthCostModel(hit, { isCurrent: false }) };
+    return { ...base, state: st.month.read?.status === 'error' ? 'error' : 'loading', message: st.month.read?.status === 'error' ? 'That month’s spot cost could not be read. Press Retry.' : `Reading ${monthName(sel)}…` };
   }
 
   return {
@@ -335,6 +384,8 @@ export function createHistoryDay({ request, requestSessions = null, onChange = (
       if (nextKey !== key) { reset(); key = nextKey; }
       ctx = valid ? next : null;
       if (!ctx) return this;
+      // A new local month drops the stored month answers (they are in memory only) so the current month is read again.
+      if (st.sessions.status === 'ready' && st.sessions.readFor && monthKey(ctx.today) !== st.sessions.readFor) { monthSeq++; st.month = { sel: null, read: null, cache: new Map() }; st.sessions = { ...st.sessions, status: 'idle' }; }
       if (st.sessions.status === 'idle') void loadSessions();
       const day = effective();
       if (st.loading) return this;
@@ -357,8 +408,20 @@ export function createHistoryDay({ request, requestSessions = null, onChange = (
       onChange();
       return true;
     },
+    /** Choose the month of the spot-cost summary (only a month the backend lists, at most 24 back); the current month needs no read. */
+    selectMonth(month) {
+      if (!ctx || st.sessions.status === 'off' || typeof month !== 'string' || !monthChoices().includes(month)) return false;
+      monthSeq++;
+      if (month === currentMonth()) { st.month.sel = null; st.month.read = null; onChange(); return true; }
+      st.month.sel = month; st.month.read = null;
+      if (!st.month.cache.has(month)) void loadMonth(month);
+      onChange();
+      return true;
+    },
     retry() {
-      if (!ctx || st.loading) return;
+      if (!ctx) return;
+      if (st.month.sel && st.month.read?.status === 'error') { void loadMonth(st.month.sel); onChange(); }
+      if (st.loading) return;
       if (st.sessions.status === 'error') { void loadSessions(); onChange(); }
       if (st.error) { void load(effective()); onChange(); }
     },
@@ -379,15 +442,16 @@ export function createHistoryDay({ request, requestSessions = null, onChange = (
         sessionsNote: st.sessions.status === 'error' ? 'Days with a recorded session could not be read; a day that has only sessions may be missing from this list.' : '',
         canPrev: !!map && days.some(d => d < shown), canNext: !!map && days.some(d => d > shown),
         canYesterday: !!map && map.has(addDays(ctx.today, -1)) && shown !== addDays(ctx.today, -1), canToday: !!map && map.has(ctx.today) && shown !== ctx.today,
-        canRetry: (!!st.error || st.sessions.status === 'error') && !st.loading, loading: !!st.loading };
+        canRetry: (!!st.error || st.sessions.status === 'error' || st.month.read?.status === 'error') && !st.loading, loading: !!st.loading };
       const notRetained = map && !map.has(shown) ? 'This day is not in the retained list (older than the raw rows, no day summary and no recorded session). Nothing can be said about it; that is not “did not charge”.' : '';
-      const withNav = model => ({ ...model, nav, ...(notRetained ? { notRetained } : {}) });
-      if (st.loading) return { state: 'loading', message: `Loading charging history for ${dayLabel(shown)}…`, nav };
+      const monthCost = monthView();
+      const withNav = model => ({ ...model, nav, monthCost, ...(notRetained ? { notRetained } : {}) });
+      if (st.loading) return { state: 'loading', message: `Loading charging history for ${dayLabel(shown)}…`, nav, monthCost };
       if (st.error && st.result?.day === shown && st.result.refreshFailed) return withNav({ ...st.result.model, refreshFailed: true });
-      if (st.error) return { state: st.error.state, message: st.error.message, nav };
+      if (st.error) return { state: st.error.state, message: st.error.message, nav, monthCost };
       if (st.result?.day === shown) return withNav({ ...st.result.model, refreshFailed: st.result.refreshFailed === true });
-      return { state: 'loading', message: `Loading charging history for ${dayLabel(shown)}…`, nav };
+      return { state: 'loading', message: `Loading charging history for ${dayLabel(shown)}…`, nav, monthCost };
     },
-    dispose() { seq++; sessSeq++; ctx = null; key = null; st = initial(); },
+    dispose() { seq++; sessSeq++; monthSeq++; ctx = null; key = null; st = initial(); },
   };
 }

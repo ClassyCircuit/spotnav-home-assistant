@@ -30,7 +30,7 @@ export function createSampleAdapter(rebuild) {
   let priceReview = null;
   const reviewPrices = () => { const shown = historyNavigation.shown(); if (!shown) return; const start = Date.parse(`${shown.day}T00:00:00Z`);
     priceReview = requestDayPrices({shown, span:[start,start+86400000], marketZone:HISTORY_ZONE, marketToday:SAMPLE_TODAY, priceDays:navigation}); rebuild?.(build()); };
-  const historyAction = (kind,arg) => { if (kind==='retry') historyNavigation.retry(); else if (kind==='prices') reviewPrices(); else if (historyNavigation.select(kind,arg)) reviewPrices(); };
+  const historyAction = (kind,arg) => { if (kind==='retry') historyNavigation.retry(); else if (kind==='prices') reviewPrices(); else if (kind==='month') historyNavigation.selectMonth(arg); else if (historyNavigation.select(kind,arg)) reviewPrices(); };
   const hours = ms => (ms-EPOCH)/3600000;
   // Fictional latest readback (remaining period only), in the backend's absolute-instant shape; never history.
   const sampleEffective = () => { const h = x => EPOCH + x * 3600000; const spans = [[now,24,0],[24,24.625,16],[24.625,25,0],[25,25.375,16],[25.375,36,0]].map(([a,b,value])=>({start:h(a),end:h(b),value}));

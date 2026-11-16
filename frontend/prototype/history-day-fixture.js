@@ -23,6 +23,12 @@ const spotBlock = (o = {}) => ({ amount: null, currency: null, unit: 'major', ma
   price_source: null, price_source_state: 'unknown', price_sources: [], priced_kwh: 0, unpriced_kwh: 8.2, unplaced_kwh: 0, unplaced_ambiguous_kwh: 0, unplaced_unknown_sessions: 1,
   unallocated_kwh: 0, estimated_kwh: 0, energy_sources: {}, sessions: 1,
   coverage: { state: 'none', complete: false, partial: false, priced_fraction: 0, reasons: ['unpriced_energy'], unpriced_reasons: { no_price_slice: 8.2 } }, currency_exclusions: null, ...o });
+const ALLOC = 'price_interval_overlap_estimate';
+const priced = (amount, kwh, o = {}) => spotBlock({ amount, currency: 'EUR', major_unit: '€', basis: 'recorded_price_slices', price_source_state: 'not_recorded', priced_kwh: kwh, unpriced_kwh: 0, unplaced_unknown_sessions: 0,
+  energy_sources: { register: kwh }, coverage: { state: 'complete', complete: true, partial: false, priced_fraction: 1, reasons: [], unpriced_reasons: {} }, ...o });
+const partial = (amount, kwh, unpriced, o = {}) => priced(amount, kwh, { unpriced_kwh: unpriced, coverage: { state: 'partial', complete: false, partial: true, priced_fraction: Math.round(kwh / (kwh + unpriced) * 10000) / 10000,
+  reasons: ['unpriced_energy'], unpriced_reasons: { no_price_slice: unpriced } }, ...o });
+const noSessions = (o = {}) => spotBlock({ sessions: 0, unpriced_kwh: 0, unplaced_unknown_sessions: 0, coverage: { state: 'no_sessions_recorded', complete: false, partial: false, priced_fraction: null, reasons: [], unpriced_reasons: {} }, ...o });
 const prov = { basis: 'recorder_register_pair', endpoint: null, when_delivered: 'unknown', note: '', window_seconds: 21600 };
 // A session evaluated against the register (late evidence kept) and one that never was (no stored record).
 const recon = (state, o = {}) => ({ state, reason: null, placed_kwh: 8.2, total_kwh: null, unplaced_late_kwh: null, placement: null, placement_reasons: [], final: false,
@@ -32,6 +38,7 @@ const session = (day, a, b, o = {}) => ({ id: `s-${day}`, start: at(day, ...a), 
   area_id: 'SAMPLE-1', cost: null, cost_basis: 'not_recomputed_here', price_slices: [], price_slices_truncated: false, price_slices_cut: 0, association: 'time_overlap_only',
   spot_cost: spotBlock(), spot_cost_in_window: spotBlock({ allocation: 'price_interval_overlap_estimate' }),
   reconciliation: recon('consistent', { total_kwh: 8.2 }), overlapping_observed_intervals: 1, ...o });
+const CLOSED = 'closed sessions only; an open session is not included';
 const retention = (oldestPower, digestDays = ['2026-11-05']) => ({ oldest_evidence: at('2026-10-30', 22), window_starts_before_oldest_evidence: false,
   oldest_by_kind: { power_w: oldestPower, current_a: null, energy_register_kwh: oldestPower, status: null }, digest_days: digestDays,
   limits: { max_samples_per_kind: 4320, max_age_days: 7, max_digest_days: 62 }, note: 'raw rows are bounded by age and count' });
@@ -43,7 +50,7 @@ function base(charger, day, over) {
     plans: [], plans_truncated: false, truncated: noCuts(), price_snapshots: {},
     observed: { intervals: [], isolated_flow_samples: 0, coverage: coverage(0, 0), energy: energy(null, null), gaps: [], capture_restarts: [] },
     comparison: { planned_blocks: [], outside_plan: [], unknown_plan_spans: [], basis: 'acknowledged_intent_known_spans_only' },
-    sessions: [], digests: [], window_spot_cost: spotBlock({ sessions: 0, unpriced_kwh: 0, coverage: { state: 'no_sessions_recorded', complete: false, partial: false, priced_fraction: null, reasons: [], unpriced_reasons: {} }, allocation: 'price_interval_overlap_estimate', local_day: day, scope: 'closed sessions only; an open session is not included' }), ...over };
+    sessions: [], digests: [], window_spot_cost: noSessions({ allocation: ALLOC, local_day: day, scope: CLOSED }), ...over };
 }
 
 const plan = id => ({ id, acked_intent: true, intent: 'schedule', dispatch_state: 'ack_received', acked_at: at('2026-11-08', 1) });
@@ -70,7 +77,8 @@ export function historyAnswer(charger, day) {
     case '2026-11-09': return base(charger, day, { plans: [plan('p1')], observed: { intervals: [interval(day, [2, 5], [2, 55])], isolated_flow_samples: 0,
       coverage: coverage(52000, 0, 52800), energy: energy(7.9, 8.1), gaps: [], capture_restarts: [] },
       comparison: { planned_blocks: [block(day, [2], [3], 'flow_observed')], outside_plan: [], unknown_plan_spans: [], basis: 'acknowledged_intent_known_spans_only' },
-      sessions: [session(day, [2, 3], [2, 58])] });
+      sessions: [session(day, [2, 3], [2, 58], { spot_cost: priced(1.23, 8.2), spot_cost_in_window: priced(1.23, 8.2, { allocation: ALLOC }) })],
+      window_spot_cost: priced(1.23, 8.2, { allocation: ALLOC, local_day: day, scope: CLOSED }) });
     case '2026-11-08': {
       const gaps = Array.from({ length: 200 }, (_, i) => ({ kind: 'power_w', from: at(day, 5, i % 60), to: null, reason: 'unreadable', source: 'ha' }));
       return base(charger, day, { plans: [plan('p1'), plan('p2')], truncated: { ...noCuts(), gaps: cap(12) },
@@ -79,17 +87,22 @@ export function historyAnswer(charger, day) {
         comparison: { planned_blocks: [block(day, [22], [23], 'unknown', { reasons: ['partial_coverage'], covered_fraction: 0.62, intent_uncertain_after: at(day, 22, 30) })],
           outside_plan: [{ interval: 0, start: at(day, 21, 50), end: at(day, 22), seconds: 600, kind: 'outside_plan', tolerance_seconds: 120 }, { interval: 1, start: at(day, 23, 10), end: at(day, 23, 40), seconds: 1800, kind: 'plan_unknown' }],
           unknown_plan_spans: [{ from: at(day, 22, 30), until: null, reason: 'dispatch_started' }], basis: 'acknowledged_intent_known_spans_only' },
-        sessions: [session(day, [21, 45], [23, 45], { reconciliation: recon('uncertain', { reason: 'late_register_unassigned', unplaced_late_kwh: 1.4, unassigned_register_kwh: 0.6 }) })] });
+        sessions: [session(day, [21, 45], [23, 45], { reconciliation: recon('uncertain', { reason: 'late_register_unassigned', unplaced_late_kwh: 1.4, unassigned_register_kwh: 0.6 }),
+          spot_cost: partial(0.84, 5, 3.2, { unplaced_kwh: 1.4 }), spot_cost_in_window: partial(0.84, 5, 3.2, { allocation: ALLOC, unplaced_kwh: 1.4 }) })],
+        window_spot_cost: partial(0.84, 5, 3.2, { allocation: ALLOC, unplaced_kwh: 1.4, local_day: day, scope: CLOSED }) });
     }
     case '2026-11-07': return base(charger, day, { retention: retention(at(day, 9), ['2026-11-05']), observed: { intervals: [interval(day, [10, 0], [10, 50])], isolated_flow_samples: 0,
-      coverage: coverage(50000, 0), energy: energy(7.1, 7.3), gaps: [], capture_restarts: [] } });
+      coverage: coverage(50000, 0), energy: energy(7.1, 7.3), gaps: [], capture_restarts: [] },
+      // a session that crosses midnight: this day holds only its share; the whole session is a different number
+      sessions: [session(day, [0, 0], [1, 0], { start: at('2026-11-06', 23), energy_kwh: 6, spot_cost: priced(-0.2, 6), spot_cost_in_window: priced(-0.1, 3, { allocation: ALLOC }) })],
+      window_spot_cost: priced(-0.1, 3, { allocation: ALLOC, local_day: day, scope: CLOSED }) });
     case '2026-11-06': return base(charger, day, { retention: retention(at('2026-11-07', 9)), plans: [plan('p1')],
       observed: { intervals: [], isolated_flow_samples: 0, coverage: { ...coverage(0, 0), power_samples_in_retention: true }, energy: energy(null, null), gaps: [], capture_restarts: [] },
       comparison: { planned_blocks: [block(day, [2], [3], 'unknown', { reasons: ['block_starts_before_retained_power', 'partial_coverage'], covered_fraction: 0 })], outside_plan: [], unknown_plan_spans: [], basis: 'acknowledged_intent_known_spans_only' },
       sessions: [session(day, [2, 3], [2, 58], { reconciliation: reconMissing() })] });
     case '2026-11-05': return base(charger, day, { retention: retention(at('2026-11-07', 9)), digests: [digest(day)] });
     case '2026-11-04': return base(charger, day, { retention: retention(at('2026-11-07', 9), []) });
-    case '2026-11-03': { const old = base(charger, day, {}); delete old.truncated; old.retention = { oldest_evidence: at('2026-10-30', 22), window_starts_before_oldest_evidence: true, note: '' }; return old; }
+    case '2026-11-03': { const old = base(charger, day, {}); delete old.truncated; delete old.window_spot_cost; old.retention = { oldest_evidence: at('2026-10-30', 22), window_starts_before_oldest_evidence: true, note: '' }; return old; }
     default: return base(charger, day, {});
   }
 }
@@ -105,6 +118,21 @@ export function fixtureHistoryRequest(context) {
 
 /** The days with a recorded session, in the shape of `spotnav/get_sessions.days` (start day, newest first; fictional). */
 export const SESSION_DAYS = ['2026-11-09', '2026-11-08', '2026-11-06', '2026-10-12'];
+const monthDays = (month, rows) => Array.from({ length: month === '2026-11' ? 30 : 31 }, (_, i) => {
+  const period = `${month}-${String(i + 1).padStart(2, '0')}`;
+  return { kind: 'delivery_day', period, spot_cost: rows[period] || noSessions({ allocation: ALLOC }) };
+});
+const delivery = (month, total, rows, extra = {}) => ({ delivery_accounting: { allocation: ALLOC, day: 'home_assistant_local_calendar_day', month: 'sum_of_delivery_days', price_basis: 'raw_published_spot_no_fees_no_taxes' },
+  delivery_days: [], month, delivery_month_summary: { kind: 'delivery_month', period: month, spot_cost: total }, delivery_month_days: monthDays(month, rows), ...extra });
+/** `spotnav/get_sessions` (latest 62 days list, limit 1) with the 8.2a delivery-month spot cost; `{month}` asks one other month. Fictional. */
 export function fixtureSessionsRequest(context) {
-  return async () => ({ api_version: 1, charger_id: context.charger, days: SESSION_DAYS.map(period => ({ period, sessions: 1, energy_kwh: 8.2 })) });
+  const base = month => ({ api_version: 1, charger_id: context.charger, days: SESSION_DAYS.map(period => ({ period, sessions: 1, energy_kwh: 8.2 })), month, available_months: ['2026-11', '2026-10', '2026-09'], open: null });
+  return async (params = {}) => {
+    if (params.month === '2026-09') return { ...base('2026-09') };      // an older month answered by an old integration: no delivery keys
+    if (params.month === '2026-10') return { ...base('2026-10'), ...delivery('2026-10', priced(-0.35, 40, { allocation: ALLOC, sessions: 5, currency_exclusions: { kwh: 6, sessions: 1, currencies: { SEK: 6 }, missing_currency_kwh: 0 } }),
+      { '2026-10-12': priced(-0.35, 8.2, { allocation: ALLOC }) }) };
+    // November so far: 3 + 1 sessions with a price, one partial; the month's unpriced energy includes timeless energy no day holds.
+    return { ...base('2026-11'), ...delivery('2026-11', partial(1.97, 16.2, 4.6, { allocation: ALLOC, sessions: 4, unallocated_kwh: 1.4, unplaced_kwh: 1.4 }),
+      { '2026-11-09': priced(1.23, 8.2, { allocation: ALLOC }), '2026-11-08': partial(0.84, 5, 3.2, { allocation: ALLOC, unplaced_kwh: 1.4 }), '2026-11-07': priced(-0.1, 3, { allocation: ALLOC }) }) };
+  };
 }
