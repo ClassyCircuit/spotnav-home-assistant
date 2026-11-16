@@ -3,7 +3,7 @@
 Status: **in progress. This is the only work queue.** Created 2026-11-14 by splitting the old roadmap, which
 is now frozen as a historical reference:
 [archive/charging-dashboard-roadmap-2026-11-14.md](archive/charging-dashboard-roadmap-2026-11-14.md)
-(“the archive”). Initial audit basis: manifest 2.5.128, HEAD `6a50a7ae`. Stage 15 is now locally implemented and coordinator-reviewed through 2.5.143 with focused mocked checks; see its entries and the handoff for unrun checks. Stage 16.1–16.2, Stage 17.1–17.6 and Stage 13.1–13.4 are implemented locally with mocked checks and committed (manifest 2.5.162, HEAD `e31463df`, 2026-11-16 audit); the next unstarted feature queue is Stage 7, then Stage 8, only when the user requests it. Nothing below is
+(“the archive”). Initial audit basis: manifest 2.5.128, HEAD `6a50a7ae`. Stage 15 is now locally implemented and coordinator-reviewed through 2.5.143 with focused mocked checks; see its entries and the handoff for unrun checks. Stage 16.1–16.2, Stage 17.1–17.6, Stage 13.1–13.4 and Stage 18.1–18.4 are implemented locally with mocked checks and committed (manifest 2.5.166, HEAD `f0bb93a3`, 2026-11-16); the next unstarted feature queue is Stage 7, then Stage 8 (audited against 2.5.166 source and made implementation-ready on 2026-11-16, docs only), started only when the user requests it. Nothing below is
 installed, deployed or physically verified, and this file authorizes no HA access, charger command, restart
 or deployment. Read `AGENTS.md` and [the development handoff](morek-development-handoff.md) first.
 
@@ -48,14 +48,14 @@ formality.
 | Stage 5.1 visual approval, 5.8 install/live validation | **User-owned** (§9.C). No LLM work. |
 | 5.7b3 local acceptance (browser, full worker/planning, 5.4c suites **unrun**) | §9.B, optional, runs only if the user asks. |
 | “Coordinator review pending” on `[x]` items | §9.B review list, independent of the queue. |
-| Stage 7.1–7.5 | **Refined and carried** into Stage 7 below (7.3 split into 7.3a/7.3b). |
-| Stage 8.1–8.3 | **Refined and carried** into Stage 8 below (8.2 and 8.3 each split a/b); two product decisions flagged (§9). |
+| Stage 7.1–7.5 | **Refined and carried** into Stage 7 below (7.3 split into 7.3a/7.3b; 7.4 into 7.4a/7.4b). |
+| Stage 8.1–8.3 | **Refined and carried** into Stage 8 below (8.2 and 8.3 each split a/b); D1 spot-only costs and D2 day-average savings are settled (§9). |
 | Stage 11 (11.1/11.2) | **Superseded `[>]`**, migrated to 15.9a/15.9b, 15.10, 15.11 (exact table in §10). |
 | Stage 13.1–13.4 | **Carried** into Stage 13 below, unchanged in scope. |
 | Stage 15.1–15.11, E1, E2 | **Stage 15 locally implemented and reviewed** through 2.5.143; E1/E2 remain optional user-directed evidence tasks. Split a/b ids stay stable. |
 | Archive B1/B2/B3/B4/C1 detail | Delivered by Stages 5–6, 12 and carried by 7–8. Obsolete wording (Sections host, A/B chart switch, per-stage “Done when”) is dropped. |
 | Archive C2 “finish the product” | Covered by Stage 12/13 plus the 8.1 session rows; no separate stage. |
-| Archive §6 “decisions still to settle” | Only three remain open: D1 cost display, D2 savings baseline, D3 history retention (§9). Visual approval is 5.1. |
+| Archive §6 “decisions still to settle” | D1/D2 are settled; D3 preserves current retention, with any extension a separate future decision (§9). Visual approval is 5.1. |
 | Research, learning rules, status wording, terminology, safe user test, 6.1 source inventory, Stage 14 detail | Kept in the archive as **reference only**; linked from the substages that need them. |
 
 ## 3. Ordered work queue
@@ -83,19 +83,20 @@ One at a time; “Needs” lists the only real dependencies. Stable parent ids; 
 | 17 | 13.2 Market and charging-cost settings | none | ✔ local, committed `7e352562` (2.5.159) |
 | 18 | 13.3 Practical plan and charger parameters | 15.1b if built (no duplicate reserve control) | ✔ local, committed `416529c3` (2.5.161) |
 | 19 | 13.4 Notification settings and setup diagnostics | none | ✔ local, committed `e31463df` (2.5.162) |
-| 20 | 7.1 Available-day navigation | none | |
-| 21 | 7.2 Chart interaction and DST/resolution fixes | none (may share a session with 7.1 if 7.1 needs no backend read) | |
-| 22 | 7.3a History client and evidence panel | none (Stage 6.3 API exists) | |
+| 20 | 7.1 Available-day navigation (one small read command + UI) | none | |
+| 21 | 7.2 Chart interaction and DST/resolution fixes | 7.1 (same chart files) | |
+| 22 | 7.3a History client, small backend delta (truncation/retention signals) and evidence panel | none (Stage 6.3 API exists) | |
 | 23 | 7.3b Aligned tracks on the price axis | 7.3a, 7.1 | |
-| 24 | 7.4 Price-insight methods (backend) | none | |
-| 25 | 7.5 Live price insights and monthly statistics (UI) | 7.4 | |
-| 26 | 8.1 Day review (default yesterday) | 7.3a, 7.1 | |
-| 27 | 8.2a Cost of measured energy with tariff provenance (backend) | 8.1, D1 | |
-| 28 | 8.2b Cost display and totals consistency | 8.2a | |
-| 29 | 8.3a Savings baseline (backend) | 8.2a, D2 | |
-| 30 | 8.3b Savings and summary cards | 8.3a, 7.5 | |
+| 24 | 7.4a Live price-insight methods (backend) | none | |
+| 25 | 7.4b Monthly price statistics (backend) | 7.4a | |
+| 26 | 7.5 Live price insights and monthly statistics (UI) | 7.4a, 7.4b | |
+| 27 | 8.1 Day review (default yesterday) | 7.1, 7.3b (needs 7.3a) | |
+| 28 | 8.2a Spot-only cost of measured energy (backend) | 7.3a | |
+| 29 | 8.2b Cost display and totals consistency | 8.2a, 8.1 | |
+| 30 | 8.3a Savings baseline (backend) | 8.2a | |
+| 31 | 8.3b Savings and summary cards | 8.2b, 8.3a, 7.5 | |
 
-Items 1–15 (Stage 15) are locally implemented and coordinator-reviewed through 2.5.143; Stage 16 and Stage 17 (below) and items 16–19 (Stage 13.1–13.4) are implemented locally and committed (2026-11-16 audit: `git log` shows 16.2 `08254d2e`, 17.1 `d9ec44cc`/`999f5fc5`, 17.2 `cc321c71`, 17.3 `e0f0d7d4`, 17.4 `7fadb671`, 17.5 `4bb08550`, 17.6 `35f5ae5f`, 13.1 `d81c3fd8`, 13.2 `7e352562`, 13.3 `416529c3`, 13.4 `e31463df`). Do not reassign any of them. **Open queue: items 20–30 (Stage 7, then Stage 8)**, started only on the user's request; none is a prerequisite for 5.8. The order is the suggested default and the user may reorder it. **Not in the queue:** §9.B reviews, §9.C user-owned items, E1/E2.
+Items 1–15 (Stage 15) are locally implemented and coordinator-reviewed through 2.5.143; Stage 16 and Stage 17 (below) and items 16–19 (Stage 13.1–13.4) are implemented locally and committed (2026-11-16 audit: `git log` shows 16.2 `08254d2e`, 17.1 `d9ec44cc`/`999f5fc5`, 17.2 `cc321c71`, 17.3 `e0f0d7d4`, 17.4 `7fadb671`, 17.5 `4bb08550`, 17.6 `35f5ae5f`, 13.1 `d81c3fd8`, 13.2 `7e352562`, 13.3 `416529c3`, 13.4 `e31463df`). Do not reassign any of them. **Open queue: items 20–31 (Stage 7, then Stage 8)**, started only on the user's request; none is a prerequisite for 5.8. The order is the suggested default and the user may reorder it within the “Needs” column. **D1/D2 are settled; there are no outstanding product-decision gates.** Suggested delegate order (one bounded medium session each): 7.1 → 7.2 → 7.3a → 7.3b → 7.4a → 7.4b → 7.5 → 8.1 → 8.2a → 8.2b → 8.3a → 8.3b. Stage 7/8 substages are not ◆ (they touch no Stage 14 path) but obey the “Binding constraints” block at the start of Stage 7. **Not in the queue:** §9.B reviews, §9.C user-owned items, E1/E2.
 
 ## 4. Standard acceptance for every substage
 
@@ -876,118 +877,192 @@ old card’s backend behaviour disappears when its UI is hidden.
 
 ### Stage 7 — Price chart navigation, evidence tracks, price insights (7.1–7.5)
 
-**Audit (source reading, 2.5.128).** The real stepped-area price chart, proposal overlay, wheel zoom, tooltips,
-reset and zoom-preserving updates already exist (5.4c; `frontend/shared-dashboard/charts.js`,
-`frontend/sidebar/price-chart.js`) — reuse, do not rebuild. Facts that shape the substages:
-(1) the sidebar chart is fed only from `raw.prices.published_intervals` in `get_dashboard`; the webhook
-`price_days` serves today/tomorrow only; the repository keeps up to `HISTORY_KEEP_DAYS` = 400 day files, but
-no sidebar read path for past days was found, and which days it actually holds depends on what was fetched;
-(2) `get_charging_history` (6.3, `sessions/history.py`) exists with **no frontend consumer**: windows ≤ 7 days,
-UTC instants, 200 rows per list, **Morek only**, raw measurements kept 7 days (4320 rows per kind), finished-
-day digests 62 days **without price rows**; the 100 W / 2-sample flow thresholds and the installation’s real
-entities, cadence and noise floor are **unverified**, so a first install is expected to show much `unknown`;
-(3) the shared `history-view.js` takes display strings, `readings {time,kw}` and one `sentHistory {start,end}`,
-and the sidebar adapter supplies **no** `history` or `insights` model, so both views render “unavailable”;
-`insight-view.js` is a text-block renderer with no real data behind it; (4) `price_history.py` builds a
-28-day weekday profile (needs ≥ 21 of 28 days). Honest data prerequisite for 7.3/8.x: measured evidence
-exists only after capture has run on the installation; nothing may be reconstructed from plans or ACKs.
+**Audit (source reading, manifest 2.5.166, HEAD `f0bb93a3`, 2026-11-16; replaces the 2.5.128 audit).** Re-verified facts, not copied claims:
 
-- [ ] **7.1 Available-day navigation.** *Scope:* shortcuts (Yesterday / Today / Tomorrow / All available) only
-  for days the price source actually provides. First document what `published_intervals` covers. If past days
-  need a backend read, add **one** read-only command returning held intervals for a requested local-day range
-  from `price_repository` (bounded range, same permissions as dashboard reads, documented in `docs/api.md`, no
-  new store); otherwise stay frontend-only. A day with no held file is disabled with the reason; unpublished
-  tomorrow is explained; unknown future is not zero; no synthesized rows; reuse `snapRange`/`initialRange`
-  and the existing horizon behaviour. *Acceptance:* shortcut availability follows held data; 23/25 h DST days
-  and source-resolution (hour vs 15 min) boundaries correct; user zoom survives routine updates; preview
-  fixture parity; focused vitest checks (browser suites only if asked).
-- [ ] **7.2 Chart interaction and DST/resolution fixes.** *Scope:* reproduce with fixtures, then fix only
-  defects found: hourly↔15-minute change inside one horizon, 23/25-hour axis ticks, container resize or
-  orientation keeping the range, tooltip for negative values and gaps. Preserve zoom, tooltip, wheel and reset;
-  no new features. May close as “verified, no defect” with the fixtures kept. Physical touch stays
-  unverified.
-- [ ] **7.3a History client and evidence panel.** *Scope:* a read-only client for `spotnav/get_charging_history`
-  and an adapter mapping into an **extended shared `history` contract** (spans with states, not just one sent
-  window): sent-plan spans from the history’s plan knowledge including `unknown_plan_spans`; observed flow
-  intervals; planned-block status `flow_observed` / `no_flow_observed` / `unknown`; `outside_plan` and
-  `no_plan_evidence` flow; measured energy by basis (meter counter vs integrated, **never summed**; a basis
-  with no segment is `null` with coverage, a measured zero is 0.0; unobserved meter energy has no placement).
-  Panel states for loading, permission, unavailable and “no evidence retained”. Preview fixtures use the same
-  contract. No JavaScript planning or interpretation beyond rendering. *Acceptance:* each status and
-  unknown/gap case renders distinctly; Morek-only and ≤ 7-day limits stated; non-admin read behaves as the API
-  does; opening writes nothing; adapter and renderer tests; build/check-dist.
-- [ ] **7.3b Aligned tracks on the price axis.** *Scope:* tracks aligned with the price time axis: **Proposal**
-  (current plan windows incl. `minimum-exception` marking), **Sent** (last acknowledged intent spans), **Effective**
-  (**latest readback only**, remaining period, labelled as such — history never restores effective knowledge)
-  and **Measured** (from 7.3a). Mismatches and missing observations are drawn as unknown/hatched, never as
-  absence; suggested cheap opportunities are not the plan; a reported limit is never drawn as kW. *Acceptance:*
-  proposal≠sent, sent≠effective and planned-without-flow cases legible; zoom/pan keeps tracks aligned; DST
-  day; preview parity; no change to the price chart’s existing interactions.
-- [ ] **7.4 Price-insight methods (backend).** *Scope:* inventory what price data is held (day files,
-  `price_history` profile, `market_observation`) with basis, resolution, retention and coverage, then
-  implement a pure, tested, read-only module and its smallest read surface (an additive block in an existing
-  read payload or one new read-only command, documented in `docs/api.md`): the current interval versus the
-  held trailing window (rank/percentile with a stated minimum coverage, else `unknown`), and the cheapest
-  upcoming window of a requested length inside the **published** horizon. Raw published spot price in the
-  existing display unit unless the existing fiscal helpers are explicitly used and labelled. Output always
-  carries baseline, coverage (days held / expected), basis and assumptions. *Acceptance:* missing history or
-  future prices reported, never invented; negative prices; DST; area/currency change; no new store.
-- [ ] **7.5 Live price insights and monthly statistics (UI).** *Scope:* bind 7.4 into the shared `insights`
-  model (`intro`, `blocks`, `caution`, `method`; host-supplied text): current-interval assessment, best
-  available windows, per-month price statistics with “n of N days held”. Opportunities are not the charging
-  plan and the card says so. *Acceptance:* each block shows baseline, coverage, price basis and assumptions;
-  unavailable data shows the reason; preview parity; i18n parity.
+1. **Chart feed.** The sidebar chart uses only `raw.prices.published_intervals`, built by `serialize_published_intervals` from
+   `capture.intervals`, which comes from `_held_documents` in `api/dashboard.py`: **today and tomorrow display days only**. No past day
+   reaches the UI. `PriceRepository` keeps market-day files for `HISTORY_KEEP_DAYS` = 400 and prunes older ones, but *which* days exist
+   depends on fetching: `pricing/price_history.py` backfills the 28-day profile window; a year (`DEEP_DAYS` 365) only from a provider that
+   answers a range in one request (ENTSO-E); a one-day-at-a-time provider (Nord Pool, reach about two months) fills the window only. So “all
+   available days” is typically about 28 days plus today/tomorrow, up to about a year on ENTSO-E, never “400 days”. No-I/O reads exist:
+   `day_snapshot` (display day cut from market-day files by `compose_display_day`), `file_snapshot`, `file_document`, `holds_file`.
+   The price area has its own display zone (`area.tz`) and market zone (`market_tz`); the history API cuts `date` windows in **Home Assistant's
+   zone** (`local_zone`). The two zones can differ, so every day a view names says which zone it uses.
+2. **History API (`spotnav/get_charging_history`, `sessions/history.py`, `api/sessions.py`).** Any signed-in user may read (same as
+   `get_sessions` and the dashboard; no admin gate; no write). One window ≤ 7 days (`MAX_SPAN`), UTC instants, a 25-hour DST day is 25 hours.
+   `MAX_ROWS` = 200 caps every list, but **only `plans_truncated` says so**: `observed.intervals`, `gaps`, `capture_restarts`,
+   `comparison.planned_blocks`, `outside_plan`, `unknown_plan_spans`, `sessions` and each session's `price_slices` are cut silently.
+   `retention.oldest_evidence` is the minimum over the plans, capture marks and the first row of *every* sample kind, so a plan or capture
+   mark older than the power samples makes `window_starts_before_oldest_evidence` read false for a window whose power rows were already
+   pruned; `observed.coverage.no_data_seconds` is the honest signal today. Both are partial signals, not enough for a quiet UI guess:
+   **7.3a carries the small backend delta below.**
+3. **Actual retention (do not promise 7 days).** Measurements: one row per kind per 60 s capture tick (`MeasurementCapture.TICK_S`), at most
+   `MAX_SAMPLES_PER_KIND` = 4320 rows per kind, so **4320 rows at 60 s = 3 days, not 7**; the 7-day age cap (`RETENTION_DAYS`) binds only
+   for sparser rows. Plans ≤ 120, events ≤ 600, capture marks ≤ 100 (all also ≤ 7 days). Digests: `MAX_DIGEST_DAYS` = 62, written once
+   (`keep_digest`, never replaced) only for a finished local day that had activity, looking back at most 14 days from the oldest evidence,
+   at the first capture tick of a later local day after a 15-minute settle (so by reading the code a digest usually appears about a day
+   after the day ends); digests carry no price rows and cap their lists (intervals/blocks 50). Sessions (`sessions/store.py`): 730 days,
+   ≤ 5000 per charger. Therefore: measured per-minute detail ≈ last 3 days, plan-and-flow summaries up to 62 days (only for days that had
+   activity while raw rows existed), session records up to two years **without** placement evidence. A day outside these is *not retained*,
+   never “nothing happened”. Whether the installation's Morek entry actually opens sessions, its capture cadence, real entities and the 100 W /
+   2-sample flow thresholds stay **unverified** (user-owned, §9.C); a first install is expected to show much `unknown`.
+4. **Sessions API (`spotnav/get_sessions`).** JSON is by month (≤ 24 months back), `days` = the latest 62 days that have a session, `limit` ≤ 100;
+   a day range exists only for CSV. Summaries attribute a session to the **local day it started** (one row for a midnight-crossing session); the
+   history `sessions` list attributes by **time overlap** (the same session appears in both days). Costs there are made at read time from the
+   session's stored kWh × raw spot price slices with the person's **current** fee/tax settings (`cost_basis` `current_settings`, or `stored` for an
+   old record with only a stored cost). Stage 15.8 `reconciliation` is on history session rows, not on `get_sessions` rows.
+5. **Frontend.** `history-view.js` takes display strings, `readings {time,kw}` and one `sentHistory {start,end}`; the sidebar adapter supplies no
+   `history` or `insights` model, so both cards render “unavailable”; `insight-view.js` is a text renderer. The chart (`charts.js`, `price-chart.js`)
+   keeps zoom across updates (`setPriceOption`, `snapRange`, `initialRange`); Stage 18.4 added `shared-dashboard/price-bands.js`.
+6. **Profile vs backfill.** The 28-day weekday profile (needs 21 held days, ≥ 8 samples per weekday-hour) is `pricing/price_profile.py`;
+   `price_history.py` is only the backfill that fills the held days. `market_observation.py` is a subscription, not a store.
+
+**Binding constraints for every Stage 7/8 substage** (new 2026-11-16, in force with §1 and the standard acceptance):
+
+- **Read-only.** Navigating days, opening history, day review or insights never uploads, replans, wakes the car, starts/stops, notifies or
+  writes settings; a read command never fetches from a provider (`day_snapshot`/`holds_file` only). No new store; no change to the existing
+  consent or permission model (any signed-in user reads, like the dashboard). No new planner, controller or sender; Stage 16/17/18 behaviour
+  is not re-implemented.
+- **Absolute price colours stay (Stage 18.4).** The chart and every price colour use `price-bands.js` (`priceBand`, `bandColor`,
+  `priceAxisExtent`): euro cents/kWh, <8 green Cheap, 8–<15 yellow Normal, 15–25 orange Medium, >25 red Expensive; axis 0 up to at least 30,
+  growing for negatives and spikes; any other unit neutral. **A relative insight (percentile, rank, “cheaper than recent days”) never recolours,
+  rescales or relabels the chart and never replaces the absolute band.** There is no user-configurable “cheap” threshold in the product today:
+  the only fixed classification is the display band; if a user setting ever exists it is a separate named thing. Insight wording keeps
+  “cheaper than the last N days (relative)” and “in the Cheap band (<8 c/kWh, fixed)” as two different statements, never one word for both.
+- **Evidence rules (Stage 15.8, 17, 12).** Measured tracks come only from `power_w` samples and register segments. A plan, ACK, readback, SOC
+  reading (fresh or estimated) or `progress_unknown` (a planning fallback, not history) never fills a measured track. *Effective* is the latest
+  readback's remaining period only, never a past day. Late register energy (`reconciliation.unplaced_late_kwh`, `unassigned_register_kwh`) has
+  **unknown placement**: never drawn on a time axis, never priced as actual, never added to the session's `energy_kwh`; replay timestamps are
+  receipts only; the session's original `energy_kwh` cannot certify a total such as ~20 kWh. A known total without a time is not a known cost.
+  Three energy figures per window are shown **side by side, never summed**: meter-counter delta, power-integrated estimate, recorder-placed session
+  energy (plus unplaced late energy as its own line); never priced twice or overlapped.
+- **Unknown is not zero; missing is not “did not charge”.** A basis with no segment is `null` + coverage; a day or list that the backend says is
+  truncated, pruned or `window_starts_before…` is shown as such. If an API answer is partial and carries no signal, assign a small backend delta
+  (named in the substage), not a UI guess.
+- **Bounded loading.** The UI never loads all held days at once. Default view = today/tomorrow as now (no new request), plus an optional held
+  yesterday. Any other span is loaded one bounded page (≤ 8 local days) at a time, on a user action. History is requested one local day at a
+  time. Every async result is checked against a request token (charger, generation, area/currency, requested range) and dropped when stale;
+  a user's zoom survives routine dashboard refreshes (only an explicit navigation action changes the range).
+
+**Engineering defaults (not user decisions; adjust in code with a note, not by asking):** baseline = trailing 30 **completed** local days
+(price-area display zone) in the current market, currency and raw-published basis; a day is *fully held* only when its document is complete,
+every interval has a finite price and no interval overlaps another; minimum 7 fully held days or the baseline is `unknown`; all averages and
+percentiles are **duration-weighted** (seconds, absolute instants, so 15-minute/hourly mixes and 23/25-hour days need no resampling);
+percentile = (time strictly cheaper + half the time equal) / baseline time; cheapest window = contiguous published intervals, default 60 minutes
+(allowed 15–720 in steps of 15), exact elapsed time (the current interval counts only from now), a gap or the published end refuses the window;
+ties → earliest; duplicate interval start with identical data is dropped once, conflicting data excludes that day; days of another currency
+are excluded and counted, never converted; price basis = raw published spot in the area's major unit per kWh in API calculations (the chart retains its existing EUR-cent display conversion), fiscal additions
+only if a helper is explicitly used **and labelled**; read-range page = 8 local days; availability list ≤ 400 dates.
+
+- [ ] **7.1 Available-day navigation (backend read + UI).** *Scope:* shortcuts Yesterday / Today / Tomorrow / Earlier… / All loaded days, each
+  enabled only for days the repository actually holds. *Delta:* **one** read-only websocket command `spotnav/get_price_days` (new small module;
+  engineering-default name, check for clashes), api_version 1, same permission and charger resolution as the dashboard, documented in
+  `docs/api.md`: `mode: "available"` → `{area_id, zone, currency, today, days:[{day, state, complete, resolution_minutes, source, fetched_at,
+  interval_count}], oldest, newest}` (≤ 400 small rows, newest first, nothing fetched); `mode: "range"` with `from`/`to` display dates → at most
+  8 days, each day's rows in the **same shape as `published_intervals`** (refactor the row builder in `serialize_published_intervals` to take
+  intervals, do not copy it), per-day provenance, refused with `spotnav_invalid_range` beyond the bound. *Reuses:* `day_snapshot`, `holds_file`,
+  `serialize_published_intervals`' row shape, `publishedChart`/`snapRange`/`initialRange`, `price-bands.js`; no new store. *UI:* a day with
+  no held file is disabled with the reason (not held / outside provider reach by `history_reachable` / tomorrow not yet published, using the
+  existing `waiting_for_tomorrow`); a held but incomplete day is selectable and labelled partial; unknown future is never zero; rows merged by
+  start instant with duplicates dropped and overlaps refusing that page; currency/area change drops pages of the other market; pages are
+  fetched on demand (Earlier… = one picker bounded by `oldest`, never a 400-day load). Preview fixtures use the same shapes. *Acceptance:*
+  All loaded days spans the current bounded page, never fetches all 400 days; availability follows held data; 23/25-hour days and 15-minute↔hourly boundaries; stale-response, area-change and charger-change tests;
+  user zoom preserved on routine updates; `docs/api.md`; fast checks, build/check-dist. *Exclusions:* no provider fetch, no write, no history
+  tracks, no insights.
+- [ ] **7.2 Chart interaction and DST/resolution fixes.** *Needs 7.1 (same chart files).* *Scope:* reproduce with fixtures, then fix only the
+  defects found: hourly↔15-minute change inside one horizon, 23/25-hour axis ticks, container resize/orientation keeping the range, tooltip for
+  negative values and gaps, the paged data of 7.1. Preserve zoom, tooltip, wheel, reset and the Stage 18.4 absolute bands/axis. May close as
+  “verified, no defect” with the fixtures kept. Physical touch stays unverified.
+- [ ] **7.3a History client, small backend delta and evidence panel.** *Backend delta (first, small, additive; API version stays 1):* in
+  `charging_history` add `truncated` (a boolean and the cut count for each capped list: intervals, gaps, restarts, planned_blocks, outside_plan,
+  unknown_plan_spans, sessions, per-session price_slices), `retention.oldest_by_kind` (oldest retained row per sample kind, so a pruned power
+  window is detected without guessing), and `retention.digest_days` (the ≤ 62 digest dates). Tests with > 200 rows and with plans older than power
+  rows. *Client:* a read-only client for `spotnav/get_charging_history` requesting **one local day** (`date`, HA zone) per call, plus the adapter
+  mapping into an **extended shared `history` contract**: sent-plan spans with `known`/`unknown` state and version id (from
+  `comparison.planned_blocks` and `unknown_plan_spans`), observed flow intervals with their bounded/unbounded edges, per-block verdict
+  `flow_observed`/`no_flow_observed`/`unknown`, `outside_plan`/`plan_unknown`/`no_plan_evidence` flow, energy by basis (see the evidence rules),
+  session rows with reconciliation state, coverage (`trusted`/`untrusted`/`no_data` seconds), `retention` and `truncated`. Panel states: loading,
+  unavailable, no evidence retained / **raw pruned, digest only** / partial (truncated), permission. Preview fixtures use the same contract; no
+  JavaScript planning or interpretation beyond rendering. *Acceptance:* each status and unknown/gap/truncation case renders distinctly; Morek-only
+  and retention (3 days at full cadence, not 7) stated; opening writes nothing; stale-day/charger responses dropped; adapter and renderer tests;
+  build/check-dist. *Exclusions:* no tracks on the price axis (7.3b), no cost, no new store, no retention change.
+- [ ] **7.3b Aligned tracks on the price axis.** *Needs 7.3a and 7.1.* *Scope:* tracks sharing the price time axis (zoom/pan stays aligned):
+  **Proposal** (the *current* plan only, with `minimum-exception` marking, drawn only while the visible range reaches now/future; a past day has no
+  proposal track unless the history lists that recorded version), **Sent** (spans of the acknowledged versions the history reports, **each span
+  carrying its own version id**; several versions in one day appear one after another, and spans after an uncertain write are `unknown`), **Effective**
+  (the latest readback's remaining period only, labelled; history never restores it, and it is never drawn for a past day) and **Measured** (7.3a flow
+  intervals). Mismatches and missing observations are hatched unknown, never absent; suggested cheap opportunities are not the plan; a reported limit
+  is never drawn as kW; the current plan is never used for a past day. *Acceptance:* proposal≠sent, sent≠effective and planned-without-flow cases
+  legible; DST day; two versions in one day; preview parity; no change to the price chart's interactions or absolute colouring.
+- [ ] **7.4a Live price-insight methods (backend).** *Delta:* a pure module (no `hass`, no clock; suggested `pricing/price_insights.py`) and **one**
+  new read-only command `spotnav/get_price_insights` (mode `live`; 7.4b adds mode `monthly` to the same command; any signed-in user; `docs/api.md`).
+  *Inventory first (in the substage's notes):* the held days, basis, resolution and coverage it reads; inspect `planner.cheapest_slots` and reuse it
+  only if it can answer an unconstrained contiguous window, otherwise keep the small pure function. *Methods:* (1) the current interval versus the
+  trailing baseline (percentile and rank by duration, engineering defaults above; `unknown` with reason when below the 7-day minimum, when the current
+  interval is missing/stale or the currency differs); (2) the cheapest contiguous window of a requested length (default 60 min) inside the published
+  horizon, with exact start/end, duration-weighted average and the same baseline percentile. Output always carries `baseline` {days_expected,
+  days_held, days_used, days_excluded with reason}, `basis`, `currency`, `resolution`, `assumptions`, `unknown_reason`. Never a cheap/expensive label
+  (classification is the frontend's absolute band), never a future guess (tomorrow unpublished = not included), no new store, no D1 dependency (these
+  are prices, not costs). *Acceptance:* missing history, partial days, duplicate/conflicting intervals, negative prices, DST 23/25 h, mixed
+  15-min/hourly, area/currency change, gap refusal, ties, partially elapsed interval; fast tests at the module boundary.
+- [ ] **7.4b Monthly price statistics (backend).** *Needs 7.4a.* *Delta:* mode `monthly` of the same command, `month` = local `YYYY-MM` in the price
+  area's zone. Per month: `days_expected` (calendar days, or completed days for the current month), `days_complete`, `days_partial`, coverage seconds
+  vs expected seconds, and — only when ≥ 7 fully held days (engineering default) — duration-weighted mean, min, max, p10/p50/p90, share of time at a
+  negative price; otherwise `unknown` with coverage. A month comparison is offered only when both months meet the minimum, share a currency and basis.
+  No hourly/quarter-hour re-binning (no bias), no hour-of-day profile in this substage, no absolute-band shares (classification stays in the UI).
+  *Acceptance:* partial month, current month, DST months (23/25 h), currency change excluded and counted, negative prices, duplicate days.
+- [ ] **7.5 Live price insights and monthly statistics (UI).** *Needs 7.4a and 7.4b.* *Scope:* bind both into the shared `insights` model (`intro`,
+  `blocks`, `caution`, `method`; host-supplied text): current-interval assessment, best available window, per-month statistics with “n of N days
+  held”, each block showing baseline, coverage, basis, currency and assumptions; unavailable data shows its reason. The absolute band of the current
+  price (only for euro c/kWh, from `price-bands.js`) and the relative percentile are two separate lines; the card says opportunities are not the
+  charging plan and a read never sends or replans. *Acceptance:* preview parity; i18n parity for new strings; read-only open; stale response dropped.
 
 ### Stage 8 — Day review, costs, savings (8.1–8.3)
 
-**Audit (source reading, 2.5.128).** Reuse Stage 6 evidence and the existing session store; do not add stores.
-(1) Evidence detail exists only 7 days (digests 62 days, no price rows); older **days** with measured data
-exist only if the session store (730 days, ≤ 5000 per charger) recorded them, and **whether the Morek entry’s
-session recorder opens sessions is unverified**. (2) Session cost is computed at read time from the **current**
-fiscal settings (`cost_basis: current_settings`) unless a legacy stored cost; only plan versions keep a tariff
-snapshot (`plan_tariff_snapshot`), so past charging must never be priced with today’s tariff silently.
-(3) Existing savings are `SAVINGS_BASIS = "day_average_price"` (`sessions/summary.py`,
-`ChargeSession.savings_minor`): the same priced energy at that day’s average price, labelled an estimate.
-The earlier roadmap’s suggested baseline (“charge the same energy immediately after plug-in at comparable
-power”) is **not implemented and not approved**. (4) `get_sessions` and `summary.py` already produce day and
-month buckets and never add currencies together. Coordinate with 7.3 (tracks) and 7.5 (monthly insights);
-implement nothing twice.
+**Audit (source reading, manifest 2.5.166).** Reuse Stage 6/7 evidence and the existing session store; add no store and no retention.
+(1) Evidence by age: per-minute flow ≈ last 3 days (see Stage 7 audit 3), digests ≤ 62 days, sessions ≤ 730 days without placement evidence.
+(2) A session keeps its kWh split over price intervals with the **raw spot price and fx** of each slice (immutable, `price_slices`); no cost is stored,
+it is made when read with the person's **current** fees/taxes (`cost_basis` `current_settings`; `stored` only for an old record). A plan version keeps its
+own tariff at creation (`plan_tariff_snapshot`: `fiscal` and up to 300 raw price rows, `fiscal_state` `resolved`/`unknown`) for as long as the plan
+survives (≤ 7 days, ≤ 120 plans); digests keep only that fiscal choice (62 days), no price rows. Changing fees today never recovers an older tariff.
+(3) Existing savings = `SAVINGS_BASIS` `day_average_price` (`sessions/summary.py`, `ChargeSession.savings_minor`): the same priced energy at the day's
+average price, an estimate. “Charge immediately after plug-in at comparable power” is **not implemented and not approved**, and the session record has
+no plug-in time (a session starts when charging is first seen; connector samples last only as long as raw evidence). (4) `summarize_bucket` already
+makes day/month buckets, never adds currencies together (but silently drops sessions whose currency is not the most recent session's — 8.2a must count
+them), and savings may be negative (the reference minus the cost). (5) History session rows carry `cost: null`, `cost_basis: "not_recomputed_here"`.
 
-- [ ] **8.1 Day review (default yesterday).** *Scope:* a day selector limited to days the history/sessions
-  APIs actually return (default yesterday; if nothing is retained, say so) showing, from 7.3a/7.3b: measured
-  charging against the plan actually sent, planned-block status, flow outside the plan, measured energy by
-  basis, coverage and unknown spans **separately from confirmed absence of flow**, price context via the 7.1
-  chart, and session rows from `get_sessions` where sessions exist (source `energy_source` labelled; an empty
-  state when the Morek recorder produced none). No cost. *Acceptance:* a plan or readback never fills the
-  measured track; missing data is “unknown”, not “did not charge”; days beyond retention are not offered; DST
-  day; midnight-spanning session; preview parity.
-- [ ] **8.2a Cost of measured energy with tariff provenance (backend).** *Scope:* price measured energy per
-  day/session/month using an explicit `cost_basis`: `plan_snapshot` (tariff and prices stored with the
-  applying plan version), `legacy_stored`, `current_settings` (labelled estimate) or `unknown`; never today’s
-  tariff silently; one applying version per priced span, otherwise `unknown`. Additive fields on the existing
-  history/sessions answers; coverage reported; negative and missing prices; currencies never mixed; fee/tax
-  changes tested. **Needs D1** (cost display basis). *Exclusions:* no retention change (D3), no new store.
-- [ ] **8.2b Cost display and totals consistency.** *Scope:* show day/session/month cost in the 8.1 view and
-  keep plan totals (existing backend `model.totals`) and historical totals consistent across cards; label
-  estimate, basis, currency and missing rates. *Acceptance:* the same inputs give the same totals in every card;
-  partial data, negative prices and missing baseline tested; unknown never becomes zero.
-- [ ] **8.3a Savings baseline (backend).** *Scope:* apply the baseline chosen in **D2**; until the user
-  chooses, keep the existing `day_average_price` and label it. Report coverage, assumptions and `unknown`
-  (never zero) when evidence is insufficient; forecast savings (from a plan) are separate from historical
-  estimates. If D2 selects “immediately after plug-in”, the plug-in time and comparable power sources must be
-  named and tested first (not assumed). **Needs 8.2a and D2.**
-- [ ] **8.3b Savings and summary cards.** *Scope:* summary cards for day/month totals reusing 7.5’s monthly
-  framing; totals identical to 8.2b’s. *Acceptance:* baseline, coverage and estimate labels visible; forecast vs
-  historical distinct; consistent totals; preview parity; i18n.
+**Stage 8 contracts (D1/D2 settled by the user, 2026-11-16).** Default historical cost and savings use **Nord Pool spot only**, excluding configured fees/taxes. Keep existing fiscal totals available in the existing APIs for compatibility, but never show them under the spot-only label. Preserve the selected provider; another provider's raw price must be labelled by its actual source, never falsely called Nord Pool.
+The day's evidence/session rows come from `get_charging_history`; extend the existing costing path and `get_sessions` additively, never add a second store. A day review means energy delivered within that HA-local calendar day: allocate retained price-slice energy by its interval, split midnight/DST boundaries by actual elapsed overlap (label this interval allocation as an estimate). A session may appear on both overlapping days, but each allocated slice is counted once; monthly sums use the same day allocations. Existing session-start-day buckets remain compatible and may be shown only as **sessions started that day**, never as energy/cost delivered that day. Missing placement stays unknown rather than moving an entire session to its start day.
+Use the same priced kWh and currency for actual cost and comparison. Savings = reference minus actual spot cost; negative amounts are valid. Aggregate amounts by summing; aggregate percentages use sum savings / sum reference, never an average of session percentages. If the reference is zero or negative, percentage savings is `null` (amount still shown), avoiding misleading percentages at negative prices. Plan totals are forecasts with their existing price basis, clearly separate from historical spot-only totals.
+
+- [ ] **8.1 Day review (default yesterday).** *Needs 7.1 and 7.3b (which needs 7.3a).* *Scope:* a day selector limited to the last 62 local days in
+  which `retention.digest_days`, the retained raw window (`oldest_by_kind`) or the `get_sessions` `days` show something; default yesterday (a digest
+  usually does not exist yet for it, so it is shown from raw rows if retained); if nothing is retained, say so. Older months are reachable only through
+  the month summaries (8.3b), not this selector. For the day: measured charging against the plan actually sent (7.3b tracks), planned-block status, flow
+  outside the plan, energy by basis side by side, coverage and unknown spans **separately from confirmed absence of flow**, the price chart for the day
+  (7.1), session rows (`energy_source` labelled, reconciliation state, unplaced late energy as its own unplaced line) and an empty state when the Morek
+  recorder produced none (unverified; empty ≠ “did not charge”). A day older than the raw rows but with a digest shows the digest facts labelled
+  “summary only; no per-minute data and no prices”. No cost. *Acceptance:* a plan or readback never fills measured; missing is “unknown”; days beyond
+  retention are not offered; DST day; midnight-spanning session; truncation shown; stale-day/charger responses dropped; preview parity; read-only open.
+- [ ] **8.2a Spot-only cost of measured energy (backend).** *Needs 7.3a.* Extend `ChargeSession.priced` / `price_slices` through one shared calculation used by history and `get_sessions`. Add `spot_cost`, `spot_cost_basis` (`recorded_price_slices`, `retained_price_intervals` or `unknown`), `priced_kwh`, `unpriced_kwh`, `unplaced_kwh` and coverage on rows/day/month summaries. Compute Σ placed kWh × raw spot price with the stored trustworthy currency/rate basis. No VAT, grid fee, energy tax or other configured fiscal addition. Prefer recorded slices; join other genuinely placed energy to retained historical prices only with matching source, area, instants and currency. Never backfill a historical price with today's price. Missing/truncated slices or rates make the missing portion unknown; a partial amount must be labelled partial, never a complete total. Unassigned/receipt-only late energy has no cost. Report currency exclusions, never silently drop them. Reuse existing fiscal cost fields unchanged, with explicit separate labels if exposed; do not build a historical fiscal-tariff engine for this spot-only stage. Apply the calendar-day allocation contract above. *Acceptance:* fee changes do not change spot cost; negative/missing prices; partial coverage; currency/rate errors; midnight/DST; no double counting; history and summary totals agree. *Exclusions:* no tariff-setting changes, no new retention/store, no supplier-bill claim.
+- [ ] **8.2b Cost display and totals consistency.** *Needs 8.2a and 8.1.* *Scope:* day/session/month cost in the 8.1 view; plan totals (the backend
+  `model.totals`, a forecast) stay visibly separate from historical totals; one shared formatter; label estimate, basis, currency and missing prices.
+  *Acceptance:* same inputs give the same totals in every card; partial data, negative prices, midnight session and unknown never becomes zero.
+- [ ] **8.3a Day-average spot savings (backend).** *Needs 8.2a; D2 settled.* Keep `day_average_price` as the baseline method, using the same charged/priced kWh at that delivery day's duration-weighted average raw spot price. Use a complete valid published local day (23/24/25 hours as appropriate); if the full-day reference is missing, report reference/savings unknown for that portion, not an average of a selectively cheap subset. Split midnight sessions by delivery day before applying the reference. Share the same cost/coverage/allocation path as 8.2a; no plug-in-time baseline or new power simulation. Return actual spot cost, reference spot cost, savings amount, nullable percentage, comparable kWh, coverage, currency and `savings_basis: day_average_price`. Negative savings are valid; zero/negative reference yields no percentage; partial aggregates explicitly identify excluded energy/days. Forecast savings stay separate from historical estimates. *Acceptance:* weighted hourly/quarter-hour/DST averages; midnight splits; same-kWh comparison; partial/missing reference; currency separation; negative/zero prices; day/month totals consistent.
+- [ ] **8.3b Savings and summary cards.** *Needs 8.2b, 8.3a and 7.5.* *Scope:* day/month summary cards reusing 7.5's monthly framing; totals identical to
+  8.2b's. *Acceptance:* baseline, coverage and estimate labels visible; forecast vs historical distinct; negative savings shown; consistent totals; preview
+  parity; i18n.
 
 ## 9. Open decisions, review work and ownership
 
-**Open product decisions (none is approved; raise with the user before the named substage):**
-**D1** — default cost display: the full configured variable cost (fees/taxes) with a Nord Pool-only option was an
-*earlier suggestion*, not agreed (blocks 8.2a). **D2** — savings baseline: keep `day_average_price` or implement
-“immediately after plug-in” (blocks 8.3a). **D3** — history retention: the earlier “90 days of detailed traces”
-proposal is **not** adopted; today’s 7 days raw / 62 days digests / 730 days sessions stand (needed only if the
-user wants measured traces older than 7 days in 8.1/8.2).
+**Settled choices and retained limits (no outstanding implementation-blocking product decisions):**
+
+- **D1 — decided by the user, 2026-11-16:** default charging costs are **Nord Pool spot price only**, excluding configured fees/taxes. Add explicitly named spot-only fields; keep fiscal totals separate and existing APIs compatible. This is a display/accounting decision, not a change to planner cap basis or fees settings.
+- **D2 — decided by the user, 2026-11-16:** compare the same charged energy against **that day's average spot price**, keeping the existing `day_average_price` method. No immediate-after-plug-in baseline. Costs and reference use the same priced energy, source and currency.
+- **D3 — history retention (no gate, not a blocker).** **Preserve the verified retention** (about 3 days of per-minute evidence at the 60 s cadence,
+  7 days only for sparse rows, 62 daily digests, 730 days/5000 sessions). The earlier “90 days of detailed traces” proposal is **not** adopted and
+  nothing in Stage 7/8 may assume it or a new retention store. Any extension is a **future explicit user decision** with its own source change;
+  until then 8.1 offers only retained days and says so.
 
 **A. Verification ledger (local implementation vs unrun acceptance vs user-owned).**
 
