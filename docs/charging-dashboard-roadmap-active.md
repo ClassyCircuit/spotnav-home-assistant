@@ -3,7 +3,7 @@
 Status: **in progress. This is the only work queue.** Created 2026-11-14 by splitting the old roadmap, which
 is now frozen as a historical reference:
 [archive/charging-dashboard-roadmap-2026-11-14.md](archive/charging-dashboard-roadmap-2026-11-14.md)
-(“the archive”). Initial audit basis: manifest 2.5.128, HEAD `6a50a7ae`. Stage 15 is now locally implemented and coordinator-reviewed through 2.5.143 with focused mocked checks; see its entries and the handoff for unrun checks. Stage 16.1 (2.5.144) is done locally; Stage 16.2 and Stage 17 (planner resilience, 17.1 first) are the open queue as of manifest 2.5.146. Nothing below is
+(“the archive”). Initial audit basis: manifest 2.5.128, HEAD `6a50a7ae`. Stage 15 is now locally implemented and coordinator-reviewed through 2.5.143 with focused mocked checks; see its entries and the handoff for unrun checks. Stage 16.1–16.2, Stage 17.1–17.6 and Stage 13.1–13.4 are implemented locally with mocked checks and committed (manifest 2.5.162, HEAD `e31463df`, 2026-11-16 audit); the next unstarted feature queue is Stage 7, then Stage 8, only when the user requests it. Nothing below is
 installed, deployed or physically verified, and this file authorizes no HA access, charger command, restart
 or deployment. Read `AGENTS.md` and [the development handoff](morek-development-handoff.md) first.
 
@@ -79,10 +79,10 @@ One at a time; “Needs” lists the only real dependencies. Stable parent ids; 
 | 13 | 15.9b Learner rules: exclusions, asymmetric trust, clamp, promotion of 15.9a captures | 15.9a | ◆ |
 | 14 | 15.11 Learned-estimate display and reset | 15.9b | |
 | 15 | 15.10 Morek behind-plan check and power feed (deferrable) | 15.9a (energy side stays capture-only until 15.9b) | ◆ |
-| 16 | 13.1 Vehicle sources and planning properties | none | |
-| 17 | 13.2 Market and charging-cost settings | none | ✔ local (2.5.159) |
-| 18 | 13.3 Practical plan and charger parameters | 15.1b if built (no duplicate reserve control) | ✔ local (2.5.161) |
-| 19 | 13.4 Notification settings and setup diagnostics | none | |
+| 16 | 13.1 Vehicle sources and planning properties | none | ✔ local, committed `d81c3fd8` (2.5.158) |
+| 17 | 13.2 Market and charging-cost settings | none | ✔ local, committed `7e352562` (2.5.159) |
+| 18 | 13.3 Practical plan and charger parameters | 15.1b if built (no duplicate reserve control) | ✔ local, committed `416529c3` (2.5.161) |
+| 19 | 13.4 Notification settings and setup diagnostics | none | ✔ local, committed `e31463df` (2.5.162) |
 | 20 | 7.1 Available-day navigation | none | |
 | 21 | 7.2 Chart interaction and DST/resolution fixes | none (may share a session with 7.1 if 7.1 needs no backend read) | |
 | 22 | 7.3a History client and evidence panel | none (Stage 6.3 API exists) | |
@@ -95,9 +95,7 @@ One at a time; “Needs” lists the only real dependencies. Stable parent ids; 
 | 29 | 8.3a Savings baseline (backend) | 8.2a, D2 | |
 | 30 | 8.3b Savings and summary cards | 8.3a, 7.5 | |
 
-Items 1–15 (Stage 15) are now locally implemented and coordinator-reviewed through 2.5.143. Do not reassign them. **Stage 16 and Stage 17 (below, strict order 17.1 → 16.2 → 17.2 … 17.6) take priority over items 16–30**, as requested on 2026-11-14. After them, Stage 13.1 (item 16) was requested and is implemented locally (2.5.157, awaiting coordinator review/commit); 13.2 onward only when requested. Items 16–30 are later features: none is a prerequisite for Stage 15 or for 5.8; the order is the
-suggested default (13, then 7, then 8) and the user may reorder it. **Not in the queue:** §9.B reviews,
-§9.C user-owned items, E1/E2.
+Items 1–15 (Stage 15) are locally implemented and coordinator-reviewed through 2.5.143; Stage 16 and Stage 17 (below) and items 16–19 (Stage 13.1–13.4) are implemented locally and committed (2026-11-16 audit: `git log` shows 16.2 `08254d2e`, 17.1 `d9ec44cc`/`999f5fc5`, 17.2 `cc321c71`, 17.3 `e0f0d7d4`, 17.4 `7fadb671`, 17.5 `4bb08550`, 17.6 `35f5ae5f`, 13.1 `d81c3fd8`, 13.2 `7e352562`, 13.3 `416529c3`, 13.4 `e31463df`). Do not reassign any of them. **Open queue: items 20–30 (Stage 7, then Stage 8)**, started only on the user's request; none is a prerequisite for 5.8. The order is the suggested default and the user may reorder it. **Not in the queue:** §9.B reviews, §9.C user-owned items, E1/E2.
 
 ## 4. Standard acceptance for every substage
 
@@ -488,29 +486,15 @@ reserve or repeated purchases beyond the remaining need through successive recal
   Stage 14 contract: SOC-only dedup, protected active window, progress and uncertain writes remain binding.
   *Exclusions:* no broad price-state admission change, new urgency rule, forecast or UI redesign.
 
-- [ ] **16.2 Safe dispatch, publication continuity and clear partial-plan UI ◆.** Reuse and narrowly fix
-  automatic/manual admission: a degraded aggregate price state may pass only with authoritative ready,
-  listed, valid data covering every remaining scheduled minute (including reserve), identical calculation
-  provenance and all existing pre-wire checks. Tomorrow missing/fetch failure must not invalidate valid
-  today coverage; genuinely stale, unavailable, invalid, held/untrusted or gapped used data still blocks.
-  Reuse one coverage judgement instead of divergent manual/automatic exceptions. Render a concise existing
-  partial-coverage indicator, e.g. "Planned using available prices; tomorrow pending", showing the remaining
-  need honestly when only part fits. No UI claim of completion, future price knowledge or physical flow.
-  *Acceptance:* production plug-in -> proposal -> guarded dispatch with today-only data; degraded due only
-  to tomorrow passes while stale/gapped used prices fail; current slot sends correctly; publication improves
-  future planning while healthy active charging retains Stage 14 protection; identical publication or SOC
-  update sends nothing; partial progress is not bought twice; restart and uncertain/Stop/Pause cases stay
-  guarded. Fast focused backend and frontend checks plus required build/check-dist. Mark source-only vs live
-  evidence truthfully. *Exclusions:* no HA access, live profile, restart or deployment; no new sender or
-  bypass of ownership, authorization, rejection cooldown, uncertainty, cap or active-window rules.
+- [x] **16.2 Safe dispatch, publication continuity and clear partial-plan UI ◆.** *Canonical status: implemented locally with mocked checks and committed (`08254d2e`, manifest 2.5.148); the checked entry under Stage 17 below holds the implementation record, and the acceptance text of this stage still applies. Not installed or live-verified.* Acceptance (unchanged): a degraded aggregate price state may pass only with authoritative ready, listed, valid data covering every remaining scheduled minute (including reserve), identical calculation provenance and all pre-wire checks; tomorrow missing/failed never invalidates valid today coverage while stale/invalid/untrusted/gapped used data still blocks; one coverage judgement for manual and automatic; a partial-coverage indicator; publication improves future planning without interrupting a healthy active window (Stage 14); identical publication or SOC sends nothing; partial progress is not bought twice. 2026-11-16 audit: `tests/test_stage_162_safe_dispatch.py` (27) drives the exact uncapped daily 08:00 rolled-to-tomorrow case through the real controller, planner and guarded worker, including tomorrow publishing during an active window (never a gap in the window the car charges in) and `tests/test_stage_161_published_only.py` covers measured register energy with a delayed SOC counted once.
 
 Standard acceptance and the Stage 14 non-regression contract apply to both substages, subject to the
 binding fast-tests-only restriction. After each review, commit and push before delegating the next.
 
 ## Stage 17 — Planner resilience: a useful, honest plan from imperfect inputs
 
-**Planned 2026-11-14 (docs only; nothing below is implemented except what is marked).** Source basis: manifest
-**2.5.146**, HEAD `d9ec44cc`, tree clean, pushed (17.1 then moved the source to 2.5.147). One fresh Claude Sonnet 5.5 medium delegate per substage in the
+**Planned 2026-11-14 (docs only; nothing below is implemented except what is marked).** Source basis at planning: manifest
+**2.5.146**, HEAD `d9ec44cc` (all of 17.1–17.6 have since landed; see the queue and checked entries). One fresh Claude Sonnet 5.5 medium delegate per substage in the
 queue below, shared worktree; the coordinator reviews, then commits and pushes each substage before the next
 starts (no batching). Every substage: Standard acceptance (§4) with the binding **fast-tests-only** rule, the §5
 contract (all are ◆ unless stated), manifest bump (next free patch, from 2.5.147) only when source or card
@@ -550,13 +534,13 @@ input-evidence → recalculation → worker-compare path.
 | --- | --- | --- |
 | 14.5 measured-progress accounting, reading order/identity guards, `vehicle_update_wait` | Done (14.5) | reused by 17.1/17.2 |
 | 16.1 published-only full/partial planning (`published_first`, `plan_published_portion`, reserve on published rows, urgency) | **Done locally, reviewed** (2.5.144) | consumed by 17.5 |
-| 2.5.146 unattributable measured progress plans from the reading, `progress_unknown`, `valid_energy_kwh` | Committed `d9ec44cc`; **17.1 review done locally (2.5.147), coordinator commit pending** | 17.1 |
+| 2.5.146 unattributable measured progress plans from the reading, `progress_unknown`, `valid_energy_kwh` | Committed `d9ec44cc`; 17.1 review done locally (2.5.147), committed | 17.1 |
 | 12.8 capped planning from a last-known *actual* reading of any age | Done (2.5.72) | 17.2 extends to estimates only |
 | Uncapped Morek path accepts an energy-derived estimate; `SocReader`/`soc_estimate` produce it | Done | 17.2 aligns capped path + admission |
 | Uncapped path works from a trusted learned wall kWh/% with no capacity (`with_learned`); capped path now does too (`capped_vehicle_energy`) — **done locally (2.5.151), committed and pushed** | Done | 17.3 |
 | Price refresh/retry/backoff, ECB retry/backoff, `wants_again` rebuild when a rate arrives, ECB table ≤ 7 days before the day | Done | reused; 17.5 only labels/guards |
 | `SessionStore.add_listener`/`_notify` (close at `store.py:365`, second notify at `:443`) and recorder `_reconcile_late` | Done | 17.4 reuses; today `_on_sessions_changed` ignores target plans |
-| Degraded aggregate price state blocks automatic and manual dispatch (`morek_plan_blocker` area states; `_validated_proposal`) and the partial-plan indicator | **Done locally (2.5.148), commit pending** | 17.5/17.6 consume |
+| Degraded aggregate price state blocks automatic and manual dispatch (`morek_plan_blocker` area states; `_validated_proposal`) and the partial-plan indicator | **Done locally (2.5.148), committed `08254d2e`** | 17.5/17.6 consume |
 
 ### Queue (strict order; one at a time)
 
@@ -712,7 +696,7 @@ Full requirement text: archive “Stage 13”.
   12.8. Never silently choose an ambiguous source, invent capacity, overwrite a saved selection or treat an old
   reading as new. Tests: ambiguous/missing/removed sensors, reported vs overridden capacity, phases,
   stale observations.
-  *Locally implemented with mocked checks (2.5.158; coordinator review/commit pending); not installed or live-verified.*
+  *Locally implemented with mocked checks (2.5.158); committed `d81c3fd8`; separate coordinator review not recorded; not installed or live-verified.*
   A collapsed “Advanced: vehicle sources & properties” section is added to the shared sidebar UI (also in the local
   preview as a fictional read-only sample). It reuses the existing admin-only commands `get_entity_config` (read),
   `choose_vehicle_soc` and `update_vehicle` (capacity / onboard phases, compare-and-set `expected`). 2.5.157 adds small backward-compatible
@@ -739,7 +723,7 @@ Full requirement text: archive “Stage 13”.
   silently switch provider, enable fees or assume prices exclude charges; keep 12.2’s c/kWh display. Tests:
   supported/missing providers, area changes, variable/negative prices, fee basis, currencies, settings-to-plan
   updates. Do not invent historical tariffs.
-  *Locally implemented with mocked checks (2.5.159; coordinator review/commit pending); not installed or live-verified.*
+  *Locally implemented with mocked checks (2.5.159); committed `7e352562`; separate coordinator review not recorded; not installed or live-verified.*
   A collapsed “Advanced: market & charging costs” section is added to the shared sidebar UI (also in the local preview as
   a fictional read-only sample), new files `sidebar/market-costs.js` (pure model and write plans),
   `sidebar/market-costs-panel.js` (panel wiring) and `shared-dashboard/market-costs-view.js`. **No backend change.** It reuses
@@ -774,7 +758,7 @@ Full requirement text: archive “Stage 13”.
   duplicate of the 15.1b reserve control). Planned current is a planning input, not load balancing; respect
   charger/electrical bounds and Morek transition/period limits; never raise current or change protection
   automatically. Tests: period counts and currents, date/weekday/deadline, DST, conflicts, backend replanning.
-  *Locally implemented with mocked checks (2.5.161; coordinator review/commit pending); not installed or live-verified.*
+  *Locally implemented with mocked checks (2.5.161); committed `416529c3`; separate coordinator review not recorded; not installed or live-verified.*
   **Morek 16 A guard (2.5.161):** the Morek schedule needs exactly 16 A, so while Morek owns the schedule only 16 A can be saved here (other values refused, saved value kept and flagged); with unknown ownership a non-16 save asks first; otherwise normal. Frontend-only; the backend refusal stays final.
   A collapsed “Advanced: plan & charger parameters” section is added to the shared sidebar UI (also in the local preview as a
   fictional read-only sample); new files `sidebar/plan-params.js` (pure model and write plans), `sidebar/plan-params-panel.js` (panel
@@ -812,7 +796,7 @@ Full requirement text: archive “Stage 13”.
   of existing capability/setup warnings (missing/ambiguous measurement sources, pricing configuration,
   execution blockers where exposed), linking to settings and reusing 12.4/12.7 text. A notice never proves a
   plan was sent or charging measured. Tests: missing phones, selected events, persistence, permissions.
-  *Implemented and coordinator-reviewed with mocked checks (2.5.162); not installed or live-verified.*
+  *Implemented with mocked checks (2.5.162); committed `e31463df`; recorded as coordinator-reviewed; not installed or live-verified.*
   A collapsed “Advanced: notifications & setup check” section is added to the shared sidebar UI (also in the local preview as a
   fictional read-only sample); new files `sidebar/notify-setup.js` (pure model, diagnostics, write plan), `sidebar/notify-setup-panel.js`
   (panel wiring) and `shared-dashboard/notify-setup-view.js`. **No backend change, no new API message.** Recipients and events are saved with
@@ -1002,4 +986,4 @@ versus waiting”, “Active charge control while offline”, “Research findin
 limits). Rule: when this file and the archive differ, this file wins; copy requirements here before assigning
 them, never assign from the archive.
 
-**Planning-resilience fix (2.5.146, mocked).** Measured energy since the reading that cannot be attributed to the identified car (a session for no car, a session straddling a reading older than 5 minutes — including one just closed whose total is not yet final — or invalid energy) no longer holds the plan (`target_progress_uncertain` is retired). The plan is made from the reading with only the genuinely attributed energy subtracted (identified sessions that began after the reading, counted once), and the snapshot is marked `progress_unknown` (dashboard `projection.progress_unknown`, sidebar note). The unattributed energy is never counted and its size is unknown, so the planned energy can be overstated, and with a minimum SOC the exception above the soft cap is still sized from the reading. The car's own limit ends a charge; that is not guaranteed by SpotNav. A newer reading rebases and clears the mark. Stale/foreign/unidentified *readings* still hold the plan (`target_soc_stale`) as in Stage 14.5. Upload admission, Pause/Stop, identity, electrical and unknown-outcome guards are unchanged. Committed as `d9ec44cc` and pushed (the earlier “uncommitted” note was stale); **coordinator review pending, tracked as Stage 17.1**; not deployed or live-verified.
+**Planning-resilience fix (2.5.146, mocked).** Measured energy since the reading that cannot be attributed to the identified car (a session for no car, a session straddling a reading older than 5 minutes — including one just closed whose total is not yet final — or invalid energy) no longer holds the plan (`target_progress_uncertain` is retired). The plan is made from the reading with only the genuinely attributed energy subtracted (identified sessions that began after the reading, counted once), and the snapshot is marked `progress_unknown` (dashboard `projection.progress_unknown`, sidebar note). The unattributed energy is never counted and its size is unknown, so the planned energy can be overstated, and with a minimum SOC the exception above the soft cap is still sized from the reading. The car's own limit ends a charge; that is not guaranteed by SpotNav. A newer reading rebases and clears the mark. Stale/foreign/unidentified *readings* still hold the plan (`target_soc_stale`) as in Stage 14.5. Upload admission, Pause/Stop, identity, electrical and unknown-outcome guards are unchanged. Committed as `d9ec44cc` and pushed (the earlier “uncommitted” note was stale); coordinator review done in Stage 17.1; not deployed or live-verified.

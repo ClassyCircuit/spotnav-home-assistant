@@ -193,3 +193,38 @@ async def test_a_deadline_just_past_the_published_end_is_not_moved(monkeypatch):
     assert proposal.has_plan and _all_published(proposal, doc)
     assert proposal.price_coverage_end == doc.start_instant + timedelta(hours=24)
     assert proposal.shown_periods[-1][1] <= doc.start_instant + timedelta(hours=24)
+
+
+@pytest.mark.asyncio
+async def test_measured_register_energy_with_a_delayed_soc_shrinks_the_published_plan_once(monkeypatch):
+    # The car charged in an earlier part of the plan, but its level has not been re-read yet: the metered
+    # energy since the reading is subtracted exactly once, and a fresh reading rebases without re-buying it.
+    from datetime import timedelta as _td
+
+    from .test_stage_145_progress_recovery import _charge, _read, _wire, auto_controller
+
+    original = auto_controller.domain_data
+    try:
+        world = await _world(monkeypatch)
+        read_at = None
+
+        async def plan(sessions=(), report_at=None):
+            nonlocal read_at
+            now, snap = await _daily(world, [.08] * 96, soc=25, hours=22)
+            read_at = report_at or (now - _td(hours=1))
+            _read(world, read_at)
+            _wire(world, list(sessions))
+            return now, await world.controller.async_recalculate()
+
+        now, base = await plan()
+        base_need = base.proposal.requested_kwh
+        assert base.proposal.has_plan and base.proposal.policy_shortfall_kwh > 1
+        _, partial = await plan([_charge(read_at + _td(minutes=5), 4.0)], report_at=read_at)
+        assert partial.proposal.requested_kwh == pytest.approx(base_need - 4.0, abs=0.05)
+        assert partial.proposal.has_plan and not partial.proposal.unpriced
+        # A fresh reading that already contains the energy rebases: nothing is subtracted a second time.
+        world.facts[0] = replace(world.facts[0], soc_report_at=now - _td(minutes=1))
+        rebased = await world.controller.async_recalculate()
+        assert rebased.proposal.requested_kwh == pytest.approx(base_need, abs=0.05)
+    finally:
+        auto_controller.domain_data = original

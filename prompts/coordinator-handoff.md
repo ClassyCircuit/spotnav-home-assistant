@@ -8,13 +8,13 @@ reviewer. The user often asks you to review another LLM's report and supply a
 copyable implementation prompt, but may also directly ask you to implement a fix.
 Follow the actual request rather than automatically starting new work.
 
-## Current handoff — 2026-11-14
+## Current handoff — 2026-11-16
 
-- Current source manifest is **2.5.162** (working tree: **Stage 13.4 notification settings and setup check, local mocked, coordinator review/commit pending** (manifest 2.5.162); 13.3 is committed as `416529c3`; 13.2 is committed as `7e352562` (manifest 2.5.159); 13.1 is committed as `d81c3fd8`, manifest 2.5.158 at that commit). Stages 16.1, 16.2 and 17.1–17.6 are **committed and pushed** (`git log`: 17.3 `e0f0d7d4`, 17.4 `7fadb671`, 17.5 `4bb08550`, 17.6 `35f5ae5f`; manifest 2.5.155 at that HEAD). **Next in order: coordinator review/commit of 13.1, then 13.2–13.4 only when requested** (active roadmap, Stage 13). 13.1 limits to know before reviewing are in its roadmap entry (2.5.157 corrections: properties shown for ambiguous cars, server-side `expected_entity_id` guard, replan on a real selection change; manifest 2.5.158: `tests/test_vehicle_soc_guard_isolated.py` 7 pass via the isolated runner, the `hass`-fixture tests still cannot run on Windows; the confirm/unconfirm services now share the guarded save's lock but do not replan, and the Repairs/config flows are unlocked). The earlier 17.3 limit still stands: a Morek-owned plan with no battery size holds because Morek learning needs a capacity. Recheck `git log` and `git status` for the exact current HEAD; a push does not install or restart Home Assistant.
+- Current source manifest is **2.5.162**, HEAD `e31463df` (2026-11-16 audit; recheck `git log`/`git status`). Committed locally with mocked checks only: Stage 16.1 (`9100d227`), 16.2 (`08254d2e`), 17.1–17.6 (`d9ec44cc`/`999f5fc5`, `cc321c71`, `e0f0d7d4`, `7fadb671`, `4bb08550`, `35f5ae5f`) and Stage 13.1–13.4 (`d81c3fd8`, `7e352562`, `416529c3`, `e31463df`). A separate coordinator review of 13.1–13.3 is not recorded. A push does not install or restart Home Assistant. **Next unstarted feature work: Stage 7, then Stage 8, only when the user requests it** (active roadmap §3 items 20–30). Known limits worth knowing: a Morek-owned plan with no battery size and no proven learned figure holds as `target_capacity_unknown`; the `hass`-fixture Python tests cannot run on Windows (`fcntl`); several older test files need the zone-prewarm fixture (e.g. `test_stage_141_current_interval.py` fails with “'Europe/Stockholm' is not a known timezone” under the manual harness — a harness limit, not a source finding).
 - **Active roadmap items 1–15 (Stage 15) are locally implemented and coordinator-reviewed.** Stage 16
-  (today-only published opportunities while tomorrow is missing) is now authorized and takes priority:
-  16.1 planning, then 16.2 guarded dispatch/UI, each fresh Claude Sonnet 5.5 medium, review and commit/push.
-  Later work is Stage 13.1–13.4, then 7 and 8, only when requested. The active roadmap is the only queue;
+  (today-only published opportunities while tomorrow is missing) is implemented and committed (16.1, 16.2);
+  an uncapped daily ready-by rolled into an unpublished tomorrow plans the cheapest known full or partial
+  charge today. Later work is Stage 7 and 8, only when requested. The active roadmap is the only queue;
   §9 retains open decisions D1–D3, unrun acceptance and user-owned work. Do not reassign completed stages.
 - **Fast focused tests only.** No full frontend/backend suites, browser/Playwright or global isolated runner.
   Use named files or selected cases with a short command timeout; stop slow checks and report them unrun.

@@ -283,3 +283,44 @@ async def test_no_usable_today_never_falls_back_to_unusable_documents(monkeypatc
     await drain(w.worker)
     w.point.call.assert_not_awaited()
     w.worker.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("tomorrow_price", [.049, .0])
+async def test_tomorrow_publishing_during_a_healthy_active_window_never_opens_a_gap_in_it(
+        monkeypatch, tmp_path, tomorrow_price):
+    # The user's case end to end: uncapped daily 08:00 rolled to tomorrow, only today published, one window sent.
+    w, world, now = await _world(monkeypatch, tmp_path, area_state="waiting_for_tomorrow",
+                                 tomorrow_state="unavailable", tomorrow_authority="unknown")
+    first = await world.controller.async_recalculate()
+    w.worker.start()
+    await drain(w.worker)
+    assert w.point.call.await_count == 1, w.worker.reason
+    start, end = first.proposal.shown_periods[0]
+    assert start > now
+    # Time passes into the sent window; the connector reports a fresh charge.
+    inside = start + timedelta(minutes=20)
+    world.controller._now = lambda: inside
+
+    class Clock:
+        now = staticmethod(lambda _: inside)
+    monkeypatch.setattr(morek_worker, "datetime", Clock)
+    monkeypatch.setattr(morek_schedule, "connector_evidence", lambda *_: "charging")
+    doc = world.area.today_snapshot.document
+    world.area.tomorrow_snapshot.document = _document(
+        doc, doc.start_instant + timedelta(days=1), [tomorrow_price] * 96, doc.day + timedelta(days=1))
+    world.area.tomorrow_state, world.area.tomorrow_authority, world.area.state = "ready", "listed", "ready"
+    world.listeners[-1](world.area)
+    later = await world.controller.async_recalculate()
+    await drain(w.worker)
+    assert later.price_state == "ready"
+    # Whatever the cheaper known night adds, the window the car is charging in stays on the wire from "now".
+    assert w.worker.continuity["preserved"] is True, w.worker.continuity
+    assert w.point.call.await_count == 2
+    profile = w.point.call.await_args_list[-1].args[0].payload["cs_charging_profiles"]
+    periods = profile["chargingSchedule"]["chargingSchedulePeriod"]
+    assert (periods[0]["startPeriod"], periods[0]["limit"]) == (0, 16), periods
+    await world.controller.async_recalculate()  # identical publication and SOC: nothing more is sent
+    await drain(w.worker)
+    assert w.point.call.await_count == 2
+    w.worker.close()
