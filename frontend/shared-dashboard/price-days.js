@@ -32,7 +32,9 @@ export function mergePriceRows(...lists) {
  * a failure stays an error until `retry()`.
  */
 export function createPriceDays({ request, onChange = () => {} }) {
-  let ctx = null, key = null, token = 0, pageId = 0;
+  let ctx = null, key = null, token = 0, pageId = 0, navSeq = 0;
+  // Every explicit choice (even the same button again) is a new navigation; a default view carries no sequence.
+  const chosen = selection => ({ ...selection, seq: ++navSeq });
   const initial = () => ({ available: null, status: 'idle', error: null, page: null, loading: null, selection: { kind: 'today' }, earlierOpen: false, retryDay: null });
   let st = initial();
   const reset = () => { token++; st = initial(); };
@@ -76,7 +78,7 @@ export function createPriceDays({ request, onChange = () => {} }) {
       const merged = mergePriceRows(...rows.map(row => row.held && Array.isArray(row.intervals) ? row.intervals : []));
       if (merged.error) throw new Error('rows');
       st.page = { id: ++pageId, from, to: day, dayRows, rows: merged.rows };
-      st.selection = selection;
+      st.selection = chosen(selection);
     } catch (error) { if (!current(mine, myKey)) return; st.error = error?.message === 'rows' ? 'Held prices of this page overlap or conflict; the page was not drawn.' : FAILED; st.retryDay = { day, selection }; }
     st.loading = null;
     onChange();
@@ -101,11 +103,11 @@ export function createPriceDays({ request, onChange = () => {} }) {
     select(kind, day) {
       if (!ctx || !st.available || st.loading) return;
       if (kind === 'earlier') { st.earlierOpen = !st.earlierOpen; onChange(); return; }
-      if (kind === 'today' || kind === 'tomorrow' || kind === 'all') { st.selection = { kind }; st.error = null; st.retryDay = null; onChange(); return; }
+      if (kind === 'today' || kind === 'tomorrow' || kind === 'all') { st.selection = chosen({ kind, explicit: true }); st.error = null; st.retryDay = null; onChange(); return; }
       const target = kind === 'yesterday' ? addDays(st.available.today, -1) : day;
       if (!heldDay(target) || (kind === 'day' && parse(target) >= parse(st.available.today))) return;
       const selection = { kind: kind === 'yesterday' ? 'yesterday' : 'day', day: target };
-      if (st.page?.dayRows.get(target)?.held && st.page.dayRows.get(target).intervals) { st.selection = selection; st.error = null; st.retryDay = null; onChange(); return; }
+      if (st.page?.dayRows.get(target)?.held && st.page.dayRows.get(target).intervals) { st.selection = chosen(selection); st.error = null; st.retryDay = null; onChange(); return; }
       void loadPage(target, selection);
       onChange();
     },
@@ -127,10 +129,12 @@ export function createPriceDays({ request, onChange = () => {} }) {
       const showsPage = page && ['yesterday', 'day', 'all'].includes(selection.kind);
       const rows = showsPage ? loaded : (liveRows || null);
       let range = null;
-      if (selection.kind === 'tomorrow') range = ctx.span?.(tomorrow) ?? null;
+      // Only an explicit Today is the local calendar day; the default keeps the rolling today/tomorrow horizon.
+      if (selection.kind === 'today' && selection.explicit) range = ctx.span?.(today) ?? null;
+      else if (selection.kind === 'tomorrow') range = ctx.span?.(tomorrow) ?? null;
       else if (selection.kind === 'yesterday' || selection.kind === 'day') range = ctx.span?.(selection.day) ?? null;
       else if (selection.kind === 'all' && rows?.length) range = [Date.parse(rows[0].start), Date.parse(rows.at(-1).end)];
-      const viewKey = `${selection.kind}:${selection.day || ''}:${showsPage ? page.id : 0}`;
+      const viewKey = `${selection.kind}:${selection.day || ''}:${showsPage ? page.id : 0}${selection.seq ? `:${selection.seq}` : ''}`;
       const available = st.available, checking = st.status === 'loading' || st.status === 'idle';
       const why = text => checking ? 'Checking which days are held…' : st.status === 'error' ? 'Held days could not be read.' : text;
       const held = day => available?.byDay.get(day);

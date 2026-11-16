@@ -27,14 +27,25 @@ export function publishedChart(raw, market, now, stale, view = null) {
   };
   const time=ms=>new Intl.DateTimeFormat('en-GB',{timeZone:zone,hour:'2-digit',minute:'2-digit',second:'2-digit',timeZoneName:'shortOffset'}).format(ms);
   const date=ms=>new Intl.DateTimeFormat('en-GB',{timeZone:zone,year:'numeric',month:'short',day:'numeric'}).format(ms);
-  const days=(start,end)=>{const result=[]; let mid=localMidnightAt(start,zone); for(let i=0;i<5&&mid<end;i++){const next=localMidnightAt(mid+36*3600000,zone);if(next<=mid)break;result.push({start:Math.max(start,mid),end:Math.min(end,next),midnight:mid,label:date(mid)});mid=next;}return result;};
+  const days=(start,end)=>{const result=[]; let mid=localMidnightAt(start,zone); for(let i=0;i<16&&mid<end;i++){const next=localMidnightAt(mid+36*3600000,zone);if(next<=mid)break;result.push({start:Math.max(start,mid),end:Math.min(end,next),midnight:mid,label:date(mid)});mid=next;}return result;};
   const priceGaps=(start,end,items)=>{const gaps=[];let cursor=start;for(const p of items){if(p.end<=cursor||p.start>=end)continue;if(p.start>cursor)gaps.push([cursor,Math.min(end,p.start)]);cursor=Math.max(cursor,Math.min(end,p.end));}if(cursor<end)gaps.push([cursor,end]);return gaps;};
   const stepSegments=items=>items.map(p=>[[p.start,p.cents],[p.end,p.cents]]);
   const stepPoints=items=>items.flatMap((p,i)=>[...(i&&items[i-1].end!==p.start?[[(items[i-1].end+p.start)/2,null]]:[]),[p.start,p.cents],[p.end,p.cents]]);
   // `view.range` is an explicit navigation (a chosen day, or every loaded day); without it the range follows `now`, as before.
   const initialRange=current=>view?.range?snapRange(Math.max(horizon[0],view.range[0]),Math.min(horizon[1],view.range[1])):snapRange(Math.max(horizon[0],Math.min(current-3600000,horizon[1]-1)),horizon[1]);
-  const timeTicks=(start,end,width)=>{const step=[3600000,7200000,14400000,21600000,43200000,86400000].find(n=>n>=(end-start)/Math.max(1,Math.floor(width/100)))||86400000;const out=[];for(let t=Math.ceil(start/step)*step;t<end;t+=step)out.push(t);return out;};
-  return {chart:{prices,now,horizon,cap:null,unit:priceUnit(currency),viewKey:view?.key ?? 'default'}, format:{chartTime:time,date,tooltipDate:date,days,priceGaps,stepSegments,stepPoints,snapRange,initialRange,timeTicks}};
+  // Ticks follow the zone's wall clock: a 23/25-hour day keeps its labels on local hours and local midnight, not on UTC multiples.
+  const wallHour=new Intl.DateTimeFormat('en-GB',{timeZone:zone,hour:'numeric',hourCycle:'h23'});
+  const localHour=(midnight,h)=>{let t=midnight+h*3600000;const shown=Number(wallHour.format(t));if(shown!==h)t+=(h-shown)*3600000;return Number(wallHour.format(t))===h?t:null;};
+  const timeTicks=(start,end,width)=>{
+    const hours=[1,2,4,6,12,24].find(n=>n*3600000>=(end-start)/Math.max(1,Math.floor(width/100)))||24, out=[];
+    if (hours===1) {for(let t=Math.ceil(start/3600000)*3600000;t<end;t+=3600000)out.push(t);return out;}
+    let mid=localMidnightAt(start,zone);
+    for(let i=0;i<16&&mid<end;i++){for(let h=0;h<24;h+=hours){const t=localHour(mid,h);if(t!==null&&t>=start&&t<end)out.push(t);}const next=localMidnightAt(mid+36*3600000,zone);if(next<=mid)break;mid=next;}
+    return out;
+  };
+  const tickLabel=ms=>localMidnightAt(ms,zone)===ms?`${time(ms)}
+${date(ms)}`:time(ms);
+  return {chart:{prices,now,horizon,cap:null,unit:priceUnit(currency),viewKey:view?.key ?? 'default'}, format:{chartTime:time,date,tooltipDate:date,days,priceGaps,stepSegments,stepPoints,snapRange,initialRange,timeTicks,tickLabel}};
 }
 
 /** The first and last instant (ms) of a local date `YYYY-MM-DD` in the price area's zone, from the zone's own rules (23/25-hour days included). */

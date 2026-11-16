@@ -339,4 +339,3 @@ describe('live adapter and preview use one nav shape', () => {
     expect(plain.model.priceNav).toBeNull();
   });
 });
-

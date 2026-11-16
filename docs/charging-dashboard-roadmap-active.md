@@ -969,7 +969,7 @@ only if a helper is explicitly used **and labelled**; read-range page = 8 local 
   All loaded days spans the current bounded page, never fetches all 400 days; availability follows held data; 23/25-hour days and 15-minute↔hourly boundaries; stale-response, area-change and charger-change tests;
   user zoom preserved on routine updates; `docs/api.md`; fast checks, build/check-dist. *Exclusions:* no provider fetch, no write, no history
   tracks, no insights.
-- [ ] **7.2 Chart interaction and DST/resolution fixes.** *Needs 7.1 (same chart files).* *Scope:* reproduce with fixtures, then fix only the
+- [x] **7.2 Chart interaction and DST/resolution fixes.** *Locally implemented with mocked checks (manifest 2.5.168); coordinator reviewed (50 focused tests and check-dist passed); the real ECharts canvas, touch and visuals are unverified; defects and unrun limits are in the handoff.* *Needs 7.1 (same chart files).* *Scope:* reproduce with fixtures, then fix only the
   defects found: hourly↔15-minute change inside one horizon, 23/25-hour axis ticks, container resize/orientation keeping the range, tooltip for
   negative values and gaps, the paged data of 7.1. Preserve zoom, tooltip, wheel, reset and the Stage 18.4 absolute bands/axis. May close as
   “verified, no defect” with the fixtures kept. Physical touch stays unverified.

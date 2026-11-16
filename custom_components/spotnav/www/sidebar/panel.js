@@ -52271,7 +52271,7 @@ use([install3, install, install5, install6, install8, install9, install7, instal
 var axis = { axisLine: { lineStyle: { color: "#536b76" } }, axisLabel: { color: "#bed0d5", fontSize: 12 }, splitLine: { lineStyle: { color: "#34444d" } } };
 function mountCharts(root, data, format3, modes) {
   let { prices, windows, now, deadline, horizon, cap, readings, sentHistory, historyAxis, unit = "c/kWh", viewKey } = data;
-  let { time: time2, date: sampleDate, days: sampleDays, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks } = format3;
+  let { time: time2, date: sampleDate, days: sampleDays, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks, tickLabel } = format3;
   time2 = format3.chartTime || time2;
   let tooltipDate = format3.tooltipDate || sampleDate;
   const controller = new AbortController();
@@ -52291,7 +52291,7 @@ function mountCharts(root, data, format3, modes) {
       const children = [{ type: "rect", shape: rect, style: { fill: color3, opacity: 0.2 } }];
       if (top.length === 2) children.push({ type: "line", shape: { x1: top[0][0], y1: top[0][1], x2: top[1][0], y2: top[1][1] }, style: { stroke: color3, lineWidth: 3 }, silent: true });
       const prev = api.value(3);
-      if (Number.isFinite(prev)) {
+      if (Number.isFinite(prev) && s4[0] >= params.coordSys.x && s4[0] <= params.coordSys.x + params.coordSys.width) {
         const from = api.coord([api.value(0), prev]), joint = graphic_exports2.clipPointsByRect([[s4[0], from[1]], [s4[0], s4[1]]], params.coordSys);
         if (joint.length === 2) children.push({ type: "line", shape: { x1: joint[0][0], y1: joint[0][1], x2: joint[1][0], y2: joint[1][1] }, style: { stroke: color3, lineWidth: 3 }, silent: true });
       }
@@ -52304,7 +52304,7 @@ function mountCharts(root, data, format3, modes) {
     const setPriceOption = (initial) => priceChart.setOption({
       animation: false,
       grid: { left: 48, right: 20, top: 82, bottom: 92, show: true, backgroundColor: "#101f30", borderWidth: 0 },
-      tooltip: { trigger: "item", confine: true, hideDelay: 0, transitionDuration: 0, backgroundColor: "#233942", borderColor: "#5b7b7a", textStyle: { color: "#f0faf8" }, formatter: (p4) => `${escapeText(tooltipDate(p4.value[0]))} ${escapeText(time2(p4.value[0]))}\u2013${escapeText(tooltipDate(p4.value[1]))} ${escapeText(time2(p4.value[1]))}<br>${priceText(p4.value[2])} ${escapeText(unit)}${priceBand(p4.value[2], unit) ? ` \xB7 ${priceBand(p4.value[2], unit).label}` : ""}${windows.filter((w2) => w2.start < p4.value[1] && w2.end > p4.value[0]).map((w2) => `<br>Proposal: ${escapeText(tooltipDate(w2.start))} ${escapeText(time2(w2.start))}\u2013${escapeText(time2(w2.end))}`).join("")}` },
+      tooltip: { trigger: "item", confine: true, hideDelay: 0, transitionDuration: 0, backgroundColor: "#233942", borderColor: "#5b7b7a", textStyle: { color: "#f0faf8" }, formatter: (p4) => !Array.isArray(p4.value) || p4.value.length < 3 || !p4.value.slice(0, 3).every(Number.isFinite) ? "" : `${escapeText(tooltipDate(p4.value[0]))} ${escapeText(time2(p4.value[0]))}\u2013${escapeText(tooltipDate(p4.value[1]))} ${escapeText(time2(p4.value[1]))}<br>${priceText(p4.value[2])} ${escapeText(unit)}${priceBand(p4.value[2], unit) ? ` \xB7 ${priceBand(p4.value[2], unit).label}` : ""}${windows.filter((w2) => w2.start < p4.value[1] && w2.end > p4.value[0]).map((w2) => `<br>Proposal: ${escapeText(tooltipDate(w2.start))} ${escapeText(time2(w2.start))}\u2013${escapeText(time2(w2.end))}`).join("")}` },
       xAxis: { ...axis, type: "value", min: horizon[0], max: horizon[1], axisLabel: { show: false }, axisTick: { show: false }, splitLine: { show: false } },
       yAxis: { ...axis, axisLabel: { ...axis.axisLabel, formatter: priceText }, type: "value", name: unit, nameTextStyle: { color: "#bed0d5", align: "left" }, ...priceAxisExtent(prices, unit, cap) },
       dataZoom: [{ type: "inside", xAxisIndex: 0, startValue: initial[0], endValue: initial[1], filterMode: "weakFilter", zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false, preventDefaultMouseMove: false }, { type: "slider", xAxisIndex: 0, startValue: initial[0], endValue: initial[1], filterMode: "weakFilter", height: 28, bottom: 12, borderColor: "#4b6871", backgroundColor: "#142630", fillerColor: "rgba(91,205,180,.22)", textStyle: { color: "#d0e1df" }, showDetail: false }],
@@ -52317,7 +52317,7 @@ function mountCharts(root, data, format3, modes) {
           lineStyle: { opacity: 0 },
           tooltip: { show: false },
           markArea: { silent: true, label: { show: false }, data: [[{ xAxis: horizon[0], itemStyle: { color: "#000000" } }, { xAxis: now }]] },
-          markPoint: { symbol: "pin", symbolSize: 54, label: { color: "#fff", fontSize: 11, fontWeight: "bold", formatter: (p4) => priceText(p4.value) }, data: [(() => {
+          markPoint: { silent: true, symbol: "pin", symbolSize: 54, label: { color: "#fff", fontSize: 11, fontWeight: "bold", formatter: (p4) => priceText(p4.value) }, data: [(() => {
             const p4 = prices.reduce((a4, b3) => a4.cents < b3.cents ? a4 : b3);
             return { name: "LOW", coord: [(p4.start + p4.end) / 2, p4.cents], value: p4.cents, itemStyle: { color: bandColor(p4.cents, unit) } };
           })(), (() => {
@@ -52343,7 +52343,7 @@ function mountCharts(root, data, format3, modes) {
         const el = document.createElement("span");
         el.dataset.hour = h3;
         el.style.left = `${priceChart.convertToPixel({ xAxisIndex: 0 }, h3)}px`;
-        el.textContent = h3 % 24 === 0 ? `${time2(h3)}
+        el.textContent = tickLabel ? tickLabel(h3) : h3 % 24 === 0 ? `${time2(h3)}
 ${sampleDate(h3)}` : time2(h3);
         return el;
       }));
@@ -52409,7 +52409,7 @@ ${sampleDate(h3)}` : time2(h3);
     refreshers.push((navigated) => {
       const z2 = priceChart.getOption().dataZoom[0];
       const a4 = Math.max(horizon[0], z2.startValue), b3 = Math.min(horizon[1], z2.endValue);
-      setPriceOption(!navigated && a4 < b3 ? [a4, b3] : initialRange(now));
+      setPriceOption(!navigated && a4 < b3 ? snapRange(a4, b3) : initialRange(now));
       drawTicks();
     });
     let pinch = null;
@@ -52509,7 +52509,7 @@ ${sampleDate(h3)}` : time2(h3);
   return { priceCharts, update(next, nextFormat) {
     const navigated = next.viewKey !== viewKey;
     ({ prices, windows, now, deadline, horizon, cap, unit = "c/kWh", viewKey } = next);
-    ({ time: time2, date: sampleDate, days: sampleDays, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks } = nextFormat);
+    ({ time: time2, date: sampleDate, days: sampleDays, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks, tickLabel } = nextFormat);
     time2 = nextFormat.chartTime || time2;
     tooltipDate = nextFormat.tooltipDate || sampleDate;
     refreshers.forEach((refresh) => refresh(navigated));
@@ -57642,7 +57642,8 @@ function mergePriceRows(...lists) {
 }
 function createPriceDays({ request, onChange = () => {
 } }) {
-  let ctx = null, key3 = null, token = 0, pageId = 0;
+  let ctx = null, key3 = null, token = 0, pageId = 0, navSeq = 0;
+  const chosen = (selection) => ({ ...selection, seq: ++navSeq });
   const initial = () => ({ available: null, status: "idle", error: null, page: null, loading: null, selection: { kind: "today" }, earlierOpen: false, retryDay: null });
   let st = initial();
   const reset = () => {
@@ -57689,7 +57690,7 @@ function createPriceDays({ request, onChange = () => {
       const merged = mergePriceRows(...rows.map((row2) => row2.held && Array.isArray(row2.intervals) ? row2.intervals : []));
       if (merged.error) throw new Error("rows");
       st.page = { id: ++pageId, from, to: day, dayRows, rows: merged.rows };
-      st.selection = selection;
+      st.selection = chosen(selection);
     } catch (error2) {
       if (!current(mine, myKey)) return;
       st.error = error2?.message === "rows" ? "Held prices of this page overlap or conflict; the page was not drawn." : FAILED;
@@ -57732,7 +57733,7 @@ function createPriceDays({ request, onChange = () => {
         return;
       }
       if (kind === "today" || kind === "tomorrow" || kind === "all") {
-        st.selection = { kind };
+        st.selection = chosen({ kind, explicit: true });
         st.error = null;
         st.retryDay = null;
         onChange();
@@ -57742,7 +57743,7 @@ function createPriceDays({ request, onChange = () => {
       if (!heldDay(target) || kind === "day" && parse2(target) >= parse2(st.available.today)) return;
       const selection = { kind: kind === "yesterday" ? "yesterday" : "day", day: target };
       if (st.page?.dayRows.get(target)?.held && st.page.dayRows.get(target).intervals) {
-        st.selection = selection;
+        st.selection = chosen(selection);
         st.error = null;
         st.retryDay = null;
         onChange();
@@ -57776,10 +57777,11 @@ function createPriceDays({ request, onChange = () => {
       const showsPage = page && ["yesterday", "day", "all"].includes(selection.kind);
       const rows = showsPage ? loaded2 : liveRows || null;
       let range2 = null;
-      if (selection.kind === "tomorrow") range2 = ctx.span?.(tomorrow) ?? null;
+      if (selection.kind === "today" && selection.explicit) range2 = ctx.span?.(today) ?? null;
+      else if (selection.kind === "tomorrow") range2 = ctx.span?.(tomorrow) ?? null;
       else if (selection.kind === "yesterday" || selection.kind === "day") range2 = ctx.span?.(selection.day) ?? null;
       else if (selection.kind === "all" && rows?.length) range2 = [Date.parse(rows[0].start), Date.parse(rows.at(-1).end)];
-      const viewKey = `${selection.kind}:${selection.day || ""}:${showsPage ? page.id : 0}`;
+      const viewKey = `${selection.kind}:${selection.day || ""}:${showsPage ? page.id : 0}${selection.seq ? `:${selection.seq}` : ""}`;
       const available = st.available, checking = st.status === "loading" || st.status === "idle";
       const why = (text4) => checking ? "Checking which days are held\u2026" : st.status === "error" ? "Held days could not be read." : text4;
       const held = (day) => available?.byDay.get(day);
@@ -57860,7 +57862,7 @@ function publishedChart(raw, market, now, stale, view = null) {
   const days = (start2, end2) => {
     const result2 = [];
     let mid = localMidnightAt(start2, zone);
-    for (let i7 = 0; i7 < 5 && mid < end2; i7++) {
+    for (let i7 = 0; i7 < 16 && mid < end2; i7++) {
       const next = localMidnightAt(mid + 36 * 36e5, zone);
       if (next <= mid) break;
       result2.push({ start: Math.max(start2, mid), end: Math.min(end2, next), midnight: mid, label: date2(mid) });
@@ -57882,13 +57884,34 @@ function publishedChart(raw, market, now, stale, view = null) {
   const stepSegments = (items) => items.map((p4) => [[p4.start, p4.cents], [p4.end, p4.cents]]);
   const stepPoints = (items) => items.flatMap((p4, i7) => [...i7 && items[i7 - 1].end !== p4.start ? [[(items[i7 - 1].end + p4.start) / 2, null]] : [], [p4.start, p4.cents], [p4.end, p4.cents]]);
   const initialRange = (current) => view?.range ? snapRange(Math.max(horizon[0], view.range[0]), Math.min(horizon[1], view.range[1])) : snapRange(Math.max(horizon[0], Math.min(current - 36e5, horizon[1] - 1)), horizon[1]);
+  const wallHour = new Intl.DateTimeFormat("en-GB", { timeZone: zone, hour: "numeric", hourCycle: "h23" });
+  const localHour = (midnight, h3) => {
+    let t6 = midnight + h3 * 36e5;
+    const shown = Number(wallHour.format(t6));
+    if (shown !== h3) t6 += (h3 - shown) * 36e5;
+    return Number(wallHour.format(t6)) === h3 ? t6 : null;
+  };
   const timeTicks = (start2, end2, width) => {
-    const step = [36e5, 72e5, 144e5, 216e5, 432e5, 864e5].find((n6) => n6 >= (end2 - start2) / Math.max(1, Math.floor(width / 100))) || 864e5;
-    const out2 = [];
-    for (let t6 = Math.ceil(start2 / step) * step; t6 < end2; t6 += step) out2.push(t6);
+    const hours = [1, 2, 4, 6, 12, 24].find((n6) => n6 * 36e5 >= (end2 - start2) / Math.max(1, Math.floor(width / 100))) || 24, out2 = [];
+    if (hours === 1) {
+      for (let t6 = Math.ceil(start2 / 36e5) * 36e5; t6 < end2; t6 += 36e5) out2.push(t6);
+      return out2;
+    }
+    let mid = localMidnightAt(start2, zone);
+    for (let i7 = 0; i7 < 16 && mid < end2; i7++) {
+      for (let h3 = 0; h3 < 24; h3 += hours) {
+        const t6 = localHour(mid, h3);
+        if (t6 !== null && t6 >= start2 && t6 < end2) out2.push(t6);
+      }
+      const next = localMidnightAt(mid + 36 * 36e5, zone);
+      if (next <= mid) break;
+      mid = next;
+    }
     return out2;
   };
-  return { chart: { prices, now, horizon, cap: null, unit: priceUnit(currency), viewKey: view?.key ?? "default" }, format: { chartTime: time2, date: date2, tooltipDate: date2, days, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks } };
+  const tickLabel = (ms) => localMidnightAt(ms, zone) === ms ? `${time2(ms)}
+${date2(ms)}` : time2(ms);
+  return { chart: { prices, now, horizon, cap: null, unit: priceUnit(currency), viewKey: view?.key ?? "default" }, format: { chartTime: time2, date: date2, tooltipDate: date2, days, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks, tickLabel } };
 }
 function localDaySpan(day, zone) {
   const m4 = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day || "");
@@ -64115,7 +64138,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.167";
+var CARD_VERSION = "2.5.168";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {
