@@ -1958,6 +1958,24 @@ PLANNING_HOLDS: dict[str, tuple[str, str, str]] = {
     "price_inputs_changed": ("wait_for_prices", "system", "plan_recalculated"),
     "plan_inputs_changed": ("wait_for_planner", "system", "plan_recalculated"),
 }
+#: Stage 19.5: the planner reasons Stage 17.6 did not name. Each states who acts and the existing input change that
+#: ends it, reusing existing banner actions (no new wording, no new trigger, timer or setting). `adjust_planning_settings`
+#: is a person-owned setting or departure the planner cannot plan around without inventing an input; the others wait.
+#: None invents a price, capacity, car or level, and none claims charging. Kept apart from `PLANNING_HOLDS` so the
+#: Stage 17.6 table and its tests stay as they were.
+EXTRA_PLANNING_HOLDS: dict[str, tuple[str, str, str]] = {
+    "settings_missing": ("adjust_planning_settings", "person", "settings_changed"),
+    "fiscal_value_missing": ("adjust_planning_settings", "person", "settings_changed"),
+    "minimum_above_target": ("adjust_planning_settings", "person", "settings_changed"),
+    "price_policy_unavailable": ("adjust_planning_settings", "person", "settings_changed"),
+    "solar_execution_unavailable": ("adjust_planning_settings", "person", "settings_changed"),
+    "deadline_too_short": ("adjust_planning_settings", "person", "settings_changed"),
+    "price_data_invalid": ("wait_for_prices", "system", "prices_published"),
+    "insufficient_price_horizon": ("wait_for_prices", "system", "prices_published"),
+    "publication_pending": ("wait_for_prices", "system", "prices_published"),
+    "waiting_for_history": ("wait_for_prices", "system", "prices_published"),
+    "unexpected_failure": ("check_logs", "system", "next_calculation"),
+}
 #: Worker reasons that only say "there is no sendable plan": the planner's own reason says why.
 _NO_PLAN_BLOCKERS = frozenset({"no_current_plan", "planning_unavailable", "prices_unavailable",
                                "prices_stale_or_unavailable"})
@@ -1972,9 +1990,10 @@ def decision_blocker(reason: str | None, plan_reason: str | None = None) -> dict
     if not reason or reason in _DECISION_OK or reason in ("pending", "stale_work", "not_started"):
         return None
     blocker = {"code": str(reason)[:60], "action": DECISION_BLOCKERS.get(reason, "see_reason")}
-    hold = PLANNING_HOLDS.get(reason)
-    if reason in _NO_PLAN_BLOCKERS and isinstance(plan_reason, str) and plan_reason in PLANNING_HOLDS:
-        hold = PLANNING_HOLDS[plan_reason]
+    hold = PLANNING_HOLDS.get(reason) or EXTRA_PLANNING_HOLDS.get(reason)
+    named = PLANNING_HOLDS.get(plan_reason) or EXTRA_PLANNING_HOLDS.get(plan_reason) if isinstance(plan_reason, str) else None
+    if reason in _NO_PLAN_BLOCKERS and named is not None:
+        hold = named
         blocker["detail"] = plan_reason[:60]
     if hold is not None:
         blocker["action"], blocker["who"], blocker["recovery"] = hold
