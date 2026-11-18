@@ -8,6 +8,7 @@ of installed profiles. OCPP's internal ChargePoint API is isolated here for easy
 from __future__ import annotations
 
 import asyncio
+import copy
 import hashlib
 import json
 import functools
@@ -1095,7 +1096,9 @@ def check_candidate(record: dict[str, Any] | None, now: datetime, *, sending: An
         return None, ack_id, "upload_pending"
     if not isinstance(ack, dict) or not ack_id or not ack.get("fingerprint"):
         return None, ack_id, "no_acknowledged_intent"
-    if not isinstance(attempt, dict) or attempt.get("id") != ack_id or attempt.get("state") != "accepted":
+    if not isinstance(attempt, dict) or ((attempt.get("id") != ack_id or attempt.get("state") != "accepted")
+                                         and rejected_reassert_of(record) != ack_id):
+        # (a definitely rejected reassert of the same intent leaves the acknowledgement in force: Stage 19.2)
         return None, ack_id, "newer_attempt"
     if verification_timer or (dispatched == ack_id and isinstance(data, dict) and not data.get("verified")
                               and not (data.get("verification") or {}).get("attempts")):
@@ -1355,6 +1358,11 @@ def _resume_authorized(record: dict[str, Any], worker: Any, generation: int) -> 
         return False  # a recorded Stop pre-empted this Resume: only a new person Resume continues
     if getattr(worker, "resume_ticket", None) == (pause.get("id"), generation):
         return True
+    authorized = record.get(RESUME_AUTHORIZED_KEY)
+    if isinstance(authorized, dict) and authorized.get("id") == pause.get("id"):
+        # Stage 19.9a: the person's Resume was made durable (via the pending-Resume path) with this very intent id.
+        # It survives restart; a Stop/Pause replaces the intent (a new id) and so ends it. Not an ACK.
+        return True
     attempt = record.get("attempt") or {}
     ack = record.get("acknowledged") or {}
     return (record.get("uncertain") is False and attempt.get("state") == "accepted"
@@ -1374,11 +1382,21 @@ def _owned_pause_status(outcomes: dict[str, Any], verification: dict[str, Any], 
     matching = not stop_pending and attempt.get("pause_id") == pause.get("id")
     # A worker reason may describe the previous intent; never attach it to a new one.
     request = "stop_pending" if stop_pending else attempt.get("state", "unknown") if matching else "pending"
+    pending_resume = valid_pending_resume(outcomes) is not None
+    if pending_resume and not stop_pending:
+        request = "resume_pending"  # the Pause stays the effective intent until the guarded recovery acts
     if (not matching and not stop_pending and pause.get("type") == "resume_requested" and worker is not None
             and getattr(worker, "resume_ticket", None) is None
             and not _resume_authorized(outcomes, worker, 0)):
         request = "resume_requires_confirmation"
+    removal = outcomes.get("removal")
     return {"intent": pause.get("type", "unknown"), "request": request,
+            "resume_pending": pending_resume and not stop_pending,
+            # 19.9a: a Resume can be requested while the previous upload is unknown; it is made durable and the
+            # guarded recovery then sends a fresh schedule. Offered only against a Pause, never while a Stop is pending.
+            "resume_recoverable": bool(not stop_pending and not pending_resume and outcomes.get("uncertain") is True
+                                       and pause.get("type") == "pause_until_resumed"
+                                       and not (isinstance(removal, dict) and removal.get("state") == "uncertain")),
             "ack": attempt.get("ack") if matching else None,
             "readback": "bounded_match" if matching and verified and verification.get("scope") in ("bounded_held_off", "remaining")
             else "unverified", "coverage_start": verification.get("coverage_start") if matching and verified else None,
@@ -1871,6 +1889,12 @@ def recovery_status(record: dict[str, Any] | None, now: datetime) -> dict[str, A
     attempt = record.get("attempt") if isinstance(record.get("attempt"), dict) else {}
     count = rejection_count(attempt)
     retry_at = rejection_retry_at(record)
+    if rejected_reassert_of(record):
+        # Stage 19.2: a refused reassert is retried by a paced read-only look then a confirmed reassert, never blindly.
+        due = reassert_next_at(record, now)
+        return {"accepted_at": accepted_at, "accepted_age_s": age_s, "accepted_is": "acknowledged_not_measured",
+                "rejections": count, "pace": "reassert", "retries_left": None,
+                "next_retry_at": (due or now).isoformat(), "exhausted": False}
     return {"accepted_at": accepted_at, "accepted_age_s": age_s, "accepted_is": "acknowledged_not_measured",
             "rejections": count, "pace": None if not count else "fast" if count <= len(REJECTION_RETRY_DELAYS) else "slow",
             "retries_left": max(0, len(REJECTION_RETRY_DELAYS) + 1 - count) if count else None,
@@ -1960,8 +1984,9 @@ def observation_entry(code: str, now_iso: str, *, retry_pending: bool = False) -
     action = DECISION_BLOCKERS.get(code)
     if action is None:
         return None
-    who = "vehicle" if action in _OBS_VEHICLE else "system" if action in _OBS_SYSTEM else "person"
-    automatic = code in TRANSIENT_BLOCKERS or (code == "upload_rejected" and retry_pending)
+    who = ("vehicle" if action in _OBS_VEHICLE else "system" if action in _OBS_SYSTEM or code == "upload_uncertain"
+           else "person")  # 19.2: an unknown upload is resolved by the guarded, paced recovery, not by a person
+    automatic = code in TRANSIENT_BLOCKERS or code == "upload_uncertain" or (code == "upload_rejected" and retry_pending)
     return {"code": code, "evidence": _OBS_EVIDENCE.get(code, "none"), "basis": "observed", "who": who,
             "next": "automatic_recheck" if automatic else "person_action", "count": 1,
             "first_at": now_iso, "last_at": now_iso}
@@ -2231,37 +2256,83 @@ async def async_record_owned_pause(hass: HomeAssistant, entry_id: str, *, resume
             if physical_connector(identity()) != connector:
                 raise ScheduleRefused("identity_changed")
             intent = record.get("schedule_pause")
-            if resume and (intent is None or record["uncertain"] or admission._person_stops.get(connector)):
+            removal = record.get("removal")
+            removal_doubt = isinstance(removal, dict) and removal.get("state") == "uncertain"
+            if resume and (intent is None or removal_doubt or admission._person_stops.get(connector)):
                 raise ScheduleRefused("resume_unavailable")
-            desired = "resume_requested" if resume else "pause_until_resumed"
+            pending = False
             committed = False
-            interrupted_before = resume and intent is not None and (
-                record.get("resume_interrupted") == intent["id"])
-            if (intent is None or intent["type"] != desired or interrupted_before
-                    or (not resume and record.get("charge_now") is not None)):
-                intent = {"version": 1, "type": desired, "id": uuid4().hex,
-                          "station_id": connector.station_id, "connector_id": connector.connector_id}
-                record["schedule_pause"] = intent
-                record.pop("resume_interrupted", None)  # a fresh intent id: a person's new Resume may continue
-                if not resume:
-                    record.pop("charge_now", None)
-                await outcomes_for(hass).write(record)
-                committed = True
-            if resume and (generation != admission.generation(connector) or admission._person_stops.get(connector)):
-                interrupted = getattr(getattr(entry, "runtime_data", None), "morek_worker", None)
-                if interrupted is not None:
-                    interrupted.resume_interrupted = intent["id"]  # a Stop took precedence: never auto-recover it
-                # Durable too, before anything else can run: a restart before the Stop's own record must not
-                # recover this superseded Resume. Written under the connector lock; a failed write propagates.
-                record["resume_interrupted"] = intent["id"]
-                await outcomes_for(hass).write(record)
-                if committed:
-                    from ..execution.auto_execution import AutoControlCommitted, EXECUTION_RECONCILE_FAILED
-                    raise AutoControlCommitted(EXECUTION_RECONCILE_FAILED)
-                raise ScheduleRefused("resume_interrupted")
+            if resume and record["uncertain"]:
+                # Stage 19.9a: the previous upload is unknown. The Pause stays the effective intent; the person's
+                # Resume is recorded as a SEPARATE durable pending request, under this connector lock, which the
+                # guarded recovery (worker + admission) later turns into the current Resume with a fresh schedule.
+                # It is not an ACK, a send or a measured charge; a later Stop/Pause deletes it.
+                pending = True
+                if intent["type"] == "pause_until_resumed" and valid_pending_resume(record) is None:
+                    record[PENDING_RESUME_KEY] = {
+                        "version": 1, "id": uuid4().hex, "pause_id": intent["id"],
+                        "station_id": connector.station_id, "connector_id": connector.connector_id,
+                        "at": datetime.now(timezone.utc).isoformat()}
+                    record.pop("resume_interrupted", None)
+                    await outcomes_for(hass).write(record)
+                    committed = True
+                if intent["type"] == "resume_requested" and not authorized_resume(record):
+                    # A Resume whose own send is unknown: the person's click makes that very intent durably authorized.
+                    record[RESUME_AUTHORIZED_KEY] = {"id": intent["id"], "at": datetime.now(timezone.utc).isoformat(),
+                                                     "from": "person_resume"}
+                    record.pop("resume_interrupted", None)
+                    await outcomes_for(hass).write(record)
+                    committed = True
+                if generation != admission.generation(connector) or admission._person_stops.get(connector):
+                    # A Stop took precedence while the request was being written: delete the request durably and
+                    # never let a restart recover it.
+                    record.pop(PENDING_RESUME_KEY, None)
+                    record.pop(RESUME_AUTHORIZED_KEY, None)
+                    if intent["type"] == "resume_requested":
+                        record["resume_interrupted"] = intent["id"]
+                    await outcomes_for(hass).write(record)
+                    raise ScheduleRefused("resume_interrupted")
+            else:
+                desired = "resume_requested" if resume else "pause_until_resumed"
+                interrupted_before = resume and intent is not None and (
+                    record.get("resume_interrupted") == intent["id"])
+                if (intent is None or intent["type"] != desired or interrupted_before
+                        or (not resume and record.get("charge_now") is not None)
+                        or (not resume and PENDING_RESUME_KEY in record)):
+                    if intent is None or intent["type"] != desired or interrupted_before:
+                        intent = {"version": 1, "type": desired, "id": uuid4().hex,
+                                  "station_id": connector.station_id, "connector_id": connector.connector_id}
+                        record["schedule_pause"] = intent
+                    record.pop("resume_interrupted", None)  # a fresh intent id: a person's new Resume may continue
+                    if not resume:
+                        # A Stop/Pause always deletes a pending Resume (even when the Pause intent is unchanged).
+                        record.pop("charge_now", None)
+                        record.pop(PENDING_RESUME_KEY, None)
+                    await outcomes_for(hass).write(record)
+                    committed = True
+                if resume and (generation != admission.generation(connector) or admission._person_stops.get(connector)):
+                    interrupted = getattr(getattr(entry, "runtime_data", None), "morek_worker", None)
+                    if interrupted is not None:
+                        interrupted.resume_interrupted = intent["id"]  # a Stop took precedence: never auto-recover it
+                    # Durable too, before anything else can run: a restart before the Stop's own record must not
+                    # recover this superseded Resume. Written under the connector lock; a failed write propagates.
+                    record["resume_interrupted"] = intent["id"]
+                    await outcomes_for(hass).write(record)
+                    if committed:
+                        from ..execution.auto_execution import AutoControlCommitted, EXECUTION_RECONCILE_FAILED
+                        raise AutoControlCommitted(EXECUTION_RECONCILE_FAILED)
+                    raise ScheduleRefused("resume_interrupted")
             if not resume and physical_connector(identity()) == connector:
                 admission.renew_ticket_for_durable_pause(entry_id, connector, generation)
     worker = getattr(getattr(entry, "runtime_data", None), "morek_worker", None)
+    if pending:
+        # The recovery may need the process-local send authority back (a restart or a link return dropped it):
+        # one guarded reconfirmation, which a durable pending Resume permits for an unsettled record. It sends
+        # nothing; a refusal leaves the request pending and visible, and the worker re-attempts it on its paced runs.
+        await async_recover_send_authority(hass, entry_id)
+        if worker is not None:
+            worker.trigger()
+        return dict(valid_pending_resume(record) or intent) | {"pending": True}
     if worker is not None:
         if resume:
             worker.resume_ticket = (intent["id"], generation)
@@ -2271,6 +2342,27 @@ async def async_record_owned_pause(hass: HomeAssistant, entry_id: str, *, resume
             worker.hold_ticket = (intent["id"], generation)
         worker.trigger()
     return dict(intent)
+
+
+async def async_recover_send_authority(hass: HomeAssistant, entry_id: str) -> str:
+    """Stage 19.2/19.9a: regain the process-local completion ticket when a durable pending Resume permits it.
+
+    `CommandAdmission.async_reconfirm_completed` still verifies the owner, identity, generation and Stop and never
+    operates the charger; only the unsettled-record check admits a pending Resume. Returns its code (or
+    `authority_present` / `recovery_unavailable`)."""
+    try:
+        entry, failure = lookup_charger(hass, entry_id)
+        if failure or entry is None:
+            return "recovery_unavailable"
+        admission = command_admission(hass)
+        from ..execution.command_admission import physical_connector
+        identity = lambda: _identity_status(hass, getattr(controller_for(hass, entry_id), "ocpp_target", None))  # noqa: E731
+        connector = physical_connector(identity())
+        if connector is not None and admission.owned_ticket_current(entry_id, connector):
+            return "authority_present"
+        return await admission.async_reconfirm_completed(entry_id, identity)
+    except Exception:  # noqa: BLE001 - no authority is the safe answer; the request stays pending and visible
+        return "recovery_unavailable"
 
 
 @_logged_action("Charge Now")
@@ -2512,14 +2604,307 @@ def upload_outcome_class(record: dict[str, Any] | None, *, in_flight: bool = Fal
     return {"class": "none", "proof": None, "basis": None}
 
 
+#: Stage 19.2 (+19.9a): convergence after an ambiguous upload. All keys are additive on the existing outcome record.
+#: The old attempt stays `unknown` historical evidence (`unknown_history`, bounded); it is never relabelled accepted,
+#: failed or sent. A *new*, separately identified absolute schedule (the same single sender, profile 42001) replaces
+#: it. `supersession` is the standing risk record: no ordering of a late old frame can be proven, so the risk stays
+#: named even after the replacement is acknowledged (`late_old_frame_not_excluded`).
+PENDING_RESUME_KEY = "pending_resume"
+RESUME_AUTHORIZED_KEY = "resume_authorized"
+UNKNOWN_HISTORY_KEY = "unknown_history"
+UNKNOWN_HISTORY_CAP = 5
+SUPERSESSION_KEY = "supersession"
+RECOVERY_KEY = "recovery"
+#: Waits (seconds) before the first and each later guarded resolve of an unknown upload; the last repeats (4 h ceiling).
+#: Before the first resolve it is measured from the unknown attempt, afterwards from the last resolve attempt.
+RECOVERY_DELAYS = (120, 300, 900, 1800, 3600, 14400)
+
+
+def _record_station_ok(item: Any) -> bool:
+    return (isinstance(item, dict) and item.get("station_id") == MOREK_STATION_ID
+            and type(item.get("connector_id")) is int and item["connector_id"] == MOREK_CONNECTOR_ID)
+
+
+def valid_pending_resume(record: dict[str, Any] | None) -> dict[str, Any] | None:
+    """The person's durable Resume request made while the previous upload was unknown, or None.
+
+    Valid only while the Pause it was made against is still the current intent (`pause_id`): a later Stop/Pause
+    removes it, replaces that intent and thereby invalidates it. It is intent, never an ACK or measured charge."""
+    if not isinstance(record, dict):
+        return None
+    pending, pause = record.get(PENDING_RESUME_KEY), record.get("schedule_pause")
+    if (not isinstance(pending, dict) or set(pending) != {"version", "id", "pause_id", "station_id", "connector_id", "at"}
+            or type(pending.get("version")) is not int or pending["version"] != 1
+            or not isinstance(pending.get("id"), str) or len(pending["id"]) != 32
+            or not _record_station_ok(pending) or not isinstance(pause, dict)
+            or pause.get("type") != "pause_until_resumed" or pause.get("id") != pending.get("pause_id")
+            or record.get("resume_interrupted") == pause.get("id")):
+        return None
+    return pending
+
+
+def recoverable_ambiguous(record: dict[str, Any] | None) -> bool:
+    """An uncertain record whose latest attempt may have reached the wire (or predates 19.1) and has no removal in
+    doubt: the only kind the guarded 19.2 resolve may supersede. A pre-wire-provable record is released by 19.1."""
+    if not isinstance(record, dict) or record.get("uncertain") is not True:
+        return False
+    removal = record.get("removal")
+    if isinstance(removal, dict) and removal.get("state") == "uncertain":
+        return False
+    return upload_outcome_class(record, in_flight=False)["class"] == "ambiguous"
+
+
+def authorized_resume(record: dict[str, Any] | None) -> bool:
+    """The current `resume_requested` intent carries the person's durable authorization marker (19.9a)."""
+    if not isinstance(record, dict):
+        return False
+    pause, marker = record.get("schedule_pause"), record.get(RESUME_AUTHORIZED_KEY)
+    return bool(isinstance(pause, dict) and pause.get("type") == "resume_requested" and isinstance(marker, dict)
+                and marker.get("id") == pause.get("id") and record.get("resume_interrupted") != pause.get("id"))
+
+
+def resume_recoverable(record: dict[str, Any] | None) -> bool:
+    """A durable person Resume (still-valid pending request, or an authorized current Resume) exists for an
+    unsettled record (ambiguous or provably unsent)."""
+    if (not isinstance(record, dict) or record.get("uncertain") is not True
+            or (valid_pending_resume(record) is None and not authorized_resume(record))):
+        return False
+    removal = record.get("removal")
+    return not (isinstance(removal, dict) and removal.get("state") == "uncertain")
+
+
+def _recovery_delay(attempts: int) -> int:
+    return RECOVERY_DELAYS[min(max(attempts, 0), len(RECOVERY_DELAYS) - 1)]
+
+
+def recovery_next_at(record: dict[str, Any] | None, *, immediate: bool = False) -> datetime | None:
+    """When the next guarded resolve of an unknown upload may run (None: unreadable evidence, never permission).
+
+    Persisted `recovery.next_at` after a resolve attempt; before the first one `RECOVERY_DELAYS[0]` after the unknown
+    attempt, or at once for a person's pending Resume. Survives restart: it is read from the ledger."""
+    if not isinstance(record, dict):
+        return None
+    state = record.get(RECOVERY_KEY)
+    try:
+        if isinstance(state, dict) and state.get("next_at"):
+            return _utc(datetime.fromisoformat(state["next_at"]))
+        if immediate:
+            return datetime.min.replace(tzinfo=timezone.utc)
+        attempt = record.get("attempt") if isinstance(record.get("attempt"), dict) else {}
+        if not attempt.get("at"):
+            return datetime.min.replace(tzinfo=timezone.utc)  # a legacy record with no timestamp: nothing to wait on
+        return _utc(datetime.fromisoformat(attempt["at"])) + timedelta(seconds=_recovery_delay(0))
+    except (TypeError, ValueError, AttributeError, OverflowError, ScheduleRefused):
+        return None
+
+
+def recovery_due(record: dict[str, Any] | None, now: datetime, *, immediate: bool = False) -> bool:
+    at = recovery_next_at(record, immediate=immediate)
+    return at is not None and now >= at
+
+
+#: Stage 19.2 late-frame guard: while the `supersession` risk record exists, a fresh, confirmed readback mismatch of the
+#: acknowledged intent is re-asserted by the guarded worker under THIS persisted pace instead of the ordinary repair
+#: budget/escalation (which would stop convergence for good). Same ladder as the recovery pace; the pace restarts after
+#: `REASSERT_RESET` of quiet. It is only ever reached from a confirmed check, never from a timer of its own.
+REASSERT_DELAYS = RECOVERY_DELAYS
+REASSERT_RESET = timedelta(hours=24)
+
+
+def reassert_open(record: dict[str, Any] | None) -> bool:
+    """The standing late-old-frame risk exists (it is never cleared), so a confirmed mismatch converges by reassert."""
+    sup = record.get(SUPERSESSION_KEY) if isinstance(record, dict) else None
+    return (isinstance(sup, dict) and sup.get("risk") == "late_old_frame_not_excluded"
+            and sup.get("state") in ("pending", "replacement_acknowledged"))
+
+
+def _reassert_attempts(record: dict[str, Any], now: datetime) -> int:
+    state = (record.get(SUPERSESSION_KEY) or {}).get("reassert")
+    try:
+        if (isinstance(state, dict) and type(state.get("attempts")) is int
+                and now - _utc(datetime.fromisoformat(state["last_at"])) < REASSERT_RESET):
+            return max(0, state["attempts"])
+    except (TypeError, ValueError, KeyError, OverflowError):
+        return 0
+    return 0
+
+
+def reassert_next_at(record: dict[str, Any] | None, now: datetime) -> datetime | None:
+    """When the next reassert may be sent (None: none pending, so due now). Unreadable pace state is treated as due:
+    the pace limits writes, it must never become the permanent lock."""
+    state = (record.get(SUPERSESSION_KEY) or {}).get("reassert") if isinstance(record, dict) else None
+    try:
+        if _reassert_attempts(record, now) and isinstance(state, dict):
+            return _utc(datetime.fromisoformat(state["next_at"]))
+    except (TypeError, ValueError, KeyError, OverflowError):
+        return None
+    return None
+
+
+def rejected_reassert_of(record: dict[str, Any] | None) -> str | None:
+    """The acknowledged attempt id when the NEWEST attempt is a definitely rejected reassert of that very intent.
+
+    A definite rejection means that frame was not applied, so the earlier acknowledgement is still the intent the
+    charger was last told: the checker may keep reading it back and a confirmed mismatch may reassert it again (under
+    the persisted reassert pace; the new send is always built from the CURRENT intent, so a plan that changed meanwhile
+    is simply sent by the ordinary path and ends this state). The attempt must be the one the reassert pace record
+    names, of the same intent kind as the acknowledgement. Anything else (uncertain, a different intent, no risk record, an unrelated rejected
+    attempt) returns None and keeps the older "newer attempt" refusal."""
+    try:
+        if not reassert_open(record) or record.get("uncertain") is not False:
+            return None
+        ack, attempt = record.get("acknowledged"), record.get("attempt")
+        mine = record[SUPERSESSION_KEY].get("reassert")
+        if (not isinstance(ack, dict) or not ack.get("id") or not ack.get("fingerprint") or not isinstance(attempt, dict)
+                or attempt.get("state") != "rejected" or not isinstance(mine, dict)
+                or mine.get("attempt_id") != attempt.get("id")
+                or bool(ack.get("routine")) != (attempt.get("pause_id") is None and attempt.get("override_id") is None)):
+            return None
+        return ack["id"]
+    except (AttributeError, KeyError, TypeError):
+        return None
+
+
+def next_planned_transition(record: dict[str, Any] | None, now: datetime) -> datetime | None:
+    """The next instant after `now` at which the acknowledged profile changes its limit (None: none, or unreadable).
+    Read-only; lets the checker look once at a transition while the late-frame risk is open. Never polling."""
+    try:
+        profile, _id, why = check_candidate(record, now)
+        if profile is None or why is not None:
+            return None
+        schedule = profile["chargingSchedule"]
+        start = _utc(datetime.fromisoformat(schedule["startSchedule"].replace("Z", "+00:00")))
+        later = [start + timedelta(seconds=p["startPeriod"]) for p in schedule["chargingSchedulePeriod"]
+                 if p["startPeriod"] > 0 and start + timedelta(seconds=p["startPeriod"]) > _utc(now)]
+        return min(later) if later else None
+    except (KeyError, TypeError, ValueError, AttributeError, OverflowError, ScheduleRefused):
+        return None
+
+
+def _intent_kind(attempt: dict[str, Any]) -> str:
+    return "charge_now" if attempt.get("override_id") else "pause_resume" if attempt.get("pause_id") else "schedule"
+
+
+def _archive_unknown(record: dict[str, Any], old: dict[str, Any], new_id: str, now: str) -> None:
+    """Keep the superseded ambiguous attempt as bounded, labelled-unknown history and open/refresh the risk record.
+    Ids, a fingerprint and times only: no profile, price or payload."""
+    entry = {"attempt_id": old.get("id"), "fingerprint": old.get("fingerprint"), "at": old.get("at"),
+             "source": old.get("source"), "intent": _intent_kind(old),
+             "dispatch_class": old.get("dispatch_class") or "legacy_unclassified", "outcome": "unknown",
+             "ack": old.get("ack"), "superseded_by": new_id, "superseded_at": now}
+    history = [item for item in record.get(UNKNOWN_HISTORY_KEY) or [] if isinstance(item, dict)]
+    history.append(entry)
+    record[UNKNOWN_HISTORY_KEY] = history[-UNKNOWN_HISTORY_CAP:]
+    previous = record.get(SUPERSESSION_KEY) if isinstance(record.get(SUPERSESSION_KEY), dict) else {}
+    record[SUPERSESSION_KEY] = {
+        "version": 1, "state": "pending", "old_attempt_id": old.get("id"), "attempt_id": new_id,
+        "since": previous.get("since") if previous.get("state") == "pending" and previous.get("since") else now,
+        "risk": "late_old_frame_not_excluded"}
+
+
+def unknown_recovery_status(record: dict[str, Any] | None, now: datetime, worker: Any = None) -> dict[str, Any]:
+    """Read-only view for the status: what is unknown, what happens next and when. Never says the old outcome is
+    known, never says charging; `physical_charging` is always `unknown`."""
+    record = record if isinstance(record, dict) else {}
+    supersession = record.get(SUPERSESSION_KEY) if isinstance(record.get(SUPERSESSION_KEY), dict) else None
+    history = record.get(UNKNOWN_HISTORY_KEY) if isinstance(record.get(UNKNOWN_HISTORY_KEY), list) else []
+    pending = valid_pending_resume(record)
+    ambiguous = recoverable_ambiguous(record)
+    next_at = recovery_next_at(record, immediate=pending is not None) if ambiguous else None
+    state = ("waiting" if ambiguous and next_at is not None and now < next_at else "due" if ambiguous
+             else "replacement_pending" if supersession and supersession.get("state") == "pending"
+             else "replacement_acknowledged" if supersession else "none")
+    recovery = record.get(RECOVERY_KEY) if isinstance(record.get(RECOVERY_KEY), dict) else {}
+    return {"state": state, "ambiguous": ambiguous,
+            "next_attempt_at": None if next_at is None or next_at.year < 2000 else next_at.isoformat(),
+            "attempts": recovery.get("attempts", 0) if isinstance(recovery.get("attempts"), int) else 0,
+            "resume_pending": pending is not None, "history_count": len(history),
+            "supersession": None if supersession is None else {
+                key: supersession.get(key) for key in ("state", "since", "risk", "ack_at")},
+            "old_outcome": "unknown" if (history or ambiguous) else None,
+            "ordering": "unverified", "physical_charging": "unknown",
+            "worker_reason": getattr(worker, "reason", None)}
+
+
+def _restore_resolve_prior(record: dict[str, Any], attempt_id: str) -> bool:
+    """A guarded `resolve` attempt that provably never reached the wire must not settle the record: the ORIGINAL
+    ambiguous attempt (and its pace, risk and Resume state) is restored, so the hazard stays recorded and retryable.
+    Pause/Resume state is only put back while it is still the one this attempt's own write created (a later Stop/Pause
+    is never overwritten). Returns False when no prior was kept (a record from before this fix)."""
+    attempt = record.get("attempt") if isinstance(record.get("attempt"), dict) else {}
+    prior = attempt.get("resolve_prior")
+    if attempt.get("id") != attempt_id or not isinstance(prior, dict) or not isinstance(prior.get("attempt"), dict):
+        return False
+    record["attempt"] = copy.deepcopy(prior["attempt"])
+    for key, slot in ((RECOVERY_KEY, "recovery"), (SUPERSESSION_KEY, "supersession"),
+                      (UNKNOWN_HISTORY_KEY, "history")):
+        if prior.get(slot) is None:
+            record.pop(key, None)
+        else:
+            record[key] = copy.deepcopy(prior[slot])
+    record["desired"] = copy.deepcopy(prior.get("desired"))
+    record["verified"] = prior.get("verified")
+    record["uncertain"] = True
+    promoted = prior.get("promoted")
+    pause, marker = record.get("schedule_pause"), record.get(RESUME_AUTHORIZED_KEY)
+    if (isinstance(promoted, str) and isinstance(pause, dict) and pause.get("id") == promoted
+            and isinstance(marker, dict) and marker.get("id") == promoted):
+        for key, slot in (("schedule_pause", "pause"), (PENDING_RESUME_KEY, "pending_resume"),
+                          ("resume_interrupted", "resume_interrupted")):
+            if prior.get(slot) is None:
+                record.pop(key, None)
+            else:
+                record[key] = copy.deepcopy(prior[slot])
+        record.pop(RESUME_AUTHORIZED_KEY, None)
+    return True
+
+
 def _mark_not_sent(record: dict[str, Any], attempt_id: str, proof: str) -> None:
     """Record the proof on `record` in place: the attempt stops being uncertain, and a repair budget entry made for
-    it is dropped (only a run that reached the wire call consumes budget). No rejection count is touched."""
+    it is dropped (only a run that reached the wire call consumes budget). No rejection count is touched.
+
+    A Stage 19.2 resolve attempt is different: it proves only that THIS replacement was not sent, so the original
+    ambiguous attempt is restored (never a settled record); a resolve record kept without that prior stays
+    uncertain/ambiguous rather than being released."""
+    if record["attempt"].get("resolve") and record["attempt"].get("id") == attempt_id:
+        if _restore_resolve_prior(record, attempt_id):
+            return  # the restored recovery pace is the original one: this replacement consumed none
+        record.pop(RECOVERY_KEY, None)
+        record["attempt"].update({"state": "aborted_before_dispatch", "dispatch_class": DISPATCH_NOT_SENT,
+                                  "not_sent_proof": proof})
+        record["uncertain"] = True  # the older ambiguous upload is still unresolved: no false settlement
+        return
+    sup = record.get(SUPERSESSION_KEY) if isinstance(record.get(SUPERSESSION_KEY), dict) else None
+    mine = sup.get("reassert") if sup is not None else None
+    if isinstance(mine, dict) and mine.get("attempt_id") == attempt_id and isinstance(mine.get("prior"), dict):
+        # A reassert that never reached the wire consumes no pace and does not replace the accepted attempt, which
+        # keeps being the one the checker reads back (otherwise "newer attempt" would end all further checks).
+        prior = mine["prior"]
+        record["attempt"] = copy.deepcopy(prior["attempt"])
+        record["desired"] = copy.deepcopy(prior.get("desired"))
+        record["verified"] = prior.get("verified")
+        if prior.get("reassert") is None:
+            sup.pop("reassert", None)
+        else:
+            sup["reassert"] = copy.deepcopy(prior["reassert"])
+        record["uncertain"] = False
+        return
     record["attempt"].update({"state": "aborted_before_dispatch", "dispatch_class": DISPATCH_NOT_SENT,
                               "not_sent_proof": proof})
     record["uncertain"] = False
     if _REPAIR_LIST_KEY in record:
         record[_REPAIR_LIST_KEY] = [e for e in record[_REPAIR_LIST_KEY] if e.get("attempt_id") != attempt_id]
+
+
+def _rearm_watch(hass: HomeAssistant, entry_id: str) -> None:
+    """Stage 19.2: an aborted or refused reassert/resolve cancelled the checker's look (a new attempt did); ask for it
+    again. A no-op unless the late-frame risk is open and a transition or a refused reassert still awaits a look."""
+    checker = hass.data.get("spotnav_morek_checker", {}).get(entry_id)
+    if checker is not None:
+        try:
+            checker.request_transition_watch()
+        except Exception:  # noqa: BLE001 - a missing watch is a missed extra look only
+            pass
 
 
 async def _release_not_sent(hass: HomeAssistant, entry_id: str, ledger: Any, attempt_id: str, proof: str) -> bool:
@@ -2542,6 +2927,7 @@ async def _release_not_sent(hass: HomeAssistant, entry_id: str, ledger: Any, att
     except Exception:  # noqa: BLE001 - an unrecorded proof leaves the latch set, never a guess
         return False
     _evidence_call(hass, entry_id, "record_event", "dispatch_aborted", plan_id=attempt_id, reason=proof)
+    _rearm_watch(hass, entry_id)
     return True
 
 
@@ -2550,13 +2936,21 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
                                validate_durable: Any = None, migration_id: str | None = None,
                                override_id: str | None = None, force_sync: bool = False,
                                end_tolerance: timedelta | None = None, baseline: Any = None,
-                               repair: str | None = None) -> str:
+                               repair: str | None = None, resolve: bool = False,
+                               promote_resume: dict[str, Any] | None = None) -> str:
     """Connector lock held. Record first, revalidate after every pre-dispatch await.
 
     `baseline` (optional) returns the reserve-free twin of the profile `validate` just built (Stage 15.1a).
     `repair` (Stage 15.4a) is the confirmed acknowledged attempt id being repaired: it bypasses ONLY the two
     `unchanged` returns, and only for that exact still-current acknowledged attempt of the same intent kind and
-    inside the repair budget; the uncertain-record return and the rejection cooldown still apply."""
+    inside the repair budget; the uncertain-record return and the rejection cooldown still apply.
+
+    `resolve` (Stage 19.2): the worker's guarded convergence of an *ambiguous* record. It bypasses ONLY the
+    `upload_uncertain` return (and the dedup against an acknowledgement older than the unknown attempt), only for an
+    automatic run, only when the persisted recovery pace is due and nothing is in flight; the unknown attempt is kept
+    as historical evidence and a NEW attempt with its own id is sent. `promote_resume` (Stage 19.9a) is the person's
+    durable pending Resume, revalidated here under the locks and turned into the current Resume intent in the same
+    durable write as the new attempt's pre-wire marker. Neither bypasses protection, ownership, identity or Stop."""
     ledger = outcomes_for(hass)
     record = await _outcome_record(hass, entry_id, data)
     profile, point, target = validate()
@@ -2564,23 +2958,32 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
     # revalidation may rebuild an equivalent profile with a later startSchedule.
     wire_profile = profile
     wire_baseline = baseline() if callable(baseline) else None
+    resolving = False
     if record["uncertain"]:
         # Stage 19.1: the one automatic release. Only a record whose latest attempt carries the pre-wire marker and
         # no wire-intent marker (cancellation, restart or a crash before the intent write) is provably not sent;
-        # a legacy record, a wire-intent marker, a removal in doubt or an attempt in flight keeps blocking.
+        # a legacy record, a wire-intent marker, a removal in doubt or an attempt in flight keeps blocking --
+        # except for the guarded Stage 19.2 resolve below.
         in_flight = hass.data.get("spotnav_morek_sending", {}).get(entry_id) is not None
-        if upload_outcome_class(record, in_flight=in_flight)["class"] != "not_sent_provable":
+        if upload_outcome_class(record, in_flight=in_flight)["class"] == "not_sent_provable":
+            if not await _release_not_sent(hass, entry_id, ledger, record["attempt"]["id"], "no_wire_intent_marker"):
+                return "upload_uncertain"
+            record = await _outcome_record(hass, entry_id, data)
+            if record["uncertain"]:
+                return "upload_uncertain"
+        elif (resolve and automatic and not repair and not in_flight and recoverable_ambiguous(record)
+              and recovery_due(record, datetime.now(timezone.utc), immediate=promote_resume is not None)):
+            resolving = True
+        else:
             return "upload_uncertain"
-        if not await _release_not_sent(hass, entry_id, ledger, record["attempt"]["id"], "no_wire_intent_marker"):
-            return "upload_uncertain"
-        record = await _outcome_record(hass, entry_id, data)
-        if record["uncertain"]:
-            return "upload_uncertain"
+    if promote_resume is not None and (valid_pending_resume(record) != promote_resume
+                                       or pause_id != promote_resume["id"]):
+        raise ScheduleRefused("stale_work")  # the Pause/Stop changed or the request was consumed: nothing is written
     acknowledged = record.get("acknowledged") or {}
     attempt = record.get("attempt") or {}
-    if automatic and not force_sync and not repair and acknowledged.get("fingerprint") == fingerprint:
+    if automatic and not force_sync and not repair and not resolving and acknowledged.get("fingerprint") == fingerprint:
         return "unchanged"
-    if (automatic and not force_sync and not repair and pause_id is None and override_id is None
+    if (automatic and not force_sync and not repair and not resolving and pause_id is None and override_id is None
             and acknowledged_revision(record) == domain_data(hass).auto_store.settings(entry_id).revision
             and same_effective_schedule(acknowledged_profile(record), profile, end_tolerance,
                                         accepted_baseline=acknowledged_baseline(record),
@@ -2589,7 +2992,9 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
         # control, a pause or a needed sync is never suppressed here); a profile creation time is not a change.
         return "unchanged"
     rejections = 0
-    if automatic and attempt.get("state") == "rejected" and attempt.get("fingerprint") == fingerprint:
+    if (automatic and attempt.get("state") == "rejected" and attempt.get("fingerprint") == fingerprint
+            and not (repair and rejected_reassert_of(record) == repair)):
+        # (Stage 19.2: the one exception is a confirmed look at a refused reassert, which has its own persisted pace)
         # A definite refusal of this very intent: tried again only a bounded number of times, each after a
         # longer pause (Stage 14.5). Never after an uncertain write (handled above), and a forced
         # sync is the person's own request.
@@ -2597,14 +3002,24 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
         retry_at = rejection_retry_at(record)
         if not force_sync and (retry_at is None or datetime.now(timezone.utc) < retry_at):
             return "upload_rejected"
+    reassert = False
     if repair:
         # Stage 15.4a: the confirmed attempt must still be the latest accepted one, of the same intent kind
         # (a hold repairs as a hold, Charge Now as its own override, a plan as a plan); then the budget.
-        if (attempt.get("id") != repair or attempt.get("state") != "accepted" or acknowledged.get("id") != repair
+        if (((attempt.get("id") != repair or attempt.get("state") != "accepted") and rejected_reassert_of(record) != repair)
+                or acknowledged.get("id") != repair
                 or attempt.get("pause_id") != pause_id or attempt.get("override_id") != override_id
                 or bool(acknowledged.get("routine")) != (pause_id is None and override_id is None)):
             return "repair_unconfirmed"
-        if repair in repaired_ids(record) or repair_escalated(record, repair):
+        reassert = reassert_open(record)
+        if reassert:
+            # Stage 19.2: the late-old-frame risk is standing, so this confirmed mismatch converges by a guarded
+            # reassert under its own persisted pace (never the 2-per-24h budget or the one-repair escalation, which
+            # would stop convergence for good). Every other guard above and below still applies.
+            due = reassert_next_at(record, datetime.now(timezone.utc))
+            if due is not None and datetime.now(timezone.utc) < due:
+                return "repair_spacing"
+        elif repair in repaired_ids(record) or repair_escalated(record, repair):
             # Stage 15.4b: the attempt in force IS an earlier repair and a fresh confirmation says it still differs:
             # a second automatic repair would be a blind loop. Persist the escalation (restart-proof, keyed to this
             # attempt so a later normal plan starts clean) and send nothing; no clear, no retry.
@@ -2612,21 +3027,52 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
                 record[_REPAIR_ESCALATION_KEY] = {"at": datetime.now(timezone.utc).isoformat(), "attempt_id": repair}
                 await ledger.write(record)
             return "repair_needs_person"
-        budget = repair_budget(record, datetime.now(timezone.utc))
-        if budget["state"] in ("exhausted", "invalid"):
-            return "repair_needs_person"
-        if budget["state"] == "spacing":
-            return "repair_spacing"
+        else:
+            budget = repair_budget(record, datetime.now(timezone.utc))
+            if budget["state"] in ("exhausted", "invalid"):
+                return "repair_needs_person"
+            if budget["state"] == "spacing":
+                return "repair_spacing"
     now = datetime.now(timezone.utc).isoformat()
     attempt_id = uuid4().hex
     settings_now = domain_data(hass).auto_store.settings(entry_id)
     revision = settings_now.revision
     cap_evidence = cap_snapshot(settings_now)
+    old_attempt = record.get("attempt") if isinstance(record.get("attempt"), dict) else {}
+    resolve_prior = None
+    if resolving:
+        # What a pre-wire abort of this replacement restores (the original ambiguous attempt and its state).
+        resolve_prior = {
+            "attempt": copy.deepcopy(old_attempt), "recovery": copy.deepcopy(record.get(RECOVERY_KEY)),
+            "supersession": copy.deepcopy(record.get(SUPERSESSION_KEY)),
+            "history": copy.deepcopy(record.get(UNKNOWN_HISTORY_KEY)), "desired": copy.deepcopy(record.get("desired")),
+            "verified": record.get("verified"),
+            **({} if promote_resume is None else {
+                "promoted": promote_resume["id"], "pause": copy.deepcopy(record.get("schedule_pause")),
+                "pending_resume": copy.deepcopy(record.get(PENDING_RESUME_KEY)),
+                "resume_interrupted": record.get("resume_interrupted")})}
+        # The ambiguous attempt becomes labelled-unknown history; the pace state is durable BEFORE the wire call so
+        # a crash cannot skip the wait. Both ride the same record-first write as the new attempt.
+        _archive_unknown(record, old_attempt, attempt_id, now)
+        attempts = (record.get(RECOVERY_KEY) or {}).get("attempts", 0) if isinstance(record.get(RECOVERY_KEY), dict) else 0
+        attempts = attempts + 1 if type(attempts) is int else 1
+        record[RECOVERY_KEY] = {"version": 1, "attempts": attempts, "last_at": now, "attempt_id": attempt_id,
+                                "next_at": (datetime.now(timezone.utc)
+                                            + timedelta(seconds=_recovery_delay(attempts))).isoformat()}
+    if promote_resume is not None:
+        record["schedule_pause"] = {"version": 1, "type": "resume_requested", "id": promote_resume["id"],
+                                    "station_id": MOREK_STATION_ID, "connector_id": MOREK_CONNECTOR_ID}
+        record.pop(PENDING_RESUME_KEY, None)
+        record.pop("resume_interrupted", None)
+        record[RESUME_AUTHORIZED_KEY] = {"id": promote_resume["id"], "at": now, "from": "pending_resume"}
+    prior_desired, prior_verified = record.get("desired"), record.get("verified")
     record.update({"desired": {"fingerprint": fingerprint, "profile": profile},
                    "attempt": {"fingerprint": fingerprint, "profile": profile, "at": now, "id": attempt_id,
                                "revision": revision,
                                "source": "worker" if automatic else "manual", "state": "uncertain",
                                "dispatch_class": DISPATCH_PRE_WIRE,
+                               **({"resolve": True, "replaces": old_attempt.get("id"), "resolve_prior": resolve_prior}
+                                  if resolving else {}),
                                **({"rejections": rejections} if rejections else {}),
                                **({} if wire_baseline is None else {"baseline": wire_baseline})},
                    "uncertain": True, "verified": None})
@@ -2634,6 +3080,18 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
         record["attempt"]["pause_id"] = pause_id
     if override_id is not None:
         record["attempt"]["override_id"] = override_id
+    if reassert:
+        # Durable BEFORE the wire call, like the recovery pace: a crash or a burst of checks cannot skip the wait.
+        count = _reassert_attempts(record, datetime.now(timezone.utc)) + 1
+        before = record[SUPERSESSION_KEY].get("reassert")
+        record[SUPERSESSION_KEY]["reassert"] = {
+            "prior": {"attempt": copy.deepcopy(old_attempt), "desired": copy.deepcopy(prior_desired),
+                      "verified": prior_verified,
+                      "reassert": None if not isinstance(before, dict) else
+                      {k: v for k, v in before.items() if k != "prior"}},
+            "attempts": count, "last_at": now, "attempt_id": attempt_id,
+            "next_at": (datetime.now(timezone.utc) + timedelta(seconds=REASSERT_DELAYS[
+                min(count - 1, len(REASSERT_DELAYS) - 1)])).isoformat()}
     await ledger.write(record)
     # Stage 15.3: a new attempt ends any read-only check episode (its finding no longer describes what is in force).
     checker = hass.data.get("spotnav_morek_checker", {}).get(entry_id)
@@ -2650,6 +3108,7 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
         await ledger.write(record)
         _evidence_call(hass, entry_id, "record_event", "dispatch_aborted", plan_id=attempt_id,
                        reason="validation_after_persistence")
+        _rearm_watch(hass, entry_id)
         raise
     _cancel_verification(hass, entry_id)
     prior_data = dict(data)
@@ -2680,7 +3139,7 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
             if await _release_not_sent(hass, entry_id, ledger, attempt_id, "durable_check_refused"):
                 return "upload_not_sent"
             return "upload_uncertain"
-        if repair:
+        if repair and not reassert:
             # Stage 15.4a: the budget entry is durable BEFORE the wire call (a crash cannot lose a repair), then the
             # final validation runs again after that await. A refusal below removes it: only a run that reaches
             # the wire call consumes budget.
@@ -2700,6 +3159,7 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
         await ledger.write(record)
         _evidence_call(hass, entry_id, "record_event", "dispatch_aborted", plan_id=attempt_id,
                        reason="validation_before_dispatch")
+        _rearm_watch(hass, entry_id)
         data.clear()
         data.update(prior_data)
         await store.async_save(data)
@@ -2732,12 +3192,18 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
             **({} if cap_evidence is None else {"cap": cap_evidence})}, "uncertain": False})
         record["attempt"]["state"] = "accepted"
         record["attempt"]["dispatch_class"] = DISPATCH_RESOLVED
+        record.pop(RECOVERY_KEY, None)
+        if isinstance(record.get(SUPERSESSION_KEY), dict):
+            # The newest ACK ends the wait, not the risk: an ACK says nothing about an older frame's ordering.
+            record[SUPERSESSION_KEY].update({"state": "replacement_acknowledged", "attempt_id": attempt_id,
+                                             "ack_at": now})
     elif state in ("rejected", "notsupported"):
         record["attempt"]["state"] = "rejected"
         record["attempt"]["dispatch_class"] = DISPATCH_RESOLVED
+        record.pop(RECOVERY_KEY, None)
         record["attempt"]["rejections"] = rejections + 1
         record["uncertain"] = False
-        if repair:
+        if repair and not reassert:
             # Stage 15.4b: a charger that refuses the repair gets no blind second write (the 5/15 min rejection
             # retries find the acknowledged intent unchanged): a person looks. Keyed to the repaired attempt.
             record[_REPAIR_ESCALATION_KEY] = {"at": now, "attempt_id": repair}
@@ -2750,7 +3216,20 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
         }
     # Unknown, cancellation, or interrupted ACK persistence stays uncertain on disk.
     record["attempt"]["ack"] = ack
+    record["attempt"].pop("resolve_prior", None)  # the call was made: a pre-wire restore can no longer apply
+    if reassert and isinstance(record[SUPERSESSION_KEY].get("reassert"), dict):
+        record[SUPERSESSION_KEY]["reassert"].pop("prior", None)
     await ledger.write(record)
+    if state == "accepted" and checker is not None and reassert_open(record):
+        # Stage 19.2: while the late-old-frame risk is open, an ACK is not an ending: the checker looks once more at
+        # the effective limits (a replacement only; a repair already requests it) and at the next planned transition.
+        if resolving:
+            checker.request_post_repair()
+        checker.request_transition_watch()
+    elif state in ("rejected", "notsupported") and checker is not None and reassert_open(record):
+        # A definite refusal leaves the acknowledgement in force: the checker looks again at the persisted reassert
+        # pace (a read, then a confirmed reassert), not blindly and not never.
+        checker.request_transition_watch()
     # The charger's answer to the command, nothing more: not installed-profile inventory and not charging.
     _evidence_call(hass, entry_id, "record_event", "ack", plan_id=attempt_id, status=state[:32] or "unknown")
     await store.async_save(data)
@@ -3369,6 +3848,9 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
                                              datetime.now(timezone.utc)),
                                          "upload_outcome": upload_outcome_class(outcomes, in_flight=bool(
                                              hass.data.get("spotnav_morek_sending", {}).get(entry.entry_id))),
+                                         "unknown_recovery": {
+                                             **unknown_recovery_status(outcomes, datetime.now(timezone.utc), worker),
+                                             "retry": getattr(worker, "recovery_retry", None)},
                                          "check": checker.status() if checker is not None else None,
                                          "repair": repair_status(worker, outcomes),
                                          "reason": worker.reason if worker is not None and

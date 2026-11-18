@@ -205,7 +205,15 @@ async def test_uncertain_write_is_never_retried(monkeypatch):
     w.ledger.value["attempt"]["at"] = (NOW - timedelta(hours=5)).isoformat()
     w.worker.trigger(kind="recovery")
     await drain(w.worker)
-    assert w.point.call.await_count == 1 and w.worker.reason == "upload_uncertain"
+    # Stage 19.2 amendment (named change): the old assertion was "never retried" (count stays 1). Once the persisted
+    # recovery pace is due (here: the unknown attempt is 5 h old) exactly ONE guarded resolve sends a new, separately
+    # identified attempt; the old one is kept as unknown history; repeats are paced (durable next_at), never a burst.
+    assert w.point.call.await_count == 2 and w.worker.reason == "upload_uncertain"
+    assert w.ledger.value["unknown_history"][0]["outcome"] == "unknown"
+    for _ in range(3):
+        w.worker.trigger(kind="recovery")
+        await drain(w.worker)
+    assert w.point.call.await_count == 2
     w.worker.close()
 
 

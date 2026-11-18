@@ -46,6 +46,14 @@ export function recoveryBanner(state, now = Date.now()) {
   const reconciliation = state.reconciliation || {};
   const blocker = reconciliation.blocker;
   const recovery = reconciliation.recovery || {};
+  const unknown = reconciliation.unknown_recovery;
+  if ((state.outcomes?.uncertain === true || blocker?.code === 'upload_uncertain') && unknown && unknown.ambiguous === true) {
+    // Stage 19.2: automatic, paced recovery of an unknown upload. The old outcome stays unknown; a fresh schedule
+    // replaces it when the charger is reachable. Never "fixed", "will charge" or "guaranteed".
+    const next = unknown.next_attempt_at ? time(unknown.next_attempt_at) : null;
+    const resume = unknown.resume_pending === true ? ' Your Resume is saved and applies with it.' : '';
+    return {level: 'warning', code: 'upload_unknown_recovering', text: `The last schedule write has an unknown outcome and stays recorded as unknown. SpotNav sends a fresh schedule automatically when Morek is reachable${next ? ` (next attempt about ${next})` : ''}; it cannot rule out that the old write is still applied later. Charging is not confirmed.${resume}`};
+  }
   if (state.outcomes?.uncertain === true || blocker?.code === 'upload_uncertain') {
     return {level: 'error', code: 'upload_uncertain', text: `${WHAT.check_charger_outcome} Charging is not confirmed; check Morek and the SpotNav logs before acting. Nothing was cleared.`};
   }

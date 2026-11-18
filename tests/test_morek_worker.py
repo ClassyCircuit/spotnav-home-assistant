@@ -1731,8 +1731,11 @@ async def test_real_admission_does_not_retry_unknown_profile_result(monkeypatch,
     assert outcome["uncertain"] is True and "migration_dispatch_evidence" not in outcome
     w.worker.trigger()
     await drain(w.worker)
+    # Stage 19.2 amendment (named change): the old assertion was reason == "profile_outcome_unavailable" (admission
+    # refused every unknown record). Admission now admits the worker's guarded resolve, whose persisted recovery pace
+    # (first wait 2 minutes) is not due: still exactly one wire call, no blind retry, honest reason.
     assert w.point.call.await_count == 1
-    assert w.worker.reason == "profile_outcome_unavailable"
+    assert w.worker.reason == "upload_uncertain"
     w.worker.close()
 
 

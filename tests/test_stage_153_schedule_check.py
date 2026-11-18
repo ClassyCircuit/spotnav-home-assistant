@@ -560,9 +560,9 @@ def test_timer_target_is_a_callback_job_not_an_executor_job():
 async def test_status_check_field_is_additive_and_holds_codes_only(monkeypatch):
     rig = routine(monkeypatch)
     assert rig.checker.status() == {"class": None, "at": None, "readback_at": None, "reason": None,
-                                    "rechecks": 0, "events": []}
+                                    "rechecks": 0, "next_transition_check_at": None, "events": []}
     status = await rig.run()
-    assert set(status) == {"class", "at", "readback_at", "reason", "rechecks", "events"}
+    assert set(status) == {"class", "at", "readback_at", "reason", "rechecks", "next_transition_check_at", "events"}
     assert set(status["events"][0]) == {"at", "last_at", "trigger", "class", "reason", "readback_at", "repeat"}
     assert all(isinstance(value, (str, int, type(None), list)) for value in status.values())
     source = open(morek_schedule.__file__, encoding="utf-8").read()

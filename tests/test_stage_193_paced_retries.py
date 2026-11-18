@@ -39,7 +39,7 @@ def test_observation_helpers_are_bounded_whitelisted_and_codes_only():
                                                            "first_at", "last_at"}
     assert morek_schedule.observation_entry("upload_rejected", "t")["evidence"] == "ack"
     assert morek_schedule.observation_entry("upload_rejected", "t")["next"] == "person_action"
-    assert morek_schedule.observation_entry("upload_uncertain", "t")["who"] == "person"
+    assert morek_schedule.observation_entry("upload_uncertain", "t")["who"] == "system"  # 19.2 amendment: guarded recovery
     assert morek_schedule.observation_entry("target_soc_stale", "t")["who"] == "vehicle"
     assert morek_schedule.observation_entry("unchanged", "t") is None
     raw = {"version": 1, "pace": {"code": "nope", "phase": "slow", "attempts": 1},
@@ -219,9 +219,13 @@ async def test_slow_rejection_retry_obeys_stop_counts_one_decision_and_never_tou
         u.ledger.value["attempt"]["at"] = (NOW - timedelta(hours=9)).isoformat()
         u.worker.trigger(kind="recovery")
         await drain(u.worker)
-    assert u.point.call.await_count == 1 and u.worker.blocker_retry is None
+    # Stage 19.2 amendment (named change): the old assertions were "an unknown write is never timer-retried" and
+    # next == person_action. Now exactly ONE guarded resolve (a new, separately identified attempt) runs once the
+    # persisted recovery pace is due; the repeats that follow are not due, so there is no burst.
+    assert u.point.call.await_count == 2 and u.worker.blocker_retry is None
+    assert u.ledger.value["unknown_history"][0]["outcome"] == "unknown"
     assert u.worker.observations[-1]["code"] == "upload_uncertain"
-    assert u.worker.observations[-1]["next"] == "person_action"
+    assert u.worker.observations[-1]["next"] == "automatic_recheck" and u.worker.observations[-1]["who"] == "system"
     u.worker.close()
 
 

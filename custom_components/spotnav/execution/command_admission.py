@@ -177,8 +177,13 @@ class CommandAdmission:
                             or self._store._cancelled_write or self._store._transition_save_uncertain):
                         return False
                 outcome = await self._async_read_outcome_recovering(entry_id, connector)
-                if (outcome is None or outcome.get("entry_id") != entry_id or outcome.get("uncertain") is not False
-                        or (not clean_start_proven(outcome, entry_id, status.get("handover_id")) and
+                # Stage 19.2: an ambiguous upload no longer pins the barrier once this process holds a current ticket
+                # (checked above): the worker's guarded resolve supersedes it with a fresh schedule. A removal in
+                # doubt or any non-ambiguous latch still blocks.
+                recovering = self._ambiguous_recoverable(outcome, entry_id)
+                if (outcome is None or outcome.get("entry_id") != entry_id
+                        or (outcome.get("uncertain") is not False and not recovering)
+                        or (not recovering and not clean_start_proven(outcome, entry_id, status.get("handover_id")) and
                             (not isinstance(outcome.get("attempt"), dict) or outcome["attempt"].get("state") not in
                              ("accepted", "rejected", "aborted_before_dispatch")))
                         or (outcome.get("removal") is not None and outcome["removal"].get("state") not in
@@ -188,6 +193,14 @@ class CommandAdmission:
                 return True
         except Exception:  # noqa: BLE001 - no evidence, no release
             return False
+
+    def _ambiguous_recoverable(self, outcome: Any, entry_id: str | None = None) -> bool:
+        """Stage 19.2: an unsettled record the guarded resolve may supersede (never a removal in doubt, and never
+        while a send for this entry is in flight)."""
+        from ..api import morek_schedule
+        if entry_id is not None and self._store._hass.data.get("spotnav_morek_sending", {}).get(entry_id) is not None:
+            return False
+        return bool(isinstance(outcome, dict) and morek_schedule.recoverable_ambiguous(outcome))
 
     async def _async_read_outcome_recovering(self, entry_id: str, connector: PhysicalConnector) -> dict[str, Any] | None:
         """Read the connector outcome; first record the Stage 19.1 pre-wire proof when (and only when) it is provable.
@@ -313,8 +326,16 @@ class CommandAdmission:
                             or self._store._cancelled_write or self._store._transition_save_uncertain):
                         return "ownership_unavailable"
                 outcome = await self._async_read_outcome_recovering(entry_id, connector)
-                if (outcome is None or outcome.get("entry_id") != entry_id or outcome.get("uncertain") is not False
-                        or (not clean_start_proven(outcome, entry_id, status.get("handover_id")) and
+                # Stage 19.2/19.9a: an unsettled record may be reconfirmed (a ticket only; nothing is sent) when
+                # (a) a person's durable Resume exists for it -- the person's own authority, also across a restart,
+                # so the dispatch-evidence requirement is waived for it -- or (b) this process observed the
+                # authority before a clean reconnect (`expected_migration`). A removal in doubt still blocks.
+                from ..api import morek_schedule
+                person_resume = isinstance(outcome, dict) and morek_schedule.resume_recoverable(outcome)
+                recovering = person_resume or (expected_migration is not None and self._ambiguous_recoverable(outcome, entry_id))
+                if (outcome is None or outcome.get("entry_id") != entry_id
+                        or (outcome.get("uncertain") is not False and not recovering)
+                        or (not recovering and not clean_start_proven(outcome, entry_id, status.get("handover_id")) and
                             (not isinstance(outcome.get("attempt"), dict) or outcome["attempt"].get("state") not in
                              ("accepted", "rejected", "aborted_before_dispatch")))
                         or (outcome.get("removal") is not None and outcome["removal"].get("state") not in
@@ -329,7 +350,7 @@ class CommandAdmission:
                         or pause.get("station_id") != connector.station_id
                         or type(pause.get("connector_id")) is not int or pause["connector_id"] != connector.connector_id):
                     return "profile_outcome_unavailable"
-                if require_dispatch_evidence:
+                if require_dispatch_evidence and not person_resume:
                     proof = outcome.get("migration_dispatch_evidence")
                     dispatch_valid = (isinstance(proof, dict) and set(proof) == {
                             "version", "migration_id", "station_id", "connector_id", "attempt_id", "ack"}
@@ -1255,8 +1276,12 @@ class CommandAdmission:
                                 or self._store._transition_save_uncertain or self._store._cancelled_write):
                             return AdmissionResult(False, "ownership_unavailable")
                     outcome = await self._async_read_outcome_recovering(entry_id, connector)
-                    if (outcome is None or outcome.get("entry_id") != entry_id or outcome.get("uncertain") is not False
-                            or (not clean_start_proven(outcome, entry_id, status.get("handover_id")) and
+                    # Stage 19.2: an ambiguous upload is admitted to the worker's guarded `resolve` (the send path
+                    # itself still refuses it unless the persisted recovery pace is due); a removal in doubt is not.
+                    recovering = self._ambiguous_recoverable(outcome, entry_id)
+                    if (outcome is None or outcome.get("entry_id") != entry_id
+                            or (outcome.get("uncertain") is not False and not recovering)
+                            or (not recovering and not clean_start_proven(outcome, entry_id, status.get("handover_id")) and
                                 (not isinstance(outcome.get("attempt"), dict) or outcome["attempt"].get("state") not in
                                  ("accepted", "rejected", "aborted_before_dispatch")))
                             or (outcome.get("removal") is not None and outcome["removal"].get("state") not in

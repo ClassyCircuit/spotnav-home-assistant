@@ -1,0 +1,12 @@
+{
+  "_comment": "The fields the sidebar's Resume gating reads, as the REAL status handler reports them for a legacy ambiguous upload (no 19.1 dispatch marker) plus a person Pause, with no process-local ownership ticket (HA restarted). Pinned by tests/test_stage_192_ui_path.py and consumed by frontend/test/sidebar-resume-recovery.test.ts.",
+  "consumed": {
+    "recorded_owner": "morek_schedule",
+    "completion_authorized": false,
+    "outcomes_uncertain": true,
+    "intent": "pause_until_resumed",
+    "resume_recoverable": true,
+    "resume_pending": false,
+    "unknown_recovery_ambiguous": true
+  }
+}

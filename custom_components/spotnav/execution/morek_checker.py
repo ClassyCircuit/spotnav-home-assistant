@@ -17,6 +17,16 @@ guarded send path and the feature gate; the checker still sends nothing. There i
 check starts only from one of the triggers above and a flapping link coalesces to at most one check per
 `CHECK_MIN_INTERVAL_S`.
 
+Stage 19.2 late-frame guard: once a replacement of an ambiguous upload exists (the standing `supersession` risk, which an
+ACK never clears), more triggers exist, all derived from the durable ledger so a restart loses none: ONE read-only look
+shortly after the acknowledged profile's next planned transition; ONE look when a *definitely rejected* reassert becomes
+retryable (its persisted `reassert.next_at`); and a bounded follow-up when a look was inconclusive only because a change
+was too close (`FOLLOWUP_REASONS`). The watch is armed on every check request (startup, link edges), after every check and
+after every accepted/rejected/aborted send; nothing while no such look is due, the link is down, or the risk does not
+exist. It is the same check, comparator and confirmation as above; a confirmed mismatch is still only a *request* to the
+worker, whose guarded reassert has its own persisted pace, so the retry of a refused reassert needs a fresh confirmed
+mismatch and is never a blind resend.
+
 The checker never touches the worker's trigger classes, `last_trigger`, `continuity`, the decision record, the
 ledger's acknowledged/uncertain fields or any `verified` field. A read is bound to the connection, the
 acknowledged attempt, the owner generation and the request epoch, re-checked after every await; a result that is
@@ -29,7 +39,7 @@ import logging
 import time
 from collections import deque
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Final
 
 from homeassistant.core import callback
@@ -48,6 +58,14 @@ CHECK_EVENT_HISTORY: Final = 10
 POST_REPAIR_DELAY_S: Final = 150  # a repair's own verification reads run at about 30/75/120 s; check after them
 POST_REPAIR_WAIT_S: Final = 60  # while that verification is still pending, look again (bounded)
 POST_REPAIR_WAIT_LIMIT: Final = 4
+#: The comparator calls a readback within `VERIFY_TOLERANCE_S` of any planned change ambiguous, so the look is taken just
+#: beyond it (an earlier one could only ever come back `coverage_boundary_ambiguous`).
+TRANSITION_SETTLE_S: Final = morek_schedule.VERIFY_TOLERANCE_S + 30
+#: A look that came back inconclusive only because a planned change was too near (or a send's own verification was still
+#: running) is taken once more shortly after, a bounded number of times, rather than waiting for the next transition.
+FOLLOWUP_REASONS: Final = ("coverage_boundary_ambiguous", "verification_pending")
+FOLLOWUP_LIMIT: Final = 3
+REASSERT_RETRY_SETTLE_S: Final = 1
 _DISCARDED: Final = ("check_superseded",)
 
 
@@ -73,6 +91,15 @@ class MorekScheduleChecker:
         self._confirmation: dict[str, Any] | None = None  # the token the worker's repair revalidates against
         self._rechecks = 0
         self._post_waits = 0
+        self._transition_cancel: Callable[[], None] | None = None
+        self._transition_at: str | None = None
+        self._transition_why = "transition"
+        self._pending_retry_key: tuple[Any, Any] | None = None
+        self._transition_task: Any = None
+        self._followup_at: datetime | None = None
+        self._followups = 0
+        self._watch_again = False  # a watch was requested while one was being derived: derive once more
+        self._retry_looked: tuple[Any, Any] | None = None  # the refused-reassert pace state a retry look was started for
         self._class: str | None = None
         self._status: dict[str, Any] = {"class": None, "at": None, "readback_at": None, "reason": None}
         self.events: deque[dict[str, Any]] = deque(maxlen=CHECK_EVENT_HISTORY)
@@ -91,6 +118,7 @@ class MorekScheduleChecker:
         self._trigger = trigger
         self._post_waits = 0
         self._arm_first()
+        self.request_transition_watch()  # startup/a link edge also re-derives the late-frame look from the ledger
 
     def request_post_repair(self) -> None:
         """Stage 15.4b: a repair was accepted. After its own verification reads, one ordinary read-only check episode
@@ -102,6 +130,83 @@ class MorekScheduleChecker:
         if self._task is None:
             self._arm(POST_REPAIR_DELAY_S, recheck=False)
 
+    def request_transition_watch(self) -> None:
+        """Stage 19.2: (re)arm the one-shot look at the acknowledged profile's next planned transition. Synchronous and
+        never raises; the ledger read and the arming happen in one short task. Sends nothing."""
+        if self._closed:
+            return
+        if self._transition_task is not None:
+            self._watch_again = True
+            return
+        try:
+            self._transition_task = self._hass.async_create_task(self._arm_transition())
+        except Exception:  # noqa: BLE001 - no watch is only a missed extra look, never a send
+            self._transition_task = None
+
+    def _cancel_transition(self) -> None:
+        if self._transition_cancel is not None:
+            self._transition_cancel()
+            self._transition_cancel = None
+        self._transition_at = None
+
+    async def _arm_transition(self) -> None:
+        try:
+            record = await morek_schedule.outcomes_for(self._hass).read()
+            now = datetime.now(timezone.utc)
+            at, why, key = None, "transition", None
+            if morek_schedule.reassert_open(record):
+                planned = morek_schedule.next_planned_transition(record, now)
+                if planned is not None:
+                    at = planned + timedelta(seconds=TRANSITION_SETTLE_S)
+                key = self._retry_key(record)
+                if key is not None and key != self._retry_looked:
+                    # a refused reassert: look again once its persisted pace allows (never earlier, never blindly),
+                    # once per pace state: a look that could not conclude waits for the next trigger, it never polls
+                    due = max(morek_schedule.reassert_next_at(record, now) or now, now)
+                    retry = due + timedelta(seconds=REASSERT_RETRY_SETTLE_S)
+                    if at is None or retry < at:
+                        at, why = retry, "reassert_retry"
+                if self._followup_at is not None and (at is None or self._followup_at < at):
+                    at, why = self._followup_at, "followup"
+            else:
+                self._followup_at = None
+            if self._closed:
+                return
+            self._cancel_transition()
+            if at is None:
+                return
+            delay = max(0.0, (at - now).total_seconds())
+            self._transition_at = at.isoformat()
+            self._transition_why = why
+            self._pending_retry_key = key if why == "reassert_retry" else None
+            self._transition_cancel = async_call_later(self._hass, delay, self._async_transition_fire)
+        except Exception:  # noqa: BLE001 - unreadable evidence: no extra look, the other triggers still apply
+            _LOGGER.debug("Morek transition watch not armed", exc_info=True)
+        finally:
+            self._transition_task = None
+            again, self._watch_again = self._watch_again, False
+            if again and not self._closed:
+                self.request_transition_watch()
+
+    @staticmethod
+    def _retry_key(record: Any) -> tuple[Any, Any] | None:
+        if not morek_schedule.rejected_reassert_of(record):
+            return None
+        state = record[morek_schedule.SUPERSESSION_KEY].get("reassert")
+        return state.get("attempt_id"), state.get("next_at")
+
+    @callback
+    def _async_transition_fire(self, _now: datetime) -> None:
+        self._transition_cancel = None
+        self._transition_at = None
+        why = self._transition_why
+        if why == "followup":
+            self._followup_at = None
+        elif why == "reassert_retry":
+            self._retry_looked = self._pending_retry_key
+        if not self._closed:
+            self.request(why)
+
     def note_new_attempt(self, repair: str | None = None) -> None:
         """A newer upload attempt exists: the episode and any in-flight read describe a superseded intent.
 
@@ -109,6 +214,7 @@ class MorekScheduleChecker:
         confirmation token, so the repair can still revalidate it at its final pre-dispatch boundary; any other new
         attempt invalidates it."""
         keep = self._confirmation if repair and self._confirmation and self._confirmation["attempt_id"] == repair else None
+        self._cancel_transition()  # it described the superseded profile; the send's outcome re-arms it
         self._end_episode("newer_attempt", "new_attempt", keep=keep)
 
     def note_link_down(self) -> None:
@@ -137,8 +243,10 @@ class MorekScheduleChecker:
         self._closed = True
         self._epoch += 1
         self._cancel_timer()
+        self._cancel_transition()
         self._rerun = False
         self._forget_observations()
+        self._followup_at = None
         if self._task is not None:
             self._task.cancel()
             self._task = None
@@ -203,6 +311,8 @@ class MorekScheduleChecker:
                             trigger)
         finally:
             self._task = None
+            if not self._closed:
+                self.request_transition_watch()  # a no-op unless the late-frame risk is open
             if self._rerun and not self._closed:
                 self._rerun = False
                 self._arm_first()
@@ -294,6 +404,7 @@ class MorekScheduleChecker:
             if confirmed:
                 state = morek_schedule.CHECK_CONFIRMED
             self._record(state, reason, result.get("readback_at"), trigger)
+            self._followups, self._followup_at = 0, None  # a conclusive look
             if confirmed:
                 # `mono` = the monotonic instant of the readback itself (the read finished `lag` wall seconds later)
                 lag = max(0.0, (datetime.now(timezone.utc) - datetime.fromisoformat(result["readback_at"])).total_seconds())
@@ -312,10 +423,25 @@ class MorekScheduleChecker:
         self._episode_attempt = None  # healthy or unknown ends the episode
         self._forget_observations()
         self._record(state, reason, result.get("readback_at"), trigger)
+        self._note_followup(state, reason, trigger)
         if (state == morek_schedule.CHECK_UNKNOWN and reason == "verification_pending" and self._trigger == "post_repair"
                 and self._post_waits < POST_REPAIR_WAIT_LIMIT):
             self._post_waits += 1
             self._arm(POST_REPAIR_WAIT_S, recheck=False)
+
+    def _note_followup(self, state: str, reason: Any, trigger: str) -> None:
+        """A look that could not be conclusive only because a planned change was too near (or a send's verification was
+        running) is repeated shortly after, at most `FOLLOWUP_LIMIT` times in a row, so a closely spaced transition is
+        never silently skipped. A conclusive result or any other kind of look restarts the count. Only a wake-up is
+        armed (memory); `_arm_transition` lets the ledger decide whether the late-frame risk is open at all."""
+        if state != morek_schedule.CHECK_UNKNOWN:
+            self._followups, self._followup_at = 0, None
+            return
+        if reason not in FOLLOWUP_REASONS or self._trigger == "post_repair":
+            return
+        self._followups = self._followups + 1 if trigger == "followup" else 0
+        self._followup_at = (None if self._followups >= FOLLOWUP_LIMIT
+                             else datetime.now(timezone.utc) + timedelta(seconds=TRANSITION_SETTLE_S))
 
     def _record(self, state: str, reason: Any, readback_at: Any, trigger: str) -> None:
         """Status always updates; one event and one INFO line per *changed* class, a repeat only counts."""
@@ -336,4 +462,5 @@ class MorekScheduleChecker:
 
     def status(self) -> dict[str, Any]:
         """Additive `reconciliation.check`: codes and times only, no raw frames, profile data or private details."""
-        return {**self._status, "rechecks": self._rechecks, "events": [dict(event) for event in self.events]}
+        return {**self._status, "rechecks": self._rechecks, "next_transition_check_at": self._transition_at,
+                "events": [dict(event) for event in self.events]}

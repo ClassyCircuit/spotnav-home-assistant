@@ -344,8 +344,15 @@ async def test_real_admission_never_releases_unprovable_or_concurrent_records(mo
     finally:
         if alteration == "schedule_lock":
             lock.release()
-    assert not result.allowed
-    operation.assert_not_awaited()
+    if alteration in ("wire_intent", "legacy", "no_attempt"):
+        # Stage 19.2 amendment (named change): a genuinely ambiguous record is no longer refused at admission; the
+        # worker's guarded `resolve` may supersede it, and `_send_profile_shared` still refuses unless the recovery
+        # pace is due. Admission itself never releases it, never rewrites it and never touches the wire.
+        assert result.allowed
+        operation.assert_awaited_once()
+    else:
+        assert not result.allowed
+        operation.assert_not_awaited()
     w.point.call.assert_not_awaited()
     assert await w.ledger.read() == record  # nothing was rewritten
     w.worker.close()

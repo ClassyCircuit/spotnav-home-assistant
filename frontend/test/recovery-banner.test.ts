@@ -5,6 +5,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { recoveryBanner } from '../sidebar/recovery-banner.js';
 import '../sidebar/panel.js';
+import { ownedResumeOffered } from '../sidebar/panel.js';
 
 ElementInternals.prototype.setFormValue = function() {};
 ElementInternals.prototype.setValidity = function() {};
@@ -18,6 +19,31 @@ const NOW = Date.parse('2026-11-13T10:00:00Z');
 const state = (reason, blocker, recovery = {}, extra = {}) => ({supported: true, verified: false, reconciliation: {reason, blocker, recovery}, ...extra});
 const later = (s) => new Date(NOW + s * 1000).toISOString();
 const tick = async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); };
+
+describe('Stage 19.2 / 19.9a unknown-upload recovery and Resume', () => {
+  const owned = (pause, outcomes = {uncertain: true}, authorized = false) => ({
+    ownership: {recorded_owner: 'morek_schedule', completion_authorized: authorized}, outcomes, schedule_pause: pause});
+  it('offers Resume while the upload is unknown (even without a current ticket), never against a Stop or twice', () => {
+    expect(ownedResumeOffered(owned({intent: 'pause_until_resumed', request: 'unknown', resume_recoverable: true}))).toBe(true);
+    expect(ownedResumeOffered(owned({intent: 'pause_until_resumed', request: 'resume_pending', resume_pending: true}))).toBe(false);
+    expect(ownedResumeOffered(owned({intent: 'pause_until_resumed', request: 'stop_pending', resume_recoverable: true}))).toBe(false);
+    expect(ownedResumeOffered(owned({intent: 'pause_until_resumed', request: 'unknown'}))).toBe(false);  // an older backend
+    expect(ownedResumeOffered(owned({intent: 'pause_until_resumed', request: 'x', resume_recoverable: true}, {uncertain: false}, true))).toBe(true);
+  });
+  it('says the old outcome stays unknown, a fresh schedule is sent automatically, and the residual risk', () => {
+    const banner = recoveryBanner(state('upload_uncertain', {code: 'upload_uncertain', action: 'check_charger_outcome'}, {},
+      {outcomes: {uncertain: true}}), NOW);
+    expect(banner.text).toMatch(/not retried automatically/);  // an older backend (no unknown_recovery): unchanged wording
+    const next = new Date(NOW + 300000).toISOString();
+    const shown = recoveryBanner({...state('upload_uncertain', {code: 'upload_uncertain', action: 'check_charger_outcome'}, {},
+      {outcomes: {uncertain: true}}), reconciliation: {reason: 'upload_uncertain', recovery: {},
+        blocker: {code: 'upload_uncertain', action: 'check_charger_outcome'},
+        unknown_recovery: {ambiguous: true, next_attempt_at: next, resume_pending: true}}}, NOW);
+    expect(shown.level).toBe('warning');
+    expect(shown.text).toMatch(/stays recorded as unknown.*fresh schedule automatically.*cannot rule out.*Charging is not confirmed.*Resume is saved/);
+    expect(shown.text).not.toMatch(/guarantee|will charge|verified|fixed/i);
+  });
+});
 
 describe('recoveryBanner', () => {
   it('says nothing when nothing blocks the schedule, and never claims success itself', () => {

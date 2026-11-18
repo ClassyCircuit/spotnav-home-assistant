@@ -1135,6 +1135,7 @@ async def _async_setup_auto_preview(
             hass.data["spotnav_morek_checker"].pop(entry_id, None)
 
     entry.async_on_unload(_drop_checker)
+    checker.request_transition_watch()  # Stage 19.2: re-derive the late-frame look from the durable ledger at startup
     worker.link_monitor = MorekLinkMonitor(hass, entry_id, worker)
     worker.link_monitor.start()  # one bounded poll timer; read-only, cancelled on unload
     entry.async_on_unload(worker.link_monitor.stop)

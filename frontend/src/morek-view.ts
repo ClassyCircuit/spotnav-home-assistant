@@ -9,9 +9,12 @@ export interface MorekState {
   outcomes?: { uncertain: boolean; state?: string } | null;
   operator?: { state: string; reason?: string | null };
   reconciliation?: { reason: string; blocker?: { code: string; action: string } | null;
+    // Stage 19.2, additive: automatic, paced recovery of an unknown upload (old outcome stays unknown).
+    unknown_recovery?: { state?: string; ambiguous?: boolean; next_attempt_at?: string | null; attempts?: number; resume_pending?: boolean;
+      history_count?: number; old_outcome?: string | null; ordering?: string; physical_charging?: string; supersession?: { state?: string; risk?: string } | null } | null;
     recovery?: { next_retry_at?: string | null; retries_left?: number | null; exhausted?: boolean;
       blocker_retry?: { code: string; attempts: number; limit: number; next_retry_at: string | null; exhausted: boolean } | null } };
-  schedule_pause?: { intent?: string; request?: string; ack?: string | null; readback?: string; measured?: string; coverage_start?: string | null; coverage_end?: string | null };
+  schedule_pause?: { intent?: string; request?: string; resume_pending?: boolean; resume_recoverable?: boolean; ack?: string | null; readback?: string; measured?: string; coverage_start?: string | null; coverage_end?: string | null };
   readiness?: { control?: string; vehicle?: string; transaction?: string; measurement?: string; vehicle_observed_at?: string | null; live?: unknown; session_start?: { state: string; reason: string }; session_start_at?: string | null;
     // Stage 15.5/15.6, additive: absent on an older backend. The sidebar treats malformed values as unknown.
     freshness?: { expected?: boolean | null; link?: unknown; quantities?: Record<string, { state: string; basis?: string; reported_at?: string | null; age_s?: number | null; link?: unknown; reason?: string }> } | null;
@@ -198,7 +201,7 @@ export function morekPanel(
     retained_profile_exit_held: "Exit is held until retained-profile resolution is reviewed.",
     resume_requires_confirmation: "Resume could not be continued automatically; confirm Resume again. The retained limit may remain.",
     schedule_mode_unarmed: "Automatic schedule sending is not enabled.",
-    upload_uncertain: "The previous write outcome is unknown; automatic retry is blocked.",
+    upload_uncertain: "The previous write outcome is unknown and stays recorded as unknown. SpotNav sends a fresh schedule automatically, paced, when Morek is reachable; it cannot rule out that the old write is applied later.",
     upload_rejected: "Morek rejected the schedule; it was not confirmed.",
     upload_accepted_unverified: "Morek accepted the schedule; readback and charging are not yet confirmed.",
     unchanged: "The current schedule was already acknowledged; charging is not confirmed.",

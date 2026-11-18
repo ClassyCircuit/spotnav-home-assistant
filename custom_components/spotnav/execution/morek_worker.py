@@ -29,6 +29,11 @@ _TRIGGER_RANK = ("plug_in", "sync", "settings", "control", "repair", "sensor", "
 _SETTLED = ("upload_accepted_unverified", "unchanged")  # outcomes that end a pending price decision
 _DECISION_HISTORY = 10
 _DECISION_REPAIR_SENT = ("upload_accepted_unverified", "upload_rejected", "upload_uncertain")
+#: Stage 19.2: results after which a pending recovery (unknown upload or a person's pending Resume) is re-woken.
+_RECOVERY_WAIT_REASONS = frozenset({"upload_uncertain", "schedule_mode_unarmed", "lifecycle_initializing",
+                                    "profile_outcome_unavailable", "ownership_unavailable", "charger_unavailable",
+                                    "stale_generation", "migration_confirmation_required"})
+_AUTHORITY_REASONS = frozenset({"schedule_mode_unarmed", "lifecycle_initializing", "profile_outcome_unavailable"})
 _DECISION_REPAIR_WAITING = ("repair_deferred",)
 _PERSIST_DELAY = 5.0  # seconds: coalesce a burst of observation/pace changes into one ledger write
 _PERSIST_MIN_INTERVAL = 60.0  # at most one retry-state write a minute, however much a link flaps
@@ -81,6 +86,10 @@ class MorekScheduleWorker:
         self._last_flush = -_PERSIST_MIN_INTERVAL
         self._rejection_count = 0
         self.resume_interrupted: str | None = None  # a Resume id a person Stop pre-empted in this process
+        # Stage 19.2: paced guarded recovery of an unknown upload / a pending Resume that is waiting for authority.
+        self._recovery_timer = None
+        self._recovery_runs = 0
+        self.recovery_retry: dict[str, Any] | None = None
         self._continuity_end: datetime | None = None
         self._deadline: float | None = None
         self._wake = asyncio.Event()
@@ -288,6 +297,9 @@ class MorekScheduleWorker:
         if self._blocker_timer is not None:
             self._blocker_timer.cancel()
             self._blocker_timer = None
+        if self._recovery_timer is not None:
+            self._recovery_timer.cancel()
+            self._recovery_timer = None
         if self._flush_timer is not None:
             self._flush_timer.cancel()
             self._flush_timer = None
@@ -357,7 +369,9 @@ class MorekScheduleWorker:
             return
         self._rejection_count = morek_schedule.rejection_count(record.get("attempt"))
         at = morek_schedule.rejection_retry_at(record)
-        if at is None:
+        if at is None or morek_schedule.rejected_reassert_of(record):
+            # (Stage 19.2: a refused reassert is retried by the checker's paced look and a confirmed reassert; a
+            # recovery run here would only find the acknowledged intent unchanged)
             return
         delay = (at - datetime.now(timezone.utc)).total_seconds() + 1
         if delay <= 1:
@@ -402,6 +416,41 @@ class MorekScheduleWorker:
                               "exhausted": False, "phase": phase}
         self._set_pace({"code": self.reason, "phase": phase, "attempts": self._blocker_runs, "next_at": next_at})
         self._blocker_timer = asyncio.get_running_loop().call_later(delay, lambda: self.trigger(kind="recovery"))
+
+    async def _arm_recovery_timer(self) -> None:
+        """Stage 19.2: while an unknown upload (or a person's pending Resume) still awaits its guarded resolve, wake the
+        worker at the persisted recovery time, or at a paced backoff while authority/link is missing. The wake is only
+        a `recovery` trigger: the run, admission and send path decide, and the persisted pace in the ledger (not this
+        timer) is what rate-limits writes, so a restart or a burst of triggers never sends early or twice."""
+        if self._recovery_timer is not None:
+            self._recovery_timer.cancel()
+            self._recovery_timer = None
+        self.recovery_retry = None
+        if self._closed:
+            return
+        try:
+            record = await morek_schedule.outcomes_for(self._hass).read()
+        except Exception:  # noqa: BLE001 - unreadable evidence: the next event re-evaluates
+            return
+        pending = morek_schedule.valid_pending_resume(record) is not None
+        waiting = morek_schedule.recoverable_ambiguous(record) or morek_schedule.resume_recoverable(record)
+        if not waiting or self.reason not in _RECOVERY_WAIT_REASONS:
+            self._recovery_runs = 0
+            return
+        now = datetime.now(timezone.utc)
+        delay = None
+        if morek_schedule.recoverable_ambiguous(record) and self.reason == "upload_uncertain":
+            at = morek_schedule.recovery_next_at(record, immediate=pending)
+            if at is not None and at > now:
+                delay = (at - now).total_seconds() + 1
+        if delay is None:
+            # Due but still blocked (authority, link, lifecycle): paced re-evaluation, never a tight loop.
+            delay = float(morek_schedule.blocker_retry_delay(self._recovery_runs))
+            self._recovery_runs += 1
+        delay = min(delay, float(morek_schedule.RECOVERY_DELAYS[-1] + 60))  # a skewed clock never parks the wake
+        self.recovery_retry = {"reason": self.reason, "attempts": self._recovery_runs,
+                               "next_retry_at": (now + timedelta(seconds=delay)).isoformat()}
+        self._recovery_timer = asyncio.get_running_loop().call_later(delay, lambda: self.trigger(kind="recovery"))
 
     # ---- Stage 19.3: durable pace and observations (the existing outcome record; no new store) -----------------
 
@@ -627,6 +676,7 @@ class MorekScheduleWorker:
                     self.last_trigger = next((k for k in _TRIGGER_RANK if k in kinds), None)
                     self._record_decision(kinds)
                     self._arm_blocker_timer(kinds)
+                    await self._arm_recovery_timer()
                     return
         finally:
             self._task = None
@@ -764,6 +814,17 @@ class MorekScheduleWorker:
                 post_repair = repair is not None and (repair["attempt_id"] in morek_schedule.repaired_ids(record)
                                                        or morek_schedule.repair_escalated(record, repair["attempt_id"]))
                 pause = record.get("schedule_pause")
+                promote = None
+                pending = morek_schedule.valid_pending_resume(record)
+                if (pending is not None and not repair and generation == admission.generation(connector)
+                        and not admission._person_stops.get(connector)):
+                    # Stage 19.9a: a person's durable Resume made while the previous upload was unknown. The Pause
+                    # stays in force until `_send_profile_shared` turns this request into the current Resume in the
+                    # same durable write as the new attempt's pre-wire marker (revalidated there under the locks).
+                    promote = pending
+                    self.resume_ticket = (pending["id"], generation)
+                    pause = {"version": 1, "type": "resume_requested", "id": pending["id"],
+                             "station_id": pending["station_id"], "connector_id": pending["connector_id"]}
                 sync = self._sync_serial == serial
                 if sync and pause is not None and pause.get("type") == "pause_until_resumed":
                     return "paused_until_resume", None, None
@@ -775,7 +836,8 @@ class MorekScheduleWorker:
                         and pause.get("type") == "pause_until_resumed"
                         and self.hold_ticket != (pause.get("id"), generation)):
                     return "paused_until_resume", None, None
-                if pause is not None and pause["type"] == "resume_requested" and not morek_schedule._resume_authorized(record, self, generation):
+                if (pause is not None and pause["type"] == "resume_requested" and promote is None
+                        and not morek_schedule._resume_authorized(record, self, generation)):
                     return "resume_requires_confirmation", None, None
                 if pause is not None and pause["type"] == "resume_requested":
                     # Carry recovered authority across the next write's pending record;
@@ -790,6 +852,7 @@ class MorekScheduleWorker:
                         and datetime.fromisoformat(record["charge_now"]["end"]) > datetime.now(timezone.utc) else None,
                     force_sync=sync, end_tolerance=end_tolerance, baseline=lambda: self._baseline,
                     repair=None if repair is None else repair["attempt_id"],
+                    resolve=repair is None, promote_resume=promote,
                     validate_durable=lambda: admission.async_owned_boundary_current(self._entry_id, connector),
                     migration_id=None if ticket is None else ticket[1])
                 return outcome, data.get("sent_at"), data.get("attempt_id")
@@ -797,6 +860,17 @@ class MorekScheduleWorker:
         result = await admission.async_execute(
             self._entry_id, "owned_profile", self._identity, dispatch, expected_generation=generation
         )
+        if (not result.allowed and result.reason in _AUTHORITY_REASONS and not self._closed
+                and morek_schedule.resume_recoverable(record)):
+            # Stage 19.9a: a person's durable Resume is waiting for the process-local send authority (restart, link
+            # return, lifecycle barrier). One guarded reconfirmation (owner, identity, generation, Stop; no charger
+            # call), then one more admission attempt in this same run. A refusal stays visible and is paced by
+            # the recovery timer; nothing is sent without admission.
+            code = await morek_schedule.async_recover_send_authority(self._hass, self._entry_id)
+            if code in ("reconfirmed", "authority_present") and serial == self._serial and not self._closed:
+                generation = admission.generation(connector)
+                result = await admission.async_execute(
+                    self._entry_id, "owned_profile", self._identity, dispatch, expected_generation=generation)
         if self._closed:
             return
         self._arm_continuity_timer()

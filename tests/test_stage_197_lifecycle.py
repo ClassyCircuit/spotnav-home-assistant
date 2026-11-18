@@ -178,7 +178,10 @@ async def owned_setup(environment, monkeypatch, *, uncertain=False, settled=True
         assert await gate.async_reconfirm_completed("a", identity) == "reconfirmed"
     if uncertain:  # a profile outcome becomes uncertain after the settled owner was confirmed
         ledger.write_text(json.dumps({"version": 1, "data": {
-            "schema": 1, "entry_id": "a", "uncertain": True}}), encoding="utf-8")
+            "schema": 1, "entry_id": "a", "uncertain": True,
+            # Stage 19.2 amendment (named change): a plain ambiguous upload no longer pins the barrier (the worker's
+            # guarded resolve supersedes it), so this persistent-refusal fixture uses a removal in doubt, which does.
+            "removal": {"state": "uncertain"}}}), encoding="utf-8")
     monitor.check()  # seed the monitor
     return hass, gate, point, worker, monitor, callbacks, tasks, unloads, identity
 

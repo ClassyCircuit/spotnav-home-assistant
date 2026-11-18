@@ -63822,7 +63822,7 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
     retained_profile_exit_held: "Exit is held until retained-profile resolution is reviewed.",
     resume_requires_confirmation: "Resume could not be continued automatically; confirm Resume again. The retained limit may remain.",
     schedule_mode_unarmed: "Automatic schedule sending is not enabled.",
-    upload_uncertain: "The previous write outcome is unknown; automatic retry is blocked.",
+    upload_uncertain: "The previous write outcome is unknown and stays recorded as unknown. SpotNav sends a fresh schedule automatically, paced, when Morek is reachable; it cannot rule out that the old write is applied later.",
     upload_rejected: "Morek rejected the schedule; it was not confirmed.",
     upload_accepted_unverified: "Morek accepted the schedule; readback and charging are not yet confirmed.",
     unchanged: "The current schedule was already acknowledged; charging is not confirmed.",
@@ -64649,6 +64649,12 @@ function recoveryBanner(state, now = Date.now()) {
   const reconciliation = state.reconciliation || {};
   const blocker = reconciliation.blocker;
   const recovery = reconciliation.recovery || {};
+  const unknown2 = reconciliation.unknown_recovery;
+  if ((state.outcomes?.uncertain === true || blocker?.code === "upload_uncertain") && unknown2 && unknown2.ambiguous === true) {
+    const next = unknown2.next_attempt_at ? time(unknown2.next_attempt_at) : null;
+    const resume = unknown2.resume_pending === true ? " Your Resume is saved and applies with it." : "";
+    return { level: "warning", code: "upload_unknown_recovering", text: `The last schedule write has an unknown outcome and stays recorded as unknown. SpotNav sends a fresh schedule automatically when Morek is reachable${next ? ` (next attempt about ${next})` : ""}; it cannot rule out that the old write is still applied later. Charging is not confirmed.${resume}` };
+  }
   if (state.outcomes?.uncertain === true || blocker?.code === "upload_uncertain") {
     return { level: "error", code: "upload_uncertain", text: `${WHAT.check_charger_outcome} Charging is not confirmed; check Morek and the SpotNav logs before acting. Nothing was cleared.` };
   }
@@ -65848,7 +65854,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.192";
+var CARD_VERSION = "2.5.195";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {
@@ -65918,7 +65924,7 @@ function actionFailure(code, action) {
     schedule_owner_unavailable: "Schedule ownership is unavailable. Review Morek status before proceeding.",
     identity_unresolved: "The charger identity could not be confirmed. Check the Morek connection.",
     identity_changed: "The charger identity changed. Refresh and check the Morek connection.",
-    resume_unavailable: "Resume is blocked by missing pause intent, an uncertain outcome or a pending Stop. Review Morek status.",
+    resume_unavailable: "Resume is blocked by a missing pause intent, a charger removal of unknown outcome or a pending Stop. Review Morek status.",
     resume_interrupted: "Resume was interrupted by a Stop or a state change. Refresh before deciding what to do.",
     ownership_blocked: "Connector ownership blocks this action. Review Morek status.",
     legacy_execution_ownership_blocked: `${action === "resume" ? "Resume" : "The action"} was refused before taking effect because legacy control is blocked by ownership or admission. Review fresh Morek status.`,
@@ -65958,10 +65964,12 @@ function admissionDetail(status) {
   return `${current}${migration ? ` ${migration}` : ""}${missing}`;
 }
 function ownedResumeOffered(status) {
+  if (status?.ownership?.recorded_owner === "morek_schedule" && status?.schedule_pause?.resume_recoverable === true && status?.schedule_pause?.intent === "pause_until_resumed" && status?.schedule_pause?.request !== "stop_pending" && status?.schedule_pause?.request !== "resume_pending") return true;
   return status?.ownership?.recorded_owner === "morek_schedule" && status?.ownership?.completion_authorized === true && (status?.schedule_pause?.intent === "pause_until_resumed" || status?.schedule_pause?.intent === "resume_requested" && status?.schedule_pause?.request === "resume_requires_confirmation") && typeof status?.schedule_pause?.request === "string" && status.schedule_pause.request !== "stop_pending" && status?.outcomes?.uncertain === false;
 }
 function ownedResumeReason(status) {
-  if (status?.outcomes?.uncertain === true) return "A profile outcome is uncertain; do not retry blindly.";
+  if (status?.schedule_pause?.request === "resume_pending") return "Resume is requested and saved. The previous upload outcome stays unknown; SpotNav sends a fresh schedule automatically when the charger is reachable" + (status?.reconciliation?.unknown_recovery?.next_attempt_at ? ` (next attempt ${new Date(status.reconciliation.unknown_recovery.next_attempt_at).toLocaleTimeString()})` : "") + ". A later Stop or Pause cancels it.";
+  if (status?.outcomes?.uncertain === true) return "A profile outcome is uncertain and cannot be resumed from here; check the charger.";
   if (status?.outcomes?.uncertain !== false) return "Profile outcome evidence is unavailable.";
   if (status?.schedule_pause?.request === "stop_pending") return "A person Stop is pending.";
   if (status?.schedule_pause?.intent === "resume_requested") return "Resume is already requested.";
@@ -66498,9 +66506,9 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       const coverage = Number.isFinite(from) && Number.isFinite(to) && to > from ? ` (${new Date(from).toLocaleString()} \u2013 ${new Date(to).toLocaleString()})` : " (coverage unavailable)";
       const readback = pause?.readback === "bounded_match" ? `bounded effective readback match${coverage}` : "readback unconfirmed";
       const canPause = isFresh && statusFresh && !!control?.can_act && !this.controlPermissionPending && !this.autoBusy && !this.autoUncertain && !this.morekBusy && !this.morekUncertain && !this.settingsBusy && this._hass?.connected !== false;
-      const can2 = canPause && !this.chargeBusy && status?.ownership?.completion_authorized === true;
+      const can2 = canPause && !this.chargeBusy && (status?.ownership?.completion_authorized === true || status?.schedule_pause?.resume_recoverable === true);
       const resumeOffered = ownedResumeOffered(status);
-      const blocker = !isFresh ? "Dashboard observation unavailable or stale." : !statusFresh ? "Morek status unavailable or stale." : !control?.can_act ? "Control permission or charger availability is unavailable." : this.controlPermissionPending ? "Waiting for a fresh permission check." : this.autoUncertain || this.morekUncertain ? "A previous action outcome is unknown; do not retry blindly." : this.autoBusy || this.morekBusy || this.settingsBusy ? "Another request is in progress." : status?.schedule_pause?.request === "stop_pending" ? "A person Stop is pending." : status?.outcomes?.uncertain === true ? "A profile outcome is uncertain; do not retry blindly." : status?.ownership?.completion_authorized !== true ? `Schedule ownership is not currently authorized; reported recovery status: ${status?.ownership?.recovery?.automatic_recovery || status?.ownership?.recovery?.state || status?.ownership?.blockers?.[0] || "unknown"}.` : !resumeOffered ? ownedResumeReason(status) : "";
+      const blocker = !isFresh ? "Dashboard observation unavailable or stale." : !statusFresh ? "Morek status unavailable or stale." : !control?.can_act ? "Control permission or charger availability is unavailable." : this.controlPermissionPending ? "Waiting for a fresh permission check." : this.autoUncertain || this.morekUncertain ? "A previous action outcome is unknown; do not retry blindly." : this.autoBusy || this.morekBusy || this.settingsBusy ? "Another request is in progress." : status?.schedule_pause?.request === "stop_pending" ? "A person Stop is pending." : status?.schedule_pause?.request === "resume_pending" ? ownedResumeReason(status) : status?.outcomes?.uncertain === true && status?.schedule_pause?.resume_recoverable !== true ? "A profile outcome is uncertain; check the charger." : status?.ownership?.completion_authorized !== true && status?.schedule_pause?.resume_recoverable !== true ? `Schedule ownership is not currently authorized; reported recovery status: ${status?.ownership?.recovery?.automatic_recovery || status?.ownership?.recovery?.state || status?.ownership?.blockers?.[0] || "unknown"}.` : !resumeOffered ? ownedResumeReason(status) : "";
       this.shadowRoot.querySelector("#pause-state").textContent = `${intent}; request ${request}; ACK ${ack}; ${readback}; physical charging unknown.${control?.execution_error === "pause_stop_failed" ? " Stop request failed." : ""}${blocker ? ` Resume unavailable: ${blocker}` : ""}`;
       this.shadowRoot.querySelector("#pause-auto").disabled = !(canPause && admittedAction(control, "stop", "until_resumed"));
       this.shadowRoot.querySelector("#resume-auto").disabled = !(can2 && resumeOffered);
@@ -66610,7 +66618,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     const morek = decodeMorekState(this.rawStatus), owner = morek?.ownership;
     const statusFresh = fresh(this.statusAt, this.statusFailed);
     if (owner?.recorded_owner === "morek_schedule" && !statusFresh) return;
-    if (owner?.recorded_owner === "morek_schedule" && action !== "stop" && (owner.completion_authorized !== true || !statusFresh)) return;
+    if (owner?.recorded_owner === "morek_schedule" && action !== "stop" && (owner.completion_authorized !== true && !(action === "resume" && morek?.schedule_pause?.resume_recoverable === true) || !statusFresh)) return;
     const offered = decoded.ok && (owner?.recorded_owner === "morek_schedule" && action === "resume" ? choice === null && statusFresh && ownedResumeOffered(morek) : admittedAction(decoded.value.control, action, choice));
     if (!this.connected || !charger || !hass || hass.connected === false || !decoded.ok || !dashboardFresh(decoded.value, this.dashboardFailed) || this.controlPermissionPending || this.autoBusy || this.autoUncertain || this.morekBusy || this.morekUncertain || this.settingsBusy || action !== "stop" && this.chargeBusy || !decoded.value.control.can_act || !offered) return;
     const dispatchedAt = Date.now();
@@ -67289,7 +67297,9 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
 Object.assign(SpotnavEnhancedPanel.prototype, marketCostMethods, planParamMethods, notifySetupMethods);
 if (!customElements.get("spotnav-enhanced-panel")) customElements.define("spotnav-enhanced-panel", SpotnavEnhancedPanel);
 export {
-  SpotnavEnhancedPanel
+  SpotnavEnhancedPanel,
+  ownedResumeOffered,
+  ownedResumeReason
 };
 /*! Bundled license information:
 

@@ -559,7 +559,7 @@ input-evidence → recalculation → worker-compare path.
 | `SessionStore.add_listener`/`_notify` (close at `store.py:365`, second notify at `:443`) and recorder `_reconcile_late` | Done | 17.4 reuses; today `_on_sessions_changed` ignores target plans |
 | Degraded aggregate price state blocks automatic and manual dispatch (`morek_plan_blocker` area states; `_validated_proposal`) and the partial-plan indicator | **Done locally (2.5.148), committed `08254d2e`** | 17.5/17.6 consume |
 
-### Queue (strict order; one at a time)
+### Historical substage map (remaining execution order is the five groups above)
 
 | # | Substage | Needs |
 | --- | --- | --- |
@@ -745,7 +745,7 @@ use focused fast tests, report visual and hardware limits truthfully, update thi
 
 ## Stage 19 — Ahead-of-time schedules and recoverable upload uncertainty
 
-**Planned 2026-11-18 (docs only; nothing below is implemented, installed, deployed or hardware-verified).**
+**Stage 19 is partly implemented locally through 2.5.195, with mocked checks; the remaining work is defined below. No Stage 19 behavior is assumed hardware-verified.**
 Source basis: manifest 2.5.178 by source reading; no HA access, charger command or restart was used to write
 this stage. One fresh Claude medium delegate per substage, shared worktree, queue order below, coordinator
 review of each substage before the next; commit/push only when authorized. Every substage: Standard acceptance
@@ -765,13 +765,84 @@ indistinguishable and every one blocks later automatic sends; there is no suppor
 direction of relaxing that permanent block (2026-11-18). This is an approved direction, not verified
 behavior:** no replacement, ordering or late-response semantics have been observed on the user's charger.
 
-### Follow-up: stuck Resume and unnecessary reconnect send (19.9 ◆; 2026-11-18)
+### Coordinator decisions and remaining execution order (2026-11-18)
 
-Observed installed 2.5.191: durable `pause_until_resumed` and a legacy uncertain upload coexist; the sidebar disables Resume on `outcomes.uncertain` and the backend rejects it, so a person cannot express a current Resume intent. This is a user-visible deadlock, not evidence of a Resume already in flight. **19.9 is open** and is authorized for the next delegated implementation. Coordinate its uncertainty resolution with 19.2: do not claim the old upload failed or that a composite readback identifies a profile, and do not treat an arbitrary timeout, local sequence or one hardware trial as proof of ordering. Preserve the actual Pause until a durable, authorized Resume is recorded; never falsely say the charger resumed or that charging occurred. Explicit Stop, protection, connector identity and current intent still win.
+This block supersedes conflicting historical Stage 19 and §5 wording below. The user wants unattended recovery,
+ahead-of-time schedules, no routine charger spam, and an active charge left alone. The existing permanent unknown
+latch and disabled Resume failed those goals. **Do not stop for another product decision on the points below.**
+Use a fresh Claude Sonnet 5.5 medium delegate for each remaining group, shared checkout, coordinator review and
+user-authorized commit/push. No live HA, charger commands, deployment or hardware testing is authorized here.
 
-- [ ] **19.9 Resume recovery, blocker clarity and reconnect stability ◆.** Trace the real UI → backend → admission → worker path for a paused record plus a legacy ambiguous upload and implement a reliable, actionable Resume/recovery path; a user's intent must not disappear or be mislabeled as physically applied. Resolve the old upload safely via 19.2 where a justified mechanism exists, or record an explicit pending intent and transparently expose the exact remaining blocker, continue paced automatic reevaluation, and identify any true technical limitation without claiming complete recovery. Never use `clear_profile` or modify HA/charger during development. Show all active blockers, including a precise explanation for a disabled Resume and who/what can unblock it; update the missing reason mappings and distinguish a newly unsent plan from an earlier retained schedule. Review whether a routine reconnect plus minor SOC drift causes an unnecessary resend: preserve an acknowledged healthy active window and existing 5-minute tolerance without suppressing a required sync, genuine mismatch, material trigger or ownership change. Tests must exercise actual UI/backend and admission boundaries, legacy ambiguous record plus Pause → Resume, no false applied state, Stop/Pause races, restart and paced reevaluation, and SOC drift during active charging with send counts and wire profiles. Use focused fast tests only and §5 non-regression rules. Record any unavoidable remaining limitation truthfully; do not mark complete while the user's original deadlock is unresolved.
+**Primary outcome and release requirement:** restore automatic charging control, not merely retain or explain an
+uncertain state. The actual legacy scenario—an old ambiguous upload plus `pause_until_resumed`—must accept the
+user's Resume, automatically reconcile and send the latest guarded plan when Morek is reachable, and continue
+recovering across disconnects and HA restarts without another click, manual ledger edits or an indefinite lock.
+A durable pending intent, warning, readback or preserved history is only an intermediate step, never completion.
+If offline, keep the current intent and retry with pacing on reconnect. Respect a later Stop/Pause and protection;
+report if the charger cannot be reached or rejects a request. Acceptance asserts the real guarded wire call and
+subsequent recovery, not just a saved intent or a UI message. Do not mark 19.2/19.9a complete until this passes.
 
-The user's temporary delegation preference for 19.9 is GPT-6.1 Terra medium; later substages return to Claude Sonnet 5.5 medium when available. Coordinator reviews, then commits and pushes authorized work.
+**Engineering policy — converge, do not promise impossible certainty.** A timeout cannot establish whether an old
+command applied, and `GetCompositeSchedule` is effective limits rather than profile inventory. Keep the old attempt
+as `unknown` historical evidence. Do not invent a maximum delivery time or label a historical attempt accepted.
+Instead, after confirming the intended physical connector and a usable link, automatically send the **latest**
+validated absolute schedule as a new, separately identified replacement through the existing single sender. Use
+profile 42001 and current intent, preserving the active window; retain ACK and readback separately. This is the
+approved pragmatic approach despite unverified firmware ordering and replacement semantics, **not a proof** that a
+late old frame cannot arrive. Persist the outstanding risk and keep checking effective limits on reconnect, after a
+replacement and when the next planned transition requires attention; if a fresh, valid readback differs, converge
+again using the existing guarded worker with paced backoff. A readback that cannot distinguish profiles is not
+proof of either historical outcome. Persist retry state across restarts. Start with 2 min, 5 min, 15 min, then
+30 min, 1 h and a 4 h ceiling; meaningful reconnect/plug-in wakes a guarded evaluation without resetting pace or
+causing a burst. Deduplicate equal settled schedules, coalesce events and log state changes rather than every retry.
+Unsupported/repeated rejections remain visible and retry slowly rather than hammering. Never use `clear_profile`.
+
+The residual risk is real: no software-side sequence number or one hardware trial proves a charger will not apply a
+late old write. Present `supersession_pending`/`last known` and alert when recovery cannot verify effective limits;
+continue guarded reconciliation rather than a permanent silent lock. Never claim this guarantees safety or charging
+while disconnected. Explicit Stop/Pause take precedence: durably record the newest intent, invalidate pending
+Resume, recheck generation at every await, prioritize its guarded hold/stop operation and reconcile that same intent
+after reconnect; never let an old ACK overwrite newer intent. A late old charger operation could still temporarily
+override it; monitoring and reassertion mitigate but cannot eliminate that device/network risk. Electrical protection,
+identity and ownership checks remain in force; inability to apply a control must be shown immediately.
+
+**Resume decision.** Resume during a paused legacy-unknown record must be selectable by an authorized user. Persist
+a separate pending Resume intent under connector admission; retain the Pause as effective authority until guarded
+recovery can act. It must survive restart without being treated as an ACK or measured charge. A subsequent Stop or
+Pause invalidates it, including persistence races; revalidate durable intent/generation before dispatch and after
+awaits. Once recovery can send, reconcile the current authorized Resume automatically. Show all active blockers,
+what happens next and the next retry; do not require a second click simply because HA restarted.
+
+**Planning decision.** Reconnect by itself is not a reason to interrupt a healthy charging window or send the same
+schedule. Persist a compact trustworthy comparison of the accepted plan's material price/cap/settings inputs and
+compare it with the current plan after restart. Apply the existing SOC-only <5-minute tolerance only when the saved
+and current evidence proves other material inputs unchanged. Unknown/missing provenance, a required sync, material
+price/cap change, mismatch, or ownership change stays strict. Never infer SOC-only from similar end times. Keep the
+Stage 14 price/cap thresholds and active-window continuity, and distinguish calculating a plan from sending it.
+
+**Remaining groups, in this order:**
+1. [x] **19.2 + 19.9a — recovery and Resume:** *(LOCAL, mocked: implemented locally 2026-11-18, manifest 2.5.193, mocked/isolated tests only; coordinator review pending; NOT hardware-verified. Done: durable pending Resume (`pending_resume`, bound to the Pause id, deleted by any later Stop/Pause) accepted by the UI action path while the old upload is unknown; guarded `resolve` through the production worker, `CommandAdmission` (ticket re-mint after restart permitted by a durable Resume without dispatch evidence; ambiguous records admitted to the guarded run, removal-in-doubt still blocks) and the single `_send_profile_shared`: a NEW attempt on profile 42001, the old attempt kept as bounded `unknown_history`, `supersession` risk record (`late_old_frame_not_excluded`, never cleared), persisted recovery pace 2/5/15/30/60 min then a 4 h ceiling, one wake timer, restart-safe. 2.5.194 follow-up: the standing risk now has an effective-readback look after the replacement, on reconnect (existing 15.3 triggers) and ONE look at the acknowledged profile's next planned transition (+120 s, checker-owned, armed only while the risk record exists, no polling); a confirmed mismatch converges through a paced guarded reassert (persisted `supersession.reassert`, 2/5/15/30/60 min then 4 h, not the repair budget/escalation); a pre-wire abort of a resolve restores the original ambiguous attempt (`resolve_prior`), never a settled record. 2.5.195 follow-up: a definitely rejected reassert is retried (checker look at the persisted `reassert.next_at`, two confirming reads, then the same guarded paced reassert; never a blind resend); the look watch is re-derived from the durable ledger at startup, on every check request (link edges included) and after every accepted/rejected/aborted send; a look made inconclusive only by a too-near change gets one bounded follow-up (at most 3). Not done / residual: charger ordering, late old frames and replacement semantics remain unverified, the looks are mitigation not proof, the retry/follow-up timers are memory-only (re-derived from the ledger on startup/link/send events, not a durable schedule); 19.3/19.5/19.6/19.7/19.8 remainders are separate groups; the old card has wording only.)* Wire the convergence policy, current-intent/Stop/Pause races, legacy
+   uncertain records and actionable Resume through production admission and existing worker. Include durable pending
+   Resume, legacy upgrade and restart; no placeholders or disabled-by-default feature gate. This is the main fix.
+2. [ ] **19.3 + 19.7 remainder — pacing and blockers:** extend existing persisted retry/observations to unknown recovery,
+   session and lifecycle blockers, repair their actionable UI, and verify no contention or extra requests. Existing
+   completed 19.3/19.7 code stays; fill gaps only.
+3. [ ] **19.5 + 19.9b — stable planning:** implement the provenance policy above, missing fallback cases that can reuse
+   known inputs, and tests for actual send counts and wire profiles. No invented SOC, prices or capacity.
+4. [ ] **19.6 — session start:** reconcile an ambiguous start with fresh transaction/status evidence; preserve observation
+   versus command ACK. For a genuinely new plug-in or confirmed reboot, use the normal guarded start after affirmative
+   fresh Preparing/no-session evidence, keep the old ambiguity in history, and pace attempts. Treat duplicate/delayed
+   start behavior as an explicit unverified device risk; never turn a Stop into a start or send repeated starts on
+   ordinary sensor updates. Keep handling the same session separate from schedule replacement.
+5. [ ] **19.8 — integrated closure:** exercise the actual production paths, replay the reported legacy unknown + Pause →
+   Resume, timeout/reconnect, restart, Stop/Pause races, active-window SOC drift, long offline periods, paced rejection
+   and readback limitations. Update docs/test procedure and report exactly what is mocked and unverified.
+
+Every group includes focused fast tests, relevant existing Stage 14 checks, required manifest bump and frontend
+build/check-dist for integration/card edits. Work around a Windows harness failure only with a documented focused
+runner; report real failures and unrun checks. No long or broad test suites. Mark a group partial if acceptance is
+not met, but continue implementing independent work instead of stopping at diagnosis. Do not represent intermediate
+planning notes or mocks as deployment or hardware proof.
 
 ### Evidence classes (binding wording and storage rule for every substage)
 
@@ -784,7 +855,7 @@ an inventory of profiles, covering only its horizon) → **transaction** → **m
 *observed* (a source reported it), *inferred* (SpotNav reasoned from observations) and *user-reported*.
 Unknown is never zero, never “no”, never “failed”; an inferred pre-dispatch release must name its proof.
 
-### Queue (strict order; one at a time)
+### Historical substage map (remaining execution order is the five groups above)
 
 | # | Substage | Needs |
 | --- | --- | --- |
@@ -807,7 +878,7 @@ it, with the change named in the report).
 
 | §5 row | Amendment | Substage |
 | --- | --- | --- |
-| Uncertainty and recovery (uncertain latch) | The latch is no longer permanent for *every* uncertain record. It may be released **only** by (a) recorded proof that the wire call never began (19.1, named proof codes), or (b) the 19.2 resolution of a truly ambiguous record: a strictly newer current-intent attempt acknowledged under a verified ordering boundary, or a correlated late ACK for the relevant unresolved attempt, subject to ordering and current-intent guards. Preserve ACK and effective-readback evidence separately; lack of readback must not create a permanent deadlock. Never resolve historical outcome by age, a readback alone, a retry count, a UI action, or `clear_profile`. Every other uncertain record keeps today's behavior. A release is a recorded, evidenced transition, never a silent flag flip. | 19.1, 19.2 |
+| Uncertainty and recovery (uncertain latch) | The latch is no longer permanent for *every* uncertain record. It may be released **only** by (a) recorded proof that the wire call never began (19.1, named proof codes), or (b) the 19.2 resolution of a truly ambiguous record: the guarded current-intent convergence policy in the coordinator decisions above; the old attempt remains historically unknown even when a newer ACK permits forward progress. Preserve ACK and effective-readback evidence separately; lack of readback must not create a permanent deadlock. Never relabel the historical outcome based on age, readback alone, retry count, UI action, or `clear_profile`. Every other uncertain record keeps today's behavior. A release is a recorded, evidenced transition, never a silent flag flip. | 19.1, 19.2 |
 | Uncertainty and recovery (`REJECTION_RETRY_DELAYS` 5, 15 min; 12-check cap of non-sending timers) | The two named delays stay exactly as they are. After them, a **slower persisted pace** (named constants chosen and listed by the delegate; each spacing ≥ the last) may continue for a definitely rejected intent and for blocker re-evaluation, surviving restart, with no per-retry log line or banner churn (19.3). The 12-check cap on *timer-driven* re-evaluation is replaced by that slow pace only for non-sending checks; a timer may initiate guarded resolution of an unknown schedule under 19.2; any send remains a guarded `_send_profile_shared` run. | 19.3 |
 | Dedup (`same_effective_schedule`, fingerprint skip) | Unchanged for every run. A new trigger `resolve` (19.2) bypasses **only** the `upload_uncertain` return, only when 19.2's conditions hold, exactly as `repair` bypasses only the `unchanged` returns; it respects rejection pacing and a separate persisted recovery pacing policy; it does not bypass protection or create a permanent repair-budget lock. | 19.2 |
 | Protected active window (`continue_active_window`, `connector_evidence`, 180 s) | Rule unchanged, including the strict 180 s bound and “unknown never releases”. An ahead-of-time horizon (19.4), a resolve resend and a slow retry carry the acknowledged window to its end and never produce a 0 A gap in the wire profile. | 19.2–19.5 |
@@ -843,26 +914,14 @@ it, with the change named in the report).
   races at every await; no budget consumed by a refused run; no blind retry; wording says “not sent” only
   with proof. *Exclusions:* no resolution of an ambiguous record (19.2), no timer, no UI beyond the status
   field, no `clear_profile`.
-- [ ] **19.2 Safe ordered replacement and late-response handling ◆.** *(Research completed; implementation unstarted, 2026-11-18: local drafts 2.5.181-2.5.184 were withdrawn and code is the committed 19.1 (2.5.180). **Blocker:** a replacement needs proof that an older in-flight `SetChargingProfile` cannot apply after a newer one. Public `ocpp` `call` shows a timeout means the frame was written to the websocket and a late answer is dropped (installed `ocpp` version unconfirmed; the integration requires `>=2.1.0`), but in-order handling, closed-connection frames and stalled queues on the Morek are unobserved, so no ordering boundary is provable. An arbitrary time expiry or a Stop/Pause bypass was rejected: one trial cannot prove a universal bound, and an old write could override newer intent. Nothing was retained in code. See the handoff entry; continue protocol and dependency research; a user-directed hardware observation may inform device behavior but cannot alone prove a universal ordering bound.)* *Needs 19.1.* *Scope:* a bounded way
-  out of a truly ambiguous record, built on the single guarded path (trigger `resolve`, no second sender).
-  (a) **Ordered replacement:** when the intent is still current and no person control intervenes, a newer
-  attempt for the *same intent kind* may be sent with a strictly increasing attempt sequence and the same
-  profile id `42001` so that, **if the charger replaces by profile id** (OCPP 1.6 rule, *unverified here*),
-  the newer one supersedes whatever the older ambiguous call did. The older attempt is recorded
-  `superseded_by` the newer; it never becomes “accepted” by inference. A newer ACK and a matching effective readback are recorded as distinct evidence; when readback is unavailable or incomplete, keep verification pending and retry checking at a paced rate, without permanently blocking current-intent recovery. A differing readback after a newer ACK is the existing mismatch path, not a release. (b) **Late
-  response:** ACK/response evidence that arrives after the 30 s wait is attributed *only* by attempt id (the
-  message/unique id the library exposes; if the installed integration cannot expose it, record that
-  limit and rely on (a) only), is stored as late evidence on that attempt, may resolve that attempt if it is
-  still the newest, and can **never** overwrite, downgrade or acknowledge a newer attempt or change the
-  acknowledged record. Ordering uses an attempt sequence persisted with the record, never wall time alone.
-  (c) **Production recovery:** implement and enable the guarded path once ordering and replacement can be justified at the available boundary; document unresolved device assumptions and expose actionable degraded status when a required guarantee cannot be established. User has approved this direction; no additional product approval gate. (d) Pause hold, Charge Now and routine intents are each resolved as themselves; no resolve while a person Stop is reserved; at most one resolve in flight; persist pacing across restarts and continue slow reassessment after a burst, never `clear_profile` or a blind retry of the *same* attempt id. *Acceptance:* ambiguous + replacement ACK + matching readback → released with
-  both attempt ids and the proof recorded; ACK without matching readback → `replacement_unconfirmed`; readback
-  of the old profile only → still ambiguous; late ACK for the newest attempt → resolves it, for a superseded
-  attempt → recorded, nothing else; late response racing a newer send; restart at each step; Stop/Pause/
-  Charge Now at each await; recovery remains paced after a burst and status explains any unresolved ordering limit;
-  active window carried with no 0 A gap; wire profile asserted. *Exclusions:* no claim that replacement
-  semantics are verified, no assumption about firmware ordering, no `clear_profile`, no change to
-  15.4 repair rules (repair and resolve share no budget and never run together).
+- [x] **19.2 Safe recovery from ambiguous schedule writes ◆.** *(Implemented locally 2026-11-18, manifest 2.5.193, mocked/isolated tests only; coordinator review pending; NOT hardware-verified. Done: durable pending Resume (`pending_resume`, bound to the Pause id, deleted by any later Stop/Pause) accepted by the UI action path while the old upload is unknown; guarded `resolve` through the production worker, `CommandAdmission` (ticket re-mint after restart permitted by a durable Resume without dispatch evidence; ambiguous records admitted to the guarded run, removal-in-doubt still blocks) and the single `_send_profile_shared`: a NEW attempt on profile 42001, the old attempt kept as bounded `unknown_history`, `supersession` risk record (`late_old_frame_not_excluded`, never cleared), persisted recovery pace 2/5/15/30/60 min then a 4 h ceiling, one wake timer, restart-safe. 2.5.194 follow-up: the standing risk now has an effective-readback look after the replacement, on reconnect (existing 15.3 triggers) and ONE look at the acknowledged profile's next planned transition (+120 s, checker-owned, armed only while the risk record exists, no polling); a confirmed mismatch converges through a paced guarded reassert (persisted `supersession.reassert`, 2/5/15/30/60 min then 4 h, not the repair budget/escalation); a pre-wire abort of a resolve restores the original ambiguous attempt (`resolve_prior`), never a settled record. 2.5.195 follow-up: a definitely rejected reassert is retried (checker look at the persisted `reassert.next_at`, two confirming reads, then the same guarded paced reassert; never a blind resend); the look watch is re-derived from the durable ledger at startup, on every check request (link edges included) and after every accepted/rejected/aborted send; a look made inconclusive only by a too-near change gets one bounded follow-up (at most 3). Not done / residual: charger ordering, late old frames and replacement semantics remain unverified, the looks are mitigation not proof, the retry/follow-up timers are memory-only (re-derived from the ledger on startup/link/send events, not a durable schedule); 19.3/19.5/19.6/19.7/19.8 remainders are separate groups; the old card has wording only.)* Implement group 1 above with 19.9a. Existing
+  19.1 pre-wire proofs stay intact. Keep old outcomes unknown, send a fresh guarded current intent, maintain durable
+  intent ordering and paced reconciliation, preserve active-window continuity and Stop/Pause precedence. Explicitly
+  label unverified charger ordering as residual risk; no arbitrary expiry and no permanent lock just because proof
+  of perfect delivery ordering is unavailable. Acceptance: real admission/worker tests cover legacy unknown, ACK,
+  no ACK, differing/short readback, timeout/restart, late old responses, Pause/Stop races, plug-in and repeated
+  reconnects; assert requests are paced, unchanged healthy schedules deduplicated, wire profile continuous, no false
+  claim about old outcome or physical charging. Use the coordinator decisions above where earlier §5 text conflicts.
 - [ ] **19.3 Persistent paced automatic retries and durable, actionable observations ◆.** *(PARTIAL, implemented locally 2026-11-18, 2.5.187, mocked/isolated tests only; coordinator review pending. Done: slow persisted pace (`SLOW_RETRY_DELAYS` 30 min..4 h ceiling) after the fast delays for definite rejections of a still-current intent and for non-sending blocker re-evaluation, surviving restart (rejection pace from the durable attempt count; blocker pace and a bounded newest-wins list of 8 actionable observations in the existing outcome record key `retry_state`, debounced, written only under the schedule lock); slow re-sends are counted repeats, not log lines; persistence failure visible in status `reconciliation.recovery.persistence`; ambiguous records are never retried. **Not done:** timer-initiated guarded resolution of an unknown schedule (needs the unimplemented 19.2), so the acceptance "unknown records are resolved only through the guarded paced path" is open; observations for session-start and 19.7 blockers. Named existing-assertion changes are listed in the handoff.)* *Needs 19.1, 19.2.* Review fixes in manifest 2.5.188: guarded connector+schedule lock flush, re-arm after active/failed flush, persisted next_at kept on restart (see handoff).
   *Scope:* (a) **Retries:** extend the existing retry timers (not a second scheduler): after
   `REJECTION_RETRY_DELAYS` and after the blocker-timer cap, continue at a slow, monotonically non-decreasing,
@@ -921,24 +980,12 @@ it, with the change named in the report).
   (SOC drift, publication, equal schedule, late response during a window, retry during a window, horizon
   extension) assert actual send counts and wire profiles; all Stage 14 files pass as before. *Exclusions:*
   threshold changes, new settings, forecasts, invented inputs.
-- [ ] **19.6 Session start unknown and reboot recovery ◆.** *(PARTIAL, implemented locally 2026-11-18, 2.5.184, mocked/isolated tests only; coordinator review pending; 19.2 NOT complete and its latch untouched (19.2 governs schedule uploads, not session starts). Done: (a) pre-dispatch proof: the start attempt carries `dispatch` `pre_wire` -> `wire_intent` (durable write strictly before `start_transaction`) -> `resolved`; a `pending` record still at `pre_wire` after a crash/cancellation is released with proof (`no_wire_intent_marker`, not counted); `wire_intent`, legacy `pending` and `unknown` stay ambiguous. (b) fresh affirmative session evidence (current Charging/Suspended status, or a positive transaction id that changed after the request) resolves the record as `observed` (records only, sends nothing). (c) an ambiguous record (`wire_intent`, legacy `pending`, `unknown`) is **never superseded**: not by a new plug-in with fresh Preparing and no transaction, not by an `unplug:` token, not by a confirmed 15.5 boot token, and not by a reconnect - none of these proves the old, possibly delivered or queued start cannot still be applied, and nothing substantiates that the charger refuses a duplicate start. It stays `uncertain` with additive `readiness.session_start_recovery` (class/evidence/reason/who_acts=`person`); nothing re-evaluates toward a send. (d) the `observed` write is serialized: connector admission lock first, schedule lock inside only when idle (never a blocking wait, which would deadlock against the manual path's schedule-then-connector order; a busy lock skips and arms a bounded retrigger), record/Stop/identity/quiescing re-validated after each await. **Not done / limits:** the ambiguous-start recovery itself (superseding) remains PARTIAL/unsolved: it needs an ordering proof or user-directed hardware evidence; the boot counter remains unverified (R5); no frontend wording changed; nothing verified on a charger or installed HA.)* *Needs 19.1, 19.2.* *Seam (verify first):*
-  `MorekSessionCoordinator` (`execution/morek_session.py`): one start request per connection token, pending/
-  unknown requests that block, the 15.5 boot evidence, `note_boot`/`evaluate_boot`, accepted-without-transaction
-  display. *Scope:* give a start request whose outcome is unknown the same two-way classification as 19.1
-  (provably not dispatched vs ambiguous) and a bounded evidence-based way forward that **never** repeats the
-  same ambiguous request blindly: (a) an affirmative transaction/session observation resolves it as started
-  (observed, not inferred); (b) a **confirmed** reboot (15.5's definition: counter rise within this process plus
-  a fresh `Preparing` afterwards) ends the old token, so the unknown request belongs to a previous charger boot
-  and the existing guarded boot start may proceed under its own rules, keeping the old record as history;
-  (c) reconcile old-session outcomes against fresh transaction, connection and explicit no-session evidence, including a new plug-in, without assuming a reconnect alone proves a reboot; reevaluate persistently when evidence is unavailable and show who acts. Unknown start is never shown as “charging”,
-  “failed” or “not started”. A reconnect, link edge or point-object change alone is still not a reboot.
-  Stop/Pause/protection/identity/ownership still win; at most one start per token as today. If the installed boot counter is unavailable (unverified, §9 R5), implement and test other justified evidence paths; do not leave the old permanent latch as the default recovery.
-  *Acceptance:* unknown start + transaction appears → resolved; unknown + confirmed reboot + Preparing + no
-  session → one start under the new token, old record preserved; unknown + reconnect only → unchanged;
-  pre-dispatch-proven start → released with proof; Stop race; restart; accepted-without-transaction still not
-  repeated. *Exclusions:* no toggle of the charge-control switch, no authorization-setting change, no start
-  from unknown/stale status; any additional trigger must use fresh evidence and the existing guarded coordinator.
-- [ ] **19.7 Storage, ownership and connection blockers ◆.** *Needs 19.3, 19.6.* **PARTIAL (2026-11-18, 2.5.186, local, review pending):** only the independent parts exist — verified-reread recovery of a poisoned outcome ledger (internally serialized by one leaf lock; never reinitializes or overwrites an invalid/unreadable file, only a missing one; cancelled saves recover only when the late write is proven landed) and an upload-only link gate (`_upload_available`: switch OR live supported OCPP link) at the worker's reconcile/dispatch checks; a switch that *changes* to unavailable still suspends until it returns, **except (2.5.189, local, mocked tests only)** when the live supported OCPP link holds: the same owner/ticket/ledger-verified barrier release then runs and only the upload path resumes; if the link was down at the edge, **(2.5.191)** the wait is also re-evaluated at a paced 60 s→600 s backoff on the monitor's readings while the link stays up, so a transient refusal cannot strand the worker (a person Stop stays permanent); the existing link monitor's next live reading re-runs that guarded release once per link return (2.5.190, no switch event needed; see the handoff). The blocker table, wording/recovery tests, slow-pace retry and observations are NOT done (19.3 missing, 19.2 blocked); see the handoff. *Scope:* one test-backed
+- [ ] **19.6 Session start unknown and reboot recovery ◆ (PARTIAL).** Preserve the implemented pre-wire proof and
+  observed-session classification. Complete group 4 above. Test fresh transaction evidence, unknown across restart,
+  new plug-in and confirmed reboot with affirmative no-session evidence, missing/stale evidence, late old request,
+  pacing, Stop/Pause races, no duplicate sends on routine updates and recovery without permanent silent blocking.
+  Record the unverified duplicate/delayed-start risk and never claim an observed session proves a specific ACK.
+- [ ] **19.7 Storage, ownership and connection blockers ◆.** *Needs 19.3, 19.6.* **PARTIAL (2026-11-18, 2.5.186, local, review pending):** only the independent parts exist — verified-reread recovery of a poisoned outcome ledger (internally serialized by one leaf lock; never reinitializes or overwrites an invalid/unreadable file, only a missing one; cancelled saves recover only when the late write is proven landed) and an upload-only link gate (`_upload_available`: switch OR live supported OCPP link) at the worker's reconcile/dispatch checks; a switch that *changes* to unavailable still suspends until it returns, **except (2.5.189, local, mocked tests only)** when the live supported OCPP link holds: the same owner/ticket/ledger-verified barrier release then runs and only the upload path resumes; if the link was down at the edge, **(2.5.191)** the wait is also re-evaluated at a paced 60 s→600 s backoff on the monitor's readings while the link stays up, so a transient refusal cannot strand the worker (a person Stop stays permanent); the existing link monitor's next live reading re-runs that guarded release once per link return (2.5.190, no switch event needed; see the handoff). The blocker table and some wording/recovery tests and session observations remain incomplete; 19.3 already implements slow pacing and bounded observations for supported cases. See the handoff. *Scope:* one test-backed
   table (like 17.6's `PLANNING_HOLDS`, reusing `decision_blocker`/the recovery banner) of the blockers that
   stop or stall an automatic send for reasons *outside* planning: **storage** (a ledger/store write that
   fails or is unavailable before or after the pre-wire marker, a record that cannot be read or fails
