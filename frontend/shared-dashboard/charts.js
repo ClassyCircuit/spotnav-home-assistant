@@ -215,7 +215,8 @@ export function mountCharts(root, data, format, modes) {
   const resize = new ResizeObserver(() => { Object.values(priceCharts).forEach(chart => chart.resize()); powerChart?.resize(); });
   for (const mode of modes) resize.observe(root.querySelector(`#price-${mode}`));
   if (powerChart) resize.observe(root.querySelector('#power-chart'));
-  return { priceCharts, update(next, nextFormat) {
+  // A chart initialised or updated inside a hidden tab measured 0x0; resize() re-measures it (zoom lives in the chart's option and is kept).
+  return { priceCharts, resize() { Object.values(priceCharts).forEach(chart => chart.resize()); powerChart?.resize(); }, update(next, nextFormat) {
     const navigated=next.viewKey!==viewKey;
     ({prices,windows,tracks=null,now,deadline,horizon,cap,unit='c/kWh',viewKey}=next);
     ({time,date:sampleDate,days:sampleDays,priceGaps,stepSegments,stepPoints,snapRange,initialRange,timeTicks,tickLabel}=nextFormat);

@@ -52552,7 +52552,10 @@ ${sampleDate(h3)}` : time2(h3);
   });
   for (const mode of modes) resize.observe(root.querySelector(`#price-${mode}`));
   if (powerChart) resize.observe(root.querySelector("#power-chart"));
-  return { priceCharts, update(next, nextFormat) {
+  return { priceCharts, resize() {
+    Object.values(priceCharts).forEach((chart) => chart.resize());
+    powerChart?.resize();
+  }, update(next, nextFormat) {
     const navigated = next.viewKey !== viewKey;
     ({ prices, windows, tracks = null, now, deadline, horizon, cap, unit = "c/kWh", viewKey } = next);
     ({ time: time2, date: sampleDate, days: sampleDays, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks, tickLabel } = nextFormat);
@@ -53085,6 +53088,37 @@ function reconcile(oldNode, newNode, preserveValue = () => false) {
   return oldNode;
 }
 
+// shared-dashboard/shell.js
+var TABS = [["overview", "Overview"], ["explore", "Explore"], ["history", "History"], ["settings", "Settings"]];
+var TAB_IDS = TABS.map(([id]) => id);
+var ICONS = {
+  overview: '<path d="M3 11.5 12 4l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" fill="currentColor"/>',
+  explore: '<path d="M4 20V10h4v10zm6 0V4h4v16zm6 0v-7h4v7z" fill="currentColor"/>',
+  history: '<path d="M13 3a9 9 0 1 0 9 9h-2a7 7 0 1 1-7-7V3zm-1 5v5l4 2 .8-1.6-3.2-1.6V8z" fill="currentColor"/>',
+  settings: '<path d="M4 7h10V5h2v2h4v2h-4v2h-2V9H4zm0 8h4v-2h2v2h10v2H10v2H8v-2H4z" fill="currentColor"/>'
+};
+var tabButtonId = (id) => `sn-tab-${id}`;
+var tabPanelId = (id) => `sn-panel-${id}`;
+function renderNav(active) {
+  return `<nav class="sn-nav" aria-label="SpotNav sections"><div class="sn-tabs" role="tablist" aria-label="SpotNav sections">${TABS.map(([id, label2]) => `<button type="button" role="tab" class="sn-tab" id="${tabButtonId(id)}" data-sn-tab="${id}" aria-controls="${tabPanelId(id)}" aria-selected="${id === active}" tabindex="${id === active ? 0 : -1}"><svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20">${ICONS[id]}</svg><span>${escapeText(label2)}</span></button>`).join("")}</div></nav>`;
+}
+var tabOpen = (id, active) => `<div class="tab-panel" role="tabpanel" id="${tabPanelId(id)}" data-tab="${id}" aria-labelledby="${tabButtonId(id)}" tabindex="-1"${id === active ? "" : " hidden"}><div class="dashboard">`;
+var tabClose = "</div></div>";
+function renderRecentSummary(day, legacy) {
+  const link = '<button type="button" class="sn-link" data-open-tab="history">Open History <span aria-hidden="true">\u2192</span></button>';
+  let body;
+  if (day && day.state === "ready") {
+    const cost = day.cost && typeof day.cost.headline === "string" ? day.cost : null;
+    const count3 = Array.isArray(day.sessions) ? day.sessions.length : null;
+    body = `<p class="subtext">${escapeText(day.nav?.label || "Retained day")}${count3 === null ? "" : ` \xB7 ${count3} recorded session${count3 === 1 ? "" : "s"} overlap this day`}. Full evidence, energy bases and coverage are in History.</p>${cost ? `<div class="history-basis"><b>${escapeText(cost.headline)}</b>${(cost.lines || []).slice(0, 1).map((l6) => `<small>${escapeText(l6)}</small>`).join("")}</div>` : ""}`;
+  } else if (day && day.message) {
+    body = `<p class="history-banner" data-history-banner="${escapeText(day.state || "unavailable")}" role="status">${escapeText(day.message)}</p>`;
+  } else if (legacy && legacy.title) {
+    body = `<p class="subtext">${escapeText(legacy.title)}${legacy.subtitle ? ` \u2014 ${escapeText(legacy.subtitle)}` : ""}</p>`;
+  } else body = '<p class="subtext">Charging history is unavailable. A proposed window is not measured history.</p>';
+  return `${body}${link}`;
+}
+
 // shared-dashboard/dashboard.js
 await Promise.all([
   customElements.get("wa-button") ? null : Promise.resolve().then(() => (init_button(), button_exports)),
@@ -53101,7 +53135,9 @@ var mounted = /* @__PURE__ */ new WeakMap();
 function mountDashboard(root, adapter) {
   if (!root || !adapter || !adapter.model || !adapter.format || typeof adapter.format.time !== "function" || typeof adapter.format.day !== "function") throw new TypeError("A root, model and explicit time/day formatters are required");
   mounted.get(root)?.dispose();
-  let disposed = false, chartMount, listeners, pendingUpdate;
+  let disposed = false, chartMount, listeners, pendingUpdate, layoutObserver;
+  let activeTab = "overview";
+  const tabScroll = /* @__PURE__ */ new Map();
   const bound = /* @__PURE__ */ new WeakSet();
   const drafts = /* @__PURE__ */ new Map();
   let current = adapter;
@@ -53113,6 +53149,62 @@ function mountDashboard(root, adapter) {
     const dialog = root.querySelector("#plan-dialog");
     if (dialog?.open) dialog.close();
     root.replaceChildren();
+  }
+  function scroller() {
+    let n6 = root.parentNode;
+    while (n6) {
+      const el = n6.nodeType === 11 ? n6.host : n6;
+      if (el?.nodeType === 1) {
+        const o9 = root.ownerDocument.defaultView?.getComputedStyle?.(el)?.overflowY;
+        if ((o9 === "auto" || o9 === "scroll") && el.scrollHeight > el.clientHeight) return el;
+      }
+      n6 = n6.nodeType === 11 ? n6.host : n6.parentNode;
+    }
+    return null;
+  }
+  const scrollTop = () => {
+    const el = scroller();
+    return el ? el.scrollTop : root.ownerDocument.defaultView?.scrollY || 0;
+  };
+  const scrollSet = (top) => {
+    const el = scroller();
+    if (el) el.scrollTop = top;
+    else root.ownerDocument.defaultView?.scrollTo?.(0, top);
+  };
+  function paintTabs() {
+    for (const id of TAB_IDS) {
+      const button = root.querySelector("#sn-tab-" + id), panel = root.querySelector("#sn-panel-" + id), on = id === activeTab;
+      if (button) {
+        button.setAttribute("aria-selected", String(on));
+        button.tabIndex = on ? 0 : -1;
+      }
+      if (panel) panel.hidden = !on;
+    }
+  }
+  function showTab(name, { focus = false, restore = true } = {}) {
+    if (disposed || !TAB_IDS.includes(name)) return false;
+    if (name !== activeTab) {
+      tabScroll.set(activeTab, scrollTop());
+      activeTab = name;
+      paintTabs();
+      chartMount?.resize();
+      if (restore) scrollSet(tabScroll.get(name) || 0);
+      current.actions?.tabChange?.(name);
+    }
+    if (focus) root.querySelector("#sn-tab-" + name)?.focus();
+    return true;
+  }
+  function reveal(el) {
+    if (!el) return false;
+    const id = el.closest?.(".tab-panel")?.dataset.tab;
+    if (id) showTab(id, { restore: false });
+    el.scrollIntoView?.({ block: "start" });
+    return true;
+  }
+  function measureLayout() {
+    const width = root.getBoundingClientRect?.().width || 0;
+    const layout2 = width > 0 && width < 760 ? "compact" : "wide";
+    if (root.dataset.snLayout !== layout2) root.dataset.snLayout = layout2;
   }
   function render2() {
     const { model: m4, format: f3, actions: actions2 = {} } = current;
@@ -53154,20 +53246,24 @@ function mountDashboard(root, adapter) {
     const modeFields = m4.settingsEditor ? `<label>Charge by <select data-setting="driver" ${m4.canSave ? "" : "disabled"}><option value="manual_kwh" ${settings.driver === "manual_kwh" ? "selected" : ""}>Requested energy (kWh)</option><option value="target_soc" ${settings.driver === "target_soc" ? "selected" : ""}>Target SOC (%)</option></select></label><span data-mode="manual_kwh"><wa-input data-setting="energy" label="Requested energy (kWh)" type="number" step="any" value="${escapeText(value(settings.energy))}" ${m4.canSave ? "" : "disabled"}></wa-input></span><label data-mode="target_soc">Planning vehicle <select data-setting="vehicleId" ${m4.canSave ? "" : "disabled"}><option value="" ${!savedVehicle ? "selected" : ""}>No saved vehicle</option>${savedVehicle && !vehicles.some((v2) => v2.id === savedVehicle) ? `<option value="${escapeText(savedVehicle)}" selected>Saved vehicle unavailable${savedVehicle === "guest" ? " (guest)" : ""}</option>` : ""}${vehicleOptions}</select></label>` : "";
     const policyFields = m4.settingsEditor ? `<label><input type="checkbox" data-setting="capEnabled" ${settings.capEnabled ? "checked" : ""} ${m4.canSave && m4.policySupported ? "" : "disabled"}> Enable soft cap</label><label>Cap price basis <select data-setting="capBasis" ${m4.canSave && m4.policySupported ? "" : "disabled"}><option value="">Not set (suggested: Nord Pool)</option><option value="nord_pool" ${settings.capBasis === "nord_pool" ? "selected" : ""}>Nord Pool</option><option value="configured_variable_cost" ${settings.capBasis === "configured_variable_cost" ? "selected" : ""}>Configured variable cost</option></select></label><label><input type="checkbox" data-setting="deadlineEnabled" ${settings.deadlineEnabled ? "checked" : ""} ${m4.canSave ? "" : "disabled"}> Enable ready-by</label>` : "";
     const policyHelp = m4.settingsEditor ? `<div class="settings-help"><p>${m4.proposedPlanDefaults ? "Proposed defaults, not saved" : "Saved Charge by"}: ${settings.driver === "target_soc" ? "target SOC" : "requested energy"}. ${m4.proposedPlanDefaults ? "Proposed target" : "Saved target"}: ${escapeText(settings.target == null ? "not set \u2014 enter a target for SOC planning" : `${settings.target}%`)}. Minimum ready-by SOC: ${escapeText(settings.minimum == null ? "not set (optional)" : `${settings.minimum}%`)}.</p><p data-mode="target_soc">${escapeText(m4.vehicleHelp || "")}</p><p>Soft cap: ${settings.capEnabled ? `enabled, ${escapeText(priceText(Number(settings.cap)))} ${escapeText(capUnit)}` : "off (no saved cap)"}. Enter a cap and choose its basis to enable it. The cap basis defines which price is compared; it does not select the price provider.</p><p>${m4.proposedPlanDefaults ? "Proposed ready-by" : "Ready-by"}: ${settings.deadlineEnabled ? `enabled at ${escapeText(settings.readyBy)}` : `off (saved time ${escapeText(settings.readyBy)})`}. ${settings.reserve !== void 0 ? `Extra time reserve: ${escapeText(settings.reserve)}% of the charging time, at most 2 h. ` : ""}Changes are saved only when you choose Save plan.</p></div>` : "";
-    const html = `<div class="shell"><header class="masthead"><div><div class="brand">SPOTNAV <span>ENHANCED</span></div><h1>Charging, in focus.</h1><p>A single view of your vehicle, plan and charger.</p></div>${labels.banner ? `<div class="sample-banner">${escapeText(labels.banner)}<br><span>${escapeText(labels.bannerDetail)}</span></div>` : ""}</header>
+    const html = `<div class="shell"><header class="sn-header"><div class="sn-brand"><h1>SPOTNAV <span>ENHANCED</span></h1><p>Vehicle, plan and charger</p></div>${renderNav(activeTab)}${labels.banner ? `<div class="sample-banner">${escapeText(labels.banner)}<br><span>${escapeText(labels.bannerDetail)}</span></div>` : ""}</header>
       ${scenario ? `<div class="scenario-picker"><label for="sample-state">${escapeText(scenario.label)}</label><select id="sample-state">${(scenario.options || []).map(option).join("")}</select><span>${escapeText(scenario.note)}</span></div>` : ""}
-      <div id="critical-live" role="status" aria-live="polite">${m4.warning ? `<div class="alert"><div><strong>${escapeText(m4.warning.title)}</strong><p>${escapeText(m4.warning.detail)}</p></div><a href="#details">View details \u2193</a></div>` : ""}</div><div class="dashboard">
+      <div id="critical-live" role="status" aria-live="polite">${m4.warning ? `<div class="alert"><div><strong>${escapeText(m4.warning.title)}</strong><p>${escapeText(m4.warning.detail)}</p></div><a href="#details">View details \u2193</a></div>` : ""}</div>${tabOpen("overview", activeTab)}
       ${card("Your vehicle", "OVERVIEW", `<div class="status-line"><span class="dot ${!Number.isFinite(state.soc) || state.soc < 0 || state.soc > 100 || state.stale ? "dot-unknown" : ""}"></span> ${escapeText(state.status)}</div>${renderBattery({ soc: state.soc, target: settings.target, minimum: settings.minimum, deadline: settings.readyBy, capacityKwh: assumptions.capacityKwh, efficiency: assumptions.efficiency, stale: !!state.stale, planStale: !!(state.planStale ?? state.stale), lowSocWarning: state.lowSocWarning, windows, sample, minutesPerTimeUnit: f3.minutesPerTimeUnit, socDetail: state.socDetail, socEstimated: state.socEstimated })}<p class="waiting">${escapeText(state.detail)}</p><div class="metrics">${metric("Measured now", state.power, labels.powerNote)}<div class="metric next-metric"><div class="muted">${state.planStale ?? state.stale ? "Next window \xB7 stale proposal" : "Next proposed window"}</div><button type="button" id="open-plan" aria-haspopup="dialog">${next ? `${escapeText(time2(next.start))}\u2013${escapeText(time2(next.end))}` : "Unknown"} <span aria-hidden="true">\u2197</span></button><div class="muted">${escapeText(next ? day(next.start) : "Unknown")} \xB7 view complete plan</div></div>${metric(state.planStale ?? state.stale ? "Last plan cost \xB7 stale" : "Estimated charge cost", money(summary.cost, f3.currency), `${number(summary.energy, 2, " kWh", (n6) => n6 >= 0)} wall energy`)}${metric("Until deadline", m4.untilDeadline, labels.deadlineNote)}</div><div class="hint"><b>${escapeText(labels.planLabel)}</b> ${escapeText(state.policy)} ${escapeText(m4.targetNote)}</div>`, "overview", tag)}
-      ${card("Plan controls", labels.settingsEyebrow || "SETTINGS", `<p class="subtext">${escapeText(labels.settingsNote)}</p><div class="fields">${modeFields}${fields}${policyFields}</div>${policyHelp}<p id="settings-notice" role="status">${escapeText(m4.settingsNotice || "")}</p><wa-button id="save-plan" variant="brand" ${typeof actions2.save !== "function" || m4.canSave !== true ? "disabled" : ""}>${escapeText(labels.saveLabel || "Save plan \xB7 unavailable")}</wa-button>${m4.settingsEditor ? '<button type="button" id="reload-settings">Reload settings</button>' : ""}<div class="controls-plan">${plan}<button type="button" id="open-plan-details" aria-haspopup="dialog">View full window details \u2197</button></div>`, "controls", tag)}
-      ${card("Price insights", labels.insightEyebrow || "PRICE DATA", renderInsights(m4.insights), "insights", tag)}
       ${modes.map(priceCard).join("")}
-      ${card("Plan activity & freshness", labels.evidenceEyebrow || "EVIDENCE", renderEvidence(m4.evidence, state.power, knownPlan ? windows.length : null), "morek", tag)}
+      ${card("Recent charging \xB7 summary", "OVERVIEW", renderRecentSummary(m4.historyDay, m4.history), "recent", tag)}
+      ${tabClose}${tabOpen("explore", activeTab)}
+      ${card("Price insights", labels.insightEyebrow || "PRICE DATA", renderInsights(m4.insights), "insights", tag)}
+      ${tabClose}${tabOpen("history", activeTab)}
       ${card("Recent charging", labels.historyEyebrow || "HISTORY", renderHistory(m4.history, historyReady, m4.historyDay), "history", tag)}
+      ${tabClose}${tabOpen("settings", activeTab)}
+      ${card("Plan controls", labels.settingsEyebrow || "SETTINGS", `<p class="subtext">${escapeText(labels.settingsNote)}</p><div class="fields">${modeFields}${fields}${policyFields}</div>${policyHelp}<p id="settings-notice" role="status">${escapeText(m4.settingsNotice || "")}</p><wa-button id="save-plan" variant="brand" ${typeof actions2.save !== "function" || m4.canSave !== true ? "disabled" : ""}>${escapeText(labels.saveLabel || "Save plan \xB7 unavailable")}</wa-button>${m4.settingsEditor ? '<button type="button" id="reload-settings">Reload settings</button>' : ""}<div class="controls-plan">${plan}<button type="button" id="open-plan-details" aria-haspopup="dialog">View full window details \u2197</button></div>`, "controls", tag)}
+      ${card("Plan activity & freshness", labels.evidenceEyebrow || "EVIDENCE", renderEvidence(m4.evidence, state.power, knownPlan ? windows.length : null), "morek", tag)}
       ${m4.vehicleSources ? card("Vehicle sources & properties", "ADVANCED", renderVehicleSources(m4.vehicleSources), "vehicle-sources", tag) : ""}
       ${m4.marketCosts ? card("Market & charging costs", "ADVANCED", renderMarketCosts(m4.marketCosts), "market-costs", tag) : ""}
       ${m4.planParams ? card("Plan & charger parameters", "ADVANCED", renderPlanParams(m4.planParams), "plan-params", tag) : ""}
       ${m4.notifySetup ? card("Notifications & setup check", "ADVANCED", renderNotifySetup(m4.notifySetup), "notify-setup", tag) : ""}
-      </div><dialog id="plan-dialog" aria-labelledby="dialog-title"><div class="dialog-head"><div><div class="eyebrow">${escapeText(labels.dialogEyebrow || "PROPOSAL")}</div><h2 id="dialog-title">Proposed charging plan</h2></div><button id="close-plan" type="button" aria-label="Close proposed plan">\u2715</button></div><p class="subtext">${escapeText(labels.dialogNote)}</p><div role="status" aria-live="polite">${m4.warning ? `<strong>${escapeText(m4.warning.title)}</strong><p>${escapeText(m4.warning.detail)}</p>` : ""}${m4.evidence?.status ? `<p>${escapeText(m4.evidence.status)}</p>` : ""}</div>${plan}</dialog><footer>${escapeText(labels.footer)}</footer></div>`;
+      ${tabClose}<dialog id="plan-dialog" aria-labelledby="dialog-title"><div class="dialog-head"><div><div class="eyebrow">${escapeText(labels.dialogEyebrow || "PROPOSAL")}</div><h2 id="dialog-title">Proposed charging plan</h2></div><button id="close-plan" type="button" aria-label="Close proposed plan">\u2715</button></div><p class="subtext">${escapeText(labels.dialogNote)}</p><div role="status" aria-live="polite">${m4.warning ? `<strong>${escapeText(m4.warning.title)}</strong><p>${escapeText(m4.warning.detail)}</p>` : ""}${m4.evidence?.status ? `<p>${escapeText(m4.evidence.status)}</p>` : ""}</div>${plan}</dialog><footer>${escapeText(labels.footer)}</footer></div>`;
     const template = document.createElement("template");
     template.innerHTML = html;
     if (!root.firstChild) root.append(template.content);
@@ -53213,6 +53309,7 @@ function mountDashboard(root, adapter) {
     root.querySelectorAll("[data-history-nav]").forEach((button) => bind3(button, () => button.addEventListener("click", () => {
       if (button.hasAttribute("disabled")) return;
       current.actions?.historyNav?.(button.dataset.historyNav);
+      if (button.dataset.historyNav === "prices") reveal(root.querySelector("section.prices"));
     }, { signal })));
     root.querySelectorAll("[data-history-date]").forEach((input) => bind3(input, () => input.addEventListener("change", () => {
       if (input.value) current.actions?.historyNav?.("day", input.value);
@@ -53227,10 +53324,30 @@ function mountDashboard(root, adapter) {
     root.querySelectorAll("[data-insight-compare]").forEach((select) => bind3(select, () => select.addEventListener("change", () => current.actions?.insightNav?.("compare", select.value), { signal })));
     root.querySelectorAll("[data-insight-compare-previous]").forEach((button) => bind3(button, () => button.addEventListener("click", () => current.actions?.insightNav?.("compare", "previous"), { signal })));
     root.querySelectorAll("[data-insight-retry]").forEach((button) => bind3(button, () => button.addEventListener("click", () => current.actions?.insightNav?.("retry"), { signal })));
+    root.querySelectorAll("[data-sn-tab]").forEach((button) => bind3(button, () => {
+      button.addEventListener("click", () => showTab(button.dataset.snTab), { signal });
+      button.addEventListener("keydown", (event) => {
+        const at = TAB_IDS.indexOf(button.dataset.snTab);
+        const to = { ArrowRight: (at + 1) % TAB_IDS.length, ArrowLeft: (at + TAB_IDS.length - 1) % TAB_IDS.length, Home: 0, End: TAB_IDS.length - 1 }[event.key];
+        if (to === void 0) return;
+        event.preventDefault();
+        showTab(TAB_IDS[to], { focus: true });
+      }, { signal });
+    }));
+    root.querySelectorAll("[data-open-tab]").forEach((button) => bind3(button, () => button.addEventListener("click", () => showTab(button.dataset.openTab), { signal })));
+    measureLayout();
+    if (!layoutObserver && typeof ResizeObserver === "function") {
+      layoutObserver = new ResizeObserver(measureLayout);
+      layoutObserver.observe(root);
+    }
     const detailsLink = root.querySelector('a[href="#details"]');
     bind3(detailsLink, () => detailsLink.addEventListener("click", (event) => {
       event.preventDefault();
-      root.querySelector("#details").open = true;
+      const d3 = root.querySelector("#details");
+      if (d3) {
+        reveal(d3);
+        d3.open = true;
+      }
     }, { signal }));
     const scenarioInput = root.querySelector("#sample-state");
     bind3(scenarioInput, () => scenarioInput.addEventListener("change", (event) => current.actions?.selectScenario?.(event.target.value), { signal }));
@@ -53400,7 +53517,7 @@ function mountDashboard(root, adapter) {
       if (!target) return;
       const d3 = target.querySelector("details");
       if (d3) d3.open = true;
-      target.scrollIntoView?.({ block: "start" });
+      reveal(target);
     }, { signal })));
     const saveButton = root.querySelector("#save-plan");
     bind3(saveButton, () => saveButton.addEventListener("click", () => {
@@ -53453,9 +53570,15 @@ function mountDashboard(root, adapter) {
     for (const key3 of [...drafts.keys()]) if (key3.startsWith("m:") && !(keepArea && key3 === "m:area")) drafts.delete(key3);
   }, get charts() {
     return chartMount?.priceCharts || {};
+  }, get activeTab() {
+    return activeTab;
+  }, showTab(name) {
+    return showTab(name);
   }, dispose() {
     if (!disposed) {
       disposed = true;
+      layoutObserver?.disconnect();
+      layoutObserver = null;
       drafts.clear();
       cleanup();
       if (mounted.get(root) === instance) mounted.delete(root);
@@ -65864,7 +65987,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.199";
+var CARD_VERSION = "2.5.200";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {
@@ -66019,7 +66142,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
   connectedCallback() {
     this.connected = true;
     this.classList.add("wa-dark");
-    this.shadowRoot.innerHTML = `<link rel="stylesheet" href="/spotnav-sidebar/panel.css?v=${CARD_VERSION}"><style>:host{display:block;min-height:100%;padding-bottom:env(safe-area-inset-bottom)}.hostbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top));background:#11151d;color:white}.hostbar label{flex:1 1 180px}.hostbar select{max-width:100%}.hostbar button,.hostbar select{font:inherit;padding:8px}.message{padding:16px;color:white;background:#11151d}</style><div class="hostbar"><button id="menu" aria-label="Open navigation">\u2630</button><strong>SpotNav Enhanced</strong><label>Charger <select id="charger"><option value="">Select charger</option></select></label><button id="refresh">Refresh observations</button><div id="automatic-controls"><span id="pause-state">Auto state unknown.</span> <button id="pause-auto" disabled>Pause Auto until resumed</button> <button id="resume-auto" disabled>Resume Auto</button><span id="pause-notice" role="status"></span></div><section id="charge-controls" aria-label="Charge Now"><details id="charge-options"><summary>Duration / change end</summary><div class="cn-fields"><label>Duration <select id="charge-duration"><option value="30">30 minutes</option><option value="60" selected>1 hour</option><option value="120">2 hours</option><option value="180">3 hours</option><option value="custom">Custom end time</option></select></label><label id="custom-label" hidden>End time <input id="charge-end" type="datetime-local"></label><button id="charge-replace" type="button" hidden>Replace Charge Now end</button></div></details><div class="cn-actions"><button id="charge-now" disabled>Charge Now</button></div><span id="charge-state" role="status">Charge Now status unavailable.</span><span id="charge-notice" role="status"></span></section></div><section id="charge-session" hidden></section><section id="schedule-check" hidden></section><div id="recovery-banner" role="alert" hidden></div><div class="message" role="status">Select a charger.</div><main></main>`;
+    this.shadowRoot.innerHTML = `<link rel="stylesheet" href="/spotnav-sidebar/panel.css?v=${CARD_VERSION}"><style>:host{display:block;min-height:100%;padding-bottom:env(safe-area-inset-bottom);background:var(--sn-bg,#11151d)}.hostbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top));background:var(--sn-surface,#11151d);border-bottom:1px solid var(--sn-line,#25395a);color:white}.hostbar label{flex:1 1 180px}.hostbar select{max-width:100%}.hostbar button,.hostbar select{font:inherit;padding:8px}.message{padding:16px;color:white;background:var(--sn-bg,#11151d)}main[data-sn-layout="compact"]~*:last-child{margin-bottom:calc(var(--sn-nav-h,64px) + env(safe-area-inset-bottom,0px))}</style><div class="hostbar"><button id="menu" aria-label="Open navigation">\u2630</button><strong>SpotNav Enhanced</strong><label>Charger <select id="charger"><option value="">Select charger</option></select></label><button id="refresh">Refresh observations</button><div id="automatic-controls"><span id="pause-state">Auto state unknown.</span> <button id="pause-auto" disabled>Pause Auto until resumed</button> <button id="resume-auto" disabled>Resume Auto</button><span id="pause-notice" role="status"></span></div><section id="charge-controls" aria-label="Charge Now"><details id="charge-options"><summary>Duration / change end</summary><div class="cn-fields"><label>Duration <select id="charge-duration"><option value="30">30 minutes</option><option value="60" selected>1 hour</option><option value="120">2 hours</option><option value="180">3 hours</option><option value="custom">Custom end time</option></select></label><label id="custom-label" hidden>End time <input id="charge-end" type="datetime-local"></label><button id="charge-replace" type="button" hidden>Replace Charge Now end</button></div></details><div class="cn-actions"><button id="charge-now" disabled>Charge Now</button></div><span id="charge-state" role="status">Charge Now status unavailable.</span><span id="charge-notice" role="status"></span></section></div><section id="charge-session" hidden></section><section id="schedule-check" hidden></section><div id="recovery-banner" role="alert" hidden></div><div class="message" role="status">Select a charger.</div><main></main>`;
     const hostStyle = document.createElement("style");
     hostStyle.textContent = ".hostbar label{color:#f0f3f8}.hostbar select,.hostbar input{color:#f0f3f8;background:#202b39;border:1px solid #8191a4;border-radius:8px;min-height:42px} #automatic-controls{display:flex;flex-wrap:wrap;gap:6px;min-width:0;max-width:100%} #automatic-controls button,#charge-controls button{max-width:100%;white-space:normal}";
     this.shadowRoot.append(hostStyle);

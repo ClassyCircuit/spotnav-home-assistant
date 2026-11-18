@@ -25,6 +25,7 @@ import { escapeText as e } from './text.js';
 import { reconcile } from './reconcile.js';
 import { priceText, priceUnit } from './price-format.js';
 import { PRICE_BANDS, bandsApply } from './price-bands.js';
+import { TAB_IDS, renderNav, tabOpen, tabClose, renderRecentSummary } from './shell.js';
 
 const card = (title, eyebrow, body, cls, tag) => `<section class="panel ${cls}"><header class="panel-head"><div><div class="eyebrow">${e(eyebrow)}</div><h2>${e(title)}</h2></div>${tag ? `<span class="sample-tag">${e(tag)}</span>` : ''}</header>${body}</section>`;
 const metric = (label, value, note) => `<div class="metric"><div class="muted">${e(label)}</div><strong>${e(value)}</strong><div class="muted">${e(note)}</div></div>`;
@@ -36,7 +37,10 @@ const mounted = new WeakMap();
 export function mountDashboard(root, adapter) {
   if (!root || !adapter || !adapter.model || !adapter.format || typeof adapter.format.time !== 'function' || typeof adapter.format.day !== 'function') throw new TypeError('A root, model and explicit time/day formatters are required');
   mounted.get(root)?.dispose();
-  let disposed = false, chartMount, listeners, pendingUpdate;
+  let disposed = false, chartMount, listeners, pendingUpdate, layoutObserver;
+  // 20.1: which tab is shown is local view state. All four panels stay mounted (hidden), so drafts, focus targets, dialogs, chart zoom and pending actions are untouched by a tab change.
+  let activeTab = 'overview';
+  const tabScroll = new Map();
   const bound = new WeakSet();
   // Only values actually edited by the user are retained across observations.
   // A host must change draftKey when the charger or canonical revision changes.
@@ -50,6 +54,52 @@ export function mountDashboard(root, adapter) {
     const dialog = root.querySelector('#plan-dialog');
     if (dialog?.open) dialog.close();
     root.replaceChildren();
+  }
+  // Scrolling: the HA panel scrolls inside the host, the preview scrolls the window; restore whichever applies per tab.
+  function scroller() {
+    let n = root.parentNode;
+    while (n) {
+      const el = n.nodeType === 11 ? n.host : n;
+      if (el?.nodeType === 1) { const o = root.ownerDocument.defaultView?.getComputedStyle?.(el)?.overflowY; if ((o === 'auto' || o === 'scroll') && el.scrollHeight > el.clientHeight) return el; }
+      n = n.nodeType === 11 ? n.host : n.parentNode;
+    }
+    return null;
+  }
+  const scrollTop = () => { const el = scroller(); return el ? el.scrollTop : (root.ownerDocument.defaultView?.scrollY || 0); };
+  const scrollSet = top => { const el = scroller(); if (el) el.scrollTop = top; else root.ownerDocument.defaultView?.scrollTo?.(0, top); };
+  function paintTabs() {
+    for (const id of TAB_IDS) {
+      const button = root.querySelector('#sn-tab-' + id), panel = root.querySelector('#sn-panel-' + id), on = id === activeTab;
+      if (button) { button.setAttribute('aria-selected', String(on)); button.tabIndex = on ? 0 : -1; }
+      if (panel) panel.hidden = !on;
+    }
+  }
+  /** Show one tab. Writes nothing and requests nothing from the host (it may only be told which tab is shown). */
+  function showTab(name, { focus = false, restore = true } = {}) {
+    if (disposed || !TAB_IDS.includes(name)) return false;
+    if (name !== activeTab) {
+      tabScroll.set(activeTab, scrollTop());
+      activeTab = name;
+      paintTabs();
+      chartMount?.resize(); // charts built or refreshed while hidden have no size until their tab is shown
+      if (restore) scrollSet(tabScroll.get(name) || 0);
+      current.actions?.tabChange?.(name);
+    }
+    if (focus) root.querySelector('#sn-tab-' + name)?.focus();
+    return true;
+  }
+  /** Make an element reachable from any tab (switching to its tab first), then scroll to it. */
+  function reveal(el) {
+    if (!el) return false;
+    const id = el.closest?.('.tab-panel')?.dataset.tab;
+    if (id) showTab(id, { restore: false });
+    el.scrollIntoView?.({ block: 'start' });
+    return true;
+  }
+  function measureLayout() {
+    const width = root.getBoundingClientRect?.().width || 0;
+    const layout = width > 0 && width < 760 ? 'compact' : 'wide';
+    if (root.dataset.snLayout !== layout) root.dataset.snLayout = layout;
   }
   function render() {
     const { model: m, format: f, actions = {} } = current;
@@ -92,20 +142,24 @@ export function mountDashboard(root, adapter) {
     const modeFields=m.settingsEditor ? `<label>Charge by <select data-setting="driver" ${m.canSave?'':'disabled'}><option value="manual_kwh" ${settings.driver==='manual_kwh'?'selected':''}>Requested energy (kWh)</option><option value="target_soc" ${settings.driver==='target_soc'?'selected':''}>Target SOC (%)</option></select></label><span data-mode="manual_kwh"><wa-input data-setting="energy" label="Requested energy (kWh)" type="number" step="any" value="${e(value(settings.energy))}" ${m.canSave?'':'disabled'}></wa-input></span><label data-mode="target_soc">Planning vehicle <select data-setting="vehicleId" ${m.canSave?'':'disabled'}><option value="" ${!savedVehicle?'selected':''}>No saved vehicle</option>${savedVehicle && !vehicles.some(v=>v.id===savedVehicle) ? `<option value="${e(savedVehicle)}" selected>Saved vehicle unavailable${savedVehicle==='guest'?' (guest)':''}</option>` : ''}${vehicleOptions}</select></label>` : '';
     const policyFields = m.settingsEditor ? `<label><input type="checkbox" data-setting="capEnabled" ${settings.capEnabled ? 'checked' : ''} ${m.canSave && m.policySupported ? '' : 'disabled'}> Enable soft cap</label><label>Cap price basis <select data-setting="capBasis" ${m.canSave && m.policySupported ? '' : 'disabled'}><option value="">Not set (suggested: Nord Pool)</option><option value="nord_pool" ${settings.capBasis === 'nord_pool' ? 'selected' : ''}>Nord Pool</option><option value="configured_variable_cost" ${settings.capBasis === 'configured_variable_cost' ? 'selected' : ''}>Configured variable cost</option></select></label><label><input type="checkbox" data-setting="deadlineEnabled" ${settings.deadlineEnabled ? 'checked' : ''} ${m.canSave ? '' : 'disabled'}> Enable ready-by</label>` : '';
     const policyHelp = m.settingsEditor ? `<div class="settings-help"><p>${m.proposedPlanDefaults ? 'Proposed defaults, not saved' : 'Saved Charge by'}: ${settings.driver==='target_soc'?'target SOC':'requested energy'}. ${m.proposedPlanDefaults ? 'Proposed target' : 'Saved target'}: ${e(settings.target == null ? 'not set — enter a target for SOC planning' : `${settings.target}%`)}. Minimum ready-by SOC: ${e(settings.minimum == null ? 'not set (optional)' : `${settings.minimum}%`)}.</p><p data-mode="target_soc">${e(m.vehicleHelp || '')}</p><p>Soft cap: ${settings.capEnabled ? `enabled, ${e(priceText(Number(settings.cap)))} ${e(capUnit)}` : 'off (no saved cap)'}. Enter a cap and choose its basis to enable it. The cap basis defines which price is compared; it does not select the price provider.</p><p>${m.proposedPlanDefaults ? 'Proposed ready-by' : 'Ready-by'}: ${settings.deadlineEnabled ? `enabled at ${e(settings.readyBy)}` : `off (saved time ${e(settings.readyBy)})`}. ${settings.reserve!==undefined ? `Extra time reserve: ${e(settings.reserve)}% of the charging time, at most 2 h. ` : ''}Changes are saved only when you choose Save plan.</p></div>` : '';
-    const html = `<div class="shell"><header class="masthead"><div><div class="brand">SPOTNAV <span>ENHANCED</span></div><h1>Charging, in focus.</h1><p>A single view of your vehicle, plan and charger.</p></div>${labels.banner ? `<div class="sample-banner">${e(labels.banner)}<br><span>${e(labels.bannerDetail)}</span></div>` : ''}</header>
+    const html = `<div class="shell"><header class="sn-header"><div class="sn-brand"><h1>SPOTNAV <span>ENHANCED</span></h1><p>Vehicle, plan and charger</p></div>${renderNav(activeTab)}${labels.banner ? `<div class="sample-banner">${e(labels.banner)}<br><span>${e(labels.bannerDetail)}</span></div>` : ''}</header>
       ${scenario ? `<div class="scenario-picker"><label for="sample-state">${e(scenario.label)}</label><select id="sample-state">${(scenario.options || []).map(option).join('')}</select><span>${e(scenario.note)}</span></div>` : ''}
-      <div id="critical-live" role="status" aria-live="polite">${m.warning ? `<div class="alert"><div><strong>${e(m.warning.title)}</strong><p>${e(m.warning.detail)}</p></div><a href="#details">View details ↓</a></div>` : ''}</div><div class="dashboard">
+      <div id="critical-live" role="status" aria-live="polite">${m.warning ? `<div class="alert"><div><strong>${e(m.warning.title)}</strong><p>${e(m.warning.detail)}</p></div><a href="#details">View details ↓</a></div>` : ''}</div>${tabOpen('overview',activeTab)}
       ${card('Your vehicle','OVERVIEW',`<div class="status-line"><span class="dot ${!Number.isFinite(state.soc) || state.soc < 0 || state.soc > 100 || state.stale ? 'dot-unknown' : ''}"></span> ${e(state.status)}</div>${renderBattery({soc:state.soc,target:settings.target,minimum:settings.minimum,deadline:settings.readyBy,capacityKwh:assumptions.capacityKwh,efficiency:assumptions.efficiency,stale:!!state.stale,planStale:!!(state.planStale ?? state.stale),lowSocWarning:state.lowSocWarning,windows,sample,minutesPerTimeUnit:f.minutesPerTimeUnit,socDetail:state.socDetail,socEstimated:state.socEstimated})}<p class="waiting">${e(state.detail)}</p><div class="metrics">${metric('Measured now',state.power,labels.powerNote)}<div class="metric next-metric"><div class="muted">${(state.planStale ?? state.stale) ? 'Next window · stale proposal' : 'Next proposed window'}</div><button type="button" id="open-plan" aria-haspopup="dialog">${next ? `${e(time(next.start))}–${e(time(next.end))}` : 'Unknown'} <span aria-hidden="true">↗</span></button><div class="muted">${e(next ? day(next.start) : 'Unknown')} · view complete plan</div></div>${metric((state.planStale ?? state.stale) ? 'Last plan cost · stale' : 'Estimated charge cost',money(summary.cost, f.currency),`${number(summary.energy,2,' kWh',n=>n>=0)} wall energy`)}${metric('Until deadline',m.untilDeadline,labels.deadlineNote)}</div><div class="hint"><b>${e(labels.planLabel)}</b> ${e(state.policy)} ${e(m.targetNote)}</div>`, 'overview',tag)}
-      ${card('Plan controls',labels.settingsEyebrow || 'SETTINGS',`<p class="subtext">${e(labels.settingsNote)}</p><div class="fields">${modeFields}${fields}${policyFields}</div>${policyHelp}<p id="settings-notice" role="status">${e(m.settingsNotice || '')}</p><wa-button id="save-plan" variant="brand" ${typeof actions.save !== 'function' || m.canSave !== true ? 'disabled' : ''}>${e(labels.saveLabel || 'Save plan · unavailable')}</wa-button>${m.settingsEditor ? '<button type="button" id="reload-settings">Reload settings</button>' : ''}<div class="controls-plan">${plan}<button type="button" id="open-plan-details" aria-haspopup="dialog">View full window details ↗</button></div>`, 'controls',tag)}
-      ${card('Price insights',labels.insightEyebrow || 'PRICE DATA',renderInsights(m.insights),'insights',tag)}
       ${modes.map(priceCard).join('')}
-      ${card('Plan activity & freshness',labels.evidenceEyebrow || 'EVIDENCE',renderEvidence(m.evidence,state.power,knownPlan ? windows.length : null),'morek',tag)}
+      ${card('Recent charging · summary','OVERVIEW',renderRecentSummary(m.historyDay,m.history),'recent',tag)}
+      ${tabClose}${tabOpen('explore',activeTab)}
+      ${card('Price insights',labels.insightEyebrow || 'PRICE DATA',renderInsights(m.insights),'insights',tag)}
+      ${tabClose}${tabOpen('history',activeTab)}
       ${card('Recent charging',labels.historyEyebrow || 'HISTORY',renderHistory(m.history,historyReady,m.historyDay),'history',tag)}
+      ${tabClose}${tabOpen('settings',activeTab)}
+      ${card('Plan controls',labels.settingsEyebrow || 'SETTINGS',`<p class="subtext">${e(labels.settingsNote)}</p><div class="fields">${modeFields}${fields}${policyFields}</div>${policyHelp}<p id="settings-notice" role="status">${e(m.settingsNotice || '')}</p><wa-button id="save-plan" variant="brand" ${typeof actions.save !== 'function' || m.canSave !== true ? 'disabled' : ''}>${e(labels.saveLabel || 'Save plan · unavailable')}</wa-button>${m.settingsEditor ? '<button type="button" id="reload-settings">Reload settings</button>' : ''}<div class="controls-plan">${plan}<button type="button" id="open-plan-details" aria-haspopup="dialog">View full window details ↗</button></div>`, 'controls',tag)}
+      ${card('Plan activity & freshness',labels.evidenceEyebrow || 'EVIDENCE',renderEvidence(m.evidence,state.power,knownPlan ? windows.length : null),'morek',tag)}
       ${m.vehicleSources ? card('Vehicle sources & properties','ADVANCED',renderVehicleSources(m.vehicleSources),'vehicle-sources',tag) : ''}
       ${m.marketCosts ? card('Market & charging costs','ADVANCED',renderMarketCosts(m.marketCosts),'market-costs',tag) : ''}
       ${m.planParams ? card('Plan & charger parameters','ADVANCED',renderPlanParams(m.planParams),'plan-params',tag) : ''}
       ${m.notifySetup ? card('Notifications & setup check','ADVANCED',renderNotifySetup(m.notifySetup),'notify-setup',tag) : ''}
-      </div><dialog id="plan-dialog" aria-labelledby="dialog-title"><div class="dialog-head"><div><div class="eyebrow">${e(labels.dialogEyebrow || 'PROPOSAL')}</div><h2 id="dialog-title">Proposed charging plan</h2></div><button id="close-plan" type="button" aria-label="Close proposed plan">✕</button></div><p class="subtext">${e(labels.dialogNote)}</p><div role="status" aria-live="polite">${m.warning ? `<strong>${e(m.warning.title)}</strong><p>${e(m.warning.detail)}</p>` : ''}${m.evidence?.status ? `<p>${e(m.evidence.status)}</p>` : ''}</div>${plan}</dialog><footer>${e(labels.footer)}</footer></div>`;
+      ${tabClose}<dialog id="plan-dialog" aria-labelledby="dialog-title"><div class="dialog-head"><div><div class="eyebrow">${e(labels.dialogEyebrow || 'PROPOSAL')}</div><h2 id="dialog-title">Proposed charging plan</h2></div><button id="close-plan" type="button" aria-label="Close proposed plan">✕</button></div><p class="subtext">${e(labels.dialogNote)}</p><div role="status" aria-live="polite">${m.warning ? `<strong>${e(m.warning.title)}</strong><p>${e(m.warning.detail)}</p>` : ''}${m.evidence?.status ? `<p>${e(m.evidence.status)}</p>` : ''}</div>${plan}</dialog><footer>${e(labels.footer)}</footer></div>`;
     const template=document.createElement('template'); template.innerHTML=html;
     if (!root.firstChild) root.append(template.content);
     else reconcile(root.firstChild,template.content.firstChild,node=>drafts.has(node.dataset?.setting) || (node.dataset?.vsetting && drafts.has(`v:${node.dataset.vsetting}`)) || (node.dataset?.msetting && drafts.has(`m:${node.dataset.msetting}`)) || (node.dataset?.psetting && drafts.has(`p:${node.dataset.psetting}`)) || (node.dataset?.nsetting && drafts.has(`n:${node.dataset.nsetting}`)) || root.getRootNode().activeElement===node);
@@ -123,7 +177,7 @@ export function mountDashboard(root, adapter) {
     root.querySelectorAll('[data-price-nav]').forEach(button=>bind(button,()=>button.addEventListener('click',()=>{if(button.hasAttribute('disabled'))return;current.actions?.priceNav?.(button.dataset.priceNav);},{signal})));
     root.querySelectorAll('[data-price-nav-day]').forEach(select=>bind(select,()=>select.addEventListener('change',()=>{if(select.value)current.actions?.priceNav?.('day',select.value);},{signal})));
     // History day (7.3a): explicit, read-only navigation; the host decides what to load and keeps the day on refreshes.
-    root.querySelectorAll('[data-history-nav]').forEach(button=>bind(button,()=>button.addEventListener('click',()=>{if(button.hasAttribute('disabled'))return;current.actions?.historyNav?.(button.dataset.historyNav);},{signal})));
+    root.querySelectorAll('[data-history-nav]').forEach(button=>bind(button,()=>button.addEventListener('click',()=>{if(button.hasAttribute('disabled'))return;current.actions?.historyNav?.(button.dataset.historyNav);if(button.dataset.historyNav==='prices')reveal(root.querySelector('section.prices'));},{signal})));
     root.querySelectorAll('[data-history-date]').forEach(input=>bind(input,()=>input.addEventListener('change',()=>{if(input.value)current.actions?.historyNav?.('day',input.value);},{signal})));
     // Price insights (7.5): explicit read-only choices (window length, month, comparison month, retry); nothing is saved.
     root.querySelectorAll('[data-insight-duration]').forEach(select=>bind(select,()=>select.addEventListener('change',()=>current.actions?.insightNav?.('duration',Number(select.value)),{signal})));
@@ -132,7 +186,19 @@ export function mountDashboard(root, adapter) {
     root.querySelectorAll('[data-insight-compare]').forEach(select=>bind(select,()=>select.addEventListener('change',()=>current.actions?.insightNav?.('compare',select.value),{signal})));
     root.querySelectorAll('[data-insight-compare-previous]').forEach(button=>bind(button,()=>button.addEventListener('click',()=>current.actions?.insightNav?.('compare','previous'),{signal})));
     root.querySelectorAll('[data-insight-retry]').forEach(button=>bind(button,()=>button.addEventListener('click',()=>current.actions?.insightNav?.('retry'),{signal})));
-    const detailsLink=root.querySelector('a[href="#details"]');bind(detailsLink,()=>detailsLink.addEventListener('click', event => { event.preventDefault(); root.querySelector('#details').open = true; }, {signal}));
+    // Four-tab navigation (20.1): click, arrow/Home/End keys (automatic activation), and in-page links to a destination.
+    root.querySelectorAll('[data-sn-tab]').forEach(button=>bind(button,()=>{
+      button.addEventListener('click',()=>showTab(button.dataset.snTab),{signal});
+      button.addEventListener('keydown',event=>{
+        const at=TAB_IDS.indexOf(button.dataset.snTab);
+        const to={ArrowRight:(at+1)%TAB_IDS.length,ArrowLeft:(at+TAB_IDS.length-1)%TAB_IDS.length,Home:0,End:TAB_IDS.length-1}[event.key];
+        if(to===undefined)return;event.preventDefault();showTab(TAB_IDS[to],{focus:true});
+      },{signal});
+    }));
+    root.querySelectorAll('[data-open-tab]').forEach(button=>bind(button,()=>button.addEventListener('click',()=>showTab(button.dataset.openTab),{signal})));
+    measureLayout();
+    if (!layoutObserver && typeof ResizeObserver === 'function') { layoutObserver = new ResizeObserver(measureLayout); layoutObserver.observe(root); }
+    const detailsLink=root.querySelector('a[href="#details"]');bind(detailsLink,()=>detailsLink.addEventListener('click', event => { event.preventDefault(); const d = root.querySelector('#details'); if (d) { reveal(d); d.open = true; } }, {signal}));
     const scenarioInput=root.querySelector('#sample-state');bind(scenarioInput,()=>scenarioInput.addEventListener('change', event => current.actions?.selectScenario?.(event.target.value), {signal}));
     const showMode=()=>{const mode=root.querySelector('[data-setting="driver"]')?.value;root.querySelectorAll('[data-mode]').forEach(el=>{el.hidden=el.dataset.mode!==mode;});};
     root.querySelectorAll('[data-setting]').forEach(input => {
@@ -189,7 +255,7 @@ export function mountDashboard(root, adapter) {
     const nvalues=()=>({targets:[...root.querySelectorAll('[data-nsetting^="tg-"]')].filter(c=>c.checked).map(c=>c.dataset.nsetting.slice(3)),events:[...root.querySelectorAll('[data-nsetting^="ev-"]')].filter(c=>c.checked).map(c=>c.dataset.nsetting.slice(3))});
     const nsave=root.querySelector('#save-notify');bind(nsave,()=>nsave.addEventListener('click',()=>{if(current.model.notifySetup?.canEdit===true && typeof current.actions?.saveNotify==='function')current.actions.saveNotify(nvalues());},{signal}));
     const nreload=root.querySelector('#reload-notify-setup');bind(nreload,()=>nreload.addEventListener('click',()=>current.actions?.reloadNotifySetup?.(),{signal}));
-    root.querySelectorAll('[data-goto]').forEach(b=>bind(b,()=>b.addEventListener('click',()=>{const target=[...root.querySelectorAll('section.panel')].find(s=>s.classList.contains(b.dataset.goto));if(!target)return;const d=target.querySelector('details');if(d)d.open=true;target.scrollIntoView?.({block:'start'});},{signal})));
+    root.querySelectorAll('[data-goto]').forEach(b=>bind(b,()=>b.addEventListener('click',()=>{const target=[...root.querySelectorAll('section.panel')].find(s=>s.classList.contains(b.dataset.goto));if(!target)return;const d=target.querySelector('details');if(d)d.open=true;reveal(target);},{signal})));
     const saveButton=root.querySelector('#save-plan');bind(saveButton,()=>saveButton.addEventListener('click', () => { if (current.model.canSave === true && typeof current.actions?.save === 'function') current.actions.save(Object.fromEntries([...root.querySelectorAll('[data-setting]')].map(input=>[input.dataset.setting,input.type === 'checkbox' ? input.checked : input.value]))); }, {signal}));
     const reloadButton=root.querySelector('#reload-settings');bind(reloadButton,()=>reloadButton.addEventListener('click', () => current.actions?.reloadSettings?.(), {signal}));
     if (chartMount && ((!chartReady && Object.keys(chartMount.priceCharts).length) || (chartReady && !Object.keys(chartMount.priceCharts).length) || (!chartReady && !historyReady))) {chartMount.dispose();chartMount=null;}
@@ -212,7 +278,7 @@ export function mountDashboard(root, adapter) {
       if (viewport && (viewport.scrollX!==x || viewport.scrollY!==y)) viewport.scrollTo(x,y);
     }
     return result;
-  }, resetDrafts() { drafts.clear(); }, resetVehicleDrafts() { for (const key of [...drafts.keys()]) if (key.startsWith('v:')) drafts.delete(key); }, setMarketDraft(name,value) { drafts.set(`m:${name}`,value); }, resetParamDrafts() { for (const key of [...drafts.keys()]) if (key.startsWith('p:')) drafts.delete(key); }, resetNotifyDrafts() { for (const key of [...drafts.keys()]) if (key.startsWith('n:')) drafts.delete(key); }, resetMarketDrafts(keepArea=false) { for (const key of [...drafts.keys()]) if (key.startsWith('m:') && !(keepArea && key==='m:area')) drafts.delete(key); }, get charts() { return chartMount?.priceCharts || {}; }, dispose() { if (!disposed) { disposed = true; drafts.clear(); cleanup(); if (mounted.get(root) === instance) mounted.delete(root); } } };
+  }, resetDrafts() { drafts.clear(); }, resetVehicleDrafts() { for (const key of [...drafts.keys()]) if (key.startsWith('v:')) drafts.delete(key); }, setMarketDraft(name,value) { drafts.set(`m:${name}`,value); }, resetParamDrafts() { for (const key of [...drafts.keys()]) if (key.startsWith('p:')) drafts.delete(key); }, resetNotifyDrafts() { for (const key of [...drafts.keys()]) if (key.startsWith('n:')) drafts.delete(key); }, resetMarketDrafts(keepArea=false) { for (const key of [...drafts.keys()]) if (key.startsWith('m:') && !(keepArea && key==='m:area')) drafts.delete(key); }, get charts() { return chartMount?.priceCharts || {}; }, get activeTab() { return activeTab; }, showTab(name) { return showTab(name); }, dispose() { if (!disposed) { disposed = true; layoutObserver?.disconnect(); layoutObserver = null; drafts.clear(); cleanup(); if (mounted.get(root) === instance) mounted.delete(root); } } };
   mounted.set(root, instance);
   return instance;
 }

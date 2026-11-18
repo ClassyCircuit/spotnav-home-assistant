@@ -4,7 +4,7 @@ import { webAwesomeRegistration } from '../scripts/web-awesome-registration.mjs'
 
 await mkdir('prototype/dist', { recursive: true });
 await build({ entryPoints: ['prototype/dashboard.js'], bundle: true, format: 'esm', outfile: 'prototype/dist/dashboard.js', legalComments: 'eof', plugins: [webAwesomeRegistration] });
-await build({ entryPoints: ['shared-dashboard/styles.css', 'shared-dashboard/dark.css'], bundle: true, outdir: 'prototype/dist', entryNames: '[name]' });
+await build({ entryPoints: ['shared-dashboard/styles.css', 'shared-dashboard/dark.css', 'shared-dashboard/shell.css'], bundle: true, outdir: 'prototype/dist', entryNames: '[name]' });
 await copyFile('node_modules/@awesome.me/webawesome/LICENSE.md', 'prototype/dist/WEB-AWESOME-LICENSE.txt');
 await copyFile('node_modules/echarts/LICENSE', 'prototype/dist/ECHARTS-LICENSE.txt');
 await copyFile('node_modules/echarts/NOTICE', 'prototype/dist/ECHARTS-NOTICE.txt');

@@ -1,3 +1,5 @@
+**20.1 coordinator review:** Reviewed shell navigation and chart reveal; 14 focused shell/CSS/chart tests passed. Build/check-dist passed in delegate checks. Browser, real canvas and hardware unverified; broad suite had two order-dependent failures that pass individually, cause unconfirmed.
+
 # SpotNav Enhanced / Morek development handoff
 
 Last updated: 2026-11-18. This file is a **public-repository handoff**, not a place for
@@ -5,6 +7,8 @@ passwords, access tokens, HA configuration exports, logs, or private household i
 Re-check the live system and Git state before acting; observations below may become stale.
 
 ## Current handoff and approved direction
+
+**Stage 20.1 implemented locally (2026-11-18, manifest 2.5.200; frontend only, no backend/live/deploy/commit; focused jsdom tests only; coordinator review, browser/visual and hardware NOT done).** The shared renderer now has a real four-tab shell (Overview / Explore / History / Settings; top bar when wide, persistent bottom bar when the mount root is under 760 px) and the sidebar and local preview render it identically; all panels stay mounted so drafts, dialog, focus and charts survive tab changes and refresh. Host bar, banners and every action controller are unchanged and still above the tabs. Old region → tab mapping and limits are in the active roadmap under 20.1. Tests: `frontend/test/shell-tabs.test.ts` (9), plus the existing sidebar/panel/history/price tests still pass. `prototype/vehicle-evidence.test.mjs` has 2 failures that predate this change (verified with the change stashed). Next: 20.2 only when requested, after checkpoint A planning.
 
 **Stage 19 continuation clarified (2026-11-18):** the active roadmap's coordinator decisions and five remaining groups supersede conflicting older Stage 19 notes below. The user wants automatic convergence after an unknown upload, safe practical retries, working Resume and stable active charging. The roadmap now specifies the pragmatic replacement/reconciliation policy, preserves unknown historical evidence and states the residual device-ordering risk, Stop/Pause precedence, durable Resume behavior, pacing, planner provenance and acceptance. 19.2/19.9a is now implemented locally through 2.5.195 (mocked, review pending; see the three entries below) and the next group is 19.3+19.7 remainder; no new product-decision gate or agent should stop at analysis-only. Claude Sonnet 5.5 medium is preferred when available. No live HA/charger operation, deployment or hardware test is authorized by this documentation.
 
