@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SpotNav Overview — matched mock</title>
+<style>
+  :root{
+    --page-w: 1586px;
+    --page-h: 992px;
+    --bg: #020c16;
+    --panel: rgba(10, 20, 34, 0.4);
+    --teal: #29f0ad;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:radial-gradient(circle at 20% 0%, #08305d 0%, #031423 32%, #010813 100%);font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;color:#f7fbff;overflow:hidden}
+  .viewport{width:100vw;height:100vh;display:grid;place-items:center;overflow:hidden;position:relative}
+  .frame{
+    width: var(--page-w);
+    height: var(--page-h);
+    transform-origin: top left;
+    position: relative;
+  }
+  .workspace{
+    width:100%;height:100%;display:grid;
+    grid-template-columns: 196px 1fr;
+    gap:0;
+    position:relative;
+  }
+  .img-block{position:relative;display:block;background-size:cover;background-repeat:no-repeat;background-position:center;border-radius:22px;overflow:hidden;box-shadow: 0 8px 40px rgba(0,0,0,.35);transition: transform .18s ease, box-shadow .18s ease, filter .18s ease}
+  .img-block.hoverable:hover{transform: translateY(-2px);box-shadow:0 16px 40px rgba(0,0,0,.42),0 0 0 1px rgba(81,223,186,.15) inset;filter:saturate(1.04)}
+  .sidebar{background-image:url('./sidebar.png');border-radius:0;box-shadow:none;height:100%}
+  .main{padding:10px 0 0 9px;display:grid;grid-template-rows: 48px 1fr;gap:11px}
+  .header{background-image:url('./header.png');border-radius:0;box-shadow:none;height:48px}
+  .content{display:grid;grid-template-columns: 883px 442px;gap:12px;align-content:start}
+  .left-col{display:grid;grid-template-rows: 428px 283px 125px;gap:14px}
+  .right-col{display:grid;grid-template-rows: 232px 144px 154px 190px;gap:14px}
+  .hero{background-image:url('./hero.png');height:428px}
+  .chart{background-image:url('./chart.png');height:283px}
+  .recent{background-image:url('./recent.png');height:125px}
+  .strategy{background-image:url('./strategy.png');height:232px}
+  .price{background-image:url('./pricepersp.png');height:144px}
+  .system{background-image:url('./chargingsys.png');height:154px}
+  .fresh{background-image:url('./datafresh.png');height:190px}
+
+  .hotspot{position:absolute;border-radius:14px;cursor:pointer;transition:background .16s ease, box-shadow .16s ease, transform .16s ease}
+  .hotspot:hover{background:rgba(255,255,255,.04);box-shadow:0 0 0 1px rgba(90,255,204,.18) inset,0 0 28px rgba(51,255,194,.09);transform:translateY(-1px)}
+  .hero .hs-charge{position:absolute;right:13px;bottom:13px;width:145px;height:42px}
+  .hero .hs-pause{position:absolute;right:13px;bottom:13px;transform:translateX(-152px);width:145px;height:42px}
+  .hero .hs-battery{position:absolute;left:269px;top:171px;width:300px;height:130px;border-radius:28px}
+  .hero .hs-status{position:absolute;left:18px;top:15px;width:520px;height:84px;border-radius:24px}
+  .hero .hs-window{position:absolute;right:19px;top:12px;width:190px;height:110px;border-radius:26px}
+  .chart .hs-chart{position:absolute;inset:0}
+  .right-col .hs-edit{position:absolute;right:16px;top:12px;width:74px;height:28px;border-radius:12px}
+
+  .toast{
+    position:absolute;right:24px;bottom:24px;max-width:360px;
+    background:linear-gradient(180deg, rgba(9,23,37,.96), rgba(6,16,28,.96));
+    color:#eef9ff;border:1px solid rgba(72, 229, 185, .26);border-radius:18px;
+    box-shadow:0 20px 50px rgba(0,0,0,.42),0 0 0 1px rgba(255,255,255,.02) inset;
+    padding:16px 18px 16px 16px;display:none;z-index:10
+  }
+  .toast.show{display:block;animation:fadeIn .18s ease}
+  .toast h4{margin:0 0 8px;font-size:16px;font-weight:700;display:flex;align-items:center;gap:10px}
+  .toast p{margin:0;font-size:13px;line-height:1.45;color:#c9deea}
+  .toast .close{position:absolute;top:8px;right:10px;background:none;border:none;color:#b9d5df;font-size:18px;cursor:pointer}
+  .kbd{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:rgba(55, 255, 193, .14);color:#7affd1;font-size:12px;font-weight:700}
+  .chip{display:inline-flex;align-items:center;gap:8px;margin-top:10px;padding:6px 10px;border-radius:999px;background:rgba(67, 238, 174, .12);border:1px solid rgba(67, 238, 174, .18);font-size:12px;color:#c9ffec}
+  .status-dot{width:8px;height:8px;border-radius:50%;background:#34f5a4;box-shadow:0 0 12px rgba(52,245,164,.6)}
+  .note{position:absolute;left:16px;bottom:16px;padding:8px 10px;border-radius:999px;background:rgba(6,15,26,.72);border:1px solid rgba(97,173,202,.18);font-size:12px;color:#d4e9f3;backdrop-filter: blur(8px)}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+<div class="viewport">
+  <div class="frame" id="frame">
+    <div class="workspace">
+      <div class="sidebar img-block" aria-label="Sidebar"></div>
+      <div class="main">
+        <div class="header img-block" aria-label="Header"></div>
+        <div class="content">
+          <div class="left-col">
+            <div class="hero img-block hoverable" aria-label="Hero card">
+              <div class="hotspot hs-status" data-title="Charging state" data-text="Scheduled — waiting for cheaper electricity. This is the exact approved visual direction carried into the prototype, with the state banner and next proposed window positioned like the screenshot."></div>
+              <div class="hotspot hs-window" data-title="Next proposed window" data-text="The next window starts at 00:15. This card remains in the same top-right position and uses the same color treatment as the approved mockup."></div>
+              <div class="hotspot hs-battery" data-title="Battery overlay" data-text="Battery stays above the car, with a transparent overlay instead of a heavy opaque slab. The charging port is on the right side of the car, matching the approved image."></div>
+              <div class="hotspot hs-pause" data-title="Pause automatic" data-text="Overview-only prototype: actions are visual prototype controls. They remain on the hero card like in the screenshot and do not open other pages."></div>
+              <div class="hotspot hs-charge" data-title="Charge now" data-text="Primary action stays bright and prominent. The whole overview page now follows the same more vibrant palette instead of the flatter green-heavy look from the earlier prototype."></div>
+            </div>
+            <div class="chart img-block hoverable" aria-label="Price chart">
+              <div class="hotspot hs-chart" data-title="Electricity prices & charging plan" data-text="This overview page was rebuilt to visually match the approved design. The chart card keeps the same bar colors, tooltip styling, and overall visual density from the screenshot."></div>
+            </div>
+            <div class="recent img-block hoverable" aria-label="Recent charging"></div>
+          </div>
+          <div class="right-col">
+            <div class="strategy img-block hoverable" aria-label="Charging strategy">
+              <div class="hotspot hs-edit" data-title="Charging strategy" data-text="Right-column cards now use the same saturated blue/teal treatment and spacing as the approved image. No extra redesign was introduced here."></div>
+            </div>
+            <div class="price img-block hoverable" aria-label="Price perspective"></div>
+            <div class="system img-block hoverable" aria-label="Charging system"></div>
+            <div class="fresh img-block hoverable" aria-label="Data freshness"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="note">Overview page only · other tabs intentionally unchanged</div>
+    <div class="toast" id="toast" role="dialog" aria-live="polite">
+      <button class="close" id="toastClose" aria-label="Close">×</button>
+      <h4><span class="kbd">i</span> <span id="toastTitle">Info</span></h4>
+      <p id="toastText"></p>
+      <div class="chip"><span class="status-dot"></span> High-fidelity visual prototype</div>
+    </div>
+  </div>
+</div>
+<script>
+  function rescale(){
+    const frame = document.getElementById('frame');
+    const sx = window.innerWidth / 1586;
+    const sy = window.innerHeight / 992;
+    const scale = Math.min(sx, sy);
+    frame.style.transform = `scale(${scale})`;
+  }
+  window.addEventListener('resize', rescale);
+  rescale();
+
+  const toast = document.getElementById('toast');
+  const toastTitle = document.getElementById('toastTitle');
+  const toastText = document.getElementById('toastText');
+  const closeBtn = document.getElementById('toastClose');
+  document.querySelectorAll('.hotspot').forEach(el => {
+    el.addEventListener('click', () => {
+      toastTitle.textContent = el.dataset.title || 'Info';
+      toastText.textContent = el.dataset.text || '';
+      toast.classList.add('show');
+    });
+  });
+  closeBtn.addEventListener('click', ()=> toast.classList.remove('show'));
+  document.addEventListener('keydown', (e)=> { if(e.key==='Escape') toast.classList.remove('show'); });
+</script>
+</body>
+</html>
