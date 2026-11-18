@@ -238,14 +238,39 @@ async def test_completion_record_and_unplug_block(monkeypatch):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("prior", ["unknown", "pending"])
-async def test_pending_or_unknown_earlier_request_is_preserved_and_never_retried(monkeypatch, prior):
+async def test_pending_or_unknown_earlier_request_without_boot_evidence_is_preserved(monkeypatch, prior):
+    """19.6: without the complete post-boot evidence the ambiguous earlier request is still never retried."""
     w = world(monkeypatch)
     await plugged_in(w)
     w.ledger.value["session_start"]["state"] = prior
+    w.ledger.value["session_start"].pop("dispatch", None)  # legacy-shaped: ambiguous
+    w.evidence.transaction = None  # no affirmative no-transaction report
     await reboot(w)
     assert w.point.calls == 1
     assert w.ledger.value["session_start"]["state"] == prior
+    assert w.coordinator.boot_status(True)["state"] in ("waiting", "blocked")  # no boot token was minted
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("prior", ["unknown", "pending"])
+async def test_confirmed_reboot_does_not_supersede_an_ambiguous_request(monkeypatch, prior):
+    """19.6: the order of an old, possibly delivered request versus the reboot is not proven (it may have been
+    written to the new socket before the boot signal was noted), so even a confirmed reboot with fresh Preparing
+    and no transaction leaves it uncertain; the person is named as the one who acts."""
+    w = world(monkeypatch)
+    await plugged_in(w)
+    w.ledger.value["session_start"]["state"] = prior
+    w.ledger.value["session_start"].pop("dispatch", None)
+    await reboot(w)
+    assert w.point.calls == 1
+    assert w.ledger.value["session_start"]["state"] == prior
+    assert "session_start_history" not in w.ledger.value
+    for _ in range(3):
+        w.coordinator.trigger()
+        await settle(w)
+    assert w.point.calls == 1
     assert w.coordinator.state == {"state": "uncertain", "reason": "previous_start_may_have_applied"}
+    assert w.coordinator.start_recovery_status()["who_acts"] == "person"
 
 
 @pytest.mark.asyncio

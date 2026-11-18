@@ -18,6 +18,7 @@ _LOGGER = logging.getLogger(__name__)
 # Bounded, memory-only re-evaluation of a transient session blocker (seconds; the last repeats).
 SESSION_RETRY_DELAYS = (5, 15, 30, 60, 120, 300)
 SESSION_RETRY_LIMIT = 12
+RESOLVE_RETRY_DELAY_S = 2  # 19.6: a skipped (lock-busy) observation is retried shortly, bounded by SESSION_RETRY_LIMIT
 NO_TRANSACTION_AFTER_S = 120  # an accepted start with the connector still Preparing: show it, never repeat it
 BOOT_EVIDENCE_WINDOW_S = 600  # Stage 15.5: how long a boot signal waits for its post-boot status evidence
 _ACTIVE_STATUSES = ("charging", "suspendedev", "suspendedevse")
@@ -110,8 +111,12 @@ class MorekSessionCoordinator:
         self.available_before_loss = False
         self._fresh_connection = False
         self._recheck = None
+        self._resolve_retry = None
+        self._resolve_skips = 0
         self._recheck_runs = 0
         self._no_transaction = None
+        self._resolve_pending = True  # 19.6: an earlier request may be unresolved (always true after a restart)
+        self.start_recovery = {"class": "none"}  # 19.6: memory-only status of the unresolved start record
         self.state_at = None
         self.state = {"state": "waiting", "reason": "waiting_for_vehicle"}
 
@@ -173,6 +178,8 @@ class MorekSessionCoordinator:
             self.available_before_loss = False
             self.offline_observed = False
             self.state = {"state": "session_observed", "reason": "charger_reports_active"}
+            if self._resolve_pending and old not in _ACTIVE_STATUSES:
+                self.trigger()  # 19.6: an observed session may resolve an earlier unknown start (records only)
         elif new in ("finishing", "faulted", "unavailable", "unknown"):
             if new == "finishing":
                 self.completed = True
@@ -479,6 +486,9 @@ class MorekSessionCoordinator:
         self.closed = True
         self._reset_recheck()
         self._cancel_no_transaction()
+        if self._resolve_retry is not None:
+            self._resolve_retry.cancel()
+            self._resolve_retry = None
         if self.retry is not None:
             self.retry.cancel()
         if self.task is not None:
@@ -488,8 +498,150 @@ class MorekSessionCoordinator:
         while self.dirty and not self.closed:
             self.dirty = False
             before = dict(self.state)
-            await self._reconcile()
+            if self.observation in _ACTIVE_STATUSES and not self.vehicle_events:
+                await self._resolve_observed()
+            else:
+                await self._reconcile()
             self._log_state(before)
+
+    # ---- Stage 19.6: classify and resolve an earlier start request whose outcome is not known
+
+    @staticmethod
+    def _prior_class(prior):
+        """`proven_not_dispatched` | `ambiguous` | `resolved` | `none` for the stored start record.
+
+        A record is provably undispatched only when it says so by write ordering: `aborted_before_dispatch`, or a
+        `pending` record whose `dispatch` marker is still `pre_wire` (the marker moves to `wire_intent` in a durable
+        write strictly before the OCPP call, so its absence proves no call began). A legacy `pending` record
+        without the marker, `wire_intent` and `unknown` are ambiguous and never released by this classification."""
+        if not isinstance(prior, dict):
+            return "none"
+        state = prior.get("state")
+        if state == "aborted_before_dispatch":
+            return "proven_not_dispatched"
+        if state == "pending":
+            return "proven_not_dispatched" if prior.get("dispatch") == "pre_wire" else "ambiguous"
+        return "ambiguous" if state == "unknown" else "resolved"
+
+    @staticmethod
+    def _stamp(value):
+        try:
+            stamp = datetime.fromisoformat(value)
+        except (TypeError, ValueError):
+            return None
+        return stamp if stamp.tzinfo is not None else None
+
+    def _live(self, now):
+        return morek_schedule._live_measurements(self.hass, controller_for(self.hass, self.entry_id), now)
+
+    def _observed_session(self, prior):
+        """Affirmative, fresh, HA-stamped session evidence that postdates the unknown request (else None).
+
+        `charger_active_status` is a current Charging/Suspended report; `transaction_present` is a current,
+        positive transaction id that *appeared* after the request. Both are observations; neither says the request
+        itself started the session. A missing, stale, unknown or earlier-stamped value is no evidence."""
+        at = self._stamp(prior.get("at"))
+        if at is None:
+            return None
+        now = datetime.now(timezone.utc)
+        try:
+            live = self._live(now)
+        except Exception:  # noqa: BLE001 - unreadable evidence is none
+            return None
+        status, transaction = live.get("status"), live.get("transaction")
+        if (isinstance(status, dict) and status.get("fresh") is True
+                and str(status.get("value", "")).lower() in _ACTIVE_STATUSES
+                and (self._stamp(status.get("observed_at")) or at) > at):
+            return "charger_active_status"
+        if (isinstance(transaction, dict) and transaction.get("fresh") is True and transaction.get("value") is True
+                and (self._stamp(transaction.get("observed_at")) or at) > at
+                and (self._stamp(transaction.get("changed_at")) or at) > at):
+            return "transaction_present"
+        return None
+
+    def _set_recovery(self, klass, *, evidence=None, reason=None, who_acts=None):
+        self.start_recovery = {"class": klass, "evidence": evidence, "reason": reason, "who_acts": who_acts}
+
+    def start_recovery_status(self):
+        """Additive status: how an unresolved start record is classified and who acts (never 'charging')."""
+        return dict(self.start_recovery)
+
+    async def _resolve_observed(self):
+        """An active connector or a new transaction after an unknown start resolves it as *observed*. Records only.
+
+        Sends nothing and needs no ownership ticket, but it writes the connector-wide outcome ledger, so it takes
+        the connector admission lock first (the start run's and Pause/Resume's order) and the schedule lock inside it
+        only if it is idle: never a blocking wait, since the manual path holds the schedule lock and then asks for the
+        connector lock. A busy schedule lock skips and arms a bounded retrigger. Everything is re-read and re-checked after
+        each await: an identity change, a quiescing connector or a person Stop in progress leaves the record
+        untouched (a later trigger re-evaluates), and the record must still be the same ambiguous request."""
+        worker = self.worker
+        identity = worker._identity()
+        connector = physical_connector(identity)
+        if classify_morek_identity(identity) != "supported_morek" or connector is None:
+            return
+        admission = command_admission(self.hass)
+
+        def blocked():
+            return (self.closed or worker._closed or connector in admission._quiescing
+                    or connector in admission._entry_draining or bool(admission._person_stops.get(connector))
+                    or physical_connector(worker._identity()) != connector)
+        try:
+            data, _ = await morek_schedule._state(self.hass, self.entry_id)
+            schedule_lock = self.hass.data[morek_schedule._DATA_KEY][self.entry_id][2]
+            async with admission._lock_for(connector):
+                # Never wait on the schedule lock while holding the connector lock: the manual path holds the schedule
+                # lock and then asks for this connector lock (a deadlock). Busy -> skip and retrigger shortly
+                # (the same try/skip rule as the pre-wire release in command_admission). The check and the
+                # acquire have no await between them, so an idle lock is taken without yielding.
+                if schedule_lock.locked() or getattr(schedule_lock, "_waiters", None):
+                    self._resolve_pending = True
+                    self._retry_resolve()
+                    return
+                async with schedule_lock:
+                    self._resolve_skips = 0
+                    if blocked():
+                        self._resolve_pending = True
+                        return
+                    ledger = morek_schedule.outcomes_for(self.hass)
+                    record = await morek_schedule._outcome_record(self.hass, self.entry_id, data)
+                    if blocked():  # re-validated after the awaited read
+                        self._resolve_pending = True
+                        return
+                    prior = record.get("session_start")
+                    if self._prior_class(prior) != "ambiguous":
+                        self._resolve_pending = False
+                        return
+                    found = self._observed_session(prior)
+                    if found is None:
+                        self._set_recovery("ambiguous", reason="no_fresh_session_evidence", who_acts="person")
+                        return
+                    await self._mark_observed(ledger, record, prior, found)
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:  # noqa: BLE001 - unreadable storage keeps the record ambiguous
+            _LOGGER.debug("Morek start resolution unavailable (%s)", type(error).__name__)
+
+    def _retry_resolve(self):
+        """Re-trigger a skipped observation (bounded; the record stays ambiguous meanwhile, nothing is sent)."""
+        if self.closed or self._resolve_retry is not None or self._resolve_skips >= SESSION_RETRY_LIMIT:
+            return
+        self._resolve_skips += 1
+
+        def fire():
+            self._resolve_retry = None
+            if not self.closed:
+                self.trigger()
+
+        self._resolve_retry = asyncio.get_running_loop().call_later(RESOLVE_RETRY_DELAY_S, fire)
+
+    async def _mark_observed(self, ledger, record, prior, found):
+        prior["resolution"] = {"by": found, "was": prior.get("state"),
+                               "at": datetime.now(timezone.utc).isoformat()}
+        prior["state"] = "observed"
+        await ledger.write(record)
+        self._resolve_pending = False
+        self._set_recovery("resolved", evidence=found, reason="session_observed", who_acts="none")
 
     def _log_state(self, before):
         """One line per changed session-start state: the request (intent), never a measured charge.
@@ -606,19 +758,44 @@ class MorekSessionCoordinator:
                 if prior is not None:
                     if (not isinstance(prior, dict) or prior.get("version") != 1
                             or not isinstance(prior.get("connection"), str)
-                            or prior.get("state") not in ("pending", "unknown", "accepted", "rejected",
-                                                          "aborted_before_dispatch")):
+                            or prior.get("state") not in ("pending", "unknown", "accepted", "rejected", "observed",
+                                                          "aborted_before_dispatch")
+                            or prior.get("dispatch") not in (None, "pre_wire", "wire_intent", "resolved")):
                         return "uncertain", "session_record_invalid"
-                    if prior.get("state") in ("unknown", "pending"):
+                    if self._prior_class(prior) == "proven_not_dispatched" and prior.get("state") == "pending":
+                        # 19.6: the durable pre-wire marker was never advanced, so no call began (write ordering).
+                        # Recorded as the same history an aborted attempt leaves; nothing is guessed or sent here.
+                        count = prior.get("attempts", 1)
+                        if type(count) is not int or not 1 <= count <= 2:
+                            return "uncertain", "session_record_invalid"
+                        prior.update(state="aborted_before_dispatch", proof="no_wire_intent_marker",
+                                     attempts=max(1, count - 1))
+                        await ledger.write(record)
+                        self._set_recovery("proven_not_dispatched", evidence="no_wire_intent_marker",
+                                           reason="released_with_proof", who_acts="none")
+                    elif self._prior_class(prior) == "ambiguous":
+                        found = self._observed_session(prior)
+                        if found is not None:
+                            await self._mark_observed(ledger, record, prior, found)
+                            return "session_observed", "charger_reports_active"
+                        # No ordering proof exists that an old, possibly delivered start cannot still be applied
+                        # (a new plug-in, a reconnect or a confirmed reboot do not prove it): stay uncertain.
+                        self._resolve_pending = True
+                        self._set_recovery("ambiguous", reason="no_session_evidence_and_no_ordering_proof",
+                                           who_acts="person")
                         return "uncertain", "previous_start_may_have_applied"
+
+                    def shown(state, reason):
+                        return ("session_observed", "charger_reports_active") if state == "observed" else (state, reason)
+
                     if connection == "recovery" and prior.get("connection") != "recovery":
-                        return prior.get("state", "blocked"), "already_requested"
+                        return shown(prior.get("state", "blocked"), "already_requested")
                     if prior.get("connection") == connection:
                         attempts = prior.get("attempts", 1)
                         if type(attempts) is not int or not 1 <= attempts <= 2:
                             return "uncertain", "session_record_invalid"
                         if prior.get("state") not in ("rejected", "aborted_before_dispatch") or attempts >= 2:
-                            return prior.get("state", "blocked"), "already_requested"
+                            return shown(prior.get("state", "blocked"), "already_requested")
                         if prior.get("state") == "rejected":
                             try:
                                 age = (datetime.now(timezone.utc) - datetime.fromisoformat(prior["at"])).total_seconds()
@@ -634,7 +811,7 @@ class MorekSessionCoordinator:
                     return "blocked", "unsupported_ocpp_logging_or_interface"
                 if not _safe_logging(point):
                     return "blocked", "ocpp_sensitive_logging_enabled"
-                attempt = {"version": 1, "connection": connection, "state": "pending",
+                attempt = {"version": 1, "connection": connection, "state": "pending", "dispatch": "pre_wire",
                            "at": datetime.now(timezone.utc).isoformat(), "attempts": attempts + 1}
                 record.pop("session_completed", None)
                 record.pop("session_unplugged", None)
@@ -659,10 +836,24 @@ class MorekSessionCoordinator:
                     attempt["attempts"] = max(1, attempts)
                     await ledger.write(record)
                     return "blocked", blocker
+                # 19.6: a durable "the call may begin" marker strictly before the OCPP call. Its absence after a
+                # crash or cancellation proves by write ordering that no call began; its presence stays ambiguous.
+                attempt["dispatch"] = "wire_intent"
+                await ledger.write(record)
+                blocker = validate()
+                if blocker:
+                    attempt.update(state="aborted_before_dispatch", dispatch="pre_wire", attempts=max(1, attempts))
+                    await ledger.write(record)
+                    return "blocked", blocker
                 self.state = {"state": "starting", "reason": "request_in_progress"}
+                self._resolve_pending = True
                 result = await _start(point, connector.connector_id)
                 attempt["state"] = result
+                if result in ("accepted", "rejected"):
+                    attempt["dispatch"] = "resolved"
                 await ledger.write(record)
+                if result in ("accepted", "rejected"):
+                    self._resolve_pending = False
                 if validate(post=True) is not None:
                     return "blocked", "newer_stop_or_connection_change"
                 return result, "request_" + result
@@ -689,7 +880,9 @@ class MorekSessionCoordinator:
             self._arm_recheck()
         except asyncio.CancelledError:
             self.state = {"state": "uncertain", "reason": "request_interrupted"}
+            self._resolve_pending = True
             raise
         except Exception as error:  # noqa: BLE001 - never print an OCPP exception or payload
+            self._resolve_pending = True
             _LOGGER.warning("Morek session start evidence unavailable (%s)", type(error).__name__)
             self.state = {"state": "uncertain", "reason": "session_evidence_unavailable"}

@@ -65837,7 +65837,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.182";
+var CARD_VERSION = "2.5.184";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {

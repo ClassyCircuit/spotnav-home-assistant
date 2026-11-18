@@ -3284,6 +3284,9 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
             if session is not None:
                 readiness["boot_start"] = session.boot_status(
                     getattr(link_monitor, "boot_generation", None) is not None)
+                recovery_view = getattr(session, "start_recovery_status", None)
+                if callable(recovery_view):
+                    readiness["session_start_recovery"] = recovery_view()  # 19.6 additive; never "charging"
             # Diagnostic only: the preview is not a checked dispatch intent and
             # even a matching readback cannot itself authorize a session start.
             readiness["session_schedule_evidence"] = session_start_schedule_evidence(
