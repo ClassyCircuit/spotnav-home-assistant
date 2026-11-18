@@ -1,2 +1,5 @@
 # Generated assets are compared byte-for-byte with build output, including on Windows.
 custom_components/spotnav/www/** text eol=lf
+
+# Images must remain binary even under generated assets.
+*.webp binary

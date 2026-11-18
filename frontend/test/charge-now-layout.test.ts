@@ -1,13 +1,16 @@
 // @vitest-environment node
-// Stage 18.2: Charge Now is one card (same field language as the plan controls) and mobile cards run edge to edge.
-// Structural checks of the shared markup/CSS; pixel layout was checked separately in a browser (see handoff).
+// Stage 18.2 -> 20.2a: Charge Now is one card inside the shared shell (rendered by shell.js from host models), and the
+// layout is decided by the measured `data-sn-layout`, never by viewport media queries. Structural checks only; pixel
+// layout needs a browser (unrun).
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { renderControls } from "../shared-dashboard/shell.js";
 
-const dark = readFileSync(new URL("../shared-dashboard/dark.css", import.meta.url), "utf8").replaceAll(String.fromCharCode(13), "");
+const css = (name: string) => readFileSync(new URL(`../shared-dashboard/${name}`, import.meta.url), "utf8").replaceAll(String.fromCharCode(13), "");
+const shell = css("shell.css");
 const panel = readFileSync(new URL("../sidebar/panel.js", import.meta.url), "utf8");
-const section = panel.slice(panel.indexOf('<section id="charge-controls"'), panel.indexOf("</section>", panel.indexOf('<section id="charge-controls"')));
-const mobile = dark.slice(dark.lastIndexOf("@media(max-width:800px){\n.shell"));
+const html = renderControls({}, {});
+const section = html.slice(html.indexOf('<section id="charge-controls"'), html.indexOf("</section>"));
 
 describe("Charge Now layout", () => {
   it("keeps every id, groups fields in one card and nests no form", () => {
@@ -18,34 +21,43 @@ describe("Charge Now layout", () => {
     expect(section).not.toContain("<form");
     expect(section.match(/id="charge-now"/g)).toHaveLength(1);
   });
-  it("styles it as a wrapping card without fixed widths or a second boxed details", () => {
-    expect(dark).toMatch(/#charge-controls,#log-viewer\{background:#1a202b/);
-    expect(dark).toMatch(/#charge-options\{background:none;[^}]*border:0/);
-    expect(dark).toContain(".cn-fields{display:flex;flex-wrap:wrap");
-    expect(dark).toMatch(/\.cn-fields label\{[^}]*flex:1 1 180px/);
-    expect(dark).toContain('.cn-fields [hidden]{display:none!important}');
-    expect(dark).toMatch(/\.cn-actions button[^}]*min-height:44px/);
-    expect(dark).not.toMatch(/#charge-controls\{[^}]*(?:[^-]width:\d+px)/);
-    expect(dark).not.toMatch(/#charge-session>\*|#schedule-check>\*/);
+  it("renders controls disabled by default and enabled only from the host model", () => {
+    expect(html).toMatch(/id="pause-auto"[^>]* disabled/);
+    expect(html).toMatch(/id="resume-auto"[^>]* disabled/);
+    expect(html).toMatch(/id="charge-now"[^>]* disabled/);
+    const on = renderControls({ pauseDisabled: false, resumeDisabled: false, chargeDisabled: false, chargeLabel: "Return to Auto" });
+    expect(on).not.toMatch(/id="(?:pause-auto|resume-auto|charge-now)"[^>]* disabled/);
+    expect(on).toContain(">Return to Auto</button>");
   });
-  it("host-bar styles no longer hard-code Charge Now layout", () => {
-    expect(panel).not.toContain("#charge-options label{display:inline-block");
-    expect(panel).not.toContain("#charge-controls{flex:1 1 100%;align-items:center}");
+  it("styles it as a wrapping card without fixed widths", () => {
+    expect(shell).toContain(".cn-fields{display:flex;flex-wrap:wrap");
+    expect(shell).toMatch(/\.cn-fields label\{[^}]*flex:1 1 180px/);
+    expect(shell).toContain(".cn-fields [hidden]{display:none!important}");
+    expect(shell).toMatch(/\.sn-btn\{[^}]*min-height:44px/);
+    expect(shell).not.toMatch(/\.sn-charge\{[^}]*[^-]width:\d+px/);
+  });
+  it("the host no longer renders its own bar or hard-codes control markup", () => {
+    expect(panel).not.toContain('class="hostbar"');
+    expect(panel).not.toContain('<section id="charge-controls"');
+    expect(panel).not.toContain("querySelector('#charge-now')");
   });
 });
 
-describe("mobile edge-to-edge cards", () => {
-  it("removes outer horizontal gutters at the existing 800px breakpoint, keeps vertical spacing", () => {
-    expect(mobile).toContain(".shell{padding-left:0;padding-right:0}");
-    expect(mobile).toMatch(/\.panel\{border-radius:0;border-left:0;border-right:0/);
-    expect(mobile).toMatch(/#charge-controls,#log-viewer\{border-radius:0;border-left-width:0;border-right-width:0/);
-    expect(mobile).toContain(".hostbar>#charge-controls{margin-left:-16px;margin-right:-16px");
-    expect(mobile).not.toMatch(/\.shell\{[^}]*(?:padding-top|padding-bottom):0/);
-    expect(mobile).not.toMatch(/100vw/.source.replace("100vw", "(?:width|min-width):100vw"));
+describe("responsive layout contract", () => {
+  it("never defines named grid areas or viewport width media queries for layout", () => {
+    for (const name of ["styles.css", "dark.css", "shell.css"]) {
+      const code = css(name).replace(/\/\*[\s\S]*?\*\//g, "");
+      expect(code, name).not.toMatch(/grid-template-areas/);
+      expect(code, name).not.toMatch(/@media\s*\(\s*(?:min|max)-width/);
+    }
   });
-  it("lets long text and debug lines wrap instead of overflowing, and keeps desktop max width", () => {
-    expect(mobile).toContain("overflow-wrap:anywhere");
-    expect(dark).toContain("white-space:pre-wrap;overflow-wrap:anywhere");
-    expect(readFileSync(new URL("../shared-dashboard/styles.css", import.meta.url), "utf8")).toContain(".shell{max-width:1440px;margin:auto;padding:32px 40px}");
+  it("auto-places one column on narrow panels, with a bottom bar and safe-area padding", () => {
+    expect(shell).toMatch(/\.tab-panel>\.dashboard\{display:grid;[^}]*grid-template-columns:minmax\(0,1fr\)/);
+    expect(shell).toMatch(/\[data-sn-layout="compact"\] \.sn-nav\{position:fixed;[^}]*bottom:0/);
+    expect(shell).toContain("env(safe-area-inset-bottom");
+    expect(shell).toMatch(/\.panel\{[^}]*min-width:0;overflow-wrap:anywhere/);
+  });
+  it("keeps the desktop shell width bounded", () => {
+    expect(shell).toMatch(/\.shell\{max-width:1480px;margin:0 auto/);
   });
 });

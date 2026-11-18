@@ -132,16 +132,27 @@ describe('four-tab shell (shared renderer)', () => {
 });
 
 describe('four-tab shell (actual panel host)', () => {
-  it('keeps host controls outside the tabs and switching tabs sends no request', async () => {
+  it('renders the host header and status stack in the shell, controls in the Overview hero, and tab switches send no request', async () => {
     const raw = fixture(); raw.generated_at = new Date().toISOString(); raw.charger.charger_id = 'a';
     const calls = [];
     const hass = { connected: true, user: { is_admin: true }, callWS: msg => { calls.push(msg); return Promise.resolve(msg.type==='spotnav/list_chargers' ? {api_version:1,chargers:[{charger_id:'a',charger_name:'A'}]} : msg.type==='spotnav/get_dashboard' ? raw : msg.type==='spotnav/get_settings' ? envelope(record()) : status); } };
     const panel = document.createElement('spotnav-enhanced-panel'); panel.hass = hass; document.body.append(panel); await tick();
     const root = panel.shadowRoot;
     expect(root.querySelectorAll('main [role="tab"]').length).toBe(4);
+    expect(root.querySelectorAll('.hostbar').length).toBe(0);
     expect(visible(root.querySelector('main'))).toEqual(['overview']);
-    for (const id of ['#menu','#charger','#refresh','#pause-auto','#resume-auto','#charge-now','#charge-duration']) {
-      const el = root.querySelector(id); expect(el, id).not.toBeNull(); expect(el.closest('main')).toBeNull();
+    // One header in the shell (menu, charger, refresh) outside every tab panel; the selected charger is preserved.
+    for (const id of ['#menu','#charger','#refresh']) {
+      const el = root.querySelector(id); expect(el, id).not.toBeNull(); expect(el.closest('.sn-header'), id).not.toBeNull(); expect(el.closest('.tab-panel'), id).toBeNull(); expect(root.querySelectorAll(id).length, id).toBe(1);
+    }
+    expect(root.querySelector('#charger').value).toBe('a');
+    // Status stack (host message, warning, charging status, schedule check, recovery) is above the tabs on every tab: one element each.
+    for (const id of ['#critical-live','#charge-session','#schedule-check','#recovery-banner']) {
+      const el = root.querySelector(id); expect(el, id).not.toBeNull(); expect(el.closest('.sn-status'), id).not.toBeNull(); expect(el.closest('.tab-panel'), id).toBeNull(); expect(root.querySelectorAll(id).length, id).toBe(1);
+    }
+    // Existing guarded controls live in the Overview hero and keep their ids (one each).
+    for (const id of ['#pause-auto','#resume-auto','#charge-now','#charge-duration','#charge-end','#charge-replace','#charge-state','#pause-state']) {
+      const el = root.querySelector(id); expect(el, id).not.toBeNull(); expect(el.closest('#sn-panel-overview'), id).not.toBeNull(); expect(root.querySelectorAll(id).length, id).toBe(1);
     }
     const before = calls.length;
     for (const id of ['explore','history','settings','overview']) root.querySelector(`#sn-tab-${id}`).click();

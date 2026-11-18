@@ -123,27 +123,20 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     this.initCosts();
     this.initParams();
     this.initNotify();
+    this.chargers = [];this.hostMessage = 'Select a charger.';this.hold = false;this.shellAdapter = null;
     this.connected = false;
   }
   connectedCallback() {
     this.connected = true;
     this.classList.add('wa-dark');
-    this.shadowRoot.innerHTML = `<link rel="stylesheet" href="/spotnav-sidebar/panel.css?v=${CARD_VERSION}"><style>:host{display:block;min-height:100%;padding-bottom:env(safe-area-inset-bottom);background:var(--sn-bg,#11151d)}.hostbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top));background:var(--sn-surface,#11151d);border-bottom:1px solid var(--sn-line,#25395a);color:white}.hostbar label{flex:1 1 180px}.hostbar select{max-width:100%}.hostbar button,.hostbar select{font:inherit;padding:8px}.message{padding:16px;color:white;background:var(--sn-bg,#11151d)}main[data-sn-layout="compact"]~*:last-child{margin-bottom:calc(var(--sn-nav-h,64px) + env(safe-area-inset-bottom,0px))}</style><div class="hostbar"><button id="menu" aria-label="Open navigation">☰</button><strong>SpotNav Enhanced</strong><label>Charger <select id="charger"><option value="">Select charger</option></select></label><button id="refresh">Refresh observations</button><div id="automatic-controls"><span id="pause-state">Auto state unknown.</span> <button id="pause-auto" disabled>Pause Auto until resumed</button> <button id="resume-auto" disabled>Resume Auto</button><span id="pause-notice" role="status"></span></div><section id="charge-controls" aria-label="Charge Now"><details id="charge-options"><summary>Duration / change end</summary><div class="cn-fields"><label>Duration <select id="charge-duration"><option value="30">30 minutes</option><option value="60" selected>1 hour</option><option value="120">2 hours</option><option value="180">3 hours</option><option value="custom">Custom end time</option></select></label><label id="custom-label" hidden>End time <input id="charge-end" type="datetime-local"></label><button id="charge-replace" type="button" hidden>Replace Charge Now end</button></div></details><div class="cn-actions"><button id="charge-now" disabled>Charge Now</button></div><span id="charge-state" role="status">Charge Now status unavailable.</span><span id="charge-notice" role="status"></span></section></div><section id="charge-session" hidden></section><section id="schedule-check" hidden></section><div id="recovery-banner" role="alert" hidden></div><div class="message" role="status">Select a charger.</div><main></main>`;
-    const hostStyle=document.createElement('style');
-    hostStyle.textContent='.hostbar label{color:#f0f3f8}.hostbar select,.hostbar input{color:#f0f3f8;background:#202b39;border:1px solid #8191a4;border-radius:8px;min-height:42px} #automatic-controls{display:flex;flex-wrap:wrap;gap:6px;min-width:0;max-width:100%} #automatic-controls button,#charge-controls button{max-width:100%;white-space:normal}';
-    this.shadowRoot.append(hostStyle);
-    this.shadowRoot.querySelector('#menu').onclick = () => this.dispatchEvent(new CustomEvent('hass-toggle-menu',{bubbles:true,composed:true}));
-    this.shadowRoot.querySelector('#charger').onchange = e => {if (e.target.value===this.charger) return; this.stopObservations(); this.charger = e.target.value; this.rememberCharger(); this.refresh();};
-    this.shadowRoot.querySelector('#refresh').onclick = () => this.loaded ? this.refresh() : this.loadChargers();
-    this.shadowRoot.querySelector('#pause-auto').onclick = () => void this.automaticAction('stop','until_resumed');
-    this.shadowRoot.querySelector('#resume-auto').onclick = () => void this.automaticAction('resume',null);
-    this.shadowRoot.querySelector('#charge-now').onclick = () => void this.chargeAction(this.rawStatus?.schedule?.charge_now?.state==='active' ? 'return_to_auto' : 'charge_now');
-    this.shadowRoot.querySelector('#charge-replace').onclick = () => void this.chargeAction('charge_now');
-    this.shadowRoot.querySelector('#charge-duration').onchange = e => {this.shadowRoot.querySelector('#custom-label').hidden=e.target.value!=='custom';};
-    this.logViewer=createLogViewer(()=>this._hass);this.logViewer.hidden=this._hass?.user?.is_admin!==true;this.shadowRoot.append(this.logViewer);
+    // One SpotNav shell (header, status stack, tabs, hero, controls) is rendered by the shared renderer from models; the host only owns controllers.
+    this.shadowRoot.innerHTML = `<link rel="stylesheet" href="/spotnav-sidebar/panel.css?v=${CARD_VERSION}"><style>:host{display:block;min-height:100%;background:#08111f}</style><main></main>`;
+    this.renderBare();
+    this.logViewer=createLogViewer(()=>this._hass);this.logViewer.hidden=this._hass?.user?.is_admin!==true;this.logViewer.classList.add('sn-log');this.shadowRoot.append(this.logViewer);
     if (this._hass) this.loadChargers();
   }
   disconnectedCallback() { this.connected=false; this.stopObservations(); this.logViewer?.destroy(); }
+  idleControl() { return {autoState:'Auto state unknown.',pauseDisabled:true,resumeDisabled:true,pauseNotice:'',chargeLabel:'Charge Now',chargeDisabled:true,replaceVisible:false,replaceDisabled:true,chargeState:'Charge Now status unavailable.',chargeNotice:''}; }
   set hass(value) {
     if (!this.settingsWriteContext && value) {
       const key=value.connection || value;
@@ -188,7 +181,33 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     }
   }
   get hass() { return this._hass; }
-  message(text) { const el=this.shadowRoot.querySelector('.message'); el.textContent=text; el.hidden=!text; }
+  // Host actions for the shared shell. They are the only way the rendered header and controls reach the controllers below.
+  hostActions() {
+    return {
+      // stopObservations() repaints the bare shell with the OLD charger, so repaint again once the new one is chosen.
+      selectCharger:value=>{if(value===this.charger)return;this.stopObservations();this.charger=value;this.rememberCharger();this.renderShell();this.refresh();},
+      refresh:()=>this.loaded ? this.refresh() : this.loadChargers(),
+      menu:()=>this.dispatchEvent(new CustomEvent('hass-toggle-menu',{bubbles:true,composed:true})),
+      pauseAuto:()=>void this.automaticAction('stop','until_resumed'),
+      resumeAuto:()=>void this.automaticAction('resume',null),
+      chargeNow:()=>void this.chargeAction(this.rawStatus?.schedule?.charge_now?.state==='active' ? 'return_to_auto' : 'charge_now'),
+      chargeReplace:()=>void this.chargeAction('charge_now')
+    };
+  }
+  headerModel() { return {chargers:this.chargers.map(c=>({id:c.charger_id,name:c.charger_name})),selected:this.charger || ''}; }
+  // Before any dashboard exists (no charger, loading, failure) the same shell renders with a message and no data cards.
+  renderBare() {
+    const main=this.shadowRoot?.querySelector('main');if(!main)return;
+    const adapter={draftKey:null,format:{time:()=>'',day:()=>''},actions:this.hostActions(),model:{bare:true,header:this.headerModel(),hostMessage:this.hostMessage,hold:false}};
+    this.shellAdapter=null;
+    if (this.view) this.view.update(adapter); else this.view=mountDashboard(main,adapter);
+  }
+  renderShell() {
+    if (!this.shellAdapter) {this.renderBare();return;}
+    this.shellAdapter.model.hold=this.hold;this.shellAdapter.model.hostMessage=this.hostMessage;this.shellAdapter.model.header=this.headerModel();
+    this.view?.update(this.shellAdapter);
+  }
+  message(text) { this.hostMessage=text||'';this.renderShell(); }
   stopObservations(preserveDraft=false) {
     const dirty=preserveDraft && this.settingsDirty;
     if (dirty && this.settingsRecord) this.draftRevision=this.settingsRecord.revision;
@@ -220,12 +239,10 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     this.rawDashboard=null; this.rawStatus=null; this.statusAt=null; this.statusFailed=false; this.dashboardFailed=false;
     this.settingsRecord=null; this.settingsLoading=false; this.settingsBusy=false; this.settingsConflict=false; this.settingsDirty=!!dirty; this.settingsNotice='';
     this.morekBusy=false; this.morekError=null; this.morekUncertain=false; this.statusEpoch=(this.statusEpoch || 0)+1; this.dashboardEpoch=(this.dashboardEpoch || 0)+1;this.autoBusy=false;this.autoUncertain=false;this.autoNotice='';this.autoRefusalAt=null;this.autoExpected=null;this.controlPermissionPending=false;
-    const pause=this.shadowRoot.querySelector('#pause-state');if(pause) pause.textContent='Auto state unknown.';
-    const charge=this.shadowRoot.querySelector('#charge-state');if(charge)charge.textContent='Charge Now status unavailable.';
-    for(const id of ['charge-now','charge-replace']) {const button=this.shadowRoot.querySelector(`#${id}`);if(button)button.disabled=true;}
-    for(const id of ['pause-auto','resume-auto']) {const button=this.shadowRoot.querySelector(`#${id}`);if(button)button.disabled=true;}
-    if (!preserveDraft) {this.view?.dispose(); this.view=null;}
-    const main=this.shadowRoot.querySelector('main');if(main)main.hidden=preserveDraft;
+    // Controls fall back to their disabled defaults (the model is rebuilt on the next paint); a held shell keeps its drafts but hides stale content.
+    if (!this.connected) {this.view?.dispose();this.view=null;this.shellAdapter=null;return;}
+    if (preserveDraft) {this.hold=true;if(this.shellAdapter){this.shellAdapter.model.control=this.idleControl();this.renderShell();}}
+    else {this.hold=false;this.renderBare();}
   }
   // Price-day navigation (7.1): the state machine lives across refreshes; it only reads held days, on a user action
   // (plus one small availability read per charger/area/currency), and drops itself when any of them changes.
@@ -286,11 +303,10 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     adapter.actions.historyNav=(kind,arg)=>this.historyNav(kind,arg);
     adapter.model.insights=this.insightView(dashboard);
     adapter.actions.insightNav=(kind,arg)=>this.insightNav(kind,arg);
-    this.paintAutomatic(dashboard);
-    this.paintChargeNow(dashboard);
-    this.paintSession();
-    this.paintCheck();
-    this.paintRecovery();
+    Object.assign(adapter.actions,this.hostActions());
+    adapter.model.header=this.headerModel();
+    adapter.model.control={...this.automaticModel(dashboard),...this.chargeNowModel(dashboard)};
+    adapter.model.banners={session:this.sessionModel(),check:this.checkModel(),recovery:this.recoveryModel()};
     if (this.settingsRecord && dashboard?.settings?.revision > this.settingsRecord.revision) {this.settingsConflict=true;this.settingsNotice='Settings changed elsewhere. Reload the charger before editing again.';}
     const allowed=this._hass?.user?.is_admin===true || dashboard?.settings?.users_change_plan===true;
     if (this.settingsRecord) {
@@ -328,52 +344,20 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     this.paintMarketCosts(adapter,dashboard);
     this.paintPlanParams(adapter,dashboard,this.morekOwnedNow());
     this.paintNotifySetup(adapter,dashboard);
-    this.message(this.dashboardFailed ? 'Dashboard refresh failed; the last observation may be stale.' : '');
+    this.hold=false;this.hostMessage=this.dashboardFailed ? 'Dashboard refresh failed; the last observation may be stale.' : '';
+    adapter.model.hold=false;adapter.model.hostMessage=this.hostMessage;
+    this.shellAdapter=adapter;
     if (this.view) this.view.update(adapter);
     else this.view=mountDashboard(this.shadowRoot.querySelector('main'),adapter);
-    this.shadowRoot.querySelector('main').hidden=false;
     this.paintMorek();
   }
-  paintSession() {
-    const el=this.shadowRoot.querySelector('#charge-session');if(!el)return;
-    // Rendering only reads status: the card never sends or changes anything. A missing/stale status says "unknown".
-    const info=this.rawStatus ? chargeSession(decodeMorekState(this.rawStatus)||{supported:false},this.statusAt,this.statusFailed,Date.now()) : null;
-    el.hidden=!info;
-    if(!info){el.replaceChildren();return;}
-    const colors={ok:['#12391f','#7ee2a0'],info:['#1c2a3b','#8db8e6'],unknown:['#2a2f38','#a9b4c2'],warning:['#4a3200','#ffb938'],error:['#5a1717','#ff8a8a']}[info.level]||['#2a2f38','#a9b4c2'];
-    el.dataset.kind=info.kind;el.dataset.level=info.level;el.dataset.posture=info.posture;
-    el.setAttribute('role',info.warning?'alert':'status');el.setAttribute('aria-label','Charging status');
-    el.style.cssText=`padding:${info.warning?'16px 18px':'10px 16px'};background:${colors[0]};color:#f4f7fb;border-left:${info.warning?10:5}px solid ${colors[1]};line-height:1.4`;
-    const title=document.createElement('div');title.style.cssText=`font-weight:700;font-size:${info.warning?'1.25em':'1.05em'};color:${colors[1]}`;title.textContent=(info.warning?'⚠ ':'')+info.title;
-    const detail=document.createElement('div');detail.textContent=info.detail;
-    const nodes=[title,detail];
-    if(info.action){const action=document.createElement('div');action.style.cssText='margin-top:6px;font-weight:600';action.textContent=info.action;nodes.push(action);}
-    const facts=document.createElement('details');facts.style.cssText='margin-top:6px;opacity:.85';
-    const summary=document.createElement('summary');summary.textContent='What SpotNav sees';facts.append(summary);
-    const list=document.createElement('ul');list.style.margin='4px 0 0';for(const fact of info.facts){const li=document.createElement('li');li.textContent=fact;list.append(li);}
-    facts.append(list);nodes.push(facts);
-    el.replaceChildren(...nodes);
-  }
-  paintCheck() {
-    const el=this.shadowRoot.querySelector('#schedule-check');if(!el)return;
-    // Secondary and read-only: shown only for a fresh status, subdued, and never in place of the charging state above.
-    const notes=fresh(this.statusAt,this.statusFailed) ? scheduleNotes(decodeMorekState(this.rawStatus),Date.now()) : null;
-    el.hidden=!notes;
-    if(!notes){el.replaceChildren();return;}
-    el.setAttribute('role','status');el.setAttribute('aria-label','Schedule check');el.dataset.kind=notes.items[0].kind;
-    el.style.cssText='padding:8px 16px;background:#1b2028;color:#c9d2de;font-size:.92em;line-height:1.4;border-left:3px solid #55606e';
-    const nodes=notes.items.map(item=>{const line=document.createElement('div');line.dataset.kind=item.kind;line.textContent=item.text;if(item.level==='warning')line.style.fontWeight='600';return line;});
-    if(notes.facts.length){const d=document.createElement('details');d.style.cssText='margin-top:4px;opacity:.85';const s=document.createElement('summary');s.textContent='Schedule check details';d.append(s);const ul=document.createElement('ul');ul.style.margin='4px 0 0';for(const f of notes.facts){const li=document.createElement('li');li.textContent=f;ul.append(li);}d.append(ul);nodes.push(d);}
-    el.replaceChildren(...nodes);
-  }
-  paintRecovery() {
-    const el=this.shadowRoot.querySelector('#recovery-banner');if(!el)return;
-    // Only a fresh status may speak; a stale one must not claim a blocker (or its absence).
-    const banner=fresh(this.statusAt,this.statusFailed) ? recoveryBanner(decodeMorekState(this.rawStatus),Date.now()) : null;
-    el.hidden=!banner;el.textContent=banner?.text||'';el.dataset.level=banner?.level||'';el.dataset.code=banner?.code||'';
-    if(banner)Object.assign(el.style,{padding:'12px 16px',color:'#fff',fontWeight:'600',background:banner.level==='error'?'#8f1d1d':banner.level==='warning'?'#8a5a00':'#1f4f7a'});
-  }
-  paintAutomatic(dashboard) {
+  // Rendering only reads status: nothing here sends or changes anything. A missing/stale status says "unknown".
+  sessionModel() { return this.rawStatus ? chargeSession(decodeMorekState(this.rawStatus)||{supported:false},this.statusAt,this.statusFailed,Date.now()) : null; }
+  // Secondary and read-only: shown only for a fresh status, and never in place of the charging state.
+  checkModel() { return fresh(this.statusAt,this.statusFailed) ? scheduleNotes(decodeMorekState(this.rawStatus),Date.now()) : null; }
+  // Only a fresh status may speak; a stale one must not claim a blocker (or its absence).
+  recoveryModel() { return fresh(this.statusAt,this.statusFailed) ? recoveryBanner(decodeMorekState(this.rawStatus),Date.now()) : null; }
+  automaticModel(dashboard) {
     const control=dashboard?.control, active=control?.pause?.choice;
     const isFresh=dashboardFresh(dashboard,this.dashboardFailed);
     const status=decodeMorekState(this.rawStatus), owner=status?.ownership?.recorded_owner;
@@ -391,31 +375,19 @@ export class SpotnavEnhancedPanel extends HTMLElement {
       const can=canPause && !this.chargeBusy && (status?.ownership?.completion_authorized===true || status?.schedule_pause?.resume_recoverable===true);
       const resumeOffered=ownedResumeOffered(status);
       const blocker = !isFresh ? 'Dashboard observation unavailable or stale.' : !statusFresh ? 'Morek status unavailable or stale.' : !control?.can_act ? 'Control permission or charger availability is unavailable.' : this.controlPermissionPending ? 'Waiting for a fresh permission check.' : this.autoUncertain || this.morekUncertain ? 'A previous action outcome is unknown; do not retry blindly.' : this.autoBusy || this.morekBusy || this.settingsBusy ? 'Another request is in progress.' : status?.schedule_pause?.request==='stop_pending' ? 'A person Stop is pending.' : status?.schedule_pause?.request==='resume_pending' ? ownedResumeReason(status) : (status?.outcomes?.uncertain===true && status?.schedule_pause?.resume_recoverable!==true) ? 'A profile outcome is uncertain; check the charger.' : (status?.ownership?.completion_authorized!==true && status?.schedule_pause?.resume_recoverable!==true) ? `Schedule ownership is not currently authorized; reported recovery status: ${status?.ownership?.recovery?.automatic_recovery || status?.ownership?.recovery?.state || status?.ownership?.blockers?.[0] || 'unknown'}.` : !resumeOffered ? ownedResumeReason(status) : '';
-      this.shadowRoot.querySelector('#pause-state').textContent=`${intent}; request ${request}; ACK ${ack}; ${readback}; physical charging unknown.${control?.execution_error==='pause_stop_failed' ? ' Stop request failed.' : ''}${blocker ? ` Resume unavailable: ${blocker}` : ''}`;
-      this.shadowRoot.querySelector('#pause-auto').disabled=!(canPause && admittedAction(control,'stop','until_resumed'));
-      this.shadowRoot.querySelector('#resume-auto').disabled=!(can && resumeOffered);
-      this.shadowRoot.querySelector('#pause-notice').textContent=notice || '';
-      return;
+      return {autoState:`${intent}; request ${request}; ACK ${ack}; ${readback}; physical charging unknown.${control?.execution_error==='pause_stop_failed' ? ' Stop request failed.' : ''}${blocker ? ` Resume unavailable: ${blocker}` : ''}`,pauseDisabled:!(canPause && admittedAction(control,'stop','until_resumed')),resumeDisabled:!(can && resumeOffered),pauseNotice:notice || ''};
     }
     const stopFailed=control?.execution_error==='pause_stop_failed' ? ' Stop request failed; physical charging state unknown.' : '';
-    this.shadowRoot.querySelector('#pause-state').textContent=control && isFresh ? (active ? `Pause intent: ${active}; physical stop not confirmed.${stopFailed}` : `No pause reported.${stopFailed}`) : 'Auto state unavailable or stale.';
     const can=isFresh && !!control?.can_act && !this.controlPermissionPending && !this.autoBusy && !this.autoUncertain && !this.morekBusy && !this.morekUncertain && !this.settingsBusy && this._hass?.connected!==false;
-    this.shadowRoot.querySelector('#pause-auto').disabled=!(can && admittedAction(control,'stop','until_resumed'));
-    this.shadowRoot.querySelector('#resume-auto').disabled=!(can && !this.chargeBusy && admittedAction(control,'resume',null));
-    this.shadowRoot.querySelector('#pause-notice').textContent=notice || '';
+    return {autoState:control && isFresh ? (active ? `Pause intent: ${active}; physical stop not confirmed.${stopFailed}` : `No pause reported.${stopFailed}`) : 'Auto state unavailable or stale.',pauseDisabled:!(can && admittedAction(control,'stop','until_resumed')),resumeDisabled:!(can && !this.chargeBusy && admittedAction(control,'resume',null)),pauseNotice:notice || ''};
   }
   chargeDashboardFresh(dashboard) { return dashboardFresh(dashboard,this.dashboardFailed); }
   chargeStatusFresh() { return fresh(this.statusAt,this.statusFailed); }
-  paintChargeNow(dashboard) {
+  chargeNowModel(dashboard) {
     const state=decodeMorekState(this.rawStatus), info=state?.charge_now;
     const active=info?.state==='active';
-    const button=this.shadowRoot.querySelector('#charge-now'), replace=this.shadowRoot.querySelector('#charge-replace');
     const blocker=chargeNowBlocker(this,dashboard,state);
-    button.textContent=active ? 'Return to Auto' : 'Charge Now';
-    button.disabled=!!blocker;
-    replace.hidden=!active;replace.disabled=!!blocker;
-    this.shadowRoot.querySelector('#charge-state').textContent=chargeNowStatus(state,this.chargeStatusFresh()) + (blocker ? ` ${blocker}` : '');
-    this.shadowRoot.querySelector('#charge-notice').textContent=this.chargeNotice || '';
+    return {chargeLabel:active ? 'Return to Auto' : 'Charge Now',chargeDisabled:!!blocker,replaceVisible:active,replaceDisabled:!!blocker,chargeState:chargeNowStatus(state,this.chargeStatusFresh()) + (blocker ? ` ${blocker}` : ''),chargeNotice:this.chargeNotice || ''};
   }
   async chargeAction(action) {
     const hass=this._hass, charger=this.charger, generation=this.generation, permissionEpoch=this.permissionEpoch;
@@ -759,13 +731,13 @@ export class SpotnavEnhancedPanel extends HTMLElement {
       if (!this.connected || this._hass?.connected===false || generation!==this.generation) return;
       if (result?.api_version!==1 || !Array.isArray(result.chargers)) throw new Error('Invalid charger list');
       const chargers=result.chargers.filter(c=>typeof c?.charger_id==='string' && c.charger_id && typeof c?.charger_name==='string');
-      const select=this.shadowRoot.querySelector('#charger'); select.replaceChildren(new Option('Select charger',''));
-      for (const charger of chargers) select.add(new Option(charger.charger_name,charger.charger_id));
+      this.chargers=chargers;
       let remembered=''; try { remembered=sessionStorage.getItem('spotnav.sidebar.charger') || ''; } catch { /* Storage is optional. */ }
       const previous=this.charger || remembered;
       const chosen=chargers.some(c=>c.charger_id===previous) ? previous : chargers.length===1 ? chargers[0].charger_id : '';
       if (chosen!==this.charger && this.view) this.stopObservations();
-      this.charger=chosen; select.value=chosen;
+      this.charger=chosen;
+      this.shellAdapter ? this.renderShell() : this.renderBare();
       if (chosen) {this.rememberCharger();this.refresh();}
       else {this.rememberCharger();this.message(chargers.length ? 'Select a charger.' : 'No chargers available.');}
     } catch { if (this.connected && generation===this.generation) {this.stopObservations(true);this.loaded=false;this.message('Charger list unavailable. Use Refresh observations to retry.');} }
@@ -790,13 +762,13 @@ export class SpotnavEnhancedPanel extends HTMLElement {
       this.bounded(pending).then(raw=>{
         if (!valid() || epoch!==this.dashboardEpoch) return;
         const decoded=dashboardAdapter(raw,this.rawStatus,this.statusAt);
-        if (!decoded || decoded.draftKey!==charger) {this.dashboardFailed=true;if(this.view)this.paint();else this.message('Dashboard unavailable or unsupported.');return;}
+        if (!decoded || decoded.draftKey!==charger) {this.dashboardFailed=true;if(this.rawDashboard)this.paint();else this.message('Dashboard unavailable or unsupported.');return;}
         this.dashboardFailed=false; this.rawDashboard=raw;this.costAwaitingRead=false;this.paramAwaitingRead=false;this.notifyAwaitingRead=false;this.controlPermissionPending=false;
         const control=decodeDashboard(raw).value?.control;
         const generated=Date.parse(raw.generated_at || '');
         if(this.autoExpected && control && fresh(generated) && generated<=Date.now() && generated>=this.autoExpected.dispatchedAt && (this.autoExpected.action==='stop' ? control.pause?.choice===this.autoExpected.choice : control.pause?.choice==null)) {this.autoNotice='Confirmed by a fresh dashboard observation.';this.autoExpected=null;}
         this.paint();
-      }).catch(()=>{if(valid() && epoch===this.dashboardEpoch) {this.dashboardFailed=true;if(this.view)this.paint();else this.message('Dashboard unavailable.');}});
+      }).catch(()=>{if(valid() && epoch===this.dashboardEpoch) {this.dashboardFailed=true;if(this.rawDashboard)this.paint();else this.message('Dashboard unavailable.');}});
     }
     if (!this.statusRead && !this.morekBusy && !this.settingsBusy) {
       const epoch=this.statusEpoch;

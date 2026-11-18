@@ -189,7 +189,7 @@ describe('actual sidebar read-only host', () => {
     const hass={connected:true,callWS:msg=>msg.type==='spotnav/list_chargers'?(fail?Promise.reject(Error()):Promise.resolve({api_version:1,chargers})):Promise.resolve(msg.type==='spotnav/get_dashboard'?raw:status)};
     const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();expect(panel.charger).toBe('');
     const select=panel.shadowRoot.querySelector('#charger');select.value='a';select.dispatchEvent(new Event('change'));await tick();
-    chargers=[];panel.hass={...hass,connected:false};panel.hass=hass;await tick();expect(panel.charger).toBe('');expect(panel.shadowRoot.textContent).toContain('No chargers available.');expect(panel.shadowRoot.querySelector('.shell')).toBeNull();
+    chargers=[];panel.hass={...hass,connected:false};panel.hass=hass;await tick();expect(panel.charger).toBe('');expect(panel.shadowRoot.textContent).toContain('No chargers available.');expect(panel.shadowRoot.querySelector('.shell [role="tab"]')).not.toBeNull();expect(panel.shadowRoot.querySelector('.hero')).toBeNull();expect(panel.shadowRoot.querySelector('#pause-auto')).toBeNull();
     fail=true;await panel.loadChargers();expect(panel.shadowRoot.textContent).toContain('Charger list unavailable.');panel.remove();
   });
   it('ignores stale list replies after reconnect and teardown', async () => {
@@ -202,7 +202,7 @@ describe('actual sidebar read-only host', () => {
     const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';let saved=record();
     const hass={connected:true,user:{is_admin:true},callWS:msg=>Promise.resolve(msg.type==='spotnav/list_chargers'?{api_version:1,chargers:[{charger_id:'a',charger_name:'A'}]}:msg.type==='spotnav/get_dashboard'?raw:msg.type==='spotnav/get_settings'?envelope(saved):status)};
     const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();const input=panel.shadowRoot.querySelector('[data-setting="target"]');input.value='85';input.dispatchEvent(new Event('input',{bubbles:true}));
-    panel.hass={...hass,connected:false};expect(panel.shadowRoot.querySelector('main').hidden).toBe(true);saved={...saved,revision:8};panel.hass=hass;await tick();
+    panel.hass={...hass,connected:false};expect(panel.shadowRoot.querySelector('.shell').dataset.hold).toBe('true');expect(panel.shadowRoot.querySelector('.sn-header #refresh')).not.toBeNull();expect(panel.shadowRoot.querySelector('#recovery-banner').hidden).toBe(true);saved={...saved,revision:8};panel.hass=hass;await tick();
     expect(panel.shadowRoot.querySelector('[data-setting="target"]').value).toBe('85');expect(panel.settingsConflict).toBe(true);expect(panel.shadowRoot.querySelector('#save-plan').disabled).toBe(true);panel.remove();
   });
   it('shows missing settings and keeps suggested basis out of an unrelated save', async () => {
@@ -402,7 +402,7 @@ describe('actual sidebar read-only host', () => {
     expect(panel.shadowRoot.querySelector('.shell')).not.toBeNull();
     expect(panel.shadowRoot.textContent).toContain('Price chart unavailable');
     expect(panel.shadowRoot.textContent).not.toContain('SAMPLE DATA');
-    resolveA(a); await tick(); expect(select.value).toBe('b');
+    resolveA(a); await tick(); expect(panel.shadowRoot.querySelector('#charger').value).toBe('b');
     panel.hass={...hass,connected:false}; expect(panel.shadowRoot.textContent).toContain('disconnected');
     panel.hass=hass; await tick(); expect(panel.shadowRoot.querySelector('.shell')).not.toBeNull();
     panel.remove();
@@ -418,7 +418,7 @@ describe('actual sidebar read-only host', () => {
     }};
     const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();
     const select=panel.shadowRoot.querySelector('#charger');select.value='a';select.dispatchEvent(new Event('change'));await tick();
-    select.value='b';select.dispatchEvent(new Event('change'));await tick();
+    {const s=panel.shadowRoot.querySelector('#charger');s.value='b';s.dispatchEvent(new Event('change'));};await tick();
     finish({api_version:1,schedule:{...status.schedule,supported:true,operator:{state:'mismatch'}}});await tick();
     expect(panel.shadowRoot.textContent).toContain('identity unsupported');
     expect(panel.shadowRoot.textContent).not.toContain('mismatch the sent');
@@ -467,7 +467,7 @@ describe('actual sidebar read-only host', () => {
     update.model.vehicle.status='Updated connection';
     update.model.settingsEditor=true;update.model.canSave=true;update.model.policySupported=true;Object.assign(update.model.settings,{driver:initial.driver,energy:initial.requested_kwh,vehicleId:''});update.actions={save:v=>panel.savePlan(v)};
     panel.view.update(update);
-    expect(panel.shadowRoot.querySelector('[data-setting="target"]')).toBe(input);expect(input.value).toBe('85');expect(panel.shadowRoot.querySelector('#critical-live').textContent).toContain('mismatch');expect(panel.shadowRoot.querySelector('.status-line').textContent).toContain('Updated connection');
+    expect(panel.shadowRoot.querySelector('[data-setting="target"]')).toBe(input);expect(input.value).toBe('85');expect(panel.shadowRoot.querySelector('#critical-live').textContent).toContain('mismatch');expect(panel.shadowRoot.querySelector('.hero-title').textContent).toContain('Updated connection');
     panel.shadowRoot.querySelector('#save-plan').click();await tick();
     const writes=calls.filter(m=>m.type==='spotnav/update_settings');expect(writes).toHaveLength(1);expect(writes[0].expected_revision).toBe(7);expect(writes[0].settings.target.target_percent).toBe(85);
     expect(panel.shadowRoot.textContent).toContain('Saved and confirmed.');
@@ -504,7 +504,7 @@ describe('actual sidebar read-only host', () => {
     const hass={connected:true,user:{is_admin:true},callWS:msg=>{if(msg.type==='spotnav/list_chargers')return Promise.resolve({api_version:1,chargers:[{charger_id:'a',charger_name:'A'},{charger_id:'b',charger_name:'B'}]});if(msg.type==='spotnav/get_dashboard')return Promise.resolve(msg.charger_id==='a'?a:b);if(msg.type==='spotnav/get_settings')return Promise.resolve(envelope(record()));if(msg.type==='spotnav/update_settings')return new Promise(r=>finish=r);return Promise.resolve(status);}};
     const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();const select=panel.shadowRoot.querySelector('#charger');select.value='a';select.dispatchEvent(new Event('change'));await tick();
     const pending=panel.savePlan({target:'85',minimum:'40',cap:'0.1',capEnabled:true,capBasis:'nord_pool',deadlineEnabled:true,readyBy:'06:30'});await tick();
-    select.value='b';select.dispatchEvent(new Event('change'));await tick();finish(envelope({...record(),revision:8}));await pending;await tick();
+    {const s=panel.shadowRoot.querySelector('#charger');s.value='b';s.dispatchEvent(new Event('change'));};await tick();finish(envelope({...record(),revision:8}));await pending;await tick();
     expect(panel.charger).toBe('b');expect(panel.settingsRecord.revision).toBe(7);expect(panel.shadowRoot.textContent).not.toContain('Saved and confirmed.');panel.remove();
   });
   it('does not apply a late settings answer after administrator access changes', async () => {
@@ -680,7 +680,7 @@ describe('actual sidebar read-only host', () => {
     const a=fixture(),b=fixture();a.generated_at=b.generated_at=new Date().toISOString();a.charger.charger_id='a';b.charger.charger_id='b';let finish;const calls=[];
     const hass={connected:true,user:{is_admin:true},callWS:msg=>{calls.push(msg);if(msg.type==='spotnav/list_chargers')return Promise.resolve({api_version:1,chargers:[{charger_id:'a',charger_name:'A'},{charger_id:'b',charger_name:'B'}]});if(msg.type==='spotnav/get_dashboard')return Promise.resolve(msg.charger_id==='a'?a:b);if(msg.type==='spotnav/get_settings')return Promise.resolve(envelope(record()));if(msg.type==='spotnav/manual_action')return new Promise(r=>finish=r);return Promise.resolve(status);}};
     const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();const select=panel.shadowRoot.querySelector('#charger');select.value='a';select.dispatchEvent(new Event('change'));await tick();const pending=panel.automaticAction('stop','until_resumed');
-    if(change==='permission')panel.hass={...hass,user:{is_admin:false}};else {select.value='b';select.dispatchEvent(new Event('change'));}await tick();finish({api_version:1,ok:true,error:null,action:'stop',choice:'until_resumed'});await pending;await tick();expect(panel.autoNotice).not.toMatch(/confirmed/i);expect(panel.autoExpected).toBeNull();expect(calls.filter(m=>m.type==='spotnav/manual_action')).toHaveLength(1);panel.remove();
+    if(change==='permission')panel.hass={...hass,user:{is_admin:false}};else {{const s=panel.shadowRoot.querySelector('#charger');s.value='b';s.dispatchEvent(new Event('change'));};}await tick();finish({api_version:1,ok:true,error:null,action:'stop',choice:'until_resumed'});await pending;await tick();expect(panel.autoNotice).not.toMatch(/confirmed/i);expect(panel.autoExpected).toBeNull();expect(calls.filter(m=>m.type==='spotnav/manual_action')).toHaveLength(1);panel.remove();
   });
   it.each(['identity','permission','unsupported'])('refuses selective clear when %s changes at confirmation', async change => {
     const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';const calls=[];const morek={api_version:1,schedule:{...status.schedule,supported:true,cleanup_supported:true,configured_id:'a',resolved_id:'b'}};

@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const dark = readFileSync(new URL("../shared-dashboard/dark.css", import.meta.url), "utf8");
+const shell = readFileSync(new URL("../shared-dashboard/shell.css", import.meta.url), "utf8");
 const panel = readFileSync(new URL("../../custom_components/spotnav/www/sidebar/panel.css", import.meta.url), "utf8");
 const rule = (css: string, selector: string) => css.split("\n").find((l) => l.startsWith(selector)) ?? "";
 const lum = (hex: string) => {
@@ -21,11 +22,13 @@ describe("dark theme ownership", () => {
     expect(dark).toContain("color-scheme:dark");
   });
   it("covers Web Awesome details/input parts, dialog, Charge Now details and the log viewer", () => {
-    for (const s of ["wa-details::part(content)", "wa-input::part(base)", "wa-input[disabled]::part(input)", "dialog{", "#charge-options", "#log-viewer", ".log-lines"]) expect(dark).toContain(s);
+    for (const s of ["wa-details::part(content)", "wa-input::part(base)", "wa-input[disabled]::part(input)", "dialog{", ".log-lines"]) expect(dark).toContain(s);
+    for (const s of ["#charge-options", "#log-viewer"]) expect(shell).toContain(s);
     expect(rule(dark, ".log-lines")).toContain("white-space:pre-wrap");
   });
   it("keeps warning/error colours distinct from the neutral dark surface", () => {
-    expect(rule(dark, ".alert{")).toContain("#422b29");
+    expect(rule(shell, ".alert{")).toContain("var(--sn-error-soft)");
+    expect(shell).toContain("--sn-error-soft:#431a22");
     expect(dark).toContain("[data-level=warn]{border-color:#b9892f}");
     expect(contrast("#ffcf97", "#1a202b")).toBeGreaterThan(7);
   });
@@ -39,6 +42,6 @@ describe("dark theme ownership", () => {
     expect(panel).toContain(":host(.wa-dark)");
     expect(panel).not.toMatch(/(^|[,{}\s])\.wa-dark[\s,{]/);
     expect(panel).toContain("#charge-options");
-    expect(panel).toMatch(/:host\s*\{[^}]*--surface-input:\s*#161e29/);
+    expect(panel).toMatch(/:host\s*\{[^}]*--sn-input:\s*#0b1626/);
   });
 });

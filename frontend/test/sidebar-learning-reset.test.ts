@@ -72,7 +72,7 @@ describe('sidebar learned-estimate reset (mocked)', () => {
   it('ignores a late answer from the old charger after another is selected', async () => {
     let finish:any;const {calls,hass}=setup(()=>new Promise(r=>{finish=r;}));const confirm=vi.spyOn(window,'confirm').mockReturnValue(true);
     const {panel,select,button}=await open(hass);button().click();await tick();
-    select.value='b';select.dispatchEvent(new Event('change'));await tick();
+    {const s=panel.shadowRoot.querySelector('#charger');s.value='b';s.dispatchEvent(new Event('change'));};await tick();
     finish(done);await tick();
     expect(panel.charger).toBe('b');expect(panel.learningNotice).toBeFalsy();expect(panel.shadowRoot.textContent).not.toContain('Learned estimates reset');
     expect(calls.filter(m=>m.action==='reset_learning')).toHaveLength(1);panel.remove();confirm.mockRestore();
@@ -87,7 +87,7 @@ describe('sidebar learned-estimate reset (mocked)', () => {
   it('an out-of-order failure from the old charger is not shown on the new one', async () => {
     let fail:any;const {hass}=setup(()=>new Promise((_,r)=>{fail=r;}));const confirm=vi.spyOn(window,'confirm').mockReturnValue(true);
     const {panel,select,button}=await open(hass);button().click();await tick();
-    select.value='b';select.dispatchEvent(new Event('change'));await tick();fail(new Error('late'));await tick();
+    {const s=panel.shadowRoot.querySelector('#charger');s.value='b';s.dispatchEvent(new Event('change'));};await tick();fail(new Error('late'));await tick();
     expect(panel.learningNotice).toBeFalsy();panel.remove();confirm.mockRestore();
   });
 });

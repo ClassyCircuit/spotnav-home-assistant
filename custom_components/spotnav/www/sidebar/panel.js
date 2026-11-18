@@ -52268,7 +52268,7 @@ function priceAxisExtent(prices, unit, extra) {
 
 // shared-dashboard/charts.js
 use([install3, install, install5, install6, install8, install9, install7, install15, install12, install16]);
-var axis = { axisLine: { lineStyle: { color: "#536b76" } }, axisLabel: { color: "#bed0d5", fontSize: 12 }, splitLine: { lineStyle: { color: "#34444d" } } };
+var axis = { axisLine: { lineStyle: { color: "#4a6286" } }, axisLabel: { color: "#aebfd8", fontSize: 12 }, splitLine: { lineStyle: { color: "#1b3150" } } };
 function mountCharts(root, data, format3, modes) {
   let { prices, windows, tracks = null, now, deadline, horizon, cap, readings, sentHistory, historyAxis, unit = "c/kWh", viewKey } = data;
   let { time: time2, date: sampleDate, days: sampleDays, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks, tickLabel } = format3;
@@ -52303,10 +52303,10 @@ function mountCharts(root, data, format3, modes) {
     };
     const setPriceOption = (initial) => priceChart.setOption({
       animation: false,
-      grid: { left: 48, right: 20, top: 82, bottom: 92, show: true, backgroundColor: "#101f30", borderWidth: 0 },
-      tooltip: { trigger: "item", confine: true, hideDelay: 0, transitionDuration: 0, backgroundColor: "#233942", borderColor: "#5b7b7a", textStyle: { color: "#f0faf8" }, formatter: (p4) => !Array.isArray(p4.value) || p4.value.length < 3 || !p4.value.slice(0, 3).every(Number.isFinite) ? "" : `${escapeText(tooltipDate(p4.value[0]))} ${escapeText(time2(p4.value[0]))}\u2013${escapeText(tooltipDate(p4.value[1]))} ${escapeText(time2(p4.value[1]))}<br>${priceText(p4.value[2])} ${escapeText(unit)}${priceBand(p4.value[2], unit) ? ` \xB7 ${priceBand(p4.value[2], unit).label}` : ""}${windows.filter((w2) => w2.start < p4.value[1] && w2.end > p4.value[0]).map((w2) => `<br>Proposal: ${escapeText(tooltipDate(w2.start))} ${escapeText(time2(w2.start))}\u2013${escapeText(time2(w2.end))}`).join("")}` },
+      grid: { left: 48, right: 20, top: 82, bottom: 92, show: true, backgroundColor: "#0b1626", borderWidth: 0 },
+      tooltip: { trigger: "item", confine: true, hideDelay: 0, transitionDuration: 0, backgroundColor: "#14233a", borderColor: "#4a6286", textStyle: { color: "#f4f8ff" }, formatter: (p4) => !Array.isArray(p4.value) || p4.value.length < 3 || !p4.value.slice(0, 3).every(Number.isFinite) ? "" : `${escapeText(tooltipDate(p4.value[0]))} ${escapeText(time2(p4.value[0]))}\u2013${escapeText(tooltipDate(p4.value[1]))} ${escapeText(time2(p4.value[1]))}<br>${priceText(p4.value[2])} ${escapeText(unit)}${priceBand(p4.value[2], unit) ? ` \xB7 ${priceBand(p4.value[2], unit).label}` : ""}${windows.filter((w2) => w2.start < p4.value[1] && w2.end > p4.value[0]).map((w2) => `<br>Proposal: ${escapeText(tooltipDate(w2.start))} ${escapeText(time2(w2.start))}\u2013${escapeText(time2(w2.end))}`).join("")}` },
       xAxis: { ...axis, type: "value", min: horizon[0], max: horizon[1], axisLabel: { show: false }, axisTick: { show: false }, splitLine: { show: false } },
-      yAxis: { ...axis, axisLabel: { ...axis.axisLabel, formatter: priceText }, type: "value", name: unit, nameTextStyle: { color: "#bed0d5", align: "left" }, ...priceAxisExtent(prices, unit, cap) },
+      yAxis: { ...axis, axisLabel: { ...axis.axisLabel, formatter: priceText }, type: "value", name: unit, nameTextStyle: { color: "#aebfd8", align: "left" }, ...priceAxisExtent(prices, unit, cap) },
       dataZoom: [{ type: "inside", xAxisIndex: 0, startValue: initial[0], endValue: initial[1], filterMode: "weakFilter", zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false, preventDefaultMouseMove: false }, { type: "slider", xAxisIndex: 0, startValue: initial[0], endValue: initial[1], filterMode: "weakFilter", height: 28, bottom: 12, borderColor: "#4b6871", backgroundColor: "#142630", fillerColor: "rgba(91,205,180,.22)", textStyle: { color: "#d0e1df" }, showDetail: false }],
       series: [
         { type: "custom", clip: true, name: "Sample price", renderItem, encode: { x: [0, 1], y: 2 }, data: stepData() },
@@ -52531,16 +52531,16 @@ ${sampleDate(h3)}` : time2(h3);
         return `${escapeText(time2(p4.value[0]))}<br>${p4.value[1] == null ? "Unavailable" : `${p4.value[1].toFixed(1)} kW`}`;
       } },
       xAxis: { ...axis, type: "value", min: readings[0].time, max: readings.at(-1).time, ...Number.isFinite(historyAxis?.interval) && historyAxis.interval > 0 ? { interval: historyAxis.interval } : {}, axisLabel: { ...axis.axisLabel, formatter: time2 } },
-      yAxis: { ...axis, type: "value", name: "kW", min: 0, ...Number.isFinite(historyAxis?.max) && historyAxis.max > 0 ? { max: historyAxis.max } : {}, nameTextStyle: { color: "#bed0d5", align: "left" } },
+      yAxis: { ...axis, type: "value", name: "kW", min: 0, ...Number.isFinite(historyAxis?.max) && historyAxis.max > 0 ? { max: historyAxis.max } : {}, nameTextStyle: { color: "#aebfd8", align: "left" } },
       series: [{
         type: "line",
         step: "end",
         connectNulls: false,
         symbol: "circle",
         symbolSize: 5,
-        lineStyle: { color: "#188c79", width: 2 },
-        itemStyle: { color: "#188c79" },
-        areaStyle: { color: new graphic_exports2.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: "rgba(31,165,137,.45)" }, { offset: 1, color: "rgba(31,165,137,.04)" }]) },
+        lineStyle: { color: "#34e8b0", width: 2 },
+        itemStyle: { color: "#34e8b0" },
+        areaStyle: { color: new graphic_exports2.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: "rgba(52,232,176,.4)" }, { offset: 1, color: "rgba(52,232,176,.04)" }]) },
         markArea: { silent: true, label: { show: false }, itemStyle: { color: "rgba(112,153,222,.15)" }, data: [[{ xAxis: sentHistory.start }, { xAxis: sentHistory.end }]] },
         data: readings.map((r7) => [r7.time, r7.kw])
       }]
@@ -53102,6 +53102,57 @@ var tabPanelId = (id) => `sn-panel-${id}`;
 function renderNav(active) {
   return `<nav class="sn-nav" aria-label="SpotNav sections"><div class="sn-tabs" role="tablist" aria-label="SpotNav sections">${TABS.map(([id, label2]) => `<button type="button" role="tab" class="sn-tab" id="${tabButtonId(id)}" data-sn-tab="${id}" aria-controls="${tabPanelId(id)}" aria-selected="${id === active}" tabindex="${id === active ? 0 : -1}"><svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20">${ICONS[id]}</svg><span>${escapeText(label2)}</span></button>`).join("")}</div></nav>`;
 }
+function renderHeader(header, active, can = {}) {
+  const h3 = header || {};
+  const chargers = Array.isArray(h3.chargers) ? h3.chargers : null;
+  const select = chargers ? `<label class="sn-field sn-charger"><span>Charger</span><select id="charger" ${can.selectCharger ? "" : "disabled"}>${[`<option value="">Select charger</option>`, ...chargers.map((c5) => `<option value="${escapeText(c5.id)}"${c5.id === h3.selected ? " selected" : ""}>${escapeText(c5.name)}</option>`)].join("")}</select></label>` : "";
+  const refresh = can.refresh ? '<button type="button" id="refresh" class="sn-btn sn-btn-quiet">Refresh observations</button>' : "";
+  const menu = can.menu ? '<button type="button" id="menu" class="sn-icon-btn" aria-label="Open navigation"><svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z" fill="currentColor"/></svg></button>' : "";
+  return `<header class="sn-header"><div class="sn-bar">${menu}<div class="sn-brand"><h1>SPOTNAV <span>ENHANCED</span></h1><p>${escapeText(h3.subtitle || "White BMW iX3 \xB7 Morek charger")}</p></div>${renderNav(active)}<div class="sn-host-tools">${select}${refresh}</div></div></header>`;
+}
+var LEVEL_ICON = { error: "\u26D4", warning: "\u26A0", info: "\u2139", ok: "\u2713", unknown: "?" };
+function renderSessionBanner(info) {
+  if (!info) return '<section id="charge-session" class="sn-banner" hidden></section>';
+  const lines4 = (info.facts || []).map((f3) => `<li>${escapeText(f3)}</li>`).join("");
+  return `<section id="charge-session" class="sn-banner${info.warning ? " sn-banner-strong" : ""}" role="${info.warning ? "alert" : "status"}" aria-label="Charging status" data-kind="${escapeText(info.kind)}" data-level="${escapeText(info.level)}" data-posture="${escapeText(info.posture)}"><div class="sn-banner-title"><span aria-hidden="true">${LEVEL_ICON[info.level] || ""}</span> ${escapeText(info.title)}</div><div class="sn-banner-detail">${escapeText(info.detail)}</div>${info.action ? `<div class="sn-banner-action">${escapeText(info.action)}</div>` : ""}<details class="sn-banner-facts"><summary>What SpotNav sees</summary><ul>${lines4}</ul></details></section>`;
+}
+function renderCheckBanner(notes) {
+  if (!notes || !Array.isArray(notes.items) || !notes.items.length) return '<section id="schedule-check" class="sn-banner sn-banner-quiet" hidden></section>';
+  const lines4 = notes.items.map((i7) => `<div data-kind="${escapeText(i7.kind)}"${i7.level === "warning" ? ' class="sn-strong"' : ""}>${escapeText(i7.text)}</div>`).join("");
+  const facts = (notes.facts || []).length ? `<details class="sn-banner-facts"><summary>Schedule check details</summary><ul>${notes.facts.map((f3) => `<li>${escapeText(f3)}</li>`).join("")}</ul></details>` : "";
+  return `<section id="schedule-check" class="sn-banner sn-banner-quiet" role="status" aria-label="Schedule check" data-kind="${escapeText(notes.items[0].kind)}">${lines4}${facts}</section>`;
+}
+function renderRecoveryBanner(banner2) {
+  if (!banner2) return '<div id="recovery-banner" class="sn-banner sn-banner-recovery" role="alert" hidden></div>';
+  return `<div id="recovery-banner" class="sn-banner sn-banner-recovery sn-banner-strong" role="alert" data-level="${escapeText(banner2.level)}" data-code="${escapeText(banner2.code)}"><span aria-hidden="true">${LEVEL_ICON[banner2.level] || ""}</span> ${escapeText(banner2.text)}</div>`;
+}
+function renderStatusStack(m4) {
+  const held = m4.hold === true;
+  const b3 = held ? {} : m4.banners || {};
+  const warning = !held && m4.warning ? `<div class="alert sn-alert"><div><strong>${escapeText(m4.warning.title)}</strong><p>${escapeText(m4.warning.detail)}</p></div><a href="#details">View details \u2193</a></div>` : "";
+  return `<div class="sn-status"><p class="message sn-notice" role="status"${m4.hostMessage ? "" : " hidden"}>${escapeText(m4.hostMessage || "")}</p><div id="critical-live" role="status" aria-live="polite">${warning}</div>${renderSessionBanner(b3.session)}${renderCheckBanner(b3.check)}${renderRecoveryBanner(b3.recovery)}</div>`;
+}
+var DURATIONS = [["30", "30 minutes"], ["60", "1 hour"], ["120", "2 hours"], ["180", "3 hours"], ["custom", "Custom end time"]];
+function renderControls(c5, draft = {}) {
+  const x2 = c5 || {};
+  const duration2 = draft.duration ?? "60";
+  const custom = duration2 === "custom";
+  const dis = (on) => on ? " disabled" : "";
+  return `<div class="sn-actions"><div id="automatic-controls" class="sn-auto"><span id="pause-state" class="sn-state">${escapeText(x2.autoState || "Auto state unknown.")}</span><div class="sn-btnrow"><button type="button" id="pause-auto" class="sn-btn"${dis(x2.pauseDisabled !== false)}>Pause Auto until resumed</button><button type="button" id="resume-auto" class="sn-btn"${dis(x2.resumeDisabled !== false)}>Resume Auto</button></div><span id="pause-notice" class="sn-note" role="status">${escapeText(x2.pauseNotice || "")}</span></div><section id="charge-controls" class="sn-charge" aria-label="Charge Now"><details id="charge-options"><summary>Duration / change end</summary><div class="cn-fields"><label>Duration <select id="charge-duration" data-csetting="duration">${DURATIONS.map(([v2, t6]) => `<option value="${v2}"${v2 === duration2 ? " selected" : ""}>${t6}</option>`).join("")}</select></label><label id="custom-label"${custom ? "" : " hidden"}>End time <input id="charge-end" type="datetime-local" data-csetting="end" value="${escapeText(draft.end ?? "")}"></label><button type="button" id="charge-replace" class="sn-btn"${x2.replaceVisible ? "" : " hidden"}${dis(x2.replaceDisabled !== false)}>Replace Charge Now end</button></div></details><div class="cn-actions"><button type="button" id="charge-now" class="sn-btn sn-btn-primary"${dis(x2.chargeDisabled !== false)}>${escapeText(x2.chargeLabel || "Charge Now")}</button></div><span id="charge-state" class="sn-state" role="status">${escapeText(x2.chargeState || "Charge Now status unavailable.")}</span><span id="charge-notice" class="sn-note" role="status">${escapeText(x2.chargeNotice || "")}</span></section></div>`;
+}
+function sceneOf(scene) {
+  const s4 = scene || {};
+  const connection = s4.connection === "connected" || s4.connection === "disconnected" ? s4.connection : "unknown";
+  const stale = s4.stale === true;
+  const label2 = connection === "connected" ? stale ? "Last reported connected \xB7 stale" : "Car reported connected" : connection === "disconnected" ? stale ? "Last reported unplugged \xB7 stale" : "Not plugged in" : "Plug state unknown";
+  const art = connection === "connected" && !stale ? "connected" : "neutral";
+  const description = art === "connected" ? "Illustration of a white BMW iX3 plugged into a Morek charger. The picture is decorative: the connection and any charging are stated in text only." : `Illustration of a white BMW iX3 without a cable. The picture is decorative: ${label2.toLowerCase()} is stated in text.`;
+  return { connection, label: label2, art, stale, description };
+}
+function renderArt(scene) {
+  const s4 = sceneOf(scene);
+  return `<div class="sn-art" data-art="${s4.art}" data-art-stale="${s4.stale}" role="img" aria-label="${escapeText(s4.description)}"></div>`;
+}
 var tabOpen = (id, active) => `<div class="tab-panel" role="tabpanel" id="${tabPanelId(id)}" data-tab="${id}" aria-labelledby="${tabButtonId(id)}" tabindex="-1"${id === active ? "" : " hidden"}><div class="dashboard">`;
 var tabClose = "</div></div>";
 function renderRecentSummary(day, legacy) {
@@ -53232,9 +53283,10 @@ function mountDashboard(root, adapter) {
     const priceAt = (h3) => prices.find((p4) => p4.start <= h3 && h3 < p4.end)?.cents;
     const priceCard = (mode) => {
       const title = mode === "bar" ? "Bars" : "Stepped area";
-      if (!chartReady) return card(`Prices & plan \xB7 ${title}`, labels.chartEyebrow || "PRICES & PLAN", `<p>Price chart unavailable.</p><p class="subtext">${escapeText(labels.chartIntro)} ${escapeText(labels.chartNote)}</p>${plan}`, `prices prices-${mode}`, tag);
+      const heading = modes.length > 1 ? `Electricity prices & plan \xB7 ${title}` : "Electricity prices & charging plan";
+      if (!chartReady) return card(heading, labels.chartEyebrow || "PRICES & PLAN", `<p>Price chart unavailable.</p><p class="subtext">${escapeText(labels.chartIntro)} ${escapeText(labels.chartNote)}</p>${plan}`, `prices prices-${mode}`, tag);
       const extremum = (p4) => p4 ? `${priceNumber(p4.cents)} ${escapeText(unit)} \xB7 ${escapeText(day(p4.start))} ${escapeText(time2(p4.start))}` : "Unknown";
-      return card(`Prices & plan \xB7 ${title}`, labels.chartEyebrow || "PRICES & PLAN", `<div class="chart-intro"><div><strong>${icon} ${mode === "bar" ? "A \xB7 Interval bars" : (chart?.comparison ? "B \xB7 " : "") + "Stepped area"}</strong><p>${escapeText(labels.chartIntro)}</p></div><div class="chart-actions"><wa-button data-zoom="${mode}" size="small" aria-label="Zoom in ${title}">Zoom +</wa-button><wa-button data-reset="${mode}" size="small" aria-label="Reset ${title} overview">Full horizon</wa-button><span>Wheel zooms \xB7 scroll outside chart</span></div></div><div class="price-context"><span>Now <b>${priceNumber(priceAt(chart.now))} ${escapeText(unit)}</b></span><span>Next window starts at <b>${priceNumber(m4.nextPriceUnavailable ? null : priceAt(next?.start))} ${escapeText(unit)}</b></span><span>Horizon low <b>${extremum(extremes[0])}</b></span><span>Horizon high <b>${extremum(extremes[1])}</b></span></div>${renderPriceNav(m4.priceNav)}<div id="price-${mode}" class="chart price-chart" role="img" aria-label="Price intervals and proposed windows"></div><div class="track-lanes" data-track-lanes="${mode}" role="group" aria-label="Evidence tracks on the price time axis: proposal, sent, effective, measured"></div><p class="legend track-legend">Tracks share the price time axis. <span class="tk tk-proposal"></span> Proposal: the current calculated plan, not sent \xB7 <span class="tk tk-sent"></span> Sent: plan versions the charger acknowledged, from the loaded history day (acknowledged is not installed) \xB7 <span class="tk tk-effective"></span> Effective: the latest fresh readback, remaining period only; a reported limit, not power \xB7 <span class="tk tk-flow"></span> Measured: observed power flow of the loaded history day \xB7 <span class="tk tk-unknown"></span> Hatched: unknown or not loaded, never zero.</p><p class="legend">${bandsApply(unit) ? `Absolute price bands, ${escapeText(unit)}: ${PRICE_BANDS.map((b3) => `<span class="${b3.css}">\u25CF</span> ${b3.label} ${b3.range}`).join(" ")} (exactly 25 is Medium; display only, not a charging limit)` : `Neutral price color: bands are defined in euro c/kWh and no trusted conversion is available for ${escapeText(unit)}, so nothing is classified.`} <span class="shade"></span> Proposed charging \xB7 gradient + pale track ${Number.isFinite(chart.cap) ? `<span class="cap-key"></span> Soft cap ${priceText(chart.cap)} ${escapeText(unit)}` : ""} <span class="now-key">\u2502</span> Now</p><p class="subtext">${escapeText(labels.chartNote)}</p>${plan}`, `prices prices-${mode}`, tag);
+      return card(heading, labels.chartEyebrow || "PRICES & PLAN", `<div class="chart-intro"><div>${modes.length > 1 ? `<strong>${icon} ${mode === "bar" ? "Interval bars" : "Stepped area"}</strong>` : ""}<p>${escapeText(labels.chartIntro)}</p></div><div class="chart-actions"><wa-button data-zoom="${mode}" size="small" aria-label="Zoom in ${title}">Zoom +</wa-button><wa-button data-reset="${mode}" size="small" aria-label="Reset ${title} overview">Full horizon</wa-button><span>Wheel zooms \xB7 scroll outside chart</span></div></div><div class="price-context"><span>Now <b>${priceNumber(priceAt(chart.now))} ${escapeText(unit)}</b></span><span>Next window starts at <b>${priceNumber(m4.nextPriceUnavailable ? null : priceAt(next?.start))} ${escapeText(unit)}</b></span><span>Horizon low <b>${extremum(extremes[0])}</b></span><span>Horizon high <b>${extremum(extremes[1])}</b></span></div>${renderPriceNav(m4.priceNav)}<div id="price-${mode}" class="chart price-chart" role="img" aria-label="Price intervals and proposed windows"></div><div class="track-lanes" data-track-lanes="${mode}" role="group" aria-label="Evidence tracks on the price time axis: proposal, sent, effective, measured"></div><p class="legend track-legend">Tracks share the price time axis. <span class="tk tk-proposal"></span> Proposal: the current calculated plan, not sent \xB7 <span class="tk tk-sent"></span> Sent: plan versions the charger acknowledged, from the loaded history day (acknowledged is not installed) \xB7 <span class="tk tk-effective"></span> Effective: the latest fresh readback, remaining period only; a reported limit, not power \xB7 <span class="tk tk-flow"></span> Measured: observed power flow of the loaded history day \xB7 <span class="tk tk-unknown"></span> Hatched: unknown or not loaded, never zero.</p><p class="legend">${bandsApply(unit) ? `Absolute price bands, ${escapeText(unit)}: ${PRICE_BANDS.map((b3) => `<span class="${b3.css}">\u25CF</span> ${b3.label} ${b3.range}`).join(" ")} (exactly 25 is Medium; display only, not a charging limit)` : `Neutral price color: bands are defined in euro c/kWh and no trusted conversion is available for ${escapeText(unit)}, so nothing is classified.`} <span class="shade"></span> Proposed charging \xB7 gradient + pale track ${Number.isFinite(chart.cap) ? `<span class="cap-key"></span> Soft cap ${priceText(chart.cap)} ${escapeText(unit)}` : ""} <span class="now-key">\u2502</span> Now</p><p class="subtext">${escapeText(labels.chartNote)}</p>${plan}`, `prices prices-${mode}`, tag);
     };
     const scenario = m4.scenarios;
     const option = (s4) => `<option value="${escapeText(s4.value)}" ${s4.value === scenario.selected ? "selected" : ""}>${escapeText(s4.label)}</option>`;
@@ -53246,10 +53298,19 @@ function mountDashboard(root, adapter) {
     const modeFields = m4.settingsEditor ? `<label>Charge by <select data-setting="driver" ${m4.canSave ? "" : "disabled"}><option value="manual_kwh" ${settings.driver === "manual_kwh" ? "selected" : ""}>Requested energy (kWh)</option><option value="target_soc" ${settings.driver === "target_soc" ? "selected" : ""}>Target SOC (%)</option></select></label><span data-mode="manual_kwh"><wa-input data-setting="energy" label="Requested energy (kWh)" type="number" step="any" value="${escapeText(value(settings.energy))}" ${m4.canSave ? "" : "disabled"}></wa-input></span><label data-mode="target_soc">Planning vehicle <select data-setting="vehicleId" ${m4.canSave ? "" : "disabled"}><option value="" ${!savedVehicle ? "selected" : ""}>No saved vehicle</option>${savedVehicle && !vehicles.some((v2) => v2.id === savedVehicle) ? `<option value="${escapeText(savedVehicle)}" selected>Saved vehicle unavailable${savedVehicle === "guest" ? " (guest)" : ""}</option>` : ""}${vehicleOptions}</select></label>` : "";
     const policyFields = m4.settingsEditor ? `<label><input type="checkbox" data-setting="capEnabled" ${settings.capEnabled ? "checked" : ""} ${m4.canSave && m4.policySupported ? "" : "disabled"}> Enable soft cap</label><label>Cap price basis <select data-setting="capBasis" ${m4.canSave && m4.policySupported ? "" : "disabled"}><option value="">Not set (suggested: Nord Pool)</option><option value="nord_pool" ${settings.capBasis === "nord_pool" ? "selected" : ""}>Nord Pool</option><option value="configured_variable_cost" ${settings.capBasis === "configured_variable_cost" ? "selected" : ""}>Configured variable cost</option></select></label><label><input type="checkbox" data-setting="deadlineEnabled" ${settings.deadlineEnabled ? "checked" : ""} ${m4.canSave ? "" : "disabled"}> Enable ready-by</label>` : "";
     const policyHelp = m4.settingsEditor ? `<div class="settings-help"><p>${m4.proposedPlanDefaults ? "Proposed defaults, not saved" : "Saved Charge by"}: ${settings.driver === "target_soc" ? "target SOC" : "requested energy"}. ${m4.proposedPlanDefaults ? "Proposed target" : "Saved target"}: ${escapeText(settings.target == null ? "not set \u2014 enter a target for SOC planning" : `${settings.target}%`)}. Minimum ready-by SOC: ${escapeText(settings.minimum == null ? "not set (optional)" : `${settings.minimum}%`)}.</p><p data-mode="target_soc">${escapeText(m4.vehicleHelp || "")}</p><p>Soft cap: ${settings.capEnabled ? `enabled, ${escapeText(priceText(Number(settings.cap)))} ${escapeText(capUnit)}` : "off (no saved cap)"}. Enter a cap and choose its basis to enable it. The cap basis defines which price is compared; it does not select the price provider.</p><p>${m4.proposedPlanDefaults ? "Proposed ready-by" : "Ready-by"}: ${settings.deadlineEnabled ? `enabled at ${escapeText(settings.readyBy)}` : `off (saved time ${escapeText(settings.readyBy)})`}. ${settings.reserve !== void 0 ? `Extra time reserve: ${escapeText(settings.reserve)}% of the charging time, at most 2 h. ` : ""}Changes are saved only when you choose Save plan.</p></div>` : "";
-    const html = `<div class="shell"><header class="sn-header"><div class="sn-brand"><h1>SPOTNAV <span>ENHANCED</span></h1><p>Vehicle, plan and charger</p></div>${renderNav(activeTab)}${labels.banner ? `<div class="sample-banner">${escapeText(labels.banner)}<br><span>${escapeText(labels.bannerDetail)}</span></div>` : ""}</header>
-      ${scenario ? `<div class="scenario-picker"><label for="sample-state">${escapeText(scenario.label)}</label><select id="sample-state">${(scenario.options || []).map(option).join("")}</select><span>${escapeText(scenario.note)}</span></div>` : ""}
-      <div id="critical-live" role="status" aria-live="polite">${m4.warning ? `<div class="alert"><div><strong>${escapeText(m4.warning.title)}</strong><p>${escapeText(m4.warning.detail)}</p></div><a href="#details">View details \u2193</a></div>` : ""}</div>${tabOpen("overview", activeTab)}
-      ${card("Your vehicle", "OVERVIEW", `<div class="status-line"><span class="dot ${!Number.isFinite(state.soc) || state.soc < 0 || state.soc > 100 || state.stale ? "dot-unknown" : ""}"></span> ${escapeText(state.status)}</div>${renderBattery({ soc: state.soc, target: settings.target, minimum: settings.minimum, deadline: settings.readyBy, capacityKwh: assumptions.capacityKwh, efficiency: assumptions.efficiency, stale: !!state.stale, planStale: !!(state.planStale ?? state.stale), lowSocWarning: state.lowSocWarning, windows, sample, minutesPerTimeUnit: f3.minutesPerTimeUnit, socDetail: state.socDetail, socEstimated: state.socEstimated })}<p class="waiting">${escapeText(state.detail)}</p><div class="metrics">${metric("Measured now", state.power, labels.powerNote)}<div class="metric next-metric"><div class="muted">${state.planStale ?? state.stale ? "Next window \xB7 stale proposal" : "Next proposed window"}</div><button type="button" id="open-plan" aria-haspopup="dialog">${next ? `${escapeText(time2(next.start))}\u2013${escapeText(time2(next.end))}` : "Unknown"} <span aria-hidden="true">\u2197</span></button><div class="muted">${escapeText(next ? day(next.start) : "Unknown")} \xB7 view complete plan</div></div>${metric(state.planStale ?? state.stale ? "Last plan cost \xB7 stale" : "Estimated charge cost", money(summary.cost, f3.currency), `${number(summary.energy, 2, " kWh", (n6) => n6 >= 0)} wall energy`)}${metric("Until deadline", m4.untilDeadline, labels.deadlineNote)}</div><div class="hint"><b>${escapeText(labels.planLabel)}</b> ${escapeText(state.policy)} ${escapeText(m4.targetNote)}</div>`, "overview", tag)}
+    const chartDraft = { duration: drafts.get("c:duration"), end: drafts.get("c:end") };
+    const scene = sceneOf(m4.scene);
+    const planIsStale = !!(state.planStale ?? state.stale);
+    const socValid = Number.isFinite(state.soc) && state.soc >= 0 && state.soc <= 100;
+    const targetValid = Number.isFinite(settings.target) && settings.target >= 0 && settings.target <= 100;
+    const socUnknown = !socValid || state.stale;
+    const toTarget = socValid && targetValid ? batteryEstimates({ soc: state.soc, target: settings.target, capacityKwh: assumptions.capacityKwh, efficiency: assumptions.efficiency }).needed : null;
+    const header = renderHeader(m4.header, activeTab, { selectCharger: typeof actions2.selectCharger === "function", refresh: typeof actions2.refresh === "function", menu: typeof actions2.menu === "function" });
+    const hero = `<section class="panel overview hero" data-scene="${scene.connection}" data-stale="${scene.stale}"><div class="hero-stage">${renderArt(m4.scene)}<div class="hero-top"><div class="hero-situation"><div class="eyebrow">OVERVIEW${sample ? " \xB7 SAMPLE" : ""}</div><h2 class="hero-title"><span class="dot ${socUnknown ? "dot-unknown" : ""}"></span> ${escapeText(state.status)}</h2><p class="hero-chip" data-connection="${scene.connection}">${escapeText(scene.label)}</p><p class="waiting">${escapeText(state.detail)}</p></div><div class="metric next-metric hero-next"><div class="muted">${planIsStale ? "Next window \xB7 stale proposal" : "Next proposed window"}</div><button type="button" id="open-plan" aria-haspopup="dialog">${next ? `${escapeText(time2(next.start))}\u2013${escapeText(time2(next.end))}` : "Unknown"} <span aria-hidden="true">\u2197</span></button><div class="muted">${escapeText(next ? day(next.start) : "Unknown")} \xB7 view complete plan</div></div></div><div class="hero-soc${socUnknown ? " hero-soc-unknown" : ""}" data-soc="${socValid ? state.socEstimated ? "estimated" : state.stale ? "last-known" : "reported" : "unknown"}"><small>${socValid ? state.socEstimated ? "Estimated SOC \xB7 not a measurement" : state.stale ? "Last known SOC \xB7 stale" : "SOC" : "SOC unknown"}</small><strong>${socValid ? `${state.soc}%` : "Unknown"}</strong><span>Target ${targetValid ? `${settings.target}%` : "unknown"}</span>${socValid || targetValid ? `<div class="hero-meter" role="img" aria-label="${socValid ? `${state.socEstimated ? "Estimated" : state.stale ? "Last known" : "Current"} SOC ${state.soc}%` : "SOC unknown"}; target ${targetValid ? `${settings.target}%` : "unknown"}">${socValid ? `<span class="hero-meter-fill" style="width:${state.soc}%"></span>` : ""}${targetValid ? `<span class="hero-meter-target" style="left:${settings.target}%"></span>` : ""}</div>` : ""}</div></div><div class="hero-body">${m4.control ? renderControls(m4.control, chartDraft) : ""}<div class="metrics">${metric("Measured now", state.power, labels.powerNote)}${toTarget != null ? metric("To target \xB7 est.", `${number(toTarget, 1, " kWh", (n6) => n6 >= 0)}`, state.stale || state.socEstimated ? "Battery energy from a last-known/estimated SOC; not measured" : "Battery energy from the reported SOC; not measured") : ""}${metric(planIsStale ? "Last plan cost \xB7 stale" : "Estimated charge cost", money(summary.cost, f3.currency), `${number(summary.energy, 2, " kWh", (n6) => n6 >= 0)} wall energy`)}${metric("Until deadline", m4.untilDeadline, labels.deadlineNote)}</div><details class="hero-battery"><summary>Battery estimates &amp; assumptions</summary>${renderBattery({ soc: state.soc, target: settings.target, minimum: settings.minimum, deadline: settings.readyBy, capacityKwh: assumptions.capacityKwh, efficiency: assumptions.efficiency, stale: !!state.stale, planStale: planIsStale, lowSocWarning: state.lowSocWarning, windows, sample, minutesPerTimeUnit: f3.minutesPerTimeUnit, socDetail: state.socDetail, socEstimated: state.socEstimated })}</details><div class="hint"><b>${escapeText(labels.planLabel)}</b> ${escapeText(state.policy)} ${escapeText(m4.targetNote)}</div></div></section>`;
+    const bareTab = (id, label2) => `${tabOpen(id, activeTab)}<section class="panel sn-empty"><header class="panel-head"><div><div class="eyebrow">${escapeText(label2.toUpperCase())}</div><h2>${escapeText(label2)}</h2></div></header><p class="subtext">This section appears once a charger is selected and its dashboard has loaded. Nothing is changed while waiting.</p></section>${tabClose}`;
+    const shellOpen = `<div class="shell" data-hold="${m4.hold === true}">${header}${scenario ? `<div class="scenario-picker"><label for="sample-state">${escapeText(scenario.label)}</label><select id="sample-state">${(scenario.options || []).map(option).join("")}</select><span>${escapeText(scenario.note)}</span></div>` : ""}${renderStatusStack(m4)}`;
+    const html = m4.bare === true ? `${shellOpen}${TABS.map(([id, label2]) => bareTab(id, label2)).join("")}</div>` : `${shellOpen}${tabOpen("overview", activeTab)}
+      ${hero}
       ${modes.map(priceCard).join("")}
       ${card("Recent charging \xB7 summary", "OVERVIEW", renderRecentSummary(m4.historyDay, m4.history), "recent", tag)}
       ${tabClose}${tabOpen("explore", activeTab)}
@@ -53267,7 +53328,7 @@ function mountDashboard(root, adapter) {
     const template = document.createElement("template");
     template.innerHTML = html;
     if (!root.firstChild) root.append(template.content);
-    else reconcile(root.firstChild, template.content.firstChild, (node) => drafts.has(node.dataset?.setting) || node.dataset?.vsetting && drafts.has(`v:${node.dataset.vsetting}`) || node.dataset?.msetting && drafts.has(`m:${node.dataset.msetting}`) || node.dataset?.psetting && drafts.has(`p:${node.dataset.psetting}`) || node.dataset?.nsetting && drafts.has(`n:${node.dataset.nsetting}`) || root.getRootNode().activeElement === node);
+    else reconcile(root.firstChild, template.content.firstChild, (node) => drafts.has(node.dataset?.setting) || node.dataset?.vsetting && drafts.has(`v:${node.dataset.vsetting}`) || node.dataset?.msetting && drafts.has(`m:${node.dataset.msetting}`) || node.dataset?.psetting && drafts.has(`p:${node.dataset.psetting}`) || node.dataset?.nsetting && drafts.has(`n:${node.dataset.nsetting}`) || node.dataset?.csetting && drafts.has(`c:${node.dataset.csetting}`) || root.getRootNode().activeElement === node);
     listeners ||= new AbortController();
     const signal = listeners.signal;
     const bind3 = (node, fn) => {
@@ -53335,6 +53396,32 @@ function mountDashboard(root, adapter) {
       }, { signal });
     }));
     root.querySelectorAll("[data-open-tab]").forEach((button) => bind3(button, () => button.addEventListener("click", () => showTab(button.dataset.openTab), { signal })));
+    const wireClick = (id, name) => {
+      const b3 = root.querySelector("#" + id);
+      bind3(b3, () => b3.addEventListener("click", () => {
+        if (!b3.disabled) current.actions?.[name]?.();
+      }, { signal }));
+    };
+    wireClick("refresh", "refresh");
+    wireClick("menu", "menu");
+    wireClick("pause-auto", "pauseAuto");
+    wireClick("resume-auto", "resumeAuto");
+    wireClick("charge-now", "chargeNow");
+    wireClick("charge-replace", "chargeReplace");
+    const chargerSelect = root.querySelector("#charger");
+    bind3(chargerSelect, () => chargerSelect.addEventListener("change", () => current.actions?.selectCharger?.(chargerSelect.value), { signal }));
+    const durationSelect = root.querySelector("#charge-duration");
+    bind3(durationSelect, () => durationSelect.addEventListener("change", () => {
+      drafts.set("c:duration", durationSelect.value);
+      const label2 = root.querySelector("#custom-label");
+      if (label2) label2.hidden = durationSelect.value !== "custom";
+    }, { signal }));
+    const endInput = root.querySelector("#charge-end");
+    bind3(endInput, () => {
+      const on = () => drafts.set("c:end", endInput.value);
+      endInput.addEventListener("input", on, { signal });
+      endInput.addEventListener("change", on, { signal });
+    });
     measureLayout();
     if (!layoutObserver && typeof ResizeObserver === "function") {
       layoutObserver = new ResizeObserver(measureLayout);
@@ -53541,6 +53628,7 @@ function mountDashboard(root, adapter) {
     const sameDraft = current.draftKey === next.draftKey;
     const scrolls = sameDraft ? [...root.querySelectorAll("*")].filter((node) => node.scrollTop || node.scrollLeft).map((node) => [node, node.scrollTop, node.scrollLeft]) : [];
     const viewport = root.ownerDocument.defaultView, x2 = viewport?.scrollX, y3 = viewport?.scrollY;
+    const rootNode = root.getRootNode?.(), focusId = !sameDraft && rootNode?.activeElement?.id && root.contains(rootNode.activeElement) ? rootNode.activeElement.id : "";
     if (!sameDraft) {
       drafts.clear();
       cleanup();
@@ -53548,6 +53636,7 @@ function mountDashboard(root, adapter) {
     pendingUpdate = null;
     current = next;
     const result2 = render2();
+    if (focusId) root.querySelector("#" + focusId)?.focus?.();
     if (sameDraft) {
       for (const [node, top, left] of scrolls) if (node.isConnected) {
         node.scrollTop = top;
@@ -53557,7 +53646,7 @@ function mountDashboard(root, adapter) {
     }
     return result2;
   }, resetDrafts() {
-    drafts.clear();
+    for (const key3 of [...drafts.keys()]) if (!key3.startsWith("c:")) drafts.delete(key3);
   }, resetVehicleDrafts() {
     for (const key3 of [...drafts.keys()]) if (key3.startsWith("v:")) drafts.delete(key3);
   }, setMarketDraft(name, value2) {
@@ -59110,7 +59199,7 @@ function createHistoryDay({ request, requestSessions = null, onChange = () => {
 var LIVE_REFRESH_MS = 3e5;
 var INTERVAL_END_GAP_MS = 6e4;
 var DEFAULT_DURATION = 60;
-var DURATIONS = Array.from({ length: 48 }, (_2, i7) => (i7 + 1) * 15);
+var DURATIONS2 = Array.from({ length: 48 }, (_2, i7) => (i7 + 1) * 15);
 var HISTORY_KEEP_DAYS = 400;
 var MAX_MONTHS = 14;
 var MIN_DAYS = 7;
@@ -59488,7 +59577,7 @@ function createPriceInsights({ request, onChange = () => {
     },
     /** An explicit window length (15..720 in steps of 15): one live read; nothing is saved. */
     setDuration(minutes) {
-      if (!ctx || !DURATIONS.includes(minutes) || minutes === st.duration) return;
+      if (!ctx || !DURATIONS2.includes(minutes) || minutes === st.duration) return;
       st.duration = minutes;
       void loadLive();
       onChange();
@@ -59571,7 +59660,7 @@ function createPriceInsights({ request, onChange = () => {
         method: METHOD,
         currentUsable,
         controls: {
-          duration: { value: st.duration, options: DURATIONS.map((v2) => ({ value: v2, label: durationText(v2) })), busy: l6.loading },
+          duration: { value: st.duration, options: DURATIONS2.map((v2) => ({ value: v2, label: durationText(v2) })), busy: l6.loading },
           month: { value: month, options: opts, busy: entry?.status === "loading" },
           compare: { value: st.compare || "", options: compareOptions, previous: previous && known(previous) && st.compare !== previous ? { value: previous, label: monthLabel(previous) } : null, busy: cmpEntry?.status === "loading" },
           canRetry: failed && !l6.loading
@@ -65705,6 +65794,8 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
       ...published?.format
     },
     model: {
+      // Artwork evidence (20.2): the plug state only from a fresh Morek status; anything else is unknown and shows no cable.
+      scene: { connection: vehicle, stale: stale || !statusFresh },
       effectiveTrack: effectiveTrack(status, observedAt, failed, now, zone),
       windows,
       nextWindow,
@@ -65987,7 +66078,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.200";
+var CARD_VERSION = "2.5.203";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {
@@ -66137,33 +66228,20 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this.initCosts();
     this.initParams();
     this.initNotify();
+    this.chargers = [];
+    this.hostMessage = "Select a charger.";
+    this.hold = false;
+    this.shellAdapter = null;
     this.connected = false;
   }
   connectedCallback() {
     this.connected = true;
     this.classList.add("wa-dark");
-    this.shadowRoot.innerHTML = `<link rel="stylesheet" href="/spotnav-sidebar/panel.css?v=${CARD_VERSION}"><style>:host{display:block;min-height:100%;padding-bottom:env(safe-area-inset-bottom);background:var(--sn-bg,#11151d)}.hostbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top));background:var(--sn-surface,#11151d);border-bottom:1px solid var(--sn-line,#25395a);color:white}.hostbar label{flex:1 1 180px}.hostbar select{max-width:100%}.hostbar button,.hostbar select{font:inherit;padding:8px}.message{padding:16px;color:white;background:var(--sn-bg,#11151d)}main[data-sn-layout="compact"]~*:last-child{margin-bottom:calc(var(--sn-nav-h,64px) + env(safe-area-inset-bottom,0px))}</style><div class="hostbar"><button id="menu" aria-label="Open navigation">\u2630</button><strong>SpotNav Enhanced</strong><label>Charger <select id="charger"><option value="">Select charger</option></select></label><button id="refresh">Refresh observations</button><div id="automatic-controls"><span id="pause-state">Auto state unknown.</span> <button id="pause-auto" disabled>Pause Auto until resumed</button> <button id="resume-auto" disabled>Resume Auto</button><span id="pause-notice" role="status"></span></div><section id="charge-controls" aria-label="Charge Now"><details id="charge-options"><summary>Duration / change end</summary><div class="cn-fields"><label>Duration <select id="charge-duration"><option value="30">30 minutes</option><option value="60" selected>1 hour</option><option value="120">2 hours</option><option value="180">3 hours</option><option value="custom">Custom end time</option></select></label><label id="custom-label" hidden>End time <input id="charge-end" type="datetime-local"></label><button id="charge-replace" type="button" hidden>Replace Charge Now end</button></div></details><div class="cn-actions"><button id="charge-now" disabled>Charge Now</button></div><span id="charge-state" role="status">Charge Now status unavailable.</span><span id="charge-notice" role="status"></span></section></div><section id="charge-session" hidden></section><section id="schedule-check" hidden></section><div id="recovery-banner" role="alert" hidden></div><div class="message" role="status">Select a charger.</div><main></main>`;
-    const hostStyle = document.createElement("style");
-    hostStyle.textContent = ".hostbar label{color:#f0f3f8}.hostbar select,.hostbar input{color:#f0f3f8;background:#202b39;border:1px solid #8191a4;border-radius:8px;min-height:42px} #automatic-controls{display:flex;flex-wrap:wrap;gap:6px;min-width:0;max-width:100%} #automatic-controls button,#charge-controls button{max-width:100%;white-space:normal}";
-    this.shadowRoot.append(hostStyle);
-    this.shadowRoot.querySelector("#menu").onclick = () => this.dispatchEvent(new CustomEvent("hass-toggle-menu", { bubbles: true, composed: true }));
-    this.shadowRoot.querySelector("#charger").onchange = (e9) => {
-      if (e9.target.value === this.charger) return;
-      this.stopObservations();
-      this.charger = e9.target.value;
-      this.rememberCharger();
-      this.refresh();
-    };
-    this.shadowRoot.querySelector("#refresh").onclick = () => this.loaded ? this.refresh() : this.loadChargers();
-    this.shadowRoot.querySelector("#pause-auto").onclick = () => void this.automaticAction("stop", "until_resumed");
-    this.shadowRoot.querySelector("#resume-auto").onclick = () => void this.automaticAction("resume", null);
-    this.shadowRoot.querySelector("#charge-now").onclick = () => void this.chargeAction(this.rawStatus?.schedule?.charge_now?.state === "active" ? "return_to_auto" : "charge_now");
-    this.shadowRoot.querySelector("#charge-replace").onclick = () => void this.chargeAction("charge_now");
-    this.shadowRoot.querySelector("#charge-duration").onchange = (e9) => {
-      this.shadowRoot.querySelector("#custom-label").hidden = e9.target.value !== "custom";
-    };
+    this.shadowRoot.innerHTML = `<link rel="stylesheet" href="/spotnav-sidebar/panel.css?v=${CARD_VERSION}"><style>:host{display:block;min-height:100%;background:#08111f}</style><main></main>`;
+    this.renderBare();
     this.logViewer = createLogViewer(() => this._hass);
     this.logViewer.hidden = this._hass?.user?.is_admin !== true;
+    this.logViewer.classList.add("sn-log");
     this.shadowRoot.append(this.logViewer);
     if (this._hass) this.loadChargers();
   }
@@ -66171,6 +66249,9 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this.connected = false;
     this.stopObservations();
     this.logViewer?.destroy();
+  }
+  idleControl() {
+    return { autoState: "Auto state unknown.", pauseDisabled: true, resumeDisabled: true, pauseNotice: "", chargeLabel: "Charge Now", chargeDisabled: true, replaceVisible: false, replaceDisabled: true, chargeState: "Charge Now status unavailable.", chargeNotice: "" };
   }
   set hass(value2) {
     if (!this.settingsWriteContext && value2) {
@@ -66257,10 +66338,51 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
   get hass() {
     return this._hass;
   }
+  // Host actions for the shared shell. They are the only way the rendered header and controls reach the controllers below.
+  hostActions() {
+    return {
+      // stopObservations() repaints the bare shell with the OLD charger, so repaint again once the new one is chosen.
+      selectCharger: (value2) => {
+        if (value2 === this.charger) return;
+        this.stopObservations();
+        this.charger = value2;
+        this.rememberCharger();
+        this.renderShell();
+        this.refresh();
+      },
+      refresh: () => this.loaded ? this.refresh() : this.loadChargers(),
+      menu: () => this.dispatchEvent(new CustomEvent("hass-toggle-menu", { bubbles: true, composed: true })),
+      pauseAuto: () => void this.automaticAction("stop", "until_resumed"),
+      resumeAuto: () => void this.automaticAction("resume", null),
+      chargeNow: () => void this.chargeAction(this.rawStatus?.schedule?.charge_now?.state === "active" ? "return_to_auto" : "charge_now"),
+      chargeReplace: () => void this.chargeAction("charge_now")
+    };
+  }
+  headerModel() {
+    return { chargers: this.chargers.map((c5) => ({ id: c5.charger_id, name: c5.charger_name })), selected: this.charger || "" };
+  }
+  // Before any dashboard exists (no charger, loading, failure) the same shell renders with a message and no data cards.
+  renderBare() {
+    const main = this.shadowRoot?.querySelector("main");
+    if (!main) return;
+    const adapter = { draftKey: null, format: { time: () => "", day: () => "" }, actions: this.hostActions(), model: { bare: true, header: this.headerModel(), hostMessage: this.hostMessage, hold: false } };
+    this.shellAdapter = null;
+    if (this.view) this.view.update(adapter);
+    else this.view = mountDashboard(main, adapter);
+  }
+  renderShell() {
+    if (!this.shellAdapter) {
+      this.renderBare();
+      return;
+    }
+    this.shellAdapter.model.hold = this.hold;
+    this.shellAdapter.model.hostMessage = this.hostMessage;
+    this.shellAdapter.model.header = this.headerModel();
+    this.view?.update(this.shellAdapter);
+  }
   message(text4) {
-    const el = this.shadowRoot.querySelector(".message");
-    el.textContent = text4;
-    el.hidden = !text4;
+    this.hostMessage = text4 || "";
+    this.renderShell();
   }
   stopObservations(preserveDraft = false) {
     const dirty = preserveDraft && this.settingsDirty;
@@ -66354,24 +66476,22 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this.autoRefusalAt = null;
     this.autoExpected = null;
     this.controlPermissionPending = false;
-    const pause = this.shadowRoot.querySelector("#pause-state");
-    if (pause) pause.textContent = "Auto state unknown.";
-    const charge = this.shadowRoot.querySelector("#charge-state");
-    if (charge) charge.textContent = "Charge Now status unavailable.";
-    for (const id of ["charge-now", "charge-replace"]) {
-      const button = this.shadowRoot.querySelector(`#${id}`);
-      if (button) button.disabled = true;
-    }
-    for (const id of ["pause-auto", "resume-auto"]) {
-      const button = this.shadowRoot.querySelector(`#${id}`);
-      if (button) button.disabled = true;
-    }
-    if (!preserveDraft) {
+    if (!this.connected) {
       this.view?.dispose();
       this.view = null;
+      this.shellAdapter = null;
+      return;
     }
-    const main = this.shadowRoot.querySelector("main");
-    if (main) main.hidden = preserveDraft;
+    if (preserveDraft) {
+      this.hold = true;
+      if (this.shellAdapter) {
+        this.shellAdapter.model.control = this.idleControl();
+        this.renderShell();
+      }
+    } else {
+      this.hold = false;
+      this.renderBare();
+    }
   }
   // Price-day navigation (7.1): the state machine lives across refreshes; it only reads held days, on a user action
   // (plus one small availability read per charger/area/currency), and drops itself when any of them changes.
@@ -66477,11 +66597,10 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     adapter.actions.historyNav = (kind, arg) => this.historyNav(kind, arg);
     adapter.model.insights = this.insightView(dashboard);
     adapter.actions.insightNav = (kind, arg) => this.insightNav(kind, arg);
-    this.paintAutomatic(dashboard);
-    this.paintChargeNow(dashboard);
-    this.paintSession();
-    this.paintCheck();
-    this.paintRecovery();
+    Object.assign(adapter.actions, this.hostActions());
+    adapter.model.header = this.headerModel();
+    adapter.model.control = { ...this.automaticModel(dashboard), ...this.chargeNowModel(dashboard) };
+    adapter.model.banners = { session: this.sessionModel(), check: this.checkModel(), recovery: this.recoveryModel() };
     if (this.settingsRecord && dashboard?.settings?.revision > this.settingsRecord.revision) {
       this.settingsConflict = true;
       this.settingsNotice = "Settings changed elsewhere. Reload the charger before editing again.";
@@ -66526,105 +66645,28 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this.paintMarketCosts(adapter, dashboard);
     this.paintPlanParams(adapter, dashboard, this.morekOwnedNow());
     this.paintNotifySetup(adapter, dashboard);
-    this.message(this.dashboardFailed ? "Dashboard refresh failed; the last observation may be stale." : "");
+    this.hold = false;
+    this.hostMessage = this.dashboardFailed ? "Dashboard refresh failed; the last observation may be stale." : "";
+    adapter.model.hold = false;
+    adapter.model.hostMessage = this.hostMessage;
+    this.shellAdapter = adapter;
     if (this.view) this.view.update(adapter);
     else this.view = mountDashboard(this.shadowRoot.querySelector("main"), adapter);
-    this.shadowRoot.querySelector("main").hidden = false;
     this.paintMorek();
   }
-  paintSession() {
-    const el = this.shadowRoot.querySelector("#charge-session");
-    if (!el) return;
-    const info = this.rawStatus ? chargeSession(decodeMorekState(this.rawStatus) || { supported: false }, this.statusAt, this.statusFailed, Date.now()) : null;
-    el.hidden = !info;
-    if (!info) {
-      el.replaceChildren();
-      return;
-    }
-    const colors = { ok: ["#12391f", "#7ee2a0"], info: ["#1c2a3b", "#8db8e6"], unknown: ["#2a2f38", "#a9b4c2"], warning: ["#4a3200", "#ffb938"], error: ["#5a1717", "#ff8a8a"] }[info.level] || ["#2a2f38", "#a9b4c2"];
-    el.dataset.kind = info.kind;
-    el.dataset.level = info.level;
-    el.dataset.posture = info.posture;
-    el.setAttribute("role", info.warning ? "alert" : "status");
-    el.setAttribute("aria-label", "Charging status");
-    el.style.cssText = `padding:${info.warning ? "16px 18px" : "10px 16px"};background:${colors[0]};color:#f4f7fb;border-left:${info.warning ? 10 : 5}px solid ${colors[1]};line-height:1.4`;
-    const title = document.createElement("div");
-    title.style.cssText = `font-weight:700;font-size:${info.warning ? "1.25em" : "1.05em"};color:${colors[1]}`;
-    title.textContent = (info.warning ? "\u26A0 " : "") + info.title;
-    const detail = document.createElement("div");
-    detail.textContent = info.detail;
-    const nodes = [title, detail];
-    if (info.action) {
-      const action = document.createElement("div");
-      action.style.cssText = "margin-top:6px;font-weight:600";
-      action.textContent = info.action;
-      nodes.push(action);
-    }
-    const facts = document.createElement("details");
-    facts.style.cssText = "margin-top:6px;opacity:.85";
-    const summary = document.createElement("summary");
-    summary.textContent = "What SpotNav sees";
-    facts.append(summary);
-    const list4 = document.createElement("ul");
-    list4.style.margin = "4px 0 0";
-    for (const fact of info.facts) {
-      const li = document.createElement("li");
-      li.textContent = fact;
-      list4.append(li);
-    }
-    facts.append(list4);
-    nodes.push(facts);
-    el.replaceChildren(...nodes);
+  // Rendering only reads status: nothing here sends or changes anything. A missing/stale status says "unknown".
+  sessionModel() {
+    return this.rawStatus ? chargeSession(decodeMorekState(this.rawStatus) || { supported: false }, this.statusAt, this.statusFailed, Date.now()) : null;
   }
-  paintCheck() {
-    const el = this.shadowRoot.querySelector("#schedule-check");
-    if (!el) return;
-    const notes = fresh(this.statusAt, this.statusFailed) ? scheduleNotes(decodeMorekState(this.rawStatus), Date.now()) : null;
-    el.hidden = !notes;
-    if (!notes) {
-      el.replaceChildren();
-      return;
-    }
-    el.setAttribute("role", "status");
-    el.setAttribute("aria-label", "Schedule check");
-    el.dataset.kind = notes.items[0].kind;
-    el.style.cssText = "padding:8px 16px;background:#1b2028;color:#c9d2de;font-size:.92em;line-height:1.4;border-left:3px solid #55606e";
-    const nodes = notes.items.map((item) => {
-      const line = document.createElement("div");
-      line.dataset.kind = item.kind;
-      line.textContent = item.text;
-      if (item.level === "warning") line.style.fontWeight = "600";
-      return line;
-    });
-    if (notes.facts.length) {
-      const d3 = document.createElement("details");
-      d3.style.cssText = "margin-top:4px;opacity:.85";
-      const s4 = document.createElement("summary");
-      s4.textContent = "Schedule check details";
-      d3.append(s4);
-      const ul = document.createElement("ul");
-      ul.style.margin = "4px 0 0";
-      for (const f3 of notes.facts) {
-        const li = document.createElement("li");
-        li.textContent = f3;
-        ul.append(li);
-      }
-      d3.append(ul);
-      nodes.push(d3);
-    }
-    el.replaceChildren(...nodes);
+  // Secondary and read-only: shown only for a fresh status, and never in place of the charging state.
+  checkModel() {
+    return fresh(this.statusAt, this.statusFailed) ? scheduleNotes(decodeMorekState(this.rawStatus), Date.now()) : null;
   }
-  paintRecovery() {
-    const el = this.shadowRoot.querySelector("#recovery-banner");
-    if (!el) return;
-    const banner2 = fresh(this.statusAt, this.statusFailed) ? recoveryBanner(decodeMorekState(this.rawStatus), Date.now()) : null;
-    el.hidden = !banner2;
-    el.textContent = banner2?.text || "";
-    el.dataset.level = banner2?.level || "";
-    el.dataset.code = banner2?.code || "";
-    if (banner2) Object.assign(el.style, { padding: "12px 16px", color: "#fff", fontWeight: "600", background: banner2.level === "error" ? "#8f1d1d" : banner2.level === "warning" ? "#8a5a00" : "#1f4f7a" });
+  // Only a fresh status may speak; a stale one must not claim a blocker (or its absence).
+  recoveryModel() {
+    return fresh(this.statusAt, this.statusFailed) ? recoveryBanner(decodeMorekState(this.rawStatus), Date.now()) : null;
   }
-  paintAutomatic(dashboard) {
+  automaticModel(dashboard) {
     const control = dashboard?.control, active = control?.pause?.choice;
     const isFresh = dashboardFresh(dashboard, this.dashboardFailed);
     const status = decodeMorekState(this.rawStatus), owner = status?.ownership?.recorded_owner;
@@ -66642,18 +66684,11 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       const can2 = canPause && !this.chargeBusy && (status?.ownership?.completion_authorized === true || status?.schedule_pause?.resume_recoverable === true);
       const resumeOffered = ownedResumeOffered(status);
       const blocker = !isFresh ? "Dashboard observation unavailable or stale." : !statusFresh ? "Morek status unavailable or stale." : !control?.can_act ? "Control permission or charger availability is unavailable." : this.controlPermissionPending ? "Waiting for a fresh permission check." : this.autoUncertain || this.morekUncertain ? "A previous action outcome is unknown; do not retry blindly." : this.autoBusy || this.morekBusy || this.settingsBusy ? "Another request is in progress." : status?.schedule_pause?.request === "stop_pending" ? "A person Stop is pending." : status?.schedule_pause?.request === "resume_pending" ? ownedResumeReason(status) : status?.outcomes?.uncertain === true && status?.schedule_pause?.resume_recoverable !== true ? "A profile outcome is uncertain; check the charger." : status?.ownership?.completion_authorized !== true && status?.schedule_pause?.resume_recoverable !== true ? `Schedule ownership is not currently authorized; reported recovery status: ${status?.ownership?.recovery?.automatic_recovery || status?.ownership?.recovery?.state || status?.ownership?.blockers?.[0] || "unknown"}.` : !resumeOffered ? ownedResumeReason(status) : "";
-      this.shadowRoot.querySelector("#pause-state").textContent = `${intent}; request ${request}; ACK ${ack}; ${readback}; physical charging unknown.${control?.execution_error === "pause_stop_failed" ? " Stop request failed." : ""}${blocker ? ` Resume unavailable: ${blocker}` : ""}`;
-      this.shadowRoot.querySelector("#pause-auto").disabled = !(canPause && admittedAction(control, "stop", "until_resumed"));
-      this.shadowRoot.querySelector("#resume-auto").disabled = !(can2 && resumeOffered);
-      this.shadowRoot.querySelector("#pause-notice").textContent = notice || "";
-      return;
+      return { autoState: `${intent}; request ${request}; ACK ${ack}; ${readback}; physical charging unknown.${control?.execution_error === "pause_stop_failed" ? " Stop request failed." : ""}${blocker ? ` Resume unavailable: ${blocker}` : ""}`, pauseDisabled: !(canPause && admittedAction(control, "stop", "until_resumed")), resumeDisabled: !(can2 && resumeOffered), pauseNotice: notice || "" };
     }
     const stopFailed = control?.execution_error === "pause_stop_failed" ? " Stop request failed; physical charging state unknown." : "";
-    this.shadowRoot.querySelector("#pause-state").textContent = control && isFresh ? active ? `Pause intent: ${active}; physical stop not confirmed.${stopFailed}` : `No pause reported.${stopFailed}` : "Auto state unavailable or stale.";
     const can = isFresh && !!control?.can_act && !this.controlPermissionPending && !this.autoBusy && !this.autoUncertain && !this.morekBusy && !this.morekUncertain && !this.settingsBusy && this._hass?.connected !== false;
-    this.shadowRoot.querySelector("#pause-auto").disabled = !(can && admittedAction(control, "stop", "until_resumed"));
-    this.shadowRoot.querySelector("#resume-auto").disabled = !(can && !this.chargeBusy && admittedAction(control, "resume", null));
-    this.shadowRoot.querySelector("#pause-notice").textContent = notice || "";
+    return { autoState: control && isFresh ? active ? `Pause intent: ${active}; physical stop not confirmed.${stopFailed}` : `No pause reported.${stopFailed}` : "Auto state unavailable or stale.", pauseDisabled: !(can && admittedAction(control, "stop", "until_resumed")), resumeDisabled: !(can && !this.chargeBusy && admittedAction(control, "resume", null)), pauseNotice: notice || "" };
   }
   chargeDashboardFresh(dashboard) {
     return dashboardFresh(dashboard, this.dashboardFailed);
@@ -66661,17 +66696,11 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
   chargeStatusFresh() {
     return fresh(this.statusAt, this.statusFailed);
   }
-  paintChargeNow(dashboard) {
+  chargeNowModel(dashboard) {
     const state = decodeMorekState(this.rawStatus), info = state?.charge_now;
     const active = info?.state === "active";
-    const button = this.shadowRoot.querySelector("#charge-now"), replace = this.shadowRoot.querySelector("#charge-replace");
     const blocker = chargeNowBlocker(this, dashboard, state);
-    button.textContent = active ? "Return to Auto" : "Charge Now";
-    button.disabled = !!blocker;
-    replace.hidden = !active;
-    replace.disabled = !!blocker;
-    this.shadowRoot.querySelector("#charge-state").textContent = chargeNowStatus(state, this.chargeStatusFresh()) + (blocker ? ` ${blocker}` : "");
-    this.shadowRoot.querySelector("#charge-notice").textContent = this.chargeNotice || "";
+    return { chargeLabel: active ? "Return to Auto" : "Charge Now", chargeDisabled: !!blocker, replaceVisible: active, replaceDisabled: !!blocker, chargeState: chargeNowStatus(state, this.chargeStatusFresh()) + (blocker ? ` ${blocker}` : ""), chargeNotice: this.chargeNotice || "" };
   }
   async chargeAction(action) {
     const hass = this._hass, charger = this.charger, generation = this.generation, permissionEpoch = this.permissionEpoch;
@@ -67311,9 +67340,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       if (!this.connected || this._hass?.connected === false || generation !== this.generation) return;
       if (result2?.api_version !== 1 || !Array.isArray(result2.chargers)) throw new Error("Invalid charger list");
       const chargers = result2.chargers.filter((c5) => typeof c5?.charger_id === "string" && c5.charger_id && typeof c5?.charger_name === "string");
-      const select = this.shadowRoot.querySelector("#charger");
-      select.replaceChildren(new Option("Select charger", ""));
-      for (const charger of chargers) select.add(new Option(charger.charger_name, charger.charger_id));
+      this.chargers = chargers;
       let remembered = "";
       try {
         remembered = sessionStorage.getItem("spotnav.sidebar.charger") || "";
@@ -67323,7 +67350,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       const chosen = chargers.some((c5) => c5.charger_id === previous) ? previous : chargers.length === 1 ? chargers[0].charger_id : "";
       if (chosen !== this.charger && this.view) this.stopObservations();
       this.charger = chosen;
-      select.value = chosen;
+      this.shellAdapter ? this.renderShell() : this.renderBare();
       if (chosen) {
         this.rememberCharger();
         this.refresh();
@@ -67372,7 +67399,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
         const decoded = dashboardAdapter(raw, this.rawStatus, this.statusAt);
         if (!decoded || decoded.draftKey !== charger) {
           this.dashboardFailed = true;
-          if (this.view) this.paint();
+          if (this.rawDashboard) this.paint();
           else this.message("Dashboard unavailable or unsupported.");
           return;
         }
@@ -67392,7 +67419,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       }).catch(() => {
         if (valid() && epoch === this.dashboardEpoch) {
           this.dashboardFailed = true;
-          if (this.view) this.paint();
+          if (this.rawDashboard) this.paint();
           else this.message("Dashboard unavailable.");
         }
       });
