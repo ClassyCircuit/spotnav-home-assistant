@@ -132,9 +132,10 @@ async def test_wire_intent_legacy_and_unknown_are_never_released_without_evidenc
                                           dispatch="wire_intent" if shape == "wire_intent" else None)
     coordinator.observe("Available", "Preparing")
     await settle(coordinator)
-    assert point.calls == 0
-    assert coordinator.state == {"state": "uncertain", "reason": "previous_start_may_have_applied"}
+    assert point.calls == 0  # 19.6 g4: no fresh post-plug-in evidence, so the plug-in alone starts nothing
+    assert coordinator.state == {"state": "blocked", "reason": "waiting_for_post_plug_in_status"}
     assert ledger.value["session_start"]["state"] != "aborted_before_dispatch"
+    assert coordinator.start_recovery_status()["who_acts"] == "system"
 
 
 @pytest.mark.asyncio
@@ -200,48 +201,46 @@ async def test_unfresh_or_earlier_observation_does_not_resolve(monkeypatch, case
 # ---- an old ambiguous start is NOT superseded by a new plug-in: no ordering proof exists
 
 @pytest.mark.asyncio
-async def test_old_delayed_start_new_plug_in_with_perfect_no_session_evidence_still_blocks(monkeypatch):
-    """A new plug-in plus a fresh Preparing and no transaction does not prove the old request cannot arrive later.
-
-    The old (possibly delivered, possibly queued) start could still be applied after this evidence was read, so
-    no second start is sent; the record stays ambiguous, kept as is, and the person is named as the one to act."""
+async def test_new_plug_in_with_affirmative_no_session_evidence_starts_once_and_keeps_old_as_history(monkeypatch):
+    """19.6 g4 (user-approved pragmatic recovery; replaces the earlier 'still blocks' assertion). The old request
+    stays `unknown` in history; the device may still deliver it late or duplicate it (unverified, not excluded)."""
     coordinator, point, ledger, _, evidence = world(monkeypatch)
     ledger.value["session_start"] = prior("unknown", dispatch="wire_intent")
     evidence.status = ("Preparing", +1)
     evidence.transaction = (False, +1)
     coordinator.observe("Available", "Preparing")
     await settle(coordinator)
-    assert point.calls == 0
-    assert coordinator.state == {"state": "uncertain", "reason": "previous_start_may_have_applied"}
-    assert ledger.value["session_start"]["state"] == "unknown"
-    assert ledger.value["session_start"]["connection"] == "old"
-    assert "session_start_history" not in ledger.value
+    assert point.calls == 1
+    start = ledger.value["session_start"]
+    assert start["state"] == "accepted" and start["connection"] == coordinator.connection
+    assert start["history"][0]["connection"] == "old" and start["history"][0]["outcome"] == "unknown"
+    assert start["recoveries"] == 1 and "ambiguity_inherited" not in start
     status = coordinator.start_recovery_status()
-    assert status["class"] == "ambiguous" and status["who_acts"] == "person"
-    assert status["reason"] == "no_session_evidence_and_no_ordering_proof"
-    assert coordinator._recheck is None  # nothing re-evaluates toward a send
-    for _ in range(3):
+    assert status["class"] == "ambiguous_superseded" and status["evidence"] == "plug_in"
+    assert status["risk"] == "duplicate_or_delayed_start_not_excluded"
+    for _ in range(3):  # routine sensor updates and re-evaluations never start again
+        coordinator.observe("Preparing", "Preparing")
         coordinator.trigger()
         await settle(coordinator)
-    assert point.calls == 0
+    assert point.calls == 1
 
 
 @pytest.mark.asyncio
-async def test_old_start_delivered_late_after_new_plug_in_is_observed_not_duplicated(monkeypatch):
-    """The late old request does start a session: the observation resolves the record, and nothing is sent."""
+async def test_old_start_delivered_late_after_replacement_is_observed_not_duplicated(monkeypatch):
+    """A late old request that does start a session sends nothing more: the session is only observed."""
     coordinator, point, ledger, _, evidence = world(monkeypatch)
     ledger.value["session_start"] = prior("unknown", dispatch="wire_intent")
     evidence.status = ("Preparing", +1)
     evidence.transaction = (False, +1)
     coordinator.observe("Available", "Preparing")
     await settle(coordinator)
-    assert point.calls == 0
-    evidence.status = ("Charging", +2)  # the delayed old frame is applied
+    assert point.calls == 1
+    evidence.status = ("Charging", +2)
     coordinator.observe("Preparing", "Charging")
     await settle(coordinator)
-    assert point.calls == 0
-    assert ledger.value["session_start"]["state"] == "observed"
-    assert ledger.value["session_start"]["resolution"]["by"] == "charger_active_status"
+    assert point.calls == 1
+    assert ledger.value["session_start"]["state"] == "accepted"
+    assert ledger.value["session_start"]["history"][0]["outcome"] == "unknown"
 
 
 @pytest.mark.asyncio

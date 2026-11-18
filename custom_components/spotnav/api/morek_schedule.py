@@ -2049,6 +2049,11 @@ DECISION_BLOCKERS.update({
     "person_stop_not_reserved": "retry_after_stop_or_change", "person_stop_active": "retry_after_stop_or_change",
     "plan_expired": "wait_for_planner", "planner_unavailable": "wait_for_planner",
     "invalid_operation": "check_logs",
+    "waiting_for_post_plug_in_status": "wait_for_next_automatic_attempt",
+    "transaction_unknown": "wait_for_next_automatic_attempt",
+    "transaction_not_reported_after_plug_in": "wait_for_next_automatic_attempt",
+    "plug_in_evidence_unavailable": "wait_for_next_automatic_attempt",
+    "start_recovery_paced": "wait_for_next_automatic_attempt",
 })
 #: Stage 9.5: blockers that clear on their own (a reconnect, prices, a fresh reading, a finished Stop). The worker
 #: re-evaluates them after a bounded backoff when no event arrives; every one is only a read-and-compare, a send
@@ -2072,6 +2077,9 @@ SESSION_OBSERVED_BLOCKERS = frozenset({
     "worker_suspended", "charger_unavailable", "stale_generation", "ownership_not_current", "identity_changed",
     "connector_quiescing", "lifecycle_initializing", "retry_cooldown", "planner_changed", "ownership_recheck_failed",
     "ownership_unavailable", "profile_outcome_unavailable",
+    # 19.6 group 4: recovery of an ambiguous start waits for fresh post-plug-in evidence or for its pace.
+    "waiting_for_post_plug_in_status", "transaction_unknown", "transaction_not_reported_after_plug_in",
+    "plug_in_evidence_unavailable", "start_recovery_paced",
 })
 BLOCKER_RETRY_DELAYS = (60, 180, 600, 900)  # seconds; the last repeats
 BLOCKER_RETRY_LIMIT = 12  # fast-phase timer re-evaluations per blocked episode (about 2.5 h); then the slow pace

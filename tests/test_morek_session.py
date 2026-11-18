@@ -116,8 +116,8 @@ async def test_unknown_survives_unplug_replug(monkeypatch):
     coordinator.observe("Preparing", "Available")
     coordinator.observe("Available", "Preparing")
     await coordinator.task
-    assert point.calls == 1
-    assert coordinator.state["state"] == "uncertain"
+    assert point.calls == 1  # 19.6 g4: the re-plug has no fresh evidence, so the old unknown stays unresolved
+    assert coordinator.state["state"] == "blocked" and coordinator.state["reason"] in ("waiting_for_post_plug_in_status", "plug_in_evidence_unavailable")
 
 
 @pytest.mark.asyncio
@@ -511,7 +511,7 @@ async def test_rapid_completion_unplug_replug_keeps_unknown_attempt(monkeypatch)
     assert ledger.value["session_start"]["state"] == "unknown"
     assert ledger.value.get("session_completed") is None
     assert ledger.value.get("session_unplugged")
-    assert coordinator.state["state"] == "uncertain"
+    assert coordinator.state["state"] == "blocked" and coordinator.state["reason"] in ("waiting_for_post_plug_in_status", "plug_in_evidence_unavailable")
 
 
 @pytest.mark.asyncio

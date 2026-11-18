@@ -279,7 +279,8 @@ async def test_genuine_unknown_start_state_blocks_even_with_stale_inputs(monkeyp
                                      "at": datetime.now(timezone.utc).isoformat(), "attempts": 1}
     coordinator.observe("Available", "Preparing")
     await settle(coordinator)
-    assert point.calls == 0 and coordinator.state["reason"] == "previous_start_may_have_applied"
+    assert point.calls == 0 and coordinator.state["reason"] in ("waiting_for_post_plug_in_status", "plug_in_evidence_unavailable")
+    assert ledger.value["session_start"]["state"] == state
 
 
 @pytest.mark.asyncio
@@ -441,7 +442,8 @@ async def test_pending_request_blocks_a_duplicate(monkeypatch):
                                      "at": datetime.now(timezone.utc).isoformat(), "attempts": 1}
     coordinator.observe("Available", "Preparing")
     await settle(coordinator)
-    assert point.calls == 0 and coordinator.state["reason"] == "previous_start_may_have_applied"
+    assert point.calls == 0 and coordinator.state["reason"] in ("waiting_for_post_plug_in_status", "plug_in_evidence_unavailable")
+    assert ledger.value["session_start"]["state"] == "pending"
 
 
 @pytest.mark.asyncio

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextvars
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import logging
 from uuid import uuid4
 
@@ -22,12 +22,22 @@ RESOLVE_RETRY_DELAY_S = 2  # 19.6: a skipped (lock-busy) observation is retried 
 NO_TRANSACTION_AFTER_S = 120  # an accepted start with the connector still Preparing: show it, never repeat it
 BOOT_EVIDENCE_WINDOW_S = 600  # Stage 15.5: how long a boot signal waits for its post-boot status evidence
 _ACTIVE_STATUSES = ("charging", "suspendedev", "suspendedevse")
+# 19.6 group 4: a genuinely new plug-in or confirmed reboot may start again after an ambiguous earlier request, but
+# never sooner than this after that request (index = earlier supersessions in the chain; the last repeats). The
+# pace is derived from the durable record, so it survives a restart. Nothing here orders the old request against
+# the new evidence: a late or duplicate start remains an unverified device risk.
+START_RECOVERY_DELAYS = (120, 300, 900, 1800, 3600, 14400)
+START_HISTORY_CAP = 4
+PLUG_IN_EVIDENCE_SKEW_S = 2  # the Preparing report is the plug-in event itself; HA stamps it just before we see it
 TRANSIENT_SESSION_BLOCKERS = frozenset({
     "worker_suspended", "charger_unavailable", "stale_generation", "ownership_not_current",
     "identity_changed", "connector_quiescing", "lifecycle_initializing", "retry_cooldown",
     "planner_changed", "ownership_recheck_failed",
     # 19.3/19.7: a store or ledger that is busy or unreadable for now; the guarded run refuses until it is settled.
     "ownership_unavailable", "profile_outcome_unavailable",
+    # 19.6 group 4: waiting for fresh post-plug-in evidence or for the recovery pace; both end by themselves.
+    "waiting_for_post_plug_in_status", "transaction_unknown", "transaction_not_reported_after_plug_in",
+    "plug_in_evidence_unavailable", "start_recovery_paced",
 })
 
 _REDACT_REQUEST = contextvars.ContextVar("spotnav_morek_remote_start", default=False)
@@ -118,6 +128,8 @@ class MorekSessionCoordinator:
         self._recheck_runs = 0
         self._no_transaction = None
         self._resolve_pending = True  # 19.6: an earlier request may be unresolved (always true after a restart)
+        self._plug_in = None  # 19.6: the genuine plug-in that minted the current connection token (memory only)
+        self._paced_delay = None
         self.start_recovery = {"class": "none"}  # 19.6: memory-only status of the unresolved start record
         self.state_at = None
         self.state = {"state": "waiting", "reason": "waiting_for_vehicle"}
@@ -160,6 +172,9 @@ class MorekSessionCoordinator:
     def _observe(self, old, new):
         self.observation = new
         boot = self._boot
+        plug_in = self._plug_in
+        if plug_in is not None and new in _ACTIVE_STATUSES and plug_in["token"] == self.connection:
+            plug_in["active_seen"] = True
         if boot is not None and new in _ACTIVE_STATUSES and (not boot["done"] or boot.get("token")):
             boot["active_seen"] = True  # also after the token is minted: it must stay revocable until dispatch
         elif boot is not None and not boot["done"] and new == "available":
@@ -194,6 +209,7 @@ class MorekSessionCoordinator:
             # no vehicle was there before, so this is one new connection, never an inherited stale session.
             self.available_before_loss = False
             self.connection = uuid4().hex
+            self._plug_in = {"token": self.connection, "at": datetime.now(timezone.utc), "active_seen": False}
             self._fresh_connection = True
             self.completed = False
             self.offline_observed = False
@@ -329,26 +345,55 @@ class MorekSessionCoordinator:
 
     def _post_boot_blocker(self, boot, now):
         """None when the post-boot evidence is complete; otherwise the truthful reason it is not."""
-        live = morek_schedule._live_measurements(self.hass, controller_for(self.hass, self.entry_id), now)
+        return self._post_event_blocker(boot["at"], now, "boot")
 
-        def after(reading):  # a fresh HA-stamped reading that postdates the boot signal
+    def _post_event_blocker(self, at, now, kind, skew_s=0):
+        """Fresh, HA-stamped Preparing and an affirmative "no transaction" report, both postdating `at`."""
+        live = morek_schedule._live_measurements(self.hass, controller_for(self.hass, self.entry_id), now)
+        floor = at - timedelta(seconds=skew_s)
+
+        def after(reading):  # a fresh HA-stamped reading that postdates the event
             return (isinstance(reading, dict) and reading.get("fresh") is True
-                    and datetime.fromisoformat(reading["observed_at"]) > boot["at"])
+                    and datetime.fromisoformat(reading["observed_at"]) > floor)
 
         status = live.get("status")
         value = str((status or {}).get("value", "")).lower()
         if after(status) and value in _ACTIVE_STATUSES:
-            return "charging_seen_after_boot"
+            return "charging_seen_after_" + kind
         if not after(status) or value != "preparing":
-            return "waiting_for_post_boot_status"
+            return "waiting_for_post_" + kind + "_status"
         transaction = live.get("transaction")
         if transaction is None or transaction.get("value") is None:
             return "transaction_unknown"
         if not after(transaction):
-            return "transaction_not_reported_after_boot"
+            return "transaction_not_reported_after_" + kind
         if transaction["value"] is not False:
             return "transaction_present"
         return None
+
+    def _plug_in_start_blocker(self, connection):
+        """Pre-dispatch recheck of a genuine plug-in token's own evidence (None = affirmative). Never raises."""
+        try:
+            plug_in = self._plug_in
+            if plug_in is None or plug_in["token"] != connection:
+                return "plug_in_evidence_replaced"
+            if plug_in["active_seen"]:
+                return "charging_seen_after_plug_in"
+            reason = self._post_event_blocker(plug_in["at"], datetime.now(timezone.utc), "plug_in",
+                                              PLUG_IN_EVIDENCE_SKEW_S)
+            if reason == "charging_seen_after_plug_in":
+                plug_in["active_seen"] = True
+            return reason
+        except Exception as error:  # noqa: BLE001 - unverifiable evidence withholds the start
+            _LOGGER.debug("Morek plug-in evidence failed (%s)", type(error).__name__)
+            return "plug_in_evidence_unavailable"
+
+    def _start_token_kind(self, connection):
+        """`reboot` / `plug_in` for the only two tokens that may supersede an ambiguous request, else None."""
+        if isinstance(connection, str) and connection.startswith("boot:"):
+            return "reboot"
+        plug_in = self._plug_in
+        return "plug_in" if plug_in is not None and plug_in["token"] == connection else None
 
     def _boot_start_blocker(self, connection):
         """Pre-dispatch recheck of a `boot:` token against its own boot evidence (None = still valid).
@@ -466,6 +511,8 @@ class MorekSessionCoordinator:
         else:
             delay = 61 if state.get("reason") == "retry_cooldown" else SESSION_RETRY_DELAYS[
                 min(self._recheck_runs, len(SESSION_RETRY_DELAYS) - 1)]
+        if state.get("reason") == "start_recovery_paced" and self._paced_delay:
+            delay = self._paced_delay  # the exact remainder of the recovery pace, not a polling cadence
         self._recheck_runs += 1
 
         def fire():
@@ -524,6 +571,11 @@ class MorekSessionCoordinator:
         if not isinstance(prior, dict):
             return "none"
         state = prior.get("state")
+        if prior.get("ambiguity_inherited") is True and (
+                state == "aborted_before_dispatch" or (state == "pending" and prior.get("dispatch") == "pre_wire")):
+            # 19.6: a replacement attempt that never reached the wire proves nothing about the older, ambiguous one
+            # it replaced; that ambiguity is still open until a replacement is actually sent or a session is observed.
+            return "ambiguous"
         if state == "aborted_before_dispatch":
             return "proven_not_dispatched"
         if state == "pending":
@@ -566,8 +618,8 @@ class MorekSessionCoordinator:
             return "transaction_present"
         return None
 
-    def _set_recovery(self, klass, *, evidence=None, reason=None, who_acts=None):
-        self.start_recovery = {"class": klass, "evidence": evidence, "reason": reason, "who_acts": who_acts}
+    def _set_recovery(self, klass, *, evidence=None, reason=None, who_acts=None, **extra):
+        self.start_recovery = {"class": klass, "evidence": evidence, "reason": reason, "who_acts": who_acts, **extra}
 
     def start_recovery_status(self):
         """Additive status: how an unresolved start record is classified and who acts (never 'charging')."""
@@ -651,9 +703,67 @@ class MorekSessionCoordinator:
         prior["resolution"] = {"by": found, "was": prior.get("state"),
                                "at": datetime.now(timezone.utc).isoformat()}
         prior["state"] = "observed"
+        prior.pop("ambiguity_inherited", None)
         await ledger.write(record)
         self._resolve_pending = False
         self._set_recovery("resolved", evidence=found, reason="session_observed", who_acts="none")
+
+    def _supersession(self, prior, connection):
+        """May a new guarded start replace the ambiguous `prior`? ("go", fields, attempts) or a (state, reason).
+
+        Only a *different* token minted from a genuine new plug-in or a confirmed reboot qualifies, with fresh
+        affirmative Preparing / no-transaction evidence postdating that event, and never sooner than the recovery
+        pace after the earlier request. A routine sensor update, a reconnect, a restart (`recovery`), the same token
+        or an `unplug:`/`offline:`/`resume:` token never qualifies. The old attempt stays as bounded history and its
+        ambiguity stays open until the replacement is actually sent. This orders nothing: a late or duplicate old
+        start remains an unverified device risk. A replacement that never reached the wire (`unsent`) sent nothing
+        and is simply retried by the same token, without pace."""
+        kind = self._start_token_kind(connection)
+        unsent = (prior.get("ambiguity_inherited") is True
+                  and (prior.get("state") == "aborted_before_dispatch"
+                       or (prior.get("state") == "pending" and prior.get("dispatch") == "pre_wire")))
+        if kind is None or (prior.get("connection") == connection and not unsent):
+            self._resolve_pending = True
+            self._set_recovery("ambiguous", reason="no_session_evidence_and_no_ordering_proof", who_acts="person",
+                               recovers_on="new_plug_in_or_confirmed_reboot")
+            return "uncertain", "previous_start_may_have_applied"
+        blocker = (self._plug_in_start_blocker(connection) if kind == "plug_in"
+                   else self._boot_start_blocker(connection))
+        if blocker is not None:
+            self._resolve_pending = True
+            self._set_recovery("ambiguous", reason=blocker, who_acts="system",
+                               recovers_on="new_plug_in_or_confirmed_reboot")
+            return "blocked", blocker
+        count = prior.get("attempts", 1)
+        if type(count) is not int or not 1 <= count <= 2:
+            return "uncertain", "session_record_invalid"
+        history = [h for h in (prior.get("history") or []) if isinstance(h, dict)]
+        recoveries = prior.get("recoveries", 0)
+        if type(recoveries) is not int or recoveries < 0:
+            recoveries = 0
+        if unsent:
+            superseded = dict(prior.get("superseded") or {})
+            superseded["by"] = kind
+            return "go", {"history": history[:START_HISTORY_CAP], "recoveries": recoveries,
+                          "ambiguity_inherited": True, "superseded": superseded}, max(0, count - 1)
+        now = datetime.now(timezone.utc)
+        stamp = self._stamp(prior.get("at"))
+        gap = START_RECOVERY_DELAYS[min(recoveries, len(START_RECOVERY_DELAYS) - 1)]
+        remaining = gap - (now - stamp).total_seconds() if stamp is not None else 0
+        if remaining > 0:
+            self._paced_delay = remaining + 1
+            self._resolve_pending = True
+            self._set_recovery("ambiguous", reason="start_recovery_paced", who_acts="system",
+                               recovers_on="new_plug_in_or_confirmed_reboot",
+                               next_at=(now + timedelta(seconds=remaining)).isoformat())
+            return "blocked", "start_recovery_paced"
+        entry = {key: prior[key] for key in ("connection", "state", "dispatch", "at", "attempts")
+                 if prior.get(key) is not None}
+        entry["outcome"] = "unknown"  # never relabelled accepted, rejected or failed
+        return "go", {"history": ([entry] + history)[:START_HISTORY_CAP], "recoveries": recoveries + 1,
+                      "ambiguity_inherited": True,
+                      "superseded": {"by": kind, "evidence": "fresh_preparing_and_no_transaction",
+                                     "was": prior.get("state"), "at": now.isoformat()}}, 0
 
     def _log_state(self, before):
         """One line per changed session-start state: the request (intent), never a measured charge.
@@ -688,6 +798,7 @@ class MorekSessionCoordinator:
 
         async def run():
             nonlocal connection
+            supersede_kind = None
             data, _ = await morek_schedule._state(self.hass, self.entry_id)
             async with self.hass.data[morek_schedule._DATA_KEY][self.entry_id][2]:
                 ledger = morek_schedule.outcomes_for(self.hass)
@@ -743,6 +854,10 @@ class MorekSessionCoordinator:
                             reason = self._boot_start_blocker(connection)
                             if reason is not None:
                                 return reason
+                        if supersede_kind == "plug_in":
+                            reason = self._plug_in_start_blocker(connection)
+                            if reason is not None:
+                                return reason
                     pause = record.get("schedule_pause")
                     if pause and not morek_schedule._resume_authorized(record, worker, generation):
                         return "paused_until_resume"
@@ -773,6 +888,7 @@ class MorekSessionCoordinator:
                     return "uncertain", "session_record_invalid"
                 prior = record.get("session_start")
                 attempts = 0
+                supersede = None
                 if prior is not None:
                     if (not isinstance(prior, dict) or prior.get("version") != 1
                             or not isinstance(prior.get("connection"), str)
@@ -796,34 +912,37 @@ class MorekSessionCoordinator:
                         if found is not None:
                             await self._mark_observed(ledger, record, prior, found)
                             return "session_observed", "charger_reports_active"
-                        # No ordering proof exists that an old, possibly delivered start cannot still be applied
-                        # (a new plug-in, a reconnect or a confirmed reboot do not prove it): stay uncertain.
-                        self._resolve_pending = True
-                        self._set_recovery("ambiguous", reason="no_session_evidence_and_no_ordering_proof",
-                                           who_acts="person")
-                        return "uncertain", "previous_start_may_have_applied"
+                        # 19.6 group 4: only a genuine new plug-in or confirmed reboot with fresh affirmative evidence,
+                        # at the recovery pace, may replace it; everything else stays uncertain (see _supersession).
+                        decision = self._supersession(prior, connection)
+                        if decision[0] != "go":
+                            return decision
+                        supersede, attempts = decision[1], decision[2]
+                        supersede_kind = supersede["superseded"]["by"]
 
                     def shown(state, reason):
                         return ("session_observed", "charger_reports_active") if state == "observed" else (state, reason)
 
-                    if connection == "recovery" and prior.get("connection") != "recovery":
-                        return shown(prior.get("state", "blocked"), "already_requested")
-                    if prior.get("connection") == connection:
-                        attempts = prior.get("attempts", 1)
-                        if type(attempts) is not int or not 1 <= attempts <= 2:
-                            return "uncertain", "session_record_invalid"
-                        if prior.get("state") not in ("rejected", "aborted_before_dispatch") or attempts >= 2:
+                    if supersede is None:
+                        if connection == "recovery" and prior.get("connection") != "recovery":
                             return shown(prior.get("state", "blocked"), "already_requested")
-                        if prior.get("state") == "rejected":
-                            try:
-                                age = (datetime.now(timezone.utc) - datetime.fromisoformat(prior["at"])).total_seconds()
-                            except (KeyError, ValueError, TypeError):
+                        if prior.get("connection") == connection:
+                            attempts = prior.get("attempts", 1)
+                            if type(attempts) is not int or not 1 <= attempts <= 2:
                                 return "uncertain", "session_record_invalid"
-                            if age < 60:
-                                return "waiting", "retry_cooldown"
-                        # An attempt aborted before dispatch sent nothing: no cooldown, and it is not counted.
-                        else:
-                            attempts -= 1
+                            if prior.get("state") not in ("rejected", "aborted_before_dispatch") or attempts >= 2:
+                                return shown(prior.get("state", "blocked"), "already_requested")
+                            if prior.get("state") == "rejected":
+                                try:
+                                    age = (datetime.now(timezone.utc)
+                                           - datetime.fromisoformat(prior["at"])).total_seconds()
+                                except (KeyError, ValueError, TypeError):
+                                    return "uncertain", "session_record_invalid"
+                                if age < 60:
+                                    return "waiting", "retry_cooldown"
+                            # An attempt aborted before dispatch sent nothing: no cooldown, and it is not counted.
+                            else:
+                                attempts -= 1
                 point = morek_schedule._charge_point(self.hass, controller_for(self.hass, self.entry_id).ocpp_target)
                 if _request_loggers(point) is None:
                     return "blocked", "unsupported_ocpp_logging_or_interface"
@@ -831,6 +950,8 @@ class MorekSessionCoordinator:
                     return "blocked", "ocpp_sensitive_logging_enabled"
                 attempt = {"version": 1, "connection": connection, "state": "pending", "dispatch": "pre_wire",
                            "at": datetime.now(timezone.utc).isoformat(), "attempts": attempts + 1}
+                if supersede is not None:
+                    attempt.update(supersede)  # the old ambiguous request is kept as history in the same durable write
                 record.pop("session_completed", None)
                 record.pop("session_unplugged", None)
                 record["session_start"] = attempt
@@ -866,12 +987,17 @@ class MorekSessionCoordinator:
                 self.state = {"state": "starting", "reason": "request_in_progress"}
                 self._resolve_pending = True
                 result = await _start(point, connector.connector_id)
+                attempt.pop("ambiguity_inherited", None)  # sent: this attempt's own outcome now governs
                 attempt["state"] = result
                 if result in ("accepted", "rejected"):
                     attempt["dispatch"] = "resolved"
                 await ledger.write(record)
                 if result in ("accepted", "rejected"):
                     self._resolve_pending = False
+                if supersede is not None:
+                    self._set_recovery("ambiguous_superseded", evidence=supersede["superseded"]["by"],
+                                       reason="new_start_after_fresh_no_session_evidence", who_acts="none",
+                                       risk="duplicate_or_delayed_start_not_excluded")
                 if validate(post=True) is not None:
                     return "blocked", "newer_stop_or_connection_change"
                 return result, "request_" + result

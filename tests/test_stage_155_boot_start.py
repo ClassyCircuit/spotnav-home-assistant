@@ -251,26 +251,52 @@ async def test_pending_or_unknown_earlier_request_without_boot_evidence_is_prese
     assert w.coordinator.boot_status(True)["state"] in ("waiting", "blocked")  # no boot token was minted
 
 
+def age_start_record(w, seconds):
+    w.ledger.value["session_start"]["at"] = (datetime.now(timezone.utc) - timedelta(seconds=seconds)).isoformat()
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("prior", ["unknown", "pending"])
-async def test_confirmed_reboot_does_not_supersede_an_ambiguous_request(monkeypatch, prior):
-    """19.6: the order of an old, possibly delivered request versus the reboot is not proven (it may have been
-    written to the new socket before the boot signal was noted), so even a confirmed reboot with fresh Preparing
-    and no transaction leaves it uncertain; the person is named as the one who acts."""
+async def test_confirmed_reboot_with_affirmative_evidence_supersedes_an_ambiguous_request_once(monkeypatch, prior):
+    """19.6 g4 (user-approved pragmatic recovery; replaces the earlier 'never supersede' assertion): a confirmed
+    reboot with fresh post-boot Preparing and an affirmative no-transaction report starts one new guarded request,
+    keeps the old ambiguous one as history and never repeats on routine updates. The device may still deliver the
+    old request late or duplicate it: that is unverified, not excluded."""
     w = world(monkeypatch)
     await plugged_in(w)
     w.ledger.value["session_start"]["state"] = prior
     w.ledger.value["session_start"].pop("dispatch", None)
+    age_start_record(w, 600)
     await reboot(w)
-    assert w.point.calls == 1
-    assert w.ledger.value["session_start"]["state"] == prior
-    assert "session_start_history" not in w.ledger.value
+    assert w.point.calls == 2
+    start = w.ledger.value["session_start"]
+    assert start["connection"].startswith("boot:") and start["state"] == "accepted"
+    assert start["history"][0]["state"] == prior and start["history"][0]["outcome"] == "unknown"
+    assert start["superseded"]["by"] == "reboot" and "ambiguity_inherited" not in start
     for _ in range(3):
         w.coordinator.trigger()
+        w.monitor.check()
+        w.coordinator.observe("Preparing", "Preparing")
         await settle(w)
+    assert w.point.calls == 2
+    status = w.coordinator.start_recovery_status()
+    assert status["class"] == "ambiguous_superseded" and status["risk"] == "duplicate_or_delayed_start_not_excluded"
+
+
+@pytest.mark.asyncio
+async def test_confirmed_reboot_is_paced_after_a_recent_ambiguous_request(monkeypatch):
+    w = world(monkeypatch)
+    await plugged_in(w)
+    w.ledger.value["session_start"]["state"] = "unknown"
+    await reboot(w)  # the unknown request is seconds old: inside the first recovery pace
     assert w.point.calls == 1
-    assert w.coordinator.state == {"state": "uncertain", "reason": "previous_start_may_have_applied"}
-    assert w.coordinator.start_recovery_status()["who_acts"] == "person"
+    assert w.coordinator.state == {"state": "blocked", "reason": "start_recovery_paced"}
+    assert w.ledger.value["session_start"]["state"] == "unknown" and "history" not in w.ledger.value["session_start"]
+    assert w.coordinator.start_recovery_status()["next_at"]
+    age_start_record(w, 600)
+    w.coordinator.trigger()  # the paced re-evaluation (the timer fires this): evidence is still the boot's own
+    await settle(w)
+    assert w.point.calls == 2
 
 
 @pytest.mark.asyncio
