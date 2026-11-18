@@ -63951,6 +63951,13 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
     }
     if (comparisonAssociated && state.verification.coverage_start) detail.textContent += ` Compared from ${localTime(state.verification.coverage_start)}.`;
     if (comparisonAssociated && state.verification.coverage_end) detail.textContent += ` Readback covers through ${localTime(state.verification.coverage_end)}.`;
+    if (comparisonAssociated && state.verification.reason === "coverage_too_short") {
+      const until = state.verification.covered_until ? localTime(state.verification.covered_until) : null;
+      const planEnd = state.verification.plan_end ? localTime(state.verification.plan_end) : null;
+      if (until && state.verification.coverage_state === "matches_covered_span") detail.textContent += ` Limits matched only until ${until}${planEnd ? `; the sent plan ends ${planEnd}` : ""}. Not verified for the whole plan, and not proof of charging.`;
+      else if (until && state.verification.coverage_state === "differs") detail.textContent += ` Limits differed within the part covered (until ${until}).`;
+      else if (until) detail.textContent += ` Covered only until ${until}; not verifiable for the whole plan.`;
+    }
     if (!comparisonAssociated) detail.textContent += " Comparison is not associated with the displayed readback; unverified.";
     if (state.verification.pending) detail.textContent += ` Automatic read-only check ${localTime(state.verification.next_check_at ?? null)}. No profile will be resent or cleared. Do not assume the sent limits are active yet.`;
     section.append(detail);
@@ -65796,6 +65803,21 @@ function bootItem(status, now, facts) {
   }
   return null;
 }
+function offlineSchedule(status, now, facts) {
+  const h3 = status?.reconciliation?.horizon;
+  if (!isObject5(h3) || h3.state !== "sent") return "";
+  const end2 = typeof h3.plan_end === "string" ? Date.parse(h3.plan_end) : NaN;
+  if (!Number.isFinite(end2)) return "";
+  const ack = typeof h3.ack === "string" ? h3.ack : "unknown";
+  facts.push(`Last sent schedule: ${h3.windows ?? "?"} window(s), ends ${clock5(end2)}, charger answer ${ack}`);
+  const accepted = ack === "accepted";
+  const covered = typeof h3.covered_until === "string" ? Date.parse(h3.covered_until) : NaN;
+  const read2 = !accepted ? "" : h3.coverage_state === "matches" ? " The last read of the charger\u2019s limits matched it" : h3.coverage_state === "matches_covered_span" ? " The last read of the charger\u2019s limits matched only part of it" : h3.coverage_state === "differs" ? " The last read of the charger\u2019s limits differed from it" : "";
+  const span2 = read2 && Number.isFinite(covered) ? h3.coverage_state === "matches_covered_span" ? ` (compared only until ${clock5(covered)}; the part after that was not compared)` : ` (readback covered until ${clock5(covered)})` : "";
+  const head = !accepted ? ` A schedule was sent to the charger, but it did not confirm accepting it, so it may not be installed (it was planned to end ${clock5(end2)}).` : end2 <= now ? ` The last schedule sent to the charger ended at ${clock5(end2)}.` : ` The last schedule sent to the charger (accepted: yes) runs until ${clock5(end2)}.`;
+  const tail = !accepted || end2 <= now ? "" : " Whether the charger keeps using it depends on its own clock, settings and authorization, and its own protections can change charging at any time; this is not a guarantee that the car charges.";
+  return `${head}${read2 ? `${read2}${span2}.` : ""}${tail} SpotNav cannot start or change anything while the connection is down.`;
+}
 function scheduleNotes(status, now = Date.now()) {
   if (!status || status.supported === false) return null;
   const facts = [];
@@ -65807,7 +65829,7 @@ function scheduleNotes(status, now = Date.now()) {
   const boot = bootItem(status, now, facts);
   if (boot) items.push(boot);
   if (link.state === "down") {
-    items.push({ kind: "link_lost", level: "info", text: `Connection lost${link.since !== null ? ` at ${clock5(link.since)}` : ""}. SpotNav checks the schedule again when the charger reconnects.` });
+    items.push({ kind: "link_lost", level: "info", text: `Connection lost${link.since !== null ? ` at ${clock5(link.since)}` : ""}. SpotNav checks the schedule again when the charger reconnects.${offlineSchedule(status, now, facts)}` });
   } else if (!items.length && link.state === "up" && link.since !== null) {
     items.push({ kind: "link_quiet", level: "info", text: `Link to the charger unchanged since ${clock5(link.since)}.` });
   }
@@ -65815,7 +65837,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.180";
+var CARD_VERSION = "2.5.181";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {

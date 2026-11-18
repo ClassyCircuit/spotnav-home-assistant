@@ -696,9 +696,91 @@ def matches(profile: dict[str, Any], actual: dict[str, Any], *, tolerance_s: int
     return _compare_remaining(profile, actual, tolerance_s=tolerance_s, require_coverage=False)["matched"]
 
 
+COVERAGE_MATCHES = "matches"  # remaining plan matched through the whole plan (matched is True)
+COVERAGE_SPAN = "matches_covered_span"  # matched only through `covered_until`, which is shorter than the plan
+COVERAGE_DIFFERS = "differs"
+COVERAGE_UNVERIFIABLE = "not_verifiable"
+
+
+def _covered_span_state(profile: dict[str, Any], actual: dict[str, Any], result: dict[str, Any],
+                        tolerance_s: int) -> str:
+    """Stage 19.4b: judge a readback that is shorter than the plan over the span it did cover. Never a match.
+
+    Only transitions at least `tolerance_s` before the reported end count, so a limit change at the edge is never
+    judged from a partial view. The compared span therefore ends `tolerance_s` before the reported end;
+    `_compare_remaining` reports that as `covered_until`. A match says nothing about anything beyond it.
+    """
+    try:
+        schedule = profile["chargingSchedule"]
+        start = _utc(datetime.fromisoformat(schedule["startSchedule"].replace("Z", "+00:00")))
+        expected = [(start + timedelta(seconds=p["startPeriod"]), p["limit"]) for p in schedule["chargingSchedulePeriod"]]
+        observed = [(_utc(datetime.fromisoformat(p["at"])), p["amps"]) for p in actual["periods"]]
+        boundary = _utc(datetime.fromisoformat(result["coverage_start"]))
+        end = _utc(datetime.fromisoformat(result["coverage_end"]))
+        edge = end - timedelta(seconds=tolerance_s)
+        if len(expected) < 2 or edge <= boundary:
+            return COVERAGE_UNVERIFIABLE
+        if any(abs((at - boundary).total_seconds()) <= tolerance_s for at, _ in expected[1:]):
+            return COVERAGE_UNVERIFIABLE
+        wanted = [(at, amps) for at, amps in expected[1:] if boundary < at < edge]
+        current = next(amps for at, amps in reversed(observed) if at <= boundary)
+        if current != next(amps for at, amps in reversed(expected) if at <= boundary):
+            return COVERAGE_DIFFERS
+        changes = []
+        for at, amps in observed:
+            if at <= boundary or at >= edge:
+                continue
+            if amps != current:
+                changes.append((at, amps))
+                current = amps
+        if len(changes) != len(wanted):
+            return COVERAGE_DIFFERS
+        for (at, amps), (want_at, want_amps) in zip(changes, wanted):
+            if amps != want_amps or abs((at - want_at).total_seconds()) > tolerance_s:
+                return COVERAGE_DIFFERS
+    except (KeyError, TypeError, ValueError, AttributeError, OverflowError, StopIteration, ScheduleRefused):
+        return COVERAGE_UNVERIFIABLE
+    return COVERAGE_SPAN
+
+
 def _compare_remaining(profile: dict[str, Any] | None, actual: dict[str, Any] | None, *,
                        tolerance_s: int, require_coverage: bool) -> dict[str, Any]:
-    """Compare only the remaining observed interval, never a historical session."""
+    """Compare only the remaining observed interval, never a historical session.
+
+    Adds (additive, Stage 19.4b) `coverage_state`, `covered_until` and `plan_end`; `matched` and `reason` are
+    exactly the core comparison's, so no gate that reads them changes.
+    """
+    result = _compare_remaining_core(profile, actual, tolerance_s=tolerance_s, require_coverage=require_coverage)
+    state = COVERAGE_UNVERIFIABLE
+    plan_end = None
+    try:
+        schedule = profile["chargingSchedule"]  # type: ignore[index]
+        start = _utc(datetime.fromisoformat(schedule["startSchedule"].replace("Z", "+00:00")))
+        plan_end = (start + timedelta(seconds=schedule["chargingSchedulePeriod"][-1]["startPeriod"])).isoformat()
+    except (KeyError, TypeError, ValueError, AttributeError, IndexError, ScheduleRefused):
+        pass
+    if result["matched"]:
+        state = COVERAGE_MATCHES
+    elif result["reason"] == "limits_or_transitions_differ":
+        state = COVERAGE_DIFFERS
+    elif result["reason"] == "coverage_too_short" and profile is not None and actual:
+        state = _covered_span_state(profile, actual, result, tolerance_s)
+    covered_until = (result.get("coverage_end")
+                     if state != COVERAGE_UNVERIFIABLE or result["reason"] == "coverage_too_short" else None)
+    if state == COVERAGE_SPAN:
+        # The final `tolerance_s` before the readback's end was never compared (see `_covered_span_state`), so a
+        # match claim must stop there, not at the reported end.
+        try:
+            covered_until = (_utc(datetime.fromisoformat(result["coverage_end"]))
+                             - timedelta(seconds=tolerance_s)).isoformat()
+        except (KeyError, TypeError, ValueError):
+            state, covered_until = COVERAGE_UNVERIFIABLE, None
+    result.update({"coverage_state": state, "plan_end": plan_end, "covered_until": covered_until})
+    return result
+
+
+def _compare_remaining_core(profile: dict[str, Any] | None, actual: dict[str, Any] | None, *,
+                            tolerance_s: int, require_coverage: bool) -> dict[str, Any]:
     result: dict[str, Any] = {"matched": False, "exact": False, "reason": "no_sent_profile",
                               "tolerance_s": tolerance_s, "max_delta_s": None,
                               "coverage_start": None, "coverage_end": None, "scope": "remaining"}
@@ -1107,6 +1189,59 @@ def session_start_schedule_evidence(profile: dict[str, Any] | None, actual: dict
     return "matched"
 
 
+def _guard_coverage_state(verification: dict[str, Any], associated: bool, now: datetime) -> None:
+    """Status-time guard (Stage 19.4b): a coverage statement belongs only to its own readback and to its own span.
+
+    An unassociated, superseded or expired comparison is `not_verifiable`, with no covered-until; a span match whose
+    covered end has passed no longer says anything about now.
+    """
+    state = verification.get("coverage_state")
+    if state is None:
+        return
+    if (not associated or verification.get("reason") in ("verification_superseded", "coverage_stale",
+                                                         "verification_interrupted")):
+        verification.update({"coverage_state": COVERAGE_UNVERIFIABLE, "covered_until": None})
+        return
+    if state == COVERAGE_SPAN:
+        # A span claim ends at what was compared (`covered_until`), not at the readback's reported end.
+        view = dict(verification, coverage_end=verification.get("covered_until"))
+        current = _verification_coverage_current(view, now)
+    else:
+        current = _verification_coverage_current(verification, now)
+    if state in (COVERAGE_MATCHES, COVERAGE_SPAN) and not current:
+        verification.update({"coverage_state": COVERAGE_UNVERIFIABLE, "covered_until": None})
+    elif state == COVERAGE_MATCHES and not verification.get("matched"):
+        # `matched` was cleared by an earlier status guard (superseded evidence): never show a stronger claim.
+        verification["coverage_state"] = COVERAGE_UNVERIFIABLE
+
+
+def schedule_horizon(profile: dict[str, Any] | None, ack: Any, verification: dict[str, Any],
+                     now: datetime) -> dict[str, Any]:
+    """Stage 19.4: what the *last sent* schedule covers, as plain facts, never a guarantee (read-only).
+
+    `plan_end` is the profile's final transition (the last window's end); `windows` counts its on-periods.
+    `ack` is the charger's answer to that upload, `coverage_state` the effective-readback judgement (separate
+    classes), `covered_until` how far that readback reached. Physical charging, the charger's clock, firmware and
+    authorization are outside it and always `unknown` here.
+    """
+    result: dict[str, Any] = {"state": "none", "plan_end": None, "windows": 0, "ack": None, "coverage_state": None,
+                              "covered_until": None, "plan_ended": None, "physical_charging": "unknown"}
+    try:
+        schedule = profile["chargingSchedule"]  # type: ignore[index]
+        start = _utc(datetime.fromisoformat(schedule["startSchedule"].replace("Z", "+00:00")))
+        periods = schedule["chargingSchedulePeriod"]
+        end = start + timedelta(seconds=periods[-1]["startPeriod"])
+        result.update({"state": "sent", "plan_end": end.isoformat(), "plan_ended": end <= _utc(now),
+                       "windows": sum(1 for p in periods if p.get("limit", 0) > 0),
+                       "ack": str(ack).lower() if isinstance(ack, str) else None})
+    except (KeyError, TypeError, ValueError, AttributeError, IndexError, ScheduleRefused):
+        return result
+    if isinstance(verification, dict) and verification.get("coverage_state") is not None:
+        result["coverage_state"] = verification["coverage_state"]
+        result["covered_until"] = verification.get("covered_until")
+    return result
+
+
 def _cancel_verification(hass: HomeAssistant, entry_id: str) -> None:
     cancel = hass.data.get(_VERIFY_KEY, {}).pop(entry_id, None)
     if cancel is not None:
@@ -1160,6 +1295,7 @@ def _schedule_verification(hass: HomeAssistant, entry_id: str, sent_at: str, att
                 verification.update({"reason": "readback_unavailable", "attempts": attempt + 2,
                                      "checked_at": datetime.now(timezone.utc).isoformat(),
                                      "readback_at": data["effective"]["fetched_at"], "coverage_start": None, "coverage_end": None,
+                                     "coverage_state": COVERAGE_UNVERIFIABLE, "covered_until": None,
                                      "pending": False, "next_check_at": None})
                 if attempt + 1 < len(VERIFY_DELAYS):
                     _schedule_verification(hass, entry_id, sent_at, attempt + 1, attempt_id)
@@ -2940,7 +3076,8 @@ async def _async_schedule_action_locked(hass: HomeAssistant, entry_id: str, acti
         if current or action == "clear" or profile is None:
             data["effective"] = effective
         else:
-            comparison.update({"coverage_start": None, "coverage_end": None})
+            comparison.update({"coverage_start": None, "coverage_end": None,
+                               "coverage_state": COVERAGE_UNVERIFIABLE, "covered_until": None})
         data["verified"] = comparison["matched"]
         verification = data.setdefault("verification", {})
         verification.update(comparison)
@@ -2973,6 +3110,7 @@ async def _async_schedule_action_locked(hass: HomeAssistant, entry_id: str, acti
             data["effective"] = previous_effective
             verification.update({"matched": False, "exact": False, "reason": "verification_superseded",
                                  "readback_at": None, "coverage_start": None, "coverage_end": None,
+                                 "coverage_state": COVERAGE_UNVERIFIABLE, "covered_until": None,
                                  "pending": False, "next_check_at": None})
             record["verified"] = None
             await outcomes_for(hass).write(record)
@@ -3092,6 +3230,7 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
                 verification.update({"matched": False, "exact": False, "reason": "coverage_stale"})
             elif data.get("verified") and not verified:
                 verification.update({"matched": False, "exact": False, "reason": "verification_superseded"})
+            _guard_coverage_state(verification, readback_associated, datetime.now(timezone.utc))
             compared = verification.get("reason") in (
                 "limits_or_transitions_differ", "coverage_missing", "coverage_too_short", "coverage_stale",
                 "coverage_boundary_ambiguous", "no_remaining_transitions", "readback_unavailable")
@@ -3137,7 +3276,11 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
                       "link": link_monitor.status() if link_monitor is not None else None,
                       "readiness": readiness,
                       "schedule_pause": _owned_pause_status(outcomes, verification, verified, worker, stop_pending=stop_pending),
-                      "reconciliation": {"upload_outcome": upload_outcome_class(outcomes, in_flight=bool(
+                      "reconciliation": {"horizon": schedule_horizon(
+                                             None if aborted_display else data.get("profile"),
+                                             None if aborted_display else data.get("ack"), verification,
+                                             datetime.now(timezone.utc)),
+                                         "upload_outcome": upload_outcome_class(outcomes, in_flight=bool(
                                              hass.data.get("spotnav_morek_sending", {}).get(entry.entry_id))),
                                          "check": checker.status() if checker is not None else None,
                                          "repair": repair_status(worker, outcomes),

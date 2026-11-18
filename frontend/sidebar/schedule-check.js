@@ -115,6 +115,32 @@ function bootItem(status, now, facts) {
   return null;
 }
 
+
+/**
+ * Stage 19.4c: what is last known about the schedule sent ahead of time while the link is down. Only backend facts
+ * (`reconciliation.horizon`), only as "accepted"/"last read" - never "will charge" or "guaranteed". Empty when the
+ * backend sent nothing usable. SpotNav cannot start or change anything while offline.
+ */
+function offlineSchedule(status, now, facts) {
+  const h = status?.reconciliation?.horizon;
+  if (!isObject(h) || h.state !== 'sent') return '';
+  const end = typeof h.plan_end === 'string' ? Date.parse(h.plan_end) : NaN;
+  if (!Number.isFinite(end)) return '';
+  const ack = typeof h.ack === 'string' ? h.ack : 'unknown';
+  facts.push(`Last sent schedule: ${h.windows ?? '?'} window(s), ends ${clock(end)}, charger answer ${ack}`);
+  const accepted = ack === 'accepted';
+  const covered = typeof h.covered_until === 'string' ? Date.parse(h.covered_until) : NaN;
+  const read = !accepted ? '' : h.coverage_state === 'matches' ? ' The last read of the charger’s limits matched it' : h.coverage_state === 'matches_covered_span' ? ' The last read of the charger’s limits matched only part of it' : h.coverage_state === 'differs' ? ' The last read of the charger’s limits differed from it' : '';
+  const span = read && Number.isFinite(covered) ? (h.coverage_state === 'matches_covered_span' ? ` (compared only until ${clock(covered)}; the part after that was not compared)` : ` (readback covered until ${clock(covered)})`) : '';
+  const head = !accepted
+    ? ` A schedule was sent to the charger, but it did not confirm accepting it, so it may not be installed (it was planned to end ${clock(end)}).`
+    : end <= now
+      ? ` The last schedule sent to the charger ended at ${clock(end)}.`
+      : ` The last schedule sent to the charger (accepted: yes) runs until ${clock(end)}.`;
+  const tail = !accepted || end <= now ? '' : ' Whether the charger keeps using it depends on its own clock, settings and authorization, and its own protections can change charging at any time; this is not a guarantee that the car charges.';
+  return `${head}${read ? `${read}${span}.` : ''}${tail} SpotNav cannot start or change anything while the connection is down.`;
+}
+
 /**
  * @returns {null | {items: {kind: string, level: 'info'|'warning', text: string}[], facts: string[]}}
  * null when the backend offers nothing here (older backend, unsupported charger). Never returns an 'ok' level.
@@ -130,7 +156,7 @@ export function scheduleNotes(status, now = Date.now()) {
   const boot = bootItem(status, now, facts);
   if (boot) items.push(boot);
   if (link.state === 'down') {
-    items.push({kind: 'link_lost', level: 'info', text: `Connection lost${link.since !== null ? ` at ${clock(link.since)}` : ''}. SpotNav checks the schedule again when the charger reconnects.`});
+    items.push({kind: 'link_lost', level: 'info', text: `Connection lost${link.since !== null ? ` at ${clock(link.since)}` : ''}. SpotNav checks the schedule again when the charger reconnects.${offlineSchedule(status, now, facts)}`});
   } else if (!items.length && link.state === 'up' && link.since !== null) {
     items.push({kind: 'link_quiet', level: 'info', text: `Link to the charger unchanged since ${clock(link.since)}.`});
   }

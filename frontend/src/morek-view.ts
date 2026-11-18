@@ -30,6 +30,7 @@ export interface MorekState {
   verification?: {
     pending?: boolean; reason?: string; exact?: boolean; tolerance_s?: number;
     max_delta_s?: number | null; coverage_start?: string | null; coverage_end?: string | null; next_check_at?: string | null; readback_at?: string | null;
+    coverage_state?: string | null; covered_until?: string | null; plan_end?: string | null;
   };
   sent: MorekProfile | null;
   effective: { status: string; fetched_at: string; periods: { at: string; amps: number }[];
@@ -346,6 +347,14 @@ export function morekPanel(
     }
     if (comparisonAssociated && state.verification.coverage_start) detail.textContent += ` Compared from ${localTime(state.verification.coverage_start)}.`;
     if (comparisonAssociated && state.verification.coverage_end) detail.textContent += ` Readback covers through ${localTime(state.verification.coverage_end)}.`;
+    // Stage 19.4b: a readback shorter than the plan is judged only over what it covered, never as the whole plan.
+    if (comparisonAssociated && state.verification.reason === "coverage_too_short") {
+      const until = state.verification.covered_until ? localTime(state.verification.covered_until) : null;
+      const planEnd = state.verification.plan_end ? localTime(state.verification.plan_end) : null;
+      if (until && state.verification.coverage_state === "matches_covered_span") detail.textContent += ` Limits matched only until ${until}${planEnd ? `; the sent plan ends ${planEnd}` : ""}. Not verified for the whole plan, and not proof of charging.`;
+      else if (until && state.verification.coverage_state === "differs") detail.textContent += ` Limits differed within the part covered (until ${until}).`;
+      else if (until) detail.textContent += ` Covered only until ${until}; not verifiable for the whole plan.`;
+    }
     if (!comparisonAssociated) detail.textContent += " Comparison is not associated with the displayed readback; unverified.";
     if (state.verification.pending) detail.textContent += ` Automatic read-only check ${localTime(state.verification.next_check_at ?? null)}. No profile will be resent or cleared. Do not assume the sent limits are active yet.`;
     section.append(detail);
