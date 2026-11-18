@@ -3243,15 +3243,16 @@ dialog[open] {
   font-size: 11px;
   line-height: 20px;
   color: #c8d6e7;
-  background: #263444;
-  border-right: 1px solid #627183;
+  background: var(--sn-surface-3);
+  border-right: 1px solid var(--sn-line);
+  opacity: .92;
 }
 .midnight-line {
   position: absolute;
   top: 82px;
   bottom: 92px;
   width: 1px;
-  background: #afc4d566;
+  background: #7d98c066;
 }
 .price-gap {
   position: absolute;
@@ -3302,15 +3303,16 @@ dialog[open] {
   background:
     linear-gradient(
       to top,
-      rgba(28, 217, 123, .52),
-      rgba(28, 217, 123, .18) 34%,
+      rgba(52, 232, 176, .5),
+      rgba(52, 232, 176, .16) 34%,
       rgba(28, 217, 123, 0) 100%);
 }
 .proposal-track {
   position: absolute;
   top: 69px;
   height: 5px;
-  background: #d4ffe7;
+  border-radius: 3px;
+  background: var(--sn-accent);
 }
 #open-plan-details {
   border: 0;
@@ -5163,27 +5165,6 @@ wa-progress-bar {
   font-size: 12px;
   color: var(--sn-muted);
 }
-.price-context {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  color: var(--sn-muted);
-  font-size: 13px;
-  margin: 12px 0 0;
-}
-.price-context span {
-  background: var(--sn-surface-2);
-  border: 1px solid var(--sn-line);
-  padding: 8px 11px;
-  border-radius: 10px;
-}
-.price-context b {
-  color: var(--sn-ink);
-}
-.price-context span:last-child {
-  border-color: #7c6951;
-  color: #f4ddbb;
-}
 .chart {
   width: 100%;
   height: 260px;
@@ -5198,16 +5179,6 @@ wa-progress-bar {
 }
 [data-sn-layout=compact] .price-chart {
   height: 380px;
-}
-[data-sn-layout=compact] .price-context {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-}
-[data-sn-layout=compact] .price-context span {
-  padding: 6px 8px;
-  font-size: 12px;
-  line-height: 1.3;
 }
 [data-sn-layout=compact] .chart-actions span {
   width: 100%;
@@ -6010,4 +5981,136 @@ wa-button[disabled] {
 #recovery-goto-controls {
   margin-left: 8px;
   min-height: 44px;
+}
+.price-context {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr));
+  gap: 10px;
+  margin: 14px 0 0;
+}
+.pc-tile {
+  background: var(--sn-surface-2);
+  border: 1px solid var(--sn-line);
+  border-radius: 12px;
+  padding: 10px 14px;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.pc-label {
+  font-size: 11px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--sn-muted);
+}
+.pc-tile b {
+  font-size: 15px;
+  color: var(--sn-ink);
+  overflow-wrap: anywhere;
+}
+.pc-tile[data-tile=now] {
+  border-color: #2d5d9c;
+}
+.pc-tile[data-tile=high] {
+  border-color: #7c6951;
+}
+[data-sn-layout=compact] .price-context {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+[data-sn-layout=compact] .pc-tile {
+  padding: 8px 10px;
+}
+[data-sn-layout=compact] .pc-tile b {
+  font-size: 13px;
+}
+.chart-intro {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.chart-actions {
+  margin: 0;
+  padding: 4px;
+  border: 1px solid var(--sn-line);
+  border-radius: 12px;
+  background: var(--sn-surface-2);
+}
+.price-chart {
+  border: 1px solid var(--sn-line);
+  border-radius: 14px;
+  background: var(--sn-surface-2);
+  overflow: hidden;
+}
+.track-lanes {
+  display: grid;
+  gap: 10px;
+}
+.track-lane {
+  display: grid;
+  gap: 4px;
+}
+.track-caption {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-weight: 650;
+  color: var(--sn-ink);
+}
+.track-caption small {
+  flex-basis: 100%;
+  font-weight: 400;
+  color: var(--sn-muted);
+}
+.track-key {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  flex: none;
+}
+.track-bar {
+  height: 26px;
+  border: 1px solid var(--sn-line);
+  border-radius: 8px;
+}
+.track-seg {
+  line-height: 24px;
+  border-radius: 6px;
+  font-weight: 650;
+}
+.chart-legend {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--sn-line);
+  border-radius: 14px;
+  background: var(--sn-surface-2);
+}
+.chart-legend .legend {
+  margin: 0;
+  gap: 6px 14px;
+  line-height: 1.5;
+}
+.cl-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.cl-note {
+  color: var(--sn-muted);
+}
+.cl-dot {
+  font-size: 14px;
+  line-height: 1;
+}
+.chart-legend .tk {
+  margin: 0;
+}
+.chart-legend .shade {
+  margin: 0;
 }

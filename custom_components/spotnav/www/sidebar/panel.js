@@ -52268,7 +52268,7 @@ function priceAxisExtent(prices, unit, extra) {
 
 // shared-dashboard/charts.js
 use([install3, install, install5, install6, install8, install9, install7, install15, install12, install16]);
-var axis = { axisLine: { lineStyle: { color: "#4a6286" } }, axisLabel: { color: "#aebfd8", fontSize: 12 }, splitLine: { lineStyle: { color: "#1b3150" } } };
+var axis = { axisLine: { lineStyle: { color: "#2f4770" } }, axisLabel: { color: "#aebfd8", fontSize: 12 }, splitLine: { lineStyle: { color: "#172a46", type: "dashed" } } };
 function mountCharts(root, data, format3, modes) {
   let { prices, windows, tracks = null, now, deadline, horizon, cap, readings, sentHistory, historyAxis, unit = "c/kWh", viewKey } = data;
   let { time: time2, date: sampleDate, days: sampleDays, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks, tickLabel } = format3;
@@ -52283,10 +52283,11 @@ function mountCharts(root, data, format3, modes) {
     priceCharts[mode] = priceChart;
     const renderItem = (params, api) => {
       const s4 = api.coord([api.value(0), api.value(2)]), e9 = api.coord([api.value(1), api.value(2)]), zero = api.coord([api.value(0), 0]);
-      const rect = graphic_exports2.clipRectByRect({ x: s4[0], y: Math.min(s4[1], zero[1]), width: Math.max(1, e9[0] - s4[0]), height: Math.max(2, Math.abs(zero[1] - s4[1])) }, params.coordSys);
+      const gap = e9[0] - s4[0] > 6 ? 1 : 0;
+      const rect = graphic_exports2.clipRectByRect({ x: s4[0], y: Math.min(s4[1], zero[1]), width: Math.max(1, e9[0] - s4[0] - gap), height: Math.max(2, Math.abs(zero[1] - s4[1])) }, params.coordSys);
       if (!rect) return null;
       const color3 = bandColor(api.value(2), unit);
-      if (mode === "bar") return { type: "group", children: [{ type: "rect", shape: rect, style: { fill: color3 } }] };
+      if (mode === "bar") return { type: "group", children: [{ type: "rect", shape: { ...rect, r: api.value(2) < 0 ? [0, 0, 3, 3] : [3, 3, 0, 0] }, style: { fill: color3, opacity: 0.92 } }] };
       const top = graphic_exports2.clipPointsByRect([[s4[0], s4[1]], [e9[0], e9[1]]], params.coordSys);
       const children = [{ type: "rect", shape: rect, style: { fill: color3, opacity: 0.2 } }];
       if (top.length === 2) children.push({ type: "line", shape: { x1: top[0][0], y1: top[0][1], x2: top[1][0], y2: top[1][1] }, style: { stroke: color3, lineWidth: 3 }, silent: true });
@@ -52303,11 +52304,11 @@ function mountCharts(root, data, format3, modes) {
     };
     const setPriceOption = (initial) => priceChart.setOption({
       animation: false,
-      grid: { left: 48, right: 20, top: 82, bottom: 92, show: true, backgroundColor: "#0b1626", borderWidth: 0 },
-      tooltip: { trigger: "item", confine: true, hideDelay: 0, transitionDuration: 0, backgroundColor: "#14233a", borderColor: "#4a6286", textStyle: { color: "#f4f8ff" }, formatter: (p4) => !Array.isArray(p4.value) || p4.value.length < 3 || !p4.value.slice(0, 3).every(Number.isFinite) ? "" : `${escapeText(tooltipDate(p4.value[0]))} ${escapeText(time2(p4.value[0]))}\u2013${escapeText(tooltipDate(p4.value[1]))} ${escapeText(time2(p4.value[1]))}<br>${priceText(p4.value[2])} ${escapeText(unit)}${priceBand(p4.value[2], unit) ? ` \xB7 ${priceBand(p4.value[2], unit).label}` : ""}${windows.filter((w2) => w2.start < p4.value[1] && w2.end > p4.value[0]).map((w2) => `<br>Proposal: ${escapeText(tooltipDate(w2.start))} ${escapeText(time2(w2.start))}\u2013${escapeText(time2(w2.end))}`).join("")}` },
+      grid: { left: 48, right: 20, top: 82, bottom: 92, show: true, backgroundColor: "#0a1727", borderWidth: 0 },
+      tooltip: { trigger: "item", confine: true, hideDelay: 0, transitionDuration: 0, backgroundColor: "#14233a", borderColor: "#34e8b0", borderWidth: 1, padding: [8, 12], extraCssText: "border-radius:10px;box-shadow:0 8px 24px rgba(2,8,18,.5)", textStyle: { color: "#f4f8ff", fontSize: 13 }, formatter: (p4) => !Array.isArray(p4.value) || p4.value.length < 3 || !p4.value.slice(0, 3).every(Number.isFinite) ? "" : `${escapeText(tooltipDate(p4.value[0]))} ${escapeText(time2(p4.value[0]))}\u2013${escapeText(tooltipDate(p4.value[1]))} ${escapeText(time2(p4.value[1]))}<br>${priceText(p4.value[2])} ${escapeText(unit)}${priceBand(p4.value[2], unit) ? ` \xB7 ${priceBand(p4.value[2], unit).label}` : ""}${windows.filter((w2) => w2.start < p4.value[1] && w2.end > p4.value[0]).map((w2) => `<br>Proposal: ${escapeText(tooltipDate(w2.start))} ${escapeText(time2(w2.start))}\u2013${escapeText(time2(w2.end))}`).join("")}` },
       xAxis: { ...axis, type: "value", min: horizon[0], max: horizon[1], axisLabel: { show: false }, axisTick: { show: false }, splitLine: { show: false } },
       yAxis: { ...axis, axisLabel: { ...axis.axisLabel, formatter: priceText }, type: "value", name: unit, nameTextStyle: { color: "#aebfd8", align: "left" }, ...priceAxisExtent(prices, unit, cap) },
-      dataZoom: [{ type: "inside", xAxisIndex: 0, startValue: initial[0], endValue: initial[1], filterMode: "weakFilter", zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false, preventDefaultMouseMove: false }, { type: "slider", xAxisIndex: 0, startValue: initial[0], endValue: initial[1], filterMode: "weakFilter", height: 28, bottom: 12, borderColor: "#4b6871", backgroundColor: "#142630", fillerColor: "rgba(91,205,180,.22)", textStyle: { color: "#d0e1df" }, showDetail: false }],
+      dataZoom: [{ type: "inside", xAxisIndex: 0, startValue: initial[0], endValue: initial[1], filterMode: "weakFilter", zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false, preventDefaultMouseMove: false }, { type: "slider", xAxisIndex: 0, startValue: initial[0], endValue: initial[1], filterMode: "weakFilter", height: 28, bottom: 12, borderColor: "#2f4770", backgroundColor: "#0f1b2d", fillerColor: "rgba(52,232,176,.2)", handleStyle: { color: "#34e8b0", borderColor: "#34e8b0" }, moveHandleStyle: { color: "#34e8b0" }, dataBackground: { lineStyle: { color: "#2f4770" }, areaStyle: { color: "#1b3150" } }, textStyle: { color: "#d0e1df" }, showDetail: false }],
       series: [
         { type: "custom", clip: true, name: "Sample price", renderItem, encode: { x: [0, 1], y: 2 }, data: stepData() },
         {
@@ -52316,7 +52317,7 @@ function mountCharts(root, data, format3, modes) {
           data: [[horizon[0], 0], [horizon[1], 0]],
           lineStyle: { opacity: 0 },
           tooltip: { show: false },
-          markArea: { silent: true, label: { show: false }, data: [[{ xAxis: horizon[0], itemStyle: { color: "#000000" } }, { xAxis: now }]] },
+          markArea: { silent: true, label: { show: false }, data: [[{ xAxis: horizon[0], itemStyle: { color: "rgba(3,8,16,.5)" } }, { xAxis: now }]] },
           markPoint: { silent: true, symbol: "pin", symbolSize: 54, label: { color: "#fff", fontSize: 11, fontWeight: "bold", formatter: (p4) => priceText(p4.value) }, data: [(() => {
             const p4 = prices.reduce((a4, b3) => a4.cents < b3.cents ? a4 : b3);
             return { name: "LOW", coord: [(p4.start + p4.end) / 2, p4.cents], value: p4.cents, itemStyle: { color: bandColor(p4.cents, unit) } };
@@ -52324,7 +52325,7 @@ function mountCharts(root, data, format3, modes) {
             const p4 = prices.reduce((a4, b3) => a4.cents > b3.cents ? a4 : b3);
             return { name: "HIGH", coord: [(p4.start + p4.end) / 2, p4.cents], value: p4.cents, itemStyle: { color: bandColor(p4.cents, unit) } };
           })()] },
-          markLine: { silent: true, symbol: "none", label: { color: "#e5d2ac", fontSize: 11 }, lineStyle: { color: "#d4a969", type: "dashed" }, data: [...Number.isFinite(cap) ? [{ yAxis: cap, label: { formatter: `Cap ${priceText(cap)} ${unit}`, position: "insideEndTop" } }] : [], { xAxis: now, label: { formatter: "Now", position: "insideStartTop", color: "#8fc5ff" }, lineStyle: { color: "#398dff", type: "solid", width: 2 } }, ...Number.isFinite(deadline) ? [{ xAxis: deadline, label: { formatter: "Ready by", position: "insideStartTop" }, lineStyle: { color: "#e1c390" } }] : []] }
+          markLine: { silent: true, symbol: "none", label: { color: "#f0d9a8", fontSize: 11 }, lineStyle: { color: "#d4a969", type: "dashed" }, data: [...Number.isFinite(cap) ? [{ yAxis: cap, label: { formatter: `Cap ${priceText(cap)} ${unit}`, position: "insideEndTop" } }] : [], { xAxis: now, label: { formatter: "Now", position: "insideStartTop", color: "#8fc5ff" }, lineStyle: { color: "#398dff", type: "solid", width: 2 } }, ...Number.isFinite(deadline) ? [{ xAxis: deadline, label: { formatter: "Ready by", position: "insideStartTop" }, lineStyle: { color: "#e1c390" } }] : []] }
         }
       ]
     });
@@ -52409,7 +52410,10 @@ ${sampleDate(h3)}` : time2(h3);
         el.dataset.lane = lane.key;
         const caption = document.createElement("div");
         caption.className = "track-caption";
-        caption.textContent = lane.caption;
+        const key3 = document.createElement("span");
+        key3.className = `track-key tk-${lane.key === "measured" ? "flow" : lane.key}`;
+        key3.setAttribute("aria-hidden", "true");
+        caption.append(key3, lane.caption);
         if (lane.note) {
           const note = document.createElement("small");
           note.textContent = lane.note;
@@ -52908,6 +52912,29 @@ function renderPriceNav(nav) {
   return `<div class="price-nav" role="group" aria-label="Price day navigation" data-price-nav-status="${escapeText(nav.status)}"><div class="price-nav-buttons">${buttons}${retry}</div>${picker}<p class="subtext price-nav-note" role="status">${escapeText(nav.message || nav.detail || "")}${nav.message && nav.detail ? ` ${escapeText(nav.detail)}` : ""}</p>${reasons ? `<p class="subtext price-nav-reasons">${reasons}</p>` : ""}</div>`;
 }
 
+// shared-dashboard/chart-view.js
+function renderChartControls(mode, title) {
+  return `<div class="chart-actions" role="group" aria-label="Chart zoom"><wa-button data-zoom="${mode}" size="small" aria-label="Zoom in ${escapeText(title)}">Zoom +</wa-button><wa-button data-reset="${mode}" size="small" aria-label="Reset ${escapeText(title)} overview">Full horizon</wa-button><span>Wheel or pinch zooms \xB7 scroll outside the chart</span></div>`;
+}
+var tile2 = (label2, body, kind) => `<div class="pc-tile" data-tile="${kind}"><span class="pc-label">${escapeText(label2)}</span><b>${body}</b></div>`;
+function renderPriceContext({ now, next, low, high, unit }) {
+  const u4 = escapeText(unit), at = (x2) => `${priceText(x2)} ${u4}`;
+  return `<div class="price-context" role="group" aria-label="Price context">${tile2("Now", at(now), "now")}${tile2("Next window starts at", at(next), "next")}${tile2("Horizon low", low || "Unknown", "low")}${tile2("Horizon high", high || "Unknown", "high")}</div>`;
+}
+var chip = (cls, text4) => `<span class="cl-item">${cls}${text4}</span>`;
+var dot = (css) => `<span class="cl-dot ${css}" aria-hidden="true">\u25CF</span>`;
+function renderChartLegend({ unit, cap }) {
+  const u4 = escapeText(unit);
+  const bands = bandsApply(unit) ? `<span class="cl-note">Absolute price bands, ${u4}:</span>${PRICE_BANDS.map((b3) => chip(dot(b3.css), `${escapeText(b3.label)} ${escapeText(b3.range)}`)).join("")}<span class="cl-note">exactly 25 is Medium; display only, not a charging limit</span>` : `<span class="cl-note">Neutral price color: bands are defined in euro c/kWh and no trusted conversion is available for ${u4}, so nothing is classified.</span>`;
+  const overlay = [
+    chip('<span class="shade" aria-hidden="true"></span>', "Proposed charging \xB7 gradient + pale track"),
+    Number.isFinite(cap) ? chip('<span class="cap-key" aria-hidden="true"></span>', `Soft cap ${priceText(cap)} ${u4}`) : "",
+    chip('<span class="now-key" aria-hidden="true">\u2502</span>', "Now")
+  ].join("");
+  const tracks = `<span class="cl-note">Tracks share the price time axis.</span>${chip('<span class="tk tk-proposal" aria-hidden="true"></span>', "Proposal: the current calculated plan, not sent")}${chip('<span class="tk tk-sent" aria-hidden="true"></span>', "Sent: plan versions the charger acknowledged, from the loaded history day (acknowledged is not installed)")}${chip('<span class="tk tk-effective" aria-hidden="true"></span>', "Effective: the latest fresh readback, remaining period only; a reported limit, not power")}${chip('<span class="tk tk-flow" aria-hidden="true"></span>', "Measured: observed power flow of the loaded history day")}${chip('<span class="tk tk-unknown" aria-hidden="true"></span>', "Hatched: unknown or not loaded, never zero")}`;
+  return `<div class="chart-legend" role="group" aria-label="Chart legend"><p class="legend track-legend" data-legend="tracks">${tracks}</p><p class="legend" data-legend="prices">${bands}</p><p class="legend" data-legend="overlay">${overlay}</p></div>`;
+}
+
 // shared-dashboard/vehicle-sources-view.js
 var opt = (value2, text4, selected) => `<option value="${escapeText(value2)}" ${selected ? "selected" : ""}>${escapeText(text4)}</option>`;
 function renderVehicleSources(m4) {
@@ -53291,7 +53318,7 @@ function mountDashboard(root, adapter) {
       const heading = modes.length > 1 ? `Electricity prices & plan \xB7 ${title}` : "Electricity prices & charging plan";
       if (!chartReady) return card(heading, labels.chartEyebrow || "PRICES & PLAN", `<p>Price chart unavailable.</p><p class="subtext">${escapeText(labels.chartIntro)} ${escapeText(labels.chartNote)}</p>${plan}`, `prices prices-${mode}`, tag);
       const extremum = (p4) => p4 ? `${priceNumber(p4.cents)} ${escapeText(unit)} \xB7 ${escapeText(day(p4.start))} ${escapeText(time2(p4.start))}` : "Unknown";
-      return card(heading, labels.chartEyebrow || "PRICES & PLAN", `<div class="chart-intro"><div>${modes.length > 1 ? `<strong>${icon} ${mode === "bar" ? "Interval bars" : "Stepped area"}</strong>` : ""}<p>${escapeText(labels.chartIntro)}</p></div><div class="chart-actions"><wa-button data-zoom="${mode}" size="small" aria-label="Zoom in ${title}">Zoom +</wa-button><wa-button data-reset="${mode}" size="small" aria-label="Reset ${title} overview">Full horizon</wa-button><span>Wheel zooms \xB7 scroll outside chart</span></div></div><div class="price-context"><span>Now <b>${priceNumber(priceAt(chart.now))} ${escapeText(unit)}</b></span><span>Next window starts at <b>${priceNumber(m4.nextPriceUnavailable ? null : priceAt(next?.start))} ${escapeText(unit)}</b></span><span>Horizon low <b>${extremum(extremes[0])}</b></span><span>Horizon high <b>${extremum(extremes[1])}</b></span></div>${renderPriceNav(m4.priceNav)}<div id="price-${mode}" class="chart price-chart" role="img" aria-label="Price intervals and proposed windows"></div><div class="track-lanes" data-track-lanes="${mode}" role="group" aria-label="Evidence tracks on the price time axis: proposal, sent, effective, measured"></div><p class="legend track-legend">Tracks share the price time axis. <span class="tk tk-proposal"></span> Proposal: the current calculated plan, not sent \xB7 <span class="tk tk-sent"></span> Sent: plan versions the charger acknowledged, from the loaded history day (acknowledged is not installed) \xB7 <span class="tk tk-effective"></span> Effective: the latest fresh readback, remaining period only; a reported limit, not power \xB7 <span class="tk tk-flow"></span> Measured: observed power flow of the loaded history day \xB7 <span class="tk tk-unknown"></span> Hatched: unknown or not loaded, never zero.</p><p class="legend">${bandsApply(unit) ? `Absolute price bands, ${escapeText(unit)}: ${PRICE_BANDS.map((b3) => `<span class="${b3.css}">\u25CF</span> ${b3.label} ${b3.range}`).join(" ")} (exactly 25 is Medium; display only, not a charging limit)` : `Neutral price color: bands are defined in euro c/kWh and no trusted conversion is available for ${escapeText(unit)}, so nothing is classified.`} <span class="shade"></span> Proposed charging \xB7 gradient + pale track ${Number.isFinite(chart.cap) ? `<span class="cap-key"></span> Soft cap ${priceText(chart.cap)} ${escapeText(unit)}` : ""} <span class="now-key">\u2502</span> Now</p><p class="subtext">${escapeText(labels.chartNote)}</p>${plan}`, `prices prices-${mode}`, tag);
+      return card(heading, labels.chartEyebrow || "PRICES & PLAN", `<div class="chart-intro"><div>${modes.length > 1 ? `<strong>${icon} ${mode === "bar" ? "Interval bars" : "Stepped area"}</strong>` : ""}<p>${escapeText(labels.chartIntro)}</p></div>${renderChartControls(mode, title)}</div>${renderPriceContext({ now: priceAt(chart.now), next: m4.nextPriceUnavailable ? null : priceAt(next?.start), low: extremum(extremes[0]), high: extremum(extremes[1]), unit })}${renderPriceNav(m4.priceNav)}<div id="price-${mode}" class="chart price-chart" role="img" aria-label="Price intervals and proposed windows"></div><div class="track-lanes" data-track-lanes="${mode}" role="group" aria-label="Evidence tracks on the price time axis: proposal, sent, effective, measured"></div>${renderChartLegend({ unit, cap: chart.cap })}<p class="subtext">${escapeText(labels.chartNote)}</p>${plan}`, `prices prices-${mode}`, tag);
     };
     const scenario = m4.scenarios;
     const option = (s4) => `<option value="${escapeText(s4.value)}" ${s4.value === scenario.selected ? "selected" : ""}>${escapeText(s4.label)}</option>`;
@@ -66110,7 +66137,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.204";
+var CARD_VERSION = "2.5.205";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {

@@ -7,7 +7,8 @@ import { priceText } from './price-format.js';
 import { priceBand, bandColor, priceAxisExtent } from './price-bands.js';
 
 echarts.use([CustomChart, LineChart, GridComponent, TooltipComponent, MarkLineComponent, MarkAreaComponent, MarkPointComponent, VisualMapComponent, DataZoomComponent, CanvasRenderer]);
-const axis = { axisLine: { lineStyle: { color: '#4a6286' } }, axisLabel: { color: '#aebfd8', fontSize: 12 }, splitLine: { lineStyle: { color: '#1b3150' } } };
+// Stage 20.4: colours follow the shell tokens (see shell.css); geometry (grid margins) is unchanged so the DOM overlays and lanes stay aligned.
+const axis = { axisLine: { lineStyle: { color: '#2f4770' } }, axisLabel: { color: '#aebfd8', fontSize: 12 }, splitLine: { lineStyle: { color: '#172a46', type: 'dashed' } } };
 export function mountCharts(root, data, format, modes) {
   let { prices, windows, tracks = null, now, deadline, horizon, cap, readings, sentHistory, historyAxis, unit = 'c/kWh', viewKey } = data;
   let { time, date: sampleDate, days: sampleDays, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks, tickLabel } = format;
@@ -22,10 +23,12 @@ export function mountCharts(root, data, format, modes) {
   priceCharts[mode] = priceChart;
   const renderItem = (params, api) => {
     const s = api.coord([api.value(0), api.value(2)]), e = api.coord([api.value(1), api.value(2)]), zero = api.coord([api.value(0), 0]);
-    const rect = echarts.graphic.clipRectByRect({ x: s[0], y: Math.min(s[1], zero[1]), width: Math.max(1, e[0] - s[0]), height: Math.max(2, Math.abs(zero[1] - s[1])) }, params.coordSys);
+    const gap = e[0] - s[0] > 6 ? 1 : 0; // hairline between bars; the interval itself keeps its exact start and end
+    const rect = echarts.graphic.clipRectByRect({ x: s[0], y: Math.min(s[1], zero[1]), width: Math.max(1, e[0] - s[0] - gap), height: Math.max(2, Math.abs(zero[1] - s[1])) }, params.coordSys);
     if (!rect) return null;
     const color = bandColor(api.value(2), unit);
-    if (mode === 'bar') return { type: 'group', children: [{ type: 'rect', shape: rect, style: { fill: color } }] };
+    // Rounded outer corners: top for a positive price, bottom for a negative one (the zero baseline stays square).
+    if (mode === 'bar') return { type: 'group', children: [{ type: 'rect', shape: { ...rect, r: api.value(2) < 0 ? [0, 0, 3, 3] : [3, 3, 0, 0] }, style: { fill: color, opacity: .92 } }] };
     // Stepped area: translucent fill to the zero baseline plus a solid top edge, both coloured by this interval's absolute value.
     const top = echarts.graphic.clipPointsByRect([[s[0], s[1]], [e[0], e[1]]], params.coordSys);
     const children = [{ type: 'rect', shape: rect, style: { fill: color, opacity: .2 } }];
@@ -35,16 +38,16 @@ export function mountCharts(root, data, format, modes) {
     return { type: 'group', children };
   };
   const stepData = () => { const seg = stepSegments(prices); return seg.map(([s, e], i) => [s[0], e[0], s[1], i && seg[i - 1][1][0] === s[0] ? seg[i - 1][0][1] : null]); };
-  const setPriceOption = (initial) => priceChart.setOption({ animation: false, grid: { left: 48, right: 20, top: 82, bottom: 92, show: true, backgroundColor: '#0b1626', borderWidth: 0 },
-    tooltip: { trigger: 'item', confine: true, hideDelay: 0, transitionDuration: 0, backgroundColor: '#14233a', borderColor: '#4a6286', textStyle: { color: '#f4f8ff' }, formatter: p => !Array.isArray(p.value) || p.value.length < 3 || !p.value.slice(0, 3).every(Number.isFinite) ? '' : `${escapeText(tooltipDate(p.value[0]))} ${escapeText(time(p.value[0]))}–${escapeText(tooltipDate(p.value[1]))} ${escapeText(time(p.value[1]))}<br>${priceText(p.value[2])} ${escapeText(unit)}${priceBand(p.value[2], unit) ? ` · ${priceBand(p.value[2], unit).label}` : ''}${windows.filter(w => w.start < p.value[1] && w.end > p.value[0]).map(w => `<br>Proposal: ${escapeText(tooltipDate(w.start))} ${escapeText(time(w.start))}–${escapeText(time(w.end))}`).join('')}` },
+  const setPriceOption = (initial) => priceChart.setOption({ animation: false, grid: { left: 48, right: 20, top: 82, bottom: 92, show: true, backgroundColor: '#0a1727', borderWidth: 0 },
+    tooltip: { trigger: 'item', confine: true, hideDelay: 0, transitionDuration: 0, backgroundColor: '#14233a', borderColor: '#34e8b0', borderWidth: 1, padding: [8, 12], extraCssText: 'border-radius:10px;box-shadow:0 8px 24px rgba(2,8,18,.5)', textStyle: { color: '#f4f8ff', fontSize: 13 }, formatter: p => !Array.isArray(p.value) || p.value.length < 3 || !p.value.slice(0, 3).every(Number.isFinite) ? '' : `${escapeText(tooltipDate(p.value[0]))} ${escapeText(time(p.value[0]))}–${escapeText(tooltipDate(p.value[1]))} ${escapeText(time(p.value[1]))}<br>${priceText(p.value[2])} ${escapeText(unit)}${priceBand(p.value[2], unit) ? ` · ${priceBand(p.value[2], unit).label}` : ''}${windows.filter(w => w.start < p.value[1] && w.end > p.value[0]).map(w => `<br>Proposal: ${escapeText(tooltipDate(w.start))} ${escapeText(time(w.start))}–${escapeText(time(w.end))}`).join('')}` },
     xAxis: { ...axis, type: 'value', min: horizon[0], max: horizon[1], axisLabel: { show: false }, axisTick: { show: false }, splitLine: { show: false } },
     yAxis: { ...axis, axisLabel: {...axis.axisLabel, formatter: priceText}, type: 'value', name: unit, nameTextStyle: { color: '#aebfd8', align: 'left' }, ...priceAxisExtent(prices, unit, cap) },
-    dataZoom: [{ type: 'inside', xAxisIndex: 0, startValue: initial[0], endValue: initial[1], filterMode: 'weakFilter', zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false, preventDefaultMouseMove: false }, { type: 'slider', xAxisIndex: 0, startValue: initial[0], endValue: initial[1], filterMode: 'weakFilter', height: 28, bottom: 12, borderColor: '#4b6871', backgroundColor: '#142630', fillerColor: 'rgba(91,205,180,.22)', textStyle: { color: '#d0e1df' }, showDetail: false }],
+    dataZoom: [{ type: 'inside', xAxisIndex: 0, startValue: initial[0], endValue: initial[1], filterMode: 'weakFilter', zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false, preventDefaultMouseMove: false }, { type: 'slider', xAxisIndex: 0, startValue: initial[0], endValue: initial[1], filterMode: 'weakFilter', height: 28, bottom: 12, borderColor: '#2f4770', backgroundColor: '#0f1b2d', fillerColor: 'rgba(52,232,176,.2)', handleStyle: { color: '#34e8b0', borderColor: '#34e8b0' }, moveHandleStyle: { color: '#34e8b0' }, dataBackground: { lineStyle: { color: '#2f4770' }, areaStyle: { color: '#1b3150' } }, textStyle: { color: '#d0e1df' }, showDetail: false }],
     series: [{ type: 'custom', clip: true, name: 'Sample price', renderItem, encode: { x: [0, 1], y: 2 }, data: stepData() },
     { type: 'line', symbol: 'none', data: [[horizon[0], 0], [horizon[1], 0]], lineStyle: { opacity: 0 }, tooltip: { show: false },
-      markArea: { silent: true, label: { show: false }, data: [[{xAxis:horizon[0], itemStyle:{color:'#000000'}},{xAxis:now}]] },
+      markArea: { silent: true, label: { show: false }, data: [[{xAxis:horizon[0], itemStyle:{color:'rgba(3,8,16,.5)'}},{xAxis:now}]] },
       markPoint: { silent: true, symbol: 'pin', symbolSize: 54, label: { color: '#fff', fontSize: 11, fontWeight: 'bold', formatter: p => priceText(p.value) }, data: [(() => { const p = prices.reduce((a,b)=>a.cents<b.cents?a:b); return { name: 'LOW', coord: [(p.start+p.end)/2,p.cents], value:p.cents, itemStyle:{color:bandColor(p.cents, unit)} }; })(), (() => { const p = prices.reduce((a,b)=>a.cents>b.cents?a:b); return { name: 'HIGH', coord: [(p.start+p.end)/2,p.cents], value:p.cents, itemStyle:{color:bandColor(p.cents, unit)} }; })()] },
-      markLine: { silent: true, symbol: 'none', label: { color: '#e5d2ac', fontSize: 11 }, lineStyle: { color: '#d4a969', type: 'dashed' }, data: [...(Number.isFinite(cap) ? [{ yAxis: cap, label: { formatter: `Cap ${priceText(cap)} ${unit}`, position: 'insideEndTop' } }] : []), { xAxis: now, label: { formatter: 'Now', position: 'insideStartTop', color:'#8fc5ff' }, lineStyle: { color: '#398dff', type:'solid', width:2 } }, ...(Number.isFinite(deadline) ? [{ xAxis: deadline, label: { formatter: 'Ready by', position: 'insideStartTop' }, lineStyle: { color: '#e1c390' } }] : [])] } }] });
+      markLine: { silent: true, symbol: 'none', label: { color: '#f0d9a8', fontSize: 11 }, lineStyle: { color: '#d4a969', type: 'dashed' }, data: [...(Number.isFinite(cap) ? [{ yAxis: cap, label: { formatter: `Cap ${priceText(cap)} ${unit}`, position: 'insideEndTop' } }] : []), { xAxis: now, label: { formatter: 'Now', position: 'insideStartTop', color:'#8fc5ff' }, lineStyle: { color: '#398dff', type:'solid', width:2 } }, ...(Number.isFinite(deadline) ? [{ xAxis: deadline, label: { formatter: 'Ready by', position: 'insideStartTop' }, lineStyle: { color: '#e1c390' } }] : [])] } }] });
   setPriceOption(initialRange(now));
   const labels = document.createElement('div');
   labels.className = 'time-ticks';
@@ -109,7 +112,8 @@ export function mountCharts(root, data, format, modes) {
     if (!tracks?.lanes?.length || !Number.isFinite(left) || !(width > 0)) { laneRoot.replaceChildren(); return; }
     laneRoot.replaceChildren(...tracks.lanes.map(lane => {
       const el = document.createElement('div'); el.className = 'track-lane'; el.dataset.lane = lane.key;
-      const caption = document.createElement('div'); caption.className = 'track-caption'; caption.textContent = lane.caption;
+      const caption = document.createElement('div'); caption.className = 'track-caption';
+      const key = document.createElement('span'); key.className = `track-key tk-${lane.key === 'measured' ? 'flow' : lane.key}`; key.setAttribute('aria-hidden', 'true'); caption.append(key, lane.caption);
       if (lane.note) { const note = document.createElement('small'); note.textContent = lane.note; caption.append(note); }
       const bar = document.createElement('div'); bar.className = 'track-bar'; bar.style.marginLeft = `${left}px`; bar.style.width = `${width}px`;
       for (const s of lane.segments) {
