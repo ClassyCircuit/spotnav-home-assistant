@@ -386,7 +386,8 @@ async def test_offline_send_is_a_transient_nonsending_blocker_and_sends_once_aft
     for _ in range(morek_schedule.BLOCKER_RETRY_LIMIT + 3):
         w.worker.trigger(kind="recovery")
         await drain(w.worker)
-    assert w.worker.blocker_retry["exhausted"] and w.worker._blocker_timer is None  # noqa: SLF001
+    # Stage 19.3 (named change): the cap now hands over to the slow pace; the timer keeps running.
+    assert w.worker.blocker_retry["phase"] == "slow" and w.worker._blocker_timer is not None  # noqa: SLF001
     assert w.worker.blocker_retry["attempts"] >= morek_schedule.BLOCKER_RETRY_LIMIT
     assert w.point.call.await_count == 0
     # the link returns: a link-driven recovery sends the changed plan exactly once through the normal path

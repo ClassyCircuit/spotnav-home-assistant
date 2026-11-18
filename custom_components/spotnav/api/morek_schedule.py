@@ -39,6 +39,13 @@ MAX_PERIODS = 8
 MAX_HORIZON = timedelta(hours=48)
 VERIFY_TOLERANCE_S = 90
 REJECTION_RETRY_DELAYS = (300, 900)  # seconds before the 2nd and 3rd attempt at a definitely rejected intent
+#: Stage 19.3: the slower, persisted pace that continues AFTER the fast delays above (rejection retries) and after the
+#: fast blocker re-evaluations. Each spacing is >= the one before and >= the last fast delay (900); the last repeats,
+#: so 4 hours is the ceiling. Non-sending re-evaluation and the re-send of a still-current, definitely rejected intent
+#: only; an uncertain write never uses it.
+SLOW_RETRY_DELAYS = (1800, 3600, 7200, 14400)
+RETRY_OBSERVATION_CAP = 8  # durable, newest wins
+RETRY_STATE_KEY = "retry_state"  # additive key of the existing outcome record
 VERIFY_DELAYS = (30, 45, 45)  # Follow-up reads at approximately 30, 75 and 120 seconds.
 _DATA_KEY = "spotnav_morek_schedule"
 _VERIFY_KEY = "spotnav_morek_verification"
@@ -1836,10 +1843,14 @@ def rejection_retry_at(record: dict[str, Any] | None) -> datetime | None:
         return None
     attempt = record.get("attempt")
     count = rejection_count(attempt)
-    if count < 1 or count > len(REJECTION_RETRY_DELAYS) or attempt.get("source") != "worker":
+    if count < 1 or attempt.get("source") != "worker":
         return None
+    # Stage 19.3: after the two fast delays the persisted slow pace continues (the count and the attempt time are
+    # already durable in the record, so it survives a restart); a changed plan restarts the count at 0.
+    delay = (REJECTION_RETRY_DELAYS[count - 1] if count <= len(REJECTION_RETRY_DELAYS)
+             else SLOW_RETRY_DELAYS[min(count - len(REJECTION_RETRY_DELAYS) - 1, len(SLOW_RETRY_DELAYS) - 1)])
     try:
-        return _utc(datetime.fromisoformat(attempt["at"])) + timedelta(seconds=REJECTION_RETRY_DELAYS[count - 1])
+        return _utc(datetime.fromisoformat(attempt["at"])) + timedelta(seconds=delay)
     except (KeyError, TypeError, ValueError, AttributeError, ScheduleRefused):
         return None
 
@@ -1861,7 +1872,8 @@ def recovery_status(record: dict[str, Any] | None, now: datetime) -> dict[str, A
     count = rejection_count(attempt)
     retry_at = rejection_retry_at(record)
     return {"accepted_at": accepted_at, "accepted_age_s": age_s, "accepted_is": "acknowledged_not_measured",
-            "rejections": count, "retries_left": max(0, len(REJECTION_RETRY_DELAYS) + 1 - count) if count else None,
+            "rejections": count, "pace": None if not count else "fast" if count <= len(REJECTION_RETRY_DELAYS) else "slow",
+            "retries_left": max(0, len(REJECTION_RETRY_DELAYS) + 1 - count) if count else None,
             "next_retry_at": None if retry_at is None else retry_at.isoformat(),
             "exhausted": bool(count and retry_at is None and not record.get("uncertain"))}
 
@@ -1919,14 +1931,67 @@ TRANSIENT_BLOCKERS = frozenset({
     "upload_not_sent",  # 19.1: proven never sent; a bounded re-evaluation is the automatic path
 })
 BLOCKER_RETRY_DELAYS = (60, 180, 600, 900)  # seconds; the last repeats
-BLOCKER_RETRY_LIMIT = 12  # timer-driven re-evaluations per blocked episode (about 2.5 h); events still re-evaluate
+BLOCKER_RETRY_LIMIT = 12  # fast-phase timer re-evaluations per blocked episode (about 2.5 h); then the slow pace
 
 
-def blocker_retry_delay(runs: int) -> int | None:
-    """Seconds until the next timer-driven re-evaluation after `runs` of them, or None when used up."""
+def blocker_retry_delay(runs: int) -> int:
+    """Seconds until the next timer-driven re-evaluation after `runs` of them (Stage 19.3: never used up).
+
+    Fast for the first `BLOCKER_RETRY_LIMIT` runs, then `SLOW_RETRY_DELAYS` (non-decreasing, 4 h ceiling). Each
+    run is only a guarded read-and-compare; events still re-evaluate at once."""
     if runs >= BLOCKER_RETRY_LIMIT:
-        return None
+        return SLOW_RETRY_DELAYS[min(runs - BLOCKER_RETRY_LIMIT, len(SLOW_RETRY_DELAYS) - 1)]
     return BLOCKER_RETRY_DELAYS[min(runs, len(BLOCKER_RETRY_DELAYS) - 1)]
+
+
+#: Stage 19.3: durable observations. Codes only; what was seen, the evidence class, who acts and what happens next.
+#: Never a payload, id, price or entity. `evidence`: nothing was sent (`none`), the durable pre-wire/wire-intent marker
+#: (`pre_wire_marker`, not proof of a send) or the charger's answer (`ack`). `basis` is always `observed` (a source
+#: reported it); nothing here is inferred or user-reported, and none claims charging.
+_OBS_EVIDENCE = {"upload_rejected": "ack", "upload_not_sent": "pre_wire_marker", "upload_uncertain": "pre_wire_marker"}
+_OBS_VEHICLE = ("wait_for_fresh_inputs",)
+_OBS_SYSTEM = ("wait_for_charger_connection", "wait_for_prices", "wait_for_planner", "wait_for_next_automatic_attempt",
+               "wait_for_repair_release", "wait_for_repair_spacing", "wait_for_confirmation",
+               "wait_for_repair_deferral", "wait_for_charge_now_end")
+
+
+def observation_entry(code: str, now_iso: str, *, retry_pending: bool = False) -> dict[str, Any] | None:
+    """The actionable observation for one blocker code, or None for a code that is not a blocker."""
+    action = DECISION_BLOCKERS.get(code)
+    if action is None:
+        return None
+    who = "vehicle" if action in _OBS_VEHICLE else "system" if action in _OBS_SYSTEM else "person"
+    automatic = code in TRANSIENT_BLOCKERS or (code == "upload_rejected" and retry_pending)
+    return {"code": code, "evidence": _OBS_EVIDENCE.get(code, "none"), "basis": "observed", "who": who,
+            "next": "automatic_recheck" if automatic else "person_action", "count": 1,
+            "first_at": now_iso, "last_at": now_iso}
+
+
+def sanitize_retry_state(raw: Any) -> dict[str, Any]:
+    """Whitelist and bound a persisted `retry_state`; anything malformed is dropped, never trusted."""
+    out: dict[str, Any] = {"pace": None, "observations": []}
+    if not isinstance(raw, dict) or raw.get("version") != 1:
+        return out
+    pace = raw.get("pace")
+    if (isinstance(pace, dict) and pace.get("code") in TRANSIENT_BLOCKERS and pace.get("phase") in ("fast", "slow")
+            and type(pace.get("attempts")) is int and 0 <= pace["attempts"] < 10_000):
+        out["pace"] = {"code": pace["code"], "phase": pace["phase"], "attempts": pace["attempts"],
+                       "next_at": pace["next_at"] if isinstance(pace.get("next_at"), str) else None}
+    items = raw.get("observations")
+    for item in (items if isinstance(items, list) else [])[-RETRY_OBSERVATION_CAP:]:
+        if (isinstance(item, dict) and item.get("code") in DECISION_BLOCKERS and type(item.get("count")) is int
+                and item["count"] >= 1 and isinstance(item.get("first_at"), str) and isinstance(item.get("last_at"), str)):
+            fresh = observation_entry(item["code"], item["first_at"], retry_pending=item.get("next") == "automatic_recheck")
+            if fresh is not None:
+                fresh.update(count=min(item["count"], 1_000_000), last_at=item["last_at"])
+                out["observations"].append(fresh)
+    return out
+
+
+def observations_status(worker: Any) -> list[dict[str, Any]]:
+    """The bounded, newest-last observation list the worker holds (also persisted); empty when none."""
+    items = getattr(worker, "observations", None)
+    return [dict(item) for item in items] if isinstance(items, list) else []
 
 
 def blocker_retry_status(worker: Any) -> dict[str, Any] | None:
@@ -3310,7 +3375,9 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
                                          getattr(worker, "reason_serial", -1) == worker._serial else "pending",
                                          "continuity": getattr(worker, "continuity", None),
                                          "recovery": {**recovery_status(outcomes, datetime.now(timezone.utc)),
-                                                      "blocker_retry": blocker_retry_status(worker)},
+                                                      "blocker_retry": blocker_retry_status(worker),
+                                                      "observations": observations_status(worker),
+                                                      "persistence": getattr(worker, "retry_persistence", None)},
                                          "inputs": planning_inputs,
                                          "last_trigger": getattr(worker, "last_trigger", None),
                                          "blocker": decision_blocker(worker.reason if worker is not None and

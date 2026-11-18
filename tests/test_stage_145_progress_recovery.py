@@ -277,11 +277,13 @@ async def test_retry_timer_is_rearmed_after_restart_respecting_uncertainty_and_l
     assert w.worker._retry_timer is not None  # noqa: SLF001
     w.worker.close()
     assert w.worker._retry_timer is None  # noqa: SLF001
-    for record in (_rejected(1, at=NOW - timedelta(seconds=60), uncertain=True),
-                   _rejected(3, at=NOW - timedelta(seconds=60))):
-        other = await _restarted(monkeypatch, record)
-        assert other.worker._retry_timer is None  # noqa: SLF001
-        other.worker.close()
+    # Stage 19.3 (named change): a third rejection no longer ends retries; the slow pace re-arms after restart.
+    slow = await _restarted(monkeypatch, _rejected(3, at=NOW - timedelta(seconds=60)))
+    assert slow.worker._retry_timer is not None  # noqa: SLF001
+    slow.worker.close()
+    other = await _restarted(monkeypatch, _rejected(1, at=NOW - timedelta(seconds=60), uncertain=True))
+    assert other.worker._retry_timer is None  # noqa: SLF001
+    other.worker.close()
 
 
 @pytest.mark.asyncio

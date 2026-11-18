@@ -29,7 +29,10 @@ def resume_record(w, attempt=PRIOR, **extra):
 
 def test_backoff_schedule_is_bounded_and_codes_are_classified():
     delays = [morek_schedule.blocker_retry_delay(n) for n in range(morek_schedule.BLOCKER_RETRY_LIMIT + 1)]
-    assert delays[:5] == [60, 180, 600, 900, 900] and delays[-1] is None and min(delays[:-1]) >= 60
+    # Stage 19.3 (named change): the old `None` after the 12-run cap is now the slow persisted pace.
+    assert delays[:5] == [60, 180, 600, 900, 900] and delays[-1] == morek_schedule.SLOW_RETRY_DELAYS[0]
+    long = [morek_schedule.blocker_retry_delay(n) for n in range(morek_schedule.BLOCKER_RETRY_LIMIT + 10)]
+    assert long == sorted(long) and long[-1] == morek_schedule.SLOW_RETRY_DELAYS[-1] == 14400 and min(long) >= 60
     transient = morek_schedule.TRANSIENT_BLOCKERS
     for code in ("charger_unavailable", "prices_stale_or_unavailable", "target_soc_stale", "vehicle_input_stale"):
         assert code in transient
@@ -54,7 +57,9 @@ async def test_offline_charger_is_rechecked_with_backoff_then_sends_once_when_ba
         w.worker.trigger(kind="recovery")
         await drain(w.worker)
         assert w.worker.blocker_retry["attempts"] == expected
-    assert w.worker.blocker_retry["exhausted"] and w.worker._blocker_timer is None  # noqa: SLF001
+    # Stage 19.3 (named change): after the fast phase the timer continues at the slow pace instead of stopping.
+    assert w.worker.blocker_retry["phase"] == "slow" and not w.worker.blocker_retry["exhausted"]
+    assert w.worker._blocker_timer is not None  # noqa: SLF001
     w.point.call.assert_not_awaited()
     online = True  # an event (reconnect) still re-evaluates after the timed checks stopped
     w.worker.trigger()

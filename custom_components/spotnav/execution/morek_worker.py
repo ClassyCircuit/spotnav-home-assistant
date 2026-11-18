@@ -18,6 +18,7 @@ from homeassistant.core import HomeAssistant
 
 from ..api import morek_schedule
 from ..runtime import controller_for, domain_data, preview_for
+from .morek_outcomes import OutcomeUnavailable
 from .command_admission import classify_morek_identity, command_admission, physical_connector
 
 _LOGGER = logging.getLogger(__name__)
@@ -29,6 +30,9 @@ _SETTLED = ("upload_accepted_unverified", "unchanged")  # outcomes that end a pe
 _DECISION_HISTORY = 10
 _DECISION_REPAIR_SENT = ("upload_accepted_unverified", "upload_rejected", "upload_uncertain")
 _DECISION_REPAIR_WAITING = ("repair_deferred",)
+_PERSIST_DELAY = 5.0  # seconds: coalesce a burst of observation/pace changes into one ledger write
+_PERSIST_MIN_INTERVAL = 60.0  # at most one retry-state write a minute, however much a link flaps
+_PERSIST_RETRY = 300.0  # after a failed write
 _SOC_CAUSE = "soc"  # the only planner cause that is routine and may use the SOC tolerance
 
 
@@ -64,6 +68,18 @@ class MorekScheduleWorker:
         self._blocker_timer = None
         self._blocker_runs = 0
         self.blocker_retry: dict[str, Any] | None = None
+        # Stage 19.3: persisted pace and bounded observations (the `retry_state` key of the existing outcome record).
+        self.observations: list[dict[str, Any]] = []
+        self.retry_persistence: str | None = None  # None until a write was needed; "ok" or a failure code (visible)
+        self._pace: dict[str, Any] | None = None
+        self._adopted = False
+        self._adopted_pace: dict[str, Any] | None = None
+        self._state_dirty = False
+        self._flush_timer = None
+        self._flush_task: asyncio.Task | None = None
+        self._flushing = False
+        self._last_flush = -_PERSIST_MIN_INTERVAL
+        self._rejection_count = 0
         self.resume_interrupted: str | None = None  # a Resume id a person Stop pre-empted in this process
         self._continuity_end: datetime | None = None
         self._deadline: float | None = None
@@ -267,6 +283,11 @@ class MorekScheduleWorker:
         if self._blocker_timer is not None:
             self._blocker_timer.cancel()
             self._blocker_timer = None
+        if self._flush_timer is not None:
+            self._flush_timer.cancel()
+            self._flush_timer = None
+        if self._flush_task is not None:
+            self._flush_task.cancel()
         if self._remove is not None:
             self._remove()
             self._remove = None
@@ -329,6 +350,7 @@ class MorekScheduleWorker:
             record = await morek_schedule._outcome_record(self._hass, self._entry_id, data)
         except Exception:  # noqa: BLE001 - no evidence, no retry
             return
+        self._rejection_count = morek_schedule.rejection_count(record.get("attempt"))
         at = morek_schedule.rejection_retry_at(record)
         if at is None:
             return
@@ -348,21 +370,149 @@ class MorekScheduleWorker:
         if self._blocker_timer is not None:
             self._blocker_timer.cancel()
             self._blocker_timer = None
+        adopted, self._adopted_pace = self._adopted_pace, None
+        persisted_wait: float | None = None
         if self._closed or self.reason not in morek_schedule.TRANSIENT_BLOCKERS:
             self._blocker_runs = 0
             self.blocker_retry = None
+            self._set_pace(None)
             return
+        if adopted is not None and adopted["code"] == self.reason and not self._blocker_runs:
+            # Stage 19.3 restart: the same blocker as before the restart continues at its persisted pace
+            # instead of starting the fast phase again; a different or cleared blocker starts fresh.
+            self._blocker_runs = adopted["attempts"]
+            try:  # keep the persisted schedule: a restart neither retries early nor pushes the next check out
+                persisted_wait = (datetime.fromisoformat(adopted["next_at"]) - datetime.now(timezone.utc)).total_seconds()
+            except Exception:  # noqa: BLE001 - unreadable time: the normal delay applies
+                persisted_wait = None
         if "recovery" in kinds:
             self._blocker_runs += 1
         delay = morek_schedule.blocker_retry_delay(self._blocker_runs)
-        state: dict[str, Any] = {"code": self.reason, "attempts": self._blocker_runs,
-                                 "limit": morek_schedule.BLOCKER_RETRY_LIMIT, "next_retry_at": None,
-                                 "exhausted": delay is None}
-        self.blocker_retry = state
-        if delay is None:
-            return
-        state["next_retry_at"] = (datetime.now(timezone.utc) + timedelta(seconds=delay)).isoformat()
+        if persisted_wait is not None and "recovery" not in kinds and 0 < persisted_wait < delay:
+            delay = persisted_wait
+        phase = "fast" if self._blocker_runs < morek_schedule.BLOCKER_RETRY_LIMIT else "slow"
+        next_at = (datetime.now(timezone.utc) + timedelta(seconds=delay)).isoformat()
+        self.blocker_retry = {"code": self.reason, "attempts": self._blocker_runs,
+                              "limit": morek_schedule.BLOCKER_RETRY_LIMIT, "next_retry_at": next_at,
+                              "exhausted": False, "phase": phase}
+        self._set_pace({"code": self.reason, "phase": phase, "attempts": self._blocker_runs, "next_at": next_at})
         self._blocker_timer = asyncio.get_running_loop().call_later(delay, lambda: self.trigger(kind="recovery"))
+
+    # ---- Stage 19.3: durable pace and observations (the existing outcome record; no new store) -----------------
+
+    def _adopt_retry_state(self, record: dict[str, Any]) -> None:
+        """Once per process: take back the observations and blocker pace the last process persisted."""
+        if self._adopted:
+            return
+        self._adopted = True
+        state = morek_schedule.sanitize_retry_state(record.get(morek_schedule.RETRY_STATE_KEY))
+        self.observations = state["observations"]
+        self._adopted_pace = state["pace"]
+        self._pace = state["pace"]
+
+    def _set_pace(self, pace: dict[str, Any] | None) -> None:
+        if pace != self._pace:
+            self._pace = pace
+            self._mark_state_dirty()
+
+    def _observe(self, code: str) -> None:
+        """One bounded entry per *changed* decision: a repeat of a code counts, newest wins, nothing per retry."""
+        now = datetime.now(timezone.utc).isoformat()
+        pending = code == "upload_rejected" and morek_schedule.rejection_retry_at(
+            {"uncertain": False, "attempt": {"state": "rejected", "source": "worker", "at": now,
+                                             "rejections": max(1, self._rejection_count)}}) is not None
+        fresh = morek_schedule.observation_entry(code, now, retry_pending=pending)
+        if fresh is None:
+            return
+        for index, item in enumerate(self.observations):
+            if item["code"] == code:
+                fresh["count"], fresh["first_at"] = item["count"] + 1, item["first_at"]
+                del self.observations[index]
+                break
+        self.observations.append(fresh)
+        del self.observations[:-morek_schedule.RETRY_OBSERVATION_CAP]
+        self._mark_state_dirty()
+
+    def _retry_state_snapshot(self) -> dict[str, Any]:
+        return {"version": 1, "pace": None if self._pace is None else dict(self._pace),
+                "observations": [dict(item) for item in self.observations]}
+
+    def _mark_state_dirty(self, delay: float | None = None) -> None:
+        self._state_dirty = True
+        if self._closed or self._flush_timer is not None or self._flushing:
+            return  # a running flush re-arms itself from its `finally` if anything is still dirty
+        loop = asyncio.get_running_loop()
+        wait = delay if delay is not None else max(_PERSIST_DELAY, self._last_flush + _PERSIST_MIN_INTERVAL - loop.time())
+        self._flush_timer = loop.call_later(wait, self._start_flush)
+
+    def _start_flush(self) -> None:
+        self._flush_timer = None
+        if not self._closed and self._state_dirty and not self._flushing:
+            self._flush_task = self._hass.async_create_task(self.async_flush_retry_state())
+
+    async def async_flush_retry_state(self) -> None:
+        """Write the pace/observations into the existing outcome record under the same guard every other
+        read-modify-write of it uses: the physical-connector admission lock, then the schedule lock (the order
+        the send path uses). The schedule lock is never *waited* on while holding the connector lock (the manual
+        path takes them the other way round), so a busy schedule lock skips this round and re-arms it. Never
+        creates or repairs the record; a missing, unreadable or foreign one is shown as `retry_persistence`. A
+        failure re-arms a slow retry; it is never silent and never blocks or triggers a send."""
+        if self._closed or not self._state_dirty or self._flushing:
+            return
+        self._flushing = True
+        retry: float | None = None
+        try:
+            retry = await self._flush_once()
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:  # noqa: BLE001 - visible, retried slowly, never an outcome of its own
+            # Only our own codes carry a message; anything else is named by its class (never a path or payload).
+            code = (error.args[0] if isinstance(error, (OutcomeUnavailable, morek_schedule.ScheduleRefused))
+                    and error.args and isinstance(error.args[0], str) else type(error).__name__)
+            if self.retry_persistence != code[:60]:
+                _LOGGER.warning("Morek retry state could not be saved (%s); it is retried slowly", code[:60])
+            self.retry_persistence = code[:60]
+            retry = _PERSIST_RETRY
+        finally:
+            self._flushing = False
+            if self._state_dirty and not self._closed:
+                self._mark_state_dirty(retry)
+
+    async def _flush_once(self) -> float | None:
+        """One guarded read-modify-write. Returns a re-arm delay when the round was skipped, else None."""
+        schedule_lock = self._hass.data[morek_schedule._DATA_KEY][self._entry_id][2]
+        try:
+            connector = physical_connector(self._identity())
+        except Exception:  # noqa: BLE001 - unresolved identity cannot safely select the connector lock
+            connector = None
+        if connector is None:
+            self.retry_persistence = "identity_unresolved"
+            return _PERSIST_RETRY
+        admission = command_admission(self._hass)
+        async with admission._lock_for(connector):
+            if schedule_lock.locked() or getattr(schedule_lock, "_waiters", None):
+                return _PERSIST_DELAY  # busy: never wait on it while holding the connector lock
+            async with schedule_lock:
+                await self._flush_locked()
+        return None
+
+    async def _flush_locked(self) -> None:
+        if self._closed:
+            return
+        desired = self._retry_state_snapshot()
+        ledger = morek_schedule.outcomes_for(self._hass)
+        record = await ledger.read()
+        if (record is None or record.get("entry_id") != self._entry_id
+                or type(record.get("uncertain")) is not bool):
+            self._state_dirty = False  # nothing to attach to yet; the next change marks it again
+            return
+        if record.get(morek_schedule.RETRY_STATE_KEY) != desired:
+            record[morek_schedule.RETRY_STATE_KEY] = desired
+            await ledger.write(record)
+        if desired == self._retry_state_snapshot():
+            self._state_dirty = False
+        self._last_flush = asyncio.get_running_loop().time()
+        self.retry_persistence = "ok"
 
     def _arm_continuity_timer(self) -> None:
         """Replan again just after a preserved window ends; planner events may not."""
@@ -490,7 +640,10 @@ class MorekScheduleWorker:
                 continuity=self.continuity if self._continuity_fresh and reason is None else None,
                 dispatched=False if reason else self._dispatched_id() not in (None, self._dispatch_before),
                 attempt_id=None if reason else self._run_attempt_id)
-            key = (event["action"], event["result"], event["evidence"], event["changed"], event["attempt_id"],
+            slow_rejection = (event["result"] == "upload_rejected"
+                              and self._rejection_count > len(morek_schedule.REJECTION_RETRY_DELAYS))
+            key = (event["action"], event["result"], event["evidence"], event["changed"],
+                   None if slow_rejection else event["attempt_id"],  # 19.3: a slow re-send is a counted repeat
                    None if event["continuity"] is None else tuple(event["continuity"].values()),
                    event["inputs"].get("plan_state"), event["inputs"].get("uncertain"))
             if key == self._decision_key and self.decision is not None:
@@ -499,6 +652,7 @@ class MorekScheduleWorker:
                 self.decision["triggers"] = sorted(set(self.decision["triggers"]) | set(event["triggers"]))[:9]
                 return
             self._decision_key = key
+            self._observe(reason or self.reason)
             self.decision = event
             self.decisions.append(event)
             inputs, cont = event["inputs"], event["continuity"] or {}
@@ -518,6 +672,7 @@ class MorekScheduleWorker:
         # Restore the fixed expiry even when the charger is offline.
         data, store = await morek_schedule._state(self._hass, self._entry_id)
         record = await morek_schedule._outcome_record(self._hass, self._entry_id, data)
+        self._adopt_retry_state(record)
         override = record.get("charge_now")
         if self._expiry is not None:
             self._expiry.cancel()

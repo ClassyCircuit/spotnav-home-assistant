@@ -7,7 +7,7 @@ physical charging.
 
 import asyncio
 from dataclasses import replace
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -143,13 +143,17 @@ def test_rejection_retry_schedule_is_bounded():
                                                 "at": NOW.isoformat()}}
     assert morek_schedule.rejection_retry_at(rec(1)) == NOW + timedelta(seconds=300)
     assert morek_schedule.rejection_retry_at(rec(2)) == NOW + timedelta(seconds=900)
-    assert morek_schedule.rejection_retry_at(rec(3)) is None
+    # Stage 19.3 (named change): after the two fast delays the slow pace continues (was `None`).
+    assert morek_schedule.rejection_retry_at(rec(3)) == NOW + timedelta(seconds=1800)
+    assert morek_schedule.rejection_retry_at(rec(4)) == NOW + timedelta(seconds=3600)
+    assert morek_schedule.rejection_retry_at(rec(99)) == NOW + timedelta(seconds=14400)
     assert morek_schedule.rejection_retry_at({**rec(1), "uncertain": True}) is None
     manual = rec(1)
     manual["attempt"]["source"] = "manual"
     assert morek_schedule.rejection_retry_at(manual) is None
     status = morek_schedule.recovery_status(rec(3), NOW)
-    assert status["exhausted"] and status["next_retry_at"] is None and status["retries_left"] == 0
+    assert not status["exhausted"] and status["pace"] == "slow" and status["retries_left"] == 0
+    assert status["next_retry_at"] == (NOW + timedelta(seconds=1800)).isoformat()
     status = morek_schedule.recovery_status(rec(1), NOW)
     assert not status["exhausted"] and status["retries_left"] == 2
     ack = {"acknowledged": {"at": (NOW - timedelta(minutes=7)).isoformat()}}
@@ -176,11 +180,17 @@ async def test_definite_rejection_retried_at_most_twice_after_backoff(monkeypatc
         await drain(w.worker)
         assert w.point.call.await_count == expected
         assert w.ledger.value["attempt"]["rejections"] == expected
-    w.ledger.value["attempt"]["at"] = (NOW - timedelta(hours=5)).isoformat()
+    # Stage 19.3 (named change): after the two fast retries the slow pace continues instead of stopping. A third
+    # rejection waits 30 minutes (no send at 20), then one more attempt is allowed.
+    w.ledger.value["attempt"]["at"] = (datetime.now(timezone.utc) - timedelta(minutes=20)).isoformat()  # the send path reads real time
     w.worker.trigger()
     await drain(w.worker)
     assert w.point.call.await_count == 3 and w.worker.reason == "upload_rejected"
-    assert w.worker._retry_timer is None  # noqa: SLF001
+    assert w.worker._retry_timer is not None  # noqa: SLF001
+    w.ledger.value["attempt"]["at"] = (NOW - timedelta(hours=5)).isoformat()
+    w.worker.trigger()
+    await drain(w.worker)
+    assert w.point.call.await_count == 4 and w.ledger.value["attempt"]["rejections"] == 4
     w.worker.close()
 
 
