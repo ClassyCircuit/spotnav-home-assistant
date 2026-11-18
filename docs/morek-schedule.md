@@ -145,15 +145,27 @@ cleanup has yet been verified in a physical charging session.
 
 ## Stage 19 mocked scenario coverage (not a hardware test)
 
-Stage 19.8 is **partial**. `tests/test_stage_198_scenarios.py` runs four fast mocked scenarios through the real
-worker and send path: a not-sent upload failure that retries once after a restart (a person Stop wins), the slow
-retry pace continuing after a restart, an offline charger with a retained schedule (only last-known evidence,
-physical charging unknown) and SOC drift in an active window (no 0 A gap, no repeat sends). They prove SpotNav's
-own bookkeeping, not that a Morek accepted, kept or applied anything.
+Stage 19.8 is **implemented locally** (manifest 2.5.199, mocked tests only, not hardware-verified).
+`tests/test_stage_198_scenarios.py` runs eleven fast mocked scenarios through the real worker and send path (HA,
+OCPP and, in most cases, admission are mocked; the clock is faked, nothing waits): a not-sent upload failure that
+retries once after a restart (a person Stop wins), the slow retry pace continuing after a restart, an offline charger
+with a retained schedule (only last-known evidence, physical charging unknown), SOC drift in an active window (no 0 A
+gap, no repeat sends), the reported chain (an old upload of unknown outcome plus Pause plus your Resume, a long
+outage, a restart while offline, reconnect: one replacement schedule on profile 42001, the old attempt still recorded
+as unknown, then no re-send for a SOC-only drift under 5 minutes after another restart), a Stop and a Pause that
+arrive while offline (they win; the Pause only ever sends its own 0 A hold, once), about eight simulated days of
+flapping triggers (a handful of log lines, at most 8 saved observations, a bounded number of saved writes; an expired
+plan is never sent afterwards), session start and schedule recovery in one record (one start, one schedule, neither old
+unknown attempt relabelled), a rejected extension retried once at its pace with the active window carried, and a
+wording check (nothing says "will charge", "guaranteed" or "is charging"; the charger's answer, the readback and
+physical charging stay separate and physical charging stays unknown). They prove SpotNav's own bookkeeping, not that a
+Morek accepted, kept or applied anything. The Stage 19.2/19.6 test files cover resolving an unknown upload and an
+unknown session start in more detail.
 
-Not covered, because the behavior is not implemented or is only partly implemented: resolving an ambiguous
-upload (Stage 19.2; an uncertain upload is never resent automatically), an unknown session start across a confirmed
-reboot as one flow, and bounded logs over a long outage end to end. Hardware questions (profile replacement order,
-late responses, retained profile after reboot or power loss, composite-schedule horizon) are unverified until you
-run them. To run the new tests on Windows, stub `fcntl`/`resource` and lift the socket guard as described in the
-handoff.
+Not covered: hardware questions (profile replacement order, late responses from an earlier command, retained profile
+after reboot or power loss, composite-schedule horizon) are unverified until you run them, and an accepted
+replacement schedule is not proof the charger charges. A default plan when the state of charge is unknown is a
+product choice that is **not** implemented (the planner keeps its hold). The wording check covers the sidebar
+recovery banner and status fields, not every translated card string. Run the tests on Windows with
+`python tools/run_isolated_logs_tests.py tests/test_stage_198_scenarios.py` (it stubs `fcntl`/`resource` and lifts
+the socket guard; the `timeout` marks are inert without the pytest-timeout plugin, the file runs in about 12 s).

@@ -237,8 +237,8 @@ def acknowledged_profile(record: dict[str, Any] | None, revision: Any = None) ->
     if not isinstance(ack, dict) or not ack.get("id") or not ack.get("fingerprint"):
         return None
     if "profile" in ack:  # durable evidence written at acceptance
-        if ack.get("routine") is not True:
-            return None
+        if ack.get("routine") is not True and ack.get("resume_plan") is not True:
+            return None  # `resume_plan` (19.8): an accepted plan sent under the person's Resume, still a plan
         profile = ack.get("profile")
     elif (isinstance(attempt, dict) and attempt.get("state") == "accepted"  # pre-2.5.103 record
             and attempt.get("id") == ack.get("id") and attempt.get("fingerprint") == ack.get("fingerprint")
@@ -3120,14 +3120,19 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
         raise ScheduleRefused("stale_work")  # the Pause/Stop changed or the request was consumed: nothing is written
     acknowledged = record.get("acknowledged") or {}
     attempt = record.get("attempt") or {}
+    current_pause = record.get("schedule_pause") or {}
+    # A plan sent under the person's current Resume is still a plan (19.8): it may be compared with the accepted plan
+    # exactly like a routine one. A hold, Charge Now and every other pause id stay out of these comparisons.
+    plan_intent = override_id is None and (pause_id is None or (
+        current_pause.get("type") == "resume_requested" and current_pause.get("id") == pause_id))
     if automatic and not force_sync and not repair and not resolving and acknowledged.get("fingerprint") == fingerprint:
         return "unchanged"
     tolerance, basis = end_tolerance, None
     if (tolerance is None and provenance_tolerance is not None and automatic and not force_sync and not repair
-            and not resolving and pause_id is None and override_id is None
+            and not resolving and plan_intent
             and material_inputs_unchanged(acknowledged_inputs(record), provenance, _profile_instant(profile))):
         tolerance, basis = provenance_tolerance, "soc_provenance"
-    if (automatic and not force_sync and not repair and not resolving and pause_id is None and override_id is None
+    if (automatic and not force_sync and not repair and not resolving and plan_intent
             and acknowledged_revision(record) == domain_data(hass).auto_store.settings(entry_id).revision
             and same_effective_schedule(acknowledged_profile(record), profile, tolerance,
                                         accepted_baseline=acknowledged_baseline(record),
@@ -3334,6 +3339,9 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
         record.update({"acknowledged": {
             "fingerprint": fingerprint, "at": now, "id": attempt_id, "profile": wire_profile,
             "revision": revision, "routine": pause_id is None and override_id is None,
+            **({"resume_plan": True} if override_id is None and pause_id is not None
+               and (record.get("schedule_pause") or {}).get("type") == "resume_requested"
+               and (record.get("schedule_pause") or {}).get("id") == pause_id else {}),
             **({} if wire_baseline is None else {"baseline": wire_baseline}),
             **({} if provenance is None else {"inputs": provenance}),
             **({} if cap_evidence is None else {"cap": cap_evidence})}, "uncertain": False})
