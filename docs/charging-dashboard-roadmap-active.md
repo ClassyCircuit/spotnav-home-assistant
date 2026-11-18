@@ -1,9 +1,9 @@
 # Active roadmap — Morek charging, HA sidebar and trustworthy history
 
-Status: **feature implementation complete locally; verification items remain. This is the only work queue.** Created 2026-11-14 by splitting the old roadmap, which
+Status: **Stage 19 is planned; earlier feature implementation is complete locally. This is the only work queue.** Created 2026-11-14 by splitting the old roadmap, which
 is now frozen as a historical reference:
 [archive/charging-dashboard-roadmap-2026-11-14.md](archive/charging-dashboard-roadmap-2026-11-14.md)
-(“the archive”). Initial audit basis: manifest 2.5.128, HEAD `6a50a7ae`. Stage 15 is locally implemented and coordinator-reviewed through 2.5.143 with focused mocked checks; see its entries and the handoff for unrun checks. Stages 16, 17, 13 and 18 are implemented locally and committed. Stages 7 and 8 are locally implemented and coordinator-reviewed through 2.5.178 (2026-11-16), with each substage committed and pushed separately. No unstarted feature substage remains in this roadmap; §9 retains outstanding reviews and user-owned validation. Nothing below is
+(“the archive”). Initial audit basis: manifest 2.5.128, HEAD `6a50a7ae`. Stage 15 is locally implemented and coordinator-reviewed through 2.5.143 with focused mocked checks; see its entries and the handoff for unrun checks. Stages 16, 17, 13 and 18 are implemented locally and committed. Stages 7 and 8 are locally implemented and coordinator-reviewed through 2.5.178 (2026-11-16), with each substage committed and pushed separately. **Stage 19 (ahead-of-time schedules and recoverable upload uncertainty, 8 substages) was planned 2026-11-18 and is the only open work; **19.1 is implemented locally (2.5.180, mocked tests, coordinator review pending); 19.2–19.8 are not started.** Earlier feature substages are recorded as locally implemented; §9 retains outstanding reviews, open research and user-owned validation. Nothing below is
 installed, deployed or physically verified, and this file authorizes no HA access, charger command, restart
 or deployment. Read `AGENTS.md` and [the development handoff](morek-development-handoff.md) first.
 
@@ -52,6 +52,7 @@ formality.
 | Stage 8.1–8.3 | **Refined and carried** into Stage 8 below (8.2 and 8.3 each split a/b); D1 spot-only costs and D2 day-average savings are settled (§9). |
 | Stage 11 (11.1/11.2) | **Superseded `[>]`**, migrated to 15.9a/15.9b, 15.10, 15.11 (exact table in §10). |
 | Stage 13.1–13.4 | **Carried** into Stage 13 below, unchanged in scope. |
+| Stage 19.1–19.8 (new 2026-11-18) | **New, unstarted.** Defined after Stage 18; amends the §5 contract only as its own table states. |
 | Stage 15.1–15.11, E1, E2 | **Stage 15 locally implemented and reviewed** through 2.5.143; E1/E2 remain optional user-directed evidence tasks. Split a/b ids stay stable. |
 | Archive B1/B2/B3/B4/C1 detail | Delivered by Stages 5–6, 12 and carried by 7–8. Obsolete wording (Sections host, A/B chart switch, per-stage “Done when”) is dropped. |
 | Archive C2 “finish the product” | Covered by Stage 12/13 plus the 8.1 session rows; no separate stage. |
@@ -95,8 +96,16 @@ One at a time; “Needs” lists the only real dependencies. Stable parent ids; 
 | 29 | 8.2b Cost display and totals consistency | 8.2a, 8.1 | |
 | 30 | 8.3a Savings baseline (backend) | 8.2a | |
 | 31 | 8.3b Savings and summary cards | 8.2b, 8.3a, 7.5 | |
+| 32 | 19.1 Upload-outcome classification: provably pre-dispatch vs truly ambiguous | none | ◆ |
+| 33 | 19.2 Safe ordered replacement and late-response handling | 19.1 | ◆ |
+| 34 | 19.3 Persistent paced retries and durable, actionable observations | 19.1, 19.2 | ◆ |
+| 35 | 19.4 Ahead-of-time schedule, effective verification and offline operation | 19.1 | ◆ |
+| 36 | 19.5 Planner fallbacks and active-window stability under the new triggers | 19.4 | ◆ |
+| 37 | 19.6 Session start unknown and reboot recovery | 19.1, 19.2 | ◆ |
+| 38 | 19.7 Storage, ownership and connection blockers | 19.3, 19.6 | ◆ |
+| 39 | 19.8 Cross-cutting scenarios, evidence-wording audit, documentation closure | 19.1–19.7 | |
 
-Items 1–15 (Stage 15) are locally implemented and coordinator-reviewed through 2.5.143; Stage 16 and Stage 17 (below) and items 16–19 (Stage 13.1–13.4) are implemented locally and committed (2026-11-16 audit: `git log` shows 16.2 `08254d2e`, 17.1 `d9ec44cc`/`999f5fc5`, 17.2 `cc321c71`, 17.3 `e0f0d7d4`, 17.4 `7fadb671`, 17.5 `4bb08550`, 17.6 `35f5ae5f`, 13.1 `d81c3fd8`, 13.2 `7e352562`, 13.3 `416529c3`, 13.4 `e31463df`). Do not reassign any of them. **Implementation queue complete: items 20–31 (Stages 7/8) are complete locally and coordinator-reviewed through 2.5.178.** None is a prerequisite for 5.8. The order is the suggested default and the user may reorder it within the “Needs” column. **D1/D2 are settled; there are no outstanding product-decision gates.** No remaining feature delegation is assigned. Stage 7/8 substages are not ◆ (they touch no Stage 14 path) but obey the “Binding constraints” block at the start of Stage 7. **Not in the queue:** §9.B reviews, §9.C user-owned items, E1/E2.
+Items 1–15 (Stage 15) are locally implemented and coordinator-reviewed through 2.5.143; Stage 16 and Stage 17 (below) and items 16–19 (Stage 13.1–13.4) are implemented locally and committed (2026-11-16 audit: `git log` shows 16.2 `08254d2e`, 17.1 `d9ec44cc`/`999f5fc5`, 17.2 `cc321c71`, 17.3 `e0f0d7d4`, 17.4 `7fadb671`, 17.5 `4bb08550`, 17.6 `35f5ae5f`, 13.1 `d81c3fd8`, 13.2 `7e352562`, 13.3 `416529c3`, 13.4 `e31463df`). Do not reassign any of them. **Items 20–31 (Stages 7/8) are complete locally and coordinator-reviewed through 2.5.178; items 32–39 (Stage 19, defined after Stage 18 below) are the only open queue, in the order shown, each with the Stage 19 contract amendments.** None is a prerequisite for 5.8. The order is the suggested default and the user may reorder it within the “Needs” column. **D1/D2 and the Stage 19 automatic-recovery direction are settled; D6 applies only if 19.5 finds a genuinely unresolved product choice.** No remaining feature delegation is assigned. Stage 7/8 substages are not ◆ (they touch no Stage 14 path) but obey the “Binding constraints” block at the start of Stage 7. **Not in the queue:** §9.B reviews, §9.C user-owned items, E1/E2.
 
 ## 4. Standard acceptance for every substage
 
@@ -141,6 +150,12 @@ and do not call the substage complete on new tests alone): `tests/test_stage_141
 `test_morek_schedule.py`, `test_morek_session.py`, `test_morek_session_activation.py`,
 `test_stage_95_recovery.py`, `test_stage_103_partial.py`. These reduce regression risk; they do not guarantee
 it or prove deployed behavior.
+
+**Stage 19 amendments (2026-11-18).** For Stage 19 substages only, the rows “Uncertainty and recovery”,
+“Dedup”, “Decision evidence” and the retry/cap constants are amended **exactly** as listed in the “Stage 14
+contract amendments” table inside Stage 19; the protected-window, material-trigger, SOC-tolerance and
+Stop/Pause/Charge Now rows keep their rules and thresholds and only gain the stated extra checks. Every
+other row and every Stage 15–18 substage is unchanged, and no amendment is verified on hardware.
 
 ## 6. Approved policy preserved by Stage 15 (user-agreed 2026-11-14 unless marked default)
 
@@ -727,6 +742,231 @@ but no expensive browser suites. Reuse the shared live/preview UI and ECharts; n
 For each substage bump integration version and run frontend build/check-dist when integration/card changes;
 use focused fast tests, report visual and hardware limits truthfully, update this checklist and handoff.
 
+## Stage 19 — Ahead-of-time schedules and recoverable upload uncertainty
+
+**Planned 2026-11-18 (docs only; nothing below is implemented, installed, deployed or hardware-verified).**
+Source basis: manifest 2.5.178 by source reading; no HA access, charger command or restart was used to write
+this stage. One fresh Claude medium delegate per substage, shared worktree, queue order below, coordinator
+review of each substage before the next; commit/push only when authorized. Every substage: Standard acceptance
+(§4) with the binding fast-tests-only rule; ◆ substages meet the §5 contract **as amended by the table in this stage**; manifest bump and `npm run build` + `npm run check-dist` when integration/card files change, a
+truthful update of this checklist and a dated handoff entry. No live operation of any kind is authorized by
+this stage.
+
+**Why (user direction, 2026-11-18):** the user wants the Morek to hold a schedule that was sent *ahead of
+time* and still govern the car while HA is down, to be able to verify that schedule as *effective* rather than
+merely accepted, and to stop one ambiguous upload from freezing automation forever. The current uncertain-write
+latch is permanent: `_send_profile_shared` (`api/morek_schedule.py`) persists `uncertain: True` before any
+wire call, and several exits after that persistence but **before** the call begins (ledger changed, durable
+check failed or refused) return `upload_uncertain` with the latch still set although that execution did not send; after a crash the durable record may not prove whether dispatch occurred; only an exception raised by `validate()` is recorded as
+`aborted_before_dispatch`. The in-memory `dispatch_started` marker is deliberately not proof. Any non-cancel
+exception from the call itself (including a 30 s timeout) is also `unknown`. Today these cases are
+indistinguishable and every one blocks later automatic sends; there is no supported general resolution path. **The user approved the
+direction of relaxing that permanent block (2026-11-18). This is an approved direction, not verified
+behavior:** no replacement, ordering or late-response semantics have been observed on the user's charger.
+
+### Evidence classes (binding wording and storage rule for every substage)
+
+Never blur these. Each is a separate field/label; a higher class never implies a lower one is absent, and
+none implies physical charging: **proposal** (calculated) → **pre-wire marker** (a durable record that a call
+was *about* to begin; not proof it began) → **wire-started** (durable marker written after the call object was
+handed to the connection, only where 19.1 can justify it) → **ACK** (Accepted/Rejected/NotSupported answer for
+that attempt id, on time or **late**) → **effective readback** (`GetCompositeSchedule`: effective limits, not
+an inventory of profiles, covering only its horizon) → **transaction** → **measured flow**. Also keep apart:
+*observed* (a source reported it), *inferred* (SpotNav reasoned from observations) and *user-reported*.
+Unknown is never zero, never “no”, never “failed”; an inferred pre-dispatch release must name its proof.
+
+### Queue (strict order; one at a time)
+
+| # | Substage | Needs |
+| --- | --- | --- |
+| 1 | 19.1 Upload-outcome classification: provably pre-dispatch vs truly ambiguous | none |
+| 2 | 19.2 Safe ordered replacement and late-response handling of an ambiguous upload | 19.1 |
+| 3 | 19.3 Persistent paced automatic retries and durable, actionable observations | 19.1, 19.2 |
+| 4 | 19.4 Ahead-of-time schedule, effective verification and offline operation | 19.1 (uses 19.2/19.3 for any ambiguous send) |
+| 5 | 19.5 Planner fallbacks and active-window stability under the new triggers | 19.4 |
+| 6 | 19.6 Session start unknown and reboot recovery | 19.1, 19.2 |
+| 7 | 19.7 Storage, ownership and connection blockers | 19.3, 19.6 |
+| 8 | 19.8 Cross-cutting scenario tests, evidence-wording audit and documentation closure | 19.1–19.7 |
+
+### Stage 14 contract amendments (the only permitted changes to §5)
+
+These amend §5 for **Stage 19 substages only**, are valid exactly as written, and do not loosen any row not
+named. Where a row is amended, the Stage 14 regression file for it must still pass unmodified in its
+existing cases (new cases may be added; an existing assertion may change **only** where the amendment states
+it, with the change named in the report).
+
+| §5 row | Amendment | Substage |
+| --- | --- | --- |
+| Uncertainty and recovery (uncertain latch) | The latch is no longer permanent for *every* uncertain record. It may be released **only** by (a) recorded proof that the wire call never began (19.1, named proof codes), or (b) the 19.2 resolution of a truly ambiguous record: a strictly newer current-intent attempt acknowledged under a verified ordering boundary, or a correlated late ACK for the relevant unresolved attempt, subject to ordering and current-intent guards. Preserve ACK and effective-readback evidence separately; lack of readback must not create a permanent deadlock. Never resolve historical outcome by age, a readback alone, a retry count, a UI action, or `clear_profile`. Every other uncertain record keeps today's behavior. A release is a recorded, evidenced transition, never a silent flag flip. | 19.1, 19.2 |
+| Uncertainty and recovery (`REJECTION_RETRY_DELAYS` 5, 15 min; 12-check cap of non-sending timers) | The two named delays stay exactly as they are. After them, a **slower persisted pace** (named constants chosen and listed by the delegate; each spacing ≥ the last) may continue for a definitely rejected intent and for blocker re-evaluation, surviving restart, with no per-retry log line or banner churn (19.3). The 12-check cap on *timer-driven* re-evaluation is replaced by that slow pace only for non-sending checks; a timer may initiate guarded resolution of an unknown schedule under 19.2; any send remains a guarded `_send_profile_shared` run. | 19.3 |
+| Dedup (`same_effective_schedule`, fingerprint skip) | Unchanged for every run. A new trigger `resolve` (19.2) bypasses **only** the `upload_uncertain` return, only when 19.2's conditions hold, exactly as `repair` bypasses only the `unchanged` returns; it respects rejection pacing and a separate persisted recovery pacing policy; it does not bypass protection or create a permanent repair-budget lock. | 19.2 |
+| Protected active window (`continue_active_window`, `connector_evidence`, 180 s) | Rule unchanged, including the strict 180 s bound and “unknown never releases”. An ahead-of-time horizon (19.4), a resolve resend and a slow retry carry the acknowledged window to its end and never produce a 0 A gap in the wire profile. | 19.2–19.5 |
+| Material triggers (`window_release`) and SOC tolerance (5 min, SOC-only, 2 s coalescing) | **Numbers unchanged** (EUR 0.50, 10%, 30 min gap, 15 min slack, strictly lower cap, 5 min, 2 s). Stage 19 adds no trigger class that can release a window: `resolve`, slow retry, ahead-of-time extension and observation events carry no price-change or cap-lowered cause. 19.5 may add tests and fix a confirmed bypass; changing any threshold needs a new explicit user decision (§9). | 19.5 |
+| Stop / Pause / Charge Now ownership | Unchanged and wins over every Stage 19 trigger, including a `resolve`, a slow retry and a late response. Each re-checks the generation after every persistence await; a refused run consumes no budget and records nothing as sent; a Stop never becomes a run; a Pause hold or Charge Now override is resolved or retried only as itself. Pause/Stop, protection and identity are **never** relaxed to reduce uncertainty. | all |
+| Decision evidence (bounded 14.6 events) | Shape reused (new codes, repeats increment, one line per *changed* decision). Amended only so a **bounded** summary of the latest decisions/observations may be persisted through the existing ledger/evidence store (19.3) instead of memory only. No new log store, sensitive payload or per-retry line. | 19.3, 19.7 |
+| Recovery sync, measured progress (14.3/14.5) | Unchanged. | — |
+
+### Substages
+
+- [x] **19.1 Upload-outcome classification: provably pre-dispatch vs truly ambiguous ◆.** *(Implemented locally 2026-11-18, 2.5.180, mocked/isolated tests only; coordinator review pending; see the handoff entry. Review fix: the read-side pre-wire release now runs at the real admission boundary (`async_execute` owned_profile, restart reconfirmation, barrier release) under the connector lock, and `upload_not_sent` re-evaluates through the existing bounded blocker timer. Wire-started-after-handoff marker rejected as unjustifiable: a before-call `wire_intent` marker is used and its presence stays ambiguous; call exceptions stay ambiguous because the `ocpp` source could not be inspected here.)* *Seam (source reading,
+  verify first):* `_send_profile_shared` and `_outcome_record`/the ledger in `api/morek_schedule.py`, the
+  `spotnav_morek_dispatched`/`dispatch_started` diagnostics, and the worker's handling of
+  `upload_uncertain`/`TRANSIENT_BLOCKERS`. *Scope:* replace the single `uncertain` meaning with a small
+  classification recorded on the attempt, additive and restart-safe, reusing the existing record: **provably
+  not sent** (every exit after the pre-wire persistence and before the wire call is handed to the connection:
+  ledger changed, durable check failed or refused, validation after persistence, cancellation before the call;
+  plus a restart that finds a pre-wire marker with no wire-started marker, *only if* 19.1 shows by ordering
+  of durable writes that the wire call cannot have begun — otherwise that case stays ambiguous),
+  **ambiguous** (the call began and its outcome is unknown: timeout, exception from the call, interrupted ACK
+  persistence, restart after a wire-started marker) and **resolved** (ACK or rejection recorded). Decide and
+  document, with a test, whether a durable wire-started marker can be written before the call without
+  weakening the “record first” rule or creating a window where the marker claims more than is known; if it
+  cannot be justified, say so and keep those cases ambiguous (no guess). Pre-dispatch-proven attempts release
+  the latch with a named proof code and **do not consume a rejection retry or a repair budget entry**; the
+  next normal trigger may send. A call that raised before reaching the wire is pre-dispatch **only** where
+  the OCPP library demonstrably cannot have transmitted (inspect `ocpp`/`point.call` source and record the
+  conclusion); otherwise ambiguous. Existing stored `uncertain: True` records without the new field are
+  treated as ambiguous (never silently released on upgrade). Surface the class in status `reconciliation`
+  (additive) and the decision event. *Acceptance (real worker and send path):* each pre-wire exit → proof code,
+  latch released, zero wire calls, next trigger sends once; timeout/exception/cancel-after-start/restart-after-
+  start → ambiguous, still blocking, never auto-retried here; legacy records stay blocking; Stop/ownership
+  races at every await; no budget consumed by a refused run; no blind retry; wording says “not sent” only
+  with proof. *Exclusions:* no resolution of an ambiguous record (19.2), no timer, no UI beyond the status
+  field, no `clear_profile`.
+- [ ] **19.2 Safe ordered replacement and late-response handling ◆.** *Needs 19.1.* *Scope:* a bounded way
+  out of a truly ambiguous record, built on the single guarded path (trigger `resolve`, no second sender).
+  (a) **Ordered replacement:** when the intent is still current and no person control intervenes, a newer
+  attempt for the *same intent kind* may be sent with a strictly increasing attempt sequence and the same
+  profile id `42001` so that, **if the charger replaces by profile id** (OCPP 1.6 rule, *unverified here*),
+  the newer one supersedes whatever the older ambiguous call did. The older attempt is recorded
+  `superseded_by` the newer; it never becomes “accepted” by inference. A newer ACK and a matching effective readback are recorded as distinct evidence; when readback is unavailable or incomplete, keep verification pending and retry checking at a paced rate, without permanently blocking current-intent recovery. A differing readback after a newer ACK is the existing mismatch path, not a release. (b) **Late
+  response:** ACK/response evidence that arrives after the 30 s wait is attributed *only* by attempt id (the
+  message/unique id the library exposes; if the installed integration cannot expose it, record that
+  limit and rely on (a) only), is stored as late evidence on that attempt, may resolve that attempt if it is
+  still the newest, and can **never** overwrite, downgrade or acknowledge a newer attempt or change the
+  acknowledged record. Ordering uses an attempt sequence persisted with the record, never wall time alone.
+  (c) **Production recovery:** implement and enable the guarded path once ordering and replacement can be justified at the available boundary; document unresolved device assumptions and expose actionable degraded status when a required guarantee cannot be established. User has approved this direction; no additional product approval gate. (d) Pause hold, Charge Now and routine intents are each resolved as themselves; no resolve while a person Stop is reserved; at most one resolve in flight; persist pacing across restarts and continue slow reassessment after a burst, never `clear_profile` or a blind retry of the *same* attempt id. *Acceptance:* ambiguous + replacement ACK + matching readback → released with
+  both attempt ids and the proof recorded; ACK without matching readback → `replacement_unconfirmed`; readback
+  of the old profile only → still ambiguous; late ACK for the newest attempt → resolves it, for a superseded
+  attempt → recorded, nothing else; late response racing a newer send; restart at each step; Stop/Pause/
+  Charge Now at each await; recovery remains paced after a burst and status explains any unresolved ordering limit;
+  active window carried with no 0 A gap; wire profile asserted. *Exclusions:* no claim that replacement
+  semantics are verified, no assumption about firmware ordering, no `clear_profile`, no change to
+  15.4 repair rules (repair and resolve share no budget and never run together).
+- [ ] **19.3 Persistent paced automatic retries and durable, actionable observations ◆.** *Needs 19.1, 19.2.*
+  *Scope:* (a) **Retries:** extend the existing retry timers (not a second scheduler): after
+  `REJECTION_RETRY_DELAYS` and after the blocker-timer cap, continue at a slow, monotonically non-decreasing,
+  *persisted* pace (state in the existing ledger record, restart-proof; constants chosen and listed by the
+  delegate, with a ceiling) for definite rejections of a still-current intent, for `resolve` runs that are
+  still allowed, and for non-sending blocker re-evaluation. Every retry is a normal guarded run; a changed
+  plan restarts the pace; Stop/Pause/ownership/identity win; ambiguous records are never blindly retried; a timer may invoke 19.2’s guarded resolution. (b) **No spam:** a repeat of the same decision increments a
+  counter; one INFO line per *changed* decision/observation; at most one banner state per episode; no
+  notification per retry; the user-facing text shows the next automatic attempt time and the count, not a
+  stream. (c) **Durable observations:** persist a *bounded* list (named cap, newest wins) through the existing
+  ledger/evidence store of actionable observations — what was observed, which evidence class, who acts
+  (system/vehicle/person), what happens next — so they survive restart; reuse 14.6 codes; observation,
+  not command history; no payloads, ids or prices. Sidebar/recovery banner reads them through the existing
+  status (no new panel). *Acceptance:* a long outage retries at the slow pace across a restart without a
+  burst, the pace resets only on a changed plan/blocker, the log/observation volume is bounded under a
+  flapping link, an equal schedule sends nothing, unknown records are resolved only through the guarded paced path, persistence failure is
+  visible, not silent. *Exclusions:* no new store, controller, push-notification channel or periodic
+  OCPP readback.
+- [ ] **19.4 Ahead-of-time schedule, effective verification and offline operation ◆.** *Needs 19.1.* *Scope:*
+  (a) **Horizon:** audit what the dispatched profile covers versus what the planner already knows (published
+  prices, the real ready-by, up to the existing three windows / seven transitions and final 0 A). The sent
+  profile should cover **every known planned window through its end**, so a retained schedule can keep
+  governing an authorized session while HA or the link is down; where tomorrow's prices are unpublished the
+  profile covers the known part and says so (Stage 16 partial plans), and never invents a window. A later
+  publication extends the horizon through the normal compared reconcile (no active-window release, no
+  duplicate send for an equal result). (b) **Effective verification:** the existing post-send readback
+  (`GetCompositeSchedule`) is judged against the *whole* sent horizon it can cover, with an explicit
+  covered-until instant; three states — *matches over the covered span*, *differs*, *not verifiable /
+  horizon shorter than the plan* — shown with the covered span, never as “verified for the whole plan” when
+  coverage is shorter, and never as physical charging. No periodic readback is added; the existing
+  one-shot verification and the 15.3 reconnect check are the only readers. (c) **Offline operation:** UI/status
+  wording for “schedule on the charger, HA offline: last known” (existing 15.2/15.7 states) names the
+  schedule's last-known end, what depends on the charger's clock/firmware/authorization, and that SpotNav
+  cannot start a session or change anything while offline. **No absolute guarantee:** Morek's own protection
+  (load/CT limits, its own configuration, a power cut, a clock fault, a conflicting profile) may stop or alter
+  charging independently, and SpotNav says “planned/accepted/effective-readback”, never “will charge” or
+  “guaranteed”. *Acceptance:* the sent profile equals the displayed windows through the covered end
+  (asserted wire profile); partial-price day sends only the known part and labels it; later publication
+  extends once; readback shorter than the plan → “covered until”, not verified-all; mismatch path unchanged;
+  offline wording shows last-known facts; no new send path. *Exclusions:* no dynamic amps, no load
+  balancing, no claim about charger clock/firmware/authorization behavior, no authorization change.
+- [ ] **19.5 Planner fallbacks and active-window stability under the new triggers ◆.** *Needs 19.4.*
+  *Scope:* (a) **Planning fallbacks:** list (as one test-backed table, extending Stage 17's) every remaining
+  planning hold that leaves **no** current intent or an obsolete one, state which already have a fallback
+  (retain the last accepted plan; plan from an honest estimate; partial published plan; labelled unknown
+  progress) and which do not, and close only gaps that need **no new product choice**: reuse an existing
+  honest input and label it, or keep today's hold with a who-acts sentence. A fallback never invents a price,
+  a capacity, a car identity or an SOC; anything that would need such a choice (for example a default plan
+  with unknown SOC) is **not implemented** and recorded as a §9 open decision for the user. (b) **Stability:**
+  prove, with the real controller and worker, that the new paths (horizon extension, `resolve`, slow retry,
+  late response, observation events) cause no extra send during a healthy active window beyond the
+  existing triggers: SOC-only drift inside 5 minutes, routine publication and equal schedules send nothing;
+  only the Stage 14.4 cap/price rules and the 15.x repair/recovery rules may touch a window, with unchanged
+  thresholds; a resolve or retry resend carries the acknowledged window. Fix a **confirmed** bypass found by
+  these tests; do not tune thresholds. *Acceptance:* the fallback table with a test per row; stability cases
+  (SOC drift, publication, equal schedule, late response during a window, retry during a window, horizon
+  extension) assert actual send counts and wire profiles; all Stage 14 files pass as before. *Exclusions:*
+  threshold changes, new settings, forecasts, invented inputs.
+- [ ] **19.6 Session start unknown and reboot recovery ◆.** *Needs 19.1, 19.2.* *Seam (verify first):*
+  `MorekSessionCoordinator` (`execution/morek_session.py`): one start request per connection token, pending/
+  unknown requests that block, the 15.5 boot evidence, `note_boot`/`evaluate_boot`, accepted-without-transaction
+  display. *Scope:* give a start request whose outcome is unknown the same two-way classification as 19.1
+  (provably not dispatched vs ambiguous) and a bounded evidence-based way forward that **never** repeats the
+  same ambiguous request blindly: (a) an affirmative transaction/session observation resolves it as started
+  (observed, not inferred); (b) a **confirmed** reboot (15.5's definition: counter rise within this process plus
+  a fresh `Preparing` afterwards) ends the old token, so the unknown request belongs to a previous charger boot
+  and the existing guarded boot start may proceed under its own rules, keeping the old record as history;
+  (c) reconcile old-session outcomes against fresh transaction, connection and explicit no-session evidence, including a new plug-in, without assuming a reconnect alone proves a reboot; reevaluate persistently when evidence is unavailable and show who acts. Unknown start is never shown as “charging”,
+  “failed” or “not started”. A reconnect, link edge or point-object change alone is still not a reboot.
+  Stop/Pause/protection/identity/ownership still win; at most one start per token as today. If the installed boot counter is unavailable (unverified, §9 R5), implement and test other justified evidence paths; do not leave the old permanent latch as the default recovery.
+  *Acceptance:* unknown start + transaction appears → resolved; unknown + confirmed reboot + Preparing + no
+  session → one start under the new token, old record preserved; unknown + reconnect only → unchanged;
+  pre-dispatch-proven start → released with proof; Stop race; restart; accepted-without-transaction still not
+  repeated. *Exclusions:* no toggle of the charge-control switch, no authorization-setting change, no start
+  from unknown/stale status; any additional trigger must use fresh evidence and the existing guarded coordinator.
+- [ ] **19.7 Storage, ownership and connection blockers ◆.** *Needs 19.3, 19.6.* *Scope:* one test-backed
+  table (like 17.6's `PLANNING_HOLDS`, reusing `decision_blocker`/the recovery banner) of the blockers that
+  stop or stall an automatic send for reasons *outside* planning: **storage** (a ledger/store write that
+  fails or is unavailable before or after the pre-wire marker, a record that cannot be read or fails
+  validation), **ownership** (another controller or a migration/held-exit record owns the connector, a stale
+  generation, a reserved person Stop), **identity** (charger alias unresolved, wrong or ambiguous station)
+  and **connection** (link down, `morek_offline`, charger unavailable, admission busy). For each: whether
+  it can be proven pre-dispatch (19.1), who acts, the existing automatic recovery trigger (and 19.3's slow
+  pace where one applies), the evidence class, and the banner/status sentence. Audit and fix recoverable store poisoning by verified reread and safe reinitialization, and decouple schedule-upload availability from a misleading switch where live OCPP connection and admission evidence suffice. Fix mismatches found:
+  a blocker with no recovery or no who-acts, wording that implies a charging failure, a storage failure
+  after a wire-started marker mislabeled as pre-dispatch, a blocker that recovers by weakening a guard.
+  **Identity, ownership, protection and Stop/Pause checks are never relaxed here**; a storage failure that
+  could hide a dispatched write stays ambiguous. *Acceptance:* every listed blocker has a wording test and a
+  recovery test (condition clears → one guarded re-evaluation → at most one send); storage failure before
+  the marker → not sent, retried at the slow pace; after → ambiguous; ownership/identity conflicts remain
+  person-actionable and are not retried by timer; observations (19.3) record each once. *Exclusions:* no new
+  store, panel, retry family, or change to the physical-station check; no automatic ownership transfer.
+- [ ] **19.8 Cross-cutting scenario tests, evidence-wording audit and documentation closure.** *Needs
+  19.1–19.7.* *Scope:* a small set of end-to-end mocked scenarios through the real planner, worker and session
+  coordinator: (1) ambiguous upload during an active window → paced guarded resolution → ACK and readback tracked separately, window never gapped; (2) pre-wire ledger failure → not sent → slow retry → one send; (3) HA down
+  with a retained schedule → wording shows last-known and no guarantee; (4) unknown session start across a
+  confirmed reboot; (5) the same flows with a person Stop/Pause racing each step (Stop wins, nothing marked
+  sent); (6) a long outage across restart with bounded logs. Then audit every new or touched sentence and
+  status field against the evidence classes (no “verified”, “charging”, “will charge”, “guaranteed” without
+  the matching evidence; inferred is labelled), reconcile the roadmap checklist, handoff and
+  `docs/morek-schedule.md` test procedure, and record in the handoff the *exact* list of unverified
+  assumptions (§9 R1–R7). *Acceptance:* the scenarios pass with real send counts and wire profiles; wording
+  audit finds no violation (or each is fixed); docs are truthful; unrun checks are named. No new feature.
+
+**Out of scope for Stage 19 (do not add):** load balancing or dynamic amps, changes to Morek's configuration
+or authorization, `ocpp.clear_profile` or any selective cleanup as automation, a second sender/controller/
+scheduler, periodic OCPP polling, new settings for thresholds, a standalone HA app, hardware experiments (E1/E2
+and any hardware test remain user-directed evidence tasks that block nothing here).
+
+**Unrun and unverified (carry in every substage report):** installed behavior; whether the charger replaces a
+profile by id/stack and in what order after a timed-out call; whether a late response can be received and
+attributed; whether a retained profile survives charger reboot or power loss and how its clock behaves; full
+suites, browser/Playwright and HA-fixture tests (`fcntl` plugin). Mocked checks never prove physical charging.
+
 ## 8. Later feature stages
 
 ### Stage 13 — Useful configuration without the old card (13.1–13.4)
@@ -1068,6 +1308,27 @@ Use the same priced kWh and currency for actual cost and comparison. Savings = r
   nothing in Stage 7/8 may assume it or a new retention store. Any extension is a **future explicit user decision** with its own source change;
   until then 8.1 offers only retained days and says so.
 
+- **D4 — user-approved direction, 2026-11-18 (not a verified behavior):** the permanent block after an
+  uncertain write may be relaxed, only through Stage 19's evidenced transitions: proven pre-dispatch release
+  (19.1) and ordered replacement or late-response resolution of a truly ambiguous record (19.2), with
+  Stop/Pause/protection/identity/ownership untouched. Hardware testing was **not** authorized or performed.
+- **D5 — settled:** automatic guarded recovery is the approved direction. Implement and enable it when its ordering boundary is justified; report unresolved device assumptions and any concrete technical limitation. Deployment and hardware operations remain user-directed.
+- **D6 — open, only if needed:** a planning fallback that needs a product choice (for example a default plan
+  with unknown SOC) found by 19.5 is recorded here for the user, not implemented. Retry-pace and bound
+  constants (19.2/19.3) are engineering defaults chosen and listed by the delegate, adjustable in code.
+
+**Open research (honest; all unverified; mocked tests cannot settle any of it).**
+
+| # | Question | Effect if it differs from the assumption |
+| --- | --- | --- |
+| R1 | Does the Morek replace a profile by id (and stack level/purpose) on `SetChargingProfile`, in arrival order, including after an earlier call timed out? (The handoff records some stack-level facts for this unit; re-read them, don't rely on this row.) | 19.2 replacement may leave an old profile in force or stay `replacement_unconfirmed`; the implementation must avoid unsafe ordering assumptions and expose any unresolved limitation. |
+| R2 | Can a response arriving after the 30 s wait reach SpotNav through the installed OCPP integration and be tied to its message/attempt id? Can `point.call` raise *before* transmitting in a distinguishable way? | Late-response and “raised before the wire” proofs are unavailable; those cases stay ambiguous. |
+| R3 | Does a retained profile survive charger reboot or power loss, what clock does it use and how does it drift, and can a *new* transaction authorize while offline? | Offline wording must stay “last known, not guaranteed”; no promise beyond the user-run experiments. |
+| R4 | What horizon and coverage does `GetCompositeSchedule` actually return on this unit, and does it ever reflect a stale or pending profile? | Verification may be “covered until” only, or not verifiable. |
+| R5 | Does the installed OCPP integration expose a boot counter and restamp status/transaction sensors after a reboot? | 19.6 reboot recovery degrades to today's behavior. |
+| R6 | Can Morek's own protection or another controller's profile override or stop a SpotNav window? | No absolute guarantee; wording and verification must stay evidence-based. |
+| R7 | What do HA `Store` writes guarantee when they fail or are delayed around the pre-wire marker? | A storage failure near dispatch may have to stay ambiguous. |
+
 **A. Verification ledger (local implementation vs unrun acceptance vs user-owned).**
 
 | Item | Local implementation (mocked) | Unrun / unverified | Owner |
@@ -1075,6 +1336,7 @@ Use the same priced kWh and currency for actual cost and comparison. Savings = r
 | 5.7b2 live binding; 6.2/6.3 capture and history API; 9.4–9.7; 10.x; 12.x; 14.x | Yes, per their archive entries | Installed sources, entity set and cadence, flow thresholds, deployed and physical behaviour; 9.5’s accepted fresh-Resume exception for an ambiguous undispatched Resume stays | User (5.8) |
 | 5.7b3 | Worker timezone harness, stale fixture and wording fixes | Browser rerun (desktop/emulated mobile), full worker/planning suites, 5.4c HA-plugin suite (Windows `fcntl` gap: unrun, not failed) | B below |
 | Stage 14 mocked suites | Yes (focused isolated runners) | Not the suites above; no live observation | — |
+| Stage 19 (planned 2026-11-18) | **None yet** (docs only) | Everything, including R1–R7 above; replacement, late-response and offline behavior need user-directed hardware evidence | User (hardware tests); delegates only mock |
 
 **B. Outstanding local review/acceptance (not feature work; blocks nothing in the queue).** (1) **5.7b3:** run
 the three unrun suites only if the user asks; report them as unrun until then. (2) **Coordinator review** of the

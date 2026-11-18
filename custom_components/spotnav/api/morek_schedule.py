@@ -1744,6 +1744,7 @@ DECISION_BLOCKERS: dict[str, str] = {
     "resume_requires_confirmation": "confirm_resume",
     "charge_now_active": "wait_for_charge_now_end",
     "upload_uncertain": "check_charger_outcome",
+    "upload_not_sent": "wait_for_next_automatic_attempt",  # 19.1: proven not sent; the bounded blocker timer re-evaluates
     "upload_rejected": "check_charger_response",
     "planner_changed": "wait_for_planner",
     "worker_unavailable": "check_logs",
@@ -1779,6 +1780,7 @@ TRANSIENT_BLOCKERS = frozenset({
     "waiting_for_vehicle_update", "prices_unavailable", "prices_stale_or_unavailable", "price_evidence_unavailable",
     "price_inputs_changed", "price_coverage_unavailable", "plan_inputs_changed", "no_current_plan",
     "vehicle_input_unavailable", "vehicle_input_stale", "vehicle_identity_unavailable",
+    "upload_not_sent",  # 19.1: proven never sent; a bounded re-evaluation is the automatic path
 })
 BLOCKER_RETRY_DELAYS = (60, 180, 600, 900)  # seconds; the last repeats
 BLOCKER_RETRY_LIMIT = 12  # timer-driven re-evaluations per blocked episode (about 2.5 h); events still re-evaluate
@@ -1800,7 +1802,8 @@ def blocker_retry_status(worker: Any) -> dict[str, Any] | None:
 _DECISION_OK = ("upload_accepted_unverified", "unchanged")
 _DECISION_SENT = ("upload_accepted_unverified", "upload_rejected", "upload_uncertain")
 _DECISION_ACK = {"upload_accepted_unverified": "accepted", "upload_rejected": "rejected",
-                 "upload_uncertain": "unknown", "unchanged": "accepted_earlier"}
+                 "upload_uncertain": "unknown", "unchanged": "accepted_earlier",
+                 "upload_not_sent": "not_sent"}
 
 
 #: Stage 17.6: the one table of the planning holds Stage 17 touches. Key: a planner reason (`AutoSnapshot.reason`)
@@ -2246,6 +2249,82 @@ def _verification_current(hass: HomeAssistant, entry_id: str, entry: Any, data: 
         return False
 
 
+#: Stage 19.1: attempt `dispatch_class` values. Written ONLY at these points, additive on the attempt record:
+#: `pre_wire` with the record-first write (a call is about to be considered, nothing is on the wire yet);
+#: `wire_intent` in a second durable write made strictly BEFORE `point.call` is awaited (so it means "the call may
+#: have begun", never "it began"; its absence after a restart proves, by write ordering, that no call was made);
+#: `resolved` with an ACK/rejection; `not_sent` when a proof code was recorded. A record without the field
+#: (written before 19.1) is ambiguous and is never released by this code.
+DISPATCH_PRE_WIRE = "pre_wire"
+DISPATCH_WIRE_INTENT = "wire_intent"
+DISPATCH_RESOLVED = "resolved"
+DISPATCH_NOT_SENT = "not_sent"
+#: Proof codes for a recorded "not sent". Wording says "not sent" only with one of these.
+NOT_SENT_PROOFS = frozenset({
+    "validation_after_persistence", "validation_before_dispatch", "ledger_changed", "durable_check_failed",
+    "durable_check_refused", "no_wire_intent_marker"})
+
+
+def upload_outcome_class(record: dict[str, Any] | None, *, in_flight: bool = False) -> dict[str, Any]:
+    """Stage 19.1: classify the latest upload attempt from durable markers only. Pure; never releases anything.
+
+    `class`: `not_sent_provable` (uncertain, but only the pre-wire marker exists, so no wire call can have begun),
+    `ambiguous` (the call may have begun, or the record predates 19.1), `not_sent` (a proof code is recorded),
+    `resolved` (ACK/rejection recorded) or `none`. `basis` says how it is known (`inferred` from write ordering,
+    `observed` from the charger's answer). It is never a statement about physical charging."""
+    if not isinstance(record, dict):
+        return {"class": "none", "proof": None, "basis": None}
+    attempt = record.get("attempt") if isinstance(record.get("attempt"), dict) else {}
+    marker = attempt.get("dispatch_class")
+    if record.get("uncertain") is True:
+        removal = record.get("removal")
+        if (not in_flight and attempt.get("state") == "uncertain" and marker == DISPATCH_PRE_WIRE
+                and not (isinstance(removal, dict) and removal.get("state") == "uncertain")):
+            return {"class": "not_sent_provable", "proof": "no_wire_intent_marker", "basis": "inferred"}
+        return {"class": "ambiguous", "proof": None, "basis": None,
+                "reason": "legacy_unclassified" if marker is None else "wire_may_have_started"
+                if marker == DISPATCH_WIRE_INTENT else "not_provable"}
+    if (attempt.get("state") == "aborted_before_dispatch" and marker == DISPATCH_NOT_SENT
+            and attempt.get("not_sent_proof") in NOT_SENT_PROOFS):
+        return {"class": "not_sent", "proof": attempt["not_sent_proof"], "basis": "inferred"}
+    if attempt.get("state") in ("accepted", "rejected"):
+        return {"class": "resolved", "proof": None, "basis": "observed"}
+    return {"class": "none", "proof": None, "basis": None}
+
+
+def _mark_not_sent(record: dict[str, Any], attempt_id: str, proof: str) -> None:
+    """Record the proof on `record` in place: the attempt stops being uncertain, and a repair budget entry made for
+    it is dropped (only a run that reached the wire call consumes budget). No rejection count is touched."""
+    record["attempt"].update({"state": "aborted_before_dispatch", "dispatch_class": DISPATCH_NOT_SENT,
+                              "not_sent_proof": proof})
+    record["uncertain"] = False
+    if _REPAIR_LIST_KEY in record:
+        record[_REPAIR_LIST_KEY] = [e for e in record[_REPAIR_LIST_KEY] if e.get("attempt_id") != attempt_id]
+
+
+async def _release_not_sent(hass: HomeAssistant, entry_id: str, ledger: Any, attempt_id: str, proof: str) -> bool:
+    """Best-effort durable release for an attempt that provably never reached the wire call.
+
+    Re-reads the CURRENT record and changes only this attempt: if the ledger no longer holds this exact still
+    pre-wire attempt (another writer changed it, storage is unreadable or poisoned), nothing is written and the
+    latch stays; a later run's read-side proof may still release it. The record is never overwritten from a stale
+    copy, so a changed ledger is never falsely cleared."""
+    try:
+        fresh = await ledger.read()
+        attempt = (fresh or {}).get("attempt")
+        if (not isinstance(attempt, dict) or attempt.get("id") != attempt_id or attempt.get("state") != "uncertain"
+                or attempt.get("dispatch_class") != DISPATCH_PRE_WIRE or fresh.get("entry_id") != entry_id
+                or fresh.get("uncertain") is not True
+                or (isinstance(fresh.get("removal"), dict) and fresh["removal"].get("state") == "uncertain")):
+            return False
+        _mark_not_sent(fresh, attempt_id, proof)
+        await ledger.write(fresh)
+    except Exception:  # noqa: BLE001 - an unrecorded proof leaves the latch set, never a guess
+        return False
+    _evidence_call(hass, entry_id, "record_event", "dispatch_aborted", plan_id=attempt_id, reason=proof)
+    return True
+
+
 async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[str, Any], store: Any,
                                fingerprint: str, validate: Any, *, automatic: bool, pause_id: str | None = None,
                                validate_durable: Any = None, migration_id: str | None = None,
@@ -2266,7 +2345,17 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
     wire_profile = profile
     wire_baseline = baseline() if callable(baseline) else None
     if record["uncertain"]:
-        return "upload_uncertain"
+        # Stage 19.1: the one automatic release. Only a record whose latest attempt carries the pre-wire marker and
+        # no wire-intent marker (cancellation, restart or a crash before the intent write) is provably not sent;
+        # a legacy record, a wire-intent marker, a removal in doubt or an attempt in flight keeps blocking.
+        in_flight = hass.data.get("spotnav_morek_sending", {}).get(entry_id) is not None
+        if upload_outcome_class(record, in_flight=in_flight)["class"] != "not_sent_provable":
+            return "upload_uncertain"
+        if not await _release_not_sent(hass, entry_id, ledger, record["attempt"]["id"], "no_wire_intent_marker"):
+            return "upload_uncertain"
+        record = await _outcome_record(hass, entry_id, data)
+        if record["uncertain"]:
+            return "upload_uncertain"
     acknowledged = record.get("acknowledged") or {}
     attempt = record.get("attempt") or {}
     if automatic and not force_sync and not repair and acknowledged.get("fingerprint") == fingerprint:
@@ -2317,6 +2406,7 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
                    "attempt": {"fingerprint": fingerprint, "profile": profile, "at": now, "id": attempt_id,
                                "revision": revision,
                                "source": "worker" if automatic else "manual", "state": "uncertain",
+                               "dispatch_class": DISPATCH_PRE_WIRE,
                                **({"rejections": rejections} if rejections else {}),
                                **({} if wire_baseline is None else {"baseline": wire_baseline})},
                    "uncertain": True, "verified": None})
@@ -2336,8 +2426,7 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
     try:
         profile, point, target = validate()
     except Exception:
-        record["attempt"]["state"] = "aborted_before_dispatch"
-        record["uncertain"] = False
+        _mark_not_sent(record, attempt_id, "validation_after_persistence")
         await ledger.write(record)
         _evidence_call(hass, entry_id, "record_event", "dispatch_aborted", plan_id=attempt_id,
                        reason="validation_after_persistence")
@@ -2356,18 +2445,20 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
         try:
             durable_ok = await validate_durable()
             if await ledger.read() != record:
-                _evidence_call(hass, entry_id, "record_event", "dispatch_aborted", plan_id=attempt_id,
-                               reason="ledger_changed")
+                # Stage 19.1: no wire call was made, but the ledger is no longer ours: only this attempt's own
+                # still-pre-wire record is released (from a fresh read, never our stale copy).
+                if await _release_not_sent(hass, entry_id, ledger, attempt_id, "ledger_changed"):
+                    return "upload_not_sent"
                 return "upload_uncertain"
-        except Exception:  # noqa: BLE001 - leave the attempted outcome uncertain
-            _evidence_call(hass, entry_id, "record_event", "dispatch_aborted", plan_id=attempt_id,
-                           reason="durable_check_failed")
+        except Exception:  # noqa: BLE001 - the proof is recorded only if storage can still say so
+            if await _release_not_sent(hass, entry_id, ledger, attempt_id, "durable_check_failed"):
+                return "upload_not_sent"
             return "upload_uncertain"
     try:
         profile, point, target = validate()
         if not durable_ok:
-            _evidence_call(hass, entry_id, "record_event", "dispatch_aborted", plan_id=attempt_id,
-                           reason="durable_check_refused")
+            if await _release_not_sent(hass, entry_id, ledger, attempt_id, "durable_check_refused"):
+                return "upload_not_sent"
             return "upload_uncertain"
         if repair:
             # Stage 15.4a: the budget entry is durable BEFORE the wire call (a crash cannot lose a repair), then the
@@ -2377,11 +2468,15 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
             record[_REPAIR_LIST_KEY] = [*kept, {"at": now, "attempt_id": attempt_id}]
             await ledger.write(record)
             profile, point, target = validate()
+        from ocpp.v16 import call as ocpp_call
+        request = ocpp_call.SetChargingProfile(connector_id=target.connector_id, cs_charging_profiles=wire_profile)
+        # Stage 19.1 wire-intent marker: durable BEFORE the call, so it only ever claims "may have begun". The
+        # last validation then runs again after this await (a Stop during the write never becomes a send).
+        record["attempt"]["dispatch_class"] = DISPATCH_WIRE_INTENT
+        await ledger.write(record)
+        profile, point, target = validate()
     except Exception:
-        if repair:
-            record[_REPAIR_LIST_KEY] = [e for e in record.get(_REPAIR_LIST_KEY, []) if e.get("attempt_id") != attempt_id]
-        record["attempt"]["state"] = "aborted_before_dispatch"
-        record["uncertain"] = False
+        _mark_not_sent(record, attempt_id, "validation_before_dispatch")
         await ledger.write(record)
         _evidence_call(hass, entry_id, "record_event", "dispatch_aborted", plan_id=attempt_id,
                        reason="validation_before_dispatch")
@@ -2389,7 +2484,6 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
         data.update(prior_data)
         await store.async_save(data)
         raise
-    from ocpp.v16 import call as ocpp_call
     sending = hass.data.setdefault("spotnav_morek_sending", {})
     sending[entry_id] = attempt_id
     # Diagnostic only (Stage 14.6): this attempt reached the wire call; a cooldown or early return never does.
@@ -2399,8 +2493,7 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
     _evidence_call(hass, entry_id, "record_event", "dispatch_started", plan_id=attempt_id)
     try:
         async with asyncio.timeout(30):
-            response = await point.call(ocpp_call.SetChargingProfile(
-                connector_id=target.connector_id, cs_charging_profiles=wire_profile))
+            response = await point.call(request)
         ack = _status(response)
     except asyncio.CancelledError:
         raise
@@ -2418,8 +2511,10 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
             **({} if wire_baseline is None else {"baseline": wire_baseline}),
             **({} if cap_evidence is None else {"cap": cap_evidence})}, "uncertain": False})
         record["attempt"]["state"] = "accepted"
+        record["attempt"]["dispatch_class"] = DISPATCH_RESOLVED
     elif state in ("rejected", "notsupported"):
         record["attempt"]["state"] = "rejected"
+        record["attempt"]["dispatch_class"] = DISPATCH_RESOLVED
         record["attempt"]["rejections"] = rejections + 1
         record["uncertain"] = False
         if repair:
@@ -2720,8 +2815,8 @@ async def _async_schedule_action_locked(hass: HomeAssistant, entry_id: str, acti
                 return current_profile, _charge_point(hass, current_target), current_target
 
             outcome = await _send_profile_shared(hass, entry_id, data, store, preview_id, validate, automatic=False)
-            if outcome == "upload_uncertain":
-                raise ScheduleRefused("upload_uncertain")
+            if outcome in ("upload_uncertain", "upload_not_sent"):
+                raise ScheduleRefused(outcome)
             if outcome != "upload_accepted_unverified":
                 raise ScheduleRefused("upload_not_confirmed")
             profile = data["profile"]
@@ -3042,7 +3137,9 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
                       "link": link_monitor.status() if link_monitor is not None else None,
                       "readiness": readiness,
                       "schedule_pause": _owned_pause_status(outcomes, verification, verified, worker, stop_pending=stop_pending),
-                      "reconciliation": {"check": checker.status() if checker is not None else None,
+                      "reconciliation": {"upload_outcome": upload_outcome_class(outcomes, in_flight=bool(
+                                             hass.data.get("spotnav_morek_sending", {}).get(entry.entry_id))),
+                                         "check": checker.status() if checker is not None else None,
                                          "repair": repair_status(worker, outcomes),
                                          "reason": worker.reason if worker is not None and
                                          getattr(worker, "reason_serial", -1) == worker._serial else "pending",

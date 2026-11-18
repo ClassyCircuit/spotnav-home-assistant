@@ -176,7 +176,7 @@ class CommandAdmission:
                     if (state != "valid" or disk != self._store._records or self._store._state != "valid"
                             or self._store._cancelled_write or self._store._transition_save_uncertain):
                         return False
-                outcome = await outcomes_for(self._store._hass).read()
+                outcome = await self._async_read_outcome_recovering(entry_id, connector)
                 if (outcome is None or outcome.get("entry_id") != entry_id or outcome.get("uncertain") is not False
                         or (not clean_start_proven(outcome, entry_id, status.get("handover_id")) and
                             (not isinstance(outcome.get("attempt"), dict) or outcome["attempt"].get("state") not in
@@ -188,6 +188,45 @@ class CommandAdmission:
                 return True
         except Exception:  # noqa: BLE001 - no evidence, no release
             return False
+
+    async def _async_read_outcome_recovering(self, entry_id: str, connector: PhysicalConnector) -> dict[str, Any] | None:
+        """Read the connector outcome; first record the Stage 19.1 pre-wire proof when (and only when) it is provable.
+
+        Caller holds the physical connector lock. A latched outcome whose latest attempt carries only the
+        `pre_wire` marker (a cancellation, crash or restart before the wire-intent write) never reached the wire
+        call; `upload_outcome_class` decides that from durable markers alone and `_release_not_sent` re-reads and
+        edits only that exact attempt. Never released here: a legacy record, a `wire_intent` marker, a removal in
+        doubt, an attempt in flight, a person Stop, a draining/quiescing connector, or a schedule-state writer that
+        holds (or queues for) the entry's schedule lock. The release grants no authority and sends nothing: ticket,
+        lifecycle, generation, identity and Stop checks still decide every later write."""
+        from .morek_outcomes import outcomes_for
+        hass = self._store._hass
+        outcome = await outcomes_for(hass).read()
+        if not isinstance(outcome, dict) or outcome.get("uncertain") is not True or outcome.get("entry_id") != entry_id:
+            return outcome
+        from ..api import morek_schedule
+        if (self._person_stops.get(connector) or connector in self._quiescing or connector in self._entry_draining
+                or hass.data.get("spotnav_morek_sending", {}).get(entry_id) is not None
+                or morek_schedule.upload_outcome_class(outcome, in_flight=False)["class"] != "not_sent_provable"):
+            return outcome
+        entry_data = hass.data.get(morek_schedule._DATA_KEY, {}).get(entry_id)
+        lock = entry_data[2] if isinstance(entry_data, tuple) and len(entry_data) > 2 else None
+        # Never wait on the schedule lock: the manual path holds it before asking for this connector lock.
+        if lock is not None and (lock.locked() or getattr(lock, "_waiters", None)):
+            return outcome
+        released = False
+        if lock is not None:
+            async with lock:
+                released = await self._release_pre_wire(hass, entry_id, outcome)
+        else:
+            released = await self._release_pre_wire(hass, entry_id, outcome)
+        return await outcomes_for(hass).read() if released else outcome
+
+    async def _release_pre_wire(self, hass: Any, entry_id: str, outcome: dict[str, Any]) -> bool:
+        from ..api import morek_schedule
+        from .morek_outcomes import outcomes_for
+        return await morek_schedule._release_not_sent(
+            hass, entry_id, outcomes_for(hass), outcome["attempt"]["id"], "no_wire_intent_marker")
 
     def lifecycle_blocked(self, entry_id: str, connector: PhysicalConnector) -> bool:
         """Do not apply a target barrier to a positively unrelated connector."""
@@ -273,7 +312,7 @@ class CommandAdmission:
                     if (state != "valid" or disk != self._store._records or self._store._state != "valid"
                             or self._store._cancelled_write or self._store._transition_save_uncertain):
                         return "ownership_unavailable"
-                outcome = await outcomes_for(self._store._hass).read()
+                outcome = await self._async_read_outcome_recovering(entry_id, connector)
                 if (outcome is None or outcome.get("entry_id") != entry_id or outcome.get("uncertain") is not False
                         or (not clean_start_proven(outcome, entry_id, status.get("handover_id")) and
                             (not isinstance(outcome.get("attempt"), dict) or outcome["attempt"].get("state") not in
@@ -1211,7 +1250,7 @@ class CommandAdmission:
                         if (disk_state != "valid" or disk != self._store._records or self._store._state != "valid"
                                 or self._store._transition_save_uncertain or self._store._cancelled_write):
                             return AdmissionResult(False, "ownership_unavailable")
-                    outcome = await outcomes_for(self._store._hass).read()
+                    outcome = await self._async_read_outcome_recovering(entry_id, connector)
                     if (outcome is None or outcome.get("entry_id") != entry_id or outcome.get("uncertain") is not False
                             or (not clean_start_proven(outcome, entry_id, status.get("handover_id")) and
                                 (not isinstance(outcome.get("attempt"), dict) or outcome["attempt"].get("state") not in
