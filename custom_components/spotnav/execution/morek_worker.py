@@ -36,11 +36,13 @@ class MorekScheduleWorker:
     """Subscribe to planner publications and reconcile the newest valid intent."""
 
     def __init__(self, hass: HomeAssistant, entry_id: str, planner: Any,
-                 available: Callable[[], bool] | None = None) -> None:
+                 available: Callable[[], bool] | None = None,
+                 upload_link: Callable[[], bool] | None = None) -> None:
         self._hass = hass
         self._entry_id = entry_id
         self._planner = planner
         self._available = available or (lambda: True)
+        self._upload_link = upload_link
         self._serial = 0
         self._task: asyncio.Task | None = None
         self._remove = None
@@ -209,6 +211,20 @@ class MorekScheduleWorker:
                 self.trigger(kind="recalc" if kind == "learned_reset" else kind)
         finally:
             self._evidence_task = None
+
+    def _upload_available(self) -> bool:
+        """Schedule uploads only: the charge-control switch OR the live supported OCPP link.
+
+        The switch is transaction-bound and can be unavailable while the OCPP connection is up, so an unavailable
+        switch alone must not hide a reachable schedule upload. `upload_link` is a local read (no charger call);
+        everything else (`_suspended`, identity, ticket, generation, Stop, admission) is still checked by the
+        callers. Start, session and verification paths keep the switch-only `_available`."""
+        if self._available():
+            return True
+        try:
+            return bool(self._upload_link is not None and self._upload_link())
+        except Exception:  # noqa: BLE001 - an unreadable link is unknown, never permission
+            return False
 
     def suspend_for_availability_change(self) -> int:
         """Invalidate queued work until this transition's initialization completes."""
@@ -512,7 +528,7 @@ class MorekScheduleWorker:
                 self._expiry = asyncio.get_running_loop().call_later(delay, self.trigger)
         # After a restart the durable rejection record alone re-arms the bounded retry, whatever this run does.
         await self._arm_retry_timer(data)
-        if self._suspended or not self._available():
+        if self._suspended or not self._upload_available():
             self.reason = "charger_unavailable"
             return
         identity = self._identity()
@@ -561,7 +577,7 @@ class MorekScheduleWorker:
                     raise morek_schedule.ScheduleRefused("stale_generation")
                 if not admission.owned_ticket_current(self._entry_id, connector):
                     raise morek_schedule.ScheduleRefused("migration_confirmation_required")
-                if self._suspended or not self._available():
+                if self._suspended or not self._upload_available():
                     raise morek_schedule.ScheduleRefused("charger_unavailable")
                 if repair is not None and not repair["current"]():
                     raise morek_schedule.ScheduleRefused("repair_unconfirmed")  # reconnect / new attempt / unload / stale read

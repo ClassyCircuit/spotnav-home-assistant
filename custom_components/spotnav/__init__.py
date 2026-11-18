@@ -853,6 +853,19 @@ def _setup_morek_session_observation(hass, entry, session, target):
     session.observe_initial(hass.states.get(sensor), datetime.now(timezone.utc))
 
 
+def _morek_upload_link(hass: HomeAssistant, target: Any) -> bool:
+    """Local read only: exactly one connected OCPP 1.6 physical Morek, identity supported."""
+    from .api import morek_schedule as _schedule
+    from .execution.command_admission import classify_morek_identity
+    if classify_morek_identity(_schedule._identity_status(hass, target)) != "supported_morek":
+        return False
+    try:
+        _schedule._charge_point(hass, target)
+    except _schedule.ScheduleRefused:
+        return False
+    return True
+
+
 async def _async_setup_auto_preview(
     hass: HomeAssistant,
     entry: ChargerConfigEntry,
@@ -958,7 +971,10 @@ async def _async_setup_auto_preview(
         state = hass.states.get(data.controller.charge_control)
         return state is not None and state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN)
 
-    worker = data.morek_worker = MorekScheduleWorker(hass, entry_id, preview, charger_available)
+    def upload_link() -> bool:
+        return _morek_upload_link(hass, getattr(data.controller, "ocpp_target", None))
+
+    worker = data.morek_worker = MorekScheduleWorker(hass, entry_id, preview, charger_available, upload_link)
     from .execution.morek_session import MorekSessionCoordinator
 
     session = worker.session = MorekSessionCoordinator(worker)

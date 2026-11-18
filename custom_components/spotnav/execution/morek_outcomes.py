@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from copy import deepcopy
 from typing import Any
 
@@ -55,16 +56,58 @@ def clean_start_proven(record: Any, entry_id: str, migration_id: str | None) -> 
 
 
 class MorekOutcomes:
-    """One supported physical connector. Failed or cancelled writes poison this process."""
+    """One supported physical connector. Failed or cancelled writes poison it until a verified reread recovers."""
 
     def __init__(self, hass):
         self.hass = hass
         self.store = Store(hass, 1, _STORAGE_KEY, atomic_writes=True)
         self.poisoned = False
+        # What a poisoned write may still change. `_late_write` is the exact record an executor job may yet write
+        # (only after a cancellation: the job outlives its awaiter); `_before_write` is the record known to be on
+        # disk before that write. Both are only meaningful while `poisoned`.
+        self._late_write: dict[str, Any] | None = None
+        self._before_write: Any = _MISSING
+        self.recovery: str | None = None
+        # Ledger-internal, non-reentrant, leaf lock: it covers exactly one public read/write, which only awaits the
+        # executor and HA's own Store write lock (neither ever calls back here). Public methods take it once and
+        # call the `_locked` internals, so there is no recursion. It makes recovery, poison and late-write state a
+        # single critical section: two readers cannot both recover, and a recovery cannot clear a poison that a
+        # newer failed write set while it was awaiting. A caller cancelled while waiting holds nothing.
+        self._lock = asyncio.Lock()
+
+    async def _recover(self) -> None:
+        """Clear the poison only when a verified reread proves no write of ours can still land.
+
+        Never reinitializes or overwrites an invalid, unsupported or unreadable file (that could hide a dispatched
+        write). After a *completed* failed save (the job returned an error) no job is in flight, so two equal valid
+        rereads suffice. After a cancelled save the job may still run, so recovery needs proof that it already
+        landed: the disk must equal the exact record that write carried and differ from what was there before
+        (an equal record could be a not-yet-run job overwriting a later write)."""
+        try:
+            first = await self._read_disk()
+            second = await self._read_disk()
+        except OutcomeUnavailable:
+            self.recovery = "storage_still_invalid"
+            raise
+        if first != second:
+            self.recovery = "storage_changing"
+            raise OutcomeUnavailable("outcome_storage_uncertain")
+        if self._late_write is not None and (first != self._late_write or self._before_write is _MISSING
+                                             or first == self._before_write):
+            self.recovery = "late_write_unproven"
+            raise OutcomeUnavailable("outcome_storage_uncertain")
+        self.poisoned = False
+        self._late_write = None
+        self._before_write = _MISSING
+        self.recovery = "recovered"
 
     async def read(self) -> dict[str, Any] | None:
-        if self.poisoned:
-            raise OutcomeUnavailable("outcome_storage_uncertain")
+        async with self._lock:
+            if self.poisoned:
+                await self._recover()
+            return await self._read_disk()
+
+    async def _read_disk(self) -> dict[str, Any] | None:
         try:
             envelope = await self.hass.async_add_executor_job(_read_envelope, self.store.path)
             if envelope is _MISSING:
@@ -87,16 +130,33 @@ class MorekOutcomes:
             raise OutcomeUnavailable("outcome_storage_invalid") from error
 
     async def write(self, data: dict[str, Any]) -> None:
+        async with self._lock:
+            await self._write_locked(data)
+
+    async def _write_locked(self, data: dict[str, Any]) -> None:
         if self.poisoned:
-            raise OutcomeUnavailable("outcome_storage_uncertain")
+            await self._recover()
+        saving = started = False
+        # A genuinely missing file reads as None (initialization is allowed). An invalid, unsupported or unreadable
+        # file raises here, before anything is written: it is never overwritten (it could hide a dispatched write),
+        # and this refusal is not a failed save, so it does not poison.
+        before: Any = await self._read_disk()
         try:
+            saving = started = True
             await self.store.async_save(deepcopy(data))
-            saved = await self.read()
+            saving = False
+            saved = await self._read_disk()
             if saved != data:
                 raise OutcomeUnavailable("outcome_storage_uncertain")
-        except BaseException:
-            # An executor write can still complete after cancellation. Do not race it.
+        except BaseException as error:
+            # An executor write can still complete after cancellation. Do not race it: only an error returned by
+            # the save itself means its job has finished; a cancellation or a failed/mismatching verification read
+            # leaves a landing possible.
             self.poisoned = True
+            self.recovery = None
+            late = started and not (saving and isinstance(error, Exception))
+            self._late_write = deepcopy(data) if late else None
+            self._before_write = before if late else _MISSING
             raise
 
 

@@ -928,7 +928,7 @@ it, with the change named in the report).
   pre-dispatch-proven start → released with proof; Stop race; restart; accepted-without-transaction still not
   repeated. *Exclusions:* no toggle of the charge-control switch, no authorization-setting change, no start
   from unknown/stale status; any additional trigger must use fresh evidence and the existing guarded coordinator.
-- [ ] **19.7 Storage, ownership and connection blockers ◆.** *Needs 19.3, 19.6.* *Scope:* one test-backed
+- [ ] **19.7 Storage, ownership and connection blockers ◆.** *Needs 19.3, 19.6.* **PARTIAL (2026-11-18, 2.5.186, local, review pending):** only the independent parts exist — verified-reread recovery of a poisoned outcome ledger (internally serialized by one leaf lock; never reinitializes or overwrites an invalid/unreadable file, only a missing one; cancelled saves recover only when the late write is proven landed) and an upload-only link gate (`_upload_available`: switch OR live supported OCPP link) at the worker's reconcile/dispatch checks; a switch that *changes* to unavailable still suspends until it returns. The blocker table, wording/recovery tests, slow-pace retry and observations are NOT done (19.3 missing, 19.2 blocked); see the handoff. *Scope:* one test-backed
   table (like 17.6's `PLANNING_HOLDS`, reusing `decision_blocker`/the recovery banner) of the blockers that
   stop or stall an automatic send for reasons *outside* planning: **storage** (a ledger/store write that
   fails or is unavailable before or after the pre-wire marker, a record that cannot be read or fails
