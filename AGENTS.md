@@ -20,13 +20,16 @@ Every Stage 15 (◆) substage must meet the active roadmap's **Stage 14 non-regr
 - This is the user's `SpotNav Enhanced` fork. Keep the Home Assistant integration domain
   `spotnav` unchanged, including the `custom_components/spotnav/` directory.
 - Do not put credentials, environment-variable values, HA configuration, auth responses, or
-  private household data into Git, tool output, logs, or chat. Use the `homeassistant`
+  private household data into Git, tool output, logs, or chat. Use the user-specified `ha_access_token` (or the previously documented `homeassistant`)
   environment variable in memory only after verifying the HA API URL is the intended host;
   a read-only request can then test whether Bearer authentication works, without printing
   the value. An SMB share is **not** proof of API connectivity.
 - Start with read-only diagnostics. Do not send an OCPP profile, clear profiles, start/stop a
-  charge, restart Home Assistant, or modify the HA share without the user's specific approval
-  for that operation. In particular, never treat `ocpp.clear_profile` as a selective cleanup.
+  charge, or modify the HA share without the user's specific approval for that operation.
+  When the user authorizes installing a new integration version, restarting Home Assistant to
+  activate that installation is also authorized; proceed autonomously and verify afterward.
+  A restart for any other purpose still needs specific approval. In particular, never treat
+  `ocpp.clear_profile` as a selective cleanup.
 - `GetCompositeSchedule` reports effective current limits, not an inventory of installed
   profiles; an accepted upload or a matching readback is not proof of physical charging.
 - If you change the integration or card, bump `custom_components/spotnav/manifest.json`, run
