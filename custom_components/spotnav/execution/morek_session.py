@@ -26,6 +26,8 @@ TRANSIENT_SESSION_BLOCKERS = frozenset({
     "worker_suspended", "charger_unavailable", "stale_generation", "ownership_not_current",
     "identity_changed", "connector_quiescing", "lifecycle_initializing", "retry_cooldown",
     "planner_changed", "ownership_recheck_failed",
+    # 19.3/19.7: a store or ledger that is busy or unreadable for now; the guarded run refuses until it is settled.
+    "ownership_unavailable", "profile_outcome_unavailable",
 })
 
 _REDACT_REQUEST = contextvars.ContextVar("spotnav_morek_remote_start", default=False)
@@ -456,9 +458,14 @@ class MorekSessionCoordinator:
             self._recheck_runs = 0
             return
         if self._recheck_runs >= SESSION_RETRY_LIMIT:
-            return
-        delay = 61 if state.get("reason") == "retry_cooldown" else SESSION_RETRY_DELAYS[
-            min(self._recheck_runs, len(SESSION_RETRY_DELAYS) - 1)]
+            # 19.3: never an indefinite silent stop. After the fast phase the same guarded re-evaluation continues at
+            # the slow pace (30 min ... 4 h ceiling). It is a read-and-compare; a start still needs every guard
+            # and the retry cooldown, so no extra request is sent. Memory-only: a restart re-evaluates at once.
+            slow = morek_schedule.SLOW_RETRY_DELAYS
+            delay = slow[min(self._recheck_runs - SESSION_RETRY_LIMIT, len(slow) - 1)]
+        else:
+            delay = 61 if state.get("reason") == "retry_cooldown" else SESSION_RETRY_DELAYS[
+                min(self._recheck_runs, len(SESSION_RETRY_DELAYS) - 1)]
         self._recheck_runs += 1
 
         def fire():
@@ -624,8 +631,13 @@ class MorekSessionCoordinator:
 
     def _retry_resolve(self):
         """Re-trigger a skipped observation (bounded; the record stays ambiguous meanwhile, nothing is sent)."""
-        if self.closed or self._resolve_retry is not None or self._resolve_skips >= SESSION_RETRY_LIMIT:
+        if self.closed or self._resolve_retry is not None:
             return
+        # 19.3: after the bounded fast retries the busy lock is still re-tried at the slow pace, never abandoned.
+        slow = self._resolve_skips >= SESSION_RETRY_LIMIT
+        delay = (morek_schedule.SLOW_RETRY_DELAYS[min(self._resolve_skips - SESSION_RETRY_LIMIT,
+                                                      len(morek_schedule.SLOW_RETRY_DELAYS) - 1)]
+                 if slow else RESOLVE_RETRY_DELAY_S)
         self._resolve_skips += 1
 
         def fire():
@@ -633,7 +645,7 @@ class MorekSessionCoordinator:
             if not self.closed:
                 self.trigger()
 
-        self._resolve_retry = asyncio.get_running_loop().call_later(RESOLVE_RETRY_DELAY_S, fire)
+        self._resolve_retry = asyncio.get_running_loop().call_later(delay, fire)
 
     async def _mark_observed(self, ledger, record, prior, found):
         prior["resolution"] = {"by": found, "was": prior.get("state"),
@@ -652,6 +664,12 @@ class MorekSessionCoordinator:
         if state == before or state.get("reason") == "waiting_for_vehicle":
             return
         code, reason = state.get("state"), state.get("reason")
+        if code == "blocked" and reason in morek_schedule.SESSION_OBSERVED_BLOCKERS:
+            # 19.3: one bounded durable observation per *changed* blocker (the worker's existing observation list).
+            try:
+                self.worker._observe(reason)
+            except Exception:  # noqa: BLE001 - a diagnostic never changes the outcome
+                _LOGGER.debug("Morek session observation unavailable", exc_info=True)
         level = logging.WARNING if code in ("rejected", "uncertain") else logging.INFO
         _LOGGER.log(level, "Morek session start %s (%s); a request outcome is not measured charging", code, reason)
 

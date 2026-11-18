@@ -21,7 +21,12 @@ const WHAT = {
   wait_for_exchange_rate: 'No plan yet: waiting for the ECB exchange rate to convert the prices. It is asked for again automatically and the plan follows.',
   adjust_planning_settings: 'The plan cannot be sent as saved; adjust the planning settings.',
   wait_for_prices: 'Prices are unavailable or incomplete for the planned window.',
-  see_reason: 'The schedule is not being updated.',
+  see_reason: 'The schedule is not being updated for a reason this version does not describe.',
+  // Stage 19.3/19.7: lifecycle, storage and not-yet-sent blockers. Nothing here claims charging or a send.
+  wait_for_startup_checks: 'SpotNav is finishing start-up or reconnect checks for this charger, so nothing was sent yet.',
+  wait_for_storage: 'SpotNav cannot read or confirm its saved schedule record right now, so nothing was sent. It is read again automatically.',
+  check_storage: 'The saved schedule record is unreadable or does not belong to this setup. Nothing was sent and the record was not overwritten; check the SpotNav logs.',
+  wait_for_next_automatic_attempt: 'SpotNav will check again automatically before taking action.',
   // 15.4a/b repair outcomes. Plain words, who acts; none of these asks for a blind resend.
   needs_person: 'Automatic repair is paused for this attempt: the charger’s schedule still doesn’t match, or the repair limit is used up. Check the charger and the SpotNav logs.',
   wait_for_repair_deferral: 'The charger’s schedule differs a little. The current charge is left alone and SpotNav fixes it a bit later.',
@@ -33,7 +38,7 @@ const REPAIR_NOTE = new Set(['wait_for_repair_deferral', 'wait_for_repair_spacin
 // Only these end by themselves: the panel says so and when SpotNav checks again.
 // A person's setting ends this one, then the existing recalculation sends once: no Refresh or Send needed.
 const PERSON_THEN_AUTOMATIC = new Set(['set_battery_capacity']);
-const AUTOMATIC = new Set(['wait_for_charger_connection', 'check_charger_identity', 'retry_after_stop_or_change', 'wait_for_planner', 'wait_for_fresh_inputs', 'wait_for_prices', 'wait_for_exchange_rate', 'check_logs']);
+const AUTOMATIC = new Set(['wait_for_charger_connection', 'check_charger_identity', 'retry_after_stop_or_change', 'wait_for_planner', 'wait_for_fresh_inputs', 'wait_for_prices', 'wait_for_exchange_rate', 'check_logs', 'wait_for_startup_checks', 'wait_for_storage', 'wait_for_next_automatic_attempt']);
 
 const time = (iso) => {
   const at = Date.parse(iso || '');
@@ -77,7 +82,11 @@ export function recoveryBanner(state, now = Date.now()) {
   if (blocker.action === 'wait_for_planner' && inputs.plan_state === 'nothing_to_charge' && blocker.code !== 'plan_inputs_changed') {
     return {level: 'info', code: blocker.code, text: 'Nothing to charge right now: the plan needs no charging, so no schedule is being sent. This describes the plan, not the charger’s actual power. SpotNav plans again when the car, prices or settings change.'};
   }
-  const what = WHAT[blocker.action] || WHAT.see_reason;
+  const what = blocker.code === 'upload_not_sent' ? 'The last schedule send did not reach the charger; SpotNav will check again automatically.' : (WHAT[blocker.action] || WHAT.see_reason);
+  if (!WHAT[blocker.action] || blocker.action === 'see_reason') {
+    // An unrecognised reason (a newer backend): never a dead end and never "does not clear by itself".
+    return {level: 'warning', code: blocker.code, text: `${what} SpotNav re-checks when something changes; see the SpotNav logs if it stays. (${blocker.detail || blocker.code})`};
+  }
   const suffix = ` (${blocker.detail || blocker.code})`;
   if (blocker.code === 'upload_rejected') {
     const next = time(recovery.next_retry_at);

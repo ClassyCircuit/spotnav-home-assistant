@@ -187,14 +187,18 @@ async def test_transient_blocker_is_named_and_cleared_by_bounded_timer(monkeypat
 
 @pytest.mark.asyncio
 async def test_transient_retries_are_bounded(monkeypatch):
+    # Stage 19.3 (named change): the fast phase is still bounded (3 here), but the re-evaluation no longer stops:
+    # it continues at the slow pace (`SLOW_RETRY_DELAYS`), still without sending anything while blocked.
     monkeypatch.setattr(morek_session, "SESSION_RETRY_DELAYS", (0.001,))
     monkeypatch.setattr(morek_session, "SESSION_RETRY_LIMIT", 3)
+    monkeypatch.setattr(morek_schedule, "SLOW_RETRY_DELAYS", (3600,))
     coordinator, point, _, _ = setup(monkeypatch)
     coordinator.worker._suspended = True
     coordinator.observe("Available", "Preparing")
     await asyncio.sleep(0.2)
     await settle(coordinator)
-    assert coordinator._recheck_runs == 3 and coordinator._recheck is None and point.calls == 0
+    assert coordinator._recheck_runs == 4 and coordinator._recheck is not None and point.calls == 0
+    coordinator.close()
 
 
 @pytest.mark.asyncio

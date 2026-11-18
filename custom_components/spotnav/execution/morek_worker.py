@@ -653,6 +653,11 @@ class MorekScheduleWorker:
                     await self._reconcile(serial, None if self._strict else _SOC_END_TOLERANCE)
                 except morek_schedule.ScheduleRefused as error:
                     self.reason = error.code
+                except OutcomeUnavailable as error:
+                    # 19.7: a ledger that cannot be trusted is a named storage blocker (uncertain: re-read on the
+                    # slow pace; invalid: never overwritten, a person checks), not "the worker failed".
+                    code = str(error.args[0]) if error.args else ""
+                    self.reason = code if code in ("outcome_storage_uncertain", "outcome_storage_invalid")                         else "outcome_storage_invalid"
                 except Exception:  # noqa: BLE001 - a failed calculation is not permission to send
                     self.reason = "worker_unavailable"
                     _LOGGER.exception("Morek schedule worker failed")

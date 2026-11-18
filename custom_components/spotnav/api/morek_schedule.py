@@ -1942,6 +1942,26 @@ DECISION_BLOCKERS.update({
     "repair_unconfirmed": "wait_for_confirmation",
     "repair_deferred": "wait_for_repair_deferral",  # 15.4b: a correct charge with only a distant future difference
 })
+#: Stage 19.3/19.7 remainder: lifecycle, session, storage and ownership codes the worker or session coordinator can
+#: report. Each reuses an existing banner action or one of the three new ones (`wait_for_startup_checks`,
+#: `wait_for_storage`, `check_storage`); none claims charging. Automatic ones are in `TRANSIENT_BLOCKERS` (worker) or
+#: `SESSION_OBSERVED_BLOCKERS` (session start); ownership and identity conflicts stay person-actionable.
+DECISION_BLOCKERS.update({
+    "lifecycle_initializing": "wait_for_startup_checks", "connector_quiescing": "wait_for_startup_checks",
+    "ownership_not_current": "wait_for_startup_checks",
+    "worker_suspended": "wait_for_charger_connection", "retry_cooldown": "wait_for_next_automatic_attempt",
+    "ownership_unavailable": "wait_for_storage", "profile_outcome_unavailable": "wait_for_storage",
+    "outcome_storage_uncertain": "wait_for_storage", "schedule_owner_unavailable": "wait_for_storage",
+    "ownership_recheck_failed": "wait_for_storage",
+    "outcome_storage_invalid": "check_storage", "outcome_binding_unavailable": "check_storage",
+    "schedule_mode_unarmed": "confirm_ownership", "ownership_transition": "confirm_ownership",
+    "ownership_inconsistent": "confirm_ownership", "legacy_not_owner": "confirm_ownership",
+    "retained_profile_exit_held": "confirm_ownership",
+    "ownership_identity_mismatch": "check_charger_identity", "not_morek_connector": "check_charger_identity",
+    "person_stop_not_reserved": "retry_after_stop_or_change", "person_stop_active": "retry_after_stop_or_change",
+    "plan_expired": "wait_for_planner", "planner_unavailable": "wait_for_planner",
+    "invalid_operation": "check_logs",
+})
 #: Stage 9.5: blockers that clear on their own (a reconnect, prices, a fresh reading, a finished Stop). The worker
 #: re-evaluates them after a bounded backoff when no event arrives; every one is only a read-and-compare, a send
 #: still passes every guard. Never here: an uncertain write (`upload_uncertain`), a rejection (own cooldown), a
@@ -1953,6 +1973,17 @@ TRANSIENT_BLOCKERS = frozenset({
     "price_inputs_changed", "price_coverage_unavailable", "plan_inputs_changed", "no_current_plan",
     "vehicle_input_unavailable", "vehicle_input_stale", "vehicle_identity_unavailable",
     "upload_not_sent",  # 19.1: proven never sent; a bounded re-evaluation is the automatic path
+    # 19.3/19.7 remainder: a lifecycle barrier, a busy/unreadable-for-now ledger or store, an expired or unavailable
+    # plan. Re-evaluation is read-and-compare only; a send still passes every guard.
+    "lifecycle_initializing", "connector_quiescing", "ownership_unavailable", "profile_outcome_unavailable",
+    "outcome_storage_uncertain", "schedule_owner_unavailable", "plan_expired", "planner_unavailable",
+    "person_stop_not_reserved",
+})
+#: Session-start blockers that end by themselves (see `morek_session`); observed once per change like worker ones.
+SESSION_OBSERVED_BLOCKERS = frozenset({
+    "worker_suspended", "charger_unavailable", "stale_generation", "ownership_not_current", "identity_changed",
+    "connector_quiescing", "lifecycle_initializing", "retry_cooldown", "planner_changed", "ownership_recheck_failed",
+    "ownership_unavailable", "profile_outcome_unavailable",
 })
 BLOCKER_RETRY_DELAYS = (60, 180, 600, 900)  # seconds; the last repeats
 BLOCKER_RETRY_LIMIT = 12  # fast-phase timer re-evaluations per blocked episode (about 2.5 h); then the slow pace
@@ -1974,7 +2005,7 @@ def blocker_retry_delay(runs: int) -> int:
 #: reported it); nothing here is inferred or user-reported, and none claims charging.
 _OBS_EVIDENCE = {"upload_rejected": "ack", "upload_not_sent": "pre_wire_marker", "upload_uncertain": "pre_wire_marker"}
 _OBS_VEHICLE = ("wait_for_fresh_inputs",)
-_OBS_SYSTEM = ("wait_for_charger_connection", "wait_for_prices", "wait_for_planner", "wait_for_next_automatic_attempt",
+_OBS_SYSTEM = ("wait_for_charger_connection", "wait_for_startup_checks", "wait_for_storage", "wait_for_prices", "wait_for_planner", "wait_for_next_automatic_attempt",
                "wait_for_repair_release", "wait_for_repair_spacing", "wait_for_confirmation",
                "wait_for_repair_deferral", "wait_for_charge_now_end")
 
@@ -1986,7 +2017,7 @@ def observation_entry(code: str, now_iso: str, *, retry_pending: bool = False) -
         return None
     who = ("vehicle" if action in _OBS_VEHICLE else "system" if action in _OBS_SYSTEM or code == "upload_uncertain"
            else "person")  # 19.2: an unknown upload is resolved by the guarded, paced recovery, not by a person
-    automatic = code in TRANSIENT_BLOCKERS or code == "upload_uncertain" or (code == "upload_rejected" and retry_pending)
+    automatic = code in TRANSIENT_BLOCKERS or code in SESSION_OBSERVED_BLOCKERS or code == "upload_uncertain" or (code == "upload_rejected" and retry_pending)
     return {"code": code, "evidence": _OBS_EVIDENCE.get(code, "none"), "basis": "observed", "who": who,
             "next": "automatic_recheck" if automatic else "person_action", "count": 1,
             "first_at": now_iso, "last_at": now_iso}

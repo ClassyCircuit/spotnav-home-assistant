@@ -18,7 +18,7 @@ const CURRENT_FLOW_A = 1;
 
 const TRANSIENT = new Set(['worker_suspended', 'charger_unavailable', 'stale_generation', 'ownership_not_current',
   'identity_changed', 'connector_quiescing', 'lifecycle_initializing', 'retry_cooldown', 'planner_changed',
-  'ownership_recheck_failed', 'waiting_for_new_connection', 'connection_changed', 'connector_not_preparing',
+  'ownership_recheck_failed', 'ownership_unavailable', 'profile_outcome_unavailable', 'waiting_for_new_connection', 'connection_changed', 'connector_not_preparing',
   'newer_stop_or_connection_change', 'charger_connection_changed', 'vehicle_event_recorded']);
 const PAUSED = new Set(['paused_until_resume', 'legacy_pause_active']);
 const FINISHED = new Set(['session_completed', 'car_completion_reported', 'session_ended_or_completion_ambiguous']);

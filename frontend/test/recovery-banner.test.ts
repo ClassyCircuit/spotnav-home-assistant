@@ -144,3 +144,28 @@ describe('sidebar recovery banner wiring', () => {
     panel.remove();
   });
 });
+
+describe('Stage 19.3 / 19.7 lifecycle, storage and unknown-reason blockers', () => {
+  const blocked = (code, action, recovery = {}) => recoveryBanner(state(code, {code, action}, recovery), NOW);
+  it('words lifecycle and storage waits as automatic re-checks with the next time, never a failure or a send', () => {
+    for (const [code, action, re] of [['lifecycle_initializing', 'wait_for_startup_checks', /start-up or reconnect checks.*nothing was sent/],
+      ['ownership_unavailable', 'wait_for_storage', /cannot read or confirm its saved schedule record.*read again automatically/],
+      ['upload_not_sent', 'wait_for_next_automatic_attempt', /did not reach the charger.*check again automatically/]]) {
+      const banner = blocked(code, action, {blocker_retry: {code, attempts: 14, limit: 12, next_retry_at: later(1800), exhausted: false, phase: 'slow'}});
+      expect(banner.level).toBe('warning');
+      expect(banner.text).toMatch(re);
+      expect(banner.text).toMatch(/re-checks automatically at /);
+      expect(banner.text).not.toMatch(/does not clear by itself|guarantee|will charge|verified/i);
+    }
+  });
+  it('keeps an unreadable record person-actionable and an unknown reason a calm warning, not a dead end', () => {
+    const invalid = blocked('outcome_storage_invalid', 'check_storage');
+    expect(invalid.level).toBe('error');
+    expect(invalid.text).toMatch(/not overwritten.*SpotNav logs.*Needs your attention/);
+    const unknown = blocked('something_new', 'see_reason');
+    expect(unknown.level).toBe('warning');
+    expect(unknown.text).toMatch(/does not describe.*re-checks when something changes.*something_new/);
+    expect(unknown.text).not.toMatch(/does not clear by itself/);
+    expect(blocked('something_new', 'a_future_action').level).toBe('warning');
+  });
+});
