@@ -401,6 +401,94 @@ def cap_lowered(record: dict[str, Any] | None, settings: Any) -> bool:
         return False
 
 
+#: Stage 19.5/19.9b: compact material-input provenance stored with an accepted routine profile (`acknowledged["inputs"]`).
+PROVENANCE_VERSION = 1
+PROVENANCE_MAX_ROWS = 400  # more price rows than this: no provenance (unknown), never a truncated one
+
+
+def material_inputs(settings: Any, snapshot: Any) -> dict[str, Any] | None:
+    """What the plan's *non-SOC* inputs were, for a later 'only the SOC moved' judgement; `None` = not provable.
+
+    Settings revision, price-source revision, price state, amps, cap, currency, power, ready-by instant, the
+    reading's basis flags (estimated / capacity unknown / progress unknown) and the published price rows the
+    calculation chose from (epoch seconds and the effective minor price). Nothing sensitive, no SOC value. Any
+    field that is missing or unreadable makes the whole thing `None`: unknown provenance never loosens anything."""
+    try:
+        proposal = snapshot.proposal
+        revision = getattr(settings, "revision", None)
+        if (proposal is None or not proposal.has_plan or type(revision) is not int or snapshot.settings_revision != revision
+                or not isinstance(snapshot.price_state, str)):
+            return None
+        power = float(proposal.power_kw)
+        horizon = tuple(getattr(proposal, "horizon", ()) or ())
+        interval = getattr(proposal, "current_interval", None)
+        rows = {(int(_utc(h.utc_start).timestamp()), int(_utc(h.utc_end).timestamp()),
+                 round(float(h.effective_minor_per_kwh), 6)) for h in horizon}
+        if interval is not None:
+            rows.add((int(_utc(interval.start).timestamp()), int(_utc(interval.end).timestamp()),
+                      round(float(interval.effective_minor_per_kwh), 6)))
+        departure = getattr(snapshot, "departure_at", None)
+        if not rows or len(rows) > PROVENANCE_MAX_ROWS or not power > 0 or not isinstance(proposal.currency, str):
+            return None
+        price_revision = getattr(snapshot, "price_revision", None)
+        cap = cap_snapshot(settings)
+        amps = getattr(settings, "amps", None)
+        if cap is None or type(amps) is not int or not (price_revision is None or isinstance(price_revision, str)):
+            return None
+        return {"version": PROVENANCE_VERSION, "settings_revision": revision, "price_revision": price_revision,
+                "price_state": snapshot.price_state, "amps": amps, "cap": cap, "currency": proposal.currency,
+                "power_kw": round(power, 6),
+                "departure_at": None if departure is None else _utc(departure).isoformat(),
+                "basis": [getattr(snapshot, "projection_estimated", False) is True,
+                          getattr(snapshot, "projection_capacity_unknown", False) is True,
+                          getattr(snapshot, "progress_unknown", False) is True],
+                "rows": [list(row) for row in sorted(rows)]}
+    except Exception:  # noqa: BLE001 - provenance that cannot be built is unknown, never a guess
+        return None
+
+
+def _profile_instant(profile: Any) -> datetime:
+    """When the candidate was calculated (its own start), the same 'from now' `same_effective_schedule` uses."""
+    try:
+        return _utc(datetime.fromisoformat(profile["chargingSchedule"]["startSchedule"].replace("Z", "+00:00")))
+    except Exception:  # noqa: BLE001 - unreadable: the clock; the comparison then fails on its own evidence
+        return datetime.now(timezone.utc)
+
+
+def acknowledged_inputs(record: dict[str, Any] | None) -> dict[str, Any] | None:
+    """The provenance stored with the *settled accepted routine* profile, or `None` (older record, none stored)."""
+    if acknowledged_profile(record) is None:
+        return None
+    stored = (record.get("acknowledged") or {}).get("inputs")
+    return stored if isinstance(stored, dict) else None
+
+
+def material_inputs_unchanged(stored: Any, current: Any, now: datetime) -> bool:
+    """True only when both sides are valid provenance and every non-SOC material input demonstrably matches.
+
+    Scalars must be equal. Price rows: every still-future stored row must exist identically in the current list,
+    and a current row the stored list lacks is accepted only when it starts at or after the stored coverage's end (a
+    horizon that rolled forward over already-listed prices); anything inserted, changed or removed inside the
+    stored coverage is a price change. No future stored row means the evidence has aged out: not provable."""
+    try:
+        if not (isinstance(stored, dict) and isinstance(current, dict)
+                and stored.get("version") == current.get("version") == PROVENANCE_VERSION):
+            return False
+        for key in ("settings_revision", "price_revision", "price_state", "amps", "cap", "currency", "power_kw",
+                    "departure_at", "basis"):
+            if key not in stored or key not in current or stored[key] != current[key]:
+                return False
+        at = int(_utc(now).timestamp())
+        old = {tuple(row) for row in stored["rows"] if row[1] > at}
+        new = {tuple(row) for row in current["rows"] if row[1] > at}
+        if not old or not old <= new:
+            return False
+        edge = max(row[1] for row in old)
+        return all(row[0] >= edge for row in new - old)
+    except Exception:  # noqa: BLE001 - doubt is a difference
+        return False
+
+
 def _priced_cost(windows: list[tuple[datetime, datetime]], rows: list[tuple[datetime, datetime, float]],
                  power_kw: float, energy_kwh: float | None = None) -> float | None:
     """Major-unit cost of charging in `windows` (chronologically, at most `energy_kwh`), or None if any part is unpriced."""
@@ -2968,7 +3056,8 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
                                override_id: str | None = None, force_sync: bool = False,
                                end_tolerance: timedelta | None = None, baseline: Any = None,
                                repair: str | None = None, resolve: bool = False,
-                               promote_resume: dict[str, Any] | None = None) -> str:
+                               promote_resume: dict[str, Any] | None = None,
+                               provenance_tolerance: timedelta | None = None) -> str:
     """Connector lock held. Record first, revalidate after every pre-dispatch await.
 
     `baseline` (optional) returns the reserve-free twin of the profile `validate` just built (Stage 15.1a).
@@ -2981,10 +3070,21 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
     automatic run, only when the persisted recovery pace is due and nothing is in flight; the unknown attempt is kept
     as historical evidence and a NEW attempt with its own id is sent. `promote_resume` (Stage 19.9a) is the person's
     durable pending Resume, revalidated here under the locks and turned into the current Resume intent in the same
-    durable write as the new attempt's pre-wire marker. Neither bypasses protection, ownership, identity or Stop."""
+    durable write as the new attempt's pre-wire marker. Neither bypasses protection, ownership, identity or Stop.
+
+    `provenance_tolerance` (Stage 19.5/19.9b): the SOC end-time tolerance for a run that is not itself a routine SOC
+    publication (a restart's first publication, a reconnect or recovery wake). It applies ONLY when the accepted
+    profile carries stored material-input provenance that the current inputs demonstrably match
+    (`material_inputs_unchanged`); missing, older, unreadable or different provenance keeps the run strict. This only
+    suppresses a *send*: the plan was already recalculated, and every other guard is unchanged."""
     ledger = outcomes_for(hass)
     record = await _outcome_record(hass, entry_id, data)
     profile, point, target = validate()
+    # Captured in the same synchronous step as the profile it describes (no await in between).
+    try:
+        provenance = material_inputs(domain_data(hass).auto_store.settings(entry_id), preview_for(hass, entry_id).snapshot())
+    except Exception:  # noqa: BLE001 - no provenance, no loosening
+        provenance = None
     # This exact wire payload is the one recorded and later dispatched. A
     # revalidation may rebuild an equivalent profile with a later startSchedule.
     wire_profile = profile
@@ -3014,11 +3114,18 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
     attempt = record.get("attempt") or {}
     if automatic and not force_sync and not repair and not resolving and acknowledged.get("fingerprint") == fingerprint:
         return "unchanged"
+    tolerance, basis = end_tolerance, None
+    if (tolerance is None and provenance_tolerance is not None and automatic and not force_sync and not repair
+            and not resolving and pause_id is None and override_id is None
+            and material_inputs_unchanged(acknowledged_inputs(record), provenance, _profile_instant(profile))):
+        tolerance, basis = provenance_tolerance, "soc_provenance"
     if (automatic and not force_sync and not repair and not resolving and pause_id is None and override_id is None
             and acknowledged_revision(record) == domain_data(hass).auto_store.settings(entry_id).revision
-            and same_effective_schedule(acknowledged_profile(record), profile, end_tolerance,
+            and same_effective_schedule(acknowledged_profile(record), profile, tolerance,
                                         accepted_baseline=acknowledged_baseline(record),
                                         candidate_baseline=wire_baseline)):
+        if basis is not None:
+            hass.data.setdefault("spotnav_morek_dedup", {})[entry_id] = basis
         # The accepted routine schedule already says this from now on (a settings edit, an explicit
         # control, a pause or a needed sync is never suppressed here); a profile creation time is not a change.
         return "unchanged"
@@ -3220,6 +3327,7 @@ async def _send_profile_shared(hass: HomeAssistant, entry_id: str, data: dict[st
             "fingerprint": fingerprint, "at": now, "id": attempt_id, "profile": wire_profile,
             "revision": revision, "routine": pause_id is None and override_id is None,
             **({} if wire_baseline is None else {"baseline": wire_baseline}),
+            **({} if provenance is None else {"inputs": provenance}),
             **({} if cap_evidence is None else {"cap": cap_evidence})}, "uncertain": False})
         record["attempt"]["state"] = "accepted"
         record["attempt"]["dispatch_class"] = DISPATCH_RESOLVED
@@ -3893,6 +4001,8 @@ async def websocket_morek_schedule(hass: HomeAssistant, connection: websocket_ap
                                                       "persistence": getattr(worker, "retry_persistence", None)},
                                          "inputs": planning_inputs,
                                          "last_trigger": getattr(worker, "last_trigger", None),
+                                         # recalculated, compared with stored provenance, nothing sent (19.5/19.9b)
+                                         "dedup_basis": getattr(worker, "dedup_basis", None),
                                          "blocker": decision_blocker(worker.reason if worker is not None and
                                                                      getattr(worker, "reason_serial", -1) == worker._serial
                                                                      else None, planning_inputs.get("plan_reason")),

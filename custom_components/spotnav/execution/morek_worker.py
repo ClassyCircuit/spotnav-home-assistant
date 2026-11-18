@@ -25,6 +25,9 @@ _LOGGER = logging.getLogger(__name__)
 _COALESCE_SECONDS = 0.1  # explicit controls, plug-in, settings: do not wait
 _ROUTINE_COALESCE_SECONDS = 2.0  # routine SOC/price bursts
 _SOC_END_TOLERANCE = timedelta(minutes=5)  # SOC-only: an end instant that moves less is not news
+#: Direct (snapshot-less) triggers that may use the tolerance, but only with matching stored provenance: a
+#: reconnect/availability return (`control`) and a recovery wake (`recovery`).
+_PROVENANCE_KINDS = ("control", "recovery")
 _TRIGGER_RANK = ("plug_in", "sync", "settings", "control", "repair", "sensor", "recovery", "recalc", "price", "routine")
 _SETTLED = ("upload_accepted_unverified", "unchanged")  # outcomes that end a pending price decision
 _DECISION_HISTORY = 10
@@ -94,6 +97,11 @@ class MorekScheduleWorker:
         self._deadline: float | None = None
         self._wake = asyncio.Event()
         self._strict = False  # sticky until a run completes: no SOC tolerance for this run
+        # Stage 19.5/19.9b: sticky like `_strict`, but set only by triggers that may NEVER use the stored-provenance
+        # tolerance (plug-in, sensor, price, settings edit, recalculation, required sync, repair); a restart's first
+        # publication, a reconnect or a recovery wake leave it clear.
+        self._hard = False
+        self.dedup_basis: str | None = None  # last run suppressed by provenance (a recalculation that sent nothing)
         self._kinds: set[str] = set()
         # A price publication that may still deserve an interruption decision. It survives stale work,
         # a refused or rejected send, an unavailable charger and a reconnect (a direct trigger re-evaluates it
@@ -157,6 +165,9 @@ class MorekScheduleWorker:
             self._price_pending = True
         if not routine or sync:
             self._strict = True
+            startup = snapshot is not None and previous is None and kind == "settings"
+            if sync or not (startup or (snapshot is None and kind in _PROVENANCE_KINDS)):
+                self._hard = True
         wait = _COALESCE_SECONDS if urgent or sync else _ROUTINE_COALESCE_SECONDS
         due = asyncio.get_running_loop().time() + wait
         if self._deadline is None or due < self._deadline:
@@ -644,13 +655,16 @@ class MorekScheduleWorker:
                 serial = self._serial
                 kinds = set(self._kinds)
                 self._price_evaluated = False
+                hard = self._hard
+                self._hass.data.get("spotnav_morek_dedup", {}).pop(self._entry_id, None)
                 self._continuity_fresh = False
                 self._run_attempt_id = None
                 self._dispatch_before = self._dispatched_id()
                 repair_asked = self._repair_request if "repair" in kinds else None
                 self._repair_run = repair_asked if morek_schedule.REPAIR_DISPATCH_ENABLED else None
                 try:
-                    await self._reconcile(serial, None if self._strict else _SOC_END_TOLERANCE)
+                    await self._reconcile(serial, None if self._strict else _SOC_END_TOLERANCE,
+                                          None if hard else _SOC_END_TOLERANCE)
                 except morek_schedule.ScheduleRefused as error:
                     self.reason = error.code
                 except OutcomeUnavailable as error:
@@ -677,6 +691,8 @@ class MorekScheduleWorker:
                         self._price_pending = False
                     self.reason_serial = serial
                     self._strict = False
+                    self._hard = False
+                    self.dedup_basis = self._hass.data.get("spotnav_morek_dedup", {}).pop(self._entry_id, None)
                     self._kinds -= kinds
                     self.last_trigger = next((k for k in _TRIGGER_RANK if k in kinds), None)
                     self._record_decision(kinds)
@@ -728,7 +744,8 @@ class MorekScheduleWorker:
         except Exception:  # noqa: BLE001 - never let a diagnostic change the outcome
             _LOGGER.debug("Morek decision evidence unavailable", exc_info=True)
 
-    async def _reconcile(self, serial: int, end_tolerance: timedelta | None = None) -> None:
+    async def _reconcile(self, serial: int, end_tolerance: timedelta | None = None,
+                         provenance_tolerance: timedelta | None = None) -> None:
         # Restore the fixed expiry even when the charger is offline.
         data, store = await morek_schedule._state(self._hass, self._entry_id)
         record = await morek_schedule._outcome_record(self._hass, self._entry_id, data)
@@ -856,6 +873,7 @@ class MorekScheduleWorker:
                     override_id=(record.get("charge_now") or {}).get("id") if record.get("charge_now")
                         and datetime.fromisoformat(record["charge_now"]["end"]) > datetime.now(timezone.utc) else None,
                     force_sync=sync, end_tolerance=end_tolerance, baseline=lambda: self._baseline,
+                    provenance_tolerance=provenance_tolerance,
                     repair=None if repair is None else repair["attempt_id"],
                     resolve=repair is None, promote_resume=promote,
                     validate_durable=lambda: admission.async_owned_boundary_current(self._entry_id, connector),
