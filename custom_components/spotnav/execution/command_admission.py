@@ -392,7 +392,11 @@ class CommandAdmission:
                 or self._lifecycle_revisions.get(entry_id, 0) != revision):
             return False
         result = await self.async_reconfirm_completed(entry_id, resolve_identity, expected_migration=candidate[1])
-        if self._reconnect_candidates.get(entry_id) == candidate:
+        # Stage 19.7: a refusal that is only missing/unreadable storage evidence leaves the in-process candidate for a
+        # paced re-evaluation (it is revision- and generation-checked on every use, and a Stop pops it); every other
+        # outcome consumes it as before. A reconfirmation never issues a ticket unless every check passes.
+        if self._reconnect_candidates.get(entry_id) == candidate and result not in (
+                "profile_outcome_unavailable", "ownership_unavailable", "reconfirmation_unavailable"):
             self._reconnect_candidates.pop(entry_id, None)
         return result == "reconfirmed" and self._completion_tickets.get(entry_id) == candidate
 

@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta, timezone
 from functools import partial
+from time import monotonic as _link_retry_clock
 from typing import Any, Callable
 
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
@@ -388,10 +389,25 @@ async def _async_setup_ownership_metadata(
         monitor = getattr(worker, "link_monitor", None)
         if monitor is not None:
             monitor.poke()  # a local read of the point's link; never a charger call
+        # Stage 19.7: the transaction-bound switch can go unavailable while the OCPP link stays up. The barrier is
+        # released by the same durable owner/ticket/ledger verification either way; only the *trigger* may be the
+        # live link instead of the switch. It is re-read (local, no charger call) again right before the release,
+        # and a link that is gone leaves the barrier until the switch or the link returns.
+        nonlocal link_pending
+        link_pending = None  # a newer edge supersedes any earlier wait for the link
+        if not is_available:
+            # The wait for the link is event-driven through the existing link monitor (its poll and pokes): one
+            # guarded attempt per observed link-live reading after the link was seen not live; never a timer here.
+            link_pending = {"epoch": epoch, "generation": generation, "revision": barrier_revision, "worker": worker,
+                            "armed": True, "running": False, "released": False,
+                            "retry_at": None, "retry_delay": _LINK_RETRY_FIRST}
+            _watch_link()
+            _try_link_release(link_pending)
         if is_available:
             async def initialize_and_reconcile() -> None:
                 nonlocal restart_pending
-                await ensure(epoch)  # Never acquire admission recursively in the worker.
+                # Never acquire admission recursively in the worker.
+                await ensure(epoch)
                 if migrate and barrier_revision is not None:
                     admission = command_admission(hass)
                     restored = await admission.async_restore_reconnect(
@@ -412,16 +428,138 @@ async def _async_setup_ownership_metadata(
 
             entry.async_create_background_task(hass, initialize_and_reconcile(), "spotnav ownership initialization")
 
+    _LINK_RETRY_FIRST, _LINK_RETRY_MAX = 60.0, 600.0  # seconds; paced on the 30 s monitor poll, doubling to a cap
+
+    def _link_live() -> bool:
+        try:
+            return bool(_morek_upload_link(hass, controller.ocpp_target))
+        except Exception:  # noqa: BLE001 - an unreadable link is unknown, never permission
+            return False
+
+    def _watch_link() -> None:
+        nonlocal link_watch_monitor, link_watch_remove
+        monitor = getattr(getattr(entry, "runtime_data", None), "morek_worker", None)
+        monitor = getattr(monitor, "link_monitor", None)
+        if monitor is None or monitor is link_watch_monitor or not hasattr(monitor, "add_listener"):
+            return
+        if link_watch_remove is not None:
+            link_watch_remove()
+        link_watch_monitor = monitor
+        link_watch_remove = monitor.add_listener(_link_checked)
+
+    @callback
+    def _link_checked() -> None:
+        """A local link reading happened (monitor poll or poke): a pending unavailable-edge wait may proceed."""
+        nonlocal link_pending
+        pending = link_pending
+        if pending is None:
+            return
+        if pending["epoch"] != lifecycle_epoch:
+            link_pending = None
+            return
+        if not _link_live():
+            pending["armed"] = True  # the next live reading is a return worth one guarded attempt
+            return
+        _try_link_release(pending)
+
+    def _try_link_release(pending: dict[str, Any]) -> None:
+        if pending["running"] or pending["epoch"] != lifecycle_epoch or not _link_live():
+            return
+        now = _link_retry_clock()
+        if not pending["armed"] and (pending["retry_at"] is None or now < pending["retry_at"]):
+            return
+        # A stable live link whose attempt was refused (ledger transiently uncertain, Stop since lifted, ticket not yet
+        # available) is re-evaluated at a slow, bounded pace on the monitor's existing readings, so a transient refusal
+        # cannot strand the suspended worker. Every attempt (success, refusal or error) schedules the next one; success
+        # clears `link_pending`, which ends the pacing. Only the guarded verification below ever runs; never a migration.
+        pending["armed"] = False
+        pending["retry_at"] = now + pending["retry_delay"]
+        pending["retry_delay"] = min(pending["retry_delay"] * 2, _LINK_RETRY_MAX)
+        pending["running"] = True
+        entry.async_create_background_task(hass, _release_on_link(pending), "spotnav link-return recovery")
+
+    async def _release_on_link(pending: dict[str, Any]) -> None:
+        """Switch unavailable, OCPP link live: the same durable verification, then uploads only.
+
+        Ownership migration/initialization never runs here in `migrate` mode (it stays behind the switch's own
+        return); a legacy or unsettled owner just fails the release and the barrier stays. Every await is followed
+        by a re-check of the edge (epoch) and the link; the last check before the resume has no await after it.
+        A failed or lost attempt is retried only after the link was seen not live and live again (no polling)."""
+        nonlocal link_pending, restart_pending
+        epoch, revision, worker = pending["epoch"], pending["revision"], pending["worker"]
+
+        def still_ours() -> bool:
+            return epoch == lifecycle_epoch and link_pending is pending
+
+        try:
+            if not migrate:
+                await ensure(epoch)
+            if not still_ours():
+                return
+            if not _link_live():
+                pending["armed"] = True
+                return
+            if migrate and revision is not None:
+                admission = command_admission(hass)
+                if pending["released"]:
+                    # Released earlier and the link went away before the resume: nothing may have intervened.
+                    if (entry.entry_id in admission._lifecycle_barriers
+                            or admission._lifecycle_revisions.get(entry.entry_id) != revision):
+                        return
+                else:
+                    restored = await admission.async_restore_reconnect(
+                        entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target), revision)
+                    if not restored and restart_pending and still_ours():
+                        result = await admission.async_recover_after_restart(
+                            entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target), revision,
+                            startup_stop_revision)
+                        admission._recovery_status.setdefault(entry.entry_id, {})["automatic_recovery"] = result
+                        if result == "automatic_recovery_ready":
+                            restart_pending = False
+                    await admission.async_release_lifecycle_barrier(
+                        entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target),
+                        revision, still_ours)
+                    # Only a verified release deletes the barrier (the restore's reconfirmation may already have
+                    # done it), so "gone at this revision" is the released test, not the call's return value.
+                    pending["released"] = (entry.entry_id not in admission._lifecycle_barriers
+                                           and admission._lifecycle_revisions.get(entry.entry_id) == revision)
+                    if not pending["released"]:
+                        return  # barrier and suspension stay: needs a new edge or a link drop and return
+            # Late revalidation: the link or the edge may have changed during the admission awaits above.
+            if not still_ours():
+                return
+            if not _link_live():
+                pending["armed"] = True
+                return
+            current = getattr(getattr(entry, "runtime_data", None), "morek_worker", None)
+            link_pending = None  # the wait ends here: resumed, or there is no longer a worker to resume
+            if current is worker and current is not None:
+                # Uploads only: start/session/verification stay behind the switch's own return.
+                current.resume_after_availability_change(pending["generation"], switch_available=False)
+        finally:
+            pending["running"] = False
+
+    link_pending: dict[str, Any] | None = None
+    link_watch_monitor: Any = None
+    link_watch_remove: Callable[[], None] | None = None
     remove_listener = async_track_state_change_event(hass, [controller.charge_control], control_available)
     def close_ownership_listener() -> None:
-        nonlocal lifecycle_epoch
+        nonlocal lifecycle_epoch, link_pending
+        link_pending = None
         lifecycle_epoch += 1
         if migrate:
             command_admission(hass).reserve_lifecycle_barrier(
                 entry.entry_id, lambda: _identity_status(hass, controller.ocpp_target))
         remove_listener()
 
+    def close_link_watch() -> None:
+        nonlocal link_pending
+        link_pending = None
+        if link_watch_remove is not None:
+            link_watch_remove()
+
     entry.async_on_unload(close_ownership_listener if migrate else remove_listener)
+    entry.async_on_unload(close_link_watch)
     await ensure(lifecycle_epoch)
 
     async def release_initial_barrier() -> None:

@@ -67,6 +67,7 @@ class MorekLinkMonitor:
         self._down_ref: datetime | None = None  # where an in-progress down span starts for the evidence gap
         self._recovery_pending = False
         self._recovery_at: datetime | None = None
+        self._listeners: list[Callable[[], None]] = []
 
     # ---- lifecycle
 
@@ -101,6 +102,19 @@ class MorekLinkMonitor:
         """An existing entity/connector event: read again (a local read; never raises into the event bus)."""
         self.check()
 
+    def add_listener(self, listener: Callable[[], None]) -> Callable[[], None]:
+        """Call `listener` (a `@callback`, no arguments) after every local link reading, i.e. on the existing poll and
+        pokes. It carries no edge and no state: the listener re-reads whatever it needs. This is how the ownership
+        lifecycle learns that a link which was down at a switch edge has returned (Stage 19.7), without its own
+        timer. Returns the remover."""
+        self._listeners.append(listener)
+
+        def remove() -> None:
+            if listener in self._listeners:
+                self._listeners.remove(listener)
+
+        return remove
+
     def status(self) -> dict[str, Any]:
         def iso(value: datetime | None) -> str | None:
             return None if value is None else value.isoformat()
@@ -123,6 +137,11 @@ class MorekLinkMonitor:
                 evaluate()  # a pending boot signal re-reads its local evidence on every poll/event
         except Exception as err:  # noqa: BLE001 - monitoring must never affect charging or the event bus
             _LOGGER.debug("Morek link check failed: %s", type(err).__name__)
+        for listener in list(self._listeners):
+            try:
+                listener()
+            except Exception as err:  # noqa: BLE001 - a listener never affects the monitor or the event bus
+                _LOGGER.debug("Morek link listener failed: %s", type(err).__name__)
 
     def _set_state(self, state: str, now: datetime) -> None:
         if state != self.state:

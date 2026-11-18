@@ -249,10 +249,15 @@ class MorekScheduleWorker:
         self.trigger()
         return self._availability_generation
 
-    def resume_after_availability_change(self, generation: int) -> None:
+    def resume_after_availability_change(self, generation: int, *, switch_available: bool = True) -> None:
+        """End the suspension. With `switch_available=False` (the switch is unavailable but the OCPP link is live and
+        the lifecycle barrier was released by the usual verification) only the upload path resumes: it is gated by
+        `_upload_available`; session reconnect and the read-only check stay behind the switch."""
         if not self._closed and generation == self._availability_generation:
             self._suspended = False
             self.trigger()
+            if not switch_available:
+                return
             session = getattr(self, "session", None)
             if session is not None:
                 session.reconnect()
