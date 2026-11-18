@@ -142,3 +142,18 @@ HA OCPP has no `GetCompositeSchedule` action. That API can change with HA OCPP
 updates. A user test on 2026-11-08 received an Accepted upload but a mismatching
 16 A effective readback. Neither the sent schedule's operation nor selective
 cleanup has yet been verified in a physical charging session.
+
+## Stage 19 mocked scenario coverage (not a hardware test)
+
+Stage 19.8 is **partial**. `tests/test_stage_198_scenarios.py` runs four fast mocked scenarios through the real
+worker and send path: a not-sent upload failure that retries once after a restart (a person Stop wins), the slow
+retry pace continuing after a restart, an offline charger with a retained schedule (only last-known evidence,
+physical charging unknown) and SOC drift in an active window (no 0 A gap, no repeat sends). They prove SpotNav's
+own bookkeeping, not that a Morek accepted, kept or applied anything.
+
+Not covered, because the behavior is not implemented or is only partly implemented: resolving an ambiguous
+upload (Stage 19.2; an uncertain upload is never resent automatically), an unknown session start across a confirmed
+reboot as one flow, and bounded logs over a long outage end to end. Hardware questions (profile replacement order,
+late responses, retained profile after reboot or power loss, composite-schedule horizon) are unverified until you
+run them. To run the new tests on Windows, stub `fcntl`/`resource` and lift the socket guard as described in the
+handoff.

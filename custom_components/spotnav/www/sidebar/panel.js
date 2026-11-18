@@ -63740,7 +63740,7 @@ function morekEvidence(state, observedAt, failed, now = Date.now()) {
   else if (state?.outcomes?.state === "storage_unavailable") summary = "Current plan is not confirmed; outcome evidence is unavailable.";
   else if (outcomeUnknown) summary = "Current plan is not confirmed; a profile action may have applied and its outcome is unknown.";
   else if (state && !state.supported) summary = "Current plan is not confirmed; Morek identity unsupported or unresolved.";
-  else if (state?.operator?.state === "offline") summary = "Current plan is not confirmed; Morek is offline.";
+  else if (state?.operator?.state === "offline") summary = "Morek is offline; the current proposal has not been confirmed. An earlier sent schedule may still be retained.";
   else if (!state?.preview?.profile) summary = "Current plan is not confirmed; a current proposal is unavailable.";
   else if (state.verification_target === "held_pause" && state.verified && associated) summary = "Current plan is not confirmed; the readback comparison concerns a held pause, not the plan.";
   else if (reason === "verification_superseded") summary = "Current plan is not confirmed; the readback belongs to an older or unavailable attempt or plan.";
@@ -63828,7 +63828,18 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
     unchanged: "The current schedule was already acknowledged; charging is not confirmed.",
     charge_now_active: "Return to Auto before syncing the automatic schedule.",
     pending: "Waiting for the schedule worker to finish checking the current plan.",
-    charger_unavailable: "Morek is unavailable; the schedule was not sent.",
+    charger_unavailable: "Morek is unavailable; the new schedule was not sent. An earlier schedule may still be retained.",
+    morek_offline: "Morek is offline; the new schedule was not sent. An earlier schedule may still be retained; wait for the connection to return.",
+    identity_changed: "Charger identity changed during the check; review the charger binding before retrying.",
+    stale_generation: "A newer control request superseded this check; wait for the current request to be evaluated.",
+    upload_not_sent: "The new schedule was not sent; check the reported blocker. An earlier schedule may still be retained.",
+    planner_changed: "The plan changed during the check; wait for a fresh calculation.",
+    planning_unavailable: "Planning is unavailable; check the plan inputs and wait for a fresh calculation.",
+    target_soc_stale: "The target state of charge is stale; check the target before retrying.",
+    target_progress_uncertain: "Progress toward the target is uncertain; check the vehicle readings before retrying.",
+    waiting_for_vehicle_update: "Waiting for a fresh vehicle update before checking the schedule again.",
+    active_window_block_limit: "The active window cannot be represented within the charger block limit; review the plan.",
+    too_many_blocks: "The plan has more blocks than the charger supports; review the schedule.",
     migration_confirmation_required: "Schedule ownership needs reconfirmation before sending.",
     worker_unavailable: "The schedule worker could not complete its check; see Home Assistant logs.",
     protection_conflict_unresolved: "A linked site regulator may also control this charger; schedule dispatch is blocked until the conflict is reviewed.",
@@ -63849,7 +63860,7 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
     profile_outcome_uncertain: "A profile action has an uncertain outcome; schedule sending remains blocked.",
     outcome_storage_unavailable: "Profile evidence storage is unavailable; schedule sending remains blocked."
   };
-  const blocker = state.ownership?.blockers?.find((value2) => blockers[value2]);
+  const activeBlockers = state.ownership?.blockers ?? [];
   const recoveryStates = {
     ownership_missing: "Ownership record is missing; do not assume a profile is absent.",
     ownership_malformed: "Ownership record is malformed; schedule sending remains blocked.",
@@ -63859,7 +63870,7 @@ function morekPanel(doc, state, admin, busy, error2, act, activeAction, confirmA
     profile_outcome_uncertain: "A profile outcome is uncertain and may have applied."
   };
   const recoveryReason = recoveryStates[state.ownership?.recovery?.state ?? ""];
-  availability.textContent = state.ownership?.completion_authorized ? "Schedule ownership is confirmed for this process. External OCPP writers and native protection cannot be verified here." : `${blocker ? blockers[blocker] : recoveryReason ?? "Schedule sending is blocked; review ownership and recovery status."} Recorded owner: ${state.ownership?.recorded_owner ?? "unknown"}.`;
+  availability.textContent = state.ownership?.completion_authorized ? "Schedule ownership is confirmed for this process. External OCPP writers and native protection cannot be verified here." : `${activeBlockers.length ? activeBlockers.map((value2) => blockers[value2] ?? `Blocker: ${value2}; review ownership and recovery status.`).join(" ") : recoveryReason ?? "Schedule sending is blocked; review ownership and recovery status."} Recorded owner: ${state.ownership?.recorded_owner ?? "unknown"}.`;
   section.append(availability);
   const migrationReasons = {
     protection_conflict_unresolved: "Automatic initialization is blocked by a linked site regulator; review the protection conflict.",
@@ -65837,7 +65848,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.191";
+var CARD_VERSION = "2.5.192";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {
