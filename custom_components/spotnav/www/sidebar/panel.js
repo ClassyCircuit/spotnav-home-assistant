@@ -53124,7 +53124,7 @@ function renderCheckBanner(notes) {
 }
 function renderRecoveryBanner(banner2) {
   if (!banner2) return '<div id="recovery-banner" class="sn-banner sn-banner-recovery" role="alert" hidden></div>';
-  return `<div id="recovery-banner" class="sn-banner sn-banner-recovery sn-banner-strong" role="alert" data-level="${escapeText(banner2.level)}" data-code="${escapeText(banner2.code)}"><span aria-hidden="true">${LEVEL_ICON[banner2.level] || ""}</span> ${escapeText(banner2.text)}</div>`;
+  return `<div id="recovery-banner" class="sn-banner sn-banner-recovery sn-banner-strong" role="alert" data-level="${escapeText(banner2.level)}" data-code="${escapeText(banner2.code)}"><span aria-hidden="true">${LEVEL_ICON[banner2.level] || ""}</span> ${escapeText(banner2.text)} <button type="button" id="recovery-goto-controls" class="sn-link" data-goto-controls>Show charging controls <span aria-hidden="true">\u2192</span></button></div>`;
 }
 function renderStatusStack(m4) {
   const held = m4.hold === true;
@@ -53138,7 +53138,11 @@ function renderControls(c5, draft = {}) {
   const duration2 = draft.duration ?? "60";
   const custom = duration2 === "custom";
   const dis = (on) => on ? " disabled" : "";
-  return `<div class="sn-actions"><div id="automatic-controls" class="sn-auto"><span id="pause-state" class="sn-state">${escapeText(x2.autoState || "Auto state unknown.")}</span><div class="sn-btnrow"><button type="button" id="pause-auto" class="sn-btn"${dis(x2.pauseDisabled !== false)}>Pause Auto until resumed</button><button type="button" id="resume-auto" class="sn-btn"${dis(x2.resumeDisabled !== false)}>Resume Auto</button></div><span id="pause-notice" class="sn-note" role="status">${escapeText(x2.pauseNotice || "")}</span></div><section id="charge-controls" class="sn-charge" aria-label="Charge Now"><details id="charge-options"><summary>Duration / change end</summary><div class="cn-fields"><label>Duration <select id="charge-duration" data-csetting="duration">${DURATIONS.map(([v2, t6]) => `<option value="${v2}"${v2 === duration2 ? " selected" : ""}>${t6}</option>`).join("")}</select></label><label id="custom-label"${custom ? "" : " hidden"}>End time <input id="charge-end" type="datetime-local" data-csetting="end" value="${escapeText(draft.end ?? "")}"></label><button type="button" id="charge-replace" class="sn-btn"${x2.replaceVisible ? "" : " hidden"}${dis(x2.replaceDisabled !== false)}>Replace Charge Now end</button></div></details><div class="cn-actions"><button type="button" id="charge-now" class="sn-btn sn-btn-primary"${dis(x2.chargeDisabled !== false)}>${escapeText(x2.chargeLabel || "Charge Now")}</button></div><span id="charge-state" class="sn-state" role="status">${escapeText(x2.chargeState || "Charge Now status unavailable.")}</span><span id="charge-notice" class="sn-note" role="status">${escapeText(x2.chargeNotice || "")}</span></section></div>`;
+  const busy = x2.chargeBusy === true ? ' aria-busy="true"' : "", autoBusy = x2.autoBusy === true ? ' aria-busy="true"' : "";
+  const kind = ["pending", "uncertain", "info"].includes(x2.chargeKind) ? x2.chargeKind : "";
+  const cf = x2.confirm;
+  const confirm = cf ? `<div id="charge-confirm" class="sn-confirm" role="alertdialog" aria-modal="false" aria-labelledby="charge-confirm-title" aria-describedby="charge-confirm-text" tabindex="-1" data-action="${escapeText(cf.action)}" data-origin="${escapeText(cf.origin || "")}" data-token="${escapeText(cf.token)}"><strong id="charge-confirm-title">${escapeText(cf.title)}</strong><p id="charge-confirm-text">${escapeText(cf.text)}</p><div class="sn-btnrow"><button type="button" id="charge-confirm-cancel" class="sn-btn">Cancel</button><button type="button" id="charge-confirm-ok" class="sn-btn sn-btn-primary">${escapeText(cf.confirmLabel || "Confirm")}</button></div></div>` : "";
+  return `<div class="sn-actions"><div id="automatic-controls" class="sn-auto" tabindex="-1"><span id="pause-state" class="sn-state">${escapeText(x2.autoState || "Auto state unknown.")}</span><div class="sn-btnrow"><button type="button" id="pause-auto" class="sn-btn"${autoBusy}${dis(x2.pauseDisabled !== false)}>Pause Auto until resumed</button><button type="button" id="resume-auto" class="sn-btn"${autoBusy}${dis(x2.resumeDisabled !== false)}>Resume Auto</button></div><span id="pause-notice" class="sn-note" role="status">${escapeText(x2.pauseNotice || "")}</span></div><section id="charge-controls" class="sn-charge" aria-label="Charge Now"><details id="charge-options"><summary>Duration / change end</summary><div class="cn-fields"><label>Duration <select id="charge-duration" data-csetting="duration">${DURATIONS.map(([v2, t6]) => `<option value="${v2}"${v2 === duration2 ? " selected" : ""}>${t6}</option>`).join("")}</select></label><label id="custom-label"${custom ? "" : " hidden"}>End time <input id="charge-end" type="datetime-local" data-csetting="end" value="${escapeText(draft.end ?? "")}"></label><button type="button" id="charge-replace" class="sn-btn"${busy}${x2.replaceVisible ? "" : " hidden"}${dis(x2.replaceDisabled !== false)}>Replace Charge Now end</button></div></details><div class="cn-actions"><button type="button" id="charge-now" class="sn-btn sn-btn-primary"${busy}${dis(x2.chargeDisabled !== false)}>${escapeText(x2.chargeLabel || "Charge Now")}</button></div>${confirm}<span id="charge-state" class="sn-state" role="status" tabindex="-1">${escapeText(x2.chargeState || "Charge Now status unavailable.")}</span><span id="charge-notice" class="sn-note" role="${kind === "uncertain" ? "alert" : "status"}" data-kind="${kind}">${escapeText(x2.chargeNotice || "")}</span></section></div>`;
 }
 function sceneOf(scene) {
   const s4 = scene || {};
@@ -53191,6 +53195,7 @@ function mountDashboard(root, adapter) {
   const tabScroll = /* @__PURE__ */ new Map();
   const bound = /* @__PURE__ */ new WeakSet();
   const drafts = /* @__PURE__ */ new Map();
+  let confirmToken = null;
   let current = adapter;
   function cleanup() {
     listeners?.abort();
@@ -53408,6 +53413,24 @@ function mountDashboard(root, adapter) {
     wireClick("resume-auto", "resumeAuto");
     wireClick("charge-now", "chargeNow");
     wireClick("charge-replace", "chargeReplace");
+    wireClick("charge-confirm-ok", "chargeConfirm");
+    wireClick("charge-confirm-cancel", "chargeCancel");
+    const confirmBox = root.querySelector("#charge-confirm");
+    bind3(confirmBox, () => confirmBox.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        current.actions?.chargeCancel?.();
+      }
+    }, { signal }));
+    const gotoControls = root.querySelector("#recovery-goto-controls");
+    bind3(gotoControls, () => gotoControls.addEventListener("click", () => {
+      const box2 = root.querySelector("#automatic-controls");
+      if (!box2) return;
+      reveal(box2);
+      const target = ["#resume-auto", "#charge-now", "#pause-auto"].map((id) => root.querySelector(id)).find((b3) => b3 && !b3.disabled && !b3.hidden);
+      (target || box2).focus?.();
+    }, { signal }));
     const chargerSelect = root.querySelector("#charger");
     bind3(chargerSelect, () => chargerSelect.addEventListener("change", () => current.actions?.selectCharger?.(chargerSelect.value), { signal }));
     const durationSelect = root.querySelector("#charge-duration");
@@ -53629,6 +53652,8 @@ function mountDashboard(root, adapter) {
     const scrolls = sameDraft ? [...root.querySelectorAll("*")].filter((node) => node.scrollTop || node.scrollLeft).map((node) => [node, node.scrollTop, node.scrollLeft]) : [];
     const viewport = root.ownerDocument.defaultView, x2 = viewport?.scrollX, y3 = viewport?.scrollY;
     const rootNode = root.getRootNode?.(), focusId = !sameDraft && rootNode?.activeElement?.id && root.contains(rootNode.activeElement) ? rootNode.activeElement.id : "";
+    const inConfirm = !!(rootNode?.activeElement && root.contains(rootNode.activeElement) && rootNode.activeElement.closest?.("#charge-confirm"));
+    const priorOrigin = root.querySelector("#charge-confirm")?.dataset.origin || "charge-now";
     if (!sameDraft) {
       drafts.clear();
       cleanup();
@@ -53636,6 +53661,13 @@ function mountDashboard(root, adapter) {
     pendingUpdate = null;
     current = next;
     const result2 = render2();
+    const token = current.model.control?.confirm?.token ?? null;
+    if (token !== null && token !== confirmToken) root.querySelector("#charge-confirm-cancel")?.focus?.();
+    else if (token === null && inConfirm) {
+      const origin = root.querySelector("#" + priorOrigin);
+      (origin && !origin.disabled && !origin.hidden ? origin : root.querySelector("#charge-state"))?.focus?.();
+    }
+    confirmToken = token;
     if (focusId) root.querySelector("#" + focusId)?.focus?.();
     if (sameDraft) {
       for (const [node, top, left] of scrolls) if (node.isConnected) {
@@ -66078,7 +66110,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.203";
+var CARD_VERSION = "2.5.204";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {
@@ -66355,7 +66387,9 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       pauseAuto: () => void this.automaticAction("stop", "until_resumed"),
       resumeAuto: () => void this.automaticAction("resume", null),
       chargeNow: () => void this.chargeAction(this.rawStatus?.schedule?.charge_now?.state === "active" ? "return_to_auto" : "charge_now"),
-      chargeReplace: () => void this.chargeAction("charge_now")
+      chargeReplace: () => void this.chargeAction("charge_now"),
+      chargeConfirm: () => void this.chargeConfirmed(),
+      chargeCancel: () => this.chargeCancel()
     };
   }
   headerModel() {
@@ -66438,6 +66472,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       this.vehicleSelected = null;
     }
     this.chargeBusy = false;
+    this.chargeConfirm = null;
     this.chargeNotice = "";
     this.learningNotice = "";
     this.generation++;
@@ -66697,14 +66732,59 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     return fresh(this.statusAt, this.statusFailed);
   }
   chargeNowModel(dashboard) {
+    this.revalidateChargeConfirm();
     const state = decodeMorekState(this.rawStatus), info = state?.charge_now;
     const active = info?.state === "active";
     const blocker = chargeNowBlocker(this, dashboard, state);
-    return { chargeLabel: active ? "Return to Auto" : "Charge Now", chargeDisabled: !!blocker, replaceVisible: active, replaceDisabled: !!blocker, chargeState: chargeNowStatus(state, this.chargeStatusFresh()) + (blocker ? ` ${blocker}` : ""), chargeNotice: this.chargeNotice || "" };
+    const confirm = this.chargeConfirm, unknown2 = !!(this.charger && this.chargeUnknown?.has(this.charger)) || !!this.autoUncertain;
+    const kind = this.chargeBusy ? "pending" : unknown2 ? "uncertain" : this.chargeNotice ? "info" : "";
+    const notice = this.chargeNotice || (unknown2 ? "A previous request has an unknown outcome. Do not retry blindly; check fresh Morek status first." : "");
+    return { chargeLabel: active ? "Return to Auto" : "Charge Now", chargeDisabled: !!blocker || !!confirm || this.chargeBusy === true, replaceVisible: active, replaceDisabled: !!blocker || !!confirm, chargeState: chargeNowStatus(state, this.chargeStatusFresh()) + (blocker ? ` ${blocker}` : ""), chargeNotice: notice, chargeKind: kind, chargeBusy: this.chargeBusy === true, autoBusy: this.autoBusy === true, confirm: confirm ? { token: confirm.token, action: confirm.action, origin: confirm.origin, title: confirm.title, text: confirm.text, confirmLabel: confirm.confirmLabel } : null };
   }
-  async chargeAction(action) {
-    const hass = this._hass, charger = this.charger, generation = this.generation, permissionEpoch = this.permissionEpoch;
-    const snapshot = this.rawStatus, observedAt = this.statusAt, state = decodeMorekState(snapshot), decoded = decodeDashboard(this.rawDashboard);
+  // The confirmation is in-page and asynchronous, so everything it depended on is checked again when it is shown and when it is
+  // confirmed: context identity, permission, every Charge Now admission gate and the override it was opened for. The polled
+  // status object itself is not compared (it is replaced on each refresh); its meaning is.
+  chargeConfirmProblem(c5) {
+    if (!this.connected || this.generation !== c5.generation || this.permissionEpoch !== c5.permissionEpoch || this.charger !== c5.charger) return "The charger or permission context changed.";
+    const state = decodeMorekState(this.rawStatus), decoded = decodeDashboard(this.rawDashboard);
+    if (!decoded.ok) return "Dashboard observation is unavailable.";
+    const blocker = chargeNowBlocker(this, decoded.value, state);
+    if (blocker) return blocker;
+    const info = state.charge_now;
+    if (info.state !== c5.cnState || (info.intent?.id ?? null) !== c5.cnId || c5.action === "return_to_auto" && info.state !== "active") return "Charge Now changed since you opened this confirmation.";
+    return "";
+  }
+  revalidateChargeConfirm() {
+    const c5 = this.chargeConfirm;
+    if (!c5) return;
+    const problem = this.chargeConfirmProblem(c5);
+    if (problem) {
+      this.chargeConfirm = null;
+      this.chargeNotice = `Confirmation closed; nothing was sent. ${problem} Review the current state and try again.`;
+    }
+  }
+  chargeCancel() {
+    if (!this.chargeConfirm) return;
+    this.chargeConfirm = null;
+    this.chargeNotice = "Cancelled; nothing was sent.";
+    this.paint();
+  }
+  async chargeConfirmed() {
+    const c5 = this.chargeConfirm;
+    if (!c5) return;
+    const problem = this.chargeConfirmProblem(c5);
+    this.chargeConfirm = null;
+    if (problem) {
+      this.chargeNotice = `State changed; nothing was sent. ${problem} Review the current state and try again.`;
+      this.paint();
+      return;
+    }
+    await this.chargeDispatch(c5.action, c5.selection, c5.charger, c5.generation, c5.permissionEpoch);
+  }
+  chargeAction(action) {
+    const charger = this.charger, generation = this.generation, permissionEpoch = this.permissionEpoch;
+    if (this.chargeConfirm || this.chargeBusy) return;
+    const state = decodeMorekState(this.rawStatus), decoded = decodeDashboard(this.rawDashboard);
     const dashboard = decoded.ok ? decoded.value : null;
     const blocker = chargeNowBlocker(this, dashboard, state);
     if (blocker || !charger || !["charge_now", "return_to_auto"].includes(action) || action === "return_to_auto" && state?.charge_now?.state !== "active") {
@@ -66712,7 +66792,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       this.paint();
       return;
     }
-    let selection;
+    let selection, title, text4, confirmLabel;
     if (action === "charge_now") {
       selection = chargeNowSelection(this.shadowRoot.querySelector("#charge-duration").value, this.shadowRoot.querySelector("#charge-end").value);
       if (selection.error) {
@@ -66721,16 +66801,22 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
         return;
       }
       const replacement = state.charge_now.state === "active" ? "This replaces the existing end, calculated from now. " : "";
-      if (!window.confirm(`${replacement}Charge Now overrides the price-based Auto plan until ${new Date(selection.end).toLocaleString()}. ${chargeNowPrice(state.charge_now)} The end is fixed; plugging in later does not extend it. Continue?`)) return;
-    } else if (!window.confirm("Return to Auto? Charging may continue if the Auto plan selects the current time. This is not a persistent Pause.")) return;
-    const latest = decodeMorekState(this.rawStatus), latestDashboard = decodeDashboard(this.rawDashboard);
-    if (!this.connected || this.generation !== generation || this.permissionEpoch !== permissionEpoch || this.charger !== charger || this.rawStatus !== snapshot || this.statusAt !== observedAt || !latestDashboard.ok || chargeNowBlocker(this, latestDashboard.value, latest) || action === "return_to_auto" && latest?.charge_now?.state !== "active") {
-      this.chargeNotice = "State changed; refresh and review before trying again.";
-      this.paint();
-      return;
+      title = state.charge_now.state === "active" ? "Replace the Charge Now end?" : "Start Charge Now?";
+      text4 = `${replacement}Charge Now overrides the price-based Auto plan until ${new Date(selection.end).toLocaleString()}. ${chargeNowPrice(state.charge_now)} The end is fixed; plugging in later does not extend it.`;
+      confirmLabel = state.charge_now.state === "active" ? "Replace end" : "Start Charge Now";
+    } else {
+      title = "Return to Auto?";
+      text4 = "Charging may continue if the Auto plan selects the current time. This is not a persistent Pause.";
+      confirmLabel = "Return to Auto";
     }
+    this.chargeConfirm = { token: this.chargeConfirmSeq = (this.chargeConfirmSeq || 0) + 1, action, charger, generation, permissionEpoch, cnState: state.charge_now.state, cnId: state.charge_now.intent?.id ?? null, selection, title, text: text4, confirmLabel, origin: action === "charge_now" && state.charge_now.state === "active" ? "charge-replace" : "charge-now" };
+    this.chargeNotice = "";
+    this.paint();
+  }
+  async chargeDispatch(action, selection, charger, generation, permissionEpoch) {
+    const hass = this._hass;
     if (selection?.options?.end_time && Date.parse(selection.options.end_time) <= Date.now()) {
-      this.chargeNotice = "Choose a future end time.";
+      this.chargeNotice = "Choose a future end time. Nothing was sent.";
       this.paint();
       return;
     }

@@ -5968,3 +5968,46 @@ wa-button[disabled] {
 .tab-panel .panel:focus-within {
   border-color: #2b4d73;
 }
+.sn-confirm {
+  margin: 10px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--sn-accent);
+  border-radius: 12px;
+  background: var(--sn-surface-2);
+  color: var(--sn-ink);
+  display: grid;
+  gap: 8px;
+}
+.sn-confirm p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.sn-confirm:focus-visible,
+#automatic-controls:focus-visible,
+#charge-state:focus-visible {
+  outline: 2px solid var(--sn-accent);
+  outline-offset: 2px;
+}
+.sn-note[data-kind=pending] {
+  color: var(--sn-info);
+}
+.sn-note[data-kind=uncertain] {
+  color: var(--sn-ink);
+  background: var(--sn-warn-soft);
+  border-left: 4px solid var(--sn-warn);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-weight: 600;
+}
+.sn-note[data-kind=info] {
+  color: var(--sn-muted);
+}
+.sn-btn[aria-busy=true] {
+  cursor: progress;
+}
+#recovery-goto-controls {
+  margin-left: 8px;
+  min-height: 44px;
+}

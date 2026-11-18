@@ -191,7 +191,9 @@ export class SpotnavEnhancedPanel extends HTMLElement {
       pauseAuto:()=>void this.automaticAction('stop','until_resumed'),
       resumeAuto:()=>void this.automaticAction('resume',null),
       chargeNow:()=>void this.chargeAction(this.rawStatus?.schedule?.charge_now?.state==='active' ? 'return_to_auto' : 'charge_now'),
-      chargeReplace:()=>void this.chargeAction('charge_now')
+      chargeReplace:()=>void this.chargeAction('charge_now'),
+      chargeConfirm:()=>void this.chargeConfirmed(),
+      chargeCancel:()=>this.chargeCancel()
     };
   }
   headerModel() { return {chargers:this.chargers.map(c=>({id:c.charger_id,name:c.charger_name})),selected:this.charger || ''}; }
@@ -227,7 +229,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     const vehicleDirty=preserveDraft && this.vehicleDirty;
     this.vehicleConfig=null;this.vehicleConfigAt=null;this.vehicleConfigFailed=false;this.vehicleLoading=false;this.vehicleBusy=false;this.vehicleConflict=false;this.vehicleNotice='';this.vehicleDirty=!!vehicleDirty;
     if (!preserveDraft) {this.vehicleBase=null;this.vehicleSelected=null;}
-    this.chargeBusy=false;this.chargeNotice='';this.learningNotice='';
+    this.chargeBusy=false;this.chargeConfirm=null;this.chargeNotice='';this.learningNotice='';
     this.generation++;
     this.priceDays?.dispose();this.priceDays=null;
     this.historyDay?.dispose();this.historyDay=null;this.priceReview=null;
@@ -384,29 +386,71 @@ export class SpotnavEnhancedPanel extends HTMLElement {
   chargeDashboardFresh(dashboard) { return dashboardFresh(dashboard,this.dashboardFailed); }
   chargeStatusFresh() { return fresh(this.statusAt,this.statusFailed); }
   chargeNowModel(dashboard) {
+    this.revalidateChargeConfirm();
     const state=decodeMorekState(this.rawStatus), info=state?.charge_now;
     const active=info?.state==='active';
     const blocker=chargeNowBlocker(this,dashboard,state);
-    return {chargeLabel:active ? 'Return to Auto' : 'Charge Now',chargeDisabled:!!blocker,replaceVisible:active,replaceDisabled:!!blocker,chargeState:chargeNowStatus(state,this.chargeStatusFresh()) + (blocker ? ` ${blocker}` : ''),chargeNotice:this.chargeNotice || ''};
+    const confirm=this.chargeConfirm, unknown=!!(this.charger && this.chargeUnknown?.has(this.charger)) || !!this.autoUncertain;
+    // Feedback kind is derived, never stored: pending while a request is in flight, uncertain while an unknown outcome latches.
+    const kind=this.chargeBusy ? 'pending' : unknown ? 'uncertain' : this.chargeNotice ? 'info' : '';
+    const notice=this.chargeNotice || (unknown ? 'A previous request has an unknown outcome. Do not retry blindly; check fresh Morek status first.' : '');
+    return {chargeLabel:active ? 'Return to Auto' : 'Charge Now',chargeDisabled:!!blocker || !!confirm || this.chargeBusy===true,replaceVisible:active,replaceDisabled:!!blocker || !!confirm,chargeState:chargeNowStatus(state,this.chargeStatusFresh()) + (blocker ? ` ${blocker}` : ''),chargeNotice:notice,chargeKind:kind,chargeBusy:this.chargeBusy===true,autoBusy:this.autoBusy===true,confirm:confirm ? {token:confirm.token,action:confirm.action,origin:confirm.origin,title:confirm.title,text:confirm.text,confirmLabel:confirm.confirmLabel} : null};
   }
-  async chargeAction(action) {
-    const hass=this._hass, charger=this.charger, generation=this.generation, permissionEpoch=this.permissionEpoch;
-    const snapshot=this.rawStatus, observedAt=this.statusAt, state=decodeMorekState(snapshot), decoded=decodeDashboard(this.rawDashboard);
+  // The confirmation is in-page and asynchronous, so everything it depended on is checked again when it is shown and when it is
+  // confirmed: context identity, permission, every Charge Now admission gate and the override it was opened for. The polled
+  // status object itself is not compared (it is replaced on each refresh); its meaning is.
+  chargeConfirmProblem(c) {
+    if (!this.connected || this.generation!==c.generation || this.permissionEpoch!==c.permissionEpoch || this.charger!==c.charger) return 'The charger or permission context changed.';
+    const state=decodeMorekState(this.rawStatus), decoded=decodeDashboard(this.rawDashboard);
+    if (!decoded.ok) return 'Dashboard observation is unavailable.';
+    const blocker=chargeNowBlocker(this,decoded.value,state);
+    if (blocker) return blocker;
+    const info=state.charge_now;
+    if (info.state!==c.cnState || (info.intent?.id ?? null)!==c.cnId || (c.action==='return_to_auto' && info.state!=='active')) return 'Charge Now changed since you opened this confirmation.';
+    return '';
+  }
+  revalidateChargeConfirm() {
+    const c=this.chargeConfirm;if(!c)return;
+    const problem=this.chargeConfirmProblem(c);
+    if (problem) {this.chargeConfirm=null;this.chargeNotice=`Confirmation closed; nothing was sent. ${problem} Review the current state and try again.`;}
+  }
+  chargeCancel() {
+    if (!this.chargeConfirm) return;
+    this.chargeConfirm=null;this.chargeNotice='Cancelled; nothing was sent.';this.paint();
+  }
+  async chargeConfirmed() {
+    const c=this.chargeConfirm;if(!c)return;
+    const problem=this.chargeConfirmProblem(c);
+    this.chargeConfirm=null;
+    if (problem) {this.chargeNotice=`State changed; nothing was sent. ${problem} Review the current state and try again.`;this.paint();return;}
+    await this.chargeDispatch(c.action,c.selection,c.charger,c.generation,c.permissionEpoch);
+  }
+  chargeAction(action) {
+    const charger=this.charger, generation=this.generation, permissionEpoch=this.permissionEpoch;
+    if (this.chargeConfirm || this.chargeBusy) return;
+    const state=decodeMorekState(this.rawStatus), decoded=decodeDashboard(this.rawDashboard);
     const dashboard=decoded.ok ? decoded.value : null;
     const blocker=chargeNowBlocker(this,dashboard,state);
     if (blocker || !charger || !['charge_now','return_to_auto'].includes(action) || (action==='return_to_auto' && state?.charge_now?.state!=='active')) {
       this.chargeNotice=blocker || 'Charge Now is unavailable.';this.paint();return;
     }
-    let selection;
+    let selection, title, text, confirmLabel;
     if (action==='charge_now') {
       selection=chargeNowSelection(this.shadowRoot.querySelector('#charge-duration').value,this.shadowRoot.querySelector('#charge-end').value);
       if (selection.error) {this.chargeNotice=selection.error;this.paint();return;}
       const replacement=state.charge_now.state==='active' ? 'This replaces the existing end, calculated from now. ' : '';
-      if (!window.confirm(`${replacement}Charge Now overrides the price-based Auto plan until ${new Date(selection.end).toLocaleString()}. ${chargeNowPrice(state.charge_now)} The end is fixed; plugging in later does not extend it. Continue?`)) return;
-    } else if (!window.confirm('Return to Auto? Charging may continue if the Auto plan selects the current time. This is not a persistent Pause.')) return;
-    const latest=decodeMorekState(this.rawStatus), latestDashboard=decodeDashboard(this.rawDashboard);
-    if (!this.connected || this.generation!==generation || this.permissionEpoch!==permissionEpoch || this.charger!==charger || this.rawStatus!==snapshot || this.statusAt!==observedAt || !latestDashboard.ok || chargeNowBlocker(this,latestDashboard.value,latest) || (action==='return_to_auto' && latest?.charge_now?.state!=='active')) {this.chargeNotice='State changed; refresh and review before trying again.';this.paint();return;}
-    if (selection?.options?.end_time && Date.parse(selection.options.end_time)<=Date.now()) {this.chargeNotice='Choose a future end time.';this.paint();return;}
+      title=state.charge_now.state==='active' ? 'Replace the Charge Now end?' : 'Start Charge Now?';
+      text=`${replacement}Charge Now overrides the price-based Auto plan until ${new Date(selection.end).toLocaleString()}. ${chargeNowPrice(state.charge_now)} The end is fixed; plugging in later does not extend it.`;
+      confirmLabel=state.charge_now.state==='active' ? 'Replace end' : 'Start Charge Now';
+    } else {
+      title='Return to Auto?';text='Charging may continue if the Auto plan selects the current time. This is not a persistent Pause.';confirmLabel='Return to Auto';
+    }
+    this.chargeConfirm={token:(this.chargeConfirmSeq=(this.chargeConfirmSeq||0)+1),action,charger,generation,permissionEpoch,cnState:state.charge_now.state,cnId:state.charge_now.intent?.id ?? null,selection,title,text,confirmLabel,origin:action==='charge_now' && state.charge_now.state==='active' ? 'charge-replace' : 'charge-now'};
+    this.chargeNotice='';this.paint();
+  }
+  async chargeDispatch(action,selection,charger,generation,permissionEpoch) {
+    const hass=this._hass;
+    if (selection?.options?.end_time && Date.parse(selection.options.end_time)<=Date.now()) {this.chargeNotice='Choose a future end time. Nothing was sent.';this.paint();return;}
     this.chargeBusy=true;this.chargeNotice='Request in progress; schedule and charging are not confirmed.';this.statusEpoch++;this.paint();
     const request=chargeNowAction(hass,charger,action,selection?.options);
     this.chargePending?.set(charger,request);

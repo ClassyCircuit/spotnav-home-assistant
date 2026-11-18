@@ -45,6 +45,7 @@ export function mountDashboard(root, adapter) {
   // Only values actually edited by the user are retained across observations.
   // A host must change draftKey when the charger or canonical revision changes.
   const drafts = new Map();
+  let confirmToken = null;
   let current = adapter;
   function cleanup() {
     listeners?.abort();
@@ -208,7 +209,10 @@ export function mountDashboard(root, adapter) {
     root.querySelectorAll('[data-open-tab]').forEach(button=>bind(button,()=>button.addEventListener('click',()=>showTab(button.dataset.openTab),{signal})));
     // Host header and charging controls (20.2): callbacks only; the host keeps every gate, latch and confirmation.
     const wireClick=(id,name)=>{const b=root.querySelector('#'+id);bind(b,()=>b.addEventListener('click',()=>{if(!b.disabled)current.actions?.[name]?.();},{signal}));};
-    wireClick('refresh','refresh');wireClick('menu','menu');wireClick('pause-auto','pauseAuto');wireClick('resume-auto','resumeAuto');wireClick('charge-now','chargeNow');wireClick('charge-replace','chargeReplace');
+    wireClick('refresh','refresh');wireClick('menu','menu');wireClick('pause-auto','pauseAuto');wireClick('resume-auto','resumeAuto');wireClick('charge-now','chargeNow');wireClick('charge-replace','chargeReplace');wireClick('charge-confirm-ok','chargeConfirm');wireClick('charge-confirm-cancel','chargeCancel');
+    const confirmBox=root.querySelector('#charge-confirm');bind(confirmBox,()=>confirmBox.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();current.actions?.chargeCancel?.();}},{signal}));
+    // Recovery text on any tab links to the one controller: switch to Overview and focus the first usable control (navigation only, no request).
+    const gotoControls=root.querySelector('#recovery-goto-controls');bind(gotoControls,()=>gotoControls.addEventListener('click',()=>{const box=root.querySelector('#automatic-controls');if(!box)return;reveal(box);const target=['#resume-auto','#charge-now','#pause-auto'].map(id=>root.querySelector(id)).find(b=>b&&!b.disabled&&!b.hidden);(target||box).focus?.();},{signal}));
     const chargerSelect=root.querySelector('#charger');bind(chargerSelect,()=>chargerSelect.addEventListener('change',()=>current.actions?.selectCharger?.(chargerSelect.value),{signal}));
     const durationSelect=root.querySelector('#charge-duration');bind(durationSelect,()=>durationSelect.addEventListener('change',()=>{drafts.set('c:duration',durationSelect.value);const label=root.querySelector('#custom-label');if(label)label.hidden=durationSelect.value!=='custom';},{signal}));
     const endInput=root.querySelector('#charge-end');bind(endInput,()=>{const on=()=>drafts.set('c:end',endInput.value);endInput.addEventListener('input',on,{signal});endInput.addEventListener('change',on,{signal});});
@@ -288,8 +292,16 @@ export function mountDashboard(root, adapter) {
     const scrolls=sameDraft ? [...root.querySelectorAll('*')].filter(node=>node.scrollTop || node.scrollLeft).map(node=>[node,node.scrollTop,node.scrollLeft]) : [];
     const viewport=root.ownerDocument.defaultView, x=viewport?.scrollX, y=viewport?.scrollY;
     const rootNode=root.getRootNode?.(), focusId=!sameDraft && rootNode?.activeElement?.id && root.contains(rootNode.activeElement) ? rootNode.activeElement.id : '';
+    const inConfirm=!!(rootNode?.activeElement && root.contains(rootNode.activeElement) && rootNode.activeElement.closest?.('#charge-confirm'));
+    const priorOrigin=root.querySelector('#charge-confirm')?.dataset.origin || 'charge-now';
     if (!sameDraft) {drafts.clear();cleanup();}
     pendingUpdate=null;current=next;const result=render();
+    // Confirmation focus: a newly opened confirmation takes focus on Cancel; when it closes while focus was inside it, focus goes back
+    // to the control that opened it (or the status line if that control is now disabled).
+    const token=current.model.control?.confirm?.token ?? null;
+    if (token!==null && token!==confirmToken) root.querySelector('#charge-confirm-cancel')?.focus?.();
+    else if (token===null && inConfirm) {const origin=root.querySelector('#'+priorOrigin);(origin && !origin.disabled && !origin.hidden ? origin : root.querySelector('#charge-state'))?.focus?.();}
+    confirmToken=token;
     if (focusId) root.querySelector('#'+focusId)?.focus?.();
     if (sameDraft) {
       for (const [node,top,left] of scrolls) if (node.isConnected) {node.scrollTop=top;node.scrollLeft=left;}
