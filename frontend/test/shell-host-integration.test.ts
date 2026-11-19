@@ -85,3 +85,25 @@ describe('bare shell (no charger / loading / failure)', () => {
     expect(root.dataset.snLayout).toBe('compact');
   });
 });
+
+it('keeps ordinary status on Overview and reveals urgent status after refresh on other tabs', () => {
+  const session = {kind:'unplugged',level:'info',warning:false,title:'Not plugged in',detail:'Disconnected',facts:[]};
+  const check = {items:[{level:'info',kind:'check',text:'Schedule checked'}],facts:[]};
+  const {root,view} = mount(bare({}, {banners:{session,check}}));
+  expect(root.querySelector('[data-overview-status="session"]').hidden).toBe(false);
+  view.showTab('history');
+  expect(root.querySelector('[data-overview-status="session"]').hidden).toBe(true);
+  expect(root.querySelector('[data-overview-status="check"]').hidden).toBe(true);
+  view.update(bare({}, {banners:{session:{...session,warning:true,level:'error',title:'Fault'},check:{items:[{level:'warning',kind:'mismatch',text:'Mismatch'}],facts:[]}}}));
+  expect(root.querySelector('[data-overview-status="session"]').hidden).toBe(false);
+  expect(root.querySelector('[data-overview-status="check"]').hidden).toBe(false);
+  view.showTab('overview');
+  expect(root.querySelector('[data-overview-status="session"]').hidden).toBe(false);
+  view.dispose(); root.remove();
+});
+it('keeps the existing Charge Now controls inside Auto and disabled when blocked', () => {
+  const host=document.createElement('div');host.innerHTML=renderControls({chargeDisabled:true,pauseDisabled:true,resumeDisabled:true});
+  expect(host.querySelector('#automatic-controls').contains(host.querySelector('#charge-controls'))).toBe(true);
+  expect(host.querySelector('#charge-now').disabled).toBe(true);
+  expect(host.querySelector('#charge-now').classList.contains('sn-btn-primary')).toBe(false);
+});
