@@ -21702,7 +21702,7 @@ var CoordinateSystem_default = CoordinateSystemManager;
 var each2 = each;
 var LOCATION_PARAMS = ["left", "right", "top", "bottom", "width", "height"];
 var HV_NAMES = [["width", "left", "right"], ["height", "top", "bottom"]];
-function boxLayout(orient, group, gap, maxWidth, maxHeight) {
+function boxLayout(orient, group2, gap, maxWidth, maxHeight) {
   var x2 = 0;
   var y3 = 0;
   if (maxWidth == null) {
@@ -21712,9 +21712,9 @@ function boxLayout(orient, group, gap, maxWidth, maxHeight) {
     maxHeight = Infinity;
   }
   var currentLineMaxSize = 0;
-  group.eachChild(function(child, idx) {
+  group2.eachChild(function(child, idx) {
     var rect = child.getBoundingRect();
-    var nextChild = group.childAt(idx + 1);
+    var nextChild = group2.childAt(idx + 1);
     var nextChildRect = nextChild && nextChild.getBoundingRect();
     var nextX;
     var nextY;
@@ -26814,9 +26814,9 @@ var ComponentView = (
     ComponentView2.prototype.toggleBlurSeries = function(seriesModels, isBlur, ecModel) {
     };
     ComponentView2.prototype.eachRendered = function(cb) {
-      var group = this.group;
-      if (group) {
-        group.traverse(cb);
+      var group2 = this.group;
+      if (group2) {
+        group2.traverse(cb);
       }
     };
     return ComponentView2;
@@ -27205,7 +27205,7 @@ function defaultLoading(api, opts) {
     lineWidth: 5,
     zlevel: 0
   });
-  var group = new Group_default();
+  var group2 = new Group_default();
   var mask = new Rect_default({
     style: {
       fill: opts.maskColor
@@ -27213,7 +27213,7 @@ function defaultLoading(api, opts) {
     zlevel: opts.zlevel,
     z: 1e4
   });
-  group.add(mask);
+  group2.add(mask);
   var textContent = new Text_default({
     style: {
       text: opts.text,
@@ -27238,7 +27238,7 @@ function defaultLoading(api, opts) {
     zlevel: opts.zlevel,
     z: 10001
   });
-  group.add(labelRect);
+  group2.add(labelRect);
   var arc;
   if (opts.showSpinner) {
     arc = new Arc_default({
@@ -27261,9 +27261,9 @@ function defaultLoading(api, opts) {
     arc.animateShape(true).when(1e3, {
       startAngle: PI5 * 3 / 2
     }).delay(300).start("circularInOut");
-    group.add(arc);
+    group2.add(arc);
   }
-  group.resize = function() {
+  group2.resize = function() {
     var textWidth = textContent.getBoundingRect().width;
     var r7 = opts.showSpinner ? opts.spinnerRadius : 0;
     var cx = (api.getWidth() - r7 * 2 - (opts.showSpinner && textWidth ? 10 : 0) - textWidth) / 2 - (opts.showSpinner && textWidth ? 0 : 5 + textWidth / 2) + (opts.showSpinner ? 0 : textWidth / 2) + (textWidth ? 0 : r7);
@@ -27285,8 +27285,8 @@ function defaultLoading(api, opts) {
       height: api.getHeight()
     });
   };
-  group.resize();
-  return group;
+  group2.resize();
+  return group2;
 }
 
 // node_modules/echarts/lib/core/Scheduler.js
@@ -35697,16 +35697,16 @@ var LineSeriesModel = (
       });
     };
     LineSeriesModel2.prototype.getLegendIcon = function(opt4) {
-      var group = new Group_default();
+      var group2 = new Group_default();
       var line = createSymbol("line", 0, opt4.itemHeight / 2, opt4.itemWidth, 0, opt4.lineStyle.stroke, false);
-      group.add(line);
+      group2.add(line);
       line.setStyle(opt4.lineStyle);
       var visualType = this.getData().getVisual("symbol");
       var visualRotate = this.getData().getVisual("symbolRotate");
       var symbolType = visualType === "none" ? "circle" : visualType;
       var size = opt4.itemHeight * 0.8;
       var symbol = createSymbol(symbolType, (opt4.itemWidth - size) / 2, (opt4.itemHeight - size) / 2, size, size, opt4.itemStyle.fill);
-      group.add(symbol);
+      group2.add(symbol);
       symbol.setStyle(opt4.itemStyle);
       var symbolRotate = opt4.iconRotate === "inherit" ? visualRotate : opt4.iconRotate || 0;
       symbol.rotation = symbolRotate * Math.PI / 180;
@@ -35716,7 +35716,7 @@ var LineSeriesModel = (
         symbol.style.fill = tokens_default.color.neutral00;
         symbol.style.lineWidth = 2;
       }
-      return group;
+      return group2;
     };
     LineSeriesModel2.type = "series.line";
     LineSeriesModel2.dependencies = ["grid", "polar"];
@@ -36085,11 +36085,11 @@ function makeSeriesScope(data) {
     cursorStyle: seriesModel.get("cursor")
   };
 }
-function createEl(SymbolCtor, data, newIdx, seriesScope, symbolUpdateOpt, point, group) {
+function createEl(SymbolCtor, data, newIdx, seriesScope, symbolUpdateOpt, point, group2) {
   var symbolEl = new SymbolCtor(data, newIdx, seriesScope, symbolUpdateOpt);
   symbolEl.setPosition(point);
   data.setItemGraphicEl(newIdx, symbolEl);
-  group.add(symbolEl);
+  group2.add(symbolEl);
   return symbolEl;
 }
 var SymbolDraw = (
@@ -36102,7 +36102,7 @@ var SymbolDraw = (
     SymbolDraw2.prototype.updateData = function(data, opt4) {
       this._progressiveEls = null;
       opt4 = normalizeUpdateOpt(opt4);
-      var group = this.group;
+      var group2 = this.group;
       var seriesModel = data.hostModel;
       var oldData = this._data;
       var SymbolCtor = this._SymbolCtor;
@@ -36115,24 +36115,24 @@ var SymbolDraw = (
         return data.getItemLayout(idx);
       };
       if (!oldData) {
-        group.removeAll();
+        group2.removeAll();
       }
       data.diff(oldData).add(function(newIdx) {
         var point = getSymbolPoint(newIdx);
         if (symbolNeedsDraw(data, point, newIdx, opt4)) {
-          createEl(SymbolCtor, data, newIdx, seriesScope, symbolUpdateOpt, point, group);
+          createEl(SymbolCtor, data, newIdx, seriesScope, symbolUpdateOpt, point, group2);
         }
       }).update(function(newIdx, oldIdx) {
         var symbolEl = oldData.getItemGraphicEl(oldIdx);
         var point = getSymbolPoint(newIdx);
         if (!symbolNeedsDraw(data, point, newIdx, opt4)) {
-          group.remove(symbolEl);
+          group2.remove(symbolEl);
           return;
         }
         var newSymbolType = data.getItemVisual(newIdx, "symbol") || "circle";
         var oldSymbolType = symbolEl && symbolEl.getSymbolType && symbolEl.getSymbolType();
         if (!symbolEl || oldSymbolType && oldSymbolType !== newSymbolType) {
-          group.remove(symbolEl);
+          group2.remove(symbolEl);
           symbolEl = new SymbolCtor(data, newIdx, seriesScope, symbolUpdateOpt);
           symbolEl.setPosition(point);
         } else {
@@ -36143,12 +36143,12 @@ var SymbolDraw = (
           };
           disableAnimation ? symbolEl.attr(target) : updateProps(symbolEl, target, seriesModel);
         }
-        group.add(symbolEl);
+        group2.add(symbolEl);
         data.setItemGraphicEl(newIdx, symbolEl);
       }).remove(function(oldIdx) {
         var el = oldData.getItemGraphicEl(oldIdx);
         el && el.fadeOut(function() {
-          group.remove(el);
+          group2.remove(el);
         }, seriesModel);
       }).execute();
       this._getSymbolPoint = getSymbolPoint;
@@ -36211,16 +36211,16 @@ var SymbolDraw = (
       traverseElements(this._progressiveEls || this.group, cb);
     };
     SymbolDraw2.prototype.remove = function(enableAnimation) {
-      var group = this.group;
+      var group2 = this.group;
       var data = this._data;
       if (data && enableAnimation) {
         data.eachItemGraphicEl(function(el) {
           el.fadeOut(function() {
-            group.remove(el);
+            group2.remove(el);
           }, data.hostModel);
         });
       } else {
-        group.removeAll();
+        group2.removeAll();
       }
     };
     ;
@@ -37369,7 +37369,7 @@ var LineView = (
     };
     LineView2.prototype.render = function(seriesModel, ecModel, api) {
       var coordSys = seriesModel.coordinateSystem;
-      var group = this.group;
+      var group2 = this.group;
       var data = seriesModel.getData();
       var lineStyleModel = seriesModel.getModel("lineStyle");
       var areaStyleModel = seriesModel.getModel("areaStyle");
@@ -37391,14 +37391,14 @@ var LineView = (
       var oldData = this._data;
       oldData && oldData.eachItemGraphicEl(function(el, idx) {
         if (el.__temp) {
-          group.remove(el);
+          group2.remove(el);
           oldData.setItemGraphicEl(idx, null);
         }
       });
       if (!showSymbol) {
         symbolDraw.remove();
       }
-      group.add(lineGroup);
+      group2.add(lineGroup);
       var step = !isCoordSysPolar ? seriesModel.get("step") : false;
       var clipShapeForSymbol;
       if (coordSys && coordSys.getArea && seriesModel.get("clip", true)) {
@@ -37936,13 +37936,13 @@ var LineView = (
       }
     };
     LineView2.prototype.remove = function(ecModel) {
-      var group = this.group;
+      var group2 = this.group;
       var oldData = this._data;
       this._lineGroup.removeAll();
       this._symbolDraw.remove(true);
       oldData && oldData.eachItemGraphicEl(function(el, idx) {
         if (el.__temp) {
-          group.remove(el);
+          group2.remove(el);
           oldData.setItemGraphicEl(idx, null);
         }
       });
@@ -38379,7 +38379,7 @@ var AxisBuilder = (
 );
 var AXIS_BUILDER_AXIS_PART_NAMES = ["axisLine", "axisTickLabelEstimate", "axisTickLabelDetermine", "axisName"];
 var builders = {
-  axisLine: function(cfg, local, shared, axisModel, group, transformGroup, api) {
+  axisLine: function(cfg, local, shared, axisModel, group2, transformGroup, api) {
     if (true) {
       var ready = shared.ensureRecord(axisModel).ready;
       assert(!ready.axisLine);
@@ -38414,7 +38414,7 @@ var builders = {
       style: lineStyle
     };
     if (axisModel.get(["axisLine", "breakLine"]) && hasBreaks(axisModel.axis.scale)) {
-      getAxisBreakHelper().buildAxisBreakLine(axisModel, group, transformGroup, pathBaseProp);
+      getAxisBreakHelper().buildAxisBreakLine(axisModel, group2, transformGroup, pathBaseProp);
     } else {
       var line = new Line_default(extend({
         shape: {
@@ -38426,7 +38426,7 @@ var builders = {
       }, pathBaseProp));
       subPixelOptimizeLine2(line.shape, line.style.lineWidth);
       line.anid = "line";
-      group.add(line);
+      group2.add(line);
     }
     var arrows = axisModel.get(["axisLine", "symbol"]);
     if (arrows != null) {
@@ -38460,7 +38460,7 @@ var builders = {
             silent: true,
             z2: 11
           });
-          group.add(symbol);
+          group2.add(symbol);
         }
       });
     }
@@ -38469,39 +38469,39 @@ var builders = {
    * [CAUTION] This method can be called multiple times, following the change due to `resetCfg` called
    *  in size measurement. Thus this method should be idempotent, and should be performant.
    */
-  axisTickLabelEstimate: function(cfg, local, shared, axisModel, group, transformGroup, api, extraParams) {
+  axisTickLabelEstimate: function(cfg, local, shared, axisModel, group2, transformGroup, api, extraParams) {
     if (true) {
       var ready = shared.ensureRecord(axisModel).ready;
       assert(!ready.axisTickLabelDetermine);
       ready.axisTickLabelEstimate = true;
     }
-    var needCallLayout = dealLastTickLabelResultReusable(local, group, extraParams);
+    var needCallLayout = dealLastTickLabelResultReusable(local, group2, extraParams);
     if (needCallLayout) {
-      layOutAxisTickLabel(cfg, local, shared, axisModel, group, transformGroup, api, AxisTickLabelComputingKind.estimate);
+      layOutAxisTickLabel(cfg, local, shared, axisModel, group2, transformGroup, api, AxisTickLabelComputingKind.estimate);
     }
   },
   /**
    * Finish axis tick label build.
    * Can be only called once.
    */
-  axisTickLabelDetermine: function(cfg, local, shared, axisModel, group, transformGroup, api, extraParams) {
+  axisTickLabelDetermine: function(cfg, local, shared, axisModel, group2, transformGroup, api, extraParams) {
     if (true) {
       var ready = shared.ensureRecord(axisModel).ready;
       ready.axisTickLabelDetermine = true;
     }
-    var needCallLayout = dealLastTickLabelResultReusable(local, group, extraParams);
+    var needCallLayout = dealLastTickLabelResultReusable(local, group2, extraParams);
     if (needCallLayout) {
-      layOutAxisTickLabel(cfg, local, shared, axisModel, group, transformGroup, api, AxisTickLabelComputingKind.determine);
+      layOutAxisTickLabel(cfg, local, shared, axisModel, group2, transformGroup, api, AxisTickLabelComputingKind.determine);
     }
-    var ticksEls = buildAxisMajorTicks(cfg, group, transformGroup, axisModel);
+    var ticksEls = buildAxisMajorTicks(cfg, group2, transformGroup, axisModel);
     syncLabelIgnoreToMajorTicks(cfg, local.labelLayoutList, ticksEls);
-    buildAxisMinorTicks(cfg, group, transformGroup, axisModel, cfg.tickDirection);
+    buildAxisMinorTicks(cfg, group2, transformGroup, axisModel, cfg.tickDirection);
   },
   /**
    * [CAUTION] This method can be called multiple times, following the change due to `resetCfg` called
    *  in size measurement. Thus this method should be idempotent, and should be performant.
    */
-  axisName: function(cfg, local, shared, axisModel, group, transformGroup, api, extraParams) {
+  axisName: function(cfg, local, shared, axisModel, group2, transformGroup, api, extraParams) {
     var sharedRecord = shared.ensureRecord(axisModel);
     if (true) {
       var ready = sharedRecord.ready;
@@ -38509,7 +38509,7 @@ var builders = {
       ready.axisName = true;
     }
     if (local.nameEl) {
-      group.remove(local.nameEl);
+      group2.remove(local.nameEl);
       local.nameEl = sharedRecord.nameLayout = sharedRecord.nameLocation = null;
     }
     var name = cfg.axisName;
@@ -38605,7 +38605,7 @@ var builders = {
       marginDefault: isNameLocationCenter(nameLocation) ? DEFAULT_CENTER_NAME_MARGIN_LEVELS[nameMarginLevel] : DEFAULT_ENDS_NAME_MARGIN_LEVELS[nameMarginLevel]
     });
     sharedRecord.nameLocation = nameLocation;
-    group.add(textEl);
+    group2.add(textEl);
     textEl.decomposeTransform();
     if (cfg.shouldNameMoveOverlap && nameLayout) {
       var record5 = shared.ensureRecord(axisModel);
@@ -38616,9 +38616,9 @@ var builders = {
     }
   }
 };
-function layOutAxisTickLabel(cfg, local, shared, axisModel, group, transformGroup, api, kind) {
+function layOutAxisTickLabel(cfg, local, shared, axisModel, group2, transformGroup, api, kind) {
   if (!axisLabelBuildResultExists(local)) {
-    buildAxisLabel(cfg, local, group, kind, axisModel, api);
+    buildAxisLabel(cfg, local, group2, kind, axisModel, api);
   }
   var labelLayoutList = local.labelLayoutList;
   updateAxisLabelChangableProps(cfg, axisModel, labelLayoutList, transformGroup);
@@ -38777,7 +38777,7 @@ function createTicks(ticksCoords, tickTransform, tickEndCoord, tickLineStyle, an
   }
   return tickEls;
 }
-function buildAxisMajorTicks(cfg, group, transformGroup, axisModel) {
+function buildAxisMajorTicks(cfg, group2, transformGroup, axisModel) {
   var axis2 = axisModel.axis;
   var tickModel = axisModel.getModel("axisTick");
   var shown = tickModel.get("show");
@@ -38797,11 +38797,11 @@ function buildAxisMajorTicks(cfg, group, transformGroup, axisModel) {
     stroke: axisModel.get(["axisLine", "lineStyle", "color"])
   }), "ticks");
   for (var i7 = 0; i7 < ticksEls.length; i7++) {
-    group.add(ticksEls[i7]);
+    group2.add(ticksEls[i7]);
   }
   return ticksEls;
 }
-function buildAxisMinorTicks(cfg, group, transformGroup, axisModel, tickDirection) {
+function buildAxisMinorTicks(cfg, group2, transformGroup, axisModel, tickDirection) {
   var axis2 = axisModel.axis;
   var minorTickModel = axisModel.getModel("minorTick");
   if (!cfg.showMinorTicks || axis2.scale.isBlank()) {
@@ -38819,11 +38819,11 @@ function buildAxisMinorTicks(cfg, group, transformGroup, axisModel, tickDirectio
   for (var i7 = 0; i7 < minorTicksCoords.length; i7++) {
     var minorTicksEls = createTicks(minorTicksCoords[i7], transformGroup.transform, tickEndCoord, minorTickLineStyle, "minorticks_" + i7);
     for (var k2 = 0; k2 < minorTicksEls.length; k2++) {
-      group.add(minorTicksEls[k2]);
+      group2.add(minorTicksEls[k2]);
     }
   }
 }
-function dealLastTickLabelResultReusable(local, group, extraParams) {
+function dealLastTickLabelResultReusable(local, group2, extraParams) {
   if (axisLabelBuildResultExists(local)) {
     var axisLabelsCreationContext = local.axisLabelsCreationContext;
     if (true) {
@@ -38840,17 +38840,17 @@ function dealLastTickLabelResultReusable(local, group, extraParams) {
       }
     }
     if (noPxChangeTryDetermine.length) {
-      group.remove(local.labelGroup);
+      group2.remove(local.labelGroup);
       axisLabelBuildResultSet(local, null, null, null);
     }
   }
   return true;
 }
-function buildAxisLabel(cfg, local, group, kind, axisModel, api) {
+function buildAxisLabel(cfg, local, group2, kind, axisModel, api) {
   var axis2 = axisModel.axis;
   var show = retrieve(cfg.raw.axisLabelShow, axisModel.get(["axisLabel", "show"]));
   var labelGroup = new Group_default();
-  group.add(labelGroup);
+  group2.add(labelGroup);
   var axisLabelCreationCtx = createAxisLabelsComputingContext(kind);
   if (!show || axis2.scale.isBlank()) {
     axisLabelBuildResultSet(local, [], labelGroup, axisLabelCreationCtx);
@@ -42249,11 +42249,11 @@ var LineDraw = (
       var _this = this;
       this._progressiveEls = null;
       var lineDraw = this;
-      var group = lineDraw.group;
+      var group2 = lineDraw.group;
       var oldLineData = lineDraw._lineData;
       lineDraw._lineData = lineData;
       if (!oldLineData) {
-        group.removeAll();
+        group2.removeAll();
       }
       var seriesScope = makeSeriesScope2(lineData);
       lineData.diff(oldLineData).add(function(idx) {
@@ -42261,7 +42261,7 @@ var LineDraw = (
       }).update(function(newIdx, oldIdx) {
         _this._doUpdate(oldLineData, lineData, oldIdx, newIdx, seriesScope);
       }).remove(function(idx) {
-        group.remove(oldLineData.getItemGraphicEl(idx));
+        group2.remove(oldLineData.getItemGraphicEl(idx));
       }).execute();
     };
     ;
@@ -43184,25 +43184,25 @@ var CustomChartView = (
       this._progressiveEls = null;
       var oldData = this._data;
       var data = customSeries.getData();
-      var group = this.group;
+      var group2 = this.group;
       var renderItem = makeRenderItem(customSeries, data, ecModel, api);
       if (!oldData) {
-        group.removeAll();
+        group2.removeAll();
       }
       data.diff(oldData).add(function(newIdx) {
-        createOrUpdateItem(api, null, newIdx, renderItem(newIdx, payload), customSeries, group, data);
+        createOrUpdateItem(api, null, newIdx, renderItem(newIdx, payload), customSeries, group2, data);
       }).remove(function(oldIdx) {
         var el = oldData.getItemGraphicEl(oldIdx);
         el && applyLeaveTransition(el, customInnerStore(el).option, customSeries);
       }).update(function(newIdx, oldIdx) {
         var oldEl = oldData.getItemGraphicEl(oldIdx);
-        createOrUpdateItem(api, oldEl, newIdx, renderItem(newIdx, payload), customSeries, group, data);
+        createOrUpdateItem(api, oldEl, newIdx, renderItem(newIdx, payload), customSeries, group2, data);
       }).execute();
       var clipPath = customSeries.get("clip", true) ? createClipPath(customSeries.coordinateSystem, false, customSeries) : null;
       if (clipPath) {
-        group.setClipPath(clipPath);
+        group2.setClipPath(clipPath);
       } else {
-        group.removeClipPath();
+        group2.removeClipPath();
       }
       this._data = data;
     };
@@ -43581,24 +43581,24 @@ function wrapEncodeDef(data) {
   });
   return encodeDef;
 }
-function createOrUpdateItem(api, existsEl, dataIndex, elOption, seriesModel, group, data) {
+function createOrUpdateItem(api, existsEl, dataIndex, elOption, seriesModel, group2, data) {
   if (!elOption) {
-    group.remove(existsEl);
+    group2.remove(existsEl);
     return;
   }
-  var el = doCreateOrUpdateEl(api, existsEl, dataIndex, elOption, seriesModel, group);
+  var el = doCreateOrUpdateEl(api, existsEl, dataIndex, elOption, seriesModel, group2);
   el && data.setItemGraphicEl(dataIndex, el);
   el && toggleHoverEmphasis(el, elOption.focus, elOption.blurScope, elOption.emphasisDisabled);
   return el;
 }
-function doCreateOrUpdateEl(api, existsEl, dataIndex, elOption, seriesModel, group) {
+function doCreateOrUpdateEl(api, existsEl, dataIndex, elOption, seriesModel, group2) {
   if (true) {
     assert(elOption, "should not have an null/undefined element setting");
   }
   var toBeReplacedIdx = -1;
   var oldEl = existsEl;
   if (existsEl && doesElNeedRecreate(existsEl, elOption, seriesModel)) {
-    toBeReplacedIdx = indexOf(group.childrenRef(), existsEl);
+    toBeReplacedIdx = indexOf(group2.childrenRef(), existsEl);
     existsEl = null;
   }
   var isInit = !existsEl;
@@ -43638,9 +43638,9 @@ function doCreateOrUpdateEl(api, existsEl, dataIndex, elOption, seriesModel, gro
     mergeChildren(api, el, dataIndex, elOption, seriesModel);
   }
   if (toBeReplacedIdx >= 0) {
-    group.replaceAt(el, toBeReplacedIdx);
+    group2.replaceAt(el, toBeReplacedIdx);
   } else {
-    group.add(el);
+    group2.add(el);
   }
   return el;
 }
@@ -43795,8 +43795,8 @@ function mergeChildren(api, el, dataIndex, elOption, seriesModel) {
     removeChildFromGroup(el, child, seriesModel);
   }
 }
-function removeChildFromGroup(group, child, seriesModel) {
-  child && applyLeaveTransition(child, customInnerStore(group).option, seriesModel);
+function removeChildFromGroup(group2, child, seriesModel) {
+  child && applyLeaveTransition(child, customInnerStore(group2).option, seriesModel);
 }
 function diffGroupChildren(context) {
   new DataDiffer_default(context.oldChildren, context.newChildren, getKey, getKey, context).add(processAddUpdate).update(processAddUpdate).remove(processRemove).execute();
@@ -43851,14 +43851,14 @@ var BaseAxisPointer = (
       }
       this._lastValue = value2;
       this._lastStatus = status;
-      var group = this._group;
+      var group2 = this._group;
       var handle = this._handle;
       if (!status || status === "hide") {
-        group && group.hide();
+        group2 && group2.hide();
         handle && handle.hide();
         return;
       }
-      group && group.show();
+      group2 && group2.show();
       handle && handle.show();
       var elOption = {};
       this.makeElOption(elOption, value2, axisModel, axisPointerModel, api);
@@ -43868,17 +43868,17 @@ var BaseAxisPointer = (
       }
       this._lastGraphicKey = graphicKey;
       var moveAnimation = this._moveAnimation = this.determineAnimation(axisModel, axisPointerModel);
-      if (!group) {
-        group = this._group = new Group_default();
-        this.createPointerEl(group, elOption, axisModel, axisPointerModel);
-        this.createLabelEl(group, elOption, axisModel, axisPointerModel);
-        api.getZr().add(group);
+      if (!group2) {
+        group2 = this._group = new Group_default();
+        this.createPointerEl(group2, elOption, axisModel, axisPointerModel);
+        this.createLabelEl(group2, elOption, axisModel, axisPointerModel);
+        api.getZr().add(group2);
       } else {
         var doUpdateProps = curry(updateProps2, axisPointerModel, moveAnimation);
-        this.updatePointerEl(group, elOption, doUpdateProps);
-        this.updateLabelEl(group, elOption, doUpdateProps, axisPointerModel);
+        this.updatePointerEl(group2, elOption, doUpdateProps);
+        this.updateLabelEl(group2, elOption, doUpdateProps, axisPointerModel);
       }
-      updateMandatoryProps(group, axisPointerModel, true);
+      updateMandatoryProps(group2, axisPointerModel, true);
       this._renderHandle(value2);
     };
     BaseAxisPointer2.prototype.remove = function(api) {
@@ -43911,22 +43911,22 @@ var BaseAxisPointer = (
     };
     BaseAxisPointer2.prototype.makeElOption = function(elOption, value2, axisModel, axisPointerModel, api) {
     };
-    BaseAxisPointer2.prototype.createPointerEl = function(group, elOption, axisModel, axisPointerModel) {
+    BaseAxisPointer2.prototype.createPointerEl = function(group2, elOption, axisModel, axisPointerModel) {
       var pointerOption = elOption.pointer;
       if (pointerOption) {
-        var pointerEl = inner9(group).pointerEl = new graphic_exports[pointerOption.type](clone3(elOption.pointer));
-        group.add(pointerEl);
+        var pointerEl = inner9(group2).pointerEl = new graphic_exports[pointerOption.type](clone3(elOption.pointer));
+        group2.add(pointerEl);
       }
     };
-    BaseAxisPointer2.prototype.createLabelEl = function(group, elOption, axisModel, axisPointerModel) {
+    BaseAxisPointer2.prototype.createLabelEl = function(group2, elOption, axisModel, axisPointerModel) {
       if (elOption.label) {
-        var labelEl = inner9(group).labelEl = new Text_default(clone3(elOption.label));
-        group.add(labelEl);
+        var labelEl = inner9(group2).labelEl = new Text_default(clone3(elOption.label));
+        group2.add(labelEl);
         updateLabelShowHide(labelEl, axisPointerModel);
       }
     };
-    BaseAxisPointer2.prototype.updatePointerEl = function(group, elOption, updateProps3) {
-      var pointerEl = inner9(group).pointerEl;
+    BaseAxisPointer2.prototype.updatePointerEl = function(group2, elOption, updateProps3) {
+      var pointerEl = inner9(group2).pointerEl;
       if (pointerEl && elOption.pointer) {
         pointerEl.setStyle(elOption.pointer.style);
         updateProps3(pointerEl, {
@@ -43934,8 +43934,8 @@ var BaseAxisPointer = (
         });
       }
     };
-    BaseAxisPointer2.prototype.updateLabelEl = function(group, elOption, updateProps3, axisPointerModel) {
-      var labelEl = inner9(group).labelEl;
+    BaseAxisPointer2.prototype.updateLabelEl = function(group2, elOption, updateProps3, axisPointerModel) {
+      var labelEl = inner9(group2).labelEl;
       if (labelEl) {
         labelEl.setStyle(elOption.label.style);
         updateProps3(labelEl, {
@@ -44039,11 +44039,11 @@ var BaseAxisPointer = (
       this._lastValue = null;
       this._lastStatus = null;
       var zr = api.getZr();
-      var group = this._group;
+      var group2 = this._group;
       var handle = this._handle;
-      if (zr && group) {
+      if (zr && group2) {
         this._lastGraphicKey = null;
-        group && zr.remove(group);
+        group2 && zr.remove(group2);
         handle && zr.remove(handle);
         this._group = null;
         this._handle = null;
@@ -44092,10 +44092,10 @@ function getHandleTransProps(trans) {
     rotation: trans.rotation || 0
   };
 }
-function updateMandatoryProps(group, axisPointerModel, silent) {
+function updateMandatoryProps(group2, axisPointerModel, silent) {
   var z2 = axisPointerModel.get("z");
   var zlevel = axisPointerModel.get("zlevel");
-  group && group.traverse(function(el) {
+  group2 && group2.traverse(function(el) {
     if (el.type !== "group") {
       z2 != null && (el.z = z2);
       zlevel != null && (el.zlevel = zlevel);
@@ -48865,7 +48865,7 @@ var SliderZoomView = (
       var dataZoomModel = this.dataZoomModel;
       function createDataShadowGroup(isSelectedArea) {
         var model = dataZoomModel.getModel(isSelectedArea ? "selectedDataBackground" : "dataBackground");
-        var group2 = new Group_default();
+        var group3 = new Group_default();
         var polygon = new Polygon_default({
           shape: {
             points: polygonPts
@@ -48884,14 +48884,14 @@ var SliderZoomView = (
           silent: true,
           z2: -19
         });
-        group2.add(polygon);
-        group2.add(polyline);
-        return group2;
+        group3.add(polygon);
+        group3.add(polyline);
+        return group3;
       }
       for (var i7 = 0; i7 < 3; i7++) {
-        var group = createDataShadowGroup(i7 === 1);
-        this._displayables.sliderGroup.add(group);
-        this._displayables.dataShadowSegs.push(group);
+        var group2 = createDataShadowGroup(i7 === 1);
+        this._displayables.sliderGroup.add(group2);
+        this._displayables.dataShadowSegs.push(group2);
       }
     };
     SliderZoomView2.prototype._prepareDataShadowInfo = function() {
@@ -49918,11 +49918,11 @@ var VisualMapView = (
       }
       this.doRender(visualMapModel, ecModel, api, payload);
     };
-    VisualMapView2.prototype.renderBackground = function(group) {
+    VisualMapView2.prototype.renderBackground = function(group2) {
       var visualMapModel = this.visualMapModel;
       var padding = normalizeCssArray2(visualMapModel.get("padding") || 0);
-      var rect = group.getBoundingRect();
-      group.add(new Rect_default({
+      var rect = group2.getBoundingRect();
+      group2.add(new Rect_default({
         z2: -1,
         silent: true,
         shape: {
@@ -49967,11 +49967,11 @@ var VisualMapView = (
       });
       return visualObj[visualCluster];
     };
-    VisualMapView2.prototype.positionGroup = function(group) {
+    VisualMapView2.prototype.positionGroup = function(group2) {
       var model = this.visualMapModel;
       var api = this.api;
       var refContainer = createBoxLayoutReference(model, api).refContainer;
-      positionElement(group, model.getBoxLayoutParams(), refContainer);
+      positionElement(group2, model.getBoxLayoutParams(), refContainer);
     };
     VisualMapView2.prototype.doRender = function(visualMapModel, ecModel, api, payload) {
     };
@@ -50064,7 +50064,7 @@ var ContinuousView = (
       this._enableHoverLinkFromSeries();
       this.positionGroup(thisGroup);
     };
-    ContinuousView2.prototype._renderEndsText = function(group, dataRangeText, endsIndex) {
+    ContinuousView2.prototype._renderEndsText = function(group2, dataRangeText, endsIndex) {
       if (!dataRangeText) {
         return;
       }
@@ -51148,7 +51148,7 @@ var PiecewiseVisualMapView = (
         return align;
       }
     };
-    PiecewiseVisualMapView2.prototype._renderEndsText = function(group, text4, itemSize, showLabel, itemAlign) {
+    PiecewiseVisualMapView2.prototype._renderEndsText = function(group2, text4, itemSize, showLabel, itemAlign) {
       if (!text4) {
         return;
       }
@@ -51163,7 +51163,7 @@ var PiecewiseVisualMapView = (
           text: text4
         })
       }));
-      group.add(itemGroup);
+      group2.add(itemGroup);
     };
     PiecewiseVisualMapView2.prototype._getViewData = function() {
       var visualMapModel = this.visualMapModel;
@@ -51186,7 +51186,7 @@ var PiecewiseVisualMapView = (
         endsText
       };
     };
-    PiecewiseVisualMapView2.prototype._createItemSymbol = function(group, representValue, shapeParam, silent) {
+    PiecewiseVisualMapView2.prototype._createItemSymbol = function(group2, representValue, shapeParam, silent) {
       var itemSymbol = createSymbol(
         // symbol will be string
         this.getControllerVisual(representValue, "symbol"),
@@ -51198,7 +51198,7 @@ var PiecewiseVisualMapView = (
         this.getControllerVisual(representValue, "color")
       );
       itemSymbol.silent = silent;
-      group.add(itemSymbol);
+      group2.add(itemSymbol);
     };
     PiecewiseVisualMapView2.prototype._onItemClick = function(piece2) {
       var visualMapModel = this.visualMapModel;
@@ -53015,11 +53015,17 @@ function renderHistoryNav(nav) {
   const button = (id, label2, enabled) => `<wa-button size="small" data-history-nav="${id}" ${enabled ? "" : "disabled"}>${escapeText(label2)}</wa-button>`;
   const picker = nav.options?.length ? `<label class="history-date">Retained day <select data-history-date aria-label="Retained history day">${nav.options.map((o9) => `<option value="${escapeText(o9.day)}" ${o9.selected ? "selected" : ""}>${escapeText(o9.label)}</option>`).join("")}</select></label>` : "";
   const prices = nav.priceNote !== void 0 ? button("prices", "Show this day on the price chart", true) : "";
-  return `<div class="history-nav" role="group" aria-label="History day" data-history-retention="${escapeText(nav.retention || "unknown")}"><div class="history-nav-buttons">${button("prev", "\u2039 Earlier day", nav.canPrev)}<strong class="history-day-label">${escapeText(nav.label)}${nav.isDefault ? " (yesterday, default)" : ""}</strong>${button("next", "Later day \u203A", nav.canNext)}${button("yesterday", "Yesterday", nav.canYesterday)}${button("today", "Today", nav.canToday)}${picker}${prices}${nav.canRetry ? button("retry", "Retry", true) : ""}</div><p class="subtext">${escapeText(nav.zoneNote)}</p><p class="subtext history-retained-note">${escapeText(nav.retentionNote || "")}${nav.sessionsNote ? ` ${escapeText(nav.sessionsNote)}` : ""}</p>${nav.priceNote ? `<p class="subtext history-price-note" role="status">${escapeText(nav.priceNote)}</p>` : ""}</div>`;
+  const day = `<div class="history-stepper">${button("prev", "\u2039 Earlier day", nav.canPrev)}<div class="history-day-head"><strong class="history-day-label">${escapeText(nav.label)}${nav.isDefault ? " (yesterday, default)" : ""}</strong></div>${button("next", "Later day \u203A", nav.canNext)}</div>`;
+  const tools = `<div class="history-nav-buttons">${button("yesterday", "Yesterday", nav.canYesterday)}${button("today", "Today", nav.canToday)}${picker}${prices}${nav.canRetry ? button("retry", "Retry", true) : ""}</div>`;
+  return `<div class="history-nav" role="group" aria-label="History day" data-history-retention="${escapeText(nav.retention || "unknown")}">${day}${tools}<p class="subtext">${escapeText(nav.zoneNote)}</p><p class="subtext history-retained-note">${escapeText(nav.retentionNote || "")}${nav.sessionsNote ? ` ${escapeText(nav.sessionsNote)}` : ""}</p>${nav.priceNote ? `<p class="subtext history-price-note" role="status">${escapeText(nav.priceNote)}</p>` : ""}</div>`;
 }
+var chip = (text4, tone, key3) => `<span class="history-chip" data-tone="${escapeText(tone)}" data-chip="${escapeText(key3)}">${escapeText(text4)}</span>`;
+var group = (title) => `<h2 class="history-group">${escapeText(title)}</h2>`;
 var banner = (kind, text4) => `<p class="history-banner" data-history-banner="${escapeText(kind)}" role="status">${escapeText(text4)}</p>`;
+var PROVENANCE = { measured: "Measured \xB7 meter counter", estimated: "Estimated \xB7 from power readings", unplaced: "Measured \xB7 no known time" };
+var provChip = (r7) => r7.kind && PROVENANCE[r7.kind] ? `<span class="history-chip" data-provenance="${escapeText(r7.kind)}">${PROVENANCE[r7.kind]}</span>` : "";
 var basisValue = (r7) => r7.value === null ? "Unavailable" : escapeText(r7.text.slice(r7.label.length + 2));
-var energy2 = (m4) => `<div class="history-energy" aria-label="Energy by basis">${m4.energyRows.map((r7) => `<div class="history-basis" data-basis-value="${r7.value === null ? "null" : r7.value}"><b>${escapeText(r7.label)}</b><span>${basisValue(r7)}</span><small>${escapeText(r7.detail)}</small></div>`).join("")}<div class="history-basis"><b>Recorder-placed session energy</b><span>${m4.sessions.length ? "Per session below" : "No session overlaps this day"}</span><small>Never added to the bases beside it</small></div></div>${list(m4.energyNotes, (t6) => row2(t6))}`;
+var energy2 = (m4) => `<div class="history-energy" aria-label="Energy by basis">${m4.energyRows.map((r7) => `<div class="history-basis" data-basis-value="${r7.value === null ? "null" : r7.value}"><b>${escapeText(r7.label)}</b><span>${basisValue(r7)}</span><small>${escapeText(r7.detail)}</small>${provChip(r7)}</div>`).join("")}<div class="history-basis"><b>Recorder-placed session energy</b><span>${m4.sessions.length ? "Per session below" : "No session overlaps this day"}</span><small>Never added to the bases beside it</small></div></div>${list(m4.energyNotes, (t6) => row2(t6))}`;
 var costBlock = (c5, cls = "") => `<div class="history-basis${cls}" data-spot-cost="${escapeText(c5.state)}"><b>${escapeText(c5.headline)}</b>${c5.lines.map((l6) => `<small>${escapeText(l6)}</small>`).join("")}</div>`;
 var savingsBlock = (c5) => `<div class="history-basis" data-spot-savings="${escapeText(c5.state)}"><b>${escapeText(c5.headline)}</b>${(c5.lines || []).map((l6) => `<small>${escapeText(l6)}</small>`).join("")}</div>`;
 var summaryCards = (cost, savings) => `<div class="history-energy history-summary" aria-label="Spot cost and estimated savings">${costBlock(cost)}${savings ? savingsBlock(savings) : ""}</div>`;
@@ -53039,7 +53045,7 @@ function renderDigest(d3) {
     d3.outside.length ? `<h4>Flow versus plan</h4>${list(d3.outside, (t6) => row2(t6))}` : ""
   ].join("");
   const facts = `${d3.unknownSpans ? `${d3.unknownSpans} span(s) where the plan was unknown. ` : ""}${d3.gapCount !== null ? `${d3.gapCount} capture gap(s), ` : ""}${d3.restartCount !== null ? `${d3.restartCount} restart(s).` : ""}`;
-  return `<section class="history-digest" data-history-section="digest"><h3>Saved day summary</h3><p class="subtext"><b>Summary only; no per-minute data and no prices.</b> ${d3.partial ? "Raw rows were already partly pruned when this was written. " : ""}${d3.computed ? `Written ${escapeText(d3.computed)}. ` : ""}It was written once and keeps no price rows.</p>${d3.coverage ? `<p>${escapeText(d3.coverage)}</p>` : ""}${d3.energy.length ? `<div class="history-energy">${d3.energy.map((r7) => `<div class="history-basis" data-basis-value="${r7.value === null ? "null" : r7.value}"><b>${escapeText(r7.label)}</b><span>${basisValue(r7)}</span></div>`).join("")}</div><p class="subtext">Separate bases, never added together.</p>` : ""}${lists}<p class="subtext">${escapeText(facts)}</p></section>`;
+  return `<section class="history-digest" data-history-section="digest"><h3>Saved day summary</h3><p class="subtext"><b>Summary only; no per-minute data and no prices.</b> ${d3.partial ? "Raw rows were already partly pruned when this was written. " : ""}${d3.computed ? `Written ${escapeText(d3.computed)}. ` : ""}It was written once and keeps no price rows.</p>${d3.coverage ? `<p>${escapeText(d3.coverage)}</p>` : ""}${d3.energy.length ? `<div class="history-energy">${d3.energy.map((r7) => `<div class="history-basis" data-basis-value="${r7.value === null ? "null" : r7.value}"><b>${escapeText(r7.label)}</b><span>${basisValue(r7)}</span>${provChip(r7)}</div>`).join("")}</div><p class="subtext">Separate bases, never added together.</p>` : ""}${lists}<p class="subtext">${escapeText(facts)}</p></section>`;
 }
 function renderHistoryDay(m4) {
   const head = renderHistoryNav(m4.nav);
@@ -53054,19 +53060,29 @@ function renderHistoryDay(m4) {
   if (m4.partial) parts.push(`<div class="history-banner" data-history-banner="truncated" role="status"><b>Partial: some lists are cut.</b>${list(m4.truncated, (t6) => row2(t6))}</div>`);
   if (m4.raw === "digest_only" && m4.digest) parts.push(renderDigest(m4.digest));
   const measured = ["full", "partial", "unknown"].includes(m4.raw);
+  const n6 = m4.sessions.length;
+  const rawChip = { full: ["Measured rows retained", "ok"], partial: ["Measured rows partial", "warn"], unknown: ["Raw retention unknown", "warn"], digest_only: ["Summary only", "info"], plan_only: ["Plans only \xB7 no power rows", "info"], none: ["No evidence retained", "warn"] }[m4.raw];
+  const chips = [rawChip ? chip(rawChip[0], rawChip[1], "raw") : "", chip(`${n6} recorded session${n6 === 1 ? "" : "s"}`, "info", "sessions"), m4.partial ? chip("Lists cut", "warn", "truncated") : "", m4.legacy ? chip("Older integration", "warn", "legacy") : ""].join("");
+  parts.push(`<div class="history-review" data-history-section="review" aria-label="Day review"><div class="history-chips">${chips}</div><p class="subtext">What is retained for this day, not a verdict on what happened. Energy bases, cost and sessions below keep their own coverage.</p></div>`);
   if (measured || m4.sent.length) parts.push(`<section data-history-section="coverage"><p>${escapeText(m4.coverage.text)}</p></section>`);
+  parts.push(group("Cost and energy"));
+  parts.push(`<section data-history-section="cost"><h3>Spot cost and estimated savings of this day</h3>${summaryCards(m4.cost, m4.savings)}</section>`);
+  if (measured) parts.push(`<section data-history-section="energy"><h3>Energy by basis</h3>${energy2(m4)}</section>`);
+  if (m4.sessions.length || m4.raw !== "digest_only") parts.push(group("Sessions"));
+  if (!m4.sessions.length && m4.raw !== "digest_only") parts.push('<section data-history-section="sessions"><h3>Sessions overlapping this day</h3><p class="subtext" data-history-empty="sessions">No session was recorded for this day by the Morek recorder (whether it records every session is unverified). That is not proof that the car did not charge.</p></section>');
+  if (m4.sessions.length) parts.push(`<section data-history-section="sessions"><h3>Sessions overlapping this day</h3><ul class="history-list history-sessions">${m4.sessions.map((s4) => `<li class="history-session"><strong>${escapeText(s4.text)}</strong><small>${escapeText(s4.detail)}</small>${s4.lines.map((l6) => `<small class="history-recon">${escapeText(l6)}</small>`).join("")}${s4.costLines.map((l6) => `<small class="history-cost">${escapeText(l6)}</small>`).join("")}</li>`).join("")}</ul><p class="subtext">A session that crosses midnight appears on both days; its placed energy is not split above, but its spot cost for this day is the share that fell on this day.</p></section>`);
+  if (m4.sent.length || measured || m4.gaps.length || m4.restarts.length) parts.push(group("Plan versus measured flow"));
   if (m4.sent.length || measured) {
     parts.push(`<section data-history-section="sent"><h3>Sent plan and measured flow</h3>${m4.sent.length ? list(m4.sent, (b3) => row2(`${b3.text} \u2014 ${b3.verdictText}`, b3.detail, `${b3.kind} verdict-${b3.verdict}`)) : '<p class="subtext">No sent plan is known for this day.</p>'}<p class="subtext">${escapeText(m4.sentNote)}</p>${m4.unacked ? `<p class="subtext">${m4.unacked} recorded plan version(s) were not acknowledged and are not treated as sent.</p>` : ""}</section>`);
   }
   if (measured) {
     parts.push(`<section data-history-section="flow"><h3>Measured flow</h3>${m4.flow.length ? list(m4.flow, (i7) => row2(i7.text, i7.detail)) : '<p class="subtext">No flow interval was found in the measured rows that exist; the coverage line says what was not measured.</p>'}${list(m4.outside, (x2) => row2(x2.text, "", `outside-${x2.kind}`))}${m4.isolated ? `<p class="subtext">${escapeText(m4.isolated)}</p>` : ""}<p class="subtext">${escapeText(m4.flowNote)}</p></section>`);
-    parts.push(`<section data-history-section="energy"><h3>Energy by basis</h3>${energy2(m4)}</section>`);
   }
-  parts.push(`<section data-history-section="cost"><h3>Spot cost and estimated savings of this day</h3>${summaryCards(m4.cost, m4.savings)}</section>`);
-  if (!m4.sessions.length && m4.raw !== "digest_only") parts.push('<section data-history-section="sessions"><h3>Sessions overlapping this day</h3><p class="subtext" data-history-empty="sessions">No session was recorded for this day by the Morek recorder (whether it records every session is unverified). That is not proof that the car did not charge.</p></section>');
-  if (m4.sessions.length) parts.push(`<section data-history-section="sessions"><h3>Sessions overlapping this day</h3><ul class="history-list">${m4.sessions.map((s4) => `<li>${escapeText(s4.text)}<small>${escapeText(s4.detail)}</small>${s4.lines.map((l6) => `<small class="history-recon">${escapeText(l6)}</small>`).join("")}${s4.costLines.map((l6) => `<small class="history-cost">${escapeText(l6)}</small>`).join("")}</li>`).join("")}</ul><p class="subtext">A session that crosses midnight appears on both days; its placed energy is not split above, but its spot cost for this day is the share that fell on this day.</p></section>`);
   if (m4.gaps.length || m4.restarts.length) parts.push(`<section data-history-section="gaps"><h3>Capture gaps and restarts</h3>${list(m4.gaps.slice(0, 5), (t6) => row2(`Gap: ${t6}`))}${m4.gaps.length > 5 ? `<p class="subtext">${m4.gaps.length - 5} more gap(s) not listed.</p>` : ""}${m4.restarts.length ? `<p class="subtext">Capture (re)started at ${m4.restarts.slice(0, 5).map(escapeText).join(", ")}${m4.restarts.length > 5 ? ` and ${m4.restarts.length - 5} more` : ""}.</p>` : ""}</section>`);
-  if (month) parts.push(month);
+  if (month) {
+    parts.push(group("Month review"));
+    parts.push(month);
+  }
   parts.push(`<p class="subtext history-retention">${escapeText(m4.retentionNote)}${m4.retention.oldestPower ? ` Measured power rows currently begin ${escapeText(m4.retention.oldestPower)}.` : ""}${m4.retention.digestDays !== null ? ` ${m4.retention.digestDays} day summary(ies) are kept.` : ""}</p>`);
   return `<div class="history-day" data-history-state="ready" data-history-raw="${escapeText(m4.raw)}">${parts.join("")}</div>`;
 }
@@ -53160,17 +53176,17 @@ function renderPriceContext({ now, next, low, high, unit }) {
   const u4 = escapeText(unit), at = (x2) => `${priceText(x2)} ${u4}`;
   return `<div class="price-context" role="group" aria-label="Price context">${tile3("Now", at(now), "now")}${tile3("Next window starts at", at(next), "next")}${tile3("Horizon low", low || "Unknown", "low")}${tile3("Horizon high", high || "Unknown", "high")}</div>`;
 }
-var chip = (cls, text4) => `<span class="cl-item">${cls}${text4}</span>`;
+var chip2 = (cls, text4) => `<span class="cl-item">${cls}${text4}</span>`;
 var dot = (css) => `<span class="cl-dot ${css}" aria-hidden="true">\u25CF</span>`;
 function renderChartLegend({ unit, cap }) {
   const u4 = escapeText(unit);
-  const bands = bandsApply(unit) ? `<span class="cl-note">Absolute price bands, ${u4}:</span>${PRICE_BANDS.map((b3) => chip(dot(b3.css), `${escapeText(b3.label)} ${escapeText(b3.range)}`)).join("")}<span class="cl-note">exactly 25 is Medium; display only, not a charging limit</span>` : `<span class="cl-note">Neutral price color: bands are defined in euro c/kWh and no trusted conversion is available for ${u4}, so nothing is classified.</span>`;
+  const bands = bandsApply(unit) ? `<span class="cl-note">Absolute price bands, ${u4}:</span>${PRICE_BANDS.map((b3) => chip2(dot(b3.css), `${escapeText(b3.label)} ${escapeText(b3.range)}`)).join("")}<span class="cl-note">exactly 25 is Medium; display only, not a charging limit</span>` : `<span class="cl-note">Neutral price color: bands are defined in euro c/kWh and no trusted conversion is available for ${u4}, so nothing is classified.</span>`;
   const overlay = [
-    chip('<span class="shade" aria-hidden="true"></span>', "Proposed charging \xB7 gradient + pale track"),
-    Number.isFinite(cap) ? chip('<span class="cap-key" aria-hidden="true"></span>', `Soft cap ${priceText(cap)} ${u4}`) : "",
-    chip('<span class="now-key" aria-hidden="true">\u2502</span>', "Now")
+    chip2('<span class="shade" aria-hidden="true"></span>', "Proposed charging \xB7 gradient + pale track"),
+    Number.isFinite(cap) ? chip2('<span class="cap-key" aria-hidden="true"></span>', `Soft cap ${priceText(cap)} ${u4}`) : "",
+    chip2('<span class="now-key" aria-hidden="true">\u2502</span>', "Now")
   ].join("");
-  const tracks = `<span class="cl-note">Tracks share the price time axis.</span>${chip('<span class="tk tk-proposal" aria-hidden="true"></span>', "Proposal: the current calculated plan, not sent")}${chip('<span class="tk tk-sent" aria-hidden="true"></span>', "Sent: plan versions the charger acknowledged, from the loaded history day (acknowledged is not installed)")}${chip('<span class="tk tk-effective" aria-hidden="true"></span>', "Effective: the latest fresh readback, remaining period only; a reported limit, not power")}${chip('<span class="tk tk-flow" aria-hidden="true"></span>', "Measured: observed power flow of the loaded history day")}${chip('<span class="tk tk-unknown" aria-hidden="true"></span>', "Hatched: unknown or not loaded, never zero")}`;
+  const tracks = `<span class="cl-note">Tracks share the price time axis.</span>${chip2('<span class="tk tk-proposal" aria-hidden="true"></span>', "Proposal: the current calculated plan, not sent")}${chip2('<span class="tk tk-sent" aria-hidden="true"></span>', "Sent: plan versions the charger acknowledged, from the loaded history day (acknowledged is not installed)")}${chip2('<span class="tk tk-effective" aria-hidden="true"></span>', "Effective: the latest fresh readback, remaining period only; a reported limit, not power")}${chip2('<span class="tk tk-flow" aria-hidden="true"></span>', "Measured: observed power flow of the loaded history day")}${chip2('<span class="tk tk-unknown" aria-hidden="true"></span>', "Hatched: unknown or not loaded, never zero")}`;
   return `<div class="chart-legend" role="group" aria-label="Chart legend"><p class="legend track-legend" data-legend="tracks">${tracks}</p><p class="legend" data-legend="prices">${bands}</p><p class="legend" data-legend="overlay">${overlay}</p></div>`;
 }
 
@@ -53282,11 +53298,11 @@ function renderPlanEditor({ m: m4, settings, e: e9, value: value2, priceText: pr
   const plainFields = [["Target SOC (%)", "target", "number", ""], ["Minimum SOC (%)", "minimum", "number", ""], [`Soft cap (${capUnit})`, "cap", "number", ' step="any"'], ["Ready by", "readyBy", "time", ""], ["Extra time reserve (%)", "reserve", "number", ' step="1" min="0" max="50"']].filter(([, key3]) => key3 !== "reserve" || settings.reserve !== void 0);
   const field = (key3) => plainFields.find((f3) => f3[1] === key3);
   const one = (key3) => field(key3) ? input(...field(key3)) : "";
-  const group = (id, title, hint, body) => `<fieldset class="plan-group" data-group="${id}"><legend>${title}</legend><p class="plan-group-hint">${hint}</p><div class="fields">${body}</div></fieldset>`;
+  const group2 = (id, title, hint, body) => `<fieldset class="plan-group" data-group="${id}"><legend>${title}</legend><p class="plan-group-hint">${hint}</p><div class="fields">${body}</div></fieldset>`;
   const goalBody = editor ? `<label>Charge by <select data-setting="driver"${canSave ? "" : " disabled"}><option value="manual_kwh" ${settings.driver === "manual_kwh" ? "selected" : ""}>Requested energy (kWh)</option><option value="target_soc" ${settings.driver === "target_soc" ? "selected" : ""}>Target SOC (%)</option></select></label><span data-mode="manual_kwh"><wa-input data-setting="energy" label="Requested energy (kWh)" type="number" step="any" value="${e9(value2(settings.energy))}"${canSave ? "" : " disabled"}></wa-input></span><label data-mode="target_soc">Planning vehicle <select data-setting="vehicleId"${canSave ? "" : " disabled"}><option value="" ${!savedVehicle ? "selected" : ""}>No saved vehicle</option>${savedVehicle && !vehicles.some((v2) => v2.id === savedVehicle) ? `<option value="${e9(savedVehicle)}" selected>Saved vehicle unavailable${savedVehicle === "guest" ? " (guest)" : ""}</option>` : ""}${vehicleOptions}</select></label>${one("target")}${one("minimum")}` : `${one("target")}${one("minimum")}`;
   const capBody = editor ? `<label><input type="checkbox" data-setting="capEnabled" ${settings.capEnabled ? "checked" : ""}${dis("capEnabled")}> Enable soft cap ${adminNote("capEnabled")}</label>${one("cap")}<label>Cap price basis <select data-setting="capBasis"${dis("capBasis")}><option value="">Not set (suggested: Nord Pool)</option><option value="nord_pool" ${settings.capBasis === "nord_pool" ? "selected" : ""}>Nord Pool</option><option value="configured_variable_cost" ${settings.capBasis === "configured_variable_cost" ? "selected" : ""}>Configured variable cost</option></select>${adminNote("capBasis")}</label>` : one("cap");
   const timeBody = editor ? `<label><input type="checkbox" data-setting="deadlineEnabled" ${settings.deadlineEnabled ? "checked" : ""}${canSave ? "" : " disabled"}> Enable ready-by</label>${one("readyBy")}${one("reserve")}` : `${one("readyBy")}${one("reserve")}`;
-  const groups = group("goal", "Charge goal", "What to charge to, and for which vehicle. The planning target is separate from the car\u2019s own charge limit.", goalBody) + group("price", "Price limit", "Optional soft cap. The basis decides which price is compared; it does not select the price provider.", capBody) + group("timing", "Ready-by and reserve", "When the charge should be finished, and extra allowed time on top of the planned windows.", timeBody);
+  const groups = group2("goal", "Charge goal", "What to charge to, and for which vehicle. The planning target is separate from the car\u2019s own charge limit.", goalBody) + group2("price", "Price limit", "Optional soft cap. The basis decides which price is compared; it does not select the price provider.", capBody) + group2("timing", "Ready-by and reserve", "When the charge should be finished, and extra allowed time on top of the planned windows.", timeBody);
   const tile4 = (label2, text4, key3) => `<div class="strategy-tile" data-fact="${key3}"><small>${label2}</small><b>${e9(text4)}</b>${adminNote(key3)}</div>`;
   const pct2 = (v2) => v2 == null || v2 === "" ? "Not set" : `${v2}%`;
   const capText = settings.capEnabled ? `${priceText2(Number(settings.cap))} ${capUnit}${settings.capBasis ? ` \xB7 ${settings.capBasis === "nord_pool" ? "Nord Pool" : "configured variable cost"}` : " \xB7 basis not set"}` : "Off";
@@ -59238,7 +59254,8 @@ function buildHistoryModel(answer, day, fmt, readAt = NaN) {
     label: label2,
     value: value2 === null || value2 === void 0 ? null : value2,
     text: value2 === null || value2 === void 0 ? `${label2}: unavailable (no measurement segment in this day)` : `${label2}: ${kwh(value2)}`,
-    detail: `${cvg[key3]?.segments ?? 0} segment(s), ${duration(cvg[key3]?.seconds)}${note ? ` \xB7 ${note}` : ""}`
+    detail: `${cvg[key3]?.segments ?? 0} segment(s), ${duration(cvg[key3]?.seconds)}${note ? ` \xB7 ${note}` : ""}`,
+    kind: key3 === "meter" ? "measured" : key3 === "power" ? "estimated" : "unplaced"
   });
   const energyRows = [
     basis("Meter-counter delta", energy3.meter_counter_kwh, "meter", "placed in time by observed readings"),
@@ -65313,7 +65330,7 @@ function notifySignature(record5) {
   const n6 = record5?.notifications;
   return JSON.stringify(n6 ? [n6.targets, n6.events, n6.url] : null);
 }
-var row3 = (id, group, level, text4, goto = null) => ({ id, group, level, text: text4, goto, gotoLabel: goto ? GOTO2[goto] : null });
+var row3 = (id, group2, level, text4, goto = null) => ({ id, group: group2, level, text: text4, goto, gotoLabel: goto ? GOTO2[goto] : null });
 function setupDiagnostics({ dashboard, status, statusFresh, now }) {
   const out2 = [];
   if (!dashboard) return [row3("dashboard", "setup", "info", "No dashboard observation yet, so setup problems are unknown.")];
@@ -66477,7 +66494,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.208";
+var CARD_VERSION = "2.5.209";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {

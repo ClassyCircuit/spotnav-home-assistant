@@ -6486,3 +6486,94 @@ wa-button[disabled] {
 [data-sn-layout=compact] .pp-tile b {
   font-size: 18px;
 }
+.history-stepper {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.history-stepper .history-day-head {
+  text-align: center;
+  min-width: 0;
+}
+.history-stepper .history-day-label {
+  display: block;
+  font-size: 17px;
+}
+.history-nav-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.history-group {
+  font-size: 12px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--sn-muted);
+  margin: 6px 0 -4px;
+  padding: 0;
+}
+.history-review {
+  display: grid;
+  gap: 8px;
+}
+.history-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.history-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--sn-line);
+  background: var(--sn-surface-3);
+  color: var(--sn-ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+.history-chip[data-tone=ok] {
+  border-color: var(--sn-accent);
+}
+.history-chip[data-tone=warn] {
+  border-color: var(--sn-warn);
+  border-style: dashed;
+}
+.history-chip[data-tone=info] {
+  border-color: var(--sn-info);
+}
+.history-chip[data-provenance=estimated],
+.history-chip[data-provenance=unplaced] {
+  border-style: dashed;
+  font-weight: 500;
+}
+.history-basis .history-chip {
+  margin-top: 8px;
+  font-size: 11px;
+}
+.history-sessions {
+  gap: 10px;
+}
+.history-session {
+  background: var(--sn-surface);
+  border: 1px solid var(--sn-line) !important;
+  border-left: 3px solid var(--sn-accent) !important;
+  border-radius: 12px;
+  padding: 10px 14px !important;
+  display: grid;
+  gap: 3px;
+}
+.history-session > strong {
+  font-size: 14px;
+  color: var(--sn-ink);
+}
+[data-sn-layout=compact] .history-stepper {
+  grid-template-columns: 1fr 1fr;
+}
+[data-sn-layout=compact] .history-stepper .history-day-head {
+  grid-column: 1/-1;
+  order: -1;
+}

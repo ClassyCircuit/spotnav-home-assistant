@@ -208,7 +208,8 @@ export function buildHistoryModel(answer, day, fmt, readAt = NaN) {
   const energy = o.energy, cvg = energy.coverage || {};
   const basis = (label, value, key, note) => ({ label, value: value === null || value === undefined ? null : value, text: value === null || value === undefined
     ? `${label}: unavailable (no measurement segment in this day)` : `${label}: ${kwh(value)}`,
-    detail: `${cvg[key]?.segments ?? 0} segment(s), ${duration(cvg[key]?.seconds)}${note ? ` · ${note}` : ''}` });
+    detail: `${cvg[key]?.segments ?? 0} segment(s), ${duration(cvg[key]?.seconds)}${note ? ` · ${note}` : ''}`,
+    kind: key === 'meter' ? 'measured' : key === 'power' ? 'estimated' : 'unplaced' });
   const energyRows = [
     basis('Meter-counter delta', energy.meter_counter_kwh, 'meter', 'placed in time by observed readings'),
     basis('Power-integrated estimate', energy.power_integrated_estimate_kwh, 'power', 'an estimate from power readings'),
