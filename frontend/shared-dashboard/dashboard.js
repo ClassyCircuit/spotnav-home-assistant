@@ -18,6 +18,7 @@ import { renderBattery, batteryEstimates } from './vehicle-view.js';
 import { renderEvidence } from './evidence-view.js';
 import { renderHistory } from './history-view.js';
 import { renderInsights } from './insight-view.js';
+import { perspectiveModel, renderPerspective } from './price-perspective-view.js';
 import { renderPriceNav } from './price-nav-view.js';
 import { renderChartControls, renderPriceContext, renderChartLegend } from './chart-view.js';
 import { renderVehicleSources } from './vehicle-sources-view.js';
@@ -200,6 +201,7 @@ export function mountDashboard(root, adapter) {
       ${windowsCard}
       ${card('Recent charging · summary','OVERVIEW',renderRecentSummary(m.historyDay,m.history),'recent',tag)}
       ${tabClose}${tabOpen('explore',activeTab)}
+      ${card('Price perspective','EXPLORE',renderPerspective(perspectiveModel({prices,now:chart?.now,unit}),{f:{time,day},nav:m.priceNav,horizon:chartReady ? chart.horizon : null,costBasis:f.costBasis,known:chartReady}),'perspective',tag)}
       ${card('Price insights',labels.insightEyebrow || 'PRICE DATA',renderInsights(m.insights),'insights',tag)}
       ${tabClose}${tabOpen('history',activeTab)}
       ${card('Recent charging',labels.historyEyebrow || 'HISTORY',renderHistory(m.history,historyReady,m.historyDay),'history',tag)}

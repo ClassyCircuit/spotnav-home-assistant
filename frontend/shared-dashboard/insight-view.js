@@ -1,4 +1,5 @@
 import { escapeText as e } from './text.js';
+import { PRICE_BANDS } from './price-bands.js';
 
 // All prose and values are supplied by the host (see `price-insights.js`); they are text, never markup.
 // Controls only name a read (`data-insight-*`); the host decides what, if anything, is requested.
@@ -18,7 +19,8 @@ function controls(block, c) {
     + `<label class="insight-control">Compare with <select data-insight-compare aria-label="Compare with another month"${c.compare.busy ? ' disabled' : ''}>${options(c.compare.options, c.compare.value)}</select></label>${previous}</div>`;
 }
 
-const block = (b, c) => `<section class="insight-block"${b.id ? ` data-insight-block="${e(b.id)}"` : ''}${b.band ? ` data-insight-band="${e(b.band)}"` : ''}><h3>${e(b.title)}</h3><div class="insight-value">${e(b.value)}</div><strong class="insight-status">${e(b.status ?? '')}</strong>${b.detail ? `<p>${e(b.detail)}</p>` : ''}${lines(b)}${b.extra ? `<div class="month-range">${e(b.extra)}</div>` : ''}${controls(b, c)}${table(b.table)}${details(b)}</section>`;
+const bandDot = key => { const b = PRICE_BANDS.find(x => x.key === key); return b ? `<span class="cl-dot ${e(b.css)}" aria-hidden="true">●</span> ` : ''; };
+const block = (b, c) => `<section class="insight-block"${b.id ? ` data-insight-block="${e(b.id)}"` : ''}${b.band ? ` data-insight-band="${e(b.band)}"` : ''}><h3>${e(b.title)}</h3><div class="insight-value">${bandDot(b.band)}${e(b.value)}</div><strong class="insight-status">${e(b.status ?? '')}</strong>${b.detail ? `<p>${e(b.detail)}</p>` : ''}${lines(b)}${b.extra ? `<div class="month-range">${e(b.extra)}</div>` : ''}${controls(b, c)}${table(b.table)}${details(b)}</section>`;
 
 export function renderInsights(insights) {
   if (!insights) return '<p>Price insights unavailable.</p>';

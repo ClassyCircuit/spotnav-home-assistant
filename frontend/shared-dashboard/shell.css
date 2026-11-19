@@ -374,3 +374,15 @@ wa-button[disabled]{opacity:.5}
 .plan-group legend{padding:0 6px;font-weight:700;color:var(--sn-ink)}
 .plan-group-hint{margin:0;color:var(--sn-muted);font-size:12px;line-height:1.4}
 .plan-group .fields{margin:10px 0 0;grid-template-columns:minmax(0,1fr)}
+/* 20.7 Explore price perspective */
+.perspective{display:grid;gap:10px}
+.pp-basis{background:var(--sn-surface-2);border:1px solid var(--sn-line);border-left:4px solid var(--sn-accent);border-radius:12px;padding:10px 14px;font-size:13px;line-height:1.5;color:var(--sn-muted)}.pp-basis b{color:var(--sn-ink)}
+.pp-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:10px}
+.pp-tile{background:var(--sn-surface-2);border:1px solid var(--sn-line);border-radius:14px;padding:12px 14px;min-width:0;display:grid;gap:4px;align-content:start}
+.pp-tile b{font-size:22px;letter-spacing:-.02em;color:var(--sn-ink);overflow-wrap:anywhere}.pp-tile small{color:var(--sn-muted);font-size:12px;line-height:1.4}
+.pp-tile[data-pp="now"]{border-color:#2d5d9c}.pp-tile[data-known="false"] b{color:var(--sn-muted)}
+.pp-band{font-size:12px;color:var(--sn-ink)}.pp-neg{font-size:12px;font-weight:650;color:#ffe3a3}
+.pp-change,.pp-coverage,.pp-neutral,.pp-negative,.pp-empty{margin:0;font-size:13px;line-height:1.5;color:var(--sn-muted)}.pp-coverage b{color:var(--sn-ink)}
+.pp-links{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
+.insight-value .cl-dot{font-size:.7em;vertical-align:middle}
+[data-sn-layout="compact"] .pp-tile b{font-size:18px}

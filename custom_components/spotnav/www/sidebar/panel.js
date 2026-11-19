@@ -53088,13 +53088,57 @@ function controls(block2, c5) {
   const previous = c5.compare.previous ? `<wa-button size="small" data-insight-compare-previous>Compare with ${escapeText(c5.compare.previous.label)}</wa-button>` : "";
   return `<div class="insight-controls"><label class="insight-control">Month <select data-insight-month aria-label="Month"${c5.month.busy ? " disabled" : ""}>${options(c5.month.options, c5.month.value)}</select></label><label class="insight-control">Compare with <select data-insight-compare aria-label="Compare with another month"${c5.compare.busy ? " disabled" : ""}>${options(c5.compare.options, c5.compare.value)}</select></label>${previous}</div>`;
 }
-var block = (b3, c5) => `<section class="insight-block"${b3.id ? ` data-insight-block="${escapeText(b3.id)}"` : ""}${b3.band ? ` data-insight-band="${escapeText(b3.band)}"` : ""}><h3>${escapeText(b3.title)}</h3><div class="insight-value">${escapeText(b3.value)}</div><strong class="insight-status">${escapeText(b3.status ?? "")}</strong>${b3.detail ? `<p>${escapeText(b3.detail)}</p>` : ""}${lines(b3)}${b3.extra ? `<div class="month-range">${escapeText(b3.extra)}</div>` : ""}${controls(b3, c5)}${table(b3.table)}${details(b3)}</section>`;
+var bandDot = (key3) => {
+  const b3 = PRICE_BANDS.find((x2) => x2.key === key3);
+  return b3 ? `<span class="cl-dot ${escapeText(b3.css)}" aria-hidden="true">\u25CF</span> ` : "";
+};
+var block = (b3, c5) => `<section class="insight-block"${b3.id ? ` data-insight-block="${escapeText(b3.id)}"` : ""}${b3.band ? ` data-insight-band="${escapeText(b3.band)}"` : ""}><h3>${escapeText(b3.title)}</h3><div class="insight-value">${bandDot(b3.band)}${escapeText(b3.value)}</div><strong class="insight-status">${escapeText(b3.status ?? "")}</strong>${b3.detail ? `<p>${escapeText(b3.detail)}</p>` : ""}${lines(b3)}${b3.extra ? `<div class="month-range">${escapeText(b3.extra)}</div>` : ""}${controls(b3, c5)}${table(b3.table)}${details(b3)}</section>`;
 function renderInsights(insights) {
   if (!insights) return "<p>Price insights unavailable.</p>";
   const blocks = Array.isArray(insights.blocks) ? insights.blocks : [];
   const banners = (insights.banners || []).map((x2) => `<p class="insight-banner" data-insight-banner="${escapeText(x2.kind)}" role="status">${escapeText(x2.text)}</p>`).join("");
   const retry = insights.controls?.canRetry ? '<wa-button size="small" data-insight-retry>Retry</wa-button>' : "";
   return `<div class="insights-intro" data-insight-state="${escapeText(insights.state ?? "ready")}">${escapeText(insights.intro)}</div>${banners}${retry}<div class="insight-grid">${blocks.map((b3) => block(b3, insights.controls)).join("")}</div><p class="insight-caution">${escapeText(insights.caution)}</p><wa-details summary="How these insights work"><div class="details-body"><p>${escapeText(insights.method)}</p></div></wa-details>`;
+}
+
+// shared-dashboard/price-perspective-view.js
+var finite3 = Number.isFinite;
+function perspectiveModel({ prices, now, unit }) {
+  const rows = (Array.isArray(prices) ? prices : []).filter((p4) => finite3(p4?.start) && finite3(p4?.end) && p4.end > p4.start && finite3(p4.cents)).sort((a4, b3) => a4.start - b3.start);
+  const current = finite3(now) ? rows.find((p4) => p4.start <= now && now < p4.end) || null : null;
+  const after = current ? current.end : finite3(now) ? now : null;
+  const nextRow = after === null ? null : rows.find((p4) => p4.start >= after) || null;
+  const next = nextRow ? { ...nextRow, gap: current ? nextRow.start > current.end : nextRow.start > now } : null;
+  const delta = current && next && !next.gap ? next.cents - current.cents : null;
+  const low = rows.length ? rows.reduce((a4, b3) => b3.cents < a4.cents ? b3 : a4) : null;
+  const high = rows.length ? rows.reduce((a4, b3) => b3.cents > a4.cents ? b3 : a4) : null;
+  return { unit, count: rows.length, current, next, delta, low, high, bands: bandsApply(unit), negative: rows.filter((p4) => p4.cents < 0).length };
+}
+var bandChip = (cents, unit) => {
+  const b3 = priceBand(cents, unit);
+  return b3 ? `<span class="pp-band" data-band="${escapeText(b3.key)}"><span class="cl-dot ${escapeText(b3.css)}" aria-hidden="true">\u25CF</span> ${escapeText(b3.label)} ${escapeText(b3.range)}</span>` : "";
+};
+var amount = (cents, unit) => `${priceText(cents)} ${escapeText(unit)}`;
+var negNote = (cents) => finite3(cents) && cents < 0 ? '<span class="pp-neg">Negative published price</span>' : "";
+function tile2(kind, label2, row4, unit, time2, extra = "") {
+  if (!row4) return `<div class="pp-tile" data-pp="${kind}" data-known="false"><span class="pc-label">${escapeText(label2)}</span><b>Unknown</b><small>${extra}</small></div>`;
+  return `<div class="pp-tile" data-pp="${kind}" data-known="true"><span class="pc-label">${escapeText(label2)}</span><b>${amount(row4.cents, unit)}</b>${bandChip(row4.cents, unit)}${negNote(row4.cents)}<small>${escapeText(time2(row4.start))}\u2013${escapeText(time2(row4.end))} ${escapeText(extra)}</small></div>`;
+}
+function renderPerspective(model, { f: f3, nav, horizon, costBasis, known }) {
+  const time2 = f3.time, day = f3.day, u4 = model.unit;
+  if (!known || !model.count) {
+    return '<p class="pp-empty" role="status">No published prices are loaded, so there is no current or next price to show. Nothing is estimated in their place.</p><div class="pp-links"><button type="button" class="sn-link" data-open-tab="overview">Price chart on Overview <span aria-hidden="true">\u2192</span></button></div>';
+  }
+  const cur = model.current, nxt = model.next;
+  const nextExtra = !nxt ? "No later price is published in the loaded days." : nxt.gap ? "The loaded prices have a gap before this interval." : `${day(nxt.start)}`;
+  const curExtra = cur ? day(cur.start) : "No loaded interval covers now.";
+  const change = model.delta === null ? "" : `<p class="pp-change" data-direction="${model.delta > 0 ? "up" : model.delta < 0 ? "down" : "same"}">${model.delta === 0 ? "Same as the current interval." : `${model.delta > 0 ? "Higher" : "Lower"} than the current interval by ${priceText(Math.abs(model.delta))} ${escapeText(u4)}.`} Published rows only, not a forecast.</p>`;
+  const range2 = (h3) => finite3(h3?.[0]) && finite3(h3?.[1]) ? `${escapeText(day(h3[0]))} ${escapeText(time2(h3[0]))} \u2192 ${escapeText(day(h3[1]))} ${escapeText(time2(h3[1]))}` : "";
+  const partial = nav?.buttons?.filter((b3) => b3.partial).map((b3) => b3.label) ?? [];
+  const note = nav ? `${escapeText(nav.message || nav.detail || "")}` : "";
+  const bands = model.bands ? "" : `<p class="subtext pp-neutral">No absolute band is shown: bands are defined in euro c/kWh and no trusted conversion exists for ${escapeText(u4)}.</p>`;
+  const neg = model.negative ? `<p class="subtext pp-negative" role="status">${model.negative} loaded interval${model.negative === 1 ? " has" : "s have"} a negative published price; the sign is kept everywhere.</p>` : "";
+  return `<div class="pp-basis" data-pp-basis="raw-spot"><b>Raw published spot price</b> in ${escapeText(u4)}, before configured fees, taxes or margin; the source may include its own charges. It is not the variable cost of charging${costBasis ? ` (the plan uses ${escapeText(costBasis)})` : ""}, and the absolute bands are a display aid, never a charging limit.</div><div class="pp-tiles" role="group" aria-label="Current and next price">${tile2("now", "Current price", cur, u4, time2, curExtra)}${tile2("next", "Next interval", nxt, u4, time2, nextExtra)}${tile2("low", "Loaded low", model.low, u4, time2, day(model.low.start))}${tile2("high", "Loaded high", model.high, u4, time2, day(model.high.start))}</div>${change}${neg}${bands}<div class="pp-coverage" data-pp-coverage><b>Coverage</b> ${model.count} published interval${model.count === 1 ? "" : "s"} loaded${range2(horizon) ? ` \xB7 ${range2(horizon)}` : ""}${partial.length ? ` \xB7 partial: ${escapeText(partial.join(", "))}` : ""}${note ? `<br>${note}` : ""}</div><div class="pp-links"><button type="button" class="sn-link" data-open-tab="overview">Choose price days and see the chart on Overview <span aria-hidden="true">\u2192</span></button><span class="subtext">Live and monthly insights follow below.</span></div>`;
 }
 
 // shared-dashboard/price-nav-view.js
@@ -53111,10 +53155,10 @@ function renderPriceNav(nav) {
 function renderChartControls(mode, title) {
   return `<div class="chart-actions" role="group" aria-label="Chart zoom"><wa-button data-zoom="${mode}" size="small" aria-label="Zoom in ${escapeText(title)}">Zoom +</wa-button><wa-button data-reset="${mode}" size="small" aria-label="Reset ${escapeText(title)} overview">Full horizon</wa-button><span>Wheel or pinch zooms \xB7 scroll outside the chart</span></div>`;
 }
-var tile2 = (label2, body, kind) => `<div class="pc-tile" data-tile="${kind}"><span class="pc-label">${escapeText(label2)}</span><b>${body}</b></div>`;
+var tile3 = (label2, body, kind) => `<div class="pc-tile" data-tile="${kind}"><span class="pc-label">${escapeText(label2)}</span><b>${body}</b></div>`;
 function renderPriceContext({ now, next, low, high, unit }) {
   const u4 = escapeText(unit), at = (x2) => `${priceText(x2)} ${u4}`;
-  return `<div class="price-context" role="group" aria-label="Price context">${tile2("Now", at(now), "now")}${tile2("Next window starts at", at(next), "next")}${tile2("Horizon low", low || "Unknown", "low")}${tile2("Horizon high", high || "Unknown", "high")}</div>`;
+  return `<div class="price-context" role="group" aria-label="Price context">${tile3("Now", at(now), "now")}${tile3("Next window starts at", at(next), "next")}${tile3("Horizon low", low || "Unknown", "low")}${tile3("Horizon high", high || "Unknown", "high")}</div>`;
 }
 var chip = (cls, text4) => `<span class="cl-item">${cls}${text4}</span>`;
 var dot = (css) => `<span class="cl-dot ${css}" aria-hidden="true">\u25CF</span>`;
@@ -53243,16 +53287,16 @@ function renderPlanEditor({ m: m4, settings, e: e9, value: value2, priceText: pr
   const capBody = editor ? `<label><input type="checkbox" data-setting="capEnabled" ${settings.capEnabled ? "checked" : ""}${dis("capEnabled")}> Enable soft cap ${adminNote("capEnabled")}</label>${one("cap")}<label>Cap price basis <select data-setting="capBasis"${dis("capBasis")}><option value="">Not set (suggested: Nord Pool)</option><option value="nord_pool" ${settings.capBasis === "nord_pool" ? "selected" : ""}>Nord Pool</option><option value="configured_variable_cost" ${settings.capBasis === "configured_variable_cost" ? "selected" : ""}>Configured variable cost</option></select>${adminNote("capBasis")}</label>` : one("cap");
   const timeBody = editor ? `<label><input type="checkbox" data-setting="deadlineEnabled" ${settings.deadlineEnabled ? "checked" : ""}${canSave ? "" : " disabled"}> Enable ready-by</label>${one("readyBy")}${one("reserve")}` : `${one("readyBy")}${one("reserve")}`;
   const groups = group("goal", "Charge goal", "What to charge to, and for which vehicle. The planning target is separate from the car\u2019s own charge limit.", goalBody) + group("price", "Price limit", "Optional soft cap. The basis decides which price is compared; it does not select the price provider.", capBody) + group("timing", "Ready-by and reserve", "When the charge should be finished, and extra allowed time on top of the planned windows.", timeBody);
-  const tile3 = (label2, text4, key3) => `<div class="strategy-tile" data-fact="${key3}"><small>${label2}</small><b>${e9(text4)}</b>${adminNote(key3)}</div>`;
+  const tile4 = (label2, text4, key3) => `<div class="strategy-tile" data-fact="${key3}"><small>${label2}</small><b>${e9(text4)}</b>${adminNote(key3)}</div>`;
   const pct2 = (v2) => v2 == null || v2 === "" ? "Not set" : `${v2}%`;
   const capText = settings.capEnabled ? `${priceText2(Number(settings.cap))} ${capUnit}${settings.capBasis ? ` \xB7 ${settings.capBasis === "nord_pool" ? "Nord Pool" : "configured variable cost"}` : " \xB7 basis not set"}` : "Off";
   const tiles = [
-    tile3("Vehicle", soc2 ? vehicleName : "Not used (energy mode)", "vehicle"),
-    soc2 ? tile3("Target", pct2(settings.target), "target") : tile3("Requested energy", settings.energy == null || settings.energy === "" ? "Not set" : `${settings.energy} kWh`, "energy"),
-    tile3("Minimum", soc2 ? pct2(settings.minimum) : "Not used (energy mode)", "minimum"),
-    tile3("Soft cap", capText, "cap"),
-    tile3("Ready by", settings.deadlineEnabled ? String(settings.readyBy ?? "Not set") : "Off", "readyBy"),
-    ...settings.reserve !== void 0 ? [tile3("Reserve", `${settings.reserve}% of charging time`, "reserve")] : []
+    tile4("Vehicle", soc2 ? vehicleName : "Not used (energy mode)", "vehicle"),
+    soc2 ? tile4("Target", pct2(settings.target), "target") : tile4("Requested energy", settings.energy == null || settings.energy === "" ? "Not set" : `${settings.energy} kWh`, "energy"),
+    tile4("Minimum", soc2 ? pct2(settings.minimum) : "Not used (energy mode)", "minimum"),
+    tile4("Soft cap", capText, "cap"),
+    tile4("Ready by", settings.deadlineEnabled ? String(settings.readyBy ?? "Not set") : "Off", "readyBy"),
+    ...settings.reserve !== void 0 ? [tile4("Reserve", `${settings.reserve}% of charging time`, "reserve")] : []
   ].join("");
   const state = m4.proposedPlanDefaults ? "Proposed defaults \xB7 not saved" : "Saved plan";
   const summary = editor ? `<div class="strategy-summary" data-state="${m4.proposedPlanDefaults ? "proposed" : "saved"}"><div class="strategy-head"><span class="strategy-chip" data-chip="mode">${soc2 ? "Charge to target SOC" : "Charge requested energy"}</span><span class="strategy-chip" data-chip="state">${state}</span>${admin ? "" : '<span class="strategy-chip" data-chip="role">Limited to your permissions</span>'}</div><div class="strategy-tiles">${tiles}</div></div>` : "";
@@ -53628,6 +53672,7 @@ function mountDashboard(root, adapter) {
       ${windowsCard}
       ${card("Recent charging \xB7 summary", "OVERVIEW", renderRecentSummary(m4.historyDay, m4.history), "recent", tag)}
       ${tabClose}${tabOpen("explore", activeTab)}
+      ${card("Price perspective", "EXPLORE", renderPerspective(perspectiveModel({ prices, now: chart?.now, unit }), { f: { time: time2, day }, nav: m4.priceNav, horizon: chartReady ? chart.horizon : null, costBasis: f3.costBasis, known: chartReady }), "perspective", tag)}
       ${card("Price insights", labels.insightEyebrow || "PRICE DATA", renderInsights(m4.insights), "insights", tag)}
       ${tabClose}${tabOpen("history", activeTab)}
       ${card("Recent charging", labels.historyEyebrow || "HISTORY", renderHistory(m4.history, historyReady, m4.historyDay), "history", tag)}
@@ -58736,16 +58781,16 @@ var num = (v2) => typeof v2 === "number" && Number.isFinite(v2);
 var nonneg = (v2) => num(v2) && v2 >= 0;
 var kwhText = (v2) => nonneg(v2) ? `${v2.toFixed(v2 < 10 ? 2 : 1)} kWh` : "unknown";
 var pct = (v2) => `${Math.round(v2 * 100)}%`;
-function formatMoney(amount, currency, majorUnit) {
-  if (!num(amount)) return "unknown";
-  const digits = amount !== 0 && Math.abs(amount) < 5e-3 ? 4 : 2;
+function formatMoney(amount2, currency, majorUnit) {
+  if (!num(amount2)) return "unknown";
+  const digits = amount2 !== 0 && Math.abs(amount2) < 5e-3 ? 4 : 2;
   if (typeof currency === "string" && /^[A-Z]{3}$/.test(currency)) {
     try {
-      return new Intl.NumberFormat("en-GB", { style: "currency", currency, minimumFractionDigits: digits, maximumFractionDigits: digits }).format(amount);
+      return new Intl.NumberFormat("en-GB", { style: "currency", currency, minimumFractionDigits: digits, maximumFractionDigits: digits }).format(amount2);
     } catch {
     }
   }
-  return `${amount.toFixed(digits)} ${typeof majorUnit === "string" && majorUnit ? majorUnit : currency || "(currency unknown)"}`;
+  return `${amount2.toFixed(digits)} ${typeof majorUnit === "string" && majorUnit ? majorUnit : currency || "(currency unknown)"}`;
 }
 function parseSpotCost(b3) {
   if (!b3 || typeof b3 !== "object" || b3.price_basis !== SPOT_PRICE_BASIS || b3.unit !== "major") return null;
@@ -60161,7 +60206,7 @@ function booleanValue(source, key3) {
   const value2 = source[key3];
   return typeof value2 === "boolean" ? value2 : bad();
 }
-function finite3(source, key3) {
+function finite4(source, key3) {
   const value2 = source[key3];
   return typeof value2 === "number" && Number.isFinite(value2) ? value2 : bad();
 }
@@ -60310,7 +60355,7 @@ function decodeTarget(source) {
   exactKeys(source, TARGET_KEYS);
   let targetPercent = null;
   if (source["target_percent"] !== null) {
-    const percent3 = finite3(source, "target_percent");
+    const percent3 = finite4(source, "target_percent");
     if (percent3 < 0 || percent3 > 100) {
       return bad();
     }
@@ -60325,7 +60370,7 @@ function decodeFrame(raw) {
   const source = record(raw);
   exactKeys(source, ["x", "y", "w", "h"]);
   const [x2, y3, w2, h3] = ["x", "y", "w", "h"].map((key3) => {
-    const value2 = finite3(source, key3);
+    const value2 = finite4(source, key3);
     return value2 < 0 || value2 > 1 ? bad() : value2;
   });
   return x2 + w2 > 1.000001 || y3 + h3 > 1.000001 ? bad() : { x: x2, y: y3, w: w2, h: h3 };
@@ -60370,15 +60415,15 @@ function decodeSettingsRecord(raw) {
   }
   return {
     revision,
-    ...present.includes("soft_price_cap") ? { soft_price_cap: source["soft_price_cap"] === null ? null : finite3(source, "soft_price_cap") } : {},
-    ...present.includes("minimum_ready_by_soc") ? { minimum_ready_by_soc: source["minimum_ready_by_soc"] === null ? null : finite3(source, "minimum_ready_by_soc") } : {},
+    ...present.includes("soft_price_cap") ? { soft_price_cap: source["soft_price_cap"] === null ? null : finite4(source, "soft_price_cap") } : {},
+    ...present.includes("minimum_ready_by_soc") ? { minimum_ready_by_soc: source["minimum_ready_by_soc"] === null ? null : finite4(source, "minimum_ready_by_soc") } : {},
     ...present.includes("time_reserve_percent") ? { time_reserve_percent: whole(source, "time_reserve_percent") } : {},
     ...present.includes("cap_price_basis") ? { cap_price_basis: source["cap_price_basis"] === null ? null : oneOf(source, "cap_price_basis", ["nord_pool", "configured_variable_cost"]) } : {},
     area_id: textOrNull(source, "area_id"),
     overrides: list2(source, "overrides").map((item) => decodeOverride(record(item))),
     phases: wholeOrNull(source, "phases"),
     amps: wholeOrNull(source, "amps"),
-    requested_kwh: finite3(source, "requested_kwh"),
+    requested_kwh: finite4(source, "requested_kwh"),
     ...present.includes("fill_to_limit") ? { fill_to_limit: booleanValue(source, "fill_to_limit") } : {},
     max_periods: periodsOrNull(source, "max_periods"),
     departure_enabled: booleanValue(source, "departure_enabled"),
@@ -61886,11 +61931,11 @@ function guestOrNull(value2) {
   }
   try {
     exactKeys2(value2, ["active", "amount_kwh", "first"]);
-    const amount = value2.amount_kwh;
-    if (typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0) {
+    const amount2 = value2.amount_kwh;
+    if (typeof amount2 !== "number" || !Number.isFinite(amount2) || amount2 <= 0) {
       return bad2();
     }
-    return { active: booleanValue2(value2, "active"), amount_kwh: amount, first: booleanValue2(value2, "first") };
+    return { active: booleanValue2(value2, "active"), amount_kwh: amount2, first: booleanValue2(value2, "first") };
   } catch {
     return null;
   }
@@ -66432,7 +66477,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.207";
+var CARD_VERSION = "2.5.208";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {
