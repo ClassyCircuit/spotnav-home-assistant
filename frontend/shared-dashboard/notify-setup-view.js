@@ -26,7 +26,7 @@ export function renderNotifySetup(m) {
   if (!m) return '';
   const notes = [m.notice, ...(m.notes || [])].filter(Boolean).map((t) => `<p class="ns-note">${e(t)}</p>`).join('');
   const reload = '<button type="button" id="reload-notify-setup">Reload notifications &amp; setup</button>';
-  const head = '<summary>Advanced: notifications &amp; setup check</summary>';
+  const head = '<summary>Notifications &amp; setup check</summary>';
   if (m.state !== 'ready') return `<details id="notify-setup-details">${head}<div class="ns-body" role="status">${notes}${diagnostics(m)}${reload}</div></details>`;
-  return `<details id="notify-setup-details">${head}<div class="ns-body">${diagnostics(m)}${recipients(m)}<div role="status" id="notify-setup-notice">${notes}</div>${reload}</div></details>`;
+  return `<details id="notify-setup-details">${head}<div class="ns-body"><p class="ns-help">Review setup findings and their links, then choose which notifications to receive. Notification changes are saved separately.</p><div class="ns-settings-grid">${diagnostics(m)}${recipients(m)}</div><div role="status" id="notify-setup-notice">${notes}</div>${reload}</div></details>`;
 }

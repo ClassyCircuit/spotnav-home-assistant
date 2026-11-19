@@ -53277,8 +53277,8 @@ function renderPlanParams(m4) {
   if (!m4) return "";
   const notes = [m4.notice, ...m4.notes || []].filter(Boolean).map((t6) => `<p class="pp-note">${escapeText(t6)}</p>`).join("");
   const reload = '<button type="button" id="reload-plan-params">Reload plan &amp; charger parameters</button>';
-  if (m4.state !== "ready") return `<details id="plan-params-details"><summary>Advanced: plan &amp; charger parameters</summary><div class="pp-body" role="status">${notes}${reload}</div></details>`;
-  return `<details id="plan-params-details"><summary>Advanced: plan &amp; charger parameters</summary><div class="pp-body">${periodsBlock(m4)}${currentBlock(m4)}${departureBlock(m4)}<p class="pp-help">${escapeText(m4.savedNote)}</p><div role="status" id="plan-params-notice">${notes}</div>${reload}</div></details>`;
+  if (m4.state !== "ready") return `<details id="plan-params-details"><summary>Plan &amp; charger parameters</summary><div class="pp-body" role="status">${notes}${reload}</div></details>`;
+  return `<details id="plan-params-details"><summary>Plan &amp; charger parameters</summary><div class="pp-body"><p class="pp-help">Each section saves independently. Review the saved values and permissions before making changes.</p><div class="pp-settings-grid">${periodsBlock(m4)}${currentBlock(m4)}${departureBlock(m4)}</div><p class="pp-help">${escapeText(m4.savedNote)}</p><div role="status" id="plan-params-notice">${notes}</div>${reload}</div></details>`;
 }
 
 // shared-dashboard/plan-editor-view.js
@@ -53342,9 +53342,9 @@ function renderNotifySetup(m4) {
   if (!m4) return "";
   const notes = [m4.notice, ...m4.notes || []].filter(Boolean).map((t6) => `<p class="ns-note">${escapeText(t6)}</p>`).join("");
   const reload = '<button type="button" id="reload-notify-setup">Reload notifications &amp; setup</button>';
-  const head = "<summary>Advanced: notifications &amp; setup check</summary>";
+  const head = "<summary>Notifications &amp; setup check</summary>";
   if (m4.state !== "ready") return `<details id="notify-setup-details">${head}<div class="ns-body" role="status">${notes}${diagnostics(m4)}${reload}</div></details>`;
-  return `<details id="notify-setup-details">${head}<div class="ns-body">${diagnostics(m4)}${recipients(m4)}<div role="status" id="notify-setup-notice">${notes}</div>${reload}</div></details>`;
+  return `<details id="notify-setup-details">${head}<div class="ns-body"><p class="ns-help">Review setup findings and their links, then choose which notifications to receive. Notification changes are saved separately.</p><div class="ns-settings-grid">${diagnostics(m4)}${recipients(m4)}</div><div role="status" id="notify-setup-notice">${notes}</div>${reload}</div></details>`;
 }
 
 // shared-dashboard/reconcile.js
@@ -66270,7 +66270,7 @@ function formatLine(e9) {
   return `${time2} ${e9.level} ${e9.logger}: ${e9.message}${e9.exception ? `
 ${e9.exception}` : ""}`;
 }
-var MARKUP = `<summary>SpotNav logs</summary>
+var MARKUP = `<summary><span><strong>SpotNav logs</strong><small>Administrator diagnostics \xB7 recent integration records</small></span></summary>
 <div class="log-controls">
   <label>Severity <select class="log-level"><option value="INFO">Info and above</option><option value="WARNING">Warnings and errors</option><option value="ERROR">Errors only</option><option value="DEBUG">Everything kept (incl. debug)</option></select></label>
   <label>Text <input class="log-text" type="search" maxlength="100" placeholder="e.g. Morek, refused"></label>
@@ -66495,7 +66495,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.211";
+var CARD_VERSION = "2.5.212";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {

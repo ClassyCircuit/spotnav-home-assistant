@@ -32,7 +32,7 @@ export function formatLine(e) {
   return `${time} ${e.level} ${e.logger}: ${e.message}${e.exception ? `\n${e.exception}` : ''}`;
 }
 
-const MARKUP = `<summary>SpotNav logs</summary>
+const MARKUP = `<summary><span><strong>SpotNav logs</strong><small>Administrator diagnostics · recent integration records</small></span></summary>
 <div class="log-controls">
   <label>Severity <select class="log-level"><option value="INFO">Info and above</option><option value="WARNING">Warnings and errors</option><option value="ERROR">Errors only</option><option value="DEBUG">Everything kept (incl. debug)</option></select></label>
   <label>Text <input class="log-text" type="search" maxlength="100" placeholder="e.g. Morek, refused"></label>

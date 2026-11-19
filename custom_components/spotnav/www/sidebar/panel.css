@@ -6740,3 +6740,61 @@ wa-button[disabled] {
   min-width: 145px;
   margin-right: 0;
 }
+.pp-settings-grid,
+.ns-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 12px;
+  align-items: start;
+}
+.pp-settings-grid > .pp-block,
+.ns-settings-grid > .ns-block {
+  height: auto;
+  min-width: 0;
+}
+#log-viewer[hidden],
+main:not(:has(#sn-tab-settings[aria-selected=true])) ~ #log-viewer {
+  display: none;
+}
+#log-viewer > summary {
+  cursor: pointer;
+  list-style: none;
+  justify-content: space-between;
+  gap: 12px;
+}
+#log-viewer > summary::after {
+  content: "+";
+  font-size: 22px;
+  color: var(--sn-muted);
+}
+#log-viewer[open] > summary::after {
+  content: "\2212";
+}
+#log-viewer summary span {
+  display: grid;
+  gap: 4px;
+}
+#log-viewer summary small {
+  font-weight: 400;
+  color: var(--sn-muted);
+}
+#log-viewer .log-controls {
+  padding: 14px;
+  background: var(--sn-surface-2);
+  border: 1px solid var(--sn-line);
+  border-radius: 12px;
+}
+#log-viewer .log-status,
+#log-viewer .log-note {
+  color: var(--sn-muted);
+  font-size: 12px;
+}
+#log-viewer .log-lines {
+  padding: 12px;
+  border: 1px solid var(--sn-line);
+  border-radius: 12px;
+  overflow: auto;
+  max-height: 360px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

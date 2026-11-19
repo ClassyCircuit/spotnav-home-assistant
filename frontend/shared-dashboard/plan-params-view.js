@@ -27,6 +27,6 @@ export function renderPlanParams(m) {
   if (!m) return '';
   const notes = [m.notice, ...(m.notes || [])].filter(Boolean).map((t) => `<p class="pp-note">${e(t)}</p>`).join('');
   const reload = '<button type="button" id="reload-plan-params">Reload plan &amp; charger parameters</button>';
-  if (m.state !== 'ready') return `<details id="plan-params-details"><summary>Advanced: plan &amp; charger parameters</summary><div class="pp-body" role="status">${notes}${reload}</div></details>`;
-  return `<details id="plan-params-details"><summary>Advanced: plan &amp; charger parameters</summary><div class="pp-body">${periodsBlock(m)}${currentBlock(m)}${departureBlock(m)}<p class="pp-help">${e(m.savedNote)}</p><div role="status" id="plan-params-notice">${notes}</div>${reload}</div></details>`;
+  if (m.state !== 'ready') return `<details id="plan-params-details"><summary>Plan &amp; charger parameters</summary><div class="pp-body" role="status">${notes}${reload}</div></details>`;
+  return `<details id="plan-params-details"><summary>Plan &amp; charger parameters</summary><div class="pp-body"><p class="pp-help">Each section saves independently. Review the saved values and permissions before making changes.</p><div class="pp-settings-grid">${periodsBlock(m)}${currentBlock(m)}${departureBlock(m)}</div><p class="pp-help">${e(m.savedNote)}</p><div role="status" id="plan-params-notice">${notes}</div>${reload}</div></details>`;
 }
