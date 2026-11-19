@@ -53197,7 +53197,7 @@ function renderVehicleSources(m4) {
   if (!m4) return "";
   const notes = [m4.notice, ...m4.notes || []].filter(Boolean).map((t6) => `<p class="vs-note">${escapeText(t6)}</p>`).join("");
   const reload = m4.state === "forbidden" ? "" : '<button type="button" id="reload-vehicle-sources">Reload vehicle sources</button>';
-  if (m4.state !== "ready") return `<details id="vehicle-sources-details"><summary>Advanced: vehicle sources &amp; properties</summary><div class="vs-body" role="status">${notes}${reload}</div></details>`;
+  if (m4.state !== "ready") return `<details id="vehicle-sources-details"><summary>Vehicle sources &amp; properties <span class="settings-summary-hint">Sensor, battery and onboard charger</span></summary><div class="vs-body" role="status">${notes}${reload}</div></details>`;
   const edit = m4.canEdit ? "" : "disabled";
   const picker = m4.vehicles.length > 1 || !m4.vehicleId ? `<label>Vehicle <select data-vselect="vehicle" ${m4.busy ? "disabled" : ""}>${m4.vehicleId ? "" : opt("", "Choose a vehicle\u2026", true)}${m4.vehicles.map((v2) => opt(v2.id, v2.name || v2.id, v2.id === m4.vehicleId)).join("")}</select></label>` : `<p class="vs-line"><b>Vehicle</b> ${escapeText(m4.vehicles[0].name || m4.vehicles[0].id)}</p>`;
   let sensor = "", props = "";
@@ -53211,7 +53211,7 @@ function renderVehicleSources(m4) {
   } else if (m4.sensor) {
     props = '<div class="vs-block" data-vs="properties"><h3>Planning properties</h3><p class="vs-line">Capacity and onboard phases could not be read for this car. Reload vehicle sources; an older backend does not report them.</p></div>';
   }
-  return `<details id="vehicle-sources-details"><summary>Advanced: vehicle sources &amp; properties</summary><div class="vs-body">${picker}${sensor}${props}<p class="vs-help">Saving only stores your choice and may recalculate plans for this car, followed by normal guarded schedule reconciliation if Morek owns the schedule. It never wakes the car, sends a notification or proves charging. A saved sensor is never replaced by detection.</p><div role="status" id="vehicle-sources-notice">${notes}</div>${reload}</div></details>`;
+  return `<details id="vehicle-sources-details"><summary>Vehicle sources &amp; properties <span class="settings-summary-hint">Sensor, battery and onboard charger</span></summary><div class="vs-body"><p class="settings-intro">Choose the vehicle data used for charging plans. Each section is saved separately.</p><div class="settings-context"><span class="settings-eyebrow">Selected vehicle</span>${picker}<div class="settings-facts"><div><span>Charge level</span><strong>${escapeText(m4.reading?.text || "Unavailable")}</strong></div><div><span>Battery</span><strong>${escapeText(m4.properties?.capacity.display || "Unavailable")}</strong></div><div><span>Onboard charger</span><strong>${escapeText(m4.properties?.phases.display || "Unavailable")}</strong></div></div></div><div class="settings-editor-grid">${sensor}${props}</div><p class="vs-help">Saving only stores your choice and may recalculate plans for this car, followed by normal guarded schedule reconciliation if Morek owns the schedule. It never wakes the car, sends a notification or proves charging. A saved sensor is never replaced by detection.</p><div role="status" id="vehicle-sources-notice">${notes}</div>${reload}</div></details>`;
 }
 
 // shared-dashboard/market-costs-view.js
@@ -53251,8 +53251,8 @@ function renderMarketCosts(m4) {
   if (!m4) return "";
   const notes = [m4.notice, ...m4.notes || []].filter(Boolean).map((t6) => `<p class="mc-note">${escapeText(t6)}</p>`).join("");
   const reload = m4.state === "forbidden" ? "" : '<button type="button" id="reload-market-costs">Reload market &amp; costs</button>';
-  if (m4.state !== "ready") return `<details id="market-costs-details"><summary>Advanced: market &amp; charging costs</summary><div class="mc-body" role="status">${notes}${summaryBlock(m4)}${reload}</div></details>`;
-  return `<details id="market-costs-details"><summary>Advanced: market &amp; charging costs</summary><div class="mc-body">${summaryBlock(m4)}${sourceBlock(m4)}${marketBlock(m4)}${tariffBlock(m4)}<div class="mc-block" data-mc="basis"><h3>How costs are built</h3><p class="mc-line">${escapeText(m4.basis)}</p></div><p class="mc-help">Saving only stores your choice. It may recalculate plans and cost estimates for every charger using this price entry, followed by normal guarded schedule reconciliation if Morek owns the schedule. It never changes the provider on its own, sends a notification, wakes the car or proves charging. Historical tariffs are not reconstructed or invented.</p><div role="status" id="market-costs-notice">${notes}</div>${reload}</div></details>`;
+  if (m4.state !== "ready") return `<details id="market-costs-details"><summary>Market &amp; charging costs <span class="settings-summary-hint">Price source, taxes and grid tariff</span></summary><div class="mc-body" role="status">${notes}${summaryBlock(m4)}${reload}</div></details>`;
+  return `<details id="market-costs-details"><summary>Market &amp; charging costs <span class="settings-summary-hint">Price source, taxes and grid tariff</span></summary><div class="mc-body"><p class="settings-intro">Review your price source and cost assumptions. Each section is saved separately.</p><div class="settings-market-overview"><span class="settings-eyebrow">Current price basis</span><div class="settings-facts"><div><span>Provider</span><strong>${escapeText(m4.provider)}</strong></div><div><span>Price area</span><strong>${escapeText(m4.area.savedText)}</strong></div><div><span>Currency</span><strong>${escapeText(m4.currencyText)}</strong></div></div></div><div class="settings-editor-grid">${summaryBlock(m4)}${sourceBlock(m4)}</div><div class="settings-editor-grid">${marketBlock(m4)}${tariffBlock(m4)}</div><div class="mc-block" data-mc="basis"><h3>How costs are built</h3><p class="mc-line">${escapeText(m4.basis)}</p></div><p class="mc-help">Saving only stores your choice. It may recalculate plans and cost estimates for every charger using this price entry, followed by normal guarded schedule reconciliation if Morek owns the schedule. It never changes the provider on its own, sends a notification, wakes the car or proves charging. Historical tariffs are not reconstructed or invented.</p><div role="status" id="market-costs-notice">${notes}</div>${reload}</div></details>`;
 }
 
 // shared-dashboard/plan-params-view.js
@@ -66495,7 +66495,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.210";
+var CARD_VERSION = "2.5.211";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {

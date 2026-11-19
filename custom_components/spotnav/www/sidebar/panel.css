@@ -6608,3 +6608,135 @@ wa-button[disabled] {
 [data-sn-layout=compact] .evidence-grid {
   grid-template-columns: 1fr;
 }
+.settings-summary-hint {
+  display: block;
+  color: var(--sn-muted);
+  font-size: 12px;
+  font-weight: 400;
+  margin: 4px 0 0;
+}
+.settings-intro {
+  color: var(--sn-muted);
+  line-height: 1.5;
+  margin: 8px 0 16px;
+}
+.vs-block,
+.mc-block {
+  background: var(--sn-surface-2);
+  border: 1px solid var(--sn-line);
+  padding: 16px;
+  margin: 12px 0;
+}
+.vs-block h3,
+.mc-block h3 {
+  margin: 0 0 10px;
+}
+.vs-block label,
+.mc-block label {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 12px 8px 0;
+  max-width: 100%;
+}
+.vs-block select,
+.vs-block input,
+.mc-block select,
+.mc-block input {
+  max-width: 100%;
+}
+.mc-row {
+  padding: 12px 0;
+  border-top: 1px solid var(--sn-line);
+}
+.vs-help,
+.mc-help {
+  line-height: 1.5;
+}
+.settings-context {
+  padding: 14px 16px;
+  border: 1px solid var(--sn-line);
+  border-radius: 12px;
+  background: var(--sn-surface-2);
+}
+.settings-context h3 {
+  margin: 0 0 8px;
+}
+.settings-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 12px;
+  align-items: start;
+  margin: 12px 0;
+}
+.settings-editor-grid > .vs-block,
+.settings-editor-grid > .mc-block {
+  min-width: 0;
+  margin: 0;
+}
+.settings-editor-grid wa-button {
+  display: block;
+  margin-top: 12px;
+}
+.settings-editor-grid label {
+  min-width: 0;
+}
+.settings-editor-grid input,
+.settings-editor-grid select {
+  box-sizing: border-box;
+  width: 100%;
+}
+.settings-context,
+.settings-market-overview {
+  padding: 18px;
+  border: 1px solid var(--sn-line);
+  border-radius: 14px;
+  background: var(--sn-surface-2);
+}
+.settings-eyebrow {
+  display: block;
+  color: var(--sn-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.settings-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.settings-facts > div {
+  border-left: 2px solid var(--sn-accent);
+  padding-left: 10px;
+  min-width: 0;
+}
+.settings-facts span,
+.settings-facts strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.settings-facts span {
+  color: var(--sn-muted);
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.settings-facts strong {
+  font-size: 14px;
+}
+.mc-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0 12px;
+}
+.mc-row > b,
+.mc-row > p {
+  flex-basis: 100%;
+}
+.mc-row label {
+  flex: 1;
+  min-width: 145px;
+  margin-right: 0;
+}
