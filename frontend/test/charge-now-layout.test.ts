@@ -60,4 +60,12 @@ describe("responsive layout contract", () => {
   it("keeps the desktop shell width bounded", () => {
     expect(shell).toMatch(/\.shell\{max-width:1480px;margin:0 auto/);
   });
+  it("uses safe-area edges for compact cards and the full chart width", () => {
+    expect(shell).toMatch(/\[data-sn-layout="compact"\] \.shell\{--sn-gutter:0px;[^}]*safe-area-inset-left[^}]*safe-area-inset-right/);
+    expect(shell).toMatch(/\[data-sn-layout="compact"\] \.prices\{padding-left:0;padding-right:0;border:0;border-radius:0/);
+    expect(shell).toMatch(/\[data-sn-layout="compact"\] \.price-chart\{border:0;border-radius:0/);
+    expect(shell).toMatch(/\[data-sn-layout="compact"\] \.prices \.track-lanes\{padding-left:0;padding-right:0/);
+    expect(shell).toMatch(/\.chart\{width:100%/);
+    expect(shell).toMatch(/\.sn-tab\{[^}]*min-height:44px;min-width:44px/);
+  });
 });

@@ -4267,7 +4267,9 @@ dialog {
   display: none;
 }
 [data-sn-layout=compact] .shell {
-  --sn-gutter:12px;
+  --sn-gutter:0px;
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
   padding-bottom: calc(var(--sn-nav-h) + 28px + env(safe-area-inset-bottom, 0px));
 }
 .sn-header {
@@ -4440,8 +4442,7 @@ dialog {
 }
 [data-sn-layout=compact] .sn-header {
   position: static;
-  padding-top: max(8px, env(safe-area-inset-top, 0px));
-  padding-bottom: 10px;
+  padding: max(8px, env(safe-area-inset-top, 0px)) 12px 10px;
 }
 [data-sn-layout=compact] .sn-brand {
   flex: 1 1 0;
@@ -5614,9 +5615,8 @@ dialog::backdrop {
   width: calc(100% - 2 * var(--sn-gutter));
 }
 main[data-sn-layout=compact] ~ #log-viewer {
-  width: calc(100% - 24px);
-  margin: 12px;
-  margin-bottom: calc(var(--sn-nav-h) + 24px + env(safe-area-inset-bottom, 0px));
+  width: auto;
+  margin: 12px env(safe-area-inset-right, 0px) calc(var(--sn-nav-h) + 24px + env(safe-area-inset-bottom, 0px)) env(safe-area-inset-left, 0px);
 }
 #log-viewer > summary {
   min-height: 44px;
@@ -6043,6 +6043,30 @@ wa-button[disabled] {
   border-radius: 14px;
   background: var(--sn-surface-2);
   overflow: hidden;
+}
+[data-sn-layout=compact] .prices {
+  padding-left: 0;
+  padding-right: 0;
+  border: 0;
+  border-radius: 0;
+}
+[data-sn-layout=compact] .prices > :not(.price-chart):not(.track-lanes) {
+  margin-left: 16px;
+  margin-right: 16px;
+}
+[data-sn-layout=compact] .price-chart {
+  border: 0;
+  border-radius: 0;
+}
+[data-sn-layout=compact] .prices .track-lanes {
+  padding-left: 0;
+  padding-right: 0;
+  border-left: 0;
+  border-right: 0;
+  border-radius: 0;
+}
+[data-sn-layout=compact] .prices .track-caption {
+  padding: 0 16px;
 }
 .track-lanes {
   display: grid;
