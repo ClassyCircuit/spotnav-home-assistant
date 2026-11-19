@@ -22413,8 +22413,8 @@ function doGuessOrdinal(data, sourceFormat, seriesLayoutBy, dimensionsDefine, st
       }
     } else {
       for (var i7 = 0; i7 < dataArrayRows.length && i7 < maxLoop; i7++) {
-        var row3 = dataArrayRows[startIndex + i7];
-        if (row3 && (result2 = detectValue(row3[dimIndex])) != null) {
+        var row4 = dataArrayRows[startIndex + i7];
+        if (row4 && (result2 = detectValue(row4[dimIndex])) != null) {
           return result2;
         }
       }
@@ -24228,8 +24228,8 @@ var rawSourceItemGetterMap = (_b = {}, _b[SOURCE_FORMAT_ARRAY_ROWS + "_" + SERIE
   var item = out2 || [];
   var data = rawData;
   for (var i7 = 0; i7 < data.length; i7++) {
-    var row3 = data[i7];
-    item[i7] = row3 ? row3[idx] : null;
+    var row4 = data[i7];
+    item[i7] = row4 ? row4[idx] : null;
   }
   return item;
 }, _b[SOURCE_FORMAT_OBJECT_ROWS] = getItemSimply, _b[SOURCE_FORMAT_KEYED_COLUMNS] = function(rawData, startIndex, dimsDef, idx, out2) {
@@ -24254,8 +24254,8 @@ var countSimply = function(rawData, startIndex, dimsDef) {
 var rawSourceDataCounterMap = (_c = {}, _c[SOURCE_FORMAT_ARRAY_ROWS + "_" + SERIES_LAYOUT_BY_COLUMN] = function(rawData, startIndex, dimsDef) {
   return Math.max(0, rawData.length - startIndex);
 }, _c[SOURCE_FORMAT_ARRAY_ROWS + "_" + SERIES_LAYOUT_BY_ROW] = function(rawData, startIndex, dimsDef) {
-  var row3 = rawData[0];
-  return row3 ? Math.max(0, row3.length - startIndex) : 0;
+  var row4 = rawData[0];
+  return row4 ? Math.max(0, row4.length - startIndex) : 0;
 }, _c[SOURCE_FORMAT_OBJECT_ROWS] = countSimply, _c[SOURCE_FORMAT_KEYED_COLUMNS] = function(rawData, startIndex, dimsDef) {
   var dimName = dimsDef[0].name;
   var col = dimName != null ? rawData[dimName] : null;
@@ -29386,31 +29386,31 @@ function normalizeSymbolArray(symbol) {
   }
   return result2;
 }
-function normalizeDashArrayX(dash) {
-  if (!dash || dash.length === 0) {
+function normalizeDashArrayX(dash2) {
+  if (!dash2 || dash2.length === 0) {
     return [[0, 0]];
   }
-  if (isNumber(dash)) {
-    var dashValue = Math.ceil(dash);
+  if (isNumber(dash2)) {
+    var dashValue = Math.ceil(dash2);
     return [[dashValue, dashValue]];
   }
   var isAllNumber = true;
-  for (var i7 = 0; i7 < dash.length; ++i7) {
-    if (!isNumber(dash[i7])) {
+  for (var i7 = 0; i7 < dash2.length; ++i7) {
+    if (!isNumber(dash2[i7])) {
       isAllNumber = false;
       break;
     }
   }
   if (isAllNumber) {
-    return normalizeDashArrayX([dash]);
+    return normalizeDashArrayX([dash2]);
   }
   var result2 = [];
-  for (var i7 = 0; i7 < dash.length; ++i7) {
-    if (isNumber(dash[i7])) {
-      var dashValue = Math.ceil(dash[i7]);
+  for (var i7 = 0; i7 < dash2.length; ++i7) {
+    if (isNumber(dash2[i7])) {
+      var dashValue = Math.ceil(dash2[i7]);
       result2.push([dashValue, dashValue]);
     } else {
-      var dashValue = map(dash[i7], function(n6) {
+      var dashValue = map(dash2[i7], function(n6) {
         return Math.ceil(n6);
       });
       if (dashValue.length % 2 === 1) {
@@ -29422,30 +29422,30 @@ function normalizeDashArrayX(dash) {
   }
   return result2;
 }
-function normalizeDashArrayY(dash) {
-  if (!dash || typeof dash === "object" && dash.length === 0) {
+function normalizeDashArrayY(dash2) {
+  if (!dash2 || typeof dash2 === "object" && dash2.length === 0) {
     return [0, 0];
   }
-  if (isNumber(dash)) {
-    var dashValue_1 = Math.ceil(dash);
+  if (isNumber(dash2)) {
+    var dashValue_1 = Math.ceil(dash2);
     return [dashValue_1, dashValue_1];
   }
-  var dashValue = map(dash, function(n6) {
+  var dashValue = map(dash2, function(n6) {
     return Math.ceil(n6);
   });
-  return dash.length % 2 ? dashValue.concat(dashValue) : dashValue;
+  return dash2.length % 2 ? dashValue.concat(dashValue) : dashValue;
 }
-function getLineBlockLengthX(dash) {
-  return map(dash, function(line) {
+function getLineBlockLengthX(dash2) {
+  return map(dash2, function(line) {
     return getLineBlockLengthY(line);
   });
 }
-function getLineBlockLengthY(dash) {
+function getLineBlockLengthY(dash2) {
   var blockLength = 0;
-  for (var i7 = 0; i7 < dash.length; ++i7) {
-    blockLength += dash[i7];
+  for (var i7 = 0; i7 < dash2.length; ++i7) {
+    blockLength += dash2[i7];
   }
-  if (dash.length % 2 === 1) {
+  if (dash2.length % 2 === 1) {
     return blockLength * 2;
   }
   return blockLength;
@@ -52270,7 +52270,7 @@ function priceAxisExtent(prices, unit, extra) {
 use([install3, install, install5, install6, install8, install9, install7, install15, install12, install16]);
 var axis = { axisLine: { lineStyle: { color: "#2f4770" } }, axisLabel: { color: "#aebfd8", fontSize: 12 }, splitLine: { lineStyle: { color: "#172a46", type: "dashed" } } };
 function mountCharts(root, data, format3, modes) {
-  let { prices, windows, tracks = null, now, deadline, horizon, cap, readings, sentHistory, historyAxis, unit = "c/kWh", viewKey } = data;
+  let { prices, windows, tracks = null, now, deadline, horizon, cap, readings, sentHistory, historyAxis, unit = "c/kWh", viewKey, selectedWindow = null, onWindowPick = null } = data;
   let { time: time2, date: sampleDate, days: sampleDays, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks, tickLabel } = format3;
   time2 = format3.chartTime || time2;
   let tooltipDate = format3.tooltipDate || sampleDate;
@@ -52278,6 +52278,7 @@ function mountCharts(root, data, format3, modes) {
   const signal = controller.signal;
   const priceCharts = {};
   const refreshers = [];
+  const focusers = [];
   for (const mode of modes) {
     const priceChart = init2(root.querySelector(`#price-${mode}`));
     priceCharts[mode] = priceChart;
@@ -52363,6 +52364,18 @@ ${sampleDate(h3)}` : time2(h3);
           elements.push(el);
         }
       }
+      if (selectedWindow && Number.isFinite(selectedWindow.start) && Number.isFinite(selectedWindow.end)) {
+        const a4 = Math.max(selectedWindow.start, z2.startValue), b3 = Math.min(selectedWindow.end, z2.endValue);
+        if (b3 > a4) {
+          const el = document.createElement("div");
+          el.className = "proposal-selected";
+          el.dataset.start = selectedWindow.start;
+          el.dataset.end = selectedWindow.end;
+          el.style.left = `${pixel(a4)}px`;
+          el.style.width = `${pixel(b3) - pixel(a4)}px`;
+          elements.push(el);
+        }
+      }
       for (const segment of sampleDays(z2.startValue, z2.endValue)) {
         const left = pixel(segment.start), right = pixel(segment.end), span2 = right - left;
         const cell = document.createElement("div");
@@ -52396,6 +52409,21 @@ ${sampleDate(h3)}` : time2(h3);
       drawLanes(z2);
     };
     const laneRoot = root.querySelector(`[data-track-lanes="${mode}"]`);
+    if (laneRoot) laneRoot.addEventListener("click", (event) => {
+      if (typeof onWindowPick !== "function") return;
+      const lane = event.target?.closest?.(".track-lane");
+      const bar = lane?.dataset?.lane === "proposal" ? lane.querySelector(".track-bar") : null;
+      if (!bar) return;
+      const rect = bar.getBoundingClientRect(), z2 = priceChart.getOption().dataZoom[0];
+      if (!(rect.width > 0)) return;
+      onWindowPick(z2.startValue + (event.clientX - rect.left) / rect.width * (z2.endValue - z2.startValue));
+    }, { signal });
+    focusers.push((start2, end2) => {
+      const hour = Number.isFinite(format3.minutesPerTimeUnit) && format3.minutesPerTimeUnit > 0 ? 60 / format3.minutesPerTimeUnit : 0;
+      const pad3 = Math.max(end2 - start2, 2 * hour);
+      const a4 = Math.max(horizon[0], start2 - pad3), b3 = Math.min(horizon[1], end2 + pad3);
+      if (b3 > a4) priceChart.dispatchAction({ type: "dataZoom", startValue: a4, endValue: b3 });
+    });
     const drawLanes = (z2) => {
       if (!laneRoot) return;
       const px = (h3) => priceChart.convertToPixel({ xAxisIndex: 0 }, h3);
@@ -52438,6 +52466,18 @@ ${sampleDate(h3)}` : time2(h3);
           seg.title = s4.text || "";
           if (s4.label && span2 >= 64) seg.textContent = s4.label;
           bar.append(seg);
+        }
+        if (lane.key === "proposal" && selectedWindow && Number.isFinite(selectedWindow.start) && Number.isFinite(selectedWindow.end)) {
+          const a4 = Math.max(selectedWindow.start, z2.startValue), b3 = Math.min(selectedWindow.end, z2.endValue);
+          if (b3 > a4) {
+            const mark = document.createElement("div");
+            mark.className = "track-selected";
+            mark.dataset.start = selectedWindow.start;
+            mark.dataset.end = selectedWindow.end;
+            mark.style.left = `${px(a4) - left}px`;
+            mark.style.width = `${px(b3) - px(a4)}px`;
+            bar.append(mark);
+          }
         }
         el.append(caption, bar);
         return el;
@@ -52556,12 +52596,14 @@ ${sampleDate(h3)}` : time2(h3);
   });
   for (const mode of modes) resize.observe(root.querySelector(`#price-${mode}`));
   if (powerChart) resize.observe(root.querySelector("#power-chart"));
-  return { priceCharts, resize() {
+  return { priceCharts, focusInterval(start2, end2) {
+    if (Number.isFinite(start2) && Number.isFinite(end2) && end2 > start2) focusers.forEach((focus) => focus(start2, end2));
+  }, resize() {
     Object.values(priceCharts).forEach((chart) => chart.resize());
     powerChart?.resize();
   }, update(next, nextFormat) {
     const navigated = next.viewKey !== viewKey;
-    ({ prices, windows, tracks = null, now, deadline, horizon, cap, unit = "c/kWh", viewKey } = next);
+    ({ prices, windows, tracks = null, now, deadline, horizon, cap, unit = "c/kWh", viewKey, selectedWindow = null, onWindowPick = null } = next);
     ({ time: time2, date: sampleDate, days: sampleDays, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks, tickLabel } = nextFormat);
     time2 = nextFormat.chartTime || time2;
     tooltipDate = nextFormat.tooltipDate || sampleDate;
@@ -52720,8 +52762,8 @@ function buildTracks({ horizon, now, toAxis = (x2) => x2, windows = null, histor
 // shared-dashboard/plan-data.js
 var validSocAssumptions = ({ startingSoc, capacityKwh, efficiency } = {}) => Number.isFinite(startingSoc) && startingSoc >= 0 && startingSoc <= 100 && Number.isFinite(capacityKwh) && capacityKwh > 0 && Number.isFinite(efficiency) && efficiency > 0 && efficiency <= 1;
 var total = (rows) => {
-  const energy3 = rows.length > 0 && rows.every((row3) => Number.isFinite(row3.energy) && row3.energy >= 0) ? rows.reduce((s4, row3) => s4 + row3.energy, 0) : null;
-  const cost = rows.length > 0 && rows.every((row3) => Number.isFinite(row3.cost)) ? rows.reduce((s4, row3) => s4 + row3.cost, 0) : null;
+  const energy3 = rows.length > 0 && rows.every((row4) => Number.isFinite(row4.energy) && row4.energy >= 0) ? rows.reduce((s4, row4) => s4 + row4.energy, 0) : null;
+  const cost = rows.length > 0 && rows.every((row4) => Number.isFinite(row4.cost)) ? rows.reduce((s4, row4) => s4 + row4.cost, 0) : null;
   const validEnergy = Number.isFinite(energy3) ? energy3 : null;
   const validCost = Number.isFinite(cost) ? cost : null;
   const average = validEnergy > 0 && validCost != null ? validCost * 100 / validEnergy : null;
@@ -52779,6 +52821,159 @@ function renderPlan(windows, assumptions = {}, stale = false, formatters, totals
   return `<div class="plan-heading"><div><h3>Complete proposed plan${stale ? ` \xB7 ${escapeText2(formatters.staleLabel ?? "stale")}` : ""}</h3><p>Estimated, not measured or guaranteed \xB7 wall energy \xB7 ${escapeText2(currency === void 0 ? "EUR" : currency || "currency unknown")}${formatters.costBasis ? ` \xB7 ${escapeText2(formatters.costBasis)}` : ""}</p></div><wa-badge variant="neutral" pill>${windows.length} windows</wa-badge></div><div class="plan-label"><span>Window</span><span>Weighted price</span><span>Wall energy</span><span>Cost</span><span>SOC after</span></div>${rows || "<p>No proposed windows</p>"}<div class="plan-total"><div><small>${hasReserve ? "REQUIRED BASELINE ENERGY" : "WALL ENERGY"}</small><strong>${energy(summary.energy)}</strong></div><div><small>${hasReserve ? "REQUIRED BASELINE COST" : "TOTAL COST"}</small><strong>${money(summary.cost, currency)}</strong></div><div><small>WEIGHTED AVERAGE</small><strong>${displayPrice2(summary.pricePerKwh, summary.centsPerKwh)}</strong></div></div>${renderReserve(reserve, currency)}${renderLearning(learning)}<p class="projection-note">SOC projection: ${projectionBasis}. ${escapeText2(assumptions.projectionNote || "Battery energy = wall energy \xD7 efficiency; capped at 100%.")}</p>${formatters.detailsNote ? `<p class="projection-note">${escapeText2(formatters.detailsNote)}</p>` : ""}`;
 }
 
+// shared-dashboard/windows-model.js
+var finite2 = Number.isFinite;
+var validInterval = (w2) => !!w2 && finite2(w2.start) && finite2(w2.end) && w2.end > w2.start;
+var windowKey = (w2) => `${w2.start}\u2192${w2.end}`;
+function contextKeyOf(draftKey, context, windows) {
+  const identity3 = typeof context?.identity === "string" && context.identity ? `id:${context.identity}` : `fp:${(windows || []).map((w2) => `${w2?.start}-${w2?.end}`).join(",")}`;
+  return `${draftKey ?? ""}|${identity3}`;
+}
+var minutes = (w2, f3) => validInterval(w2) && finite2(f3.minutesPerTimeUnit) && f3.minutesPerTimeUnit > 0 ? (w2.end - w2.start) * f3.minutesPerTimeUnit : null;
+var durationText = (value2) => {
+  if (!finite2(value2) || value2 < 0) return "Unknown";
+  const m4 = Math.round(value2);
+  return m4 < 60 ? `${m4} min` : `${Math.floor(m4 / 60)} h${m4 % 60 ? ` ${m4 % 60} min` : ""}`;
+};
+var CONSTRAINED = ["minimum_shortfall", "target_shortfall", "block_limit", "minimum_exception"];
+var NO_NEED = ["target_met"];
+var UNAVAILABLE = ["recalculating", "unavailable", "error"];
+function windowsStatus({ knownPlan, stale, count: count3, context }) {
+  const codes = Array.isArray(context?.codes) ? context.codes : [];
+  if (!knownPlan) return stale ? "stale" : "unavailable";
+  if (count3 > 0) return context?.provisional === true ? "provisional" : "proposed";
+  if (codes.some((c5) => UNAVAILABLE.includes(c5))) return "unavailable";
+  if (codes.some((c5) => CONSTRAINED.includes(c5)) || context?.provisional === true) return "constrained";
+  if (codes.some((c5) => NO_NEED.includes(c5))) return "noneed";
+  return "empty";
+}
+function buildWindowsModel({ windows, knownPlan, stale = false, totals, context, format: f3, draftKey, nav = null, chartHorizon = null }) {
+  const list4 = knownPlan && Array.isArray(windows) ? windows : [];
+  const eps = finite2(f3.minutesPerTimeUnit) && f3.minutesPerTimeUnit > 0 ? 1e-3 / f3.minutesPerTimeUnit : 0;
+  const text4 = (x2) => finite2(x2) ? f3.time(x2) : "Unknown";
+  const dayOf = (x2) => finite2(x2) ? f3.day(x2) : "Unknown";
+  const offsetOf = (x2) => typeof f3.offset === "function" && finite2(x2) ? f3.offset(x2) : null;
+  const seen = /* @__PURE__ */ new Map(), ambiguous = /* @__PURE__ */ new Set();
+  for (const w2 of list4) for (const x2 of [w2?.start, w2?.end]) if (finite2(x2)) {
+    const k2 = `${dayOf(x2)} ${text4(x2)}`;
+    if (seen.has(k2) && seen.get(k2) !== x2) ambiguous.add(k2);
+    else seen.set(k2, x2);
+  }
+  const rows = list4.map((w2, i7) => {
+    const valid = validInterval(w2);
+    const crosses = valid && dayOf(w2.start) !== dayOf(w2.end - eps);
+    const a4 = valid ? offsetOf(w2.start) : null, b3 = valid ? offsetOf(w2.end) : null;
+    const clash = valid && (ambiguous.has(`${dayOf(w2.start)} ${text4(w2.start)}`) || ambiguous.has(`${dayOf(w2.end)} ${text4(w2.end)}`));
+    const showOffset = !!(a4 && b3 && (a4 !== b3 || clash));
+    const exception = w2?.control === "minimum-exception";
+    const reserve = finite2(w2?.reserveMinutes) && w2.reserveMinutes > 0 ? w2.reserveMinutes : null;
+    const inChart = valid && Array.isArray(chartHorizon) && chartHorizon.length === 2 && w2.start >= chartHorizon[0] && w2.end <= chartHorizon[1];
+    return {
+      ordinal: i7 + 1,
+      key: valid ? windowKey(w2) : null,
+      valid,
+      start: w2?.start,
+      end: w2?.end,
+      startText: text4(w2?.start),
+      endText: text4(w2?.end),
+      startDay: dayOf(w2?.start),
+      endDay: valid ? dayOf(w2.end - eps) : "Unknown",
+      crosses,
+      startOffset: showOffset ? a4 : null,
+      endOffset: showOffset ? b3 : null,
+      repeatedHour: clash && !showOffset,
+      minutes: minutes(w2, f3),
+      exception,
+      reserve,
+      w: w2,
+      inChart
+    };
+  });
+  const status = windowsStatus({ knownPlan, stale, count: rows.length, context });
+  const summary = totals === void 0 ? total(list4) : totals || {};
+  const durations = rows.map((r7) => r7.minutes);
+  const totalMinutes = rows.length > 0 && durations.every(finite2) ? durations.reduce((s4, v2) => s4 + v2, 0) : null;
+  return { status, rows, summary, totalMinutes, count: rows.length, contextKey: contextKeyOf(draftKey, context, list4), draftKey, nav, knownPlan };
+}
+function resolveSelection(sel, model) {
+  if (!sel) return { selected: null, notice: "" };
+  if (sel.draftKey !== model.draftKey) return { selected: null, notice: "" };
+  const row4 = model.contextKey === sel.contextKey ? model.rows.find((r7) => r7.valid && r7.key === sel.key) : null;
+  if (row4) return { selected: row4, notice: "" };
+  return { selected: null, notice: model.knownPlan ? "The proposal changed, so the selected window was cleared. Nothing was sent or replanned." : "The proposal is no longer current, so the selected window was cleared." };
+}
+function windowsAt(model, instant4) {
+  return finite2(instant4) ? model.rows.filter((r7) => r7.valid && r7.start <= instant4 && instant4 < r7.end) : [];
+}
+
+// shared-dashboard/windows-view.js
+var STATUS = {
+  proposed: ["Proposed", "neutral", "Selected by the planner for the current settings. Calculated, not necessarily sent."],
+  provisional: ["Provisional", "warning", "Planned from the prices published so far; the proposal may change when more prices arrive."],
+  constrained: ["No windows \xB7 constrained", "warning", "The planner proposes no windows because of a limit or missing prices, not because charging is unnecessary."],
+  noneed: ["No charging needed", "success", "The planner reports no charging is needed for the current target."],
+  empty: ["No windows", "neutral", "The current proposal has no windows and the planner did not state why. This is not an error and not a statement that no charging is needed."],
+  stale: ["Stale proposal", "danger", "The proposal is stale or historical, so no windows are shown as current."],
+  unavailable: ["Plan unavailable", "danger", "No current proposal is available, so no windows can be listed."]
+};
+var fixed = (value2, digits, unit, ok3 = () => true) => Number.isFinite(value2) && ok3(value2) ? `${value2.toFixed(digits)}${unit}` : null;
+var dash = (text4) => text4 == null ? '<span class="win-na" title="Unavailable: see the note below the list">\u2014</span>' : escapeText(text4);
+function fact(label2, body) {
+  return `<div><dt>${escapeText(label2)}</dt><dd>${body}</dd></div>`;
+}
+function row(r7, ctx) {
+  const { selected, nextKey, f: f3, assumptions } = ctx;
+  if (!r7.valid) {
+    return `<li class="win-row win-invalid" data-window-invalid="${r7.ordinal}"><span class="win-ord">${String(r7.ordinal).padStart(2, "0")}</span><span class="win-time"><b>Interval unavailable</b><small>This proposal row has no valid start and end. It is shown as received and is not drawn on the chart.</small></span></li>`;
+  }
+  const w2 = r7.w, isSel = selected?.key === r7.key, isNext = r7.key === nextKey;
+  const currency = f3.currency, priceCurrency = currency === void 0 ? "EUR" : currency;
+  const priceValue = w2.pricePerKwh === void 0 && priceCurrency === "EUR" ? w2.centsPerKwh : w2.pricePerKwh;
+  const price = Number.isFinite(priceValue) && typeof priceCurrency === "string" && /^[A-Z]{3}$/.test(priceCurrency) ? `${summaryPriceText(priceValue)} ${priceUnit(priceCurrency)}` : null;
+  const cost = Number.isFinite(w2.cost) ? money(w2.cost, currency) : null;
+  const projection = assumptions.projectionSupported === true || validSocAssumptions(assumptions);
+  const socAfter = projection ? fixed(w2.projectedSoc, 1, "%", (n6) => n6 >= 0 && n6 <= 100) : null;
+  const when2 = `${r7.startDay}${r7.crosses ? ` \u2192 ${r7.endDay}` : ""}`;
+  const clock6 = `${r7.startText}${r7.startOffset ? ` ${r7.startOffset}` : ""}\u2013${r7.endText}${r7.endOffset ? ` ${r7.endOffset}` : ""}`;
+  const tags = [
+    isNext ? '<span class="win-tag" data-tag="next">Next</span>' : "",
+    r7.crosses ? '<span class="win-tag" data-tag="crosses">Crosses midnight</span>' : "",
+    r7.repeatedHour ? '<span class="win-tag" data-tag="repeated">Repeated local hour (DST)</span>' : "",
+    r7.exception ? '<span class="win-tag" data-tag="exception">Above-cap minimum</span>' : "",
+    r7.reserve ? `<span class="win-tag" data-tag="reserve">Includes ${escapeText(durationText(r7.reserve))} reserve</span>` : "",
+    !r7.inChart && ctx.chartKnown ? '<span class="win-tag" data-tag="off-chart">Outside the days on the chart</span>' : ""
+  ].join("");
+  const label2 = `Window ${r7.ordinal}: ${r7.startDay} ${r7.startText} to ${r7.crosses ? `${r7.endDay} ` : ""}${r7.endText}, ${durationText(r7.minutes)}. ${isSel ? "Selected; activate to clear." : "Activate to select and highlight it on the chart. Read only."}`;
+  return `<li class="win-row${isNext ? " win-next" : ""}" data-window="${escapeText(r7.key)}" data-selected="${isSel}"><button type="button" class="win-select" data-win-select="${escapeText(r7.key)}" aria-pressed="${isSel}" aria-label="${escapeText(label2)}"><span class="win-ord" aria-hidden="true">${String(r7.ordinal).padStart(2, "0")}</span><span class="win-time"><b>${escapeText(clock6)}</b><small>${escapeText(when2)}</small></span><span class="win-dur">${escapeText(durationText(r7.minutes))}</span></button><dl class="win-facts">${fact("Wall energy", dash(fixed(w2.energy, 2, " kWh", (n6) => n6 >= 0)))}${fact("Weighted price", dash(price))}${fact("Cost", dash(cost))}${fact("SOC after", dash(socAfter))}</dl>` + (tags ? `<div class="win-tags">${tags}</div>` : "") + "</li>";
+}
+function selectionBar(model, ctx) {
+  const { selected, notice } = ctx;
+  const live = `<p class="subtext win-selection" role="status" aria-live="polite" data-win-notice="${notice ? "cleared" : selected ? "selected" : "none"}">${notice ? escapeText(notice) : selected ? `Window ${selected.ordinal} selected: ${escapeText(selected.startDay)} ${escapeText(selected.startText)}\u2013${escapeText(selected.endText)}. Highlighted on the chart; nothing is sent.` : ""}</p>`;
+  if (!selected) return live;
+  const jump = !selected.inChart && ctx.chartKnown ? (() => {
+    const buttons = (model.nav?.buttons || []).filter((b3) => b3.enabled && !b3.selected && ["today", "tomorrow", "all", "yesterday"].includes(b3.id));
+    return `<div class="win-jump" data-win-jump><p class="subtext">This window is outside the days currently drawn on the chart.${buttons.length ? " Show another available price day:" : " No other price day is available to show it."}</p>${buttons.map((b3) => `<wa-button size="small" data-win-nav="${escapeText(b3.id)}">${escapeText(b3.label)}</wa-button>`).join("")}</div>`;
+  })() : "";
+  return `${live}<div class="win-actions" role="group" aria-label="Selected window, read only">${selected.inChart ? '<wa-button size="small" id="win-show-chart">Show on chart</wa-button>' : ""}<wa-button size="small" id="win-clear">Clear selection</wa-button></div>${jump}`;
+}
+function renderWindows(model, ctx) {
+  const { f: f3 } = ctx;
+  const [badge, variant, explain] = STATUS[model.status] || STATUS.unavailable;
+  const currency = f3.currency === void 0 ? "EUR" : f3.currency || "currency unknown";
+  const count3 = `${model.count} window${model.count === 1 ? "" : "s"}`;
+  const head = `<div class="win-head" data-win-status="${model.status}"><wa-badge variant="${variant}" pill>${escapeText(badge)}</wa-badge><span class="win-count">${escapeText(model.knownPlan ? count3 : "No list")}</span><span class="subtext">Estimated, not measured or guaranteed \xB7 wall energy \xB7 ${escapeText(currency)}${f3.costBasis ? ` \xB7 ${escapeText(f3.costBasis)}` : ""}</span></div>`;
+  const policy = ctx.policy && model.status !== "stale" && model.status !== "unavailable" ? `<p class="subtext win-policy">Planner: ${escapeText(ctx.policy)}</p>` : "";
+  const prices = ctx.context?.tomorrowPending === true && model.status !== "stale" && model.status !== "unavailable" ? '<p class="subtext">Tomorrow\u2019s prices are pending, so unpriced intervals stay unknown.</p>' : "";
+  const body = model.count ? `<div class="win-scroll" role="region" tabindex="0" aria-label="${escapeText(`Proposed windows, ${count3} in total`)}"><ol class="win-list">${model.rows.map((r7) => row(r7, { ...ctx, nextKey: ctx.nextKey })).join("")}</ol></div>` : "";
+  const s4 = model.summary || {};
+  const hasReserve = !!ctx.reserve && Number.isFinite(ctx.reserve.minutes) && ctx.reserve.minutes > 0;
+  const price = Number.isFinite(s4.pricePerKwh ?? s4.centsPerKwh) && (f3.currency === void 0 || typeof f3.currency === "string" && /^[A-Z]{3}$/.test(f3.currency)) ? `${summaryPriceText(s4.pricePerKwh ?? s4.centsPerKwh)} ${priceUnit(f3.currency === void 0 ? "EUR" : f3.currency)}` : "Unknown";
+  const footer = model.count ? `<div class="win-footer" data-win-footer><div><small>Selected time</small><strong>${escapeText(durationText(model.totalMinutes))}</strong></div><div><small>${hasReserve ? "Required baseline energy" : "Plan wall energy"}</small><strong>${Number.isFinite(s4.energy) ? escapeText(`${s4.energy.toFixed(2)} kWh`) : "Unknown"}</strong></div><div><small>${hasReserve ? "Required baseline cost" : "Plan cost"}</small><strong>${escapeText(money(s4.cost, f3.currency))}</strong></div><div><small>Weighted average</small><strong>${escapeText(price)}</strong></div></div>` : "";
+  const note = f3.detailsNote && model.count ? `<p class="subtext win-details-note">${escapeText(f3.detailsNote)}</p>` : "";
+  const sep = '<p class="subtext win-separation">Proposal only. Whether it was sent, acknowledged or is in effect at the charger is separate evidence: see Plan activity &amp; freshness. Opening or selecting a window never replans or sends anything.</p>';
+  return `${head}<p class="subtext win-explain">${escapeText(explain)}</p>${policy}${prices}${body}${model.count ? selectionBar(model, ctx) : ""}${footer}${note}${sep}${model.count ? "" : `<p class="subtext win-selection" role="status" aria-live="polite">${ctx.notice ? escapeText(ctx.notice) : ""}</p>`}`;
+}
+
 // shared-dashboard/vehicle-view.js
 var percent = (n6) => Number.isFinite(n6) && n6 >= 0 && n6 <= 100;
 var positive = (n6) => Number.isFinite(n6) && n6 > 0;
@@ -52814,7 +53009,7 @@ function renderEvidence(data, power, count3) {
 
 // shared-dashboard/history-view.js
 var list = (items, render2) => items.length ? `<ul class="history-list">${items.map(render2).join("")}</ul>` : "";
-var row = (text4, detail = "", cls = "") => `<li${cls ? ` class="${cls}"` : ""}>${escapeText(text4)}${detail ? `<small>${escapeText(detail)}</small>` : ""}</li>`;
+var row2 = (text4, detail = "", cls = "") => `<li${cls ? ` class="${cls}"` : ""}>${escapeText(text4)}${detail ? `<small>${escapeText(detail)}</small>` : ""}</li>`;
 function renderHistoryNav(nav) {
   if (!nav) return "";
   const button = (id, label2, enabled) => `<wa-button size="small" data-history-nav="${id}" ${enabled ? "" : "disabled"}>${escapeText(label2)}</wa-button>`;
@@ -52824,7 +53019,7 @@ function renderHistoryNav(nav) {
 }
 var banner = (kind, text4) => `<p class="history-banner" data-history-banner="${escapeText(kind)}" role="status">${escapeText(text4)}</p>`;
 var basisValue = (r7) => r7.value === null ? "Unavailable" : escapeText(r7.text.slice(r7.label.length + 2));
-var energy2 = (m4) => `<div class="history-energy" aria-label="Energy by basis">${m4.energyRows.map((r7) => `<div class="history-basis" data-basis-value="${r7.value === null ? "null" : r7.value}"><b>${escapeText(r7.label)}</b><span>${basisValue(r7)}</span><small>${escapeText(r7.detail)}</small></div>`).join("")}<div class="history-basis"><b>Recorder-placed session energy</b><span>${m4.sessions.length ? "Per session below" : "No session overlaps this day"}</span><small>Never added to the bases beside it</small></div></div>${list(m4.energyNotes, (t6) => row(t6))}`;
+var energy2 = (m4) => `<div class="history-energy" aria-label="Energy by basis">${m4.energyRows.map((r7) => `<div class="history-basis" data-basis-value="${r7.value === null ? "null" : r7.value}"><b>${escapeText(r7.label)}</b><span>${basisValue(r7)}</span><small>${escapeText(r7.detail)}</small></div>`).join("")}<div class="history-basis"><b>Recorder-placed session energy</b><span>${m4.sessions.length ? "Per session below" : "No session overlaps this day"}</span><small>Never added to the bases beside it</small></div></div>${list(m4.energyNotes, (t6) => row2(t6))}`;
 var costBlock = (c5, cls = "") => `<div class="history-basis${cls}" data-spot-cost="${escapeText(c5.state)}"><b>${escapeText(c5.headline)}</b>${c5.lines.map((l6) => `<small>${escapeText(l6)}</small>`).join("")}</div>`;
 var savingsBlock = (c5) => `<div class="history-basis" data-spot-savings="${escapeText(c5.state)}"><b>${escapeText(c5.headline)}</b>${(c5.lines || []).map((l6) => `<small>${escapeText(l6)}</small>`).join("")}</div>`;
 var summaryCards = (cost, savings) => `<div class="history-energy history-summary" aria-label="Spot cost and estimated savings">${costBlock(cost)}${savings ? savingsBlock(savings) : ""}</div>`;
@@ -52832,16 +53027,16 @@ function renderMonthCost(m4) {
   const picker = m4.options?.length ? `<label class="history-date">Month <select data-history-month aria-label="Spot cost month">${m4.options.map((o9) => `<option value="${escapeText(o9.value)}" ${o9.selected ? "selected" : ""}>${escapeText(o9.label)}</option>`).join("")}</select></label>` : "";
   let body;
   if (m4.state === "ready") {
-    body = `${summaryCards(m4.total, m4.savings)}${m4.days.length ? `<h4>Days with a recorded session (delivery day, Home Assistant time)</h4>${list(m4.days, (d3) => row(d3.text, d3.detail, `spot-${d3.state}`))}` : ""}${m4.emptyDays ? `<p class="subtext">${m4.emptyDays} day(s) with no recorded session: no cost shown for them (not zero, not proof that nothing was charged).</p>` : ""}`;
+    body = `${summaryCards(m4.total, m4.savings)}${m4.days.length ? `<h4>Days with a recorded session (delivery day, Home Assistant time)</h4>${list(m4.days, (d3) => row2(d3.text, d3.detail, `spot-${d3.state}`))}` : ""}${m4.emptyDays ? `<p class="subtext">${m4.emptyDays} day(s) with no recorded session: no cost shown for them (not zero, not proof that nothing was charged).</p>` : ""}`;
   } else body = banner(m4.state === "error" ? "error" : m4.state === "invalid" ? "invalid" : m4.state === "legacy" ? "legacy" : "loading", m4.message);
   const read2 = m4.readNote ? `<p class="subtext history-month-read" data-month-read${m4.refreshing ? " data-month-refreshing" : ""}>${escapeText(m4.readNote)}</p>` : "";
   return `<section data-history-section="month-cost" data-month-cost-state="${escapeText(m4.state)}"><h3>Spot cost and estimated savings by month</h3>${picker}${read2}${body}</section>`;
 }
 function renderDigest(d3) {
   const lists = [
-    d3.flow.length ? `<h4>Flow intervals in the summary</h4>${list(d3.flow, (i7) => row(i7.text, i7.detail))}` : "",
-    d3.blocks.length ? `<h4>Sent-plan blocks in the summary</h4>${list(d3.blocks, (b3) => row(`${b3.text} \u2014 ${b3.verdictText}`, "", `verdict-${b3.verdict}`))}` : "",
-    d3.outside.length ? `<h4>Flow versus plan</h4>${list(d3.outside, (t6) => row(t6))}` : ""
+    d3.flow.length ? `<h4>Flow intervals in the summary</h4>${list(d3.flow, (i7) => row2(i7.text, i7.detail))}` : "",
+    d3.blocks.length ? `<h4>Sent-plan blocks in the summary</h4>${list(d3.blocks, (b3) => row2(`${b3.text} \u2014 ${b3.verdictText}`, "", `verdict-${b3.verdict}`))}` : "",
+    d3.outside.length ? `<h4>Flow versus plan</h4>${list(d3.outside, (t6) => row2(t6))}` : ""
   ].join("");
   const facts = `${d3.unknownSpans ? `${d3.unknownSpans} span(s) where the plan was unknown. ` : ""}${d3.gapCount !== null ? `${d3.gapCount} capture gap(s), ` : ""}${d3.restartCount !== null ? `${d3.restartCount} restart(s).` : ""}`;
   return `<section class="history-digest" data-history-section="digest"><h3>Saved day summary</h3><p class="subtext"><b>Summary only; no per-minute data and no prices.</b> ${d3.partial ? "Raw rows were already partly pruned when this was written. " : ""}${d3.computed ? `Written ${escapeText(d3.computed)}. ` : ""}It was written once and keeps no price rows.</p>${d3.coverage ? `<p>${escapeText(d3.coverage)}</p>` : ""}${d3.energy.length ? `<div class="history-energy">${d3.energy.map((r7) => `<div class="history-basis" data-basis-value="${r7.value === null ? "null" : r7.value}"><b>${escapeText(r7.label)}</b><span>${basisValue(r7)}</span></div>`).join("")}</div><p class="subtext">Separate bases, never added together.</p>` : ""}${lists}<p class="subtext">${escapeText(facts)}</p></section>`;
@@ -52856,21 +53051,21 @@ function renderHistoryDay(m4) {
   if (m4.notRetained) parts.push(banner("not-retained", m4.notRetained));
   if (m4.refreshFailed) parts.push(banner("refresh-failed", "The latest refresh failed; this is the earlier read of the day."));
   if (m4.legacy) parts.push(banner("legacy", "This integration is older than the card: it does not say when lists are cut or which rows are kept, so missing rows cannot be told from rows that never existed."));
-  if (m4.partial) parts.push(`<div class="history-banner" data-history-banner="truncated" role="status"><b>Partial: some lists are cut.</b>${list(m4.truncated, (t6) => row(t6))}</div>`);
+  if (m4.partial) parts.push(`<div class="history-banner" data-history-banner="truncated" role="status"><b>Partial: some lists are cut.</b>${list(m4.truncated, (t6) => row2(t6))}</div>`);
   if (m4.raw === "digest_only" && m4.digest) parts.push(renderDigest(m4.digest));
   const measured = ["full", "partial", "unknown"].includes(m4.raw);
   if (measured || m4.sent.length) parts.push(`<section data-history-section="coverage"><p>${escapeText(m4.coverage.text)}</p></section>`);
   if (m4.sent.length || measured) {
-    parts.push(`<section data-history-section="sent"><h3>Sent plan and measured flow</h3>${m4.sent.length ? list(m4.sent, (b3) => row(`${b3.text} \u2014 ${b3.verdictText}`, b3.detail, `${b3.kind} verdict-${b3.verdict}`)) : '<p class="subtext">No sent plan is known for this day.</p>'}<p class="subtext">${escapeText(m4.sentNote)}</p>${m4.unacked ? `<p class="subtext">${m4.unacked} recorded plan version(s) were not acknowledged and are not treated as sent.</p>` : ""}</section>`);
+    parts.push(`<section data-history-section="sent"><h3>Sent plan and measured flow</h3>${m4.sent.length ? list(m4.sent, (b3) => row2(`${b3.text} \u2014 ${b3.verdictText}`, b3.detail, `${b3.kind} verdict-${b3.verdict}`)) : '<p class="subtext">No sent plan is known for this day.</p>'}<p class="subtext">${escapeText(m4.sentNote)}</p>${m4.unacked ? `<p class="subtext">${m4.unacked} recorded plan version(s) were not acknowledged and are not treated as sent.</p>` : ""}</section>`);
   }
   if (measured) {
-    parts.push(`<section data-history-section="flow"><h3>Measured flow</h3>${m4.flow.length ? list(m4.flow, (i7) => row(i7.text, i7.detail)) : '<p class="subtext">No flow interval was found in the measured rows that exist; the coverage line says what was not measured.</p>'}${list(m4.outside, (x2) => row(x2.text, "", `outside-${x2.kind}`))}${m4.isolated ? `<p class="subtext">${escapeText(m4.isolated)}</p>` : ""}<p class="subtext">${escapeText(m4.flowNote)}</p></section>`);
+    parts.push(`<section data-history-section="flow"><h3>Measured flow</h3>${m4.flow.length ? list(m4.flow, (i7) => row2(i7.text, i7.detail)) : '<p class="subtext">No flow interval was found in the measured rows that exist; the coverage line says what was not measured.</p>'}${list(m4.outside, (x2) => row2(x2.text, "", `outside-${x2.kind}`))}${m4.isolated ? `<p class="subtext">${escapeText(m4.isolated)}</p>` : ""}<p class="subtext">${escapeText(m4.flowNote)}</p></section>`);
     parts.push(`<section data-history-section="energy"><h3>Energy by basis</h3>${energy2(m4)}</section>`);
   }
   parts.push(`<section data-history-section="cost"><h3>Spot cost and estimated savings of this day</h3>${summaryCards(m4.cost, m4.savings)}</section>`);
   if (!m4.sessions.length && m4.raw !== "digest_only") parts.push('<section data-history-section="sessions"><h3>Sessions overlapping this day</h3><p class="subtext" data-history-empty="sessions">No session was recorded for this day by the Morek recorder (whether it records every session is unverified). That is not proof that the car did not charge.</p></section>');
   if (m4.sessions.length) parts.push(`<section data-history-section="sessions"><h3>Sessions overlapping this day</h3><ul class="history-list">${m4.sessions.map((s4) => `<li>${escapeText(s4.text)}<small>${escapeText(s4.detail)}</small>${s4.lines.map((l6) => `<small class="history-recon">${escapeText(l6)}</small>`).join("")}${s4.costLines.map((l6) => `<small class="history-cost">${escapeText(l6)}</small>`).join("")}</li>`).join("")}</ul><p class="subtext">A session that crosses midnight appears on both days; its placed energy is not split above, but its spot cost for this day is the share that fell on this day.</p></section>`);
-  if (m4.gaps.length || m4.restarts.length) parts.push(`<section data-history-section="gaps"><h3>Capture gaps and restarts</h3>${list(m4.gaps.slice(0, 5), (t6) => row(`Gap: ${t6}`))}${m4.gaps.length > 5 ? `<p class="subtext">${m4.gaps.length - 5} more gap(s) not listed.</p>` : ""}${m4.restarts.length ? `<p class="subtext">Capture (re)started at ${m4.restarts.slice(0, 5).map(escapeText).join(", ")}${m4.restarts.length > 5 ? ` and ${m4.restarts.length - 5} more` : ""}.</p>` : ""}</section>`);
+  if (m4.gaps.length || m4.restarts.length) parts.push(`<section data-history-section="gaps"><h3>Capture gaps and restarts</h3>${list(m4.gaps.slice(0, 5), (t6) => row2(`Gap: ${t6}`))}${m4.gaps.length > 5 ? `<p class="subtext">${m4.gaps.length - 5} more gap(s) not listed.</p>` : ""}${m4.restarts.length ? `<p class="subtext">Capture (re)started at ${m4.restarts.slice(0, 5).map(escapeText).join(", ")}${m4.restarts.length > 5 ? ` and ${m4.restarts.length - 5} more` : ""}.</p>` : ""}</section>`);
   if (month) parts.push(month);
   parts.push(`<p class="subtext history-retention">${escapeText(m4.retentionNote)}${m4.retention.oldestPower ? ` Measured power rows currently begin ${escapeText(m4.retention.oldestPower)}.` : ""}${m4.retention.digestDays !== null ? ` ${m4.retention.digestDays} day summary(ies) are kept.` : ""}</p>`);
   return `<div class="history-day" data-history-state="ready" data-history-raw="${escapeText(m4.raw)}">${parts.join("")}</div>`;
@@ -53223,6 +53418,7 @@ function mountDashboard(root, adapter) {
   const bound = /* @__PURE__ */ new WeakSet();
   const drafts = /* @__PURE__ */ new Map();
   let confirmToken = null;
+  let winSelection = null, winNotice = "", winModel = null;
   let current = adapter;
   function cleanup() {
     listeners?.abort();
@@ -53284,6 +53480,40 @@ function mountDashboard(root, adapter) {
     el.scrollIntoView?.({ block: "start" });
     return true;
   }
+  function selectWindow(key3, toggle = true) {
+    const row4 = winModel?.rows.find((r7) => r7.valid && r7.key === key3);
+    if (!row4) return;
+    const same = winSelection?.key === key3 && winSelection.contextKey === winModel.contextKey;
+    winSelection = toggle && same ? null : { draftKey: current.draftKey, contextKey: winModel.contextKey, key: key3 };
+    winNotice = "";
+    render2();
+  }
+  function clearWindow() {
+    const key3 = winSelection?.key;
+    winSelection = null;
+    winNotice = "";
+    render2();
+    if (key3) [...root.querySelectorAll("[data-win-select]")].find((b3) => b3.dataset.winSelect === key3)?.focus?.();
+  }
+  function windowClick(event) {
+    const hit = (selector) => event.target?.closest?.(selector);
+    const pick = hit("[data-win-select]");
+    if (pick) {
+      selectWindow(pick.dataset.winSelect);
+      return;
+    }
+    if (hit("#win-clear")) {
+      clearWindow();
+      return;
+    }
+    const row4 = winSelection ? winModel?.rows.find((r7) => r7.valid && r7.key === winSelection.key) : null;
+    if (hit("#win-show-chart")) {
+      if (row4) chartMount?.focusInterval(row4.start, row4.end);
+      return;
+    }
+    const nav = hit("[data-win-nav]");
+    if (nav && row4) current.actions?.priceNav?.(nav.dataset.winNav);
+  }
   function measureLayout() {
     const width = root.getBoundingClientRect?.().width || 0;
     const layout2 = width > 0 && width < 760 ? "compact" : "wide";
@@ -53316,9 +53546,9 @@ function mountDashboard(root, adapter) {
     const priceCard = (mode) => {
       const title = mode === "bar" ? "Bars" : "Stepped area";
       const heading = modes.length > 1 ? `Electricity prices & plan \xB7 ${title}` : "Electricity prices & charging plan";
-      if (!chartReady) return card(heading, labels.chartEyebrow || "PRICES & PLAN", `<p>Price chart unavailable.</p><p class="subtext">${escapeText(labels.chartIntro)} ${escapeText(labels.chartNote)}</p>${plan}`, `prices prices-${mode}`, tag);
+      if (!chartReady) return card(heading, labels.chartEyebrow || "PRICES & PLAN", `<p>Price chart unavailable.</p><p class="subtext">${escapeText(labels.chartIntro)} ${escapeText(labels.chartNote)}</p>`, `prices prices-${mode}`, tag);
       const extremum = (p4) => p4 ? `${priceNumber(p4.cents)} ${escapeText(unit)} \xB7 ${escapeText(day(p4.start))} ${escapeText(time2(p4.start))}` : "Unknown";
-      return card(heading, labels.chartEyebrow || "PRICES & PLAN", `<div class="chart-intro"><div>${modes.length > 1 ? `<strong>${icon} ${mode === "bar" ? "Interval bars" : "Stepped area"}</strong>` : ""}<p>${escapeText(labels.chartIntro)}</p></div>${renderChartControls(mode, title)}</div>${renderPriceContext({ now: priceAt(chart.now), next: m4.nextPriceUnavailable ? null : priceAt(next?.start), low: extremum(extremes[0]), high: extremum(extremes[1]), unit })}${renderPriceNav(m4.priceNav)}<div id="price-${mode}" class="chart price-chart" role="img" aria-label="Price intervals and proposed windows"></div><div class="track-lanes" data-track-lanes="${mode}" role="group" aria-label="Evidence tracks on the price time axis: proposal, sent, effective, measured"></div>${renderChartLegend({ unit, cap: chart.cap })}<p class="subtext">${escapeText(labels.chartNote)}</p>${plan}`, `prices prices-${mode}`, tag);
+      return card(heading, labels.chartEyebrow || "PRICES & PLAN", `<div class="chart-intro"><div>${modes.length > 1 ? `<strong>${icon} ${mode === "bar" ? "Interval bars" : "Stepped area"}</strong>` : ""}<p>${escapeText(labels.chartIntro)}</p></div>${renderChartControls(mode, title)}</div>${renderPriceContext({ now: priceAt(chart.now), next: m4.nextPriceUnavailable ? null : priceAt(next?.start), low: extremum(extremes[0]), high: extremum(extremes[1]), unit })}${renderPriceNav(m4.priceNav)}<div id="price-${mode}" class="chart price-chart" role="img" aria-label="Price intervals and proposed windows"></div><div class="track-lanes" data-track-lanes="${mode}" role="group" aria-label="Evidence tracks on the price time axis: proposal, sent, effective, measured"></div>${renderChartLegend({ unit, cap: chart.cap })}<p class="subtext">${escapeText(labels.chartNote)}</p>`, `prices prices-${mode}`, tag);
     };
     const scenario = m4.scenarios;
     const option = (s4) => `<option value="${escapeText(s4.value)}" ${s4.value === scenario.selected ? "selected" : ""}>${escapeText(s4.label)}</option>`;
@@ -53333,6 +53563,21 @@ function mountDashboard(root, adapter) {
     const chartDraft = { duration: drafts.get("c:duration"), end: drafts.get("c:end") };
     const scene = sceneOf(m4.scene);
     const planIsStale = !!(state.planStale ?? state.stale);
+    winModel = buildWindowsModel({ windows, knownPlan, stale: planIsStale, totals: m4.totals, context: m4.windowsContext, format: f3, draftKey: current.draftKey, nav: m4.priceNav, chartHorizon: chartReady ? chart.horizon : null });
+    const resolved = resolveSelection(winSelection, winModel);
+    if (winSelection && !resolved.selected) {
+      winSelection = null;
+      winNotice = resolved.notice;
+    }
+    const winSelected = resolved.selected;
+    const nextWindowKey = next && Number.isFinite(next.start) && Number.isFinite(next.end) && next.end > next.start ? windowKey(next) : null;
+    const windowsCard = card("Proposed charging windows", "PLAN", renderWindows(winModel, { f: f3, selected: winSelected, notice: winNotice, nextKey: nextWindowKey, assumptions, policy: state.policy, context: m4.windowsContext, reserve: m4.reserve, chartKnown: chartReady }), "windows", tag);
+    const selectedWindow = winSelected ? { start: winSelected.start, end: winSelected.end } : null;
+    const pickWindow = (instant4) => {
+      const hits = windowsAt(winModel, instant4);
+      if (hits.length !== 1) return;
+      selectWindow(hits[0].key);
+    };
     const socValid = Number.isFinite(state.soc) && state.soc >= 0 && state.soc <= 100;
     const targetValid = Number.isFinite(settings.target) && settings.target >= 0 && settings.target <= 100;
     const socUnknown = !socValid || state.stale;
@@ -53344,6 +53589,7 @@ function mountDashboard(root, adapter) {
     const html = m4.bare === true ? `${shellOpen}${TABS.map(([id, label2]) => bareTab(id, label2)).join("")}</div>` : `${shellOpen}${tabOpen("overview", activeTab)}
       ${hero}
       ${modes.map(priceCard).join("")}
+      ${windowsCard}
       ${card("Recent charging \xB7 summary", "OVERVIEW", renderRecentSummary(m4.historyDay, m4.history), "recent", tag)}
       ${tabClose}${tabOpen("explore", activeTab)}
       ${card("Price insights", labels.insightEyebrow || "PRICE DATA", renderInsights(m4.insights), "insights", tag)}
@@ -53369,6 +53615,7 @@ function mountDashboard(root, adapter) {
         fn();
       }
     };
+    bind3(root.querySelector(".shell"), () => root.querySelector(".shell").addEventListener("click", windowClick, { signal }));
     const dialog = root.querySelector("#plan-dialog");
     let trigger2;
     root.querySelectorAll("#open-plan, #open-plan-details").forEach((button) => bind3(button, () => button.addEventListener("click", () => {
@@ -53667,8 +53914,8 @@ function mountDashboard(root, adapter) {
       chartMount = null;
     }
     if ((chartReady || historyReady) && !chartMount) {
-      chartMount = mountCharts(root, { ...chart, prices, windows: chartWindows, tracks, readings: historyReady ? readings : null, sentHistory: historyReady ? sentHistory : null, historyAxis: m4.history?.axis }, f3, chartReady ? modes : []);
-    } else if (chartMount && chartReady) chartMount.update({ ...chart, prices, windows: chartWindows, tracks }, f3);
+      chartMount = mountCharts(root, { ...chart, prices, windows: chartWindows, tracks, selectedWindow, onWindowPick: pickWindow, readings: historyReady ? readings : null, sentHistory: historyReady ? sentHistory : null, historyAxis: m4.history?.axis }, f3, chartReady ? modes : []);
+    } else if (chartMount && chartReady) chartMount.update({ ...chart, prices, windows: chartWindows, tracks, selectedWindow, onWindowPick: pickWindow }, f3);
     return chartMount;
   }
   render2();
@@ -53683,6 +53930,8 @@ function mountDashboard(root, adapter) {
     const priorOrigin = root.querySelector("#charge-confirm")?.dataset.origin || "charge-now";
     if (!sameDraft) {
       drafts.clear();
+      winSelection = null;
+      winNotice = "";
       cleanup();
     }
     pendingUpdate = null;
@@ -58212,15 +58461,15 @@ var addDays = (day, n6) => format2(parse2(day) + n6 * DAY_MS2);
 var dayLabel = (day) => Number.isFinite(parse2(day)) ? new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", weekday: "short", day: "numeric", month: "short", year: "numeric" }).format(parse2(day)) : "Unknown day";
 function mergePriceRows(...lists) {
   const byStart = /* @__PURE__ */ new Map();
-  for (const list4 of lists) for (const row3 of list4 || []) {
-    const start2 = Date.parse(row3?.start), end2 = Date.parse(row3?.end);
-    if (!Number.isFinite(start2) || !Number.isFinite(end2) || end2 <= start2 || !(row3.raw_price === null || Number.isFinite(row3.raw_price))) return { error: "malformed" };
+  for (const list4 of lists) for (const row4 of list4 || []) {
+    const start2 = Date.parse(row4?.start), end2 = Date.parse(row4?.end);
+    if (!Number.isFinite(start2) || !Number.isFinite(end2) || end2 <= start2 || !(row4.raw_price === null || Number.isFinite(row4.raw_price))) return { error: "malformed" };
     const old = byStart.get(start2);
     if (old) {
-      if (old.end === end2 && old.row.raw_price === row3.raw_price) continue;
+      if (old.end === end2 && old.row.raw_price === row4.raw_price) continue;
       return { error: "conflict" };
     }
-    byStart.set(start2, { end: end2, row: row3 });
+    byStart.set(start2, { end: end2, row: row4 });
   }
   const sorted = [...byStart.entries()].sort((a4, b3) => a4[0] - b3[0]);
   for (let i7 = 1; i7 < sorted.length; i7++) if (sorted[i7][0] < sorted[i7 - 1][1].end) return { error: "overlap" };
@@ -58246,9 +58495,9 @@ function createPriceDays({ request, onChange = () => {
       const answer = await request({ mode: "available" });
       if (!current(mine, myKey)) return;
       const days = Array.isArray(answer?.days) ? answer.days : null;
-      const valid = answer?.api_version === 1 && answer.mode === "available" && answer.charger_id === asked.charger && answer.area_id === asked.area && answer.currency === asked.currency && typeof answer.today === "string" && Number.isFinite(parse2(answer.today)) && days && days.length <= 400 && days.every((row3) => Number.isFinite(parse2(row3?.day)));
+      const valid = answer?.api_version === 1 && answer.mode === "available" && answer.charger_id === asked.charger && answer.area_id === asked.area && answer.currency === asked.currency && typeof answer.today === "string" && Number.isFinite(parse2(answer.today)) && days && days.length <= 400 && days.every((row4) => Number.isFinite(parse2(row4?.day)));
       if (!valid) throw new Error("context");
-      st.available = { today: answer.today, days, byDay: new Map(days.map((row3) => [row3.day, row3])), yesterdayReachable: answer.yesterday_reachable === true };
+      st.available = { today: answer.today, days, byDay: new Map(days.map((row4) => [row4.day, row4])), yesterdayReachable: answer.yesterday_reachable === true };
       st.status = "ready";
     } catch {
       if (!current(mine, myKey)) return;
@@ -58270,10 +58519,10 @@ function createPriceDays({ request, onChange = () => {
       const wanted = [];
       for (let d3 = from; parse2(d3) <= parse2(day); d3 = addDays(d3, 1)) wanted.push(d3);
       const rows = Array.isArray(answer?.days) ? answer.days : null;
-      const valid = answer?.api_version === 1 && answer.mode === "range" && answer.charger_id === asked.charger && answer.area_id === asked.area && answer.currency === asked.currency && answer.from === from && answer.to === day && rows && rows.length === wanted.length && rows.every((row3, i7) => row3?.day === wanted[i7] && typeof row3.held === "boolean");
+      const valid = answer?.api_version === 1 && answer.mode === "range" && answer.charger_id === asked.charger && answer.area_id === asked.area && answer.currency === asked.currency && answer.from === from && answer.to === day && rows && rows.length === wanted.length && rows.every((row4, i7) => row4?.day === wanted[i7] && typeof row4.held === "boolean");
       if (!valid) throw new Error("context");
-      const dayRows = new Map(rows.map((row3) => [row3.day, row3]));
-      const merged = mergePriceRows(...rows.map((row3) => row3.held && Array.isArray(row3.intervals) ? row3.intervals : []));
+      const dayRows = new Map(rows.map((row4) => [row4.day, row4]));
+      const merged = mergePriceRows(...rows.map((row4) => row4.held && Array.isArray(row4.intervals) ? row4.intervals : []));
       if (merged.error) throw new Error("rows");
       st.page = { id: ++pageId, from, to: day, dayRows, rows: merged.rows };
       st.selection = chosen(selection);
@@ -58288,8 +58537,8 @@ function createPriceDays({ request, onChange = () => {
   const heldDay = (day) => st.available?.byDay.get(day);
   const liveCoversDay = (liveRows, c5, day) => {
     const span2 = c5.span?.(day);
-    return !!span2 && (liveRows || []).some((row3) => {
-      const s4 = Date.parse(row3?.start);
+    return !!span2 && (liveRows || []).some((row4) => {
+      const s4 = Date.parse(row4?.start);
       return s4 >= span2[0] && s4 < span2[1];
     });
   };
@@ -58386,8 +58635,8 @@ function createPriceDays({ request, onChange = () => {
       const available = st.available, checking = st.status === "loading" || st.status === "idle";
       const why = (text4) => checking ? "Checking which days are held\u2026" : st.status === "error" ? "Held days could not be read." : text4;
       const held = (day) => available?.byDay.get(day);
-      const partial = (row4) => row4 && row4.complete === false;
-      const earlier = available ? available.days.filter((row4) => parse2(row4.day) < parse2(yesterday)) : [];
+      const partial = (row5) => row5 && row5.complete === false;
+      const earlier = available ? available.days.filter((row5) => parse2(row5.day) < parse2(yesterday)) : [];
       const tomorrowThere = liveCoversDay(liveRows, ctx, tomorrow);
       const buttons = [
         { id: "yesterday", label: "Yesterday", enabled: !!held(yesterday), partial: partial(held(yesterday)), reason: held(yesterday) ? "" : why(available && !available.yesterdayReachable ? "Outside what the price provider keeps." : "Yesterday\u2019s prices are not held.") },
@@ -58397,11 +58646,11 @@ function createPriceDays({ request, onChange = () => {
         { id: "all", label: "All loaded days", enabled: !!rows?.length, reason: rows?.length ? "" : "No prices are loaded." }
       ];
       for (const button of buttons) button.selected = button.id === "earlier" ? st.earlierOpen || selection.kind === "day" : selection.kind === button.id;
-      const row3 = selection.day ? page?.dayRows.get(selection.day) : null;
+      const row4 = selection.day ? page?.dayRows.get(selection.day) : null;
       const loadedDays = showsPage ? new Set([...page.dayRows.values()].filter((r7) => r7.held && r7.intervals).map((r7) => r7.day)) : /* @__PURE__ */ new Set();
       let detail = "";
       if (selection.kind === "all") detail = `All loaded days: ${loadedDays.size ? `${loadedDays.size} held day${loadedDays.size === 1 ? "" : "s"} of the current page of up to ${PAGE_DAYS} days plus` : ""} today and tomorrow. Not the full price history.`;
-      else if (row3?.held) detail = `${dayLabel(row3.day)} \xB7 ${row3.complete === false ? "partial: the held prices cover only part of this day" : "complete"} \xB7 ${row3.interval_count ?? "unknown"} intervals${row3.resolution_minutes ? ` of ${row3.resolution_minutes} min` : " (mixed lengths)"} \xB7 source ${row3.source || "unknown"}${row3.fetched_at ? ` \xB7 fetched ${ctx.formatInstant ? ctx.formatInstant(row3.fetched_at) : row3.fetched_at}` : ""}`;
+      else if (row4?.held) detail = `${dayLabel(row4.day)} \xB7 ${row4.complete === false ? "partial: the held prices cover only part of this day" : "complete"} \xB7 ${row4.interval_count ?? "unknown"} intervals${row4.resolution_minutes ? ` of ${row4.resolution_minutes} min` : " (mixed lengths)"} \xB7 source ${row4.source || "unknown"}${row4.fetched_at ? ` \xB7 fetched ${ctx.formatInstant ? ctx.formatInstant(row4.fetched_at) : row4.fetched_at}` : ""}`;
       else if (selection.kind === "tomorrow") detail = "Tomorrow\u2019s published prices.";
       const unusable = page ? [...page.dayRows.values()].filter((r7) => r7.held && !r7.intervals) : [];
       if (unusable.length) detail += ` ${unusable.map((r7) => dayLabel(r7.day)).join(", ")}: held, but not drawn (${unusable.some((r7) => r7.reason === "no_price_rate") ? "no usable exchange rate" : "invalid intervals"}).`;
@@ -58955,7 +59204,7 @@ function buildHistoryModel(answer, day, fmt, readAt = NaN) {
     gapCount: digest.gap_count ?? null,
     restartCount: digest.restart_count ?? null,
     coverage: digest.coverage ? `${duration(digest.coverage.trusted_seconds)} measured, ${duration(digest.coverage.untrusted_seconds)} untrusted, ${duration(digest.coverage.no_data_seconds)} no data` : null,
-    energy: digest.energy ? [basis("Meter-counter delta", digest.energy.meter_counter_kwh, "meter"), basis("Power-integrated estimate", digest.energy.power_integrated_estimate_kwh, "power")].map((row3) => ({ ...row3, detail: "" })) : []
+    energy: digest.energy ? [basis("Meter-counter delta", digest.energy.meter_counter_kwh, "meter"), basis("Power-integrated estimate", digest.energy.power_integrated_estimate_kwh, "power")].map((row4) => ({ ...row4, detail: "" })) : []
   } : null;
   return {
     state: "ready",
@@ -59312,8 +59561,8 @@ var prevMonth = (month) => {
   const m4 = MONTH_RE2.exec(month);
   return m4 ? new Date(Date.UTC(+m4[1], +m4[2] - 2, 1)).toISOString().slice(0, 7) : null;
 };
-var durationText = (minutes) => {
-  const h3 = Math.floor(minutes / 60), m4 = minutes % 60;
+var durationText2 = (minutes2) => {
+  const h3 = Math.floor(minutes2 / 60), m4 = minutes2 % 60;
   return h3 && m4 ? `${h3} h ${m4} min` : h3 ? `${h3} h` : `${m4} min`;
 };
 function monthOptions(today) {
@@ -59336,7 +59585,7 @@ function excluded(x2) {
 var excludedText = (x2) => !x2 || x2.count === 0 ? "" : `${x2.count} excluded${x2.reasons.length ? ` (${x2.reasons.map(([code, n6]) => `${n6} ${EXCLUDED[code] || words3(code)}`).join(", ")})` : ""}`;
 function providers(list4, key3) {
   const out2 = [];
-  for (const row3 of Array.isArray(list4) ? list4 : []) for (const label2 of key3 === "providers" ? Array.isArray(row3?.providers) ? row3.providers : [] : [row3?.provider]) if (typeof label2 === "string" && label2 && !out2.includes(label2)) out2.push(label2);
+  for (const row4 of Array.isArray(list4) ? list4 : []) for (const label2 of key3 === "providers" ? Array.isArray(row4?.providers) ? row4.providers : [] : [row4?.provider]) if (typeof label2 === "string" && label2 && !out2.includes(label2)) out2.push(label2);
   return out2;
 }
 function parseBaseline(b3) {
@@ -59473,7 +59722,7 @@ function currentBlock2(live, nowMs) {
 }
 function windowBlock(live, duration2, pending) {
   const w2 = live.window, cu = live.currency, zone = live.zone;
-  const block2 = { id: "window", title: `Best published ${durationText(duration2)} window`, value: "Unavailable", status: "", detail: "", lines: [], details: [] };
+  const block2 = { id: "window", title: `Best published ${durationText2(duration2)} window`, value: "Unavailable", status: "", detail: "", lines: [], details: [] };
   if (pending) {
     block2.status = pending;
     return block2;
@@ -59484,7 +59733,7 @@ function windowBlock(live, duration2, pending) {
     return block2;
   }
   block2.value = moneyIn(w2.price, cu);
-  block2.status = `${span(w2.start, w2.end, zone)} \xB7 ${durationText(duration2)}`;
+  block2.status = `${span(w2.start, w2.end, zone)} \xB7 ${durationText2(duration2)}`;
   block2.lines.push({ label: "Mean", text: "Duration-weighted mean of the published prices in this window" });
   if (w2.comparison.known) block2.lines.push({ label: "Relative", text: `Assumption: this window's mean compared with single interval prices of the last ${live.baseline.expected} days, higher than about ${Math.round(w2.comparison.percentile)}% of interval time` });
   else block2.lines.push({ label: "Relative", text: `Unknown: ${reasonText(w2.comparison.reason)}` });
@@ -59635,9 +59884,9 @@ function createPriceInsights({ request, onChange = () => {
       return api;
     },
     /** An explicit window length (15..720 in steps of 15): one live read; nothing is saved. */
-    setDuration(minutes) {
-      if (!ctx || !DURATIONS2.includes(minutes) || minutes === st.duration) return;
-      st.duration = minutes;
+    setDuration(minutes2) {
+      if (!ctx || !DURATIONS2.includes(minutes2) || minutes2 === st.duration) return;
+      st.duration = minutes2;
       void loadLive();
       onChange();
     },
@@ -59694,7 +59943,7 @@ function createPriceInsights({ request, onChange = () => {
         banners.push({ kind: l6.error ? l6.error.state : "loading", text: text4 });
         blocks.push(
           { id: "current", title: "Current price", value: "Unavailable", status: l6.error ? "Unavailable" : "Loading\u2026", lines: [], details: [] },
-          { id: "window", title: `Best published ${durationText(st.duration)} window`, value: "Unavailable", status: l6.error ? "Unavailable" : "Loading\u2026", lines: [], details: [] }
+          { id: "window", title: `Best published ${durationText2(st.duration)} window`, value: "Unavailable", status: l6.error ? "Unavailable" : "Loading\u2026", lines: [], details: [] }
         );
       }
       const mb = monthBlock(entry, month);
@@ -59719,7 +59968,7 @@ function createPriceInsights({ request, onChange = () => {
         method: METHOD,
         currentUsable,
         controls: {
-          duration: { value: st.duration, options: DURATIONS2.map((v2) => ({ value: v2, label: durationText(v2) })), busy: l6.loading },
+          duration: { value: st.duration, options: DURATIONS2.map((v2) => ({ value: v2, label: durationText2(v2) })), busy: l6.loading },
           month: { value: month, options: opts, busy: entry?.status === "loading" },
           compare: { value: st.compare || "", options: compareOptions, previous: previous && known(previous) && st.compare !== previous ? { value: previous, label: monthLabel(previous) } : null, busy: cmpEntry?.status === "loading" },
           canRetry: failed && !l6.loading
@@ -59749,11 +59998,11 @@ function publishedChart(raw, market, now, stale, view = null) {
   }
   const prices = [];
   let previous = -Infinity;
-  for (const row3 of rows) {
-    if (!row3 || typeof row3.start !== "string" || typeof row3.end !== "string" || !/(?:Z|[+-]\d\d:\d\d)$/i.test(row3.start) || !/(?:Z|[+-]\d\d:\d\d)$/i.test(row3.end)) return null;
-    const start2 = Date.parse(row3.start), end2 = Date.parse(row3.end);
-    if (!Number.isFinite(start2) || !Number.isFinite(end2) || end2 <= start2 || start2 < previous || !(row3.raw_price === null || Number.isFinite(row3.raw_price))) return null;
-    if (row3.raw_price !== null) prices.push({ start: start2, end: end2, cents: displayPrice(row3.raw_price, currency) });
+  for (const row4 of rows) {
+    if (!row4 || typeof row4.start !== "string" || typeof row4.end !== "string" || !/(?:Z|[+-]\d\d:\d\d)$/i.test(row4.start) || !/(?:Z|[+-]\d\d:\d\d)$/i.test(row4.end)) return null;
+    const start2 = Date.parse(row4.start), end2 = Date.parse(row4.end);
+    if (!Number.isFinite(start2) || !Number.isFinite(end2) || end2 <= start2 || start2 < previous || !(row4.raw_price === null || Number.isFinite(row4.raw_price))) return null;
+    if (row4.raw_price !== null) prices.push({ start: start2, end: end2, cents: displayPrice(row4.raw_price, currency) });
     previous = end2;
   }
   if (!prices.length) return null;
@@ -59876,7 +60125,7 @@ function booleanValue(source, key3) {
   const value2 = source[key3];
   return typeof value2 === "boolean" ? value2 : bad();
 }
-function finite2(source, key3) {
+function finite3(source, key3) {
   const value2 = source[key3];
   return typeof value2 === "number" && Number.isFinite(value2) ? value2 : bad();
 }
@@ -60025,7 +60274,7 @@ function decodeTarget(source) {
   exactKeys(source, TARGET_KEYS);
   let targetPercent = null;
   if (source["target_percent"] !== null) {
-    const percent3 = finite2(source, "target_percent");
+    const percent3 = finite3(source, "target_percent");
     if (percent3 < 0 || percent3 > 100) {
       return bad();
     }
@@ -60040,7 +60289,7 @@ function decodeFrame(raw) {
   const source = record(raw);
   exactKeys(source, ["x", "y", "w", "h"]);
   const [x2, y3, w2, h3] = ["x", "y", "w", "h"].map((key3) => {
-    const value2 = finite2(source, key3);
+    const value2 = finite3(source, key3);
     return value2 < 0 || value2 > 1 ? bad() : value2;
   });
   return x2 + w2 > 1.000001 || y3 + h3 > 1.000001 ? bad() : { x: x2, y: y3, w: w2, h: h3 };
@@ -60085,15 +60334,15 @@ function decodeSettingsRecord(raw) {
   }
   return {
     revision,
-    ...present.includes("soft_price_cap") ? { soft_price_cap: source["soft_price_cap"] === null ? null : finite2(source, "soft_price_cap") } : {},
-    ...present.includes("minimum_ready_by_soc") ? { minimum_ready_by_soc: source["minimum_ready_by_soc"] === null ? null : finite2(source, "minimum_ready_by_soc") } : {},
+    ...present.includes("soft_price_cap") ? { soft_price_cap: source["soft_price_cap"] === null ? null : finite3(source, "soft_price_cap") } : {},
+    ...present.includes("minimum_ready_by_soc") ? { minimum_ready_by_soc: source["minimum_ready_by_soc"] === null ? null : finite3(source, "minimum_ready_by_soc") } : {},
     ...present.includes("time_reserve_percent") ? { time_reserve_percent: whole(source, "time_reserve_percent") } : {},
     ...present.includes("cap_price_basis") ? { cap_price_basis: source["cap_price_basis"] === null ? null : oneOf(source, "cap_price_basis", ["nord_pool", "configured_variable_cost"]) } : {},
     area_id: textOrNull(source, "area_id"),
     overrides: list2(source, "overrides").map((item) => decodeOverride(record(item))),
     phases: wholeOrNull(source, "phases"),
     amps: wholeOrNull(source, "amps"),
-    requested_kwh: finite2(source, "requested_kwh"),
+    requested_kwh: finite3(source, "requested_kwh"),
     ...present.includes("fill_to_limit") ? { fill_to_limit: booleanValue(source, "fill_to_limit") } : {},
     max_periods: periodsOrNull(source, "max_periods"),
     departure_enabled: booleanValue(source, "departure_enabled"),
@@ -61088,15 +61337,15 @@ function decodeStrategyRow(source) {
 function decodeStrategy(source) {
   exactKeys2(source, ["selected", "available"]);
   const selected = enumOrNull(source, "selected", STRATEGIES2);
-  const rows = arrayValue(source, "available").map((row3) => decodeStrategyRow(record2(row3)));
+  const rows = arrayValue(source, "available").map((row4) => decodeStrategyRow(record2(row4)));
   const seen = /* @__PURE__ */ new Set();
-  for (const row3 of rows) {
-    if (seen.has(row3.strategy)) {
+  for (const row4 of rows) {
+    if (seen.has(row4.strategy)) {
       return bad2();
     }
-    seen.add(row3.strategy);
+    seen.add(row4.strategy);
   }
-  const enabled = rows.filter((row3) => row3.available).map((row3) => row3.strategy);
+  const enabled = rows.filter((row4) => row4.available).map((row4) => row4.strategy);
   if (selected === null ? enabled.length !== 0 : !enabled.includes(selected)) {
     return bad2();
   }
@@ -61621,8 +61870,8 @@ function setupOrNull(root) {
       const item = record2(entry);
       const writes = "field" in item || "value" in item;
       exactKeys2(item, writes ? ["id", "dismissible", "field", "value"] : ["id", "dismissible"]);
-      const row3 = { id: text2(item, "id"), dismissible: booleanValue2(item, "dismissible") };
-      return writes ? { ...row3, write: { field: text2(item, "field"), value: booleanValue2(item, "value") } } : row3;
+      const row4 = { id: text2(item, "id"), dismissible: booleanValue2(item, "dismissible") };
+      return writes ? { ...row4, write: { field: text2(item, "field"), value: booleanValue2(item, "value") } } : row4;
     });
     return { items };
   } catch {
@@ -62936,7 +63185,7 @@ function sensorModel(vehicle, entityState) {
   if (base2 && !candidates.some((c5) => c5.entityId === base2)) options2.push({ value: base2, text: `${label(selected)} (no longer offered)` });
   return { status, level, text: text4, base: base2, options: options2 };
 }
-function propertiesModel(props, row3, canWrite) {
+function propertiesModel(props, row4, canWrite) {
   if (!props) return null;
   const source = props.capacitySource;
   const reported = ok(props.reportedCapacityKwh) && props.reportedCapacityKwh > 0 ? props.reportedCapacityKwh : null;
@@ -62954,7 +63203,7 @@ function propertiesModel(props, row3, canWrite) {
     phases: {
       base: String(props.onboardPhases === 1 ? 1 : 3),
       display: phases === 1 ? "1-phase" : phases === 3 ? "3-phase (entered by you)" : "3-phase (the default; nothing entered)",
-      suggestion: row3 && row3.suggested_onboard_phases === 1 && props.onboardPhases !== 1 ? "Recent charges look single-phase. Nothing was changed; set 1-phase below if that is right." : "",
+      suggestion: row4 && row4.suggested_onboard_phases === 1 && props.onboardPhases !== 1 ? "Recent charges look single-phase. Nothing was changed; set 1-phase below if that is right." : "",
       editable: canWrite
     }
   };
@@ -62978,11 +63227,11 @@ function vehicleSourcesModel(input) {
   if (!vehicle) return { ...model, sensor: null, reading: null, properties: null };
   const sensor = sensorModel(vehicle, input.entityState);
   sensor.canEdit = canEdit && configFresh && input.dashboardFresh !== false;
-  const row3 = (input.rows || []).find((r8) => r8.id === vehicle.id) || null;
+  const row4 = (input.rows || []).find((r8) => r8.id === vehicle.id) || null;
   const props = (input.config.vehicleProperties || []).find((p4) => p4.id === vehicle.id) || null;
-  const properties = propertiesModel(props, row3, canEdit && configFresh);
+  const properties = propertiesModel(props, row4, canEdit && configFresh);
   const r7 = input.reading && input.reading.vehicleId === vehicle.id ? input.reading : null;
-  const reading = r7 && ok(r7.value) ? { text: `${r7.value}%${r7.stale ? " \xB7 stale or unconfirmed" : ""} \u2014 ${r7.detail}`, stale: !!r7.stale } : row3 && ok(row3.soc_percent) ? { text: `${row3.soc_percent}% \xB7 last value, age unknown \u2014 not shown as a current reading.`, stale: true } : { text: "No valid reading from this car.", stale: true };
+  const reading = r7 && ok(r7.value) ? { text: `${r7.value}%${r7.stale ? " \xB7 stale or unconfirmed" : ""} \u2014 ${r7.detail}`, stale: !!r7.stale } : row4 && ok(row4.soc_percent) ? { text: `${row4.soc_percent}% \xB7 last value, age unknown \u2014 not shown as a current reading.`, stale: true } : { text: "No valid reading from this car.", stale: true };
   return { ...model, sensor, reading, properties, propertiesMissing: !props };
 }
 function sensorWritePlan(vehicle, draft) {
@@ -63183,8 +63432,8 @@ function decodeMarketOptions(raw) {
   }
 }
 var FISCAL_COMPONENTS = ["vat", "tax", "transfer"];
-function fiscalFormFrom(row3, component) {
-  const fiscal = row3 === null ? null : row3[component];
+function fiscalFormFrom(row4, component) {
+  const fiscal = row4 === null ? null : row4[component];
   const stored = fiscal === null ? null : fiscal.value;
   return {
     enabled: fiscal !== null && fiscal.enabled,
@@ -63261,9 +63510,9 @@ function sameFiscal(left, right) {
 function sameRow(left, right) {
   return left.area_id === right.area_id && sameFiscal(left.vat, right.vat) && sameFiscal(left.tax, right.tax) && sameFiscal(left.transfer, right.transfer);
 }
-function rowStatesNothing(row3) {
+function rowStatesNothing(row4) {
   for (const component of FISCAL_COMPONENTS) {
-    const fiscal = row3[component];
+    const fiscal = row4[component];
     if (fiscal.enabled || fiscal.value !== null) {
       return false;
     }
@@ -63296,15 +63545,15 @@ function marketReplacement(base2, values, options2) {
     }
     components[component] = stated.value;
   }
-  const row3 = {
+  const row4 = {
     area_id: areaId,
     vat: components.vat,
     tax: components.tax,
     transfer: components.transfer
   };
   const existing = base2.overrides.find((item) => item.area_id === areaId) ?? null;
-  const changed = areaId !== base2.area_id ? true : existing === null ? !rowStatesNothing(row3) : !sameRow(existing, row3);
-  const overrides = existing === null && rowStatesNothing(row3) ? base2.overrides : existing === null ? [...base2.overrides, row3] : base2.overrides.map((item) => item.area_id === areaId ? row3 : item);
+  const changed = areaId !== base2.area_id ? true : existing === null ? !rowStatesNothing(row4) : !sameRow(existing, row4);
+  const overrides = existing === null && rowStatesNothing(row4) ? base2.overrides : existing === null ? [...base2.overrides, row4] : base2.overrides.map((item) => item.area_id === areaId ? row4 : item);
   return {
     ok: true,
     body: { ...encodeBody(base2), area_id: areaId, overrides },
@@ -63401,10 +63650,10 @@ var figureText = (n6) => ok2(n6) ? String(n6) : "";
 var modeOf = (form) => !form.enabled ? "off" : form.intent === "suggested" ? "suggested" : "custom";
 function costSignature(record5, options2, block2, areaId) {
   const id = areaId ?? record5?.area_id ?? null;
-  const row3 = record5 ? record5.overrides.find((o9) => o9.area_id === id) || null : null;
+  const row4 = record5 ? record5.overrides.find((o9) => o9.area_id === id) || null : null;
   return JSON.stringify([
     record5?.area_id ?? null,
-    row3,
+    row4,
     options2 ? options2.state : null,
     options2 && id ? marketIncluded(options2, id) : null,
     block2 ? [block2.write_revision, block2.transfer_percent.policy, block2.transfer_percent.explicit_value, block2.transfer_high.policy, block2.transfer_high.explicit_value, block2.high_load_window] : null
@@ -63450,14 +63699,14 @@ function currencyLine(dashboard, area) {
   return `Currency ${cur}${major ? ` (${major}${minor ? `, minor unit ${minor}` : ""})` : ""}. Prices and the chart show ${priceUnit(cur)}; flat fees are entered in ${minor ? `${minor}/kWh` : "the area\u2019s minor unit (unknown)"} exactly as stored, and VAT and the grid fee percentage in %.`;
 }
 function feeRows(record5, options2, areaId, canEdit) {
-  const row3 = record5.overrides.find((o9) => o9.area_id === areaId) || null;
+  const row4 = record5.overrides.find((o9) => o9.area_id === areaId) || null;
   const included = marketIncluded(options2, areaId);
   const rows = [];
   for (const key3 of FISCAL_COMPONENTS) {
-    const form = fiscalFormFrom(row3, key3);
+    const form = fiscalFormFrom(row4, key3);
     const suggestion = marketSuggestion(options2, areaId, key3);
     const unit = fiscalUnit(options2, areaId, key3) ? key3 === "vat" ? "%" : `${fiscalUnit(options2, areaId, key3)}/kWh` : key3 === "vat" ? "%" : "unit unknown";
-    const stored = row3 ? row3[key3] : null;
+    const stored = row4 ? row4[key3] : null;
     const base2 = modeOf(form);
     if (included.includes(key3)) {
       rows.push({ key: key3, label: LABELS[key3], included: true, unit, mode: "included", figure: figureText(stored?.value ?? null), modes: [], hint: `Already included in this area\u2019s published price \u2014 nothing is added${stored && stored.value !== null ? ` (a stored figure of ${stored.value} ${unit} is kept but not used)` : ""}.`, canEdit: false });
@@ -64506,7 +64755,7 @@ function setupRowText(language, id) {
 var DEFAULT_CURRENT_RANGE = { minA: 6, maxA: 32 };
 function chargerCarsOf(dashboard) {
   if (dashboard.vehicle_choices.length === 0) {
-    return dashboard.vehicles.map((row3) => ({ id: row3.id, name: row3.name }));
+    return dashboard.vehicles.map((row4) => ({ id: row4.id, name: row4.name }));
   }
   const allowed = dashboard.settings?.vehicle_ids ?? null;
   return dashboard.vehicle_choices.filter((choice) => allowed === null || allowed.includes(choice.id));
@@ -64983,29 +65232,29 @@ function notifySignature(record5) {
   const n6 = record5?.notifications;
   return JSON.stringify(n6 ? [n6.targets, n6.events, n6.url] : null);
 }
-var row2 = (id, group, level, text4, goto = null) => ({ id, group, level, text: text4, goto, gotoLabel: goto ? GOTO2[goto] : null });
+var row3 = (id, group, level, text4, goto = null) => ({ id, group, level, text: text4, goto, gotoLabel: goto ? GOTO2[goto] : null });
 function setupDiagnostics({ dashboard, status, statusFresh, now }) {
   const out2 = [];
-  if (!dashboard) return [row2("dashboard", "setup", "info", "No dashboard observation yet, so setup problems are unknown.")];
+  if (!dashboard) return [row3("dashboard", "setup", "info", "No dashboard observation yet, so setup problems are unknown.")];
   const rows = setupRowsOf(dashboard.setup ?? null);
-  if (dashboard.setup == null) out2.push(row2("setup-unknown", "setup", "info", "The backend did not report what is left to set up, so that is unknown (it is shown to administrators only)."));
+  if (dashboard.setup == null) out2.push(row3("setup-unknown", "setup", "info", "The backend did not report what is left to set up, so that is unknown (it is shown to administrators only)."));
   for (const r7 of rows) {
     if (!(r7.id in MEASUREMENT_ROWS)) continue;
     const goto = MEASUREMENT_ROWS[r7.id];
-    out2.push(row2(`setup-${r7.id}`, "measurement", r7.id === "grid_power_sign" || r7.id === "grid_current_sign" ? "warning" : "info", `${setupRowText("en", r7.id)}${goto ? "" : " This is set up in Home Assistant (the SpotNav card or the site settings), not here."}`, goto));
+    out2.push(row3(`setup-${r7.id}`, "measurement", r7.id === "grid_power_sign" || r7.id === "grid_current_sign" ? "warning" : "info", `${setupRowText("en", r7.id)}${goto ? "" : " This is set up in Home Assistant (the SpotNav card or the site settings), not here."}`, goto));
   }
   const soc2 = dashboard.soc;
-  if (soc2 && soc2.value == null && !rows.some((r7) => r7.id === "car_level" || r7.id === "vehicle")) out2.push(row2("soc-missing", "measurement", "info", "The car\u2019s charge level has no valid reading now, so an SOC plan relies on the last known or an estimated level. Choose or check the level sensor.", "vehicle-sources"));
+  if (soc2 && soc2.value == null && !rows.some((r7) => r7.id === "car_level" || r7.id === "vehicle")) out2.push(row3("soc-missing", "measurement", "info", "The car\u2019s charge level has no valid reading now, so an SOC plan relies on the last known or an estimated level. Choose or check the level sensor.", "vehicle-sources"));
   const prices = dashboard.prices;
   if (prices) {
-    if (prices.provider && !prices.provider.name) out2.push(row2("price-provider", "pricing", "warning", `No price provider is configured for the saved area${prices.provider.notice ? ` (${prices.provider.notice.code.replace(/_/g, " ")})` : ""}. Prices may be missing or held from before.`, "market-costs"));
-    if (typeof prices.state === "string" && prices.state !== "ready") out2.push(row2("price-state", "pricing", "warning", `Held price data is \u201C${prices.state.replace(/_/g, " ")}\u201D${prices.reason ? ` (${String(prices.reason).replace(/_/g, " ")})` : ""}, so plans may use incomplete prices. Held data is not proof the provider answered just now.`, "market-costs"));
-    else if (prices.interval_count === 0) out2.push(row2("price-none", "pricing", "warning", "No price intervals are held, so a price-based plan cannot be made.", "market-costs"));
+    if (prices.provider && !prices.provider.name) out2.push(row3("price-provider", "pricing", "warning", `No price provider is configured for the saved area${prices.provider.notice ? ` (${prices.provider.notice.code.replace(/_/g, " ")})` : ""}. Prices may be missing or held from before.`, "market-costs"));
+    if (typeof prices.state === "string" && prices.state !== "ready") out2.push(row3("price-state", "pricing", "warning", `Held price data is \u201C${prices.state.replace(/_/g, " ")}\u201D${prices.reason ? ` (${String(prices.reason).replace(/_/g, " ")})` : ""}, so plans may use incomplete prices. Held data is not proof the provider answered just now.`, "market-costs"));
+    else if (prices.interval_count === 0) out2.push(row3("price-none", "pricing", "warning", "No price intervals are held, so a price-based plan cannot be made.", "market-costs"));
   }
-  if (!statusFresh) out2.push(row2("status-stale", "execution", "info", "Morek status is unavailable or stale, so execution blockers are unknown. This is not proof that nothing is blocked.", "morek"));
+  if (!statusFresh) out2.push(row3("status-stale", "execution", "info", "Morek status is unavailable or stale, so execution blockers are unknown. This is not proof that nothing is blocked.", "morek"));
   else {
     const banner2 = recoveryBanner(status, now);
-    if (banner2) out2.push(row2(`exec-${banner2.code || "blocker"}`, "execution", banner2.level === "error" ? "error" : banner2.level === "warning" ? "warning" : "info", banner2.text, "morek"));
+    if (banner2) out2.push(row3(`exec-${banner2.code || "blocker"}`, "execution", banner2.level === "error" ? "error" : banner2.level === "warning" ? "warning" : "info", banner2.text, "morek"));
   }
   return out2;
 }
@@ -65733,6 +65982,14 @@ var part = (ms2, zone, options2) => {
     return U;
   }
 };
+var offsetName = (ms2, zone) => {
+  if (!Number.isFinite(ms2) || !zone) return null;
+  try {
+    return new Intl.DateTimeFormat("en", { timeZone: zone, timeZoneName: "shortOffset" }).formatToParts(ms2).find((p4) => p4.type === "timeZoneName")?.value ?? null;
+  } catch {
+    return null;
+  }
+};
 var providerName = (key3) => ({ nordpool: "Nord Pool", entsoe: "ENTSO-E", pvpc: "PVPC", octopus: "Octopus Energy", zonneplan: "Zonneplan", relay: "Legacy relay" })[key3] || (typeof key3 === "string" && key3 ? key3 : "unknown provider");
 function priceProvenance(prices, market, zone, stale = false, now = Date.now()) {
   const selected = prices?.provider?.name || (prices?.provider?.key ? providerName(prices.provider.key) : "Unavailable");
@@ -65798,7 +66055,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
   const rawProposal = raw?.plan?.proposal;
   const details2 = rawProposal?.window_details;
   const rawProjection = rawProposal?.projection;
-  const validDetails = Array.isArray(details2) && proposal && details2.length === proposal.periods.length && details2.every((item, i7) => item && Date.parse(item.start) === proposal.periods[i7].startMs && Date.parse(item.end) === proposal.periods[i7].endMs && Number.isFinite(item.energy_kwh) && item.energy_kwh >= 0 && (item.cost === null || Number.isFinite(item.cost)) && (item.projected_soc === void 0 || validPercent(item.projected_soc))) && Number.isFinite(proposal.planned_kwh) && Math.abs(details2.reduce((sum, row3) => sum + row3.energy_kwh, 0) - proposal.planned_kwh) < Math.max(1e-6, Math.abs(proposal.planned_kwh) * 1e-8) && (proposal.unpriced || !proposal.cost || details2.every((row3) => Number.isFinite(row3.cost)) && Math.abs(details2.reduce((sum, row3) => sum + row3.cost, 0) - proposal.cost.value) < Math.max(1e-6, Math.abs(proposal.cost.value) * 1e-8));
+  const validDetails = Array.isArray(details2) && proposal && details2.length === proposal.periods.length && details2.every((item, i7) => item && Date.parse(item.start) === proposal.periods[i7].startMs && Date.parse(item.end) === proposal.periods[i7].endMs && Number.isFinite(item.energy_kwh) && item.energy_kwh >= 0 && (item.cost === null || Number.isFinite(item.cost)) && (item.projected_soc === void 0 || validPercent(item.projected_soc))) && Number.isFinite(proposal.planned_kwh) && Math.abs(details2.reduce((sum, row4) => sum + row4.energy_kwh, 0) - proposal.planned_kwh) < Math.max(1e-6, Math.abs(proposal.planned_kwh) * 1e-8) && (proposal.unpriced || !proposal.cost || details2.every((row4) => Number.isFinite(row4.cost)) && Math.abs(details2.reduce((sum, row4) => sum + row4.cost, 0) - proposal.cost.value) < Math.max(1e-6, Math.abs(proposal.cost.value) * 1e-8));
   const planCurrency = proposal?.cost?.currency || d3.market?.currency || null;
   const pricedBasis = rawProposal?.cost_basis === "configured_variable_cost" && !proposal?.unpriced && proposal?.cost?.currency === planCurrency && /^[A-Z]{3}$/.test(planCurrency || "");
   const projectionValid = !planStale && validPercent(rawProjection?.starting_soc) && Number.isFinite(rawProjection?.kwh_per_percent) && rawProjection.kwh_per_percent > 0;
@@ -65848,6 +66105,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
       costBasis: pricedBasis ? "configured variable cost, including configured additions" : null,
       detailsNote: !validDetails ? "Window energy and costs are unavailable because reconciled planner details are missing." : proposal?.unpriced ? "Window costs and prices are unavailable for an unpriced plan." : !pricedBasis ? "Window prices and weighted average are unavailable because the cost basis or currency is unknown." : null,
       minutesPerTimeUnit: 1 / 6e4,
+      offset: (ms2) => offsetName(ms2, zone),
       time: (ms2) => part(ms2, zone, { timeStyle: "short" }),
       day: (ms2) => part(ms2, zone, { dateStyle: "medium" }),
       ...published?.format
@@ -65855,6 +66113,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
     model: {
       // Artwork evidence (20.2): the plug state only from a fresh Morek status; anything else is unknown and shows no cable.
       scene: { connection: vehicle, stale: stale || !statusFresh },
+      windowsContext: proposal ? { identity: proposal.identity ?? null, codes: policy, provisional: !planStale && raw?.plan?.price_policy?.provisional === true, tomorrowPending: !planStale && raw?.plan?.price_policy?.tomorrow_pending === true, unpriced: proposal.unpriced === true } : null,
       effectiveTrack: effectiveTrack(status, observedAt, failed, now, zone),
       windows,
       nextWindow,
@@ -66137,7 +66396,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.205";
+var CARD_VERSION = "2.5.206";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {
@@ -66148,9 +66407,9 @@ function chargeNowSelection(choice, custom, now = Date.now()) {
     }
     return { end: end3, options: { end_time: new Date(end3).toISOString() } };
   }
-  const minutes = Number(choice);
-  if (![30, 60, 120, 180].includes(minutes)) return { error: "Choose a valid duration." };
-  const end2 = now + minutes * 6e4;
+  const minutes2 = Number(choice);
+  if (![30, 60, 120, 180].includes(minutes2)) return { error: "Choose a valid duration." };
+  const end2 = now + minutes2 * 6e4;
   return { end: end2, options: { end_time: new Date(end2).toISOString() } };
 }
 function chargeNowPrice(info) {

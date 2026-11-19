@@ -12,6 +12,8 @@ import { mountCharts } from './charts.js';
 import { buildTracks } from './chart-tracks.js';
 import { total, money } from './plan-data.js';
 import { renderPlan, number } from './plan-view.js';
+import { buildWindowsModel, resolveSelection, windowsAt, windowKey } from './windows-model.js';
+import { renderWindows } from './windows-view.js';
 import { renderBattery, batteryEstimates } from './vehicle-view.js';
 import { renderEvidence } from './evidence-view.js';
 import { renderHistory } from './history-view.js';
@@ -46,6 +48,8 @@ export function mountDashboard(root, adapter) {
   // A host must change draftKey when the charger or canonical revision changes.
   const drafts = new Map();
   let confirmToken = null;
+  // 20.5: the selected proposal window is local, read-only view state: charger + proposal identity + exact interval.
+  let winSelection = null, winNotice = '', winModel = null;
   let current = adapter;
   function cleanup() {
     listeners?.abort();
@@ -97,6 +101,32 @@ export function mountDashboard(root, adapter) {
     el.scrollIntoView?.({ block: 'start' });
     return true;
   }
+  // 20.5 window selection: purely local; re-rendering repaints the highlight and never requests, replans or sends anything.
+  function selectWindow(key, toggle = true) {
+    const row = winModel?.rows.find(r => r.valid && r.key === key);
+    if (!row) return;
+    const same = winSelection?.key === key && winSelection.contextKey === winModel.contextKey;
+    winSelection = toggle && same ? null : { draftKey: current.draftKey, contextKey: winModel.contextKey, key };
+    winNotice = '';
+    render();
+  }
+  function clearWindow() {
+    const key = winSelection?.key;
+    winSelection = null; winNotice = '';
+    render();
+    if (key) [...root.querySelectorAll('[data-win-select]')].find(b => b.dataset.winSelect === key)?.focus?.();
+  }
+  function windowClick(event) {
+    const hit = selector => event.target?.closest?.(selector);
+    const pick = hit('[data-win-select]');
+    if (pick) { selectWindow(pick.dataset.winSelect); return; }
+    if (hit('#win-clear')) { clearWindow(); return; }
+    const row = winSelection ? winModel?.rows.find(r => r.valid && r.key === winSelection.key) : null;
+    if (hit('#win-show-chart')) { if (row) chartMount?.focusInterval(row.start, row.end); return; }
+    const nav = hit('[data-win-nav]');
+    // Only an already-offered, existing price-day view is requested; the selection stays and re-resolves once the chart shows that day.
+    if (nav && row) current.actions?.priceNav?.(nav.dataset.winNav);
+  }
   function measureLayout() {
     const width = root.getBoundingClientRect?.().width || 0;
     const layout = width > 0 && width < 760 ? 'compact' : 'wide';
@@ -130,9 +160,9 @@ export function mountDashboard(root, adapter) {
     const priceCard = mode => {
       const title = mode === 'bar' ? 'Bars' : 'Stepped area';
       const heading = modes.length > 1 ? `Electricity prices & plan · ${title}` : 'Electricity prices & charging plan';
-      if (!chartReady) return card(heading, labels.chartEyebrow || 'PRICES & PLAN', `<p>Price chart unavailable.</p><p class="subtext">${e(labels.chartIntro)} ${e(labels.chartNote)}</p>${plan}`, `prices prices-${mode}`, tag);
+      if (!chartReady) return card(heading, labels.chartEyebrow || 'PRICES & PLAN', `<p>Price chart unavailable.</p><p class="subtext">${e(labels.chartIntro)} ${e(labels.chartNote)}</p>`, `prices prices-${mode}`, tag);
       const extremum = p => p ? `${priceNumber(p.cents)} ${e(unit)} · ${e(day(p.start))} ${e(time(p.start))}` : 'Unknown';
-      return card(heading, labels.chartEyebrow || 'PRICES & PLAN', `<div class="chart-intro"><div>${modes.length > 1 ? `<strong>${icon} ${mode === 'bar' ? 'Interval bars' : 'Stepped area'}</strong>` : ''}<p>${e(labels.chartIntro)}</p></div>${renderChartControls(mode,title)}</div>${renderPriceContext({now:priceAt(chart.now),next:m.nextPriceUnavailable ? null : priceAt(next?.start),low:extremum(extremes[0]),high:extremum(extremes[1]),unit})}${renderPriceNav(m.priceNav)}<div id="price-${mode}" class="chart price-chart" role="img" aria-label="Price intervals and proposed windows"></div><div class="track-lanes" data-track-lanes="${mode}" role="group" aria-label="Evidence tracks on the price time axis: proposal, sent, effective, measured"></div>${renderChartLegend({unit,cap:chart.cap})}<p class="subtext">${e(labels.chartNote)}</p>${plan}`, `prices prices-${mode}`, tag);
+      return card(heading, labels.chartEyebrow || 'PRICES & PLAN', `<div class="chart-intro"><div>${modes.length > 1 ? `<strong>${icon} ${mode === 'bar' ? 'Interval bars' : 'Stepped area'}</strong>` : ''}<p>${e(labels.chartIntro)}</p></div>${renderChartControls(mode,title)}</div>${renderPriceContext({now:priceAt(chart.now),next:m.nextPriceUnavailable ? null : priceAt(next?.start),low:extremum(extremes[0]),high:extremum(extremes[1]),unit})}${renderPriceNav(m.priceNav)}<div id="price-${mode}" class="chart price-chart" role="img" aria-label="Price intervals and proposed windows"></div><div class="track-lanes" data-track-lanes="${mode}" role="group" aria-label="Evidence tracks on the price time axis: proposal, sent, effective, measured"></div>${renderChartLegend({unit,cap:chart.cap})}<p class="subtext">${e(labels.chartNote)}</p>`, `prices prices-${mode}`, tag);
     };
     const scenario = m.scenarios;
     const option = (s) => `<option value="${e(s.value)}" ${s.value === scenario.selected ? 'selected' : ''}>${e(s.label)}</option>`;
@@ -147,6 +177,19 @@ export function mountDashboard(root, adapter) {
     const chartDraft = { duration: drafts.get('c:duration'), end: drafts.get('c:end') };
     const scene = sceneOf(m.scene);
     const planIsStale = !!(state.planStale ?? state.stale);
+    // 20.5: the proposed-windows list uses the same validated windows as the chart; selection keeps proposal identity + exact interval.
+    winModel = buildWindowsModel({ windows, knownPlan, stale: planIsStale, totals: m.totals, context: m.windowsContext, format: f, draftKey: current.draftKey, nav: m.priceNav, chartHorizon: chartReady ? chart.horizon : null });
+    const resolved = resolveSelection(winSelection, winModel);
+    if (winSelection && !resolved.selected) { winSelection = null; winNotice = resolved.notice; }
+    const winSelected = resolved.selected;
+    const nextWindowKey = next && Number.isFinite(next.start) && Number.isFinite(next.end) && next.end > next.start ? windowKey(next) : null;
+    const windowsCard = card('Proposed charging windows', 'PLAN', renderWindows(winModel, { f, selected: winSelected, notice: winNotice, nextKey: nextWindowKey, assumptions, policy: state.policy, context: m.windowsContext, reserve: m.reserve, chartKnown: chartReady }), 'windows', tag);
+    const selectedWindow = winSelected ? { start: winSelected.start, end: winSelected.end } : null;
+    const pickWindow = instant => {
+      const hits = windowsAt(winModel, instant);
+      if (hits.length !== 1) return;
+      selectWindow(hits[0].key);
+    };
     const socValid = Number.isFinite(state.soc) && state.soc >= 0 && state.soc <= 100;
     const targetValid = Number.isFinite(settings.target) && settings.target >= 0 && settings.target <= 100;
     const socUnknown = !socValid || state.stale;
@@ -158,6 +201,7 @@ export function mountDashboard(root, adapter) {
     const html = m.bare === true ? `${shellOpen}${TABS.map(([id, label]) => bareTab(id, label)).join('')}</div>` : `${shellOpen}${tabOpen('overview',activeTab)}
       ${hero}
       ${modes.map(priceCard).join('')}
+      ${windowsCard}
       ${card('Recent charging · summary','OVERVIEW',renderRecentSummary(m.historyDay,m.history),'recent',tag)}
       ${tabClose}${tabOpen('explore',activeTab)}
       ${card('Price insights',labels.insightEyebrow || 'PRICE DATA',renderInsights(m.insights),'insights',tag)}
@@ -176,6 +220,7 @@ export function mountDashboard(root, adapter) {
     else reconcile(root.firstChild,template.content.firstChild,node=>drafts.has(node.dataset?.setting) || (node.dataset?.vsetting && drafts.has(`v:${node.dataset.vsetting}`)) || (node.dataset?.msetting && drafts.has(`m:${node.dataset.msetting}`)) || (node.dataset?.psetting && drafts.has(`p:${node.dataset.psetting}`)) || (node.dataset?.nsetting && drafts.has(`n:${node.dataset.nsetting}`)) || (node.dataset?.csetting && drafts.has(`c:${node.dataset.csetting}`)) || root.getRootNode().activeElement===node);
     listeners ||= new AbortController(); const signal = listeners.signal;
     const bind=(node,fn)=>{if(node && !bound.has(node)){bound.add(node);fn();}};
+    bind(root.querySelector('.shell'), () => root.querySelector('.shell').addEventListener('click', windowClick, { signal }));
     const dialog = root.querySelector('#plan-dialog'); let trigger;
     root.querySelectorAll('#open-plan, #open-plan-details').forEach(button => bind(button,()=>button.addEventListener('click', () => { trigger = button; dialog.showModal(); root.querySelector('#close-plan').focus(); }, {signal})));
     bind(root.querySelector('#close-plan'),()=>root.querySelector('#close-plan').addEventListener('click', () => dialog.close(), {signal}));
@@ -280,8 +325,8 @@ export function mountDashboard(root, adapter) {
     const reloadButton=root.querySelector('#reload-settings');bind(reloadButton,()=>reloadButton.addEventListener('click', () => current.actions?.reloadSettings?.(), {signal}));
     if (chartMount && ((!chartReady && Object.keys(chartMount.priceCharts).length) || (chartReady && !Object.keys(chartMount.priceCharts).length) || (!chartReady && !historyReady))) {chartMount.dispose();chartMount=null;}
     if ((chartReady || historyReady) && !chartMount) {
-      chartMount = mountCharts(root, {...chart,prices,windows:chartWindows,tracks,readings:historyReady ? readings : null,sentHistory:historyReady ? sentHistory : null,historyAxis:m.history?.axis}, f, chartReady ? modes : []);
-    } else if (chartMount && chartReady) chartMount.update({...chart,prices,windows:chartWindows,tracks},f);
+      chartMount = mountCharts(root, {...chart,prices,windows:chartWindows,tracks,selectedWindow,onWindowPick:pickWindow,readings:historyReady ? readings : null,sentHistory:historyReady ? sentHistory : null,historyAxis:m.history?.axis}, f, chartReady ? modes : []);
+    } else if (chartMount && chartReady) chartMount.update({...chart,prices,windows:chartWindows,tracks,selectedWindow,onWindowPick:pickWindow},f);
     return chartMount;
   }
   render();
@@ -294,7 +339,7 @@ export function mountDashboard(root, adapter) {
     const rootNode=root.getRootNode?.(), focusId=!sameDraft && rootNode?.activeElement?.id && root.contains(rootNode.activeElement) ? rootNode.activeElement.id : '';
     const inConfirm=!!(rootNode?.activeElement && root.contains(rootNode.activeElement) && rootNode.activeElement.closest?.('#charge-confirm'));
     const priorOrigin=root.querySelector('#charge-confirm')?.dataset.origin || 'charge-now';
-    if (!sameDraft) {drafts.clear();cleanup();}
+    if (!sameDraft) {drafts.clear();winSelection=null;winNotice='';cleanup();}
     pendingUpdate=null;current=next;const result=render();
     // Confirmation focus: a newly opened confirmation takes focus on Cancel; when it closes while focus was inside it, focus goes back
     // to the control that opened it (or the status line if that control is now disabled).

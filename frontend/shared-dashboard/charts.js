@@ -10,7 +10,7 @@ echarts.use([CustomChart, LineChart, GridComponent, TooltipComponent, MarkLineCo
 // Stage 20.4: colours follow the shell tokens (see shell.css); geometry (grid margins) is unchanged so the DOM overlays and lanes stay aligned.
 const axis = { axisLine: { lineStyle: { color: '#2f4770' } }, axisLabel: { color: '#aebfd8', fontSize: 12 }, splitLine: { lineStyle: { color: '#172a46', type: 'dashed' } } };
 export function mountCharts(root, data, format, modes) {
-  let { prices, windows, tracks = null, now, deadline, horizon, cap, readings, sentHistory, historyAxis, unit = 'c/kWh', viewKey } = data;
+  let { prices, windows, tracks = null, now, deadline, horizon, cap, readings, sentHistory, historyAxis, unit = 'c/kWh', viewKey, selectedWindow = null, onWindowPick = null } = data;
   let { time, date: sampleDate, days: sampleDays, priceGaps, stepSegments, stepPoints, snapRange, initialRange, timeTicks, tickLabel } = format;
   time = format.chartTime || time;
   let tooltipDate = format.tooltipDate || sampleDate;
@@ -18,6 +18,7 @@ export function mountCharts(root, data, format, modes) {
   const signal = controller.signal;
   const priceCharts = {};
   const refreshers = [];
+  const focusers = [];
   for (const mode of modes) {
   const priceChart = echarts.init(root.querySelector(`#price-${mode}`));
   priceCharts[mode] = priceChart;
@@ -78,6 +79,16 @@ export function mountCharts(root, data, format, modes) {
         elements.push(el);
       }
     }
+    // 20.5: the window selected in the proposed-windows list, drawn at its exact interval (display only, never an action).
+    if (selectedWindow && Number.isFinite(selectedWindow.start) && Number.isFinite(selectedWindow.end)) {
+      const a = Math.max(selectedWindow.start, z.startValue), b = Math.min(selectedWindow.end, z.endValue);
+      if (b > a) {
+        const el = document.createElement('div'); el.className = 'proposal-selected';
+        el.dataset.start = selectedWindow.start; el.dataset.end = selectedWindow.end;
+        el.style.left = `${pixel(a)}px`; el.style.width = `${pixel(b)-pixel(a)}px`;
+        elements.push(el);
+      }
+    }
     for (const segment of sampleDays(z.startValue,z.endValue)) {
       const left = pixel(segment.start), right = pixel(segment.end), span = right-left;
       const cell = document.createElement('div');
@@ -105,6 +116,22 @@ export function mountCharts(root, data, format, modes) {
   // Evidence tracks (7.3b): DOM lanes below the chart positioned with the chart's own axis conversion, so zoom, pan and
   // resize move them with the price intervals. They add nothing to the chart's series, grid or y extent.
   const laneRoot = root.querySelector(`[data-track-lanes="${mode}"]`);
+  // A click on the proposal lane only asks the host which window contains that instant (read-only; ambiguity selects nothing).
+  if (laneRoot) laneRoot.addEventListener('click', event => {
+    if (typeof onWindowPick !== 'function') return;
+    const lane = event.target?.closest?.('.track-lane');
+    const bar = lane?.dataset?.lane === 'proposal' ? lane.querySelector('.track-bar') : null;
+    if (!bar) return;
+    const rect = bar.getBoundingClientRect(), z = priceChart.getOption().dataZoom[0];
+    if (!(rect.width > 0)) return;
+    onWindowPick(z.startValue + (event.clientX - rect.left) / rect.width * (z.endValue - z.startValue));
+  }, { signal });
+  focusers.push((start, end) => {
+    const hour = Number.isFinite(format.minutesPerTimeUnit) && format.minutesPerTimeUnit > 0 ? 60 / format.minutesPerTimeUnit : 0;
+    const pad = Math.max(end - start, 2 * hour);
+    const a = Math.max(horizon[0], start - pad), b = Math.min(horizon[1], end + pad);
+    if (b > a) priceChart.dispatchAction({ type: 'dataZoom', startValue: a, endValue: b });
+  });
   const drawLanes = z => {
     if (!laneRoot) return;
     const px = h => priceChart.convertToPixel({xAxisIndex:0}, h);
@@ -128,6 +155,15 @@ export function mountCharts(root, data, format, modes) {
         seg.title = s.text || ''; 
         if (s.label && span >= 64) seg.textContent = s.label;
         bar.append(seg);
+      }
+      if (lane.key === 'proposal' && selectedWindow && Number.isFinite(selectedWindow.start) && Number.isFinite(selectedWindow.end)) {
+        const a = Math.max(selectedWindow.start, z.startValue), b = Math.min(selectedWindow.end, z.endValue);
+        if (b > a) {
+          const mark = document.createElement('div'); mark.className = 'track-selected';
+          mark.dataset.start = selectedWindow.start; mark.dataset.end = selectedWindow.end;
+          mark.style.left = `${px(a) - left}px`; mark.style.width = `${px(b) - px(a)}px`;
+          bar.append(mark);
+        }
       }
       el.append(caption, bar);
       return el;
@@ -220,9 +256,9 @@ export function mountCharts(root, data, format, modes) {
   for (const mode of modes) resize.observe(root.querySelector(`#price-${mode}`));
   if (powerChart) resize.observe(root.querySelector('#power-chart'));
   // A chart initialised or updated inside a hidden tab measured 0x0; resize() re-measures it (zoom lives in the chart's option and is kept).
-  return { priceCharts, resize() { Object.values(priceCharts).forEach(chart => chart.resize()); powerChart?.resize(); }, update(next, nextFormat) {
+  return { priceCharts, focusInterval(start, end) { if (Number.isFinite(start) && Number.isFinite(end) && end > start) focusers.forEach(focus => focus(start, end)); }, resize() { Object.values(priceCharts).forEach(chart => chart.resize()); powerChart?.resize(); }, update(next, nextFormat) {
     const navigated=next.viewKey!==viewKey;
-    ({prices,windows,tracks=null,now,deadline,horizon,cap,unit='c/kWh',viewKey}=next);
+    ({prices,windows,tracks=null,now,deadline,horizon,cap,unit='c/kWh',viewKey,selectedWindow=null,onWindowPick=null}=next);
     ({time,date:sampleDate,days:sampleDays,priceGaps,stepSegments,stepPoints,snapRange,initialRange,timeTicks,tickLabel}=nextFormat);
     time=nextFormat.chartTime || time;
     tooltipDate=nextFormat.tooltipDate || sampleDate;

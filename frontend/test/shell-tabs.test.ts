@@ -46,7 +46,7 @@ describe('four-tab shell (shared renderer)', () => {
   });
   it('gives every existing card exactly one canonical tab home', () => {
     const { root } = mount();
-    expect(homes(root,'overview')).toEqual(['overview','prices','recent']);
+    expect(homes(root,'overview')).toEqual(['overview','prices','windows','recent']);
     expect(homes(root,'explore')).toEqual(['insights']);
     expect(homes(root,'history')).toEqual(['history']);
     expect(homes(root,'settings').slice(0,2)).toEqual(['controls','morek']);

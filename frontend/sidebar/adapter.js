@@ -24,6 +24,11 @@ const part = (ms, zone, options) => {
   if (!Number.isFinite(ms)) return U;
   try { return new Intl.DateTimeFormat('en', {...options,timeZone:zone || 'UTC'}).format(ms) + (zone ? '' : ' UTC'); } catch { return U; }
 };
+// UTC offset name of an instant in the HA zone (e.g. GMT+2), used only to disambiguate repeated DST hours in the windows list.
+const offsetName = (ms, zone) => {
+  if (!Number.isFinite(ms) || !zone) return null;
+  try { return new Intl.DateTimeFormat('en', {timeZone:zone, timeZoneName:'shortOffset'}).formatToParts(ms).find(p => p.type === 'timeZoneName')?.value ?? null; } catch { return null; }
+};
 const providerName = key => ({nordpool:'Nord Pool',entsoe:'ENTSO-E',pvpc:'PVPC',octopus:'Octopus Energy',zonneplan:'Zonneplan',relay:'Legacy relay'})[key] || (typeof key === 'string' && key ? key : 'unknown provider');
 export function priceProvenance(prices, market, zone, stale = false, now = Date.now()) {
   const selected=prices?.provider?.name || (prices?.provider?.key ? providerName(prices.provider.key) : 'Unavailable');
@@ -137,10 +142,11 @@ export function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), f
     draftKey: d.charger.charger_id,
     format: {currency, costBasis:pricedBasis ? 'configured variable cost, including configured additions' : null,
       detailsNote:!validDetails ? 'Window energy and costs are unavailable because reconciled planner details are missing.' : proposal?.unpriced ? 'Window costs and prices are unavailable for an unpriced plan.' : !pricedBasis ? 'Window prices and weighted average are unavailable because the cost basis or currency is unknown.' : null,
-      minutesPerTimeUnit:1/60000, time: ms=>part(ms,zone,{timeStyle:'short'}), day: ms=>part(ms,zone,{dateStyle:'medium'}), ...published?.format},
+      minutesPerTimeUnit:1/60000, offset: ms=>offsetName(ms,zone), time: ms=>part(ms,zone,{timeStyle:'short'}), day: ms=>part(ms,zone,{dateStyle:'medium'}), ...published?.format},
     model: {
       // Artwork evidence (20.2): the plug state only from a fresh Morek status; anything else is unknown and shows no cable.
       scene:{connection:vehicle,stale:stale || !statusFresh},
+      windowsContext:proposal ? {identity:proposal.identity ?? null, codes:policy, provisional:!planStale && raw?.plan?.price_policy?.provisional===true, tomorrowPending:!planStale && raw?.plan?.price_policy?.tomorrow_pending===true, unpriced:proposal.unpriced===true} : null,
       effectiveTrack:effectiveTrack(status, observedAt, failed, now, zone), windows, nextWindow, learning:proposal ? learningModel(rawProposal?.learning,planStale,learningText()) : null, reserve:!planStale && proposal ? reserveModel(rawProposal?.reserve,pricedBasis ? planCurrency : null,reserveText()) : null, chart:published?.chart, priceNav:priceView?.nav || null, totals: !planStale && proposal ? {energy:proposal.planned_kwh,cost:proposal.unpriced ? null : proposal.cost?.value,pricePerKwh:avg} : null,
       vehicle: {status: stale ? 'Connection unavailable · stale dashboard' : d.charger.available ? (d.connection?.state || U) : 'Charger unavailable', detail:`Dashboard observed ${date(d.generated_at,zone)}${stale ? ` · stale: ${staleReason}` : ''}`, power:live.power,live:live.summary,liveMismatch:live.mismatch, soc:validPercent(soc) ? soc : null, stale:socStale, planStale, socDetail, socEstimated:!useRaw && d.soc?.estimated===true, policy:policyText},
       assumptions:{startingSoc:projectionValid ? rawProjection.starting_soc : null,capacityKwh:d.soc?.capacity_kwh,efficiency:d.soc?.efficiency,projectionSupported:projectionValid,projectionKwhPerPercent:rawProjection?.kwh_per_percent,projectionNote:projectionNoteFull},

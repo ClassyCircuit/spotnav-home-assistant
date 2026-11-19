@@ -153,7 +153,7 @@ describe('actual sidebar read-only host', () => {
     expect(html).toContain('20 c/kWh');expect(html).toContain('12.5 c/kWh');expect(html).toContain('15 c/kWh');expect(html).toContain('65.0%');
     const hass={connected:true,user:{is_admin:true},callWS:msg=>Promise.resolve(msg.type==='spotnav/list_chargers'?{api_version:1,chargers:[{charger_id:'a',charger_name:'A'}]}:msg.type==='spotnav/get_dashboard'?raw:msg.type==='spotnav/get_settings'?envelope(record()):status)};
     const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();
-    for(const root of [panel.shadowRoot.querySelector('.controls-plan'),panel.shadowRoot.querySelector('.prices'),panel.shadowRoot.querySelector('#plan-dialog')]) expect(root.textContent).toContain('15 c/kWh');
+    for(const root of [panel.shadowRoot.querySelector('.controls-plan'),panel.shadowRoot.querySelector('.windows'),panel.shadowRoot.querySelector('#plan-dialog')]) expect(root.textContent).toContain('15 c/kWh');
     panel.remove();
     raw.plan.proposal.projection.time_basis='last_updated';expect(dashboardAdapter(raw,status,now,now).model.assumptions.projectionNote).toMatch(/HA state 1440 min old; vehicle report time unavailable/);
     expect(dashboardAdapter(raw,status,now,now).model.assumptions.projectionNote).not.toMatch(/progress since this reading is unknown/);
