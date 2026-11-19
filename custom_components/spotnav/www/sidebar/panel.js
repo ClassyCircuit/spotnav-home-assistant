@@ -53589,6 +53589,7 @@ function mountDashboard(root, adapter) {
     winSelection = toggle && same ? null : { draftKey: current.draftKey, contextKey: winModel.contextKey, key: key3 };
     winNotice = "";
     render2();
+    [...root.querySelectorAll("[data-win-select]")].find((b3) => b3.dataset.winSelect === key3)?.focus?.();
   }
   function clearWindow() {
     const key3 = winSelection?.key;
@@ -53599,6 +53600,12 @@ function mountDashboard(root, adapter) {
   }
   function windowClick(event) {
     const hit = (selector) => event.target?.closest?.(selector);
+    if (hit("[data-chart-windows]")) {
+      const target = root.querySelector("[data-win-select]") || root.querySelector(".windows");
+      reveal(target);
+      target?.focus?.();
+      return;
+    }
     const pick = hit("[data-win-select]");
     if (pick) {
       selectWindow(pick.dataset.winSelect);
@@ -53650,7 +53657,7 @@ function mountDashboard(root, adapter) {
       const heading = modes.length > 1 ? `Electricity prices & plan \xB7 ${title}` : "Electricity prices & charging plan";
       if (!chartReady) return card(heading, labels.chartEyebrow || "PRICES & PLAN", `<p>Price chart unavailable.</p><p class="subtext">${escapeText(labels.chartIntro)} ${escapeText(labels.chartNote)}</p>`, `prices prices-${mode}`, tag);
       const extremum = (p4) => p4 ? `${priceNumber(p4.cents)} ${escapeText(unit)} \xB7 ${escapeText(day(p4.start))} ${escapeText(time2(p4.start))}` : "Unknown";
-      return card(heading, labels.chartEyebrow || "PRICES & PLAN", `<div class="chart-intro"><div>${modes.length > 1 ? `<strong>${icon} ${mode === "bar" ? "Interval bars" : "Stepped area"}</strong>` : ""}<p>${escapeText(labels.chartIntro)}</p></div>${renderChartControls(mode, title)}</div>${renderPriceContext({ now: priceAt(chart.now), next: m4.nextPriceUnavailable ? null : priceAt(next?.start), low: extremum(extremes[0]), high: extremum(extremes[1]), unit })}${renderPriceNav(m4.priceNav)}<div id="price-${mode}" class="chart price-chart" role="img" aria-label="Price intervals and proposed windows"></div><div class="track-lanes" data-track-lanes="${mode}" role="group" aria-label="Evidence tracks on the price time axis: proposal, sent, effective, measured"></div>${renderChartLegend({ unit, cap: chart.cap })}<p class="subtext">${escapeText(labels.chartNote)}</p>`, `prices prices-${mode}`, tag);
+      return card(heading, labels.chartEyebrow || "PRICES & PLAN", `<div class="chart-intro"><div>${modes.length > 1 ? `<strong>${icon} ${mode === "bar" ? "Interval bars" : "Stepped area"}</strong>` : ""}<p>${escapeText(labels.chartIntro)}</p></div>${renderChartControls(mode, title)}</div>${renderPriceContext({ now: priceAt(chart.now), next: m4.nextPriceUnavailable ? null : priceAt(next?.start), low: extremum(extremes[0]), high: extremum(extremes[1]), unit })}${renderPriceNav(m4.priceNav)}<div id="price-${mode}" class="chart price-chart" role="img" aria-label="Price intervals and proposed windows"></div><div class="track-lanes" data-track-lanes="${mode}" role="group" aria-label="Evidence tracks on the price time axis: proposal, sent, effective, measured"></div>${renderChartLegend({ unit, cap: chart.cap })}<button type="button" data-chart-windows>Go to proposed windows</button><p class="subtext">${escapeText(labels.chartNote)}</p>`, `prices prices-${mode}`, tag);
     };
     const scenario = m4.scenarios;
     const option = (s4) => `<option value="${escapeText(s4.value)}" ${s4.value === scenario.selected ? "selected" : ""}>${escapeText(s4.label)}</option>`;
@@ -66495,7 +66502,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.212";
+var CARD_VERSION = "2.5.213";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {

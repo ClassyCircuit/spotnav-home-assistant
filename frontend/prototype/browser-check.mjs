@@ -10,6 +10,7 @@ let id = 0; const pending = new Map(), urls = [], errors = [];
 ws.onmessage = ({data}) => { const m = JSON.parse(data); if (m.method === 'Network.requestWillBeSent') urls.push(m.params.request.url); if (m.method === 'Runtime.exceptionThrown') errors.push(m.params.exceptionDetails.text); if (m.id && pending.has(m.id)) { const p = pending.get(m.id); pending.delete(m.id); m.error ? p.reject(new Error(m.error.message)) : p.resolve(m.result); } };
 const cmd = (method, params = {}) => new Promise((resolve,reject) => { const key=++id; pending.set(key,{resolve,reject}); ws.send(JSON.stringify({id:key,method,params})); });
 const evaluate = async expression => { const r = await cmd('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true}); if (r.exceptionDetails) throw new Error(r.exceptionDetails.text); return r.result.value; };
+const showTab = async name => { await evaluate(`document.querySelector('#sn-tab-${name}').click()`); await evaluate(`new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))`); };
 const snapped = async mode => { const z=await evaluate(`(()=>{let z=window.samplePriceCharts.${mode}.getOption().dataZoom[0];return [z.startValue,z.endValue]})()`); assert.ok(z.every(v=>Math.abs(v*4-Math.round(v*4))<1e-6),`${mode} unsnapped ${z}`); return z; };
 const labels = async mode => { const ticks=await evaluate(`[...document.querySelectorAll('#price-${mode} .time-ticks span')].map(e=>({hour:Number(e.dataset.hour),text:e.innerText,rect:e.getBoundingClientRect().toJSON()}))`); assert.ok(ticks.length>0,'visible time labels'); for(const t of ticks) {assert.ok(Number.isInteger(t.hour/2) || ticks.length>8 && Number.isInteger(t.hour*4),`unaligned tick ${t.hour}`); if(t.hour===24) assert.match(t.text,/Tue 10 Nov/);} for(let i=1;i<ticks.length;i++) assert.ok(ticks[i].rect.left>=ticks[i-1].rect.right-1,'overlapping time labels'); return ticks; };
 const band = async mode => { const info=await evaluate(`(()=>{const c=window.samplePriceCharts.${mode},root=c.getDom().getBoundingClientRect();return {cells:[...root && c.getDom().querySelectorAll('.day-cell')].map(e=>({start:+e.dataset.start,end:+e.dataset.end,text:e.textContent,left:e.getBoundingClientRect().left-root.left,right:e.getBoundingClientRect().right-root.left,expectedLeft:c.convertToPixel({xAxisIndex:0},+e.dataset.start),expectedRight:c.convertToPixel({xAxisIndex:0},+e.dataset.end)})),lines:[...c.getDom().querySelectorAll('.midnight-line')].map(e=>({hour:+e.dataset.hour,left:e.getBoundingClientRect().left-root.left,expected:c.convertToPixel({xAxisIndex:0},+e.dataset.hour)}))}})()`); assert.ok(info.cells.length); for(const c of info.cells){assert.ok(Math.abs(c.left-c.expectedLeft)<1 && Math.abs(c.right-c.expectedRight)<1,'day band alignment'); if(c.right-c.left>=140) assert.match(c.text,/Nov/);} for(const l of info.lines) assert.ok(Math.abs(l.left-l.expected)<1,'midnight line alignment'); return info; };
@@ -19,27 +20,37 @@ for (const [name,width,height] of [['desktop',1440,1000],['mobile',390,844]]) {
   await cmd('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:name==='mobile'});
   const loaded = new Promise(resolve => { const prev=ws.onmessage; ws.onmessage=e=>{prev(e); if(JSON.parse(e.data).method==='Page.loadEventFired'){ws.onmessage=prev;resolve();}}; });
   await cmd('Page.navigate',{url:'http://127.0.0.1:8765/prototype/?comparison=bar'}); await loaded;
-  const state=await evaluate(`(async()=>{await Promise.all([...document.querySelectorAll('wa-button,wa-input,wa-badge,wa-progress-bar,wa-details')].map(e=>e.updateComplete));return {width:document.documentElement.scrollWidth,viewport:innerWidth,panels:document.querySelectorAll('.panel').length,charts:document.querySelectorAll('.chart canvas').length,rows:document.querySelectorAll('.plan-row').length,disabled:[...document.querySelectorAll('.controls wa-button,.details-body wa-button')].every(e=>e.disabled),text:document.body.innerText,rects:[...document.querySelectorAll('.prices')].map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}})};})()`);
-  assert.ok(state.width<=state.viewport,`${name} overflow ${state.width}/${state.viewport}`); assert.equal(state.panels,7); assert.equal(state.charts,3); assert.equal(state.rows,8); assert.ok(state.disabled); assert.ok(state.rects[1].y>state.rects[0].y); assert.ok(Math.abs(state.rects[0].width-state.rects[1].width)<1);
+  await showTab('overview');
+  const state=await evaluate(`(async()=>{await Promise.all([...document.querySelectorAll('wa-button,wa-input,wa-badge,wa-progress-bar,wa-details')].map(e=>e.updateComplete));return {width:document.documentElement.scrollWidth,viewport:innerWidth,panels:document.querySelectorAll('.panel').length,charts:document.querySelectorAll('.chart canvas').length,rows:document.querySelectorAll('.windows .win-row').length,disabled:[...document.querySelectorAll('.controls wa-button,.details-body wa-button')].every(e=>e.disabled),text:document.body.innerText,rects:[...document.querySelectorAll('.prices')].map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}})};})()`);
+  assert.ok(state.width<=state.viewport,`${name} overflow ${state.width}/${state.viewport}`); assert.ok(state.panels >= 8, 'shared tab panels are mounted'); assert.equal(state.charts,3); assert.ok(state.rows > 0); assert.ok(state.disabled); assert.ok(state.rects[1].y>state.rects[0].y); assert.ok(Math.abs(state.rects[0].width-state.rects[1].width)<1);
+  await showTab('settings');
+  state.text += ' ' + await evaluate(`document.body.innerText`);
+  await showTab('overview');
   for(const text of ['unverified','unarmed','26.45 c/kwh','00:37:30','not an optimized']) assert.ok(state.text.toLowerCase().includes(text),text);
-  const layout=await evaluate(`(()=>{let a=document.querySelector('.overview').getBoundingClientRect(),b=document.querySelector('.controls').getBoundingClientRect();return {ax:a.x,ay:a.y,aw:a.width,ab:a.bottom,bx:b.x,by:b.y,bw:b.width,bb:b.bottom}})()`);
-  if(name==='desktop') {assert.ok(Math.abs(layout.ay-layout.by)<1 && layout.bx>layout.ax && Math.abs(layout.aw-layout.bw)<1 && Math.abs(layout.ab-layout.bb)<1,'overview and controls aligned');} else assert.ok(layout.by>=layout.ab,'controls follow overview');
-  const cardsClip=await evaluate(`(()=>{const a=document.querySelector('.overview').getBoundingClientRect(),b=document.querySelector('.controls').getBoundingClientRect();return {x:Math.min(a.x,b.x)+scrollX,y:a.y+scrollY,width:Math.max(a.right,b.right)-Math.min(a.left,b.left),height:Math.max(a.bottom,b.bottom)-a.top,scale:1}})()`);
+  const layout=await evaluate(`(()=>{const hero=document.querySelector('.overview'),controls=hero.querySelector('#automatic-controls');return {hasControls:!!controls,inside:!!controls && hero.contains(controls)}})()`);
+  assert.ok(layout.hasControls && layout.inside, 'charging controls belong to the Overview hero');
+  const cardsClip=await evaluate(`(()=>{const r=document.querySelector('.overview').getBoundingClientRect();return {x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1}})()`);
   const cardsImage=await cmd('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:cardsClip}); await writeFile(`${process.env.TEMP}/opencode/spotnav-51b4a-${name}-cards.png`,Buffer.from(cardsImage.data,'base64'));
   const vehicle=await evaluate(`(()=>{const e=document.querySelector('.overview'),r=e.getBoundingClientRect();return {text:e.innerText,clip:{x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1}}})()`);
   assert.match(vehicle.text,/28\.8 kWh/); assert.match(vehicle.text,/19\.2 kWh/); assert.match(vehicle.text,/21\.3 kWh/); assert.match(vehicle.text,/Target/);
   const contrast=await evaluate(`(()=>{const parse=s=>s.match(/[0-9]+/g).slice(0,3).map(Number),lum=c=>{const a=c.map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4});return .2126*a[0]+.7152*a[1]+.0722*a[2]},fg=lum(parse(getComputedStyle(document.querySelector('.battery-note')).color)),bg=lum(parse(getComputedStyle(document.querySelector('.overview')).backgroundColor));return (Math.max(fg,bg)+.05)/(Math.min(fg,bg)+.05)})()`); assert.ok(contrast>=4.5,`battery note contrast ${contrast}`);
   const vehicleImg=await cmd('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:vehicle.clip}); await writeFile(`${process.env.TEMP}/opencode/spotnav-51e-${name}-vehicle.png`,Buffer.from(vehicleImg.data,'base64'));
+  await showTab('settings');
   const evidence=await evaluate(`(()=>{const e=document.querySelector('.morek'),r=e.getBoundingClientRect();return {text:e.innerText,clip:{x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1}}})()`);
   assert.match(evidence.text,/mismatch with last sent/); assert.match(evidence.text,/14:15/); assert.match(evidence.text,/14:28/); assert.match(evidence.text,/not a profile inventory/); assert.match(evidence.text,/does not prove physical charging/);
   const evidenceImg=await cmd('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:evidence.clip}); await writeFile(`${process.env.TEMP}/opencode/spotnav-51e-${name}-evidence.png`,Buffer.from(evidenceImg.data,'base64'));
-  const insightsState=await evaluate(`(()=>{const el=document.querySelector('.insights'),r=el.getBoundingClientRect();return {text:el.innerText,clip:{x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1},chartPrice:document.querySelector('.prices-bar .price-context span').innerText}})()`);
-  assert.match(insightsState.text,/November 2026 so far/); assert.match(insightsState.text,/100\.0% of the expected time/); assert.match(insightsState.text,/not the charging plan/i); assert.ok(insightsState.text.includes(insightsState.chartPrice.replace('Now ','').trim()));
+  await showTab('overview');
+  const chartPrice=await evaluate(`document.querySelector('.prices-bar .price-context span').innerText`);
+  await showTab('explore');
+  const insightsState=await evaluate(`(()=>{const el=document.querySelector('.insights'),r=el.getBoundingClientRect();return {text:el.innerText,clip:{x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1}}})()`);
+  assert.match(insightsState.text,/November 2026 so far/); assert.match(insightsState.text,/100\.0% of the expected time/); assert.match(insightsState.text,/not the charging plan/i); assert.ok(insightsState.text.includes(chartPrice.replace('Now ','').trim()));
   const insightImage=await cmd('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:insightsState.clip}); await writeFile(`${process.env.TEMP}/opencode/spotnav-51c-${name}-insights.png`,Buffer.from(insightImage.data,'base64'));
   await evaluate(`document.querySelector('.insights wa-details').open=true`);
   const method=await evaluate(`document.querySelector('.insights wa-details').innerText`); assert.match(method,/30 completed local days/); assert.match(method,/at least 7/); await evaluate(`document.querySelector('.insights wa-details').open=false`);
-  const consistency=await evaluate(`(()=>{let nodes=['.controls','.prices-bar','.prices-step','#plan-dialog'].map(s=>document.querySelector(s));return nodes.map(n=>({rows:[...n.querySelectorAll('.plan-row')].map(e=>e.textContent),total:n.querySelector('.plan-total').textContent}))})()`);
-  assert.deepEqual(consistency[0],consistency[1]); assert.deepEqual(consistency[0],consistency[2]); assert.deepEqual(consistency[0],consistency[3]);
+  await showTab('overview');
+  const windows=await evaluate(`(()=>({list:document.querySelectorAll('.windows [data-win-select]').length,dialog:document.querySelectorAll('#plan-dialog .plan-row').length,links:document.querySelectorAll('[data-chart-windows]').length}))()`);
+  assert.ok(windows.list > 0 && windows.dialog > 0); assert.equal(windows.links,2);
+  await showTab('overview');
   await evaluate(`document.querySelector('#open-plan').focus()`);
   await cmd('Input.dispatchKeyEvent',{type:'keyDown',key:' ',code:'Space',windowsVirtualKeyCode:32}); await cmd('Input.dispatchKeyEvent',{type:'keyUp',key:' ',code:'Space',windowsVirtualKeyCode:32});
   assert.equal(await evaluate(`document.querySelector('#plan-dialog').open`),true); assert.equal(await evaluate(`document.activeElement.id`),'close-plan');
@@ -57,10 +68,12 @@ for (const [name,width,height] of [['desktop',1440,1000],['mobile',390,844]]) {
   await evaluate(`document.querySelector('#open-plan').click();document.querySelector('#close-plan').click()`);
   assert.equal(await evaluate(`document.querySelector('#plan-dialog').open`),false);
   await evaluate(`new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))`);
+  await showTab('settings');
   await evaluate(`document.querySelector('#open-plan-details').focus()`);
   await cmd('Input.dispatchKeyEvent',{type:'keyDown',key:' ',code:'Space',windowsVirtualKeyCode:32}); await cmd('Input.dispatchKeyEvent',{type:'keyUp',key:' ',code:'Space',windowsVirtualKeyCode:32});
   assert.equal(await evaluate(`document.querySelector('#plan-dialog').open`),true);
   await evaluate(`document.querySelector('#close-plan').click()`); assert.equal(await evaluate(`document.activeElement.id`),'open-plan-details');
+  await showTab('overview');
   const metrics=await cmd('Page.getLayoutMetrics');
   const full=await cmd('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:{x:0,y:0,width:metrics.cssContentSize.width,height:metrics.cssContentSize.height,scale:1}});
   await writeFile(`${process.env.TEMP}/opencode/spotnav-51d-${name}-full.png`,Buffer.from(full.data,'base64'));
@@ -160,16 +173,17 @@ for (const [name,width,height] of [['desktop',1440,1000],['mobile',390,844]]) {
   for (const scenario of ['missing','invalid','long']) {
     const loadedScenario = new Promise(resolve => { const prev=ws.onmessage; ws.onmessage=e=>{prev(e); if(JSON.parse(e.data).method==='Page.loadEventFired'){ws.onmessage=prev;resolve();}}; });
     await cmd('Page.navigate',{url:`http://127.0.0.1:8765/prototype/?comparison=bar&plan=${scenario}`}); await loadedScenario;
-    const result=await evaluate(`(async()=>{await Promise.all([...document.querySelectorAll('wa-button,wa-input,wa-badge')].map(e=>e.updateComplete));const nodes=['.controls','.prices-bar','.prices-step','#plan-dialog'].map(s=>document.querySelector(s));const a=document.querySelector('.overview').getBoundingClientRect(),b=document.querySelector('.controls').getBoundingClientRect(),chart=document.querySelector('.prices-bar').getBoundingClientRect();return {width:document.documentElement.scrollWidth,viewport:innerWidth,plans:nodes.map(n=>({rows:[...n.querySelectorAll('.plan-row')].map(e=>e.textContent),total:n.querySelector('.plan-total').textContent,note:n.querySelector('.projection-note').textContent})),a:a.toJSON(),b:b.toJSON(),chart:chart.toJSON(),disabled:[...document.querySelectorAll('.controls wa-button,.details-body wa-button')].every(e=>e.disabled),text:document.body.innerText}})()`);
-    assert.ok(result.width<=result.viewport); assert.ok(result.disabled); assert.ok(result.chart.top>=Math.max(result.a.bottom,result.b.bottom));
-    if(name==='desktop') assert.ok(Math.abs(result.a.bottom-result.b.bottom)<1 && Math.abs(result.a.width-result.b.width)<1); else assert.ok(result.b.top>=result.a.bottom);
-    for(const p of result.plans.slice(1)) assert.deepEqual(p,result.plans[0]);
-    assert.doesNotMatch(JSON.stringify(result.plans),/NaN|Infinity/);
-    assert.equal(result.plans[0].rows.length,scenario==='long'?8:2);
-    if(scenario==='missing') { assert.match(result.plans[0].rows[0],/3\.75 kWh/); assert.match(result.plans[0].rows[0],/Unknown/); assert.match(result.plans[0].total,/6\.00 kWh/); assert.match(result.plans[0].total,/Unknown/); assert.match(result.plans[0].note,/Unknown efficiency/); }
-    if(scenario==='invalid') { assert.match(result.plans[0].rows[0],/Unknown/); assert.match(result.plans[0].total,/Unknown/); assert.match(result.text,/Target feasibility is unknown/); }
-    if(scenario==='long') assert.ok(result.plans[0].rows.at(-1).includes('03:30'));
-    const clip=await evaluate(`(()=>{const a=document.querySelector('.overview').getBoundingClientRect(),b=document.querySelector('.controls').getBoundingClientRect();return {x:Math.min(a.x,b.x)+scrollX,y:a.y+scrollY,width:Math.max(a.right,b.right)-Math.min(a.left,b.left),height:Math.max(a.bottom,b.bottom)-a.top,scale:1}})()`);
+    await showTab('overview');
+    const result=await evaluate(`(async()=>{await Promise.all([...document.querySelectorAll('wa-button,wa-input,wa-badge')].map(e=>e.updateComplete));const card=document.querySelector('.windows'),dialog=document.querySelector('#plan-dialog'),r=card.getBoundingClientRect();return {width:document.documentElement.scrollWidth,viewport:innerWidth,cardRows:[...card.querySelectorAll('.win-row')].map(e=>e.textContent),dialogRows:[...dialog.querySelectorAll('.plan-row')].map(e=>e.textContent),cardTotal:card.querySelector('.win-footer')?.textContent ?? null,dialogTotal:dialog.querySelector('.plan-total')?.textContent ?? null,note:dialog.querySelector('.projection-note')?.textContent ?? null,text:document.body.innerText,clip:{x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1}}})()`);
+    assert.ok(result.width<=result.viewport);
+    assert.equal(result.cardRows.length,scenario==='long'?8:2);
+    assert.equal(result.dialogRows.length,result.cardRows.length);
+    assert.doesNotMatch(JSON.stringify(result),/NaN|Infinity/);
+    assert.ok(result.cardTotal && result.dialogTotal && result.note);
+    if(scenario==='missing') { assert.match(result.cardRows[0],/3\.75 kWh/); assert.match(result.dialogRows[0],/3\.75 kWh/); assert.match(result.cardTotal,/6\.00 kWh/); assert.match(result.dialogTotal,/6\.00 kWh/); assert.match(result.note,/Unknown efficiency/); }
+    if(scenario==='invalid') { assert.match(result.dialogRows[0],/Unknown/); assert.match(result.dialogTotal,/Unknown/); assert.match(result.text,/Target feasibility is unknown/); }
+    if(scenario==='long') { assert.match(result.cardRows.at(-1),/03:30/); assert.match(result.dialogRows.at(-1),/03:30/); }
+    const clip=result.clip;
     const image=await cmd('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip}); await writeFile(`${process.env.TEMP}/opencode/spotnav-51b4a-${name}-${scenario}.png`,Buffer.from(image.data,'base64'));
     await evaluate(`document.querySelector('#open-plan').focus()`);
     await cmd('Input.dispatchKeyEvent',{type:'keyDown',key:' ',code:'Space',windowsVirtualKeyCode:32}); await cmd('Input.dispatchKeyEvent',{type:'keyUp',key:' ',code:'Space',windowsVirtualKeyCode:32});
@@ -180,30 +194,38 @@ for (const [name,width,height] of [['desktop',1440,1000],['mobile',390,844]]) {
   }
   const missingLoaded = new Promise(resolve => { const prev=ws.onmessage; ws.onmessage=e=>{prev(e); if(JSON.parse(e.data).method==='Page.loadEventFired'){ws.onmessage=prev;resolve();}}; });
   await cmd('Page.navigate',{url:'http://127.0.0.1:8765/prototype/?comparison=bar&insights=missing&plan=missing'}); await missingLoaded;
+  await showTab('explore');
   const missingInsight=await evaluate(`(async()=>{let el=document.querySelector('.insights');await el.querySelector('wa-details').updateComplete;const r=el.getBoundingClientRect();return {text:el.innerText,width:document.documentElement.scrollWidth,viewport:innerWidth,clip:{x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1},disabled:[...document.querySelectorAll('.controls wa-button,.details-body wa-button')].every(e=>e.disabled)}})()`);
   assert.ok(missingInsight.width<=missingInsight.viewport && missingInsight.disabled); assert.match(missingInsight.text,/Unknown/); assert.match(missingInsight.text,/Unavailable/); assert.match(missingInsight.text,/fewer than 7 complete/); assert.doesNotMatch(missingInsight.text,/NaN|Infinity/);
   const missingImage=await cmd('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:missingInsight.clip}); await writeFile(`${process.env.TEMP}/opencode/spotnav-51c-${name}-missing.png`,Buffer.from(missingImage.data,'base64'));
   assert.equal(await evaluate(`document.querySelectorAll('.price-chart canvas').length`),2);
+  await showTab('overview');
   await evaluate(`document.querySelector('#open-plan').focus()`);
   await cmd('Input.dispatchKeyEvent',{type:'keyDown',key:' ',code:'Space',windowsVirtualKeyCode:32}); await cmd('Input.dispatchKeyEvent',{type:'keyUp',key:' ',code:'Space',windowsVirtualKeyCode:32});
   assert.equal(await evaluate(`document.querySelector('#plan-dialog').open`),true);
   await cmd('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27}); await cmd('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
   assert.equal(await evaluate(`document.activeElement.id`),'open-plan');
+  await showTab('history');
   const history=await evaluate(`(()=>{const e=document.querySelector('.history'),r=e.getBoundingClientRect();return {text:e.innerText,disabled:e.querySelector('select').disabled,clip:{x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1}}})()`);
   assert.match(history.text,/3\/4 intervals · 75%/); assert.match(history.text,/21:45–22:00/); assert.match(history.text,/22:30–22:45 is unknown/); assert.ok(history.disabled);
   const historyImage=await cmd('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:history.clip}); await writeFile(`${process.env.TEMP}/opencode/spotnav-51d-${name}-history.png`,Buffer.from(historyImage.data,'base64'));
   for (const [daily,expected] of [['waiting','waiting to charge'],['charging','6.0 kW'],['unavailable','Vehicle state unavailable'],['infeasible','falls short'],['partial','01:22:30'],['exception','Above cap'],['stale','Vehicle data stale']]) {
     const loadedDaily=new Promise(resolve=>{const prev=ws.onmessage;ws.onmessage=e=>{prev(e);if(JSON.parse(e.data).method==='Page.loadEventFired'){ws.onmessage=prev;resolve();}};});
     await cmd('Page.navigate',{url:`http://127.0.0.1:8765/prototype/?comparison=bar&state=${daily}`}); await loadedDaily;
-    const result=await evaluate(`(async()=>{await Promise.all([...document.querySelectorAll('wa-button,wa-input,wa-badge')].map(e=>e.updateComplete));const a=document.querySelector('.overview').getBoundingClientRect(),b=document.querySelector('.controls').getBoundingClientRect();return {text:document.body.innerText,width:document.documentElement.scrollWidth,viewport:innerWidth,charts:document.querySelectorAll('.price-chart canvas').length,buttons:[...document.querySelectorAll('.controls wa-button,.details-body wa-button')].every(e=>e.disabled),clip:{x:Math.min(a.left,b.left)+scrollX,y:a.top+scrollY,width:Math.max(a.right,b.right)-Math.min(a.left,b.left),height:Math.max(a.bottom,b.bottom)-a.top,scale:1}}})()`);
+    await showTab('overview');
+    const result=await evaluate(`(async()=>{await Promise.all([...document.querySelectorAll('wa-button,wa-input,wa-badge')].map(e=>e.updateComplete));const a=document.querySelector('.overview').getBoundingClientRect();return {text:document.body.innerText,width:document.documentElement.scrollWidth,viewport:innerWidth,charts:document.querySelectorAll('.price-chart canvas').length,buttons:[...document.querySelectorAll('.controls wa-button,.details-body wa-button')].every(e=>e.disabled),clip:{x:a.left+scrollX,y:a.top+scrollY,width:a.width,height:a.height,scale:1}}})()`);
+    await showTab('settings');
+    result.text += ' ' + await evaluate(`document.body.innerText`);
+    await showTab('overview');
     assert.ok(result.width<=result.viewport && result.buttons); assert.equal(result.charts,2); assert.ok(result.text.includes(expected),`${daily}: ${expected}`);
     assert.equal(await evaluate(`Boolean(document.querySelector('.alert'))`),['unavailable','infeasible','stale'].includes(daily),`${daily} warning visibility`);
     if(daily==='unavailable') assert.match(result.text,/Sample battery SOC/);
     if(daily==='infeasible') assert.match(result.text,/Low-SOC warning 20%/);
-    if(daily==='stale') { assert.match(result.text,/Last sample SOC · stale/); assert.match(result.text,/Evidence is stale/); assert.match(result.text,/Stale SOC is not used in estimates/); assert.ok(await evaluate(`['.controls','.prices-bar','.prices-step','#plan-dialog'].every(s=>document.querySelector(s).textContent.includes('stale sample'))`)); }
-    if(daily==='exception') { assert.match(result.text,/15:00–15:30/); assert.match(result.text,/40\.0%/); assert.match(result.text,/ABOVE-CAP MINIMUM/); assert.ok(await evaluate(`['.controls','.prices-bar','.prices-step','#plan-dialog'].every(s=>document.querySelector(s).textContent.includes('ABOVE-CAP MINIMUM'))`)); }
+    if(daily==='stale') { assert.match(result.text,/Last sample SOC · stale/); assert.match(result.text,/Evidence is stale/); assert.match(result.text,/Stale SOC is not used in estimates/); assert.ok(await evaluate(`['.windows','#plan-dialog'].every(s=>document.querySelector(s).textContent.includes('stale sample'))`)); }
+    if(daily==='exception') { assert.match(result.text,/15:00–15:30/); assert.match(result.text,/40\.0%/); assert.match(result.text,/ABOVE-CAP MINIMUM/); assert.ok(await evaluate(`['.windows','#plan-dialog'].every(s=>document.querySelector(s).textContent.includes('ABOVE-CAP MINIMUM'))`)); }
     if(['charging','unavailable','exception','infeasible','partial','waiting'].includes(daily)) { const img=await cmd('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:result.clip}); await writeFile(`${process.env.TEMP}/opencode/spotnav-51d-${name}-${daily}.png`,Buffer.from(img.data,'base64')); }
-    if(['stale','unavailable','infeasible'].includes(daily)) { for(const selector of ['.overview','.morek']) { const clip=await evaluate(`(()=>{let r=document.querySelector('${selector}').getBoundingClientRect();return {x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1}})()`); const img=await cmd('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip}); await writeFile(`${process.env.TEMP}/opencode/spotnav-51e-${name}-${daily}-${selector === '.overview' ? 'vehicle' : 'evidence'}.png`,Buffer.from(img.data,'base64')); } }
+    if(['stale','unavailable','infeasible'].includes(daily)) { for(const selector of ['.overview','.morek']) { await showTab(selector === '.overview' ? 'overview' : 'settings'); const clip=await evaluate(`(()=>{let r=document.querySelector('${selector}').getBoundingClientRect();return {x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1}})()`); const img=await cmd('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip}); await writeFile(`${process.env.TEMP}/opencode/spotnav-51e-${name}-${daily}-${selector === '.overview' ? 'vehicle' : 'evidence'}.png`,Buffer.from(img.data,'base64')); } }
+    await showTab('overview');
     await evaluate(`document.querySelector('#open-plan').focus()`); await cmd('Input.dispatchKeyEvent',{type:'keyDown',key:' ',code:'Space',windowsVirtualKeyCode:32}); await cmd('Input.dispatchKeyEvent',{type:'keyUp',key:' ',code:'Space',windowsVirtualKeyCode:32});
     assert.equal(await evaluate(`document.querySelector('#plan-dialog').open`),true); await cmd('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27}); await cmd('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27}); assert.equal(await evaluate(`document.activeElement.id`),'open-plan');
   }

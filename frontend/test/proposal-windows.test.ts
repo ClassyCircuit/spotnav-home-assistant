@@ -177,6 +177,13 @@ describe('selection and chart linkage', () => {
     expect(root.querySelector('.proposal-selected')).toBeNull();
     for (const fn of Object.values(act)) expect(fn).not.toHaveBeenCalled();
   });
+  it('offers chart-to-list navigation and retains focus after selecting a window', () => {
+    const { root } = mount(build());
+    click(root.querySelector('[data-chart-windows]'));
+    expect(root.activeElement || document.activeElement).toBe(selectBtn(root, 0));
+    click(selectBtn(root, 0));
+    expect(root.activeElement || document.activeElement).toBe(selectBtn(root, 0));
+  });
   it('shows the window on the chart without changing anything else and keeps the selection through zoom', () => {
     charts.length = 0;
     const { root } = mount(build());
