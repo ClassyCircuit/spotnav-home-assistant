@@ -146,6 +146,8 @@ wa-progress-bar{--height:8px;--indicator-color:var(--sn-accent);--track-color:va
 /* Battery detail (inside the hero, collapsed: the SOC and target already sit on the scene) */
 .hero-battery{background:var(--sn-surface-2);border:1px solid var(--sn-line);border-radius:14px;padding:0 16px}
 .hero-battery>summary{min-height:44px;display:flex;align-items:center;font-weight:700;cursor:pointer}
+.sn-disclosure>summary{min-height:44px;display:flex;align-items:center;font-weight:700;cursor:pointer;color:var(--sn-focus)}
+.sn-disclosure>summary:focus-visible{outline:3px solid var(--sn-focus);outline-offset:2px}
 .hero-battery[open]>summary{margin-bottom:8px}
 .hero-battery .battery-card{margin:0 0 14px}
 .overview .battery-card{margin:0}

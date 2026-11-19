@@ -80,7 +80,8 @@ describe('card content', () => {
     expect(card(root).querySelector('.win-scroll').getAttribute('aria-label')).toBe('Proposed windows, 8 windows in total');
     expect(rows[0].querySelector('[data-tag="next"]')).not.toBeNull();
     expect(card(root).querySelector('.win-head').dataset.winStatus).toBe('proposed');
-    expect(card(root).textContent).toMatch(/Proposal only\. Whether it was sent, acknowledged or is in effect/);
+    expect(card(root).querySelector('.win-separation').textContent).toContain('Proposal only');
+    expect(card(root).querySelector('#window-evidence-help').textContent).toContain('Whether it was sent, acknowledged or is in effect');
     expect(card(root).textContent).not.toMatch(/Acknowledged|Confirmed/);
   });
   it('shows energy and cost only where the validated details and basis permit', () => {

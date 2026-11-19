@@ -83,7 +83,7 @@ export function renderHistoryDay(m) {
   }
   if (m.gaps.length || m.restarts.length) parts.push(`<section data-history-section="gaps"><h3>Capture gaps and restarts</h3>${list(m.gaps.slice(0, 5), t => row(`Gap: ${t}`))}${m.gaps.length > 5 ? `<p class="subtext">${m.gaps.length - 5} more gap(s) not listed.</p>` : ''}${m.restarts.length ? `<p class="subtext">Capture (re)started at ${m.restarts.slice(0, 5).map(e).join(', ')}${m.restarts.length > 5 ? ` and ${m.restarts.length - 5} more` : ''}.</p>` : ''}</section>`);
   if (month) { parts.push(group('Month review')); parts.push(month); }
-  parts.push(`<p class="subtext history-retention">${e(m.retentionNote)}${m.retention.oldestPower ? ` Measured power rows currently begin ${e(m.retention.oldestPower)}.` : ''}${m.retention.digestDays !== null ? ` ${m.retention.digestDays} day summary(ies) are kept.` : ''}</p>`);
+  parts.push(`<details id="history-retention-details" class="sn-disclosure"><summary>Retention details</summary><p class="subtext history-retention">${e(m.retentionNote)}${m.retention.oldestPower ? ` Measured power rows currently begin ${e(m.retention.oldestPower)}.` : ''}${m.retention.digestDays !== null ? ` ${m.retention.digestDays} day summary(ies) are kept.` : ''}</p></details>`);
   return `<div class="history-day" data-history-state="ready" data-history-raw="${e(m.raw)}">${parts.join('')}</div>`;
 }
 

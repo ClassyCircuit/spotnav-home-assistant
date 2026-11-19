@@ -35,6 +35,20 @@ const visible = root => [...root.querySelectorAll('.tab-panel')].filter(p => !p.
 const homes = (root, id) => [...root.querySelectorAll(`#sn-panel-${id} > .dashboard > section.panel`)].map(s => s.classList[1]);
 
 describe('four-tab shell (shared renderer)', () => {
+  it('keeps window help open and urgent warnings visible across tabs and refresh', () => {
+    const raw = fixture(); raw.generated_at = new Date().toISOString();
+    const adapter = adapterOf(raw); adapter.model.warning = {title:'Urgent warning', detail:'Action needed'};
+    const root = document.createElement('main'); document.body.append(root);
+    const view = mountDashboard(root, adapter);
+    const help = root.querySelector('#window-evidence-help');
+    expect(help).not.toBeNull(); help.open = true;
+    root.querySelector('#sn-tab-settings').click();
+    expect(root.querySelector('#critical-live').textContent).toContain('Urgent warning');
+    const next = adapterOf(raw); next.model.warning = adapter.model.warning; view.update(next);
+    expect(root.querySelector('#window-evidence-help')).toBe(help); expect(help.open).toBe(true);
+    expect(root.querySelector('#critical-live').textContent).toContain('Action needed');
+    root.querySelector('#sn-tab-overview').click(); expect(help.open).toBe(true);
+  });
   it('opens on Overview with four labeled tabs and exactly one visible panel', () => {
     const { root } = mount();
     const tabs = [...root.querySelectorAll('[role="tab"]')];

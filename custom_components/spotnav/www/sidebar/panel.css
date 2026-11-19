@@ -5129,6 +5129,18 @@ wa-progress-bar {
   font-weight: 700;
   cursor: pointer;
 }
+.sn-disclosure > summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--sn-focus);
+}
+.sn-disclosure > summary:focus-visible {
+  outline: 3px solid var(--sn-focus);
+  outline-offset: 2px;
+}
 .hero-battery[open] > summary {
   margin-bottom: 8px;
 }
