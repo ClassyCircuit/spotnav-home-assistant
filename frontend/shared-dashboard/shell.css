@@ -356,3 +356,21 @@ wa-button[disabled]{opacity:.5}
 .track-selected{position:absolute;top:0;bottom:0;box-sizing:border-box;border:2px solid var(--sn-ink);border-radius:6px;pointer-events:none}
 .track-lane[data-lane="proposal"] .track-bar{cursor:pointer}
 [data-sn-layout="compact"] .win-facts{grid-template-columns:repeat(2,minmax(0,1fr))}
+/* 20.6 strategy summary and plan editor */
+.strategy-summary{display:grid;gap:12px;margin:14px 0;padding:14px;border:1px solid var(--sn-line);border-radius:16px;background:rgba(255,255,255,.04)}
+.strategy-summary[data-state="proposed"]{border-color:var(--sn-accent)}
+.strategy-head{display:flex;flex-wrap:wrap;gap:8px}
+.strategy-chip{padding:4px 12px;border:1px solid var(--sn-line);border-radius:999px;font-size:12px;font-weight:650;color:var(--sn-ink)}
+.strategy-chip[data-chip="mode"]{background:rgba(52,232,176,.14);border-color:var(--sn-accent)}
+.strategy-chip[data-chip="role"]{color:var(--sn-muted)}
+.strategy-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.strategy-tile{display:grid;gap:2px;min-width:0;padding:10px 12px;border:1px solid var(--sn-line);border-radius:12px}
+.strategy-tile small{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--sn-muted)}
+.strategy-tile b{font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.plan-admin-only{display:block;color:var(--sn-muted);font-size:11px}
+.plan-role-note{margin:0 0 10px;color:var(--sn-muted);font-size:12px}
+.plan-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:14px;margin:6px 0 12px}
+.plan-group{margin:0;padding:12px 14px;border:1px solid var(--sn-line);border-radius:14px;min-width:0}
+.plan-group legend{padding:0 6px;font-weight:700;color:var(--sn-ink)}
+.plan-group-hint{margin:0;color:var(--sn-muted);font-size:12px;line-height:1.4}
+.plan-group .fields{margin:10px 0 0;grid-template-columns:minmax(0,1fr)}

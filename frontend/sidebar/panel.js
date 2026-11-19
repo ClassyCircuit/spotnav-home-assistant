@@ -333,6 +333,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
         adapter.model.chart.cap=displayPrice(record.soft_price_cap,currency);
       }
       adapter.model.settingsEditor=true;
+      adapter.model.planAdmin=this._hass?.user?.is_admin===true;
       adapter.model.policySupported=record.soft_price_cap!==undefined;
       adapter.model.canSave=allowed && !this.settingsBusy && !this.settingsConflict;
       adapter.model.settingsNotice=this.settingsNotice || (!allowed ? 'You do not have permission to change this plan.' : '');
@@ -606,6 +607,8 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     const base=formFromRecord(record), driver=values.driver ?? base.driver, vehicleId=values.vehicleId ?? base.vehicleId;
     if (vehicleId!==base.vehicleId && (!decoded.ok || !chargerCarsOf(decoded.value).some(v=>v.id===vehicleId && v.id!=='guest'))) {this.settingsNotice='Choose an available discovered vehicle.';this.paint();return;}
     const form={...base,driver,energy:values.energy ?? base.energy,vehicleId,targetPercent:values.target ?? base.targetPercent,minimumReadySoc:values.minimum,capValue:capForSave(values.cap,decoded.ok ? decoded.value.market?.currency : null,record.soft_price_cap),capEnabled:values.capEnabled,capBasis:values.capBasis,deadlineEnabled:values.deadlineEnabled,deadlineTime:values.readyBy,...(base.timeReserve===undefined?{}:{timeReserve:values.reserve ?? base.timeReserve})};
+    // Backend NON_ADMIN_FIELDS leaves the minimum, soft cap, its basis and the reserve to an administrator: never send a change to them from anyone else (also covers a draft made before a role change).
+    if (hass?.user?.is_admin!==true) Object.assign(form,{minimumReadySoc:base.minimumReadySoc,capValue:base.capValue,capEnabled:base.capEnabled,capBasis:base.capBasis,...(base.timeReserve===undefined?{}:{timeReserve:base.timeReserve})});
     const check=replacementFor('plan',record,form);
     if (!check.ok) {this.settingsNotice=translate('en',check.errorKey);this.paint();return;}
     if (check.body.target.target_percent!=null && check.body.minimum_ready_by_soc!=null && check.body.minimum_ready_by_soc>check.body.target.target_percent) {this.settingsNotice='Minimum SOC must not exceed the planning target.';this.paint();return;}

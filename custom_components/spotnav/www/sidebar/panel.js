@@ -53220,6 +53220,47 @@ function renderPlanParams(m4) {
   return `<details id="plan-params-details"><summary>Advanced: plan &amp; charger parameters</summary><div class="pp-body">${periodsBlock(m4)}${currentBlock(m4)}${departureBlock(m4)}<p class="pp-help">${escapeText(m4.savedNote)}</p><div role="status" id="plan-params-notice">${notes}</div>${reload}</div></details>`;
 }
 
+// shared-dashboard/plan-editor-view.js
+var ADMIN_ONLY_FIELDS = Object.freeze(["minimum", "cap", "capEnabled", "capBasis", "reserve"]);
+function renderPlanEditor({ m: m4, settings, e: e9, value: value2, priceText: priceText2, capUnit }) {
+  const editor = m4.settingsEditor === true;
+  const canSave = m4.canSave === true;
+  const admin = m4.planAdmin !== false;
+  const policyOk = !editor || !!m4.policySupported;
+  const locked = (key3) => !canSave || !policyOk && ["minimum", "cap", "capEnabled", "capBasis"].includes(key3) || !admin && ADMIN_ONLY_FIELDS.includes(key3);
+  const dis = (key3) => locked(key3) ? " disabled" : "";
+  const adminNote = (key3) => !admin && ADMIN_ONLY_FIELDS.includes(key3) ? '<small class="plan-admin-only">Administrator only</small>' : "";
+  const vehicles = m4.planVehicles || [], savedVehicle = settings.vehicleId || "";
+  const vehicleOptions = vehicles.map((v2) => `<option value="${e9(v2.id)}" ${v2.id === savedVehicle ? "selected" : ""}>${e9(v2.name || v2.id)}</option>`).join("");
+  const vehicleName = savedVehicle ? vehicles.find((v2) => v2.id === savedVehicle)?.name || (savedVehicle === "guest" ? "Guest" : vehicles.find((v2) => v2.id === savedVehicle)?.id) || "Saved vehicle unavailable" : "Not selected";
+  const soc2 = settings.driver === "target_soc";
+  const input = (label2, key3, type, extra = "") => `<span ${editor && key3 === "target" ? 'data-mode="target_soc"' : ""}><wa-input data-setting="${key3}" label="${e9(label2)}" value="${e9(value2(settings[key3]))}" type="${type}"${extra}${dis(key3)}></wa-input>${adminNote(key3)}</span>`;
+  const plainFields = [["Target SOC (%)", "target", "number", ""], ["Minimum SOC (%)", "minimum", "number", ""], [`Soft cap (${capUnit})`, "cap", "number", ' step="any"'], ["Ready by", "readyBy", "time", ""], ["Extra time reserve (%)", "reserve", "number", ' step="1" min="0" max="50"']].filter(([, key3]) => key3 !== "reserve" || settings.reserve !== void 0);
+  const field = (key3) => plainFields.find((f3) => f3[1] === key3);
+  const one = (key3) => field(key3) ? input(...field(key3)) : "";
+  const group = (id, title, hint, body) => `<fieldset class="plan-group" data-group="${id}"><legend>${title}</legend><p class="plan-group-hint">${hint}</p><div class="fields">${body}</div></fieldset>`;
+  const goalBody = editor ? `<label>Charge by <select data-setting="driver"${canSave ? "" : " disabled"}><option value="manual_kwh" ${settings.driver === "manual_kwh" ? "selected" : ""}>Requested energy (kWh)</option><option value="target_soc" ${settings.driver === "target_soc" ? "selected" : ""}>Target SOC (%)</option></select></label><span data-mode="manual_kwh"><wa-input data-setting="energy" label="Requested energy (kWh)" type="number" step="any" value="${e9(value2(settings.energy))}"${canSave ? "" : " disabled"}></wa-input></span><label data-mode="target_soc">Planning vehicle <select data-setting="vehicleId"${canSave ? "" : " disabled"}><option value="" ${!savedVehicle ? "selected" : ""}>No saved vehicle</option>${savedVehicle && !vehicles.some((v2) => v2.id === savedVehicle) ? `<option value="${e9(savedVehicle)}" selected>Saved vehicle unavailable${savedVehicle === "guest" ? " (guest)" : ""}</option>` : ""}${vehicleOptions}</select></label>${one("target")}${one("minimum")}` : `${one("target")}${one("minimum")}`;
+  const capBody = editor ? `<label><input type="checkbox" data-setting="capEnabled" ${settings.capEnabled ? "checked" : ""}${dis("capEnabled")}> Enable soft cap ${adminNote("capEnabled")}</label>${one("cap")}<label>Cap price basis <select data-setting="capBasis"${dis("capBasis")}><option value="">Not set (suggested: Nord Pool)</option><option value="nord_pool" ${settings.capBasis === "nord_pool" ? "selected" : ""}>Nord Pool</option><option value="configured_variable_cost" ${settings.capBasis === "configured_variable_cost" ? "selected" : ""}>Configured variable cost</option></select>${adminNote("capBasis")}</label>` : one("cap");
+  const timeBody = editor ? `<label><input type="checkbox" data-setting="deadlineEnabled" ${settings.deadlineEnabled ? "checked" : ""}${canSave ? "" : " disabled"}> Enable ready-by</label>${one("readyBy")}${one("reserve")}` : `${one("readyBy")}${one("reserve")}`;
+  const groups = group("goal", "Charge goal", "What to charge to, and for which vehicle. The planning target is separate from the car\u2019s own charge limit.", goalBody) + group("price", "Price limit", "Optional soft cap. The basis decides which price is compared; it does not select the price provider.", capBody) + group("timing", "Ready-by and reserve", "When the charge should be finished, and extra allowed time on top of the planned windows.", timeBody);
+  const tile3 = (label2, text4, key3) => `<div class="strategy-tile" data-fact="${key3}"><small>${label2}</small><b>${e9(text4)}</b>${adminNote(key3)}</div>`;
+  const pct2 = (v2) => v2 == null || v2 === "" ? "Not set" : `${v2}%`;
+  const capText = settings.capEnabled ? `${priceText2(Number(settings.cap))} ${capUnit}${settings.capBasis ? ` \xB7 ${settings.capBasis === "nord_pool" ? "Nord Pool" : "configured variable cost"}` : " \xB7 basis not set"}` : "Off";
+  const tiles = [
+    tile3("Vehicle", soc2 ? vehicleName : "Not used (energy mode)", "vehicle"),
+    soc2 ? tile3("Target", pct2(settings.target), "target") : tile3("Requested energy", settings.energy == null || settings.energy === "" ? "Not set" : `${settings.energy} kWh`, "energy"),
+    tile3("Minimum", soc2 ? pct2(settings.minimum) : "Not used (energy mode)", "minimum"),
+    tile3("Soft cap", capText, "cap"),
+    tile3("Ready by", settings.deadlineEnabled ? String(settings.readyBy ?? "Not set") : "Off", "readyBy"),
+    ...settings.reserve !== void 0 ? [tile3("Reserve", `${settings.reserve}% of charging time`, "reserve")] : []
+  ].join("");
+  const state = m4.proposedPlanDefaults ? "Proposed defaults \xB7 not saved" : "Saved plan";
+  const summary = editor ? `<div class="strategy-summary" data-state="${m4.proposedPlanDefaults ? "proposed" : "saved"}"><div class="strategy-head"><span class="strategy-chip" data-chip="mode">${soc2 ? "Charge to target SOC" : "Charge requested energy"}</span><span class="strategy-chip" data-chip="state">${state}</span>${admin ? "" : '<span class="strategy-chip" data-chip="role">Limited to your permissions</span>'}</div><div class="strategy-tiles">${tiles}</div></div>` : "";
+  const roleNote = editor && canSave && !admin ? '<p class="plan-role-note" role="note">You may change the charge goal, vehicle, energy, target and ready-by. Minimum SOC, soft cap, cap basis and reserve can be changed by an administrator only.</p>' : "";
+  const help = editor ? `<div class="settings-help"><p>${m4.proposedPlanDefaults ? "Proposed defaults, not saved" : "Saved Charge by"}: ${soc2 ? "target SOC" : "requested energy"}. ${m4.proposedPlanDefaults ? "Proposed target" : "Saved target"}: ${e9(settings.target == null ? "not set \u2014 enter a target for SOC planning" : `${settings.target}%`)}. Minimum ready-by SOC: ${e9(settings.minimum == null ? "not set (optional)" : `${settings.minimum}%`)}.</p><p data-mode="target_soc">${e9(m4.vehicleHelp || "")}</p><p>Soft cap: ${settings.capEnabled ? `enabled, ${e9(priceText2(Number(settings.cap)))} ${e9(capUnit)}` : "off (no saved cap)"}. Enter a cap and choose its basis to enable it. The cap basis defines which price is compared; it does not select the price provider.</p><p>${m4.proposedPlanDefaults ? "Proposed ready-by" : "Ready-by"}: ${settings.deadlineEnabled ? `enabled at ${e9(settings.readyBy)}` : `off (saved time ${e9(settings.readyBy)})`}. ${settings.reserve !== void 0 ? `Extra time reserve: ${e9(settings.reserve)}% of the charging time, at most 2 h. ` : ""}Changes are saved only when you choose Save plan.</p></div>` : "";
+  return { summary, groups: `<div class="plan-groups">${groups}</div>`, roleNote, help };
+}
+
 // shared-dashboard/notify-setup-view.js
 var lines3 = (items, cls = "ns-line") => (items || []).filter(Boolean).map((t6) => `<p class="${cls}">${escapeText(t6)}</p>`).join("");
 var GOTO = /* @__PURE__ */ new Set(["vehicle-sources", "market-costs", "morek", "notify-setup"]);
@@ -53554,12 +53595,7 @@ function mountDashboard(root, adapter) {
     const option = (s4) => `<option value="${escapeText(s4.value)}" ${s4.value === scenario.selected ? "selected" : ""}>${escapeText(s4.label)}</option>`;
     const capCurrency = m4.capCurrency === void 0 ? f3.currency === void 0 ? "EUR" : f3.currency : m4.capCurrency;
     const capUnit = priceUnit(capCurrency);
-    const fields = [["Target SOC (%)", "target", "number"], ["Minimum SOC (%)", "minimum", "number"], [`Soft cap (${capUnit})`, "cap", "number"], ["Ready by", "readyBy", "time"], ["Extra time reserve (%)", "reserve", "number"]].filter(([, key3]) => key3 !== "reserve" || settings.reserve !== void 0).map(([label2, key3, type]) => `<span ${m4.settingsEditor && key3 === "target" ? 'data-mode="target_soc"' : ""}><wa-input data-setting="${key3}" label="${escapeText(label2)}" value="${escapeText(value(settings[key3]))}" type="${type}"${key3 === "cap" ? ' step="any"' : ""}${key3 === "reserve" ? ' step="1" min="0" max="50"' : ""}${m4.canSave === true && !(m4.settingsEditor && (["minimum", "cap"].includes(key3) && !m4.policySupported)) ? "" : " disabled"}></wa-input></span>`).join("");
-    const vehicles = m4.planVehicles || [], savedVehicle = settings.vehicleId || "";
-    const vehicleOptions = vehicles.map((v2) => `<option value="${escapeText(v2.id)}" ${v2.id === savedVehicle ? "selected" : ""}>${escapeText(v2.name || v2.id)}</option>`).join("");
-    const modeFields = m4.settingsEditor ? `<label>Charge by <select data-setting="driver" ${m4.canSave ? "" : "disabled"}><option value="manual_kwh" ${settings.driver === "manual_kwh" ? "selected" : ""}>Requested energy (kWh)</option><option value="target_soc" ${settings.driver === "target_soc" ? "selected" : ""}>Target SOC (%)</option></select></label><span data-mode="manual_kwh"><wa-input data-setting="energy" label="Requested energy (kWh)" type="number" step="any" value="${escapeText(value(settings.energy))}" ${m4.canSave ? "" : "disabled"}></wa-input></span><label data-mode="target_soc">Planning vehicle <select data-setting="vehicleId" ${m4.canSave ? "" : "disabled"}><option value="" ${!savedVehicle ? "selected" : ""}>No saved vehicle</option>${savedVehicle && !vehicles.some((v2) => v2.id === savedVehicle) ? `<option value="${escapeText(savedVehicle)}" selected>Saved vehicle unavailable${savedVehicle === "guest" ? " (guest)" : ""}</option>` : ""}${vehicleOptions}</select></label>` : "";
-    const policyFields = m4.settingsEditor ? `<label><input type="checkbox" data-setting="capEnabled" ${settings.capEnabled ? "checked" : ""} ${m4.canSave && m4.policySupported ? "" : "disabled"}> Enable soft cap</label><label>Cap price basis <select data-setting="capBasis" ${m4.canSave && m4.policySupported ? "" : "disabled"}><option value="">Not set (suggested: Nord Pool)</option><option value="nord_pool" ${settings.capBasis === "nord_pool" ? "selected" : ""}>Nord Pool</option><option value="configured_variable_cost" ${settings.capBasis === "configured_variable_cost" ? "selected" : ""}>Configured variable cost</option></select></label><label><input type="checkbox" data-setting="deadlineEnabled" ${settings.deadlineEnabled ? "checked" : ""} ${m4.canSave ? "" : "disabled"}> Enable ready-by</label>` : "";
-    const policyHelp = m4.settingsEditor ? `<div class="settings-help"><p>${m4.proposedPlanDefaults ? "Proposed defaults, not saved" : "Saved Charge by"}: ${settings.driver === "target_soc" ? "target SOC" : "requested energy"}. ${m4.proposedPlanDefaults ? "Proposed target" : "Saved target"}: ${escapeText(settings.target == null ? "not set \u2014 enter a target for SOC planning" : `${settings.target}%`)}. Minimum ready-by SOC: ${escapeText(settings.minimum == null ? "not set (optional)" : `${settings.minimum}%`)}.</p><p data-mode="target_soc">${escapeText(m4.vehicleHelp || "")}</p><p>Soft cap: ${settings.capEnabled ? `enabled, ${escapeText(priceText(Number(settings.cap)))} ${escapeText(capUnit)}` : "off (no saved cap)"}. Enter a cap and choose its basis to enable it. The cap basis defines which price is compared; it does not select the price provider.</p><p>${m4.proposedPlanDefaults ? "Proposed ready-by" : "Ready-by"}: ${settings.deadlineEnabled ? `enabled at ${escapeText(settings.readyBy)}` : `off (saved time ${escapeText(settings.readyBy)})`}. ${settings.reserve !== void 0 ? `Extra time reserve: ${escapeText(settings.reserve)}% of the charging time, at most 2 h. ` : ""}Changes are saved only when you choose Save plan.</p></div>` : "";
+    const editorView = renderPlanEditor({ m: m4, settings, e: escapeText, value, priceText, capUnit });
     const chartDraft = { duration: drafts.get("c:duration"), end: drafts.get("c:end") };
     const scene = sceneOf(m4.scene);
     const planIsStale = !!(state.planStale ?? state.stale);
@@ -53596,7 +53632,7 @@ function mountDashboard(root, adapter) {
       ${tabClose}${tabOpen("history", activeTab)}
       ${card("Recent charging", labels.historyEyebrow || "HISTORY", renderHistory(m4.history, historyReady, m4.historyDay), "history", tag)}
       ${tabClose}${tabOpen("settings", activeTab)}
-      ${card("Plan controls", labels.settingsEyebrow || "SETTINGS", `<p class="subtext">${escapeText(labels.settingsNote)}</p><div class="fields">${modeFields}${fields}${policyFields}</div>${policyHelp}<p id="settings-notice" role="status">${escapeText(m4.settingsNotice || "")}</p><wa-button id="save-plan" variant="brand" ${typeof actions2.save !== "function" || m4.canSave !== true ? "disabled" : ""}>${escapeText(labels.saveLabel || "Save plan \xB7 unavailable")}</wa-button>${m4.settingsEditor ? '<button type="button" id="reload-settings">Reload settings</button>' : ""}<div class="controls-plan">${plan}<button type="button" id="open-plan-details" aria-haspopup="dialog">View full window details \u2197</button></div>`, "controls", tag)}
+      ${card("Charging strategy & plan", labels.settingsEyebrow || "SETTINGS", `<p class="subtext">${escapeText(labels.settingsNote)}</p>${editorView.summary}${editorView.roleNote}${editorView.groups}${editorView.help}<p id="settings-notice" role="status">${escapeText(m4.settingsNotice || "")}</p><wa-button id="save-plan" variant="brand" ${typeof actions2.save !== "function" || m4.canSave !== true ? "disabled" : ""}>${escapeText(labels.saveLabel || "Save plan \xB7 unavailable")}</wa-button>${m4.settingsEditor ? '<button type="button" id="reload-settings">Reload settings</button>' : ""}<div class="controls-plan">${plan}<button type="button" id="open-plan-details" aria-haspopup="dialog">View full window details \u2197</button></div>`, "controls", tag)}
       ${card("Plan activity & freshness", labels.evidenceEyebrow || "EVIDENCE", renderEvidence(m4.evidence, state.power, knownPlan ? windows.length : null), "morek", tag)}
       ${m4.vehicleSources ? card("Vehicle sources & properties", "ADVANCED", renderVehicleSources(m4.vehicleSources), "vehicle-sources", tag) : ""}
       ${m4.marketCosts ? card("Market & charging costs", "ADVANCED", renderMarketCosts(m4.marketCosts), "market-costs", tag) : ""}
@@ -66396,7 +66432,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.206";
+var CARD_VERSION = "2.5.207";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {
@@ -66949,6 +66985,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
         adapter.model.chart.cap = displayPrice(record5.soft_price_cap, currency);
       }
       adapter.model.settingsEditor = true;
+      adapter.model.planAdmin = this._hass?.user?.is_admin === true;
       adapter.model.policySupported = record5.soft_price_cap !== void 0;
       adapter.model.canSave = allowed && !this.settingsBusy && !this.settingsConflict;
       adapter.model.settingsNotice = this.settingsNotice || (!allowed ? "You do not have permission to change this plan." : "");
@@ -67354,6 +67391,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       return;
     }
     const form = { ...base2, driver, energy: values.energy ?? base2.energy, vehicleId, targetPercent: values.target ?? base2.targetPercent, minimumReadySoc: values.minimum, capValue: capForSave(values.cap, decoded.ok ? decoded.value.market?.currency : null, record5.soft_price_cap), capEnabled: values.capEnabled, capBasis: values.capBasis, deadlineEnabled: values.deadlineEnabled, deadlineTime: values.readyBy, ...base2.timeReserve === void 0 ? {} : { timeReserve: values.reserve ?? base2.timeReserve } };
+    if (hass?.user?.is_admin !== true) Object.assign(form, { minimumReadySoc: base2.minimumReadySoc, capValue: base2.capValue, capEnabled: base2.capEnabled, capBasis: base2.capBasis, ...base2.timeReserve === void 0 ? {} : { timeReserve: base2.timeReserve } });
     const check = replacementFor("plan", record5, form);
     if (!check.ok) {
       this.settingsNotice = translate2("en", check.errorKey);

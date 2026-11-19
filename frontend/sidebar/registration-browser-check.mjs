@@ -15,7 +15,7 @@ for (const scenario of ['clean','icon','mixed','prior-panel','with-card','icon-p
   await cmd('Page.navigate',{url:`http://127.0.0.1:${process.env.SPOTNAV_HTTP_PORT || 8766}/sidebar/browser-test.html?panel&readonly&${scenario}`});
   const result=await evaluate(`new Promise(resolve=>{let n=0;const t=setInterval(()=>{const p=document.querySelector('spotnav-enhanced-panel'),r=p?.shadowRoot;if(r?.querySelector('.shell')||n++>100){clearInterval(t);if(!r?.querySelector('.shell'))return resolve(null);const b=r.querySelector('#open-plan');b.click();resolve({text:r.textContent,dialog:r.querySelector('#plan-dialog').open,button:!!customElements.get('wa-button'),details:!!customElements.get('wa-details'),iconPreserved:!window.originalIcon||customElements.get('wa-icon')===window.originalIcon,buttonPreserved:!window.originalButton||customElements.get('wa-button')===window.originalButton,writes:window.panelMessages.filter(m=>m.type==='spotnav/manual_action'||m.type==='spotnav/update_settings'||(m.type==='spotnav/morek_schedule'&&m.action!=='status')).length})}},50)})`);
   assert.ok(result,`${scenario}: dashboard did not mount; errors: ${errors.join('\n')}`);
-  assert.match(result.text,/Your vehicle/);assert.match(result.text,/Plan controls/);
+  assert.match(result.text,/Your vehicle/);assert.match(result.text,/Charging strategy & plan/);
   assert.equal(result.dialog,true);assert.equal(result.button,true);assert.equal(result.details,true);assert.equal(result.iconPreserved,true);assert.equal(result.buttonPreserved,true);assert.equal(result.writes,0);
   await cmd('Page.removeScriptToEvaluateOnNewDocument',{identifier:script.identifier});
 }
