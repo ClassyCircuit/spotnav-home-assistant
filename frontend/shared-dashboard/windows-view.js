@@ -62,6 +62,15 @@ function selectionBar(model, ctx) {
   return `${live}<div class="win-actions" role="group" aria-label="Selected window, read only">${selected.inChart ? '<wa-button size="small" id="win-show-chart">Show on chart</wa-button>' : ''}<wa-button size="small" id="win-clear">Clear selection</wa-button></div>${jump}`;
 }
 
+function comparison(model, ctx) {
+  const readback = ctx.effective || { state: 'unknown' };
+  const stamp = value => Number.isFinite(value) ? `${ctx.f.day(value)} ${ctx.f.time(value)}` : 'Unknown';
+  const proposalRows = model.rows.filter(r => r.valid).map(r => `<tr><td>${e(stamp(r.w.start))}</td><td>${e(stamp(r.w.end))}</td></tr>`).join('');
+  const spans = (readback.spans || []).map(s => `<tr><td>${e(stamp(s.start))}</td><td>${e(stamp(s.end))}</td><td>${e(`${s.value} ${readback.unit}`)}</td></tr>`).join('');
+  const state = readback.failed && readback.state === 'fresh' ? 'stale' : readback.state;
+  return `<div class="win-comparison"><section><h4>Proposal</h4><p>Calculated at: ${e(stamp(ctx.calculatedAt))}</p><table><thead><tr><th scope="col">Start</th><th scope="col">End</th></tr></thead><tbody>${proposalRows || '<tr><td colspan="2">No current windows available</td></tr>'}</tbody></table></section><section><h4>Fetched Morek limits</h4><p>Status: ${e(state)}${readback.failed ? ' · latest status refresh failed' : ''}</p><p>Fetched at: ${e(stamp(readback.fetchedAt))}</p>${Number.isFinite(readback.start) ? `<p>Reported coverage: ${e(stamp(readback.start))} – ${e(stamp(readback.end))}</p>` : ''}<table><thead><tr><th scope="col">Start</th><th scope="col">End</th><th scope="col">Limit</th></tr></thead><tbody>${spans || '<tr><td colspan="3">No valid limits available</td></tr>'}</tbody></table><p>Effective limits are not proof of physical charging.</p></section></div>`;
+}
+
 export function renderWindows(model, ctx) {
   const { f } = ctx;
   const [badge, variant, explain] = STATUS[model.status] || STATUS.unavailable;
@@ -77,5 +86,5 @@ export function renderWindows(model, ctx) {
   const footer = model.count ? `<div class="win-footer" data-win-footer><div><small>Selected time</small><strong>${e(durationText(model.totalMinutes))}</strong></div><div><small>${hasReserve ? 'Required baseline energy' : 'Plan wall energy'}</small><strong>${Number.isFinite(s.energy) ? e(`${s.energy.toFixed(2)} kWh`) : 'Unknown'}</strong></div><div><small>${hasReserve ? 'Required baseline cost' : 'Plan cost'}</small><strong>${e(money(s.cost, f.currency))}</strong></div><div><small>Weighted average</small><strong>${e(price)}</strong></div></div>` : '';
   const note = f.detailsNote && model.count ? `<p class="subtext win-details-note">${e(f.detailsNote)}</p>` : '';
   const sep = '<p class="subtext win-separation">Proposal only. Whether it was sent, acknowledged or is in effect at the charger is separate evidence: see Plan activity &amp; freshness. Opening or selecting a window never replans or sends anything.</p>';
-  return `${head}<p class="subtext win-explain">${e(explain)}</p>${policy}${prices}${body}${model.count ? selectionBar(model, ctx) : ''}${footer}${note}${sep}${model.count ? '' : `<p class="subtext win-selection" role="status" aria-live="polite">${ctx.notice ? e(ctx.notice) : ''}</p>`}`;
+  return `${comparison(model, ctx)}${head}<p class="subtext win-explain">${e(explain)}</p>${policy}${prices}${body}${model.count ? selectionBar(model, ctx) : ''}${footer}${note}${sep}${model.count ? '' : `<p class="subtext win-selection" role="status" aria-live="polite">${ctx.notice ? e(ctx.notice) : ''}</p>`}`;
 }

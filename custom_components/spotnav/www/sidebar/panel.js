@@ -52902,8 +52902,8 @@ function resolveSelection(sel, model) {
   if (row4) return { selected: row4, notice: "" };
   return { selected: null, notice: model.knownPlan ? "The proposal changed, so the selected window was cleared. Nothing was sent or replanned." : "The proposal is no longer current, so the selected window was cleared." };
 }
-function windowsAt(model, instant4) {
-  return finite2(instant4) ? model.rows.filter((r7) => r7.valid && r7.start <= instant4 && instant4 < r7.end) : [];
+function windowsAt(model, instant5) {
+  return finite2(instant5) ? model.rows.filter((r7) => r7.valid && r7.start <= instant5 && instant5 < r7.end) : [];
 }
 
 // shared-dashboard/windows-view.js
@@ -52956,6 +52956,14 @@ function selectionBar(model, ctx) {
   })() : "";
   return `${live}<div class="win-actions" role="group" aria-label="Selected window, read only">${selected.inChart ? '<wa-button size="small" id="win-show-chart">Show on chart</wa-button>' : ""}<wa-button size="small" id="win-clear">Clear selection</wa-button></div>${jump}`;
 }
+function comparison(model, ctx) {
+  const readback = ctx.effective || { state: "unknown" };
+  const stamp3 = (value2) => Number.isFinite(value2) ? `${ctx.f.day(value2)} ${ctx.f.time(value2)}` : "Unknown";
+  const proposalRows = model.rows.filter((r7) => r7.valid).map((r7) => `<tr><td>${escapeText(stamp3(r7.w.start))}</td><td>${escapeText(stamp3(r7.w.end))}</td></tr>`).join("");
+  const spans = (readback.spans || []).map((s4) => `<tr><td>${escapeText(stamp3(s4.start))}</td><td>${escapeText(stamp3(s4.end))}</td><td>${escapeText(`${s4.value} ${readback.unit}`)}</td></tr>`).join("");
+  const state = readback.failed && readback.state === "fresh" ? "stale" : readback.state;
+  return `<div class="win-comparison"><section><h4>Proposal</h4><p>Calculated at: ${escapeText(stamp3(ctx.calculatedAt))}</p><table><thead><tr><th scope="col">Start</th><th scope="col">End</th></tr></thead><tbody>${proposalRows || '<tr><td colspan="2">No current windows available</td></tr>'}</tbody></table></section><section><h4>Fetched Morek limits</h4><p>Status: ${escapeText(state)}${readback.failed ? " \xB7 latest status refresh failed" : ""}</p><p>Fetched at: ${escapeText(stamp3(readback.fetchedAt))}</p>${Number.isFinite(readback.start) ? `<p>Reported coverage: ${escapeText(stamp3(readback.start))} \u2013 ${escapeText(stamp3(readback.end))}</p>` : ""}<table><thead><tr><th scope="col">Start</th><th scope="col">End</th><th scope="col">Limit</th></tr></thead><tbody>${spans || '<tr><td colspan="3">No valid limits available</td></tr>'}</tbody></table><p>Effective limits are not proof of physical charging.</p></section></div>`;
+}
 function renderWindows(model, ctx) {
   const { f: f3 } = ctx;
   const [badge, variant, explain] = STATUS[model.status] || STATUS.unavailable;
@@ -52971,7 +52979,7 @@ function renderWindows(model, ctx) {
   const footer = model.count ? `<div class="win-footer" data-win-footer><div><small>Selected time</small><strong>${escapeText(durationText(model.totalMinutes))}</strong></div><div><small>${hasReserve ? "Required baseline energy" : "Plan wall energy"}</small><strong>${Number.isFinite(s4.energy) ? escapeText(`${s4.energy.toFixed(2)} kWh`) : "Unknown"}</strong></div><div><small>${hasReserve ? "Required baseline cost" : "Plan cost"}</small><strong>${escapeText(money(s4.cost, f3.currency))}</strong></div><div><small>Weighted average</small><strong>${escapeText(price)}</strong></div></div>` : "";
   const note = f3.detailsNote && model.count ? `<p class="subtext win-details-note">${escapeText(f3.detailsNote)}</p>` : "";
   const sep = '<p class="subtext win-separation">Proposal only. Whether it was sent, acknowledged or is in effect at the charger is separate evidence: see Plan activity &amp; freshness. Opening or selecting a window never replans or sends anything.</p>';
-  return `${head}<p class="subtext win-explain">${escapeText(explain)}</p>${policy}${prices}${body}${model.count ? selectionBar(model, ctx) : ""}${footer}${note}${sep}${model.count ? "" : `<p class="subtext win-selection" role="status" aria-live="polite">${ctx.notice ? escapeText(ctx.notice) : ""}</p>`}`;
+  return `${comparison(model, ctx)}${head}<p class="subtext win-explain">${escapeText(explain)}</p>${policy}${prices}${body}${model.count ? selectionBar(model, ctx) : ""}${footer}${note}${sep}${model.count ? "" : `<p class="subtext win-selection" role="status" aria-live="polite">${ctx.notice ? escapeText(ctx.notice) : ""}</p>`}`;
 }
 
 // shared-dashboard/vehicle-view.js
@@ -53676,10 +53684,10 @@ function mountDashboard(root, adapter) {
     }
     const winSelected = resolved.selected;
     const nextWindowKey = next && Number.isFinite(next.start) && Number.isFinite(next.end) && next.end > next.start ? windowKey(next) : null;
-    const windowsCard = card("Proposed charging windows", "PLAN", renderWindows(winModel, { f: f3, selected: winSelected, notice: winNotice, nextKey: nextWindowKey, assumptions, policy: state.policy, context: m4.windowsContext, reserve: m4.reserve, chartKnown: chartReady }), "windows", tag);
+    const windowsCard = card("Proposed charging windows", "PLAN", renderWindows(winModel, { f: f3, selected: winSelected, notice: winNotice, nextKey: nextWindowKey, assumptions, policy: state.policy, context: m4.windowsContext, reserve: m4.reserve, effective: m4.effectiveDisplay, calculatedAt: m4.calculatedAt, chartKnown: chartReady }), "windows", tag);
     const selectedWindow = winSelected ? { start: winSelected.start, end: winSelected.end } : null;
-    const pickWindow = (instant4) => {
-      const hits = windowsAt(winModel, instant4);
+    const pickWindow = (instant5) => {
+      const hits = windowsAt(winModel, instant5);
       if (hits.length !== 1) return;
       selectWindow(hits[0].key);
     };
@@ -59798,12 +59806,12 @@ var span = (a4, b3, zone) => `${stamp(a4, zone)}\u2013${stamp(b3, zone, localDay
 var percent2 = (v2, digits = 0) => `${v2.toFixed(digits)}%`;
 var sourceLine = (list4) => list4.length ? `Provider label${list4.length > 1 ? "s" : ""} on the held files: ${list4.join(", ")}` : "Provider not reported";
 var BASIS_TEXT = (currency) => `Raw published spot price per kWh, no fees, taxes or margin${currency === "EUR" ? "; shown in euro cents" : ""}`;
-function relativeLine(comparison, baseline) {
-  if (comparison?.known) {
-    const used = baseline.used, expected = baseline.expected, p4 = comparison.percentile;
+function relativeLine(comparison2, baseline) {
+  if (comparison2?.known) {
+    const used = baseline.used, expected = baseline.expected, p4 = comparison2.percentile;
     return { label: "Relative", text: `Compared with ${used} of the last ${expected} days: higher than about ${Math.round(p4)}% of that time (relative, duration-weighted; it does not change the fixed band)` };
   }
-  const why = comparison?.reason ? reasonText(comparison.reason) : "the baseline is unavailable";
+  const why = comparison2?.reason ? reasonText(comparison2.reason) : "the baseline is unavailable";
   const days = baseline && baseline.expected !== null ? ` (${baseline.used} of ${baseline.expected} recent days usable, ${baseline.min} needed${baseline.excluded?.count ? `; ${excludedText(baseline.excluded)}` : ""})` : "";
   return { label: "Relative", text: `Unknown: ${why}${days}` };
 }
@@ -66068,6 +66076,22 @@ function effectiveTrack(status, observedAt, failed, now, zone = null) {
   return { state: "reported", readAt, readAtText: clock4(readAt, zone), unit, spans, differs: associated && status.verification?.reason === "limits_or_transitions_differ" };
 }
 
+// sidebar/effective-display.js
+var instant4 = (v2) => typeof v2 === "string" && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:\d\d)$/.test(v2) ? Date.parse(v2) : NaN;
+function effectiveDisplay(status, observedAt, now) {
+  const e9 = status?.effective;
+  if (!e9 || typeof e9 !== "object" || e9.status !== "Accepted") return { state: "unknown" };
+  const fetchedAt = instant4(e9.fetched_at);
+  if (!Number.isFinite(now) || !Number.isFinite(observedAt) || observedAt > now || !Number.isFinite(fetchedAt) || fetchedAt > now || fetchedAt > observedAt) return { state: "unknown" };
+  const start2 = instant4(e9.schedule_start), duration2 = e9.duration_s, end2 = start2 + duration2 * 1e3;
+  if (!Number.isFinite(start2) || typeof duration2 !== "number" || !Number.isFinite(duration2) || duration2 <= 0 || !Number.isFinite(end2) || end2 <= start2 || !["A", "W"].includes(e9.rate_unit) || !Array.isArray(e9.periods) || !e9.periods.length) return { state: "invalid" };
+  const points2 = e9.periods.map((p4) => ({ at: instant4(p4?.at), value: p4?.amps }));
+  if (points2.some((p4, i7) => !Number.isFinite(p4.at) || typeof p4.value !== "number" || !Number.isFinite(p4.value) || p4.value < 0 || p4.at < start2 || p4.at >= end2 || i7 > 0 && p4.at <= points2[i7 - 1].at)) return { state: "invalid" };
+  const spans = points2.map((p4, i7) => ({ start: p4.at, end: points2[i7 + 1]?.at ?? end2, value: p4.value }));
+  const stale = observationFreshness(observedAt, now) !== "fresh" || observationFreshness(fetchedAt, now) !== "fresh";
+  return { state: end2 <= now ? "expired" : stale ? "stale" : "fresh", fetchedAt, start: start2, end: end2, unit: e9.rate_unit, spans };
+}
+
 // sidebar/adapter.js
 var U = "Unknown";
 var reserveText = () => ({ explain: translate2("en", "reserve.explain"), limits: Object.fromEntries(["two_hour_limit", "no_eligible_time", "window_limit", "unknown"].map((k2) => [k2, translate2("en", `reserve.limit.${k2}`)])) });
@@ -66221,6 +66245,8 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
       // Artwork evidence (20.2): the plug state only from a fresh Morek status; anything else is unknown and shows no cable.
       scene: { connection: vehicle, stale: stale || !statusFresh },
       windowsContext: proposal ? { identity: proposal.identity ?? null, codes: policy, provisional: !planStale && raw?.plan?.price_policy?.provisional === true, tomorrowPending: !planStale && raw?.plan?.price_policy?.tomorrow_pending === true, unpriced: proposal.unpriced === true } : null,
+      effectiveDisplay: { ...effectiveDisplay(status, observedAt, now), failed },
+      calculatedAt: Number.isFinite(computed) && computed <= now ? computed : null,
       effectiveTrack: effectiveTrack(status, observedAt, failed, now, zone),
       windows,
       nextWindow,
@@ -66503,7 +66529,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.214";
+var CARD_VERSION = "2.5.215";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {

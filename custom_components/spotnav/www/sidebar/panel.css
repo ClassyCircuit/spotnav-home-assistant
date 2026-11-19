@@ -6798,3 +6798,22 @@ main:not(:has(#sn-tab-settings[aria-selected=true])) ~ #log-viewer {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.win-comparison {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 16px;
+}
+.win-comparison section {
+  min-width: 0;
+  overflow-x: auto;
+}
+.win-comparison table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.win-comparison th,
+.win-comparison td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--sn-line);
+}

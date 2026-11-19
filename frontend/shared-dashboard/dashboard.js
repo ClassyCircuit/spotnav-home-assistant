@@ -183,7 +183,7 @@ export function mountDashboard(root, adapter) {
     if (winSelection && !resolved.selected) { winSelection = null; winNotice = resolved.notice; }
     const winSelected = resolved.selected;
     const nextWindowKey = next && Number.isFinite(next.start) && Number.isFinite(next.end) && next.end > next.start ? windowKey(next) : null;
-    const windowsCard = card('Proposed charging windows', 'PLAN', renderWindows(winModel, { f, selected: winSelected, notice: winNotice, nextKey: nextWindowKey, assumptions, policy: state.policy, context: m.windowsContext, reserve: m.reserve, chartKnown: chartReady }), 'windows', tag);
+    const windowsCard = card('Proposed charging windows', 'PLAN', renderWindows(winModel, { f, selected: winSelected, notice: winNotice, nextKey: nextWindowKey, assumptions, policy: state.policy, context: m.windowsContext, reserve: m.reserve, effective: m.effectiveDisplay, calculatedAt: m.calculatedAt, chartKnown: chartReady }), 'windows', tag);
     const selectedWindow = winSelected ? { start: winSelected.start, end: winSelected.end } : null;
     const pickWindow = instant => {
       const hits = windowsAt(winModel, instant);

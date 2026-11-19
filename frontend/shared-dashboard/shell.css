@@ -435,3 +435,5 @@ wa-button[disabled]{opacity:.5}
 #log-viewer .log-controls{padding:14px;background:var(--sn-surface-2);border:1px solid var(--sn-line);border-radius:12px}
 #log-viewer .log-status,#log-viewer .log-note{color:var(--sn-muted);font-size:12px}
 #log-viewer .log-lines{padding:12px;border:1px solid var(--sn-line);border-radius:12px;overflow:auto;max-height:360px;white-space:pre-wrap;overflow-wrap:anywhere}
+
+.win-comparison{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:16px}.win-comparison section{min-width:0;overflow-x:auto}.win-comparison table{width:100%;border-collapse:collapse;text-align:left}.win-comparison th,.win-comparison td{padding:4px 8px;border-bottom:1px solid var(--sn-line)}
