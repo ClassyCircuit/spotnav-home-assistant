@@ -52956,13 +52956,36 @@ function selectionBar(model, ctx) {
   })() : "";
   return `${live}<div class="win-actions" role="group" aria-label="Selected window, read only">${selected.inChart ? '<wa-button size="small" id="win-show-chart">Show on chart</wa-button>' : ""}<wa-button size="small" id="win-clear">Clear selection</wa-button></div>${jump}`;
 }
+function compareProposedWindows(proposal, readback) {
+  if (readback?.failed || ["stale", "expired"].includes(readback?.state)) return "stale";
+  if (!proposal || readback?.state !== "fresh" || readback.unit !== "A" || !Number.isFinite(proposal.now) || !Number.isFinite(proposal.amps) || proposal.amps <= 0 || !Array.isArray(proposal.windows) || !proposal.windows.length) return "unknown";
+  const windows = proposal.windows;
+  if (windows.some((w2, i7) => !Number.isFinite(w2.start) || !Number.isFinite(w2.end) || w2.start >= w2.end || i7 && w2.start < windows[i7 - 1].end)) return "unknown";
+  const spans = readback.spans;
+  if (!Number.isFinite(readback.start) || !Number.isFinite(readback.end) || readback.start >= readback.end || !Array.isArray(spans) || !spans.length || spans.some((s4, i7) => !Number.isFinite(s4.start) || !Number.isFinite(s4.end) || !Number.isFinite(s4.value) || s4.value < 0 || s4.start < readback.start || s4.end > readback.end || s4.start >= s4.end || i7 && s4.start < spans[i7 - 1].end)) return "unknown";
+  let covered = 0, required2 = 0, different = false;
+  for (const w2 of windows) {
+    const start2 = Math.max(w2.start, proposal.now);
+    if (start2 >= w2.end) continue;
+    required2 += w2.end - start2;
+    for (const s4 of spans) {
+      const length = Math.max(0, Math.min(w2.end, s4.end) - Math.max(start2, s4.start));
+      covered += length;
+      if (length && s4.value !== proposal.amps) different = true;
+    }
+  }
+  if (!required2 || !covered) return "unknown";
+  if (different) return covered < required2 ? "different-partial" : "different";
+  return covered < required2 ? "partial" : "match";
+}
 function comparison(model, ctx) {
   const readback = ctx.effective || { state: "unknown" };
   const stamp3 = (value2) => Number.isFinite(value2) ? `${ctx.f.day(value2)} ${ctx.f.time(value2)}` : "Unknown";
-  const proposalRows = model.rows.filter((r7) => r7.valid).map((r7) => `<tr><td>${escapeText(stamp3(r7.w.start))}</td><td>${escapeText(stamp3(r7.w.end))}</td></tr>`).join("");
   const spans = (readback.spans || []).map((s4) => `<tr><td>${escapeText(stamp3(s4.start))}</td><td>${escapeText(stamp3(s4.end))}</td><td>${escapeText(`${s4.value} ${readback.unit}`)}</td></tr>`).join("");
   const state = readback.failed && readback.state === "fresh" ? "stale" : readback.state;
-  return `<div class="win-comparison"><section><h4>Proposal</h4><p>Calculated at: ${escapeText(stamp3(ctx.calculatedAt))}</p><table><thead><tr><th scope="col">Start</th><th scope="col">End</th></tr></thead><tbody>${proposalRows || '<tr><td colspan="2">No current windows available</td></tr>'}</tbody></table></section><section><h4>Fetched Morek limits</h4>${ctx.fetch ? `<button type="button" id="morek-fetch" ${ctx.fetch.enabled ? "" : "disabled"} aria-busy="${ctx.fetch.pending ? "true" : "false"}">${ctx.fetch.pending ? "Refreshing..." : "Refresh Morek limits"}</button><p role="status" aria-live="polite">${escapeText(ctx.fetch.notice || (ctx.fetch.enabled ? "Read-only refresh available." : "Refresh unavailable: administrator access and a fresh connected charger status are required."))}</p>` : ""}<p>Status: ${escapeText(state)}${readback.failed ? " \xB7 latest fetch or status refresh failed" : ""}</p><p>Fetched at: ${escapeText(stamp3(readback.fetchedAt))}</p>${Number.isFinite(readback.start) ? `<p>Reported coverage: ${escapeText(stamp3(readback.start))} \u2013 ${escapeText(stamp3(readback.end))}</p>` : ""}<table><thead><tr><th scope="col">Start</th><th scope="col">End</th><th scope="col">Limit</th></tr></thead><tbody>${spans || '<tr><td colspan="3">No valid limits available</td></tr>'}</tbody></table><p>Effective limits are not proof of physical charging.</p></section></div>`;
+  const result2 = compareProposedWindows(ctx.comparisonProposal, readback);
+  const labels = { match: "Limits within proposed windows match; coverage outside those windows is not compared.", different: "Limits differ within proposed windows.", partial: "Partial coverage within proposed windows; no complete match established.", "different-partial": "Limits differ within the verified overlap; coverage is partial.", stale: "Comparison stale: a fresh readback is required.", unknown: "Comparison unknown: comparable current proposal or readback coverage is unavailable." };
+  return `<div class="win-comparison"><section><h4>Proposal and fetched limits</h4><p><strong>${escapeText(labels[result2])}</strong></p><p>Calculated at: ${escapeText(stamp3(ctx.calculatedAt))}</p>${ctx.fetch ? `<button type="button" id="morek-fetch" ${ctx.fetch.enabled ? "" : "disabled"} aria-busy="${ctx.fetch.pending ? "true" : "false"}">${ctx.fetch.pending ? "Refreshing..." : "Refresh Morek limits"}</button><p role="status" aria-live="polite">${escapeText(ctx.fetch.notice || (ctx.fetch.enabled ? "Read-only refresh available." : "Refresh unavailable: administrator access and a fresh connected charger status are required."))}</p>` : ""}<p>Status: ${escapeText(state)}${readback.failed ? " \xB7 latest fetch or status refresh failed" : ""}</p><p>Fetched at: ${escapeText(stamp3(readback.fetchedAt))}</p>${Number.isFinite(readback.start) ? `<p>Reported coverage: ${escapeText(stamp3(readback.start))} \u2013 ${escapeText(stamp3(readback.end))}</p>` : ""}<table aria-label="Fetched Morek limits"><thead><tr><th scope="col">Start</th><th scope="col">End</th><th scope="col">Limit</th></tr></thead><tbody>${spans || '<tr><td colspan="3">No valid limits available</td></tr>'}</tbody></table><details><summary>About fetched limits</summary><p>Effective limits are not proof of physical charging.</p></details></section></div>`;
 }
 function renderWindows(model, ctx) {
   const { f: f3 } = ctx;
@@ -53684,7 +53707,7 @@ function mountDashboard(root, adapter) {
     }
     const winSelected = resolved.selected;
     const nextWindowKey = next && Number.isFinite(next.start) && Number.isFinite(next.end) && next.end > next.start ? windowKey(next) : null;
-    const windowsCard = card("Proposed charging windows", "PLAN", renderWindows(winModel, { f: f3, selected: winSelected, notice: winNotice, nextKey: nextWindowKey, assumptions, policy: state.policy, context: m4.windowsContext, reserve: m4.reserve, effective: m4.effectiveDisplay, fetch: m4.morekFetch, calculatedAt: m4.calculatedAt, chartKnown: chartReady }), "windows", tag);
+    const windowsCard = card("Proposed charging windows", "PLAN", renderWindows(winModel, { f: f3, selected: winSelected, notice: winNotice, nextKey: nextWindowKey, assumptions, policy: state.policy, context: m4.windowsContext, reserve: m4.reserve, effective: m4.effectiveDisplay, comparisonProposal: m4.comparisonProposal, fetch: m4.morekFetch, calculatedAt: m4.calculatedAt, chartKnown: chartReady }), "windows", tag);
     const selectedWindow = winSelected ? { start: winSelected.start, end: winSelected.end } : null;
     const pickWindow = (instant5) => {
       const hits = windowsAt(winModel, instant5);
@@ -66246,6 +66269,7 @@ function dashboardAdapter(raw, statusRaw, observedAt, now = Date.now(), failed =
       // Artwork evidence (20.2): the plug state only from a fresh Morek status; anything else is unknown and shows no cable.
       scene: { connection: vehicle, stale: stale || !statusFresh },
       windowsContext: proposal ? { identity: proposal.identity ?? null, codes: policy, provisional: !planStale && raw?.plan?.price_policy?.provisional === true, tomorrowPending: !planStale && raw?.plan?.price_policy?.tomorrow_pending === true, unpriced: proposal.unpriced === true } : null,
+      comparisonProposal: !planStale && proposal && typeof proposal.identity === "string" && proposal.identity.trim() && proposal.settings_revision != null && proposal.settings_revision === d3.settings?.revision && proposal.settings_revision === d3.planning?.settings_revision && Number.isFinite(proposal.amps) && proposal.amps > 0 && Number.isFinite(computed) && computed <= now ? { amps: proposal.amps, windows, now } : null,
       effectiveDisplay: { ...effectiveDisplay(status, observedAt, now), failed },
       calculatedAt: Number.isFinite(computed) && computed <= now ? computed : null,
       effectiveTrack: effectiveTrack(status, observedAt, failed, now, zone),
@@ -66530,7 +66554,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.216";
+var CARD_VERSION = "2.5.217";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {

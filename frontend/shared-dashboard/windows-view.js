@@ -62,13 +62,35 @@ function selectionBar(model, ctx) {
   return `${live}<div class="win-actions" role="group" aria-label="Selected window, read only">${selected.inChart ? '<wa-button size="small" id="win-show-chart">Show on chart</wa-button>' : ''}<wa-button size="small" id="win-clear">Clear selection</wa-button></div>${jump}`;
 }
 
+export function compareProposedWindows(proposal, readback) {
+  if (readback?.failed || ['stale', 'expired'].includes(readback?.state)) return 'stale';
+  if (!proposal || readback?.state !== 'fresh' || readback.unit !== 'A' || !Number.isFinite(proposal.now) || !Number.isFinite(proposal.amps) || proposal.amps <= 0 || !Array.isArray(proposal.windows) || !proposal.windows.length) return 'unknown';
+  const windows = proposal.windows;
+  if (windows.some((w, i) => !Number.isFinite(w.start) || !Number.isFinite(w.end) || w.start >= w.end || (i && w.start < windows[i-1].end))) return 'unknown';
+  const spans = readback.spans;
+  if (!Number.isFinite(readback.start) || !Number.isFinite(readback.end) || readback.start >= readback.end || !Array.isArray(spans) || !spans.length || spans.some((s,i) => !Number.isFinite(s.start) || !Number.isFinite(s.end) || !Number.isFinite(s.value) || s.value < 0 || s.start < readback.start || s.end > readback.end || s.start >= s.end || (i && s.start < spans[i-1].end))) return 'unknown';
+  let covered = 0, required = 0, different = false;
+  for (const w of windows) {
+    const start = Math.max(w.start, proposal.now); if (start >= w.end) continue;
+    required += w.end - start;
+    for (const s of spans) {
+      const length = Math.max(0, Math.min(w.end, s.end) - Math.max(start, s.start));
+      covered += length; if (length && s.value !== proposal.amps) different = true;
+    }
+  }
+  if (!required || !covered) return 'unknown';
+  if (different) return covered < required ? 'different-partial' : 'different';
+  return covered < required ? 'partial' : 'match';
+}
+
 function comparison(model, ctx) {
   const readback = ctx.effective || { state: 'unknown' };
   const stamp = value => Number.isFinite(value) ? `${ctx.f.day(value)} ${ctx.f.time(value)}` : 'Unknown';
-  const proposalRows = model.rows.filter(r => r.valid).map(r => `<tr><td>${e(stamp(r.w.start))}</td><td>${e(stamp(r.w.end))}</td></tr>`).join('');
   const spans = (readback.spans || []).map(s => `<tr><td>${e(stamp(s.start))}</td><td>${e(stamp(s.end))}</td><td>${e(`${s.value} ${readback.unit}`)}</td></tr>`).join('');
   const state = readback.failed && readback.state === 'fresh' ? 'stale' : readback.state;
-  return `<div class="win-comparison"><section><h4>Proposal</h4><p>Calculated at: ${e(stamp(ctx.calculatedAt))}</p><table><thead><tr><th scope="col">Start</th><th scope="col">End</th></tr></thead><tbody>${proposalRows || '<tr><td colspan="2">No current windows available</td></tr>'}</tbody></table></section><section><h4>Fetched Morek limits</h4>${ctx.fetch ? `<button type="button" id="morek-fetch" ${ctx.fetch.enabled ? '' : 'disabled'} aria-busy="${ctx.fetch.pending ? 'true' : 'false'}">${ctx.fetch.pending ? 'Refreshing...' : 'Refresh Morek limits'}</button><p role="status" aria-live="polite">${e(ctx.fetch.notice || (ctx.fetch.enabled ? 'Read-only refresh available.' : 'Refresh unavailable: administrator access and a fresh connected charger status are required.'))}</p>` : ''}<p>Status: ${e(state)}${readback.failed ? ' · latest fetch or status refresh failed' : ''}</p><p>Fetched at: ${e(stamp(readback.fetchedAt))}</p>${Number.isFinite(readback.start) ? `<p>Reported coverage: ${e(stamp(readback.start))} – ${e(stamp(readback.end))}</p>` : ''}<table><thead><tr><th scope="col">Start</th><th scope="col">End</th><th scope="col">Limit</th></tr></thead><tbody>${spans || '<tr><td colspan="3">No valid limits available</td></tr>'}</tbody></table><p>Effective limits are not proof of physical charging.</p></section></div>`;
+  const result = compareProposedWindows(ctx.comparisonProposal, readback);
+  const labels = {match:'Limits within proposed windows match; coverage outside those windows is not compared.', different:'Limits differ within proposed windows.', partial:'Partial coverage within proposed windows; no complete match established.', 'different-partial':'Limits differ within the verified overlap; coverage is partial.', stale:'Comparison stale: a fresh readback is required.', unknown:'Comparison unknown: comparable current proposal or readback coverage is unavailable.'};
+  return `<div class="win-comparison"><section><h4>Proposal and fetched limits</h4><p><strong>${e(labels[result])}</strong></p><p>Calculated at: ${e(stamp(ctx.calculatedAt))}</p>${ctx.fetch ? `<button type="button" id="morek-fetch" ${ctx.fetch.enabled ? '' : 'disabled'} aria-busy="${ctx.fetch.pending ? 'true' : 'false'}">${ctx.fetch.pending ? 'Refreshing...' : 'Refresh Morek limits'}</button><p role="status" aria-live="polite">${e(ctx.fetch.notice || (ctx.fetch.enabled ? 'Read-only refresh available.' : 'Refresh unavailable: administrator access and a fresh connected charger status are required.'))}</p>` : ''}<p>Status: ${e(state)}${readback.failed ? ' · latest fetch or status refresh failed' : ''}</p><p>Fetched at: ${e(stamp(readback.fetchedAt))}</p>${Number.isFinite(readback.start) ? `<p>Reported coverage: ${e(stamp(readback.start))} – ${e(stamp(readback.end))}</p>` : ''}<table aria-label="Fetched Morek limits"><thead><tr><th scope="col">Start</th><th scope="col">End</th><th scope="col">Limit</th></tr></thead><tbody>${spans || '<tr><td colspan="3">No valid limits available</td></tr>'}</tbody></table><details><summary>About fetched limits</summary><p>Effective limits are not proof of physical charging.</p></details></section></div>`;
 }
 
 export function renderWindows(model, ctx) {

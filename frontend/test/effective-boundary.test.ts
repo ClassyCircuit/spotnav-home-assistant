@@ -26,7 +26,14 @@ it('never substitutes sent or ACK evidence',()=>{
 });
 it('qualifies stale, failed and malformed readbacks',()=>{
  expect(render({...effective,fetched_at:'2026-11-19T11:58:00Z'}).text).toContain('Status: stale');
- expect(render(effective,{failed:true}).text).toContain('Status: stale · latest status refresh failed');
+ expect(render(effective,{failed:true}).text).toContain('Status: stale Â· latest fetch or status refresh failed');
  const text=render({...effective,periods:[{at:effective.periods[0].at,amps:-1}]}).text;
  expect(text).toContain('Status: invalid'); expect(text).toContain('No valid limits available'); expect(text).not.toContain('-1 A');
+});
+
+it('keeps comparison unknown for a fresh zero-amp readback', () => {
+ const result = render(effective);
+ expect(result.text).toContain('Comparison unknown');
+ expect(result.text).toContain('0 A');
+ expect(result.text).toContain('About fetched limits');
 });
