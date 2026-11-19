@@ -1,3 +1,10 @@
+Stage 20.9 focused test continuation (2026-11-19): Added adapter-to-evidence-view coverage for independent unknown transaction/flow, stale status and reported-state/flow mismatch, plus non-admin and uncertain-send click guards. stage-209-evidence (2), morek-view (34) and charge-session-freshness (22) passed individually; npm build and check-dist passed at 2.5.210. No browser, broad suite, HA or hardware checks. The prior report identifies the wider diagnostics/maintenance redesign as incomplete; the focused tests do not establish that remaining scope, so 20.9 remains open.
+
+Stage 20.9 continuation: The evidence view now explicitly labels observations independent and separates readiness from Morek diagnostics and maintenance headings. Existing controllers and guards remain unchanged; build and check-dist passed. Focused independent-state and permission/outcome tests and the wider redesign remain incomplete, so 20.9 stays open. No deployment.
+
+
+
+Stage 20.9 partial local work (2.5.210, 2026-11-19): Evidence view now displays the existing qualified session transaction fact and existing recovery action separately, alongside proposal, ACK, readback and measured flow; the Morek observation freshness remains visible. Readiness and debug controls remain available. Freshness evaluation and action controllers are unchanged. Focused charge-session-freshness and morek-view tests passed (56); build and check-dist passed. The broader sidebar test was interrupted after excessive jsdom CSS warnings. No browser, HA, hardware, permission/outcome regression or dedicated new view tests were completed. The wider diagnostics/maintenance redesign and independent state coverage remain open; Stage 20.9 is not complete. No deployment.
 # Active roadmap — Morek charging, HA sidebar and trustworthy history
 
 Status: **Stage 20 UI redesign is planned; Stage 19 is locally implemented with coordinator review pending. This is the only work queue.** Created 2026-11-14 by splitting the old roadmap, which

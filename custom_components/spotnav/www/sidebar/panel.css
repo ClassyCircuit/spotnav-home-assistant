@@ -6577,3 +6577,34 @@ wa-button[disabled] {
   grid-column: 1/-1;
   order: -1;
 }
+.evidence-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-wrap: anywhere;
+}
+.evidence-card small {
+  color: var(--sn-muted);
+  font-weight: 700;
+}
+.evidence-card b {
+  line-height: 1.4;
+}
+.evidence-card span {
+  color: var(--sn-muted);
+  font-size: 12px;
+  margin-top: auto;
+}
+.evidence-next {
+  background: var(--sn-surface-2);
+  border: 1px solid var(--sn-line);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-top: 10px;
+}
+.evidence-next p {
+  margin: 4px 0 0;
+}
+[data-sn-layout=compact] .evidence-grid {
+  grid-template-columns: 1fr;
+}
