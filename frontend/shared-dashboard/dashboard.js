@@ -183,7 +183,7 @@ export function mountDashboard(root, adapter) {
     if (winSelection && !resolved.selected) { winSelection = null; winNotice = resolved.notice; }
     const winSelected = resolved.selected;
     const nextWindowKey = next && Number.isFinite(next.start) && Number.isFinite(next.end) && next.end > next.start ? windowKey(next) : null;
-    const windowsCard = card('Proposed charging windows', 'PLAN', renderWindows(winModel, { f, selected: winSelected, notice: winNotice, nextKey: nextWindowKey, assumptions, policy: state.policy, context: m.windowsContext, reserve: m.reserve, effective: m.effectiveDisplay, calculatedAt: m.calculatedAt, chartKnown: chartReady }), 'windows', tag);
+    const windowsCard = card('Proposed charging windows', 'PLAN', renderWindows(winModel, { f, selected: winSelected, notice: winNotice, nextKey: nextWindowKey, assumptions, policy: state.policy, context: m.windowsContext, reserve: m.reserve, effective: m.effectiveDisplay, fetch: m.morekFetch, calculatedAt: m.calculatedAt, chartKnown: chartReady }), 'windows', tag);
     const selectedWindow = winSelected ? { start: winSelected.start, end: winSelected.end } : null;
     const pickWindow = instant => {
       const hits = windowsAt(winModel, instant);
@@ -256,6 +256,7 @@ export function mountDashboard(root, adapter) {
     // Host header and charging controls (20.2): callbacks only; the host keeps every gate, latch and confirmation.
     const wireClick=(id,name)=>{const b=root.querySelector('#'+id);bind(b,()=>b.addEventListener('click',()=>{if(!b.disabled)current.actions?.[name]?.();},{signal}));};
     wireClick('refresh','refresh');wireClick('menu','menu');wireClick('pause-auto','pauseAuto');wireClick('resume-auto','resumeAuto');wireClick('charge-now','chargeNow');wireClick('charge-replace','chargeReplace');wireClick('charge-confirm-ok','chargeConfirm');wireClick('charge-confirm-cancel','chargeCancel');
+    wireClick('morek-fetch','morekFetch');
     const confirmBox=root.querySelector('#charge-confirm');bind(confirmBox,()=>confirmBox.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();current.actions?.chargeCancel?.();}},{signal}));
     // Recovery text on any tab links to the one controller: switch to Overview and focus the first usable control (navigation only, no request).
     const gotoControls=root.querySelector('#recovery-goto-controls');bind(gotoControls,()=>gotoControls.addEventListener('click',()=>{const box=root.querySelector('#automatic-controls');if(!box)return;reveal(box);const target=['#resume-auto','#charge-now','#pause-auto'].map(id=>root.querySelector(id)).find(b=>b&&!b.disabled&&!b.hidden);(target||box).focus?.();},{signal}));

@@ -240,7 +240,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     this.dashboardRead=null; this.statusRead=null;
     this.rawDashboard=null; this.rawStatus=null; this.statusAt=null; this.statusFailed=false; this.dashboardFailed=false;
     this.settingsRecord=null; this.settingsLoading=false; this.settingsBusy=false; this.settingsConflict=false; this.settingsDirty=!!dirty; this.settingsNotice='';
-    this.morekBusy=false; this.morekError=null; this.morekUncertain=false; this.statusEpoch=(this.statusEpoch || 0)+1; this.dashboardEpoch=(this.dashboardEpoch || 0)+1;this.autoBusy=false;this.autoUncertain=false;this.autoNotice='';this.autoRefusalAt=null;this.autoExpected=null;this.controlPermissionPending=false;
+    this.morekBusy=false; this.morekError=null; this.morekFetchNotice=''; this.morekUncertain=false; this.statusEpoch=(this.statusEpoch || 0)+1; this.dashboardEpoch=(this.dashboardEpoch || 0)+1;this.autoBusy=false;this.autoUncertain=false;this.autoNotice='';this.autoRefusalAt=null;this.autoExpected=null;this.controlPermissionPending=false;
     // Controls fall back to their disabled defaults (the model is rebuilt on the next paint); a held shell keeps its drafts but hides stale content.
     if (!this.connected) {this.view?.dispose();this.view=null;this.shellAdapter=null;return;}
     if (preserveDraft) {this.hold=true;if(this.shellAdapter){this.shellAdapter.model.control=this.idleControl();this.renderShell();}}
@@ -301,6 +301,10 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     const adapter=dashboardAdapter(this.rawDashboard,this.rawStatus,this.statusAt,Date.now(),this.statusFailed,this.dashboardFailed,this.priceView(dashboard));
     if (!adapter || adapter.draftKey!==this.charger) { this.message('Dashboard unavailable or unsupported.'); return; }
     adapter.actions.priceNav=(kind,arg)=>this.priceNav(kind,arg);
+    const fetchState=decodeMorekState(this.rawStatus);
+    adapter.model.morekFetch={enabled:!!(this.connected && this._hass?.connected!==false && this._hass?.user?.is_admin===true && this.charger && fetchState?.supported && fresh(this.statusAt,this.statusFailed) && !this.morekBusy && !this.autoBusy && !this.chargeBusy && !this.vehicleBusy && !this.costBusy && !this.paramBusy && !this.notifyBusy && !this.settingsBusy), pending:this.morekBusy && this.morekActiveAction==='fetch', notice:this.morekFetchNotice || ''};
+    adapter.actions.morekFetch=()=>void this.morekAction('fetch');
+    if (this.morekFetchNotice?.startsWith('Fetch failed')) adapter.model.effectiveDisplay.failed=true;
     adapter.model.historyDay=this.historyView(dashboard);
     adapter.actions.historyNav=(kind,arg)=>this.historyNav(kind,arg);
     adapter.model.insights=this.insightView(dashboard);
@@ -541,6 +545,7 @@ export class SpotnavEnhancedPanel extends HTMLElement {
   async morekAction(action) {
     const hass=this._hass, charger=this.charger, generation=this.generation, permissionEpoch=this.permissionEpoch, statusSnapshot=this.rawStatus, observedAt=this.statusAt, state=decodeMorekState(statusSnapshot);
     if (!this.connected || hass?.connected===false || hass?.user?.is_admin!==true || !charger || !state || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || this.paramBusy || this.notifyBusy || !['status','send','fetch','clear','reconfirm_migration','recalculate_sync','reset_learning'].includes(action)) return;
+    if (action==='fetch' && !fresh(this.statusAt,this.statusFailed)) return;
     if (action==='reconfirm_migration' && state.ownership?.reconfirmation_required!==true) return;
     if (action!=='status' && !state.supported) return;
     if (action==='clear' && state.cleanup_supported!==true) return;
@@ -559,7 +564,8 @@ export class SpotnavEnhancedPanel extends HTMLElement {
     if (action==='send' && (this.rawDashboard!==dashboardSnapshot || !dashboard.ok || !dashboardFresh(dashboard.value,this.dashboardFailed) || dashboard.value.control.pause?.choice!=='until_resumed' || !dashboard.value.control.pause_blocks_execution)) return;
     if (!this.connected || this.generation!==generation || this.permissionEpoch!==permissionEpoch || this.charger!==charger || this.rawStatus!==statusSnapshot || this.statusAt!==observedAt || this._hass?.user?.is_admin!==true || this._hass?.connected===false || this.morekBusy || this.settingsBusy || this.autoBusy || !latest || latest.configured_id!==configured || latest.resolved_id!==resolved || (action!=='status' && !latest.supported) || (action==='send' && (this.morekUncertain || this.autoUncertain || latest.outcomes?.uncertain || !latest.preview?.preview_id || latest.preview.preview_id!==previewId || latest.preview.reason!==null || !latest.preview.profile || this.settingsDirty || !fresh(this.statusAt,this.statusFailed))) || (action==='clear' && (!latest.supported || latest.cleanup_supported!==true))) return;
     this.morekBusy=true;this.morekActiveAction=action;this.morekError=null;this.statusEpoch++;
-    this.paintMorek();
+    if(action==='fetch')this.morekFetchNotice='Fetching effective limits...';
+    this.paint();
     try {
       const raw=await this.bounded(morekSchedule(hass,charger,action,previewId));
       if (action==='reconfirm_migration') {this.morekError=null;return;}
@@ -574,9 +580,14 @@ export class SpotnavEnhancedPanel extends HTMLElement {
       if (action==='recalculate_sync') {this.syncNotice=raw?.schedule?.reconciliation==='requested' ? 'Recalculated; sync requested, not yet confirmed. The schedule sync status above shows the latest worker result.' : 'Sync response unavailable; check schedule sync status before trying again.';return;}
       const result=decodeMorekState(raw);
       if (!this.connected || generation!==this.generation || permissionEpoch!==this.permissionEpoch || charger!==this.charger) return;
+      if (action==='fetch') {
+        const accepted=result?.effective?.status?.toLowerCase()==='accepted';
+        this.morekFetchNotice=accepted ? 'Fetch response received; checking latest status.' : 'Fetch failed or unavailable. Previous limits are last known.';
+        if (!accepted) { this.statusFailed=true; return; }
+      }
       if (!result) {if(action==='send')this.morekUncertain=true;this.morekError='Response unavailable; operation outcome may be unknown.';}
       else {this.rawStatus={api_version:1,schedule:result};this.statusAt=action==='status' ? Date.now() : null;this.statusFailed=action!=='status';}
-    } catch (error) {if(this.connected && generation===this.generation && charger===this.charger) {if(action==='send')this.morekUncertain=true;if(action==='reset_learning'){if(permissionEpoch===this.permissionEpoch && this._hass?.user?.is_admin===true)this.learningNotice=translate('en','learning.reset.failed');}else if(action==='recalculate_sync')this.syncNotice=`Sync not confirmed${error?.code ? ` (${error.code})` : ''}; check reconciliation status before retrying.`;else this.morekError='Request failed or outcome unknown; do not assume the operation did not apply.';}}
+    } catch (error) {if(this.connected && generation===this.generation && permissionEpoch===this.permissionEpoch && charger===this.charger) {if(action==='fetch'){this.morekFetchNotice='Fetch failed or timed out. Previous limits are last known.';this.statusFailed=true;}if(action==='send')this.morekUncertain=true;if(action==='reset_learning'){if(permissionEpoch===this.permissionEpoch && this._hass?.user?.is_admin===true)this.learningNotice=translate('en','learning.reset.failed');}else if(action==='recalculate_sync')this.syncNotice=`Sync not confirmed${error?.code ? ` (${error.code})` : ''}; check reconciliation status before retrying.`;else this.morekError='Request failed or outcome unknown; do not assume the operation did not apply.';}}
     finally {
       if (this.connected && generation===this.generation && charger===this.charger) {
         this.morekBusy=false;this.morekActiveAction=null;this.paint();

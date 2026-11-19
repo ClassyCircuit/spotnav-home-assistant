@@ -473,6 +473,22 @@ describe('actual sidebar read-only host', () => {
     expect(panel.shadowRoot.textContent).toContain('Saved and confirmed.');
     expect(calls.filter(m=>m.type==='spotnav/morek_schedule' && m.action!=='status')).toHaveLength(0);panel.remove();
   });
+  it.each(['rejected','timeout','charger','permission','busy'])('Stage 21.2b fetch boundary: %s', async mode => {
+    vi.useFakeTimers();try {
+      const a=fixture(),b=fixture();a.generated_at=b.generated_at=new Date().toISOString();a.charger.charger_id='a';b.charger.charger_id='b';let finish;const calls=[];
+      const morek={api_version:1,schedule:{...status.schedule,supported:true}};
+      const hass={connected:true,user:{is_admin:true},callWS:msg=>{calls.push(msg);if(msg.type==='spotnav/list_chargers')return Promise.resolve({api_version:1,chargers:[{charger_id:'a',charger_name:'A'},{charger_id:'b',charger_name:'B'}]});if(msg.type==='spotnav/get_dashboard')return Promise.resolve(msg.charger_id==='a'?a:b);if(msg.type==='spotnav/get_settings')return Promise.resolve(envelope(record()));if(msg.action==='fetch')return mode==='rejected'?Promise.reject(new Error('failed')):new Promise(r=>finish=r);return Promise.resolve(morek);}};
+      const panel=document.createElement('spotnav-enhanced-panel');panel.hass=hass;document.body.append(panel);await tick();let select=panel.shadowRoot.querySelector('#charger');select.value='a';select.dispatchEvent(new Event('change'));await tick();
+      panel.paint();for(const tab of panel.shadowRoot.querySelectorAll('[role="tab"]'))tab.click();expect(calls.filter(m=>m.action==='fetch')).toHaveLength(0);
+      panel.statusAt=0;await panel.morekAction('fetch');panel.statusAt=Date.now();panel.hass={...hass,user:{is_admin:false}};await panel.morekAction('fetch');expect(calls.filter(m=>m.action==='fetch')).toHaveLength(0);
+      panel.hass=hass;panel.statusAt=Date.now();panel.paint();const cached=panel.rawStatus;const button=panel.shadowRoot.querySelector('#morek-fetch');expect(button.disabled).toBe(false);button.click();await tick();expect(calls.filter(m=>m.action==='fetch')).toHaveLength(1);
+      if(mode==='busy'){await panel.morekAction('fetch');expect(calls.filter(m=>m.action==='fetch')).toHaveLength(1);finish(morek);await tick();}
+      if(mode==='timeout'){await vi.advanceTimersByTimeAsync(10001);await tick();}
+      if(mode==='rejected'||mode==='timeout'){expect(panel.rawStatus).toBe(cached);expect(panel.morekFetchNotice).toMatch(/last known/i);}
+      if(mode==='charger'||mode==='permission'){if(mode==='charger'){select=panel.shadowRoot.querySelector('#charger');select.value='b';select.dispatchEvent(new Event('change'));await tick();}else panel.hass={...hass,user:{is_admin:false}};const before=panel.rawStatus;finish({api_version:1,schedule:{...morek.schedule,operator:{state:'mismatch'}}});await tick();expect(panel.rawStatus).toBe(before);expect(panel.morekFetchNotice).not.toMatch(/response received/i);}
+      panel.remove();
+    } finally {vi.useRealTimers();}
+  });
   it('allows only an explicit administrator Morek refresh and blocks non-admin dispatch', async () => {
     const raw=fixture();raw.generated_at=new Date().toISOString();raw.charger.charger_id='a';const calls=[];
     const morek={api_version:1,schedule:{...status.schedule,supported:true}};

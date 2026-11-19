@@ -52962,7 +52962,7 @@ function comparison(model, ctx) {
   const proposalRows = model.rows.filter((r7) => r7.valid).map((r7) => `<tr><td>${escapeText(stamp3(r7.w.start))}</td><td>${escapeText(stamp3(r7.w.end))}</td></tr>`).join("");
   const spans = (readback.spans || []).map((s4) => `<tr><td>${escapeText(stamp3(s4.start))}</td><td>${escapeText(stamp3(s4.end))}</td><td>${escapeText(`${s4.value} ${readback.unit}`)}</td></tr>`).join("");
   const state = readback.failed && readback.state === "fresh" ? "stale" : readback.state;
-  return `<div class="win-comparison"><section><h4>Proposal</h4><p>Calculated at: ${escapeText(stamp3(ctx.calculatedAt))}</p><table><thead><tr><th scope="col">Start</th><th scope="col">End</th></tr></thead><tbody>${proposalRows || '<tr><td colspan="2">No current windows available</td></tr>'}</tbody></table></section><section><h4>Fetched Morek limits</h4><p>Status: ${escapeText(state)}${readback.failed ? " \xB7 latest status refresh failed" : ""}</p><p>Fetched at: ${escapeText(stamp3(readback.fetchedAt))}</p>${Number.isFinite(readback.start) ? `<p>Reported coverage: ${escapeText(stamp3(readback.start))} \u2013 ${escapeText(stamp3(readback.end))}</p>` : ""}<table><thead><tr><th scope="col">Start</th><th scope="col">End</th><th scope="col">Limit</th></tr></thead><tbody>${spans || '<tr><td colspan="3">No valid limits available</td></tr>'}</tbody></table><p>Effective limits are not proof of physical charging.</p></section></div>`;
+  return `<div class="win-comparison"><section><h4>Proposal</h4><p>Calculated at: ${escapeText(stamp3(ctx.calculatedAt))}</p><table><thead><tr><th scope="col">Start</th><th scope="col">End</th></tr></thead><tbody>${proposalRows || '<tr><td colspan="2">No current windows available</td></tr>'}</tbody></table></section><section><h4>Fetched Morek limits</h4>${ctx.fetch ? `<button type="button" id="morek-fetch" ${ctx.fetch.enabled ? "" : "disabled"} aria-busy="${ctx.fetch.pending ? "true" : "false"}">${ctx.fetch.pending ? "Refreshing..." : "Refresh Morek limits"}</button><p role="status" aria-live="polite">${escapeText(ctx.fetch.notice || (ctx.fetch.enabled ? "Read-only refresh available." : "Refresh unavailable: administrator access and a fresh connected charger status are required."))}</p>` : ""}<p>Status: ${escapeText(state)}${readback.failed ? " \xB7 latest fetch or status refresh failed" : ""}</p><p>Fetched at: ${escapeText(stamp3(readback.fetchedAt))}</p>${Number.isFinite(readback.start) ? `<p>Reported coverage: ${escapeText(stamp3(readback.start))} \u2013 ${escapeText(stamp3(readback.end))}</p>` : ""}<table><thead><tr><th scope="col">Start</th><th scope="col">End</th><th scope="col">Limit</th></tr></thead><tbody>${spans || '<tr><td colspan="3">No valid limits available</td></tr>'}</tbody></table><p>Effective limits are not proof of physical charging.</p></section></div>`;
 }
 function renderWindows(model, ctx) {
   const { f: f3 } = ctx;
@@ -53684,7 +53684,7 @@ function mountDashboard(root, adapter) {
     }
     const winSelected = resolved.selected;
     const nextWindowKey = next && Number.isFinite(next.start) && Number.isFinite(next.end) && next.end > next.start ? windowKey(next) : null;
-    const windowsCard = card("Proposed charging windows", "PLAN", renderWindows(winModel, { f: f3, selected: winSelected, notice: winNotice, nextKey: nextWindowKey, assumptions, policy: state.policy, context: m4.windowsContext, reserve: m4.reserve, effective: m4.effectiveDisplay, calculatedAt: m4.calculatedAt, chartKnown: chartReady }), "windows", tag);
+    const windowsCard = card("Proposed charging windows", "PLAN", renderWindows(winModel, { f: f3, selected: winSelected, notice: winNotice, nextKey: nextWindowKey, assumptions, policy: state.policy, context: m4.windowsContext, reserve: m4.reserve, effective: m4.effectiveDisplay, fetch: m4.morekFetch, calculatedAt: m4.calculatedAt, chartKnown: chartReady }), "windows", tag);
     const selectedWindow = winSelected ? { start: winSelected.start, end: winSelected.end } : null;
     const pickWindow = (instant5) => {
       const hits = windowsAt(winModel, instant5);
@@ -53803,6 +53803,7 @@ function mountDashboard(root, adapter) {
     wireClick("charge-replace", "chargeReplace");
     wireClick("charge-confirm-ok", "chargeConfirm");
     wireClick("charge-confirm-cancel", "chargeCancel");
+    wireClick("morek-fetch", "morekFetch");
     const confirmBox = root.querySelector("#charge-confirm");
     bind3(confirmBox, () => confirmBox.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
@@ -66529,7 +66530,7 @@ function scheduleNotes(status, now = Date.now()) {
 }
 
 // src/generated/version.ts
-var CARD_VERSION = "2.5.215";
+var CARD_VERSION = "2.5.216";
 
 // sidebar/charge-now.js
 function chargeNowSelection(choice, custom, now = Date.now()) {
@@ -66921,6 +66922,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this.settingsNotice = "";
     this.morekBusy = false;
     this.morekError = null;
+    this.morekFetchNotice = "";
     this.morekUncertain = false;
     this.statusEpoch = (this.statusEpoch || 0) + 1;
     this.dashboardEpoch = (this.dashboardEpoch || 0) + 1;
@@ -67047,6 +67049,10 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       return;
     }
     adapter.actions.priceNav = (kind, arg) => this.priceNav(kind, arg);
+    const fetchState = decodeMorekState(this.rawStatus);
+    adapter.model.morekFetch = { enabled: !!(this.connected && this._hass?.connected !== false && this._hass?.user?.is_admin === true && this.charger && fetchState?.supported && fresh(this.statusAt, this.statusFailed) && !this.morekBusy && !this.autoBusy && !this.chargeBusy && !this.vehicleBusy && !this.costBusy && !this.paramBusy && !this.notifyBusy && !this.settingsBusy), pending: this.morekBusy && this.morekActiveAction === "fetch", notice: this.morekFetchNotice || "" };
+    adapter.actions.morekFetch = () => void this.morekAction("fetch");
+    if (this.morekFetchNotice?.startsWith("Fetch failed")) adapter.model.effectiveDisplay.failed = true;
     adapter.model.historyDay = this.historyView(dashboard);
     adapter.actions.historyNav = (kind, arg) => this.historyNav(kind, arg);
     adapter.model.insights = this.insightView(dashboard);
@@ -67385,6 +67391,7 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
   async morekAction(action) {
     const hass = this._hass, charger = this.charger, generation = this.generation, permissionEpoch = this.permissionEpoch, statusSnapshot = this.rawStatus, observedAt = this.statusAt, state = decodeMorekState(statusSnapshot);
     if (!this.connected || hass?.connected === false || hass?.user?.is_admin !== true || !charger || !state || this.morekBusy || this.autoBusy || this.chargeBusy || this.vehicleBusy || this.costBusy || this.paramBusy || this.notifyBusy || !["status", "send", "fetch", "clear", "reconfirm_migration", "recalculate_sync", "reset_learning"].includes(action)) return;
+    if (action === "fetch" && !fresh(this.statusAt, this.statusFailed)) return;
     if (action === "reconfirm_migration" && state.ownership?.reconfirmation_required !== true) return;
     if (action !== "status" && !state.supported) return;
     if (action === "clear" && state.cleanup_supported !== true) return;
@@ -67404,7 +67411,8 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
     this.morekActiveAction = action;
     this.morekError = null;
     this.statusEpoch++;
-    this.paintMorek();
+    if (action === "fetch") this.morekFetchNotice = "Fetching effective limits...";
+    this.paint();
     try {
       const raw = await this.bounded(morekSchedule(hass, charger, action, previewId));
       if (action === "reconfirm_migration") {
@@ -67423,6 +67431,14 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
       }
       const result2 = decodeMorekState(raw);
       if (!this.connected || generation !== this.generation || permissionEpoch !== this.permissionEpoch || charger !== this.charger) return;
+      if (action === "fetch") {
+        const accepted = result2?.effective?.status?.toLowerCase() === "accepted";
+        this.morekFetchNotice = accepted ? "Fetch response received; checking latest status." : "Fetch failed or unavailable. Previous limits are last known.";
+        if (!accepted) {
+          this.statusFailed = true;
+          return;
+        }
+      }
       if (!result2) {
         if (action === "send") this.morekUncertain = true;
         this.morekError = "Response unavailable; operation outcome may be unknown.";
@@ -67432,7 +67448,11 @@ var SpotnavEnhancedPanel = class extends HTMLElement {
         this.statusFailed = action !== "status";
       }
     } catch (error2) {
-      if (this.connected && generation === this.generation && charger === this.charger) {
+      if (this.connected && generation === this.generation && permissionEpoch === this.permissionEpoch && charger === this.charger) {
+        if (action === "fetch") {
+          this.morekFetchNotice = "Fetch failed or timed out. Previous limits are last known.";
+          this.statusFailed = true;
+        }
         if (action === "send") this.morekUncertain = true;
         if (action === "reset_learning") {
           if (permissionEpoch === this.permissionEpoch && this._hass?.user?.is_admin === true) this.learningNotice = translate2("en", "learning.reset.failed");
